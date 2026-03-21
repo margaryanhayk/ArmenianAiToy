@@ -28,6 +28,7 @@ public class AppDbContext : DbContext
         {
             e.HasKey(c => c.Id);
             e.HasOne(c => c.Device).WithMany().HasForeignKey(c => c.DeviceId);
+            e.Property(c => c.Gender).HasConversion<string>();
         });
 
         modelBuilder.Entity<Conversation>(e =>

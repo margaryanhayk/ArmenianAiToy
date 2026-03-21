@@ -11,6 +11,7 @@ public class ChatService : IChatService
     private readonly IAiChatClient _aiClient;
     private readonly IModerationService _moderation;
     private readonly IConversationService _conversations;
+    private readonly IChildService _childService;
     private readonly IConfiguration _config;
     private readonly ILogger<ChatService> _logger;
 
@@ -18,19 +19,26 @@ public class ChatService : IChatService
         IAiChatClient aiClient,
         IModerationService moderation,
         IConversationService conversations,
+        IChildService childService,
         IConfiguration config,
         ILogger<ChatService> logger)
     {
         _aiClient = aiClient;
         _moderation = moderation;
         _conversations = conversations;
+        _childService = childService;
         _config = config;
         _logger = logger;
     }
 
     public async Task<ChatResponse> GetResponseAsync(Guid deviceId, string userMessage, Guid? childId = null)
     {
-        var conversation = await _conversations.GetOrCreateActiveConversationAsync(deviceId, childId);
+        // Load child profile (use provided childId or default child for device)
+        var child = childId.HasValue
+            ? await _childService.GetChildAsync(childId.Value)
+            : await _childService.GetDefaultChildForDeviceAsync(deviceId);
+
+        var conversation = await _conversations.GetOrCreateActiveConversationAsync(deviceId, child?.Id);
 
         // Step 1: Pre-moderate user input
         var inputModeration = await _moderation.CheckContentAsync(userMessage);
@@ -39,11 +47,11 @@ public class ChatService : IChatService
             _logger.LogWarning("User input blocked. Device: {DeviceId}, Categories: {Categories}",
                 deviceId, string.Join(", ", inputModeration.FlaggedCategories));
 
-            var blockedMsg = await _conversations.AddMessageAsync(
+            await _conversations.AddMessageAsync(
                 conversation.Id, MessageRole.User, userMessage, SafetyFlag.Blocked);
 
             var fallback = _config["SafetyFallbackResponse"]
-                ?? "Եdelays delays delays delays delays delays delays delays delays delays!";
+                ?? "Let's talk about something more fun!";
             var fallbackMsg = await _conversations.AddMessageAsync(
                 conversation.Id, MessageRole.Assistant, fallback, SafetyFlag.Clean);
 
@@ -53,11 +61,18 @@ public class ChatService : IChatService
         // Step 2: Store user message
         await _conversations.AddMessageAsync(conversation.Id, MessageRole.User, userMessage);
 
-        // Step 3: Build context from conversation history
-        var history = await _conversations.GetRecentMessagesAsync(conversation.Id);
+        // Step 3: Build system prompt with child context
         var systemPrompt = _config["SystemPrompt"] ?? "You are a friendly assistant for Armenian children. Reply in Armenian.";
 
-        // Step 4: Call AI
+        if (child != null)
+        {
+            systemPrompt += _childService.BuildChildContext(child);
+        }
+
+        // Step 4: Build conversation history
+        var history = await _conversations.GetRecentMessagesAsync(conversation.Id);
+
+        // Step 5: Call AI
         string aiResponse;
         try
         {
@@ -69,7 +84,7 @@ public class ChatService : IChatService
             throw;
         }
 
-        // Step 5: Post-moderate AI response
+        // Step 6: Post-moderate AI response
         var outputModeration = await _moderation.CheckContentAsync(aiResponse);
         var safetyFlag = SafetyFlag.Clean;
 
@@ -78,10 +93,10 @@ public class ChatService : IChatService
             _logger.LogWarning("AI response flagged. Device: {DeviceId}", deviceId);
             safetyFlag = SafetyFlag.Flagged;
             aiResponse = _config["SafetyFallbackResponse"]
-                ?? "Եdelays delays delays delays delays delays delays delays delays delays!";
+                ?? "Let's talk about something more fun!";
         }
 
-        // Step 6: Store AI response
+        // Step 7: Store AI response
         var responseMsg = await _conversations.AddMessageAsync(
             conversation.Id, MessageRole.Assistant, aiResponse, safetyFlag);
 

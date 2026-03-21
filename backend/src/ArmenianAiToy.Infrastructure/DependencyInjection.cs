@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<IDeviceService, DeviceService>();
         services.AddScoped<IParentService, ParentService>();
+        services.AddScoped<IChildService, ChildService>();
 
         return services;
     }
