@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="hy">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Areg — Armenian AI Toy</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+    }
+    .app {
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    /* Setup Panel */
+    .setup {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .setup h2 { margin-bottom: 12px; font-size: 18px; }
+    .setup .row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .setup input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 2px solid #ddd;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+    .setup button {
+      padding: 10px 16px;
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .setup button:hover { background: #22943d; }
+    .setup .status {
+      font-size: 13px;
+      padding: 8px;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+    .setup .status.ok { background: #d4edda; color: #155724; }
+    .setup .status.err { background: #f8d7da; color: #721c24; }
+
+    /* Chat Panel */
+    .chat-container {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .chat-header {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .chat-header h1 { font-size: 24px; }
+    .chat-header p { color: #888; font-size: 13px; }
+    .chat-box {
+      height: 400px;
+      overflow-y: auto;
+      border: 2px solid #eee;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+      background: #fafafa;
+    }
+    .msg {
+      margin-bottom: 10px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      max-width: 85%;
+      word-wrap: break-word;
+      line-height: 1.5;
+      font-size: 15px;
+    }
+    .msg.user {
+      background: #667eea;
+      color: white;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+    .msg.bot {
+      background: #e8e8e8;
+      color: #333;
+      border-bottom-left-radius: 4px;
+    }
+    .msg.error { background: #ffe0e0; color: #c00; }
+    .msg.thinking { background: #e8e8e8; color: #888; font-style: italic; }
+    .msg .safety-badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+    }
+    .safety-badge.blocked { background: #f8d7da; color: #721c24; }
+    .safety-badge.flagged { background: #fff3cd; color: #856404; }
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+    .input-row input {
+      flex: 1;
+      padding: 12px 14px;
+      border: 2px solid #ddd;
+      border-radius: 14px;
+      font-size: 16px;
+      outline: none;
+    }
+    .input-row input:focus { border-color: #667eea; }
+    .input-row button {
+      padding: 12px 20px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 14px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .input-row button:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* Parent Panel */
+    .parent-panel {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      margin-top: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .parent-panel h2 { margin-bottom: 12px; font-size: 18px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .tabs button {
+      padding: 8px 16px;
+      border: 2px solid #ddd;
+      border-radius: 10px;
+      background: white;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .tabs button.active { border-color: #667eea; background: #667eea; color: white; }
+    .history-list { max-height: 300px; overflow-y: auto; }
+    .history-item {
+      border: 1px solid #eee;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+    .history-item .meta { font-size: 12px; color: #888; margin-bottom: 6px; }
+    .history-item .q { color: #667eea; font-weight: 500; }
+    .history-item .a { color: #333; margin-top: 4px; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <!-- Step 1: Device Setup -->
+  <div class="setup" id="setupPanel">
+    <h2>1. Register Device</h2>
+    <div class="row">
+      <input id="macAddr" placeholder="MAC Address (e.g. AA:BB:CC:DD:EE:FF)" value="AA:BB:CC:DD:EE:FF" />
+      <button onclick="registerDevice()">Register</button>
+    </div>
+    <div id="setupStatus" class="status" style="display:none"></div>
+  </div>
+
+  <!-- Step 2: Chat -->
+  <div class="chat-container" id="chatPanel" style="display:none">
+    <div class="chat-header">
+      <h1>&#9728; Areg</h1>
+      <p id="deviceInfo"></p>
+    </div>
+    <div class="chat-box" id="chat"></div>
+    <div class="input-row">
+      <input type="text" id="msg" placeholder="Type your question..." autocomplete="off" />
+      <button id="btn" onclick="sendMsg()">Send</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Parent Panel -->
+  <div class="parent-panel" id="parentPanel">
+    <h2>Parent Monitoring</h2>
+    <div class="tabs">
+      <button class="active" onclick="showTab('auth')">Login/Register</button>
+      <button onclick="showTab('history')">History</button>
+    </div>
+
+    <div id="authTab">
+      <div class="row" style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="parentEmail" placeholder="Email" style="flex:1;padding:8px;border:2px solid #ddd;border-radius:8px" />
+        <input id="parentPass" type="password" placeholder="Password" style="flex:1;padding:8px;border:2px solid #ddd;border-radius:8px" />
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="parentRegister()" style="padding:8px 16px;background:#28a745;color:white;border:none;border-radius:8px;cursor:pointer">Register</button>
+        <button onclick="parentLogin()" style="padding:8px 16px;background:#667eea;color:white;border:none;border-radius:8px;cursor:pointer">Login</button>
+        <button onclick="linkDevice()" style="padding:8px 16px;background:#ffc107;color:#333;border:none;border-radius:8px;cursor:pointer">Link Device</button>
+      </div>
+      <div id="parentStatus" class="status" style="display:none;margin-top:8px"></div>
+    </div>
+
+    <div id="historyTab" style="display:none">
+      <button onclick="loadHistory()" style="padding:8px 16px;background:#667eea;color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:12px">Load History</button>
+      <div class="history-list" id="historyList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let deviceId = localStorage.getItem('deviceId') || '';
+  let apiKey = localStorage.getItem('apiKey') || '';
+  let parentToken = localStorage.getItem('parentToken') || '';
+
+  // Restore state on load
+  if (deviceId && apiKey) {
+    document.getElementById('setupStatus').textContent = `Device: ${deviceId.slice(0,8)}...`;
+    document.getElementById('setupStatus').className = 'status ok';
+    document.getElementById('setupStatus').style.display = 'block';
+    document.getElementById('chatPanel').style.display = 'block';
+    document.getElementById('deviceInfo').textContent = `Device: ${deviceId.slice(0,8)}...`;
+  }
+
+  document.getElementById('msg').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !document.getElementById('btn').disabled) sendMsg();
+  });
+
+  async function registerDevice() {
+    const mac = document.getElementById('macAddr').value.trim();
+    const status = document.getElementById('setupStatus');
+    try {
+      const res = await fetch('/api/devices/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ macAddress: mac })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        deviceId = data.deviceId;
+        apiKey = data.apiKey;
+        localStorage.setItem('deviceId', deviceId);
+        localStorage.setItem('apiKey', apiKey);
+        status.textContent = `Registered! Device: ${deviceId.slice(0,8)}... API Key: ${apiKey.slice(0,12)}...`;
+        status.className = 'status ok';
+        document.getElementById('chatPanel').style.display = 'block';
+        document.getElementById('deviceInfo').textContent = `Device: ${deviceId.slice(0,8)}...`;
+      } else {
+        status.textContent = `Error: ${JSON.stringify(data)}`;
+        status.className = 'status err';
+      }
+    } catch(e) {
+      status.textContent = `Error: ${e.message}`;
+      status.className = 'status err';
+    }
+    status.style.display = 'block';
+  }
+
+  function addMsg(text, cls, safetyFlag) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + cls;
+    div.textContent = text;
+    if (safetyFlag && safetyFlag !== 'Clean') {
+      const badge = document.createElement('span');
+      badge.className = 'safety-badge ' + safetyFlag.toLowerCase();
+      badge.textContent = safetyFlag;
+      div.appendChild(badge);
+    }
+    const chat = document.getElementById('chat');
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    return div;
+  }
+
+  async function sendMsg() {
+    const input = document.getElementById('msg');
+    const btn = document.getElementById('btn');
+    const text = input.value.trim();
+    if (!text || !deviceId) return;
+
+    addMsg(text, 'user');
+    input.value = '';
+    btn.disabled = true;
+
+    const thinking = addMsg('Thinking...', 'thinking');
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Device-Id': deviceId,
+          'X-Api-Key': apiKey
+        },
+        body: JSON.stringify({ message: text })
+      });
+
+      document.getElementById('chat').removeChild(thinking);
+
+      if (res.ok) {
+        const data = await res.json();
+        addMsg(data.response, 'bot', data.safetyFlag);
+      } else {
+        const err = await res.text();
+        addMsg('Error: ' + err, 'error');
+      }
+    } catch(e) {
+      document.getElementById('chat').removeChild(thinking);
+      addMsg('Error: ' + e.message, 'error');
+    }
+
+    btn.disabled = false;
+    input.focus();
+  }
+
+  function showTab(tab) {
+    document.getElementById('authTab').style.display = tab === 'auth' ? 'block' : 'none';
+    document.getElementById('historyTab').style.display = tab === 'history' ? 'block' : 'none';
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+
+  async function parentRegister() {
+    const email = document.getElementById('parentEmail').value;
+    const password = document.getElementById('parentPass').value;
+    const status = document.getElementById('parentStatus');
+    try {
+      const res = await fetch('/api/parents/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      status.textContent = res.ok ? `Registered! Now login.` : `Error: ${JSON.stringify(data)}`;
+      status.className = res.ok ? 'status ok' : 'status err';
+    } catch(e) {
+      status.textContent = e.message;
+      status.className = 'status err';
+    }
+    status.style.display = 'block';
+  }
+
+  async function parentLogin() {
+    const email = document.getElementById('parentEmail').value;
+    const password = document.getElementById('parentPass').value;
+    const status = document.getElementById('parentStatus');
+    try {
+      const res = await fetch('/api/parents/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        parentToken = data.token;
+        localStorage.setItem('parentToken', parentToken);
+        status.textContent = 'Logged in!';
+        status.className = 'status ok';
+      } else {
+        status.textContent = `Error: ${JSON.stringify(data)}`;
+        status.className = 'status err';
+      }
+    } catch(e) {
+      status.textContent = e.message;
+      status.className = 'status err';
+    }
+    status.style.display = 'block';
+  }
+
+  async function linkDevice() {
+    if (!parentToken || !deviceId) {
+      alert('Login first and register a device');
+      return;
+    }
+    const status = document.getElementById('parentStatus');
+    try {
+      const res = await fetch('/api/parents/devices/link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + parentToken
+        },
+        body: JSON.stringify({ deviceId, apiKey })
+      });
+      const data = await res.json();
+      status.textContent = res.ok ? 'Device linked!' : `Error: ${JSON.stringify(data)}`;
+      status.className = res.ok ? 'status ok' : 'status err';
+    } catch(e) {
+      status.textContent = e.message;
+      status.className = 'status err';
+    }
+    status.style.display = 'block';
+  }
+
+  async function loadHistory() {
+    if (!parentToken || !deviceId) {
+      alert('Login first and link a device');
+      return;
+    }
+    const list = document.getElementById('historyList');
+    list.innerHTML = 'Loading...';
+    try {
+      const res = await fetch(`/api/conversations?deviceId=${deviceId}&limit=10`, {
+        headers: { 'Authorization': 'Bearer ' + parentToken }
+      });
+      const data = await res.json();
+      if (!res.ok) { list.innerHTML = `Error: ${JSON.stringify(data)}`; return; }
+
+      list.innerHTML = '';
+      if (data.conversations.length === 0) {
+        list.innerHTML = '<p style="color:#888">No conversations yet.</p>';
+        return;
+      }
+      data.conversations.forEach(conv => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        const time = new Date(conv.startedAt).toLocaleString();
+        const flagged = conv.hasFlaggedContent ? ' <span style="color:red">[FLAGGED]</span>' : '';
+        let html = `<div class="meta">${time} (${conv.messageCount} messages)${flagged}</div>`;
+        conv.messages.forEach(m => {
+          if (m.role === 'user') html += `<div class="q">Child: ${m.content}</div>`;
+          else if (m.role === 'assistant') html += `<div class="a">Areg: ${m.content}</div>`;
+        });
+        div.innerHTML = html;
+        list.appendChild(div);
+      });
+    } catch(e) {
+      list.innerHTML = 'Error: ' + e.message;
+    }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+using ArmenianAiToy.Domain.Enums;
+
+namespace ArmenianAiToy.Application.DTOs;
+
+public record ChatResponse(
+    string Response,
+    Guid ConversationId,
+    Guid MessageId,
+    SafetyFlag SafetyFlag);

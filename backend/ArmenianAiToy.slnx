@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ArmenianAiToy.Api/ArmenianAiToy.Api.csproj" />
+    <Project Path="src/ArmenianAiToy.Application/ArmenianAiToy.Application.csproj" />
+    <Project Path="src/ArmenianAiToy.Domain/ArmenianAiToy.Domain.csproj" />
+    <Project Path="src/ArmenianAiToy.Infrastructure/ArmenianAiToy.Infrastructure.csproj" />
+  </Folder>
+</Solution>
