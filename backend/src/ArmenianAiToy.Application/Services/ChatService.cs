@@ -96,12 +96,16 @@ public class ChatService : IChatService
         await _conversations.AddMessageAsync(conversation.Id, MessageRole.User, userMessage);
 
         // Step 4: Normalize child input against pending choice labels (best-effort)
+        string? normalizedChoice = null;
         if (pending is not null && DateTime.UtcNow - pending.ExtractedAt < ChoiceExpiry)
         {
             var choiceResult = ChoiceNormalizer.Normalize(userMessage, pending.OptionA, pending.OptionB);
             _logger.LogInformation(
                 "Choice normalized. ConversationId: {ConversationId}, Normalized: {Normalized}, Confidence: {Confidence}, Method: {Method}",
                 conversation.Id, choiceResult.Normalized, choiceResult.Confidence, choiceResult.Method);
+
+            if (choiceResult.Normalized is "option_a" or "option_b")
+                normalizedChoice = choiceResult.Normalized;
         }
 
         // Step 5: Build system prompt with child context
@@ -119,6 +123,12 @@ public class ChatService : IChatService
         if (HasStoryIntent(userMessage, history))
         {
             systemPrompt += StoryChoiceInstruction;
+
+            // Step 7b: If the child made a recognized choice, hint the model
+            if (normalizedChoice is not null)
+            {
+                systemPrompt += $"\n\nprevious_story_choice: {normalizedChoice}";
+            }
         }
 
         // Step 8: Call AI

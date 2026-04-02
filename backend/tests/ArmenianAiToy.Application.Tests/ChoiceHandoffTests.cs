@@ -207,6 +207,115 @@ public class ChoiceHandoffTests
     }
 
     [Fact]
+    public async Task NormalizedChoice_InjectedIntoSystemPrompt()
+    {
+        // Set up a separate instance with controllable history
+        var aiClient = Substitute.For<IAiChatClient>();
+        var moderation = Substitute.For<IModerationService>();
+        var conversations = Substitute.For<IConversationService>();
+        var childService = Substitute.For<IChildService>();
+        var logger = Substitute.For<ILogger<ChatService>>();
+        var config = Substitute.For<IConfiguration>();
+        config["SystemPrompt"].Returns("You are a test assistant.");
+
+        var convId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var conv = new Conversation { Id = convId, DeviceId = deviceId, StartedAt = DateTime.UtcNow };
+
+        conversations.GetOrCreateActiveConversationAsync(Arg.Any<Guid>(), Arg.Any<Guid?>()).Returns(conv);
+        moderation.CheckContentAsync(Arg.Any<string>()).Returns(new ModerationResult(true, new List<string>()));
+        childService.GetDefaultChildForDeviceAsync(Arg.Any<Guid>()).Returns((Child?)null);
+        conversations.AddMessageAsync(Arg.Any<Guid>(), Arg.Any<MessageRole>(), Arg.Any<string>(), Arg.Any<SafetyFlag>())
+            .Returns(callInfo => new Message
+            {
+                Id = Guid.NewGuid(), ConversationId = convId,
+                Role = callInfo.ArgAt<MessageRole>(1), Content = callInfo.ArgAt<string>(2),
+                Timestamp = DateTime.UtcNow, SafetyFlag = callInfo.ArgAt<SafetyFlag>(3)
+            });
+
+        // Request 1: empty history, AI returns story with tail block
+        conversations.GetRecentMessagesAsync(Arg.Any<Guid>(), Arg.Any<int>())
+            .Returns(new List<(string Role, string Content)>());
+        aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Pick one!\n---\nCHOICE_A:Help the fox\nCHOICE_B:Cross alone");
+
+        var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
+        await svc.GetResponseAsync(deviceId, "tell me a story");
+
+        // Request 2: history now contains "tell me a story" (story intent active)
+        conversations.GetRecentMessagesAsync(Arg.Any<Guid>(), Arg.Any<int>())
+            .Returns(new List<(string Role, string Content)>
+            {
+                ("User", "tell me a story"),
+                ("Assistant", "Pick one!"),
+            });
+        aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("The fox was happy!");
+
+        await svc.GetResponseAsync(deviceId, "left");
+
+        // The system prompt in the second call should contain the choice hint
+        await aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("previous_story_choice: option_a")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task UnknownChoice_NotInjectedIntoSystemPrompt()
+    {
+        // Set up a separate instance with controllable history
+        var aiClient = Substitute.For<IAiChatClient>();
+        var moderation = Substitute.For<IModerationService>();
+        var conversations = Substitute.For<IConversationService>();
+        var childService = Substitute.For<IChildService>();
+        var logger = Substitute.For<ILogger<ChatService>>();
+        var config = Substitute.For<IConfiguration>();
+        config["SystemPrompt"].Returns("You are a test assistant.");
+
+        var convId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var conv = new Conversation { Id = convId, DeviceId = deviceId, StartedAt = DateTime.UtcNow };
+
+        conversations.GetOrCreateActiveConversationAsync(Arg.Any<Guid>(), Arg.Any<Guid?>()).Returns(conv);
+        moderation.CheckContentAsync(Arg.Any<string>()).Returns(new ModerationResult(true, new List<string>()));
+        childService.GetDefaultChildForDeviceAsync(Arg.Any<Guid>()).Returns((Child?)null);
+        conversations.AddMessageAsync(Arg.Any<Guid>(), Arg.Any<MessageRole>(), Arg.Any<string>(), Arg.Any<SafetyFlag>())
+            .Returns(callInfo => new Message
+            {
+                Id = Guid.NewGuid(), ConversationId = convId,
+                Role = callInfo.ArgAt<MessageRole>(1), Content = callInfo.ArgAt<string>(2),
+                Timestamp = DateTime.UtcNow, SafetyFlag = callInfo.ArgAt<SafetyFlag>(3)
+            });
+
+        // Request 1: AI returns story with tail block
+        conversations.GetRecentMessagesAsync(Arg.Any<Guid>(), Arg.Any<int>())
+            .Returns(new List<(string Role, string Content)>());
+        aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Pick one!\n---\nCHOICE_A:Help the fox\nCHOICE_B:Cross alone");
+
+        var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
+        await svc.GetResponseAsync(deviceId, "tell me a story");
+
+        // Request 2: history has story trigger, but child says gibberish → unknown
+        conversations.GetRecentMessagesAsync(Arg.Any<Guid>(), Arg.Any<int>())
+            .Returns(new List<(string Role, string Content)>
+            {
+                ("User", "tell me a story"),
+                ("Assistant", "Pick one!"),
+            });
+        aiClient.ClearReceivedCalls();
+        aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("What do you mean?");
+
+        await svc.GetResponseAsync(deviceId, "asdfgh");
+
+        // The system prompt should NOT contain the choice hint
+        await aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => !s.Contains("previous_story_choice:")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
     public async Task ExpiredPendingLabels_DoNotTriggerNormalizer()
     {
         // Directly seed a stale pending choice (31 minutes old)
