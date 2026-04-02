@@ -12,6 +12,10 @@ public class ChatService : IChatService
 {
     private const string StoryChoiceInstruction = """
 
+        STORY RESPONSES: Keep story responses short — typically 1 to 3 simple
+        sentences. Use clear, warm language that is easy to listen to. Avoid
+        long explanations or complex sentences.
+
         STORY CHOICES: When you offer the child exactly two choices in a story,
         end your message with a separator and two labeled lines, like this:
         ---
