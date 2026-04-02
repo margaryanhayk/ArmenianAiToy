@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python tests/engines/test_choice_normalizer.py -v)",
+      "Bash(python tests/engines/test_story_diversity.py --sessions 20)",
+      "Bash(python -c ':*)",
+      "Bash(python write_test.py)",
+      "Bash(python _write_normalizer.py)",
+      "Bash(dotnet new:*)",
+      "Bash(dotnet sln:*)",
+      "Bash(dotnet add:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet build:*)",
+      "Bash(ls:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)"
+    ]
+  }
+}
