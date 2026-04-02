@@ -18,6 +18,15 @@ public class ChatService : IChatService
         CHOICE_A:first option here
         CHOICE_B:second option here
         Do not include this block when you are not offering a choice.
+
+        If a previous_story_choice is provided, continue the story following
+        that choice. Do not ask the child to choose again, do not ignore the
+        choice, and do not re-offer the same options.
+
+        If previous_story_choice is "unclear", the child tried to answer but
+        their reply was not understood. Stay in the same story moment and
+        gently help the child continue in simple words. Only restate the
+        choice if needed. Do not pretend the choice was understood.
         """;
 
     // One-shot in-memory store for option labels extracted from the previous
@@ -124,10 +133,15 @@ public class ChatService : IChatService
         {
             systemPrompt += StoryChoiceInstruction;
 
-            // Step 7b: If the child made a recognized choice, hint the model
+            // Step 7b: If the child made a recognized choice, hint the model.
+            // If there was a pending choice but the reply was unclear, hint that too.
             if (normalizedChoice is not null)
             {
                 systemPrompt += $"\n\nprevious_story_choice: {normalizedChoice}";
+            }
+            else if (pending is not null && DateTime.UtcNow - pending.ExtractedAt < ChoiceExpiry)
+            {
+                systemPrompt += "\n\nprevious_story_choice: unclear";
             }
         }
 

@@ -261,7 +261,7 @@ public class ChoiceHandoffTests
     }
 
     [Fact]
-    public async Task UnknownChoice_NotInjectedIntoSystemPrompt()
+    public async Task UnknownChoice_InjectsUnclearHint()
     {
         // Set up a separate instance with controllable history
         var aiClient = Substitute.For<IAiChatClient>();
@@ -309,9 +309,9 @@ public class ChoiceHandoffTests
 
         await svc.GetResponseAsync(deviceId, "asdfgh");
 
-        // The system prompt should NOT contain the choice hint
+        // The system prompt should contain the "unclear" hint
         await aiClient.Received().GetCompletionAsync(
-            Arg.Is<string>(s => !s.Contains("previous_story_choice:")),
+            Arg.Is<string>(s => s.Contains("previous_story_choice: unclear")),
             Arg.Any<List<(string, string)>>());
     }
 
@@ -337,5 +337,56 @@ public class ChoiceHandoffTests
 
         // Entry should have been consumed (removed) even though expired
         Assert.False(ChatService.PendingChoices.ContainsKey(_conversationId));
+    }
+
+    [Fact]
+    public async Task ExpiredPendingLabels_DoNotInjectUnclearHint()
+    {
+        // Set up with controllable history so story intent is active
+        var aiClient = Substitute.For<IAiChatClient>();
+        var moderation = Substitute.For<IModerationService>();
+        var conversations = Substitute.For<IConversationService>();
+        var childService = Substitute.For<IChildService>();
+        var logger = Substitute.For<ILogger<ChatService>>();
+        var config = Substitute.For<IConfiguration>();
+        config["SystemPrompt"].Returns("You are a test assistant.");
+
+        var convId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var conv = new Conversation { Id = convId, DeviceId = deviceId, StartedAt = DateTime.UtcNow };
+
+        conversations.GetOrCreateActiveConversationAsync(Arg.Any<Guid>(), Arg.Any<Guid?>()).Returns(conv);
+        moderation.CheckContentAsync(Arg.Any<string>()).Returns(new ModerationResult(true, new List<string>()));
+        childService.GetDefaultChildForDeviceAsync(Arg.Any<Guid>()).Returns((Child?)null);
+        conversations.AddMessageAsync(Arg.Any<Guid>(), Arg.Any<MessageRole>(), Arg.Any<string>(), Arg.Any<SafetyFlag>())
+            .Returns(callInfo => new Message
+            {
+                Id = Guid.NewGuid(), ConversationId = convId,
+                Role = callInfo.ArgAt<MessageRole>(1), Content = callInfo.ArgAt<string>(2),
+                Timestamp = DateTime.UtcNow, SafetyFlag = callInfo.ArgAt<SafetyFlag>(3)
+            });
+
+        // History has story trigger so HasStoryIntent returns true
+        conversations.GetRecentMessagesAsync(Arg.Any<Guid>(), Arg.Any<int>())
+            .Returns(new List<(string Role, string Content)>
+            {
+                ("User", "tell me a story"),
+                ("Assistant", "Once upon a time..."),
+            });
+
+        // Seed an expired pending choice (31 minutes old)
+        ChatService.PendingChoices[convId] = new ChatService.PendingChoice(
+            "Left", "Right", DateTime.UtcNow.AddMinutes(-31));
+
+        aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Continuing...");
+
+        var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
+        await svc.GetResponseAsync(deviceId, "asdfgh");
+
+        // Expired labels should NOT inject any previous_story_choice hint
+        await aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => !s.Contains("previous_story_choice:")),
+            Arg.Any<List<(string, string)>>());
     }
 }
