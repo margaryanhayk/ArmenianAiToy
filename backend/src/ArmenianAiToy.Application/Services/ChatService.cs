@@ -18,6 +18,8 @@ public class ChatService : IChatService
         CHOICE_A:first option here
         CHOICE_B:second option here
         Do not include this block when you are not offering a choice.
+        Each choice should be short, action-based, clearly different from the
+        other, and simple enough for a child aged 4–7 to say back easily.
 
         If a previous_story_choice is provided, continue the story following
         that choice. Do not ask the child to choose again, do not ignore the
