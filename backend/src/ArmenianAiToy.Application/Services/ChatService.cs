@@ -24,9 +24,10 @@ public class ChatService : IChatService
         choice, and do not re-offer the same options.
 
         If previous_story_choice is "unclear", the child tried to answer but
-        their reply was not understood. Stay in the same story moment and
-        gently help the child continue in simple words. Only restate the
-        choice if needed. Do not pretend the choice was understood.
+        their reply was not understood. First respond naturally to what the
+        child said, then gently move the story forward — a new event, a soft
+        resolution, or a small scene change. Do not stay frozen in the same
+        moment. Do not say "since you didn't choose" or blame the child.
         Do not include a CHOICE_A/CHOICE_B block in this response.
         """;
 
