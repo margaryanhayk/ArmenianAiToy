@@ -5,4 +5,7 @@
     <Project Path="src/ArmenianAiToy.Domain/ArmenianAiToy.Domain.csproj" />
     <Project Path="src/ArmenianAiToy.Infrastructure/ArmenianAiToy.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ArmenianAiToy.Application.Tests/ArmenianAiToy.Application.Tests.csproj" />
+  </Folder>
 </Solution>

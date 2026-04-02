@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Domain.Enums;
 using Microsoft.Extensions.Configuration;
@@ -8,6 +10,35 @@ namespace ArmenianAiToy.Application.Services;
 
 public class ChatService : IChatService
 {
+    private const string StoryChoiceInstruction = """
+
+        STORY CHOICES: When you offer the child exactly two choices in a story,
+        end your message with a separator and two labeled lines, like this:
+        ---
+        CHOICE_A:first option here
+        CHOICE_B:second option here
+        Do not include this block when you are not offering a choice.
+        """;
+
+    // One-shot in-memory store for option labels extracted from the previous
+    // assistant response. Keyed by conversation ID. Consumed and removed on
+    // the next child message. Entries older than 30 minutes are discarded.
+    internal static readonly ConcurrentDictionary<Guid, PendingChoice> PendingChoices = new();
+    private static readonly TimeSpan ChoiceExpiry = TimeSpan.FromMinutes(30);
+
+    internal record PendingChoice(string OptionA, string OptionB, DateTime ExtractedAt);
+
+    private static readonly string[] StoryTriggerPhrases =
+    [
+        "tell me a story",
+        "tell a story",
+        "what happens next",
+        "\u057a\u0561\u057f\u0574\u056b\u0580",                             // patmir
+        "\u057a\u0561\u057f\u0574\u0578\u0582\u0569\u0575\u0578\u0582\u0576", // patmutyun
+        "\u0570\u0565\u0584\u056b\u0561\u0569",                             // heqiat
+        "\u056b\u0576\u0579 \u056f\u056c\u056b\u0576\u056b",                 // inch klini
+    ];
+
     private readonly IAiChatClient _aiClient;
     private readonly IModerationService _moderation;
     private readonly IConversationService _conversations;
@@ -40,7 +71,10 @@ public class ChatService : IChatService
 
         var conversation = await _conversations.GetOrCreateActiveConversationAsync(deviceId, child?.Id);
 
-        // Step 1: Pre-moderate user input
+        // Step 1: Consume pending choice labels (always remove to prevent stale entries)
+        PendingChoices.TryRemove(conversation.Id, out var pending);
+
+        // Step 2: Pre-moderate user input
         var inputModeration = await _moderation.CheckContentAsync(userMessage);
         if (!inputModeration.IsSafe)
         {
@@ -58,10 +92,19 @@ public class ChatService : IChatService
             return new ChatResponse(fallback, conversation.Id, fallbackMsg.Id, SafetyFlag.Blocked);
         }
 
-        // Step 2: Store user message
+        // Step 3: Store user message
         await _conversations.AddMessageAsync(conversation.Id, MessageRole.User, userMessage);
 
-        // Step 3: Build system prompt with child context
+        // Step 4: Normalize child input against pending choice labels (best-effort)
+        if (pending is not null && DateTime.UtcNow - pending.ExtractedAt < ChoiceExpiry)
+        {
+            var choiceResult = ChoiceNormalizer.Normalize(userMessage, pending.OptionA, pending.OptionB);
+            _logger.LogInformation(
+                "Choice normalized. ConversationId: {ConversationId}, Normalized: {Normalized}, Confidence: {Confidence}, Method: {Method}",
+                conversation.Id, choiceResult.Normalized, choiceResult.Confidence, choiceResult.Method);
+        }
+
+        // Step 5: Build system prompt with child context
         var systemPrompt = _config["SystemPrompt"] ?? "You are a friendly assistant for Armenian children. Reply in Armenian.";
 
         if (child != null)
@@ -69,10 +112,16 @@ public class ChatService : IChatService
             systemPrompt += _childService.BuildChildContext(child);
         }
 
-        // Step 4: Build conversation history
+        // Step 6: Build conversation history
         var history = await _conversations.GetRecentMessagesAsync(conversation.Id);
 
-        // Step 5: Call AI
+        // Step 7: Append story-choice instruction if conversation has story intent
+        if (HasStoryIntent(userMessage, history))
+        {
+            systemPrompt += StoryChoiceInstruction;
+        }
+
+        // Step 8: Call AI
         string aiResponse;
         try
         {
@@ -84,7 +133,7 @@ public class ChatService : IChatService
             throw;
         }
 
-        // Step 6: Post-moderate AI response
+        // Step 9: Post-moderate AI response
         var outputModeration = await _moderation.CheckContentAsync(aiResponse);
         var safetyFlag = SafetyFlag.Clean;
 
@@ -96,10 +145,44 @@ public class ChatService : IChatService
                 ?? "Let's talk about something more fun!";
         }
 
-        // Step 7: Store AI response
+        // Step 10: Strip tail block and store labels for next request
+        if (TailBlockParser.TryExtract(aiResponse, out var cleanedResponse, out var optionA, out var optionB))
+        {
+            PendingChoices[conversation.Id] = new PendingChoice(optionA!, optionB!, DateTime.UtcNow);
+            _logger.LogInformation(
+                "Story choice extracted. ConversationId: {ConversationId}, OptionA: {OptionA}, OptionB: {OptionB}",
+                conversation.Id, optionA, optionB);
+            aiResponse = cleanedResponse;
+        }
+
+        // Step 11: Store AI response
         var responseMsg = await _conversations.AddMessageAsync(
             conversation.Id, MessageRole.Assistant, aiResponse, safetyFlag);
 
         return new ChatResponse(aiResponse, conversation.Id, responseMsg.Id, safetyFlag);
+    }
+
+    internal static bool HasStoryIntent(
+        string userMessage, List<(string Role, string Content)> history)
+    {
+        if (MatchesAnyTrigger(userMessage)) return true;
+
+        int checkedCount = 0;
+        for (int i = history.Count - 1; i >= 0 && checkedCount < 2; i--)
+        {
+            if (history[i].Role == "User")
+            {
+                if (MatchesAnyTrigger(history[i].Content)) return true;
+                checkedCount++;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool MatchesAnyTrigger(string text)
+    {
+        var lower = text.ToLowerInvariant();
+        return StoryTriggerPhrases.Any(p => lower.Contains(p));
     }
 }
