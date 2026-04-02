@@ -27,6 +27,7 @@ public class ChatService : IChatService
         their reply was not understood. Stay in the same story moment and
         gently help the child continue in simple words. Only restate the
         choice if needed. Do not pretend the choice was understood.
+        Do not include a CHOICE_A/CHOICE_B block in this response.
         """;
 
     // One-shot in-memory store for option labels extracted from the previous
