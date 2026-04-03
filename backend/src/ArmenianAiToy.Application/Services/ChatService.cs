@@ -23,6 +23,10 @@ public class ChatService : IChatService
         Avoid long setup or generic filler before something happens.
         End each turn naturally — with a small action, a soft continuation,
         or a gentle hook. Do not end abruptly or force a question.
+        If the child's message is unclear or incomplete, try to understand
+        their intent and respond naturally. Do not say "I don't understand"
+        or correct their language. If needed, gently clarify in simple story
+        language — often just a few words or a short phrase.
 
         STORY CHOICES: When you offer the child exactly two choices in a story,
         end your message with a separator and two labeled lines, like this:
