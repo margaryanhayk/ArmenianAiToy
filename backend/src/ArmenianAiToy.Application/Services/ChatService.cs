@@ -14,7 +14,8 @@ public class ChatService : IChatService
 
         STORY RESPONSES: Keep story responses short — typically 1 to 3 simple
         sentences. Use clear, warm language that is easy to listen to. Avoid
-        long explanations or complex sentences.
+        long explanations or complex sentences. Use at most one short question
+        per response. Do not stack multiple questions together.
 
         STORY CHOICES: When you offer the child exactly two choices in a story,
         end your message with a separator and two labeled lines, like this:
@@ -24,6 +25,9 @@ public class ChatService : IChatService
         Do not include this block when you are not offering a choice.
         Each choice should be short, action-based, clearly different from the
         other, and simple enough for a child aged 4–7 to say back easily.
+        Do not offer a choice every turn. Let the story breathe — only offer
+        a choice at meaningful moments when the child's decision would change
+        what happens next.
 
         If a previous_story_choice is provided, continue the story following
         that choice. Do not ask the child to choose again, do not ignore the
