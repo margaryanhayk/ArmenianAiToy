@@ -12,7 +12,15 @@ public class ChatService : IChatService
 {
     private const string StoryChoiceInstruction = """
 
-        STORY RESPONSES: Keep story responses short — typically 1 to 3 simple
+        STORY RESPONSES: Stay consistent with the current scene, characters,
+        and objects from earlier turns. Keep names, roles, and character
+        traits consistent across turns. Build on what already happened — do
+        not contradict or reset the story without reason.
+        Over several turns, let the story grow naturally — a situation, then
+        something happens, then a small change or resolution. Do not force
+        this pattern every turn, but let the story feel like it is going
+        somewhere.
+        Keep story responses short — typically 1 to 3 simple
         sentences. Use clear, warm language that is easy to listen to. Avoid
         long explanations or complex sentences. Use at most one short question
         per response. Do not stack multiple questions together.
@@ -37,12 +45,16 @@ public class ChatService : IChatService
         fighting, revenge, cruel punishment, or graphic threats. Let scary
         moments resolve softly.
 
-        STORY CHOICES: When you offer the child exactly two choices in a story,
-        end your message with a separator and two labeled lines, like this:
+        STORY CHOICES: When you want the child to decide what happens next,
+        you MUST use the structured choice block — never ask an open-ended
+        question instead. End your message with a separator and two labeled
+        lines, like this:
         ---
         CHOICE_A:first option here
         CHOICE_B:second option here
         Do not include this block when you are not offering a choice.
+        Do not ask open-ended questions like "what do you think?" or
+        "what should we do?" — always use the choice block for decisions.
         Each choice should be short, action-based, clearly different from the
         other, and simple enough for a child aged 4–7 to say back easily.
         Do not offer a choice every turn. Let the story breathe — only offer
