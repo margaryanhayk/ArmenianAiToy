@@ -6,4 +6,6 @@ public record ChatResponse(
     string Response,
     Guid ConversationId,
     Guid MessageId,
-    SafetyFlag SafetyFlag);
+    SafetyFlag SafetyFlag,
+    string? ChoiceA = null,
+    string? ChoiceB = null);

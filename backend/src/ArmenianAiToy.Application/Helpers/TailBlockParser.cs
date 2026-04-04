@@ -18,9 +18,13 @@ public static class TailBlockParser
 {
     // Labels use [^\r\n]+ to enforce single-line and prevent greedy cross-line capture.
     // \r?\n tolerates both \n and \r\n line endings.
+    // ----- tolerates models generating longer separators (---+).
+    // [ \t]* after separator tolerates trailing whitespace on the --- line.
+    // (\r?\n)+ between separator and CHOICE_A tolerates blank lines.
+    // \s* after colon tolerates optional space between label and value.
     // Trailing \s* tolerates whitespace after the block.
     private static readonly Regex TailBlockRegex = new(
-        @"\r?\n---\r?\nCHOICE_A:([^\r\n]+)\r?\nCHOICE_B:([^\r\n]+)\s*$",
+        @"\r?\n-{3,}[ \t]*(\r?\n)+CHOICE_A:\s*([^\r\n]+)\r?\nCHOICE_B:\s*([^\r\n]+)\s*$",
         RegexOptions.Compiled);
 
     /// <summary>
@@ -47,8 +51,8 @@ public static class TailBlockParser
             return false;
         }
 
-        var a = match.Groups[1].Value.Trim();
-        var b = match.Groups[2].Value.Trim();
+        var a = match.Groups[2].Value.Trim();
+        var b = match.Groups[3].Value.Trim();
 
         // Both labels must be non-empty after trimming
         if (a.Length == 0 || b.Length == 0)

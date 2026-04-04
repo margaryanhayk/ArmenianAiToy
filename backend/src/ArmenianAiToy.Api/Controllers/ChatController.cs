@@ -4,6 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ArmenianAiToy.Api.Controllers;
 
+/// <summary>
+/// Chat with the AI toy. Requires device auth headers: X-Device-Id and X-Api-Key.
+/// </summary>
 [ApiController]
 [Route("api/chat")]
 public class ChatController : ControllerBase
@@ -15,7 +18,18 @@ public class ChatController : ControllerBase
         _chatService = chatService;
     }
 
+    /// <summary>
+    /// Send a message from device and receive AI response.
+    /// </summary>
+    /// <remarks>
+    /// Requires headers:
+    /// - **X-Device-Id**: Device GUID from registration
+    /// - **X-Api-Key**: Device API key from registration
+    /// </remarks>
     [HttpPost]
+    [ProducesResponseType(typeof(ChatResponse), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
     public async Task<IActionResult> Chat([FromBody] ChatRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Message))
