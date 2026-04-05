@@ -96,22 +96,27 @@ public class ChoiceHandoffTests
 
         await _chatService.GetResponseAsync(_deviceId, "tell me a story");
 
+        // Second call: return response WITH choices so the fallback doesn't fire
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Continuing...");
+            .Returns("Continuing...\n---\nCHOICE_A:New A\nCHOICE_B:New B");
 
         await _chatService.GetResponseAsync(_deviceId, "left");
 
         _logger.ClearReceivedCalls();
 
+        // Third call: the ORIGINAL labels (Option A / Option B) should be gone.
+        // New labels (New A / New B) may be present from the second call.
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns("More story.");
 
         await _chatService.GetResponseAsync(_deviceId, "right");
 
+        // Verify the original "Option A"/"Option B" labels are NOT in any log —
+        // they were consumed on the second call.
         _logger.DidNotReceive().Log(
             LogLevel.Information,
             Arg.Any<EventId>(),
-            Arg.Is<object>(o => o.ToString()!.Contains("Choice normalized")),
+            Arg.Is<object>(o => o.ToString()!.Contains("Option A") || o.ToString()!.Contains("Option B")),
             Arg.Any<Exception?>(),
             Arg.Any<Func<object, Exception?, string>>());
     }

@@ -39,7 +39,8 @@ public class ChatController : ControllerBase
 
         try
         {
-            var response = await _chatService.GetResponseAsync(deviceId, request.Message, request.ChildId);
+            var response = await _chatService.GetResponseAsync(deviceId, request.Message, request.ChildId,
+                request.StorySessionId, request.SelectedChoice);
             return Ok(response);
         }
         catch (Exception ex)

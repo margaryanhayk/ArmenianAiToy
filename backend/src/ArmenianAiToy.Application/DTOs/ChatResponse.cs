@@ -8,4 +8,5 @@ public record ChatResponse(
     Guid MessageId,
     SafetyFlag SafetyFlag,
     string? ChoiceA = null,
-    string? ChoiceB = null);
+    string? ChoiceB = null,
+    Guid? StorySessionId = null);
