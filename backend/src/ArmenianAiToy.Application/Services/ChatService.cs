@@ -509,11 +509,76 @@ public class ChatService : IChatService
             }
         }
 
+        // Step 10c-bis: One-shot quality gate. Retry the AI call at most once
+        // when the response has 4+ Latin letters in a row, leaked CHOICE_*/
+        // STORY_MEMORY tags, or an explicit subject mismatch. Re-run the
+        // moderation + parse pipeline on the retry result.
+        if (safetyFlag != SafetyFlag.Flagged)
+        {
+            var retryReason = ResponseQualityGate.CheckRetry(aiResponse, userMessage);
+            if (retryReason is not null)
+            {
+                _logger.LogInformation(
+                    "Quality gate retry triggered. ConversationId: {ConversationId}, Reason: {Reason}",
+                    conversation.Id, retryReason);
+                try
+                {
+                    var retryRaw = await _aiClient.GetCompletionAsync(systemPrompt, history);
+                    var retryMod = await _moderation.CheckContentAsync(retryRaw);
+                    if (retryMod.IsSafe)
+                    {
+                        var retryResp = retryRaw;
+
+                        // Re-run STORY_MEMORY extraction.
+                        StoryMemoryParser.TryExtract(retryResp, out var rMemStripped, out var rMem);
+                        retryResp = rMemStripped;
+                        if (rMem is not null)
+                        {
+                            StoryMemories.AddOrUpdate(
+                                conversation.Id,
+                                rMem,
+                                (_, existing) => StoryMemoryParser.Merge(existing, rMem));
+                        }
+
+                        // Re-run tail-block extraction.
+                        if (TailBlockParser.TryExtract(retryResp, out var rCleaned, out var rA, out var rB))
+                        {
+                            PendingChoices[conversation.Id] = new PendingChoice(rA!, rB!, DateTime.UtcNow);
+                            choiceA = rA;
+                            choiceB = rB;
+                            retryResp = rCleaned;
+                        }
+
+                        aiResponse = retryResp;
+                        _logger.LogInformation(
+                            "Quality gate retry accepted. ConversationId: {ConversationId}",
+                            conversation.Id);
+                    }
+                    else
+                    {
+                        _logger.LogInformation(
+                            "Quality gate retry rejected by moderation. ConversationId: {ConversationId}",
+                            conversation.Id);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Quality gate retry failed. ConversationId: {ConversationId}",
+                        conversation.Id);
+                }
+            }
+        }
+
         // Step 10d: Armenian simplification — replace formal/bookish words with
         // child-friendly alternatives. Runs on story text and choice labels.
         aiResponse = ArmenianSimplifier.Simplify(aiResponse);
         choiceA = choiceA is not null ? ArmenianSimplifier.Simplify(choiceA) : null;
         choiceB = choiceB is not null ? ArmenianSimplifier.Simplify(choiceB) : null;
+
+        // Step 10e: Strip any leaked internal formatting (CHOICE_A/B, STORY_MEMORY,
+        // --- separators) that survived parsing. Safety net for visible text.
+        aiResponse = ResponseCleaner.Clean(aiResponse);
 
         // Step 11: Store AI response
         var responseMsg = await _conversations.AddMessageAsync(
