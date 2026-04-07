@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parent Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f6f4fb;
+      color: #2b1f47;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .app { max-width: 720px; margin: 0 auto; }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 4px 20px;
+    }
+    .header h1 { font-size: 22px; color: #5b3e8a; }
+    .header .sub { font-size: 12px; color: #9a8ab5; }
+    .header .right { display: flex; gap: 8px; align-items: center; }
+
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 2px 12px rgba(91,62,138,0.08);
+      margin-bottom: 14px;
+    }
+    .card h2 { font-size: 15px; color: #5b3e8a; margin-bottom: 12px; }
+
+    label { display: block; font-size: 12px; color: #6b5b8a; margin-bottom: 4px; }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 2px solid #e0d6f0;
+      border-radius: 10px;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    button {
+      padding: 9px 14px;
+      background: #7c5cbf;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button:hover { background: #6b4aad; }
+    button.secondary { background: #e0d6f0; color: #5b3e8a; }
+    button.secondary:hover { background: #d0c2e8; }
+    button.link {
+      background: none;
+      color: #7c5cbf;
+      padding: 0;
+      font-size: 13px;
+      text-decoration: underline;
+    }
+    button.link:hover { background: none; color: #5b3e8a; }
+
+    .status { font-size: 13px; padding: 8px 0; min-height: 20px; }
+    .status.err { color: #c62828; }
+    .status.muted { color: #9a8ab5; }
+
+    .row {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: #faf7ff;
+      border: 1px solid #ece4f8;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #2b1f47;
+    }
+    .row:hover { background: #f0e8fc; }
+
+    .row .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 12px;
+      color: #6b5b8a;
+    }
+    .row .snippet {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #4b3b6e;
+      margin-top: 2px;
+    }
+    .row .snippet.assistant { color: #7c5cbf; }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #fce4ec;
+      color: #c62828;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    .msg {
+      border-left: 3px solid #e0d6f0;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      background: #faf7ff;
+      border-radius: 0 8px 8px 0;
+    }
+    .msg.flagged { border-left-color: #c62828; background: #fff5f6; }
+    .msg .meta {
+      font-size: 11px;
+      color: #9a8ab5;
+      margin-bottom: 4px;
+    }
+    .msg .role {
+      font-weight: 600;
+      color: #5b3e8a;
+      margin-right: 8px;
+    }
+    .msg .body {
+      font-size: 14px;
+      color: #2b1f47;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .pager {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div>
+        <h1>Parent Dashboard</h1>
+        <div class="sub">Read-only conversation viewer</div>
+      </div>
+      <div class="right">
+        <button id="logoutBtn" class="secondary" hidden>Log out</button>
+      </div>
+    </div>
+
+    <!-- Login view -->
+    <section id="loginView" class="card" hidden>
+      <h2>Log in</h2>
+      <label for="emailInput">Email</label>
+      <input id="emailInput" type="email" autocomplete="username">
+      <label for="passwordInput">Password</label>
+      <input id="passwordInput" type="password" autocomplete="current-password">
+      <button id="loginBtn">Log in</button>
+      <div id="loginStatus" class="status"></div>
+    </section>
+
+    <!-- Devices view -->
+    <section id="devicesView" class="card" hidden>
+      <h2>Linked devices</h2>
+      <div id="devicesList"></div>
+      <div id="devicesStatus" class="status muted"></div>
+    </section>
+
+    <!-- Summaries view -->
+    <section id="summariesView" class="card" hidden>
+      <h2><button class="link" id="backToDevices">← Devices</button> &nbsp; Conversations <span id="summariesDeviceLabel" class="sub"></span></h2>
+      <div id="summariesList"></div>
+      <div id="summariesStatus" class="status muted"></div>
+      <div class="pager">
+        <button id="newerBtn" class="secondary">← Newer</button>
+        <button id="olderBtn" class="secondary">Older →</button>
+      </div>
+    </section>
+
+    <!-- Detail view -->
+    <section id="detailView" class="card" hidden>
+      <h2><button class="link" id="backToSummaries">← Conversations</button></h2>
+      <div id="detailMeta" class="status muted"></div>
+      <div id="detailMessages"></div>
+      <div id="detailStatus" class="status"></div>
+    </section>
+  </div>
+
+  <script>
+  (function () {
+    'use strict';
+
+    // ---------- state ----------
+    var TOKEN_KEY = 'areg_parent_token';
+    var PAGE_SIZE = 20;
+    var state = {
+      currentDeviceId: null,
+      offset: 0
+    };
+
+    // ---------- helpers ----------
+    function getToken() { return sessionStorage.getItem(TOKEN_KEY); }
+    function setToken(t) { sessionStorage.setItem(TOKEN_KEY, t); }
+    function clearToken() { sessionStorage.removeItem(TOKEN_KEY); }
+
+    function show(viewId) {
+      var ids = ['loginView', 'devicesView', 'summariesView', 'detailView'];
+      for (var i = 0; i < ids.length; i++) {
+        document.getElementById(ids[i]).hidden = (ids[i] !== viewId);
+      }
+      document.getElementById('logoutBtn').hidden = (viewId === 'loginView');
+    }
+
+    function setStatus(elId, text, kind) {
+      var el = document.getElementById(elId);
+      el.textContent = text || '';
+      el.className = 'status' + (kind ? ' ' + kind : '');
+    }
+
+    function clearChildren(el) {
+      while (el.firstChild) el.removeChild(el.firstChild);
+    }
+
+    function fmtTime(iso) {
+      if (!iso) return '';
+      try { return new Date(iso).toLocaleString(); } catch (e) { return iso; }
+    }
+
+    function shortId(guid) {
+      if (!guid) return '';
+      return String(guid).slice(0, 8) + '…';
+    }
+
+    function roleLabel(role) {
+      if (role === 'user') return 'Child';
+      if (role === 'assistant') return 'Assistant';
+      return String(role || '');
+    }
+
+    // ---------- fetch wrapper ----------
+    function authedFetch(url) {
+      var token = getToken();
+      if (!token) {
+        return Promise.reject({ status: 401, message: 'No token' });
+      }
+      return fetch(url, {
+        headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
+      }).then(function (res) {
+        if (res.status === 401) {
+          clearToken();
+          show('loginView');
+          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          return Promise.reject({ status: 401, message: 'Unauthorized' });
+        }
+        if (!res.ok) {
+          return Promise.reject({ status: res.status, message: 'HTTP ' + res.status });
+        }
+        return res.json();
+      });
+    }
+
+    // ---------- login ----------
+    function doLogin() {
+      var email = document.getElementById('emailInput').value.trim();
+      var password = document.getElementById('passwordInput').value;
+      if (!email || !password) {
+        setStatus('loginStatus', 'Email and password are required.', 'err');
+        return;
+      }
+      setStatus('loginStatus', 'Logging in…', 'muted');
+      fetch('/api/parents/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, password: password })
+      }).then(function (res) {
+        if (res.status === 401) {
+          setStatus('loginStatus', 'Invalid email or password.', 'err');
+          return null;
+        }
+        if (!res.ok) {
+          setStatus('loginStatus', 'Error: HTTP ' + res.status, 'err');
+          return null;
+        }
+        return res.json();
+      }).then(function (data) {
+        if (!data) return;
+        if (!data.token) {
+          setStatus('loginStatus', 'Login response missing token.', 'err');
+          return;
+        }
+        setToken(data.token);
+        setStatus('loginStatus', '', '');
+        document.getElementById('passwordInput').value = '';
+        loadDevices();
+      }).catch(function () {
+        setStatus('loginStatus', 'Network error.', 'err');
+      });
+    }
+
+    function doLogout() {
+      clearToken();
+      state.currentDeviceId = null;
+      state.offset = 0;
+      show('loginView');
+      setStatus('loginStatus', '', '');
+    }
+
+    // ---------- devices ----------
+    function loadDevices() {
+      show('devicesView');
+      setStatus('devicesStatus', 'Loading…', 'muted');
+      var listEl = document.getElementById('devicesList');
+      clearChildren(listEl);
+      authedFetch('/api/parents/devices').then(function (data) {
+        var devices = (data && data.devices) || [];
+        if (devices.length === 0) {
+          setStatus('devicesStatus', 'No linked devices.', 'muted');
+          return;
+        }
+        setStatus('devicesStatus', '', '');
+        devices.forEach(function (id) {
+          var btn = document.createElement('button');
+          btn.className = 'row';
+          btn.title = id;
+          var top = document.createElement('div');
+          top.className = 'top';
+          var label = document.createElement('span');
+          label.textContent = 'Device ' + shortId(id);
+          var hint = document.createElement('span');
+          hint.textContent = 'View conversations →';
+          top.appendChild(label);
+          top.appendChild(hint);
+          btn.appendChild(top);
+          btn.addEventListener('click', function () { openDevice(id); });
+          listEl.appendChild(btn);
+        });
+      }).catch(function (err) {
+        if (err && err.status === 401) return;
+        setStatus('devicesStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+      });
+    }
+
+    // ---------- summaries ----------
+    function openDevice(deviceId) {
+      state.currentDeviceId = deviceId;
+      state.offset = 0;
+      loadSummaries();
+    }
+
+    function loadSummaries() {
+      show('summariesView');
+      document.getElementById('summariesDeviceLabel').textContent = state.currentDeviceId
+        ? '· device ' + shortId(state.currentDeviceId)
+        : '';
+      setStatus('summariesStatus', 'Loading…', 'muted');
+      var listEl = document.getElementById('summariesList');
+      clearChildren(listEl);
+
+      var url = '/api/conversations/summary'
+        + '?deviceId=' + encodeURIComponent(state.currentDeviceId)
+        + '&limit=' + PAGE_SIZE
+        + '&offset=' + state.offset;
+
+      authedFetch(url).then(function (data) {
+        var rows = (data && data.conversations) || [];
+        if (rows.length === 0) {
+          setStatus('summariesStatus',
+            state.offset === 0 ? 'No conversations yet.' : 'No more conversations.',
+            'muted');
+          return;
+        }
+        setStatus('summariesStatus', '', '');
+        rows.forEach(function (row) {
+          listEl.appendChild(buildSummaryRow(row));
+        });
+      }).catch(function (err) {
+        if (err && err.status === 401) return;
+        setStatus('summariesStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+      });
+    }
+
+    function buildSummaryRow(row) {
+      var btn = document.createElement('button');
+      btn.className = 'row';
+      btn.title = row.id;
+
+      var top = document.createElement('div');
+      top.className = 'top';
+
+      var leftWrap = document.createElement('span');
+      var timeSpan = document.createElement('span');
+      timeSpan.textContent = fmtTime(row.startedAt);
+      leftWrap.appendChild(timeSpan);
+      if (row.hasFlaggedContent) {
+        var badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = '⚠ flagged';
+        leftWrap.appendChild(badge);
+      }
+
+      var countSpan = document.createElement('span');
+      var count = (typeof row.messageCount === 'number') ? row.messageCount : 0;
+      countSpan.textContent = count + (count === 1 ? ' message' : ' messages');
+
+      top.appendChild(leftWrap);
+      top.appendChild(countSpan);
+      btn.appendChild(top);
+
+      if (row.firstUserSnippet) {
+        var u = document.createElement('div');
+        u.className = 'snippet';
+        u.textContent = 'Child: ' + row.firstUserSnippet;
+        btn.appendChild(u);
+      }
+      if (row.lastAssistantSnippet) {
+        var a = document.createElement('div');
+        a.className = 'snippet assistant';
+        a.textContent = 'Assistant: ' + row.lastAssistantSnippet;
+        btn.appendChild(a);
+      }
+
+      btn.addEventListener('click', function () { openConversation(row.id); });
+      return btn;
+    }
+
+    function pageOlder() {
+      state.offset += PAGE_SIZE;
+      loadSummaries();
+    }
+    function pageNewer() {
+      state.offset = Math.max(0, state.offset - PAGE_SIZE);
+      loadSummaries();
+    }
+
+    // ---------- detail ----------
+    function openConversation(conversationId) {
+      show('detailView');
+      var metaEl = document.getElementById('detailMeta');
+      var msgsEl = document.getElementById('detailMessages');
+      metaEl.textContent = 'Loading…';
+      clearChildren(msgsEl);
+      setStatus('detailStatus', '', '');
+
+      authedFetch('/api/conversations/' + encodeURIComponent(conversationId)).then(function (data) {
+        var c = data && data.conversation;
+        if (!c) {
+          setStatus('detailStatus', 'Conversation not found.', 'err');
+          metaEl.textContent = '';
+          return;
+        }
+        var metaParts = ['Started ' + fmtTime(c.startedAt)];
+        if (c.endedAt) metaParts.push('Ended ' + fmtTime(c.endedAt));
+        metaParts.push((c.messageCount || 0) + ' messages');
+        if (c.hasFlaggedContent) metaParts.push('⚠ contains flagged content');
+        metaEl.textContent = metaParts.join(' · ');
+
+        var msgs = c.messages || [];
+        if (msgs.length === 0) {
+          setStatus('detailStatus', 'No messages in this conversation.', 'muted');
+          return;
+        }
+        msgs.forEach(function (m) {
+          msgsEl.appendChild(buildMessage(m));
+        });
+      }).catch(function (err) {
+        if (err && err.status === 401) return;
+        metaEl.textContent = '';
+        setStatus('detailStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+      });
+    }
+
+    function buildMessage(m) {
+      var div = document.createElement('div');
+      div.className = 'msg';
+      // Anything other than "Clean" SafetyFlag is treated as flagged.
+      if (m.safetyFlag && m.safetyFlag !== 'Clean' && m.safetyFlag !== 0) {
+        div.classList.add('flagged');
+      }
+
+      var meta = document.createElement('div');
+      meta.className = 'meta';
+      var role = document.createElement('span');
+      role.className = 'role';
+      role.textContent = roleLabel(m.role);
+      var ts = document.createElement('span');
+      ts.textContent = fmtTime(m.timestamp);
+      meta.appendChild(role);
+      meta.appendChild(ts);
+
+      var body = document.createElement('div');
+      body.className = 'body';
+      body.textContent = m.content || '';
+
+      div.appendChild(meta);
+      div.appendChild(body);
+      return div;
+    }
+
+    // ---------- wiring ----------
+    document.getElementById('loginBtn').addEventListener('click', doLogin);
+    document.getElementById('passwordInput').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') doLogin();
+    });
+    document.getElementById('logoutBtn').addEventListener('click', doLogout);
+    document.getElementById('backToDevices').addEventListener('click', loadDevices);
+    document.getElementById('backToSummaries').addEventListener('click', loadSummaries);
+    document.getElementById('olderBtn').addEventListener('click', pageOlder);
+    document.getElementById('newerBtn').addEventListener('click', pageNewer);
+
+    // ---------- boot ----------
+    if (getToken()) {
+      loadDevices();
+    } else {
+      show('loginView');
+    }
+  })();
+  </script>
+</body>
+</html>
