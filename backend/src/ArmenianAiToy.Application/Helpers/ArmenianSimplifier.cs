@@ -46,6 +46,45 @@ public static class ArmenianSimplifier
         ("\u0532\u0561\u0581\u0561\u0570\u0561\u0575\u057f\u0565\u0581", "\u0533\u057f\u0561\u057e"),
         ("\u0546\u056f\u0561\u057f\u0565\u0581", "\u054f\u0565\u057d\u0561\u057e"),
         ("\u054a\u057d\u057a\u0572\u0561\u0581\u0578\u0572", "\u0553\u0561\u0575\u056c\u0578\u0582\u0576"),
+
+        // Targeted phrase fixes from latest benchmark observations.
+        // Each entry is a literal substring replacement — no regex, bounded
+        // and order-independent.
+
+        // " Եվ այսքանը:" / " Եվ այսքանը։" → "" — filler wrap-up phrase.
+        // Leading space included so the deletion does not leave a double space.
+        (" Եվ այսքանը:", ""),
+        (" Եվ այսքանը։", ""),
+
+        // "մեծական ականջները" → "մեծ ականջները" — "մեծական" isn't a real word.
+        ("մեծական ականջները", "մեծ ականջները"),
+
+        // " անվերապահորեն" → "" — adult/legalistic, redundant in story context.
+        (" անվերապահորեն", ""),
+
+        // "ծռվել ու բավարարվել" → "ծռվել" — drop nonsensical second verb.
+        ("ծռվել ու բավարարվել", "ծռվել"),
+
+        // "թռչյուն" → "թռչուն" — wrong stem; this literal also catches every
+        // inflected form (թռչյունները, թռչյուններին, …) without regex.
+        ("թռչյուն", "թռչուն"),
+        ("Թռչյուն", "Թռչուն"),
+
+        // "քաղցրածին ժպտաց" → "քաղցր ժպտաց" — invented compound adjective.
+        ("քաղցրածին ժպտաց", "քաղցր ժպտաց"),
+
+        // "դրախտյան այգում" → "գեղեցիկ այգում" — too literary/religious.
+        ("դրախտյան այգում", "գեղեցիկ այգում"),
+
+        // "քայլեցնելով փորձեց ուսուցանել" → "փորձեց սովորեցնել" — drop bookish
+        // gerund and replace formal verb.
+        ("քայլեցնելով փորձեց ուսուցանել", "փորձեց սովորեցնել"),
+
+        // "լողափնյա ճյուղերի վրա" → "ճյուղերի վրա" — drop incoherent adjective.
+        ("լողափնյա ճյուղերի վրա", "ճյուղերի վրա"),
+
+        // "կային սպասված նրանց" → "սպասում էին նրանց" — broken syntax fix.
+        ("կային սպասված նրանց", "սպասում էին նրանց"),
     ];
 
     /// <summary>
