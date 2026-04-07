@@ -1,0 +1,1022 @@
+{
+  "runId": "20260407-203026",
+  "apiBase": "http://localhost:5000",
+  "totals": {
+    "total": 100,
+    "passed": 100,
+    "failed": 0
+  },
+  "distribution": {
+    "owned": 40,
+    "non_owned": 30,
+    "fake": 30
+  },
+  "parents": {
+    "parentAId": "974A9D14-230A-42CB-9FCB-7C21F1DC7C62",
+    "parentAEmail": "eptest-a-20260407-203026@local.test",
+    "parentBId": "BD654402-0708-423C-8D5E-EA063C25551C",
+    "parentBEmail": "eptest-b-20260407-203026@local.test"
+  },
+  "results": [
+    {
+      "testId": "T001",
+      "category": "owned",
+      "conversationId": "2EEFC4AC-966A-4858-B4F9-9B2362271448",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"2eefc4ac-966a-4858-b4f9-9b2362271448\",\"deviceId\":\"769d0a4c-cc4a-4116-8999-7358d2ee0ff1\",\"startedAt\":\"2026-04-07T20:30:27.944905\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T002",
+      "category": "owned",
+      "conversationId": "634383FE-C34C-480C-A0B4-D876D5F91027",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"634383fe-c34c-480c-a0b4-d876d5f91027\",\"deviceId\":\"73dbb2e9-aa51-4ad5-a96a-4fca8823c2b4\",\"startedAt\":\"2026-04-07T20:30:27.956237\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T003",
+      "category": "owned",
+      "conversationId": "501C81B1-FF46-49DA-B6A6-B8FAE4363DE3",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"501c81b1-ff46-49da-b6a6-b8fae4363de3\",\"deviceId\":\"b68ea07a-afdf-4356-8c1c-c2331db52273\",\"startedAt\":\"2026-04-07T20:30:27.956317\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T004",
+      "category": "owned",
+      "conversationId": "A3191DB3-D825-4576-B949-23560C7A3AF9",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"a3191db3-d825-4576-b949-23560c7a3af9\",\"deviceId\":\"767bc8cd-8f3c-4709-b2b6-570eac912805\",\"startedAt\":\"2026-04-07T20:30:27.956431\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T005",
+      "category": "owned",
+      "conversationId": "22B16CF1-1D5F-49E1-B98A-97484D2A423D",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"22b16cf1-1d5f-49e1-b98a-97484d2a423d\",\"deviceId\":\"e2136962-fde0-4324-bddf-15100b409ac9\",\"startedAt\":\"2026-04-07T20:30:27.956488\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T006",
+      "category": "owned",
+      "conversationId": "82B23FB2-A87E-46DA-A802-BDF0C3465170",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"82b23fb2-a87e-46da-a802-bdf0c3465170\",\"deviceId\":\"2f84ae8c-9f8d-4b26-bd18-673a3480cadb\",\"startedAt\":\"2026-04-07T20:30:27.956541\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T007",
+      "category": "owned",
+      "conversationId": "9F6E0D9D-A888-4C41-98F6-355FEDB936E2",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"9f6e0d9d-a888-4c41-98f6-355fedb936e2\",\"deviceId\":\"bc7d3e93-1545-4af0-a1ed-e927a0cdba02\",\"startedAt\":\"2026-04-07T20:30:27.956613\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T008",
+      "category": "owned",
+      "conversationId": "A898EB96-1D4C-4EA9-B2B5-9C8AE2BAB676",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"a898eb96-1d4c-4ea9-b2b5-9c8ae2bab676\",\"deviceId\":\"09f79e01-fa6e-4b2d-9c34-057d4bc128ed\",\"startedAt\":\"2026-04-07T20:30:27.956713\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T009",
+      "category": "owned",
+      "conversationId": "7DDBDE15-D641-4190-9DAE-9E7AFC445D5C",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"7ddbde15-d641-4190-9dae-9e7afc445d5c\",\"deviceId\":\"a7826084-a325-43a4-bf5f-236797efbc9a\",\"startedAt\":\"2026-04-07T20:30:27.956768\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T010",
+      "category": "owned",
+      "conversationId": "C871FC94-432F-4B57-976E-BF41F15ED9D3",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"c871fc94-432f-4b57-976e-bf41f15ed9d3\",\"deviceId\":\"e2b18c32-0fc6-48a9-bb42-a68b8da3b2c7\",\"startedAt\":\"2026-04-07T20:30:27.956826\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T011",
+      "category": "owned",
+      "conversationId": "5D1E8531-C867-4014-9756-B5885649A8CD",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"5d1e8531-c867-4014-9756-b5885649a8cd\",\"deviceId\":\"1949f812-50d6-4018-b03b-3f7da5cfd0b4\",\"startedAt\":\"2026-04-07T20:30:27.956876\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T012",
+      "category": "owned",
+      "conversationId": "1DDE3AB0-B4E8-4F35-8698-DF3692A47F27",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"1dde3ab0-b4e8-4f35-8698-df3692a47f27\",\"deviceId\":\"e0b101fe-2da8-47d4-b643-a17a05016e70\",\"startedAt\":\"2026-04-07T20:30:27.956924\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T013",
+      "category": "owned",
+      "conversationId": "EA77B2F9-3FF1-4DD1-B813-696AC11B4C1E",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"ea77b2f9-3ff1-4dd1-b813-696ac11b4c1e\",\"deviceId\":\"ef3001fc-d33b-48f7-8f70-fb6a1006a8b2\",\"startedAt\":\"2026-04-07T20:30:27.956969\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T014",
+      "category": "owned",
+      "conversationId": "053F4315-A4F6-455F-AC3B-42292E286A08",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"053f4315-a4f6-455f-ac3b-42292e286a08\",\"deviceId\":\"31afc05a-c599-4768-952f-00131168e636\",\"startedAt\":\"2026-04-07T20:30:27.95702\",\"endedAt\"",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T015",
+      "category": "owned",
+      "conversationId": "846CEA9B-0EC1-4D62-9851-6893DA59C9A3",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"846cea9b-0ec1-4d62-9851-6893da59c9a3\",\"deviceId\":\"fba809be-e837-4774-8fc8-b211e8001f63\",\"startedAt\":\"2026-04-07T20:30:27.957082\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T016",
+      "category": "owned",
+      "conversationId": "8836A338-B55A-469F-8DA0-2048E6B1EA8A",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"8836a338-b55a-469f-8da0-2048e6b1ea8a\",\"deviceId\":\"6ef3c09d-afd2-46a6-8427-298d769ec388\",\"startedAt\":\"2026-04-07T20:30:27.957133\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T017",
+      "category": "owned",
+      "conversationId": "2315881A-503A-4164-AC38-C7BCEDE5347B",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"2315881a-503a-4164-ac38-c7bcede5347b\",\"deviceId\":\"0fb655ca-3627-4296-b076-94b9a97b6053\",\"startedAt\":\"2026-04-07T20:30:27.957177\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T018",
+      "category": "owned",
+      "conversationId": "6A78C295-AB80-4C0D-B991-AD465EFCF0B7",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"6a78c295-ab80-4c0d-b991-ad465efcf0b7\",\"deviceId\":\"8f61356e-7640-4f51-860e-d37638f153f1\",\"startedAt\":\"2026-04-07T20:30:27.957225\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T019",
+      "category": "owned",
+      "conversationId": "37DD39D4-B38F-4669-80B3-958AE42E30D7",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"37dd39d4-b38f-4669-80b3-958ae42e30d7\",\"deviceId\":\"a3dd9e55-7a4c-4af8-8879-26e568c9b646\",\"startedAt\":\"2026-04-07T20:30:27.95727\",\"endedAt\"",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T020",
+      "category": "owned",
+      "conversationId": "E224D262-C140-43FA-AE91-AB39014EBB7F",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"e224d262-c140-43fa-ae91-ab39014ebb7f\",\"deviceId\":\"1a4296b5-5eb4-4013-8f55-1ef4fa6832ac\",\"startedAt\":\"2026-04-07T20:30:27.957309\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T021",
+      "category": "owned",
+      "conversationId": "2FC59546-58E5-425F-B9A4-02ABE0507B3C",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"2fc59546-58e5-425f-b9a4-02abe0507b3c\",\"deviceId\":\"577bb369-8b54-41b2-878b-6f27609307e7\",\"startedAt\":\"2026-04-07T20:30:27.957353\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T022",
+      "category": "owned",
+      "conversationId": "9131AB91-7434-4985-9C64-7056CBCC0144",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"9131ab91-7434-4985-9c64-7056cbcc0144\",\"deviceId\":\"1374d928-3223-46ed-843e-a8cc2d2a19ee\",\"startedAt\":\"2026-04-07T20:30:27.957399\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T023",
+      "category": "owned",
+      "conversationId": "7D45DF9B-66AE-4728-93B0-917380E332A1",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"7d45df9b-66ae-4728-93b0-917380e332a1\",\"deviceId\":\"1a0d0802-788e-40f8-b044-1e8df022d1b5\",\"startedAt\":\"2026-04-07T20:30:27.957446\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T024",
+      "category": "owned",
+      "conversationId": "0826060A-253F-4843-A4B5-BAC35481D608",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"0826060a-253f-4843-a4b5-bac35481d608\",\"deviceId\":\"a6236f0f-5ba5-4799-9805-1a7381988cd8\",\"startedAt\":\"2026-04-07T20:30:27.957497\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T025",
+      "category": "owned",
+      "conversationId": "DB7A3313-037E-4287-B1A8-031460CABCAB",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"db7a3313-037e-4287-b1a8-031460cabcab\",\"deviceId\":\"9af0c4a9-0be9-49a2-831b-ee42f2fd038b\",\"startedAt\":\"2026-04-07T20:30:27.957537\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T026",
+      "category": "owned",
+      "conversationId": "2D94567C-9CD5-43A3-B900-CF5A8CE8C24B",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"2d94567c-9cd5-43a3-b900-cf5a8ce8c24b\",\"deviceId\":\"c2cc7fd5-9663-4b32-81e9-e135ce2b4bf3\",\"startedAt\":\"2026-04-07T20:30:27.957576\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T027",
+      "category": "owned",
+      "conversationId": "993A9980-03D6-4168-A3B1-F566AC329091",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"993a9980-03d6-4168-a3b1-f566ac329091\",\"deviceId\":\"6ea50a64-f800-4fb5-b86c-280bdd890e58\",\"startedAt\":\"2026-04-07T20:30:27.957616\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T028",
+      "category": "owned",
+      "conversationId": "0A300823-7EF2-4654-9367-9277452F9FDB",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"0a300823-7ef2-4654-9367-9277452f9fdb\",\"deviceId\":\"92bbe4a1-a44e-4782-a29b-01bbefcbbeef\",\"startedAt\":\"2026-04-07T20:30:27.957663\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T029",
+      "category": "owned",
+      "conversationId": "6A6BD12E-687F-4151-8B67-C3114A4760B9",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"6a6bd12e-687f-4151-8b67-c3114a4760b9\",\"deviceId\":\"76b86339-ca37-4b64-b6fc-5acbd147a4b0\",\"startedAt\":\"2026-04-07T20:30:27.957703\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T030",
+      "category": "owned",
+      "conversationId": "FC2593A0-B2F7-493D-A6AF-F68200CF3808",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"fc2593a0-b2f7-493d-a6af-f68200cf3808\",\"deviceId\":\"a1402070-b7d4-4b89-87c8-5a279ff3a8de\",\"startedAt\":\"2026-04-07T20:30:27.95776\",\"endedAt\"",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T031",
+      "category": "owned",
+      "conversationId": "87B2D0BF-28DE-4766-82CD-AE35BD60532E",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"87b2d0bf-28de-4766-82cd-ae35bd60532e\",\"deviceId\":\"d553d2d4-ab53-45e5-98b0-2de77d7aa56d\",\"startedAt\":\"2026-04-07T20:30:27.957807\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T032",
+      "category": "owned",
+      "conversationId": "F2754E57-3AA3-4E28-92F3-67F999364797",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"f2754e57-3aa3-4e28-92f3-67f999364797\",\"deviceId\":\"02c86f4e-fd68-4975-9730-6b48200e8c67\",\"startedAt\":\"2026-04-07T20:30:27.95785\",\"endedAt\"",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T033",
+      "category": "owned",
+      "conversationId": "3C78EA4E-3184-438E-B050-152D91CA1F33",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"3c78ea4e-3184-438e-b050-152d91ca1f33\",\"deviceId\":\"94b5dd13-d869-4c55-93fc-db4a8ad54dcf\",\"startedAt\":\"2026-04-07T20:30:27.95789\",\"endedAt\"",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T034",
+      "category": "owned",
+      "conversationId": "41D0482A-BB49-4E67-990B-46F29D0742A1",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"41d0482a-bb49-4e67-990b-46f29d0742a1\",\"deviceId\":\"5ca7babb-e869-4854-b659-e041cb4061a7\",\"startedAt\":\"2026-04-07T20:30:27.957939\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T035",
+      "category": "owned",
+      "conversationId": "5525B609-CC29-4AAC-A072-271EF2688703",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"5525b609-cc29-4aac-a072-271ef2688703\",\"deviceId\":\"b5903fdd-3180-424e-b1bd-c8afab5f65f4\",\"startedAt\":\"2026-04-07T20:30:27.958046\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T036",
+      "category": "owned",
+      "conversationId": "B40D2CD6-2917-46D9-96B3-E600F5528E19",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"b40d2cd6-2917-46d9-96b3-e600f5528e19\",\"deviceId\":\"70c33d20-9f71-4b4d-b77f-9b5d3b3fb33e\",\"startedAt\":\"2026-04-07T20:30:27.958086\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T037",
+      "category": "owned",
+      "conversationId": "B38957C5-D5A5-4CDB-B0AC-6F1DAA4C4745",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"b38957c5-d5a5-4cdb-b0ac-6f1daa4c4745\",\"deviceId\":\"d945bf0b-ef7e-46c1-934e-214dc3aa99cd\",\"startedAt\":\"2026-04-07T20:30:27.958134\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T038",
+      "category": "owned",
+      "conversationId": "0E10E3E9-A26E-4EAD-88A1-A82C04631A1C",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"0e10e3e9-a26e-4ead-88a1-a82c04631a1c\",\"deviceId\":\"e659e98c-3ca3-4c4b-9347-c50a67959e79\",\"startedAt\":\"2026-04-07T20:30:27.958178\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T039",
+      "category": "owned",
+      "conversationId": "122E01A7-8D11-4999-8F78-FFB35A9691FD",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"122e01a7-8d11-4999-8f78-ffb35a9691fd\",\"deviceId\":\"5700964a-4005-410b-af7a-575a9e51d741\",\"startedAt\":\"2026-04-07T20:30:27.958218\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T040",
+      "category": "owned",
+      "conversationId": "D03799DB-3F61-4A3C-99A7-AC8686FE4716",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "passed": true,
+      "responseSnippet": "{\"conversation\":{\"id\":\"d03799db-3f61-4a3c-99a7-ac8686fe4716\",\"deviceId\":\"4bfd35a4-f950-48fd-b81f-390aa45ad606\",\"startedAt\":\"2026-04-07T20:30:27.958259\",\"endedAt",
+      "notes": "messages=2 deviceIdMatches=True"
+    },
+    {
+      "testId": "T041",
+      "category": "non_owned",
+      "conversationId": "A0CFD828-C038-475A-932C-238257BA5710",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-86405b2e03e1d38738a094ca502a3885-aece09995fc31522-00",
+      "notes": ""
+    },
+    {
+      "testId": "T042",
+      "category": "non_owned",
+      "conversationId": "B2D44C1F-B015-4CAE-88CA-B1212EBE6E0C",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-c1dcd9b7934d2c5533e29468656ca1ba-34ac095761cc423d-00",
+      "notes": ""
+    },
+    {
+      "testId": "T043",
+      "category": "non_owned",
+      "conversationId": "C2ACA819-DE2E-462B-85DB-720FB23EC8F9",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-a5b66892819c023f28be229de919ce0c-1a95efdcb2369d20-00",
+      "notes": ""
+    },
+    {
+      "testId": "T044",
+      "category": "non_owned",
+      "conversationId": "50D62F05-39A3-46FF-B6B0-095708C29600",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-41f54e5fae3d03db6735c8ddd5d67ec8-065f66efb728a32d-00",
+      "notes": ""
+    },
+    {
+      "testId": "T045",
+      "category": "non_owned",
+      "conversationId": "16979B63-1E49-4886-B080-43286825E860",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-c95913d93565ac632b28e574747563a2-c8ced3354b27824c-00",
+      "notes": ""
+    },
+    {
+      "testId": "T046",
+      "category": "non_owned",
+      "conversationId": "46CA4CA1-7E52-4C13-B185-53C0EC123E40",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-5bbffaaf84bc9d77f17246af36eaeaef-36487143e145924b-00",
+      "notes": ""
+    },
+    {
+      "testId": "T047",
+      "category": "non_owned",
+      "conversationId": "51E89329-6463-413A-BF9D-9C6B3990CC87",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-454eeefe02a87c55e75d4ba32f74dd55-3434c1c3484aeb15-00",
+      "notes": ""
+    },
+    {
+      "testId": "T048",
+      "category": "non_owned",
+      "conversationId": "9C5F796F-0334-48F0-8A9F-98432DA4875D",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-90080a00a3b531f2ac3ea80d8e3ad55b-3388feb5b628cd1c-00",
+      "notes": ""
+    },
+    {
+      "testId": "T049",
+      "category": "non_owned",
+      "conversationId": "5CB53AB0-B085-492D-B367-718A70ED41D5",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-b0dced3a23321bc44ff128bbbf39de6b-19281afaeefbcf2b-00",
+      "notes": ""
+    },
+    {
+      "testId": "T050",
+      "category": "non_owned",
+      "conversationId": "CF898644-4EF3-4E2B-A44B-2ACFC885E759",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-990a6fe9f3107ea3b9af217051154790-f98bccb1689407d4-00",
+      "notes": ""
+    },
+    {
+      "testId": "T051",
+      "category": "non_owned",
+      "conversationId": "774E9B45-FFA5-4CD0-B49E-059D9419332C",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-a0ce9b707a8970d263c20a84e8111b26-b8099bb51d17349d-00",
+      "notes": ""
+    },
+    {
+      "testId": "T052",
+      "category": "non_owned",
+      "conversationId": "6128B329-3E3E-44FA-A1F5-8D5F62C8D90D",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-deafc9d9db1e6b33ceedb0557e2d6c3b-818fb7b794e296fb-00",
+      "notes": ""
+    },
+    {
+      "testId": "T053",
+      "category": "non_owned",
+      "conversationId": "3CCEF1FB-BFB6-436F-9429-DA62D2A5F93D",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-33bc8ee7ce71db4a44bfdcf38023c066-57a88f4b6f481bf0-00",
+      "notes": ""
+    },
+    {
+      "testId": "T054",
+      "category": "non_owned",
+      "conversationId": "C5208F36-6057-4871-AD0E-D7701E81C29E",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-e60e7b783b13e79627ce5b487841084a-7e6cd0c7d57f477f-00",
+      "notes": ""
+    },
+    {
+      "testId": "T055",
+      "category": "non_owned",
+      "conversationId": "C25C2961-E043-43F5-A59D-D87E3973A8A6",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-589fca55bd49f78a4608362b9826e861-41173aee22a2a1c3-00",
+      "notes": ""
+    },
+    {
+      "testId": "T056",
+      "category": "non_owned",
+      "conversationId": "5802F535-4D50-48AC-B42F-708ED7C75B5F",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-77e084009127022cecc5fbd7bf804c3c-c16236a91c93a733-00",
+      "notes": ""
+    },
+    {
+      "testId": "T057",
+      "category": "non_owned",
+      "conversationId": "21D3DC3C-F43A-4DDA-BEF4-96F1CD94E8E0",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-0467fe7559631a25aadaa40d4bac0b54-a45f62e86e95010d-00",
+      "notes": ""
+    },
+    {
+      "testId": "T058",
+      "category": "non_owned",
+      "conversationId": "E3ED4CC2-B753-4C70-85D2-28DAEB645AFA",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-3e58aafcceb4e65587d673515e1658b6-72c24ac504310ef6-00",
+      "notes": ""
+    },
+    {
+      "testId": "T059",
+      "category": "non_owned",
+      "conversationId": "2DE101B4-2C10-4940-813C-F83E23B9546A",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-7e9d02eb30b874caacb9d7af1efe626a-a65c85493dc3b8c6-00",
+      "notes": ""
+    },
+    {
+      "testId": "T060",
+      "category": "non_owned",
+      "conversationId": "14FD9A4D-9908-4B96-B5DC-4835675D5D40",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-5cafbf601cd534495764423beb018146-6a4aaf464c89f7e3-00",
+      "notes": ""
+    },
+    {
+      "testId": "T061",
+      "category": "non_owned",
+      "conversationId": "6CAF1E7F-5BC0-4435-B50B-125A739A1984",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-24fafe799e9de133a3a2bc5f65f142f9-84da0a2d85cb7bc0-00",
+      "notes": ""
+    },
+    {
+      "testId": "T062",
+      "category": "non_owned",
+      "conversationId": "10F8CDFA-ADD4-4C54-9A01-8D415A2DC3DB",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-608e86673c9cdb391479610d7cd0ace6-b19b333d59a5d69e-00",
+      "notes": ""
+    },
+    {
+      "testId": "T063",
+      "category": "non_owned",
+      "conversationId": "AA636BB2-CB10-4607-9E0C-4093C9AB833E",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-61a2c782aa5ef0522d47f45e562d8df5-f577c3fd8435a272-00",
+      "notes": ""
+    },
+    {
+      "testId": "T064",
+      "category": "non_owned",
+      "conversationId": "82F14EBA-A459-4094-94F9-8D97B1C67BD8",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-903dcd0f26a5328ff886bda11b98cc70-d8f74b790d193dc4-00",
+      "notes": ""
+    },
+    {
+      "testId": "T065",
+      "category": "non_owned",
+      "conversationId": "DDF548E1-B73B-4E63-93B0-B88645E00136",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-44cd4b2fac0330ee8ac8eb24bdaa8e40-adf7dcea304b56a5-00",
+      "notes": ""
+    },
+    {
+      "testId": "T066",
+      "category": "non_owned",
+      "conversationId": "C9250A1C-BCF4-454A-84F4-40FA4A187BD4",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-29dc08a1879edafab10959b7c4562ed0-d3601cfbfad58550-00",
+      "notes": ""
+    },
+    {
+      "testId": "T067",
+      "category": "non_owned",
+      "conversationId": "0C0E87D7-6791-4497-9948-A593EF70A5D5",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-287be98a30583a12460eb656fa9fbce3-112b1171c72cd497-00",
+      "notes": ""
+    },
+    {
+      "testId": "T068",
+      "category": "non_owned",
+      "conversationId": "2DD6E658-7F6D-4A7B-BBD7-FE879317C455",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-472ff323aff1d44a571a5bfc58ad1147-bbfc2eaffd054a19-00",
+      "notes": ""
+    },
+    {
+      "testId": "T069",
+      "category": "non_owned",
+      "conversationId": "9DCF3AD9-6DE1-472B-A2F6-A5E36989FD8A",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-1d3b55d4b9056d19e2ef1f4cbac62e37-155e34781a438029-00",
+      "notes": ""
+    },
+    {
+      "testId": "T070",
+      "category": "non_owned",
+      "conversationId": "0660ECCE-F172-4164-AB79-D375A01EE6B4",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-978f509da68838eeed87b08698ab795b-5f678ad4b7b3bfe5-00",
+      "notes": ""
+    },
+    {
+      "testId": "T071",
+      "category": "fake",
+      "conversationId": "09A0F211-6D7E-454F-A284-05E536E4C4A5",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-8aa6e300aa9f99d47a1c1681b673d59c-eea9f3b5714950be-00",
+      "notes": ""
+    },
+    {
+      "testId": "T072",
+      "category": "fake",
+      "conversationId": "753B6F32-3DCA-4AB4-9B6C-4418D1876F4E",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-7e16dc525a75be112c9de2257af6778c-955f014fabeec000-00",
+      "notes": ""
+    },
+    {
+      "testId": "T073",
+      "category": "fake",
+      "conversationId": "89FB7574-9AA1-458D-A64E-808AE838D88C",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-55bc021e8e3b699366fea071b04ffdf2-3bfd077fb4cb47ab-00",
+      "notes": ""
+    },
+    {
+      "testId": "T074",
+      "category": "fake",
+      "conversationId": "8E32C7FD-6CF0-4FA7-8BA6-A30C8B52C4F6",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-217c04380cb8f17db4efaf3226c55e36-f7f02bcdbf4cb1b7-00",
+      "notes": ""
+    },
+    {
+      "testId": "T075",
+      "category": "fake",
+      "conversationId": "F9EDCC5C-392E-411B-88EC-05007EA83A77",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-1b303fc3be64a0f3513e2ff12441af46-912ddfdb62e5c564-00",
+      "notes": ""
+    },
+    {
+      "testId": "T076",
+      "category": "fake",
+      "conversationId": "7A255AD6-E9A6-4D68-8C6D-2C83FEFE675C",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-726f0cfcd0abf59618547e1dffc42dae-cdff2ebaf1dda3b1-00",
+      "notes": ""
+    },
+    {
+      "testId": "T077",
+      "category": "fake",
+      "conversationId": "94FD2565-CC58-4839-B7F3-24E0DE66322B",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-b242678e4f3382b5793af6c99d9f64de-92c27f3f3b7f2a29-00",
+      "notes": ""
+    },
+    {
+      "testId": "T078",
+      "category": "fake",
+      "conversationId": "B303C740-820C-4762-9F43-DFDD3C0E40D8",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-d53c01fbed689d587cb5dbd37ca2c516-99bf511c4bbdb6c3-00",
+      "notes": ""
+    },
+    {
+      "testId": "T079",
+      "category": "fake",
+      "conversationId": "5DC5B1C0-1B71-47A1-99BA-74001BCABE12",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-338a92717714e7d3342d038fd3030798-b38f9dd3218c4a17-00",
+      "notes": ""
+    },
+    {
+      "testId": "T080",
+      "category": "fake",
+      "conversationId": "3BD22D19-BFC5-4A16-B6A4-4D918C294DE9",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-3e179eaaf7921030dfd5b46aa3615371-07fd3bf1c61c3845-00",
+      "notes": ""
+    },
+    {
+      "testId": "T081",
+      "category": "fake",
+      "conversationId": "4BC38D8F-81BE-4EF1-8E01-D9ED0893F8C0",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-d518ee00db4a25e21b04773b3b138103-33e4d0f5499fdfe6-00",
+      "notes": ""
+    },
+    {
+      "testId": "T082",
+      "category": "fake",
+      "conversationId": "FA4DD0FE-9CF7-421B-B965-D84C5E286A6C",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-a09b67c485821aed544ee124bd1db959-3187f95ce4149feb-00",
+      "notes": ""
+    },
+    {
+      "testId": "T083",
+      "category": "fake",
+      "conversationId": "56FB85AF-1006-48A5-8A41-F35AE849BA25",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-00d8d9c2a3b48f38d9cf7114445b555d-74eae1f785297e7a-00",
+      "notes": ""
+    },
+    {
+      "testId": "T084",
+      "category": "fake",
+      "conversationId": "EC8C4D1C-31E5-4C7D-A3E4-52B390AF36A4",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-b7faedf45cdd32baa2f5b65a269d90a0-d061987b49e726d2-00",
+      "notes": ""
+    },
+    {
+      "testId": "T085",
+      "category": "fake",
+      "conversationId": "210470AC-1A6A-44B1-813F-722F855330B5",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-ce0ae262caac7d1df76702401ef5ef5e-23de7537da91cea4-00",
+      "notes": ""
+    },
+    {
+      "testId": "T086",
+      "category": "fake",
+      "conversationId": "B9BA3446-2C55-4533-BB4B-6940490EB196",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-b81c296754730d1dee28031979e375a8-c8413fea441d1764-00",
+      "notes": ""
+    },
+    {
+      "testId": "T087",
+      "category": "fake",
+      "conversationId": "E77F6266-A638-47B8-B82D-F340FA2B2D04",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-7dd5c13b07e478737bcf323d63f71706-3cb12a36bdd37230-00",
+      "notes": ""
+    },
+    {
+      "testId": "T088",
+      "category": "fake",
+      "conversationId": "181B1CEE-4ECF-4703-8BFB-927F9FF81B54",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-39cb35badde9a2de696d2affcedc00c8-9f4d925824332ed7-00",
+      "notes": ""
+    },
+    {
+      "testId": "T089",
+      "category": "fake",
+      "conversationId": "B0C0E60A-60A2-4E85-8593-CCADCFCC6C27",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-11adfdea7a306d069895fb8df662f31a-bda3b48b5d671a13-00",
+      "notes": ""
+    },
+    {
+      "testId": "T090",
+      "category": "fake",
+      "conversationId": "BCBFDBE4-4C4B-4EAC-83FA-28DBDBABEE39",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-f5b1bad338bd056bd70b6866c2aaab91-71ba6fe255de461e-00",
+      "notes": ""
+    },
+    {
+      "testId": "T091",
+      "category": "fake",
+      "conversationId": "FEE0059C-146B-499F-B131-53DC5EB19247",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-83d7c132c85842be4a877b8ba63fdb77-4390e4f219a78b8e-00",
+      "notes": ""
+    },
+    {
+      "testId": "T092",
+      "category": "fake",
+      "conversationId": "F40312F6-58E6-47D1-B2AC-7F939CCDDDFC",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-1c6362f062cfbed985f6a620b86bbea1-b9d06c4bba4bb763-00",
+      "notes": ""
+    },
+    {
+      "testId": "T093",
+      "category": "fake",
+      "conversationId": "DEB69C4B-BB48-48C9-BA8A-A7DDF1EB91DD",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-1ee6d0a67ac7da26a055394fa35b1c4b-b33acc61a1bd86d4-00",
+      "notes": ""
+    },
+    {
+      "testId": "T094",
+      "category": "fake",
+      "conversationId": "252E98EE-1E5C-469F-A77A-33C641F7FBEB",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-c7d0e13ec484420651c40a9ccc46a755-6dba5cfd18e77ba6-00",
+      "notes": ""
+    },
+    {
+      "testId": "T095",
+      "category": "fake",
+      "conversationId": "5A84FE95-10A7-448E-AD59-5CDDA6432999",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-7e2d1e895cb9abf1b05a35c0bc4efd3a-86d94110bf2dbdf6-00",
+      "notes": ""
+    },
+    {
+      "testId": "T096",
+      "category": "fake",
+      "conversationId": "713CF8EA-1440-428E-9C50-1938D5B6F00F",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-77a481cedac0c3c591eb6c9623311014-b63adb8325de00db-00",
+      "notes": ""
+    },
+    {
+      "testId": "T097",
+      "category": "fake",
+      "conversationId": "20BEDC3C-C08D-4065-A6CD-85C406984B83",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-67ad9557132c2df67e14506db2aced6e-05b126ac6833cb88-00",
+      "notes": ""
+    },
+    {
+      "testId": "T098",
+      "category": "fake",
+      "conversationId": "42C9293C-4E58-422A-ADD9-8B3F573C5EC5",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-0269b18a71b26e5de25596997595e61f-d827563ef6d5f25a-00",
+      "notes": ""
+    },
+    {
+      "testId": "T099",
+      "category": "fake",
+      "conversationId": "EF27285E-1A9D-4128-B22F-2FB2C1754225",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-5bd91bf7daf2f59e4ad41143a23c7ac6-e93b3e699c892339-00",
+      "notes": ""
+    },
+    {
+      "testId": "T100",
+      "category": "fake",
+      "conversationId": "24D91905-5261-49BF-A914-3EF26CD29377",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "passed": true,
+      "responseSnippet": "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.5\",\"title\":\"Not Found\",\"status\":404,\"traceId\":\"00-60295c46ca5f472e7829d2bea39a58ae-070097cb3c9e060d-00",
+      "notes": ""
+    }
+  ]
+}
