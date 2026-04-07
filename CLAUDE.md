@@ -53,6 +53,31 @@ Database (SQLite) auto-creates on first run via `EnsureCreated()`.
 
 **ESP32 Firmware** — Thin client. Proxies to .NET backend. No AI on device.
 
+## Parent-Facing Read-Only Monitoring Surface
+
+A read-only dashboard for parents to review device activity. Strictly observational —
+no editing, no deletion, no child-facing features.
+
+**UI**
+- `wwwroot/parent.html` — single self-contained static page (HTML + inline CSS + vanilla JS, no framework, no build step).
+- Discoverable via a small link inside the Parent Monitoring panel of `wwwroot/index.html`.
+- Views: login → linked devices → conversation summaries / flagged messages tabs → conversation detail.
+
+**Backend endpoints** (all parent-JWT authenticated, ownership-checked against linked devices)
+- `POST /api/parents/login` — issues JWT
+- `GET  /api/parents/devices` — list linked device ids
+- `GET  /api/conversations?deviceId=&limit=&offset=` — full conversation history
+- `GET  /api/conversations/summary?deviceId=&limit=&offset=` — lightweight summary rows with snippets
+- `GET  /api/conversations/flagged?deviceId=&limit=&offset=` — flat newest-first list of non-Clean messages
+- `GET  /api/conversations/{conversationId}` — full conversation detail (404 on not-yours, no existence leak)
+
+**Pagination guard**: list endpoints reject `offset < 0` and `limit < 1` with 400, and clamp `limit > 100` to 100. Lives as a private static helper inside `ConversationController`.
+
+**Manual smoke**
+1. `dotnet run --project src/ArmenianAiToy.Api`
+2. Open `http://localhost:5000/` → click "Open the Parent Dashboard →" in the Parent Monitoring panel.
+3. Log in as a registered parent → click a linked device → switch between Conversations / Flagged tabs → click a row to open detail.
+
 ## Engineering Guardrails
 
 - **No architecture redesign.** Work within existing structure.
