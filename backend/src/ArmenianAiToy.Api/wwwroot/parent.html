@@ -64,6 +64,23 @@
     }
     button.link:hover { background: none; color: #5b3e8a; }
 
+    .tabs {
+      display: inline-flex;
+      gap: 6px;
+      margin: 0 8px;
+      vertical-align: middle;
+    }
+    .tabs button {
+      padding: 5px 12px;
+      font-size: 12px;
+      background: #ece4f8;
+      color: #5b3e8a;
+      border-radius: 999px;
+    }
+    .tabs button:hover { background: #d8c8f0; }
+    .tabs button.active { background: #7c5cbf; color: white; }
+    .tabs button.active:hover { background: #6b4aad; }
+
     .status { font-size: 13px; padding: 8px 0; min-height: 20px; }
     .status.err { color: #c62828; }
     .status.muted { color: #9a8ab5; }
@@ -99,6 +116,21 @@
       margin-top: 2px;
     }
     .row .snippet.assistant { color: #7c5cbf; }
+    .row .content-block {
+      color: #2b1f47;
+      margin-top: 4px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .row .from-line {
+      font-size: 11px;
+      color: #9a8ab5;
+      margin-top: 6px;
+    }
 
     .badge {
       display: inline-block;
@@ -107,6 +139,15 @@
       border-radius: 999px;
       background: #fce4ec;
       color: #c62828;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .badge.warn { background: #fff3e0; color: #e65100; }
+    .badge.muted { background: #ece4f8; color: #6b5b8a; }
+    .role-tag {
+      display: inline-block;
+      font-size: 11px;
+      color: #6b5b8a;
       margin-left: 6px;
       vertical-align: middle;
     }
@@ -177,7 +218,14 @@
 
     <!-- Summaries view -->
     <section id="summariesView" class="card" hidden>
-      <h2><button class="link" id="backToDevices">← Devices</button> &nbsp; Conversations <span id="summariesDeviceLabel" class="sub"></span></h2>
+      <h2>
+        <button class="link" id="backToDevices">← Devices</button>
+        <span class="tabs">
+          <button data-tab="summaries">Conversations</button>
+          <button data-tab="flagged">Flagged</button>
+        </span>
+        <span id="summariesDeviceLabel" class="sub"></span>
+      </h2>
       <div id="summariesList"></div>
       <div id="summariesStatus" class="status muted"></div>
       <div class="pager">
@@ -186,9 +234,27 @@
       </div>
     </section>
 
+    <!-- Flagged view -->
+    <section id="flaggedView" class="card" hidden>
+      <h2>
+        <button class="link" id="flaggedBackToDevices">← Devices</button>
+        <span class="tabs">
+          <button data-tab="summaries">Conversations</button>
+          <button data-tab="flagged">Flagged</button>
+        </span>
+        <span id="flaggedDeviceLabel" class="sub"></span>
+      </h2>
+      <div id="flaggedList"></div>
+      <div id="flaggedStatus" class="status muted"></div>
+      <div class="pager">
+        <button id="flaggedNewerBtn" class="secondary">← Newer</button>
+        <button id="flaggedOlderBtn" class="secondary">Older →</button>
+      </div>
+    </section>
+
     <!-- Detail view -->
     <section id="detailView" class="card" hidden>
-      <h2><button class="link" id="backToSummaries">← Conversations</button></h2>
+      <h2><button class="link" id="backFromDetailBtn">← Back</button></h2>
       <div id="detailMeta" class="status muted"></div>
       <div id="detailMessages"></div>
       <div id="detailStatus" class="status"></div>
@@ -204,7 +270,9 @@
     var PAGE_SIZE = 20;
     var state = {
       currentDeviceId: null,
-      offset: 0
+      offset: 0,
+      flaggedOffset: 0,
+      backFromDetail: null
     };
 
     // ---------- helpers ----------
@@ -213,7 +281,7 @@
     function clearToken() { sessionStorage.removeItem(TOKEN_KEY); }
 
     function show(viewId) {
-      var ids = ['loginView', 'devicesView', 'summariesView', 'detailView'];
+      var ids = ['loginView', 'devicesView', 'summariesView', 'flaggedView', 'detailView'];
       for (var i = 0; i < ids.length; i++) {
         document.getElementById(ids[i]).hidden = (ids[i] !== viewId);
       }
@@ -244,6 +312,17 @@
       if (role === 'user') return 'Child';
       if (role === 'assistant') return 'Assistant';
       return String(role || '');
+    }
+
+    function setActiveTab(name) {
+      var tabs = document.querySelectorAll('.tabs button');
+      for (var i = 0; i < tabs.length; i++) {
+        if (tabs[i].getAttribute('data-tab') === name) {
+          tabs[i].classList.add('active');
+        } else {
+          tabs[i].classList.remove('active');
+        }
+      }
     }
 
     // ---------- fetch wrapper ----------
@@ -310,6 +389,8 @@
       clearToken();
       state.currentDeviceId = null;
       state.offset = 0;
+      state.flaggedOffset = 0;
+      state.backFromDetail = null;
       show('loginView');
       setStatus('loginStatus', '', '');
     }
@@ -353,11 +434,14 @@
     function openDevice(deviceId) {
       state.currentDeviceId = deviceId;
       state.offset = 0;
+      state.flaggedOffset = 0;
       loadSummaries();
     }
 
     function loadSummaries() {
       show('summariesView');
+      setActiveTab('summaries');
+      state.backFromDetail = loadSummaries;
       document.getElementById('summariesDeviceLabel').textContent = state.currentDeviceId
         ? '· device ' + shortId(state.currentDeviceId)
         : '';
@@ -441,6 +525,103 @@
       loadSummaries();
     }
 
+    // ---------- flagged ----------
+    function loadFlagged() {
+      show('flaggedView');
+      setActiveTab('flagged');
+      state.backFromDetail = loadFlagged;
+      document.getElementById('flaggedDeviceLabel').textContent = state.currentDeviceId
+        ? '· device ' + shortId(state.currentDeviceId)
+        : '';
+      setStatus('flaggedStatus', 'Loading…', 'muted');
+      var listEl = document.getElementById('flaggedList');
+      clearChildren(listEl);
+
+      var url = '/api/conversations/flagged'
+        + '?deviceId=' + encodeURIComponent(state.currentDeviceId)
+        + '&limit=' + PAGE_SIZE
+        + '&offset=' + state.flaggedOffset;
+
+      authedFetch(url).then(function (data) {
+        var rows = (data && data.flaggedMessages) || [];
+        if (rows.length === 0) {
+          setStatus('flaggedStatus',
+            state.flaggedOffset === 0 ? 'No flagged messages.' : 'No more flagged messages.',
+            'muted');
+          return;
+        }
+        setStatus('flaggedStatus', '', '');
+        rows.forEach(function (row) {
+          listEl.appendChild(buildFlaggedRow(row));
+        });
+      }).catch(function (err) {
+        if (err && err.status === 401) return;
+        setStatus('flaggedStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+      });
+    }
+
+    function buildFlaggedRow(row) {
+      var btn = document.createElement('button');
+      btn.className = 'row';
+      btn.title = row.conversationId || '';
+
+      var top = document.createElement('div');
+      top.className = 'top';
+
+      var leftWrap = document.createElement('span');
+      var timeSpan = document.createElement('span');
+      timeSpan.textContent = fmtTime(row.timestamp);
+      leftWrap.appendChild(timeSpan);
+
+      var rightWrap = document.createElement('span');
+      var badge = document.createElement('span');
+      // safetyFlag may serialize as enum string ("Flagged"/"Blocked") or int (1/2).
+      var flag = row.safetyFlag;
+      if (flag === 'Blocked' || flag === 2) {
+        badge.className = 'badge';
+        badge.textContent = '⚠ Blocked';
+      } else if (flag === 'Flagged' || flag === 1) {
+        badge.className = 'badge warn';
+        badge.textContent = '⚠ Flagged';
+      } else {
+        badge.className = 'badge muted';
+        badge.textContent = String(flag == null ? '' : flag);
+      }
+      rightWrap.appendChild(badge);
+
+      var roleTag = document.createElement('span');
+      roleTag.className = 'role-tag';
+      roleTag.textContent = String(row.role || '');
+      rightWrap.appendChild(roleTag);
+
+      top.appendChild(leftWrap);
+      top.appendChild(rightWrap);
+      btn.appendChild(top);
+
+      var content = document.createElement('div');
+      content.className = 'content-block';
+      content.textContent = row.content || '';
+      btn.appendChild(content);
+
+      var fromLine = document.createElement('div');
+      fromLine.className = 'from-line';
+      fromLine.textContent = 'from conversation started ' + fmtTime(row.conversationStartedAt);
+      btn.appendChild(fromLine);
+
+      var convId = row.conversationId;
+      btn.addEventListener('click', function () { openConversation(convId); });
+      return btn;
+    }
+
+    function pageOlderFlagged() {
+      state.flaggedOffset += PAGE_SIZE;
+      loadFlagged();
+    }
+    function pageNewerFlagged() {
+      state.flaggedOffset = Math.max(0, state.flaggedOffset - PAGE_SIZE);
+      loadFlagged();
+    }
+
     // ---------- detail ----------
     function openConversation(conversationId) {
       show('detailView');
@@ -505,6 +686,14 @@
       return div;
     }
 
+    function backFromDetail() {
+      if (typeof state.backFromDetail === 'function') {
+        state.backFromDetail();
+      } else {
+        loadSummaries();
+      }
+    }
+
     // ---------- wiring ----------
     document.getElementById('loginBtn').addEventListener('click', doLogin);
     document.getElementById('passwordInput').addEventListener('keydown', function (e) {
@@ -512,9 +701,27 @@
     });
     document.getElementById('logoutBtn').addEventListener('click', doLogout);
     document.getElementById('backToDevices').addEventListener('click', loadDevices);
-    document.getElementById('backToSummaries').addEventListener('click', loadSummaries);
+    document.getElementById('flaggedBackToDevices').addEventListener('click', loadDevices);
+    document.getElementById('backFromDetailBtn').addEventListener('click', backFromDetail);
     document.getElementById('olderBtn').addEventListener('click', pageOlder);
     document.getElementById('newerBtn').addEventListener('click', pageNewer);
+    document.getElementById('flaggedOlderBtn').addEventListener('click', pageOlderFlagged);
+    document.getElementById('flaggedNewerBtn').addEventListener('click', pageNewerFlagged);
+
+    // Tab buttons (in both summaries and flagged views)
+    var tabButtons = document.querySelectorAll('.tabs button');
+    for (var i = 0; i < tabButtons.length; i++) {
+      (function (btn) {
+        btn.addEventListener('click', function () {
+          var t = btn.getAttribute('data-tab');
+          if (t === 'flagged') {
+            loadFlagged();
+          } else {
+            loadSummaries();
+          }
+        });
+      })(tabButtons[i]);
+    }
 
     // ---------- boot ----------
     if (getToken()) {
