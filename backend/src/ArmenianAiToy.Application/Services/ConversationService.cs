@@ -147,6 +147,31 @@ public class ConversationService : IConversationService
         )).ToList();
     }
 
+    public async Task<List<FlaggedMessageDto>> GetFlaggedMessagesAsync(Guid deviceId, int limit = 20, int offset = 0)
+    {
+        var rows = await _db.Set<Message>()
+            .Join(
+                _db.Set<Conversation>().Where(c => c.DeviceId == deviceId),
+                m => m.ConversationId,
+                c => c.Id,
+                (m, c) => new { Message = m, ConversationStartedAt = c.StartedAt })
+            .Where(x => x.Message.SafetyFlag != SafetyFlag.Clean)
+            .OrderByDescending(x => x.Message.Timestamp)
+            .Skip(offset)
+            .Take(limit)
+            .Select(x => new FlaggedMessageDto(
+                x.Message.Id,
+                x.Message.ConversationId,
+                x.ConversationStartedAt,
+                x.Message.Role.ToString().ToLower(),
+                x.Message.Content,
+                x.Message.Timestamp,
+                x.Message.SafetyFlag))
+            .ToListAsync();
+
+        return rows;
+    }
+
     private static string? MakeSnippet(string? content)
     {
         if (string.IsNullOrWhiteSpace(content))

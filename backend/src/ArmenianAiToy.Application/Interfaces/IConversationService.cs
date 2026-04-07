@@ -12,4 +12,5 @@ public interface IConversationService
     Task<List<ConversationDto>> GetConversationHistoryAsync(Guid deviceId, int limit = 10, int offset = 0);
     Task<ConversationDto?> GetConversationByIdAsync(Guid conversationId);
     Task<List<ConversationSummaryDto>> GetConversationSummariesAsync(Guid deviceId, int limit = 20, int offset = 0);
+    Task<List<FlaggedMessageDto>> GetFlaggedMessagesAsync(Guid deviceId, int limit = 20, int offset = 0);
 }
