@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\ArmenianAiToy.Api\ArmenianAiToy.Api.csproj" />
     <ProjectReference Include="..\..\src\ArmenianAiToy.Application\ArmenianAiToy.Application.csproj" />
     <ProjectReference Include="..\..\src\ArmenianAiToy.Domain\ArmenianAiToy.Domain.csproj" />
   </ItemGroup>

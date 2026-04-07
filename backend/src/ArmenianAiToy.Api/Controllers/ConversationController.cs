@@ -9,6 +9,8 @@ namespace ArmenianAiToy.Api.Controllers;
 [Route("api/conversations")]
 public class ConversationController : ControllerBase
 {
+    private const int MaxLimit = 100;
+
     private readonly IConversationService _conversationService;
     private readonly IParentService _parentService;
 
@@ -25,6 +27,9 @@ public class ConversationController : ControllerBase
         [FromQuery] int limit = 10,
         [FromQuery] int offset = 0)
     {
+        if (!TryNormalizePagination(ref limit, offset, out var error))
+            return BadRequest(new { error });
+
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var linkedDevices = await _parentService.GetLinkedDeviceIdsAsync(parentId);
 
@@ -42,6 +47,9 @@ public class ConversationController : ControllerBase
         [FromQuery] int limit = 20,
         [FromQuery] int offset = 0)
     {
+        if (!TryNormalizePagination(ref limit, offset, out var error))
+            return BadRequest(new { error });
+
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var linkedDevices = await _parentService.GetLinkedDeviceIdsAsync(parentId);
 
@@ -59,6 +67,9 @@ public class ConversationController : ControllerBase
         [FromQuery] int limit = 20,
         [FromQuery] int offset = 0)
     {
+        if (!TryNormalizePagination(ref limit, offset, out var error))
+            return BadRequest(new { error });
+
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var linkedDevices = await _parentService.GetLinkedDeviceIdsAsync(parentId);
 
@@ -85,5 +96,29 @@ public class ConversationController : ControllerBase
             return NotFound();
 
         return Ok(new { conversation });
+    }
+
+    // Validates and clamps pagination inputs for the parent list endpoints.
+    // - offset < 0           => reject
+    // - limit  < 1           => reject
+    // - limit  > MaxLimit    => clamp to MaxLimit (mutates the ref)
+    private static bool TryNormalizePagination(ref int limit, int offset, out string? error)
+    {
+        if (offset < 0)
+        {
+            error = "offset must be >= 0";
+            return false;
+        }
+        if (limit < 1)
+        {
+            error = "limit must be between 1 and " + MaxLimit;
+            return false;
+        }
+        if (limit > MaxLimit)
+        {
+            limit = MaxLimit;
+        }
+        error = null;
+        return true;
     }
 }
