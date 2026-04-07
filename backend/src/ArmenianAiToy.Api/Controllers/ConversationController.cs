@@ -35,6 +35,23 @@ public class ConversationController : ControllerBase
         return Ok(new { conversations });
     }
 
+    [HttpGet("summary")]
+    [Authorize]
+    public async Task<IActionResult> GetSummary(
+        [FromQuery] Guid deviceId,
+        [FromQuery] int limit = 20,
+        [FromQuery] int offset = 0)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var linkedDevices = await _parentService.GetLinkedDeviceIdsAsync(parentId);
+
+        if (!linkedDevices.Contains(deviceId))
+            return Forbid();
+
+        var conversations = await _conversationService.GetConversationSummariesAsync(deviceId, limit, offset);
+        return Ok(new { conversations });
+    }
+
     [HttpGet("{conversationId}")]
     [Authorize]
     public async Task<IActionResult> GetById(Guid conversationId)

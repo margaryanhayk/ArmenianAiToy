@@ -15,6 +15,10 @@ public class ConversationService : IConversationService
     // A conversation is "active" if started within the last 30 minutes
     private static readonly TimeSpan ConversationTimeout = TimeSpan.FromMinutes(30);
 
+    // Local convention for the parent summary endpoint only.
+    // No prior snippet/preview helper exists in the repo, so this length lives here.
+    private const int SnippetMaxLength = 120;
+
     public ConversationService(DbContext db, ILogger<ConversationService> logger)
     {
         _db = db;
@@ -103,6 +107,54 @@ public class ConversationService : IConversationService
                 m.SafetyFlag
             )).ToList()
         )).ToList();
+    }
+
+    public async Task<List<ConversationSummaryDto>> GetConversationSummariesAsync(Guid deviceId, int limit = 20, int offset = 0)
+    {
+        var conversations = await _db.Set<Conversation>()
+            .Where(c => c.DeviceId == deviceId)
+            .OrderByDescending(c => c.StartedAt)
+            .Skip(offset)
+            .Take(limit)
+            .Select(c => new
+            {
+                c.Id,
+                c.StartedAt,
+                c.EndedAt,
+                MessageCount = c.Messages.Count(),
+                HasFlaggedContent = c.Messages.Any(m => m.SafetyFlag != SafetyFlag.Clean),
+                FirstUserContent = c.Messages
+                    .Where(m => m.Role == MessageRole.User)
+                    .OrderBy(m => m.Timestamp)
+                    .Select(m => m.Content)
+                    .FirstOrDefault(),
+                LastAssistantContent = c.Messages
+                    .Where(m => m.Role == MessageRole.Assistant)
+                    .OrderByDescending(m => m.Timestamp)
+                    .Select(m => m.Content)
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
+
+        return conversations.Select(c => new ConversationSummaryDto(
+            c.Id,
+            c.StartedAt,
+            c.EndedAt,
+            c.MessageCount,
+            c.HasFlaggedContent,
+            MakeSnippet(c.FirstUserContent),
+            MakeSnippet(c.LastAssistantContent)
+        )).ToList();
+    }
+
+    private static string? MakeSnippet(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return null;
+        var trimmed = content.Trim();
+        if (trimmed.Length <= SnippetMaxLength)
+            return trimmed;
+        return trimmed.Substring(0, SnippetMaxLength) + "…";
     }
 
     public async Task<ConversationDto?> GetConversationByIdAsync(Guid conversationId)
