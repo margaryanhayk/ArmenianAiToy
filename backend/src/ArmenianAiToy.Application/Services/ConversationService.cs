@@ -90,6 +90,7 @@ public class ConversationService : IConversationService
 
         return conversations.Select(c => new ConversationDto(
             c.Id,
+            c.DeviceId,
             c.StartedAt,
             c.EndedAt,
             c.Messages.Count,
@@ -102,5 +103,32 @@ public class ConversationService : IConversationService
                 m.SafetyFlag
             )).ToList()
         )).ToList();
+    }
+
+    public async Task<ConversationDto?> GetConversationByIdAsync(Guid conversationId)
+    {
+        var conversation = await _db.Set<Conversation>()
+            .Where(c => c.Id == conversationId)
+            .Include(c => c.Messages.OrderBy(m => m.Timestamp))
+            .FirstOrDefaultAsync();
+
+        if (conversation is null)
+            return null;
+
+        return new ConversationDto(
+            conversation.Id,
+            conversation.DeviceId,
+            conversation.StartedAt,
+            conversation.EndedAt,
+            conversation.Messages.Count,
+            conversation.Messages.Any(m => m.SafetyFlag != SafetyFlag.Clean),
+            conversation.Messages.Select(m => new MessageDto(
+                m.Id,
+                m.Role.ToString().ToLower(),
+                m.Content,
+                m.Timestamp,
+                m.SafetyFlag
+            )).ToList()
+        );
     }
 }

@@ -34,4 +34,22 @@ public class ConversationController : ControllerBase
         var conversations = await _conversationService.GetConversationHistoryAsync(deviceId, limit, offset);
         return Ok(new { conversations });
     }
+
+    [HttpGet("{conversationId}")]
+    [Authorize]
+    public async Task<IActionResult> GetById(Guid conversationId)
+    {
+        var conversation = await _conversationService.GetConversationByIdAsync(conversationId);
+        if (conversation is null)
+            return NotFound();
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var linkedDevices = await _parentService.GetLinkedDeviceIdsAsync(parentId);
+
+        // Same 404 for "not yours" as for "doesn't exist" — no existence leak.
+        if (!linkedDevices.Contains(conversation.DeviceId))
+            return NotFound();
+
+        return Ok(new { conversation });
+    }
 }

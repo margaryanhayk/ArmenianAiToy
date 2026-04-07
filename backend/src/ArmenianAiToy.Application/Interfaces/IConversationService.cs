@@ -10,4 +10,5 @@ public interface IConversationService
     Task<Message> AddMessageAsync(Guid conversationId, MessageRole role, string content, SafetyFlag flag = SafetyFlag.Clean);
     Task<List<(string Role, string Content)>> GetRecentMessagesAsync(Guid conversationId, int count = 20);
     Task<List<ConversationDto>> GetConversationHistoryAsync(Guid deviceId, int limit = 10, int offset = 0);
+    Task<ConversationDto?> GetConversationByIdAsync(Guid conversationId);
 }

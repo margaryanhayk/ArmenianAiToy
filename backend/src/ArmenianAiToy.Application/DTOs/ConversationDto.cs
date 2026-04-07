@@ -4,6 +4,7 @@ namespace ArmenianAiToy.Application.DTOs;
 
 public record ConversationDto(
     Guid Id,
+    Guid DeviceId,
     DateTime StartedAt,
     DateTime? EndedAt,
     int MessageCount,
