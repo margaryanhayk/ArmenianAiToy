@@ -63,6 +63,33 @@
       text-decoration: underline;
     }
     button.link:hover { background: none; color: #5b3e8a; }
+    button:disabled,
+    button.secondary:disabled {
+      background: #ece4f8;
+      color: #b8a8d6;
+      cursor: not-allowed;
+    }
+    button:focus-visible,
+    .row:focus-visible {
+      outline: 2px solid #7c5cbf;
+      outline-offset: 2px;
+    }
+
+    .device-context {
+      font-size: 12px;
+      color: #6b5b8a;
+      margin-top: 6px;
+      margin-bottom: 10px;
+      word-break: break-all;
+    }
+    .device-context strong { color: #5b3e8a; }
+
+    .pager-info {
+      font-size: 12px;
+      color: #9a8ab5;
+      text-align: center;
+      margin-top: 6px;
+    }
 
     .tabs {
       display: inline-flex;
@@ -160,6 +187,7 @@
       border-radius: 0 8px 8px 0;
     }
     .msg.flagged { border-left-color: #c62828; background: #fff5f6; }
+    .msg.flagged.warn { border-left-color: #e65100; background: #fff8f0; }
     .msg .meta {
       font-size: 11px;
       color: #9a8ab5;
@@ -206,58 +234,60 @@
       <label for="passwordInput">Password</label>
       <input id="passwordInput" type="password" autocomplete="current-password">
       <button id="loginBtn">Log in</button>
-      <div id="loginStatus" class="status"></div>
+      <div id="loginStatus" class="status" aria-live="polite"></div>
     </section>
 
     <!-- Devices view -->
     <section id="devicesView" class="card" hidden>
       <h2>Linked devices</h2>
       <div id="devicesList"></div>
-      <div id="devicesStatus" class="status muted"></div>
+      <div id="devicesStatus" class="status muted" aria-live="polite"></div>
     </section>
 
     <!-- Summaries view -->
     <section id="summariesView" class="card" hidden>
       <h2>
-        <button class="link" id="backToDevices">← Devices</button>
-        <span class="tabs">
-          <button data-tab="summaries">Conversations</button>
-          <button data-tab="flagged">Flagged</button>
+        <button class="link" id="backToDevices" aria-label="Back to devices">← Devices</button>
+        <span class="tabs" role="tablist" aria-label="Device views">
+          <button data-tab="summaries" role="tab" aria-selected="false">Conversations</button>
+          <button data-tab="flagged" role="tab" aria-selected="false">Flagged</button>
         </span>
-        <span id="summariesDeviceLabel" class="sub"></span>
       </h2>
+      <div id="summariesDeviceContext" class="device-context"></div>
       <div id="summariesList"></div>
-      <div id="summariesStatus" class="status muted"></div>
+      <div id="summariesStatus" class="status muted" aria-live="polite"></div>
       <div class="pager">
-        <button id="newerBtn" class="secondary">← Newer</button>
-        <button id="olderBtn" class="secondary">Older →</button>
+        <button id="newerBtn" class="secondary" aria-label="Newer page">← Newer</button>
+        <button id="olderBtn" class="secondary" aria-label="Older page">Older →</button>
       </div>
+      <div id="summariesPagerInfo" class="pager-info"></div>
     </section>
 
     <!-- Flagged view -->
     <section id="flaggedView" class="card" hidden>
       <h2>
-        <button class="link" id="flaggedBackToDevices">← Devices</button>
-        <span class="tabs">
-          <button data-tab="summaries">Conversations</button>
-          <button data-tab="flagged">Flagged</button>
+        <button class="link" id="flaggedBackToDevices" aria-label="Back to devices">← Devices</button>
+        <span class="tabs" role="tablist" aria-label="Device views">
+          <button data-tab="summaries" role="tab" aria-selected="false">Conversations</button>
+          <button data-tab="flagged" role="tab" aria-selected="false">Flagged</button>
         </span>
-        <span id="flaggedDeviceLabel" class="sub"></span>
       </h2>
+      <div id="flaggedDeviceContext" class="device-context"></div>
       <div id="flaggedList"></div>
-      <div id="flaggedStatus" class="status muted"></div>
+      <div id="flaggedStatus" class="status muted" aria-live="polite"></div>
       <div class="pager">
-        <button id="flaggedNewerBtn" class="secondary">← Newer</button>
-        <button id="flaggedOlderBtn" class="secondary">Older →</button>
+        <button id="flaggedNewerBtn" class="secondary" aria-label="Newer page">← Newer</button>
+        <button id="flaggedOlderBtn" class="secondary" aria-label="Older page">Older →</button>
       </div>
+      <div id="flaggedPagerInfo" class="pager-info"></div>
     </section>
 
     <!-- Detail view -->
     <section id="detailView" class="card" hidden>
-      <h2><button class="link" id="backFromDetailBtn">← Back</button></h2>
-      <div id="detailMeta" class="status muted"></div>
+      <h2><button class="link" id="backFromDetailBtn" aria-label="Back to list">← Back</button></h2>
+      <div id="detailMeta" class="status muted" aria-live="polite"></div>
       <div id="detailMessages"></div>
-      <div id="detailStatus" class="status"></div>
+      <div id="detailStatus" class="status" aria-live="polite"></div>
     </section>
   </div>
 
@@ -272,7 +302,9 @@
       currentDeviceId: null,
       offset: 0,
       flaggedOffset: 0,
-      backFromDetail: null
+      backFromDetail: null,
+      lastSummariesPageSize: 0,
+      lastFlaggedPageSize: 0
     };
 
     // ---------- helpers ----------
@@ -317,12 +349,33 @@
     function setActiveTab(name) {
       var tabs = document.querySelectorAll('.tabs button');
       for (var i = 0; i < tabs.length; i++) {
-        if (tabs[i].getAttribute('data-tab') === name) {
-          tabs[i].classList.add('active');
-        } else {
-          tabs[i].classList.remove('active');
-        }
+        var isActive = tabs[i].getAttribute('data-tab') === name;
+        tabs[i].classList.toggle('active', isActive);
+        tabs[i].setAttribute('aria-selected', isActive ? 'true' : 'false');
       }
+    }
+
+    function renderDeviceContext(elId) {
+      var el = document.getElementById(elId);
+      clearChildren(el);
+      if (!state.currentDeviceId) return;
+      var label = document.createElement('strong');
+      label.textContent = 'Device ' + shortId(state.currentDeviceId);
+      var full = document.createElement('span');
+      full.textContent = ' · ' + state.currentDeviceId;
+      el.appendChild(label);
+      el.appendChild(full);
+    }
+
+    function updatePager(newerBtnId, olderBtnId, infoId, offset, lastPageSize) {
+      var newerBtn = document.getElementById(newerBtnId);
+      var olderBtn = document.getElementById(olderBtnId);
+      var info = document.getElementById(infoId);
+      newerBtn.disabled = (offset === 0);
+      // Disable Older when the just-loaded page was empty or short (last page).
+      olderBtn.disabled = (lastPageSize < PAGE_SIZE);
+      var page = Math.floor(offset / PAGE_SIZE) + 1;
+      info.textContent = 'Page ' + page;
     }
 
     // ---------- fetch wrapper ----------
@@ -391,6 +444,8 @@
       state.offset = 0;
       state.flaggedOffset = 0;
       state.backFromDetail = null;
+      state.lastSummariesPageSize = 0;
+      state.lastFlaggedPageSize = 0;
       show('loginView');
       setStatus('loginStatus', '', '');
     }
@@ -404,7 +459,7 @@
       authedFetch('/api/parents/devices').then(function (data) {
         var devices = (data && data.devices) || [];
         if (devices.length === 0) {
-          setStatus('devicesStatus', 'No linked devices.', 'muted');
+          setStatus('devicesStatus', 'No devices linked to this account yet.', 'muted');
           return;
         }
         setStatus('devicesStatus', '', '');
@@ -442,9 +497,7 @@
       show('summariesView');
       setActiveTab('summaries');
       state.backFromDetail = loadSummaries;
-      document.getElementById('summariesDeviceLabel').textContent = state.currentDeviceId
-        ? '· device ' + shortId(state.currentDeviceId)
-        : '';
+      renderDeviceContext('summariesDeviceContext');
       setStatus('summariesStatus', 'Loading…', 'muted');
       var listEl = document.getElementById('summariesList');
       clearChildren(listEl);
@@ -456,19 +509,25 @@
 
       authedFetch(url).then(function (data) {
         var rows = (data && data.conversations) || [];
+        state.lastSummariesPageSize = rows.length;
         if (rows.length === 0) {
           setStatus('summariesStatus',
-            state.offset === 0 ? 'No conversations yet.' : 'No more conversations.',
+            state.offset === 0
+              ? 'No conversations recorded for this device yet.'
+              : 'No more conversations.',
             'muted');
-          return;
+        } else {
+          setStatus('summariesStatus', '', '');
+          rows.forEach(function (row) {
+            listEl.appendChild(buildSummaryRow(row));
+          });
         }
-        setStatus('summariesStatus', '', '');
-        rows.forEach(function (row) {
-          listEl.appendChild(buildSummaryRow(row));
-        });
+        updatePager('newerBtn', 'olderBtn', 'summariesPagerInfo', state.offset, rows.length);
       }).catch(function (err) {
         if (err && err.status === 401) return;
+        state.lastSummariesPageSize = 0;
         setStatus('summariesStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+        updatePager('newerBtn', 'olderBtn', 'summariesPagerInfo', state.offset, 0);
       });
     }
 
@@ -530,9 +589,7 @@
       show('flaggedView');
       setActiveTab('flagged');
       state.backFromDetail = loadFlagged;
-      document.getElementById('flaggedDeviceLabel').textContent = state.currentDeviceId
-        ? '· device ' + shortId(state.currentDeviceId)
-        : '';
+      renderDeviceContext('flaggedDeviceContext');
       setStatus('flaggedStatus', 'Loading…', 'muted');
       var listEl = document.getElementById('flaggedList');
       clearChildren(listEl);
@@ -544,19 +601,25 @@
 
       authedFetch(url).then(function (data) {
         var rows = (data && data.flaggedMessages) || [];
+        state.lastFlaggedPageSize = rows.length;
         if (rows.length === 0) {
           setStatus('flaggedStatus',
-            state.flaggedOffset === 0 ? 'No flagged messages.' : 'No more flagged messages.',
+            state.flaggedOffset === 0
+              ? 'No safety-flagged messages on this device. ✓'
+              : 'No more flagged messages.',
             'muted');
-          return;
+        } else {
+          setStatus('flaggedStatus', '', '');
+          rows.forEach(function (row) {
+            listEl.appendChild(buildFlaggedRow(row));
+          });
         }
-        setStatus('flaggedStatus', '', '');
-        rows.forEach(function (row) {
-          listEl.appendChild(buildFlaggedRow(row));
-        });
+        updatePager('flaggedNewerBtn', 'flaggedOlderBtn', 'flaggedPagerInfo', state.flaggedOffset, rows.length);
       }).catch(function (err) {
         if (err && err.status === 401) return;
+        state.lastFlaggedPageSize = 0;
         setStatus('flaggedStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+        updatePager('flaggedNewerBtn', 'flaggedOlderBtn', 'flaggedPagerInfo', state.flaggedOffset, 0);
       });
     }
 
@@ -662,9 +725,13 @@
     function buildMessage(m) {
       var div = document.createElement('div');
       div.className = 'msg';
-      // Anything other than "Clean" SafetyFlag is treated as flagged.
-      if (m.safetyFlag && m.safetyFlag !== 'Clean' && m.safetyFlag !== 0) {
+      // Distinguish Flagged (amber/warn) from Blocked (red) in the detail view.
+      var flag = m.safetyFlag;
+      if (flag === 'Blocked' || flag === 2) {
         div.classList.add('flagged');
+      } else if (flag === 'Flagged' || flag === 1) {
+        div.classList.add('flagged');
+        div.classList.add('warn');
       }
 
       var meta = document.createElement('div');
