@@ -6,6 +6,9 @@ using System.Security.Claims;
 
 namespace ArmenianAiToy.Api.Controllers;
 
+/// <summary>
+/// Parent authentication and device-linking endpoints.
+/// </summary>
 [ApiController]
 [Route("api/parents")]
 public class ParentController : ControllerBase
@@ -17,7 +20,13 @@ public class ParentController : ControllerBase
         _parentService = parentService;
     }
 
+    /// <summary>
+    /// Register a new parent account.
+    /// </summary>
     [HttpPost("register")]
+    [ProducesResponseType(201)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(409)]
     public async Task<IActionResult> Register([FromBody] ParentRegisterRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
@@ -34,7 +43,12 @@ public class ParentController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Log in and receive a JWT token.
+    /// </summary>
     [HttpPost("login")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
     public async Task<IActionResult> Login([FromBody] ParentLoginRequest request)
     {
         var result = await _parentService.LoginAsync(request.Email, request.Password);
@@ -44,8 +58,14 @@ public class ParentController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Link an existing device to the authenticated parent.
+    /// </summary>
     [HttpPost("devices/link")]
     [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
     public async Task<IActionResult> LinkDevice([FromBody] LinkDeviceRequest request)
     {
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -57,8 +77,13 @@ public class ParentController : ControllerBase
         return Ok(new { linked = true });
     }
 
+    /// <summary>
+    /// List device IDs linked to the authenticated parent.
+    /// </summary>
     [HttpGet("devices")]
     [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
     public async Task<IActionResult> GetDevices()
     {
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
