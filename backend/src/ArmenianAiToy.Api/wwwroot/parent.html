@@ -456,27 +456,44 @@
       setStatus('devicesStatus', 'Loading…', 'muted');
       var listEl = document.getElementById('devicesList');
       clearChildren(listEl);
-      authedFetch('/api/parents/devices').then(function (data) {
+      authedFetch('/api/parents/devices/details').then(function (data) {
         var devices = (data && data.devices) || [];
         if (devices.length === 0) {
           setStatus('devicesStatus', 'No devices linked to this account yet.', 'muted');
           return;
         }
         setStatus('devicesStatus', '', '');
-        devices.forEach(function (id) {
+        devices.forEach(function (d) {
           var btn = document.createElement('button');
           btn.className = 'row';
-          btn.title = id;
+          btn.title = d.deviceId;
           var top = document.createElement('div');
           top.className = 'top';
           var label = document.createElement('span');
-          label.textContent = 'Device ' + shortId(id);
+          label.textContent = d.deviceName || ('Device ' + shortId(d.deviceId));
           var hint = document.createElement('span');
           hint.textContent = 'View conversations →';
           top.appendChild(label);
           top.appendChild(hint);
           btn.appendChild(top);
-          btn.addEventListener('click', function () { openDevice(id); });
+
+          var details = [];
+          if (d.children && d.children.length > 0) {
+            details.push(d.children.map(function (c) {
+              var parts = [c.name];
+              if (c.age != null) parts.push('age ' + c.age);
+              return parts.join(', ');
+            }).join(' · '));
+          }
+          if (d.lastSeenAt) details.push('last seen ' + fmtTime(d.lastSeenAt));
+          if (details.length > 0) {
+            var sub = document.createElement('div');
+            sub.className = 'snippet';
+            sub.textContent = details.join(' — ');
+            btn.appendChild(sub);
+          }
+
+          btn.addEventListener('click', function () { openDevice(d.deviceId); });
           listEl.appendChild(btn);
         });
       }).catch(function (err) {

@@ -89,6 +89,42 @@ public class ParentService : IParentService
             .ToListAsync();
     }
 
+    public async Task<List<LinkedDeviceDto>> GetLinkedDeviceDetailsAsync(Guid parentId)
+    {
+        var links = await _db.Set<ParentDevice>()
+            .Where(pd => pd.ParentId == parentId)
+            .Join(_db.Set<Device>(), pd => pd.DeviceId, d => d.Id, (pd, d) => new { pd.LinkedAt, Device = d })
+            .ToListAsync();
+
+        if (links.Count == 0)
+            return new List<LinkedDeviceDto>();
+
+        var deviceIds = links.Select(l => l.Device.Id).ToList();
+
+        var childrenByDevice = (await _db.Set<Child>()
+            .Where(c => deviceIds.Contains(c.DeviceId))
+            .ToListAsync())
+            .GroupBy(c => c.DeviceId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var lastConversationByDevice = await _db.Set<Conversation>()
+            .Where(c => deviceIds.Contains(c.DeviceId))
+            .GroupBy(c => c.DeviceId)
+            .Select(g => new { DeviceId = g.Key, LastStartedAt = g.Max(c => c.StartedAt) })
+            .ToDictionaryAsync(x => x.DeviceId, x => x.LastStartedAt);
+
+        return links.Select(l => new LinkedDeviceDto(
+            l.Device.Id,
+            l.Device.Name,
+            l.Device.LastSeenAt,
+            l.LinkedAt,
+            lastConversationByDevice.TryGetValue(l.Device.Id, out var lastConv) ? lastConv : null,
+            childrenByDevice.TryGetValue(l.Device.Id, out var children)
+                ? children.Select(c => new LinkedDeviceChildDto(c.Id, c.Name, c.GetAge(), c.Gender)).ToList()
+                : new List<LinkedDeviceChildDto>()
+        )).ToList();
+    }
+
     private string GenerateJwt(Parent parent)
     {
         var key = _config["Jwt:Key"] ?? "ArmenianAiToyDefaultSecretKeyThatShouldBeChanged123!";

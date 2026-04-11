@@ -78,6 +78,20 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// List linked devices with child info and last activity.
+    /// </summary>
+    [HttpGet("devices/details")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetDeviceDetails()
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var devices = await _parentService.GetLinkedDeviceDetailsAsync(parentId);
+        return Ok(new { devices });
+    }
+
+    /// <summary>
     /// List device IDs linked to the authenticated parent.
     /// </summary>
     [HttpGet("devices")]
