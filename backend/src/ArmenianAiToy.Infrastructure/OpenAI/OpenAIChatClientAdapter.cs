@@ -5,6 +5,7 @@ namespace ArmenianAiToy.Infrastructure.OpenAI;
 
 public class OpenAIChatClientAdapter : IAiChatClient
 {
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
     private readonly ChatClient _client;
 
     public OpenAIChatClientAdapter(ChatClient client)
@@ -29,7 +30,8 @@ public class OpenAIChatClientAdapter : IAiChatClient
             });
         }
 
-        var completion = await _client.CompleteChatAsync(chatMessages);
+        using var cts = new CancellationTokenSource(RequestTimeout);
+        var completion = await _client.CompleteChatAsync(chatMessages, cancellationToken: cts.Token);
         return completion.Value.Content[0].Text;
     }
 }

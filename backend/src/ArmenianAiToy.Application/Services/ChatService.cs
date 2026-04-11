@@ -389,6 +389,22 @@ public class ChatService : IChatService
         {
             systemPrompt += StoryChoiceInstruction;
 
+            // Step 7a-bis: Inject story memory for character/place/mood continuity.
+            if (StoryMemories.TryGetValue(conversation.Id, out var storyMemory))
+            {
+                var memoryLines = new List<string>();
+                if (storyMemory.Character is not null) memoryLines.Add($"- Character: {storyMemory.Character}");
+                if (storyMemory.Place is not null) memoryLines.Add($"- Place: {storyMemory.Place}");
+                if (storyMemory.ImportantObject is not null) memoryLines.Add($"- Key object: {storyMemory.ImportantObject}");
+                if (storyMemory.CurrentSituation is not null) memoryLines.Add($"- Situation: {storyMemory.CurrentSituation}");
+                if (storyMemory.Mood is not null) memoryLines.Add($"- Mood: {storyMemory.Mood}");
+                if (memoryLines.Count > 0)
+                {
+                    systemPrompt += "\n\nCURRENT STORY STATE (use this for consistency, do not repeat it verbatim):\n"
+                        + string.Join("\n", memoryLines);
+                }
+            }
+
             // Step 7b: If the child made a recognized choice, inject the label.
             if (normalizedChoice is not null && choiceLabel is not null)
             {
