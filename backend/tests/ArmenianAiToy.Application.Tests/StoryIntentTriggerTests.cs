@@ -81,17 +81,37 @@ public class StoryIntentTriggerTests
     [Fact]
     public void StoryPhraseInRecentUserHistory_ReturnsTrue()
     {
+        // Uses lowercase "user"/"assistant" — matching GetRecentMessagesAsync output
         var history = new List<(string Role, string Content)>
         {
-            ("User", "hello"),
-            ("Assistant", "Hi there!"),
-            ("User", "tell me a story"),
-            ("Assistant", "Once upon a time..."),
-            ("User", "ok"),
+            ("user", "hello"),
+            ("assistant", "Hi there!"),
+            ("user", "tell me a story"),
+            ("assistant", "Once upon a time..."),
+            ("user", "ok"),
         };
 
         // Current message is non-story, but "tell me a story" is in last 2 user messages
         Assert.True(ChatService.HasStoryIntent("ok", history));
+    }
+
+    [Fact]
+    public void StoryPhraseInHistory_CaseInsensitiveRoleMatch()
+    {
+        // Verifies role matching works regardless of casing (User vs user)
+        var historyLower = new List<(string Role, string Content)>
+        {
+            ("user", "tell me a story"),
+            ("assistant", "Once upon a time..."),
+        };
+        var historyUpper = new List<(string Role, string Content)>
+        {
+            ("User", "tell me a story"),
+            ("Assistant", "Once upon a time..."),
+        };
+
+        Assert.True(ChatService.HasStoryIntent("ok", historyLower));
+        Assert.True(ChatService.HasStoryIntent("ok", historyUpper));
     }
 
     // --- Assistant messages are ignored ---
@@ -101,10 +121,10 @@ public class StoryIntentTriggerTests
     {
         var history = new List<(string Role, string Content)>
         {
-            ("User", "hello"),
-            ("Assistant", "Let me tell you a story about a fox."),
-            ("User", "ok"),
-            ("Assistant", "What happens next is exciting!"),
+            ("user", "hello"),
+            ("assistant", "Let me tell you a story about a fox."),
+            ("user", "ok"),
+            ("assistant", "What happens next is exciting!"),
         };
 
         Assert.False(ChatService.HasStoryIntent("yes", history));
@@ -117,12 +137,12 @@ public class StoryIntentTriggerTests
     {
         var history = new List<(string Role, string Content)>
         {
-            ("User", "tell me a story"),   // old — beyond last 2 user messages
-            ("Assistant", "Once upon a time..."),
-            ("User", "and then?"),          // 2nd-to-last user message (no trigger)
-            ("Assistant", "The fox ran."),
-            ("User", "wow"),                // last user message (no trigger)
-            ("Assistant", "Indeed!"),
+            ("user", "tell me a story"),   // old — beyond last 2 user messages
+            ("assistant", "Once upon a time..."),
+            ("user", "and then?"),          // 2nd-to-last user message (no trigger)
+            ("assistant", "The fox ran."),
+            ("user", "wow"),                // last user message (no trigger)
+            ("assistant", "Indeed!"),
         };
 
         // Current message is "ok" — not a trigger.

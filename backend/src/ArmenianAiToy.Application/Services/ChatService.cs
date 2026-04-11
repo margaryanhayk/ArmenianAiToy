@@ -619,7 +619,7 @@ public class ChatService : IChatService
         int checkedCount = 0;
         for (int i = history.Count - 1; i >= 0 && checkedCount < 2; i--)
         {
-            if (history[i].Role == "User")
+            if (string.Equals(history[i].Role, "user", StringComparison.OrdinalIgnoreCase))
             {
                 if (MatchesAnyTrigger(history[i].Content)) return true;
                 checkedCount++;
