@@ -1,4 +1,5 @@
 using ArmenianAiToy.Application.Interfaces;
+using Microsoft.Extensions.Logging;
 using OpenAI.Moderations;
 using AppModerationResult = ArmenianAiToy.Application.DTOs.ModerationResult;
 
@@ -7,10 +8,12 @@ namespace ArmenianAiToy.Infrastructure.OpenAI;
 public class OpenAIModerationAdapter : IModerationService
 {
     private readonly ModerationClient _client;
+    private readonly ILogger<OpenAIModerationAdapter> _logger;
 
-    public OpenAIModerationAdapter(ModerationClient client)
+    public OpenAIModerationAdapter(ModerationClient client, ILogger<OpenAIModerationAdapter> logger)
     {
         _client = client;
+        _logger = logger;
     }
 
     public async Task<AppModerationResult> CheckContentAsync(string content)
@@ -30,11 +33,10 @@ public class OpenAIModerationAdapter : IModerationService
 
             return new AppModerationResult(flagged.Count == 0, flagged);
         }
-        catch
+        catch (Exception ex)
         {
-            // If moderation API fails, allow the message through
-            // (system prompt is the primary safety layer)
-            return new AppModerationResult(true, new List<string>());
+            _logger.LogError(ex, "Moderation API failed — treating content as unsafe (fail-closed)");
+            return new AppModerationResult(false, new List<string> { "moderation_unavailable" });
         }
     }
 }
