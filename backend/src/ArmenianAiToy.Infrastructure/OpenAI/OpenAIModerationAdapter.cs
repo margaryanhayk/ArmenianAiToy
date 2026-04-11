@@ -7,6 +7,7 @@ namespace ArmenianAiToy.Infrastructure.OpenAI;
 
 public class OpenAIModerationAdapter : IModerationService
 {
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
     private readonly ModerationClient _client;
     private readonly ILogger<OpenAIModerationAdapter> _logger;
 
@@ -20,7 +21,8 @@ public class OpenAIModerationAdapter : IModerationService
     {
         try
         {
-            var result = await _client.ClassifyTextAsync(content);
+            using var cts = new CancellationTokenSource(RequestTimeout);
+            var result = await _client.ClassifyTextAsync(content, cts.Token);
             var categories = result.Value;
 
             var flagged = new List<string>();
