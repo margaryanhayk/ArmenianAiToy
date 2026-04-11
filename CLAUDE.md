@@ -102,3 +102,42 @@ no editing, no deletion, no child-facing features.
 - Story choice labels handed off across requests via in-memory `ConcurrentDictionary` with 30-min expiry.
 - `previous_story_choice: option_a|option_b|unclear` injected into prompt only during active story flow.
 - Choice normalization happens only after input moderation passes.
+- Story memory (character/place/mood) extracted from AI responses and re-injected into system prompt for continuity.
+- OpenAI chat calls have a 30-second timeout via CancellationToken.
+
+## Autonomous Workflow
+
+Claude CLI operates on this project using a multi-agent pipeline. The agents and skills are defined in `backend/.claude/agents/` and `.claude/skills/`.
+
+**Before every task:**
+1. Classify: workstream (story-core / safety / parent-surface / tests / hardening / tooling), mode (review-only / minimal-code-change / test-only / no-change-needed), risk (low / medium / high).
+2. HIGH risk (ChatService, system prompt, domain entities, safety, auth) → produce plan, stop for approval.
+3. MEDIUM risk (new endpoint, helper, DTO) → produce plan, pause for approval.
+4. LOW risk (test, doc, UI polish) → brief plan, proceed.
+
+**Available agents** (`backend/.claude/agents/`):
+- `repo-scout` — read-only reconnaissance (first step of every session)
+- `plan-proposer` — generates implementation plans with exact files/lines
+- `backend-implementer` — executes approved plans, writes code and tests
+- `test-runner` — runs `dotnet test`, diagnoses failures
+- `doc-sync` — keeps CLAUDE.md and Swagger docs accurate
+- `areg-story-evaluator` — story output quality scoring (7-dimension rubric)
+- `armenian-linguistic-reviewer` — Armenian text naturalness review
+- `prompt-reviewer` — pre-implementation scope/risk/safety review
+
+**Available skills** (`.claude/skills/`):
+- `/change-decision` — classify work mode before touching code
+- `/minimal-csharp-change` — enforce smallest-safe-diff discipline
+- `/phase-b-guardrails` — scope enforcement, product boundary check
+- `/story-flow-review` — correctness check for story choice pipeline
+- `/pre-commit-check` — final validation gate before commits
+- `/benchmark-run` — run StoryBenchmark and compare to baseline
+- `/task-brief` — standardized task intake and classification
+
+**Hard stops (must get human approval):**
+ChatService changes, system prompt changes, domain entity changes, new endpoints, safety/moderation changes, new NuGet dependencies, git push, persistent test failures, benchmark regressions.
+
+**Self-validation before completing any task:**
+All tests pass, no secrets staged, CLAUDE.md test count matches, new endpoints documented, diff is minimal, story-affecting changes benchmarked.
+
+**Work session pattern:** accept task → classify → plan → approve if needed → implement → test → doc-sync → pre-commit-check → commit → report.
