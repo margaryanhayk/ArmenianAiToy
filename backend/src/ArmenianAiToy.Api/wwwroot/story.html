@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="hy">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Areg — Story Mode</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Sans Armenian', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #fef9ef 0%, #f0e6ff 100%);
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .app {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      padding: 20px 0 12px;
+    }
+    .header h1 {
+      font-size: 28px;
+      color: #5b3e8a;
+    }
+    .header p {
+      font-size: 13px;
+      color: #9a8ab5;
+      margin-top: 4px;
+    }
+
+    /* Setup (device registration) */
+    .setup {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 12px rgba(91,62,138,0.1);
+    }
+    .setup h2 { font-size: 16px; margin-bottom: 10px; color: #5b3e8a; }
+    .setup .row { display: flex; gap: 8px; }
+    .setup input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 2px solid #e0d6f0;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+    .setup button {
+      padding: 10px 16px;
+      background: #7c5cbf;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .setup button:hover { background: #6b4aad; }
+    .setup .status {
+      font-size: 13px;
+      padding: 8px;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+    .setup .status.ok { background: #e8f5e9; color: #2e7d32; }
+    .setup .status.err { background: #fce4ec; color: #c62828; }
+
+    /* Story area */
+    .story-area {
+      background: white;
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 4px 20px rgba(91,62,138,0.12);
+      margin-bottom: 16px;
+    }
+
+    .story-scroll {
+      max-height: 50vh;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .turn {
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #f0e6ff;
+    }
+    .turn:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+    .turn-choice {
+      font-size: 12px;
+      color: #7c5cbf;
+      font-weight: 600;
+      margin-bottom: 6px;
+      letter-spacing: 0.3px;
+    }
+
+    .turn-text {
+      font-size: 17px;
+      line-height: 1.7;
+      color: #3a2d4f;
+    }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      padding: 24px;
+      color: #9a8ab5;
+      font-style: italic;
+      font-size: 15px;
+    }
+    .loading .dots::after {
+      content: '';
+      animation: dots 1.2s steps(4, end) infinite;
+    }
+    @keyframes dots {
+      0% { content: ''; }
+      25% { content: '.'; }
+      50% { content: '..'; }
+      75% { content: '...'; }
+    }
+
+    /* Choice buttons */
+    .choices {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .choice-btn {
+      flex: 1;
+      padding: 14px 12px;
+      border: 2px solid #e0d6f0;
+      border-radius: 14px;
+      background: #faf7ff;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1.4;
+      color: #3a2d4f;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+    .choice-btn:hover {
+      border-color: #7c5cbf;
+      background: #f0e6ff;
+      transform: translateY(-1px);
+    }
+    .choice-btn:active {
+      transform: translateY(0);
+      background: #e0d6f0;
+    }
+    .choice-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .choice-btn .label {
+      font-size: 11px;
+      color: #9a8ab5;
+      display: block;
+      margin-bottom: 4px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    /* Start form */
+    .start-form {
+      display: flex;
+      gap: 8px;
+    }
+    .start-form input {
+      flex: 1;
+      padding: 14px 16px;
+      border: 2px solid #e0d6f0;
+      border-radius: 14px;
+      font-size: 16px;
+      outline: none;
+    }
+    .start-form input:focus { border-color: #7c5cbf; }
+    .start-form button {
+      padding: 14px 24px;
+      background: #7c5cbf;
+      color: white;
+      border: none;
+      border-radius: 14px;
+      font-size: 16px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .start-form button:hover { background: #6b4aad; }
+    .start-form button:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* New story button */
+    .new-story-btn {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      background: none;
+      border: 2px dashed #d0c4e8;
+      border-radius: 14px;
+      color: #7c5cbf;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    .new-story-btn:hover { background: #faf7ff; border-color: #7c5cbf; }
+
+    /* Error */
+    .error-msg {
+      background: #fce4ec;
+      color: #c62828;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>&#10024; Areg</h1>
+    <p>Story Mode</p>
+  </div>
+
+  <!-- Device setup (shown if no device registered) -->
+  <div class="setup" id="setupPanel">
+    <h2>Register Device</h2>
+    <div class="row">
+      <input id="macAddr" placeholder="MAC Address" value="AA:BB:CC:DD:EE:FF" />
+      <button onclick="registerDevice()">Register</button>
+    </div>
+    <div id="setupStatus" class="status" style="display:none"></div>
+  </div>
+
+  <!-- Story UI (shown after device ready) -->
+  <div id="storyUI" style="display:none">
+    <div class="story-area">
+      <div class="story-scroll" id="storyScroll">
+        <!-- Turns appear here -->
+        <div id="turns"></div>
+        <div id="loadingIndicator" class="loading" style="display:none">
+          <span id="loadingText"></span><span class="dots"></span>
+        </div>
+      </div>
+
+      <!-- Choices (shown after AI response with choices) -->
+      <div id="choicesPanel" class="choices" style="display:none">
+        <button class="choice-btn" id="btnA" onclick="pickChoice('A')">
+          <span class="label">A</span>
+          <span id="labelA"></span>
+        </button>
+        <button class="choice-btn" id="btnB" onclick="pickChoice('B')">
+          <span class="label">B</span>
+          <span id="labelB"></span>
+        </button>
+      </div>
+
+      <!-- Error display -->
+      <div id="errorBox" class="error-msg" style="display:none"></div>
+    </div>
+
+    <!-- Start / free text input -->
+    <div id="startPanel" class="start-form">
+      <input type="text" id="msgInput" placeholder="Tell me a story..." value="tell me a story" autocomplete="off" />
+      <button id="startBtn" onclick="startStory()">Start</button>
+    </div>
+
+    <button class="new-story-btn" id="newStoryBtn" style="display:none" onclick="resetStory()">
+      New Story
+    </button>
+  </div>
+</div>
+
+<script>
+  // --- State ---
+  let deviceId = localStorage.getItem('deviceId') || '';
+  let apiKey = localStorage.getItem('apiKey') || '';
+  let storySessionId = null;
+  let isLoading = false;
+
+  // --- Init ---
+  if (deviceId && apiKey) {
+    showReady();
+  }
+
+  document.getElementById('msgInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !document.getElementById('startBtn').disabled) startStory();
+  });
+
+  // --- Device Registration ---
+  async function registerDevice() {
+    const mac = document.getElementById('macAddr').value.trim();
+    const status = document.getElementById('setupStatus');
+    try {
+      const res = await fetch('/api/devices/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ macAddress: mac })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        deviceId = data.deviceId;
+        apiKey = data.apiKey;
+        localStorage.setItem('deviceId', deviceId);
+        localStorage.setItem('apiKey', apiKey);
+        status.textContent = 'Device registered!';
+        status.className = 'status ok';
+        showReady();
+      } else {
+        status.textContent = 'Error: ' + JSON.stringify(data);
+        status.className = 'status err';
+      }
+    } catch (e) {
+      status.textContent = 'Error: ' + e.message;
+      status.className = 'status err';
+    }
+    status.style.display = 'block';
+  }
+
+  function showReady() {
+    document.getElementById('setupPanel').style.display = 'none';
+    document.getElementById('storyUI').style.display = 'block';
+  }
+
+  // --- API Call ---
+  async function callChat(message, selectedChoice) {
+    const body = { message };
+    if (storySessionId) body.storySessionId = storySessionId;
+    if (selectedChoice) body.selectedChoice = selectedChoice;
+
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Device-Id': deviceId,
+        'X-Api-Key': apiKey
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err);
+    }
+
+    return await res.json();
+  }
+
+  // --- Story Flow ---
+  async function startStory() {
+    if (isLoading) return;
+    const msg = document.getElementById('msgInput').value.trim();
+    if (!msg) return;
+
+    setLoading(true);
+    hideError();
+    hideChoices();
+
+    // Hide start panel, show new story button
+    document.getElementById('startPanel').style.display = 'none';
+    document.getElementById('newStoryBtn').style.display = 'block';
+
+    try {
+      const data = await callChat(msg, null);
+      storySessionId = data.storySessionId || null;
+      addTurn(null, data.response);
+      showChoicesIfPresent(data);
+    } catch (e) {
+      showError(e.message);
+      // Re-show start panel on error so user can retry
+      document.getElementById('startPanel').style.display = 'flex';
+      document.getElementById('newStoryBtn').style.display = 'none';
+    }
+    setLoading(false);
+  }
+
+  async function pickChoice(choice) {
+    if (isLoading) return;
+
+    const label = choice === 'A'
+      ? document.getElementById('labelA').textContent
+      : document.getElementById('labelB').textContent;
+
+    setLoading(true);
+    hideError();
+    hideChoices();
+
+    try {
+      const data = await callChat('continue', choice);
+      storySessionId = data.storySessionId || storySessionId;
+      addTurn(label, data.response);
+      showChoicesIfPresent(data);
+    } catch (e) {
+      showError(e.message);
+    }
+    setLoading(false);
+  }
+
+  function resetStory() {
+    if (isLoading) return;
+    storySessionId = null;
+    document.getElementById('turns').innerHTML = '';
+    hideChoices();
+    hideError();
+    document.getElementById('startPanel').style.display = 'flex';
+    document.getElementById('newStoryBtn').style.display = 'none';
+    document.getElementById('msgInput').value = 'tell me a story';
+  }
+
+  // --- UI Helpers ---
+  function addTurn(choiceLabel, text) {
+    const turn = document.createElement('div');
+    turn.className = 'turn';
+
+    if (choiceLabel) {
+      const choiceDiv = document.createElement('div');
+      choiceDiv.className = 'turn-choice';
+      choiceDiv.textContent = '\u25B6 ' + choiceLabel;
+      turn.appendChild(choiceDiv);
+    }
+
+    const textDiv = document.createElement('div');
+    textDiv.className = 'turn-text';
+    textDiv.textContent = text;
+    turn.appendChild(textDiv);
+
+    document.getElementById('turns').appendChild(turn);
+    scrollToBottom();
+  }
+
+  function showChoicesIfPresent(data) {
+    if (data.choiceA && data.choiceB) {
+      document.getElementById('labelA').textContent = data.choiceA;
+      document.getElementById('labelB').textContent = data.choiceB;
+      document.getElementById('choicesPanel').style.display = 'flex';
+      document.getElementById('btnA').disabled = false;
+      document.getElementById('btnB').disabled = false;
+    } else {
+      // No choices returned — re-show free text input so user can continue
+      document.getElementById('startPanel').style.display = 'flex';
+      document.getElementById('msgInput').value = '';
+      document.getElementById('msgInput').placeholder = 'Tell Areg what happens next...';
+    }
+  }
+
+  function hideChoices() {
+    document.getElementById('choicesPanel').style.display = 'none';
+  }
+
+  const loadingPhrases = [
+    "Արեգը հեքիաթ է գտնում...",
+    "Մի պահ, հեքիաթը գալիս է",
+    "Արեգը հեքիաթ է բերում...",
+  ];
+  
+    function setLoading(on) {
+      isLoading = on;
+      if (on) {
+        const phrase = loadingPhrases[Math.floor(Math.random() * loadingPhrases.length)];
+        document.getElementById("loadingText").textContent = phrase;
+      }
+      document.getElementById("loadingIndicator").style.display = on ? "block" : "none";
+    document.getElementById('startBtn').disabled = on;
+    document.getElementById('btnA').disabled = on;
+    document.getElementById('btnB').disabled = on;
+    if (on) scrollToBottom();
+  }
+
+  function showError(msg) {
+    const box = document.getElementById('errorBox');
+    box.textContent = msg;
+    box.style.display = 'block';
+  }
+
+  function hideError() {
+    document.getElementById('errorBox').style.display = 'none';
+  }
+
+  function scrollToBottom() {
+    const el = document.getElementById('storyScroll');
+    el.scrollTop = el.scrollHeight;
+  }
+</script>
+</body>
+</html>
