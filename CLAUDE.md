@@ -73,10 +73,14 @@ no editing, no deletion, no child-facing features.
 
 **Pagination guard**: list endpoints reject `offset < 0` and `limit < 1` with 400, and clamp `limit > 100` to 100. Lives as a private static helper inside `ConversationController`.
 
-**Manual smoke**
-1. `dotnet run --project src/ArmenianAiToy.Api`
-2. Open `http://localhost:5000/` → click "Open the Parent Dashboard →" in the Parent Monitoring panel.
-3. Log in as a registered parent → click a linked device → switch between Conversations / Flagged tabs → click a row to open detail.
+**Manual QA checklist**
+1. `dotnet run --project src/ArmenianAiToy.Api` → open `http://localhost:5000/` → click "Open the Parent Dashboard →".
+2. Log in → devices list loads (or "No devices linked to this account yet." if none).
+3. Click a device → Conversations tab active, summaries load. Click Flagged tab → flagged list loads (or "No safety-flagged messages on this device. ✓").
+4. Click a row → detail view opens with messages; Blocked (red) and Flagged (amber) borders distinct. ← Back returns to the originating tab.
+5. Pagination: ← Newer disabled on page 1, Older → disabled on last page, "Page N" label visible.
+6. Bad inputs: `?offset=-1` → 400; `?limit=0` → 400; `?limit=500` → 200 with at most 100 rows.
+7. Log out → returns to login view, token cleared from sessionStorage.
 
 ## Engineering Guardrails
 
