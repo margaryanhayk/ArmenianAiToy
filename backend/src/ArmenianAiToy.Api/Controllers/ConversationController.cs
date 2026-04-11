@@ -5,6 +5,9 @@ using System.Security.Claims;
 
 namespace ArmenianAiToy.Api.Controllers;
 
+/// <summary>
+/// Parent-facing read-only conversation monitoring endpoints.
+/// </summary>
 [ApiController]
 [Route("api/conversations")]
 public class ConversationController : ControllerBase
@@ -20,8 +23,15 @@ public class ConversationController : ControllerBase
         _parentService = parentService;
     }
 
+    /// <summary>
+    /// List full conversation history for an owned device.
+    /// </summary>
     [HttpGet]
     [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
     public async Task<IActionResult> GetHistory(
         [FromQuery] Guid deviceId,
         [FromQuery] int limit = 10,
@@ -40,8 +50,15 @@ public class ConversationController : ControllerBase
         return Ok(new { conversations });
     }
 
+    /// <summary>
+    /// List lightweight conversation summaries with snippets for an owned device.
+    /// </summary>
     [HttpGet("summary")]
     [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
     public async Task<IActionResult> GetSummary(
         [FromQuery] Guid deviceId,
         [FromQuery] int limit = 20,
@@ -60,8 +77,15 @@ public class ConversationController : ControllerBase
         return Ok(new { conversations });
     }
 
+    /// <summary>
+    /// List safety-flagged messages (newest first) for an owned device.
+    /// </summary>
     [HttpGet("flagged")]
     [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
     public async Task<IActionResult> GetFlagged(
         [FromQuery] Guid deviceId,
         [FromQuery] int limit = 20,
@@ -80,8 +104,14 @@ public class ConversationController : ControllerBase
         return Ok(new { flaggedMessages });
     }
 
+    /// <summary>
+    /// Get a single conversation with full message list.
+    /// </summary>
     [HttpGet("{conversationId}")]
     [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
     public async Task<IActionResult> GetById(Guid conversationId)
     {
         var conversation = await _conversationService.GetConversationByIdAsync(conversationId);
