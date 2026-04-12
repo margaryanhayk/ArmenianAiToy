@@ -338,4 +338,104 @@ public class ModeDetectorIntegrationTests
         await _aiClient.Received(2).GetCompletionAsync(
             Arg.Any<string>(), Arg.Any<List<(string, string)>>());
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Curiosity Window
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CuriosityTrigger_InjectsCuriosityPrompt()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "why is the sky blue");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("MODE: CURIOSITY WINDOW")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task CuriosityArmenianTrigger_InjectsCuriosityPrompt()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0541\u0575\u0578\u0582\u0576\u0568 \u057d\u057a\u056b\u057f\u0561\u056f \u0567\u0589");
+
+        // Armenian "ինչու" (why)
+        await _chatService.GetResponseAsync(_deviceId,
+            "\u056b\u0576\u0579\u0578\u0582 \u0567 \u0571\u0575\u0578\u0582\u0576\u0568 \u057d\u057a\u056b\u057f\u0561\u056f");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("MODE: CURIOSITY WINDOW")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task CuriosityMidStory_PreservesPendingChoices()
+    {
+        // Turn 1: Start a story → establishes pending choices.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("A fox walked.\n---\nCHOICE_A:Help fox\nCHOICE_B:Run away");
+        await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+
+        // Turn 2: Curiosity detour — choices should be preserved.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567\u0589");
+        await _chatService.GetResponseAsync(_deviceId, "why is the sky blue");
+
+        // Verify pending choices still exist for this conversation.
+        Assert.True(ChatService.PendingChoices.ContainsKey(_conversationId));
+    }
+
+    [Fact]
+    public async Task CuriosityMidStory_StoryResumesOnNextTurn()
+    {
+        // Turn 1: Start a story.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("A fox walked.\n---\nCHOICE_A:Help fox\nCHOICE_B:Run away");
+        await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+
+        // Turn 2: Curiosity detour.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567\u0589");
+        await _chatService.GetResponseAsync(_deviceId, "why is the sky blue");
+
+        // Turn 3: Neutral message — story should resume because preserved choices
+        // make hasActiveStorySession true, so ModeDetector returns Story.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Fox ran fast.\n---\nCHOICE_A:Chase\nCHOICE_B:Hide");
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "ok");
+
+        Assert.NotNull(result.ChoiceA);
+        Assert.NotNull(result.ChoiceB);
+        Assert.NotNull(result.StorySessionId);
+    }
+
+    [Fact]
+    public async Task CuriosityNoActiveStory_DoesNotStoreChoices()
+    {
+        // No prior story — just a curiosity question from scratch.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "why is the sky blue");
+
+        Assert.False(ChatService.PendingChoices.ContainsKey(_conversationId));
+    }
+
+    [Fact]
+    public async Task CuriosityMode_NoFormatReminderInjected()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "what is a rainbow");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Any<string>(),
+            Arg.Is<List<(string, string)>>(h =>
+                !h.Any(m => m.Item2.Contains("FORMAT REMINDER"))));
+    }
 }

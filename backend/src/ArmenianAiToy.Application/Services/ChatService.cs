@@ -243,6 +243,26 @@ public class ChatService : IChatService
         - End with a soft, restful image or a gentle closing phrase.
         """;
 
+    internal const string CuriosityWindowInstruction = """
+
+        MODE: CURIOSITY WINDOW. The child asked a real question.
+
+        TONE: Conversational, genuinely interested, warm. Sound like a
+        kind adult who actually finds the question interesting.
+
+        RULES:
+        - Answer in 1 to 2 short sentences. Be honest and simple.
+        - Keep every word in child-register Eastern Armenian.
+        - Do NOT ask any questions back.
+        - Do NOT give a lecture, list, or school-style explanation.
+        - Do NOT include a CHOICE_A / CHOICE_B block.
+        - Do NOT include a STORY_MEMORY block.
+        - If the conversation was in a story, you may end with a brief,
+          natural phrase inviting the child back to the story — but only
+          if it feels right. Do not force it.
+        - Do NOT turn this into a lesson or a quiz.
+        """;
+
     // Tiny prompt for generating choices from an existing story paragraph.
     private const string ChoiceGenerationPrompt =
         "You are given a short Armenian children's story paragraph. "
@@ -445,6 +465,16 @@ public class ChatService : IChatService
         else if (detectedMode == DetectedMode.Calm)
         {
             systemPrompt += CalmModeInstruction;
+        }
+        else if (detectedMode == DetectedMode.Curiosity)
+        {
+            systemPrompt += CuriosityWindowInstruction;
+
+            // Preserve pending choices so the story can resume after this one-turn detour.
+            if (pending is not null && DateTime.UtcNow - pending.ExtractedAt < ChoiceExpiry)
+            {
+                PendingChoices[conversation.Id] = pending;
+            }
         }
 
         // Step 7c: Inject format reminder at end of history for story mode.
