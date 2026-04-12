@@ -163,12 +163,29 @@ public class ResponseQualityGateTests
         Assert.Null(result);
     }
 
-    // --- Mode-aware overload: Curiosity brevity checks ---
+    // --- Mode-aware overload: Curiosity checks ---
 
     [Fact]
-    public void Curiosity_ShortResponse_PassesGate()
+    public void Curiosity_QuestionMark_TriggersCuriosityQuestion()
     {
-        // 1-2 sentences, well under 200 chars.
+        var result = ResponseQualityGate.CheckRetry(
+            "\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567, \u0561\u0575\u0576\u057a\u0565\u057d \u0579\u0567?",
+            "why is the sky blue", DetectedMode.Curiosity);
+        Assert.Equal("curiosity_question", result);
+    }
+
+    [Fact]
+    public void Curiosity_ArmenianQuestionMark_TriggersCuriosityQuestion()
+    {
+        var result = ResponseQualityGate.CheckRetry(
+            "\u0540\u0565\u057f\u0561\u0584\u0580\u0584\u056b\u0580 \u0567\u055e",
+            "what is a rainbow", DetectedMode.Curiosity);
+        Assert.Equal("curiosity_question", result);
+    }
+
+    [Fact]
+    public void Curiosity_ShortCleanResponse_PassesGate()
+    {
         var result = ResponseQualityGate.CheckRetry(
             "\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567, \u0578\u0580\u0578\u057e\u0570\u0565\u057f\u0587 \u056c\u0578\u0582\u0575\u057d\u0568 \u0581\u0580\u057e\u0578\u0582\u0574 \u0567\u0589",
             "why is the sky blue", DetectedMode.Curiosity);

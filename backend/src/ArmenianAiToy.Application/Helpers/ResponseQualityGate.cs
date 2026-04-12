@@ -53,10 +53,13 @@ public static class ResponseQualityGate
                     return "calm_exclamation";
             }
 
-            // Curiosity responses must be brief (1-2 sentences). A response over
-            // 200 chars is likely a lecture or school-style explanation.
-            if (mode == DetectedMode.Curiosity && response.Length > 200)
-                return "curiosity_too_long";
+            if (mode == DetectedMode.Curiosity)
+            {
+                if (response.Contains('?') || response.Contains('\u055E'))
+                    return "curiosity_question";
+                if (response.Length > 200)
+                    return "curiosity_too_long";
+            }
         }
 
         return null;
