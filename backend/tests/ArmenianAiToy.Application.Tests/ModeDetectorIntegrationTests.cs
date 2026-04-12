@@ -696,4 +696,109 @@ public class ModeDetectorIntegrationTests
         Assert.DoesNotContain("CHOICE_A", result.Response);
         Assert.DoesNotContain("CHOICE_B", result.Response);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Game/Riddle session persistence
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GameSession_ShortFollowUp_StaysInGame()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053e\u0561\u0583\u056b\u056f \u057f\u0578\u0582\u0580\u0589");
+
+        // Turn 1: start game
+        var r1 = await _chatService.GetResponseAsync(_deviceId, "lets play a game");
+        Assert.Equal("game", r1.Mode);
+
+        // Turn 2: short follow-up — should persist in game mode
+        var r2 = await _chatService.GetResponseAsync(_deviceId, "ok I did it");
+        Assert.Equal("game", r2.Mode);
+
+        // Turn 3: another short follow-up
+        var r3 = await _chatService.GetResponseAsync(_deviceId, "done");
+        Assert.Equal("game", r3.Mode);
+    }
+
+    [Fact]
+    public async Task RiddleSession_GuessFollowUp_StaysInRiddle()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053b\u0576\u0579 \u0567 \u0564\u0561\u0589");
+
+        var r1 = await _chatService.GetResponseAsync(_deviceId, "give me a riddle");
+        Assert.Equal("riddle", r1.Mode);
+
+        var r2 = await _chatService.GetResponseAsync(_deviceId, "a cat");
+        Assert.Equal("riddle", r2.Mode);
+
+        var r3 = await _chatService.GetResponseAsync(_deviceId, "the sun");
+        Assert.Equal("riddle", r3.Mode);
+    }
+
+    [Fact]
+    public async Task GameSession_ExplicitStoryTrigger_OverridesGame()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053e\u0561\u0583\u056b\u056f\u0589",
+                     "Fox.\n---\nCHOICE_A:Go\nCHOICE_B:Stay");
+
+        await _chatService.GetResponseAsync(_deviceId, "lets play");
+        var r2 = await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+        Assert.Equal("story", r2.Mode);
+    }
+
+    [Fact]
+    public async Task GameSession_CalmTrigger_OverridesGame()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053e\u0561\u0583\u056b\u056f\u0589",
+                     "\u053c\u0561\u057e \u0567\u0580\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "lets play");
+        var r2 = await _chatService.GetResponseAsync(_deviceId, "good night");
+        Assert.Equal("calm", r2.Mode);
+    }
+
+    [Fact]
+    public async Task RiddleSession_CuriosityTrigger_OverridesRiddle()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053b\u0576\u0579 \u0567 \u0564\u0561\u0589",
+                     "\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "riddle me");
+        var r2 = await _chatService.GetResponseAsync(_deviceId, "why is the sky blue");
+        Assert.Equal("curiosity", r2.Mode);
+    }
+
+    [Fact]
+    public async Task GameSession_ClearedAfterStory()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053e\u0561\u0583\u056b\u056f\u0589",
+                     "Fox.\n---\nCHOICE_A:Go\nCHOICE_B:Stay",
+                     "\u053e\u0561\u0583\u056b\u056f\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "lets play");
+
+        // Switch to story — clears game session
+        await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+
+        // Short follow-up after story should NOT fall back to game
+        var r3 = await _chatService.GetResponseAsync(_deviceId, "ok");
+        // Story has pending choices → stays in story, not game
+        Assert.Equal("story", r3.Mode);
+    }
+
+    [Fact]
+    public async Task NoActiveSession_ShortMessage_ReturnsNone()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0532\u0561\u0580\u0587\u0589");
+
+        // No prior game/riddle — short message stays as None
+        var result = await _chatService.GetResponseAsync(_deviceId, "yes");
+        Assert.Null(result.Mode);
+    }
 }

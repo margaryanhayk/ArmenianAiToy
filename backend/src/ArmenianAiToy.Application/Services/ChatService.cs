@@ -348,6 +348,13 @@ public class ChatService : IChatService
 
     internal record PendingChoice(string OptionA, string OptionB, DateTime ExtractedAt);
 
+    // Active Game/Riddle session tracker. When ModeDetector returns None but an
+    // active game/riddle was recently running, the session continues. Story uses
+    // PendingChoices for this; Game/Riddle have no per-turn state to carry, so a
+    // simple mode+timestamp is enough. 30-minute expiry matches ChoiceExpiry.
+    internal static readonly ConcurrentDictionary<Guid, ActiveModeEntry> ActiveModes = new();
+    internal record ActiveModeEntry(DetectedMode Mode, DateTime ActivatedAt);
+
     internal const string DefaultFallbackResponse =
         "\u0531\u0580\u056b, \u0574\u056b \u0578\u0582\u0580\u056b\u0577 \u0570\u0565\u057f\u0561\u0584\u0580\u0584\u056b\u0580 \u0562\u0561\u0576 \u056d\u0578\u057d\u0565\u0576\u0584\u0589";
 
@@ -484,6 +491,23 @@ public class ChatService : IChatService
             ? DetectedMode.Story
             : ModeDetector.Detect(userMessage, history,
                 hasActiveStorySession: pending is not null && DateTime.UtcNow - pending.ExtractedAt < ChoiceExpiry);
+
+        // Step 7a: Game/Riddle session persistence. When ModeDetector finds no trigger
+        // but an active game/riddle was running recently, continue that mode.
+        if (detectedMode == DetectedMode.None
+            && ActiveModes.TryGetValue(conversation.Id, out var activeMode)
+            && DateTime.UtcNow - activeMode.ActivatedAt < ChoiceExpiry
+            && activeMode.Mode is DetectedMode.Game or DetectedMode.Riddle)
+        {
+            detectedMode = activeMode.Mode;
+        }
+
+        // Update active-mode tracker: store on Game/Riddle, clear on anything else.
+        if (detectedMode is DetectedMode.Game or DetectedMode.Riddle)
+            ActiveModes[conversation.Id] = new ActiveModeEntry(detectedMode, DateTime.UtcNow);
+        else
+            ActiveModes.TryRemove(conversation.Id, out _);
+
         bool isStoryMode = detectedMode == DetectedMode.Story;
         if (isStoryMode)
         {
