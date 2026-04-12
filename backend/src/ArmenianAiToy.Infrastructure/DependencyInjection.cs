@@ -25,7 +25,7 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("OpenAI:ApiKey is required");
         var chatModel = config["OpenAI:ChatModel"] ?? "gpt-4o-mini";
 
-        var moderationModel = config["OpenAI:ModerationModel"] ?? "text-moderation-stable";
+        var moderationModel = config["OpenAI:ModerationModel"] ?? "omni-moderation-latest";
 
         var openAiClient = new OpenAIClient(apiKey);
         services.AddSingleton(openAiClient.GetChatClient(chatModel));
