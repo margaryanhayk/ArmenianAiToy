@@ -438,4 +438,146 @@ public class ModeDetectorIntegrationTests
             Arg.Is<List<(string, string)>>(h =>
                 !h.Any(m => m.Item2.Contains("FORMAT REMINDER"))));
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Game mode
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GameTrigger_InjectsGamePrompt()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053e\u0561\u0583\u056b\u056f \u057f\u0578\u0582\u0580 \u0565\u0580\u056f\u0578\u0582 \u0561\u0576\u0563\u0561\u0574\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "let's play a game");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("MODE: GAME")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task GameArmenianTrigger_InjectsGamePrompt()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053e\u0561\u0583\u056b\u056f \u057f\u0578\u0582\u0580\u0589");
+
+        // Armenian "խdelays delays delaysdelays delays delays" (let's play)
+        await _chatService.GetResponseAsync(_deviceId, "\u056d\u0561\u0572\u0561\u0576\u0584");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("MODE: GAME")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task GameMode_NoChoiceBlock()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053e\u0561\u0583\u056b\u056f \u057f\u0578\u0582\u0580\u0589");
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "play with me");
+
+        Assert.Null(result.ChoiceA);
+        Assert.Null(result.ChoiceB);
+        Assert.Null(result.StorySessionId);
+    }
+
+    [Fact]
+    public async Task GameMode_NoFormatReminder()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053e\u0561\u0583\u056b\u056f \u057f\u0578\u0582\u0580\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Any<string>(),
+            Arg.Is<List<(string, string)>>(h =>
+                !h.Any(m => m.Item2.Contains("FORMAT REMINDER"))));
+    }
+
+    [Fact]
+    public async Task GameMode_PromptForbidsStoryContent()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053e\u0561\u0583\u056b\u056f \u057f\u0578\u0582\u0580\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "let's play a game");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("Do NOT tell a story")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Riddle mode
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task RiddleTrigger_InjectsRiddlePrompt()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053b\u0576\u0579 \u0567 \u0564\u0561, \u056b\u0576\u0579 \u0567 \u0564\u0561\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "give me a riddle");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("MODE: RIDDLE")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task RiddleArmenianTrigger_InjectsRiddlePrompt()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053b\u0576\u0579 \u0567 \u0564\u0561\u0589");
+
+        // Armenian "delaysdelays delaysdelays delaysdelays delaysdelays delays" (riddle)
+        await _chatService.GetResponseAsync(_deviceId, "\u0570\u0561\u0576\u0565\u056c\u0578\u0582\u056f");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("MODE: RIDDLE")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task RiddleMode_NoChoiceBlock()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053b\u0576\u0579 \u0567 \u0564\u0561\u0589");
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "riddle me this");
+
+        Assert.Null(result.ChoiceA);
+        Assert.Null(result.ChoiceB);
+        Assert.Null(result.StorySessionId);
+    }
+
+    [Fact]
+    public async Task RiddleMode_NoFormatReminder()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053b\u0576\u0579 \u0567 \u0564\u0561\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "ask me a riddle");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Any<string>(),
+            Arg.Is<List<(string, string)>>(h =>
+                !h.Any(m => m.Item2.Contains("FORMAT REMINDER"))));
+    }
+
+    [Fact]
+    public async Task RiddleMode_PromptForbidsTrickRiddles()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053b\u0576\u0579 \u0567 \u0564\u0561\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "give me a riddle");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("Do NOT use trick riddles")),
+            Arg.Any<List<(string, string)>>());
+    }
 }
