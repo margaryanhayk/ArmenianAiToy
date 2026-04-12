@@ -97,4 +97,29 @@ public class ResponseCleanerTests
         var result = ResponseCleaner.Clean(input);
         Assert.Equal("\u0544\u056b \u0561\u0576\u0563\u0561\u0574 \u056f\u0561\u057f\u0578\u0582\u0576 \u0563\u0576\u0561\u0581\u0589", result);
     }
+
+    // --- Emoji stripping ---
+
+    [Fact]
+    public void CleanText_Emoji_Stripped()
+    {
+        var input = "\u053c\u057d\u056b\u0580 \u0570\u0561\u0576\u0565\u056c\u0578\u0582\u056f\u0568\uD83C\uDF1E\u2728";
+        var result = ResponseCleaner.Clean(input);
+        Assert.Equal("\u053c\u057d\u056b\u0580 \u0570\u0561\u0576\u0565\u056c\u0578\u0582\u056f\u0568", result);
+    }
+
+    [Fact]
+    public void CleanText_ArmenianOnly_Untouched()
+    {
+        var input = "\u0531\u0580\u0565\u0563\u0568 \u0577\u0578\u0572\u0578\u0582\u0574 \u0567\u0580\u0589";
+        Assert.Equal(input, ResponseCleaner.Clean(input));
+    }
+
+    [Fact]
+    public void CleanText_EmojiAmidText_OnlyEmojiRemoved()
+    {
+        var input = "\u053c\u0561\u057e \u0567\uD83D\uDE0A \u0577\u0561\u057f \u056c\u0561\u057e\u0589";
+        var result = ResponseCleaner.Clean(input);
+        Assert.Equal("\u053c\u0561\u057e \u0567 \u0577\u0561\u057f \u056c\u0561\u057e\u0589", result);
+    }
 }
