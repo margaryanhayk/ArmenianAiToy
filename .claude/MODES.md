@@ -277,15 +277,14 @@ Plain Armenian text. No tail block. No questions.
   he should not return to story / game / riddle on his own. Only an
   explicit child re-engagement ("ուզում եմ խաղալ") can lift him out.
 
-**Code touch points (future).**
-- New `CalmModePromptSection` constant.
-- `ModeDetector` detects calm cues.
-- `ChatService` would skip story-mode-only steps: story memory injection,
-  format reminder, tail-block fallback generation, story quality gate.
-- `ResponseQualityGate` would skip CHOICE_A/B requirement and instead
-  enforce: no questions, no exclamations, no choice block.
+**Code touch points.**
+- `CalmModeInstruction` constant in `ChatService.cs`
+- `ModeDetector` detects calm cues
+- `ChatService` skips story-mode-only steps when Calm
+- `ResponseQualityGate.CheckRetry(response, userMessage, mode)` enforces
+  no questions and no exclamations with retry
 
-**Test implications.**
+**Test coverage.**
 - Detector tests for "ննջել", "kpnem", "I'm tired", "sleep now",
   "գիշեր բարի".
 - Must NOT trigger on "tell me a story about sleeping" — that is a story
@@ -333,18 +332,20 @@ These are constant across modes and must never drift:
 
 ---
 
-## Implementation status (as of 2026-04-12)
+## Implementation status (as of 2026-04-13)
 
-| Mode             | Detection            | Prompt section                  | Quality gate         |
-|------------------|----------------------|---------------------------------|----------------------|
-| Story            | `HasStoryIntent` ✅  | `StoryChoiceInstruction` ✅      | `ResponseQualityGate` ✅ |
-| Game             | `ModeDetector` ✅ *  | not yet                         | not yet              |
-| Riddle           | `ModeDetector` ✅ *  | not yet                         | not yet              |
-| Curiosity Window | `ModeDetector` ✅ *  | not yet                         | not yet              |
-| Calm / Bedtime   | `ModeDetector` ✅ *  | not yet                         | not yet              |
+| Mode             | Detection              | Prompt section                     | Quality gate                          |
+|------------------|------------------------|------------------------------------|---------------------------------------|
+| Story            | `ModeDetector` ✅      | `StoryChoiceInstruction` ✅         | `ResponseQualityGate` ✅ (universal)  |
+| Game             | `ModeDetector` ✅      | `GameModeInstruction` ✅            | universal only                        |
+| Riddle           | `ModeDetector` ✅      | `RiddleModeInstruction` ✅          | universal only                        |
+| Curiosity Window | `ModeDetector` ✅      | `CuriosityWindowInstruction` ✅     | universal only                        |
+| Calm / Bedtime   | `ModeDetector` ✅      | `CalmModeInstruction` ✅            | `calm_question` / `calm_exclamation` ✅ |
 
-\* `ModeDetector` is additive infrastructure — not yet wired into
-`ChatService`. Wiring is gated on human approval (see ROADMAP.md).
+All 5 modes are live. `ModeDetector` is wired into `ChatService` as the
+primary mode classifier (replacing `HasStoryIntent`). Curiosity preserves
+pending story choices for resume. Calm has a mode-specific quality gate
+that retries on `?`/`!`.
 
 ---
 

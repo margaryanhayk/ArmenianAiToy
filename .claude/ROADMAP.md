@@ -39,7 +39,9 @@ verified in isolation. Future phases wire it in under separate review.
 
 ---
 
-## Phase 2 — Mode-aware quality gates (NEXT, requires approval)
+## Phase 2 — Mode-aware quality gates (partially done)
+
+Calm quality gate is live. Curiosity/Game/Riddle have universal checks only.
 
 Risk: **MEDIUM**. Touches `ResponseQualityGate` which is read by
 `ChatService` line ~534. The change is additive: a new overload that takes
@@ -58,47 +60,23 @@ No call-site change in `ChatService` in this phase.
 
 ---
 
-## Phase 3 — Per-mode prompt sections (HIGH RISK, requires approval)
+## Phase 3 — Per-mode prompt sections (✅ done)
 
-Touches the system prompt — a hard stop in `CLAUDE.md`.
-
-Add new const sections alongside `StoryChoiceInstruction`:
-
-- `GameModePromptSection`
-- `RiddleModePromptSection`
-- `CalmModePromptSection`
-- `CuriosityResponseGuidance` (single-turn overlay)
-
-Each section must be reviewed by:
-- `prompt-reviewer` (scope, safety, identity drift)
-- `armenian-linguistic-reviewer` (Armenian tone correctness)
-- `areg-story-evaluator` for the Story-adjacent ones (Riddle)
-
-**Validation gate:** new prompt sections are unit-testable as constants.
-Behavioral validation requires Phase 4.
+All 5 prompt sections are live in `ChatService`:
+- `StoryChoiceInstruction` (existing)
+- `CalmModeInstruction`
+- `CuriosityWindowInstruction`
+- `GameModeInstruction`
+- `RiddleModeInstruction`
 
 ---
 
-## Phase 4 — ChatService mode wiring (HIGH RISK, requires approval)
+## Phase 4 — ChatService mode wiring (✅ done)
 
-The integration step. Replace `bool isStoryMode = HasStoryIntent(...)` with
-`DetectedMode mode = ModeDetector.Detect(...)` and gate prompt-section
-selection, story memory injection, format reminder, tail-block fallback,
-and quality gate on the mode value.
-
-**Diff discipline:**
-- Must remain within ~80 line delta in `ChatService.cs`.
-- Must be paired with end-to-end tests for each non-story mode that
-  verify (a) the right prompt section is appended and (b) the tail-block
-  pipeline is not invoked.
-- Must run StoryBenchmark and show no regression on the existing 27
-  prompts before being committed.
-
-**Validation gate:**
-- All existing tests pass.
-- New per-mode integration tests pass.
-- StoryBenchmark equal-or-better vs. baseline.
-- `prompt-reviewer` AGREE verdict on the diff.
+`ModeDetector.Detect` replaced `HasStoryIntent` as the primary mode
+classifier. Prompt-section selection, story memory injection, format
+reminder, and tail-block fallback are all gated on `detectedMode`.
+Curiosity preserves pending choices for story resume.
 
 ---
 

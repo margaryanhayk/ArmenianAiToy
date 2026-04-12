@@ -162,4 +162,45 @@ public class ResponseQualityGateTests
             "\u053c\u0561\u057e \u0567\u0580?", "hello", DetectedMode.None);
         Assert.Null(result);
     }
+
+    // --- Mode-aware overload: Curiosity brevity checks ---
+
+    [Fact]
+    public void Curiosity_ShortResponse_PassesGate()
+    {
+        // 1-2 sentences, well under 200 chars.
+        var result = ResponseQualityGate.CheckRetry(
+            "\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567, \u0578\u0580\u0578\u057e\u0570\u0565\u057f\u0587 \u056c\u0578\u0582\u0575\u057d\u0568 \u0581\u0580\u057e\u0578\u0582\u0574 \u0567\u0589",
+            "why is the sky blue", DetectedMode.Curiosity);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Curiosity_LongResponse_TriggersCuriosityTooLong()
+    {
+        // >200 chars = lecture territory.
+        var longResponse = new string('\u0561', 201);
+        var result = ResponseQualityGate.CheckRetry(
+            longResponse, "why is the sky blue", DetectedMode.Curiosity);
+        Assert.Equal("curiosity_too_long", result);
+    }
+
+    [Fact]
+    public void Curiosity_Exactly200Chars_PassesGate()
+    {
+        var exactResponse = new string('\u0561', 200);
+        var result = ResponseQualityGate.CheckRetry(
+            exactResponse, "why is the sky blue", DetectedMode.Curiosity);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Story_LongResponse_DoesNotTriggerCuriosityCheck()
+    {
+        // Long responses in Story mode are fine — only Curiosity checks length.
+        var longResponse = new string('\u0561', 500);
+        var result = ResponseQualityGate.CheckRetry(
+            longResponse, "tell me a story", DetectedMode.Story);
+        Assert.Null(result);
+    }
 }
