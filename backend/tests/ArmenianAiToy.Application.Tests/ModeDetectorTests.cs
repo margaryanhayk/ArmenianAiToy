@@ -104,6 +104,10 @@ public class ModeDetectorTests
     [InlineData("what is a rainbow")]
     [InlineData("what's a star")]
     [InlineData("where is the sun at night")]
+    [InlineData("where does rain come from")]
+    [InlineData("where do birds go in winter")]
+    [InlineData("how does a rainbow form")]
+    [InlineData("how do fish breathe")]
     public void Curiosity_EnglishStarter_DetectsCuriosity(string message)
     {
         Assert.Equal(DetectedMode.Curiosity, ModeDetector.Detect(message, EmptyHistory));

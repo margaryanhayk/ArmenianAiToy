@@ -115,8 +115,12 @@ public static class ModeDetector
         "what are",
         "where is",
         "where are",
+        "where does",
+        "where do",
         "when is",
         "when does",
+        "how does",
+        "how do",
         "\u056b\u0576\u0579\u0578\u0582",                          // ինչու (why)
         "\u056b\u0576\u0579\u057a\u0565\u057d",                    // ինչպես (how)
     ];
