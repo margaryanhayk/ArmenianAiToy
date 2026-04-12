@@ -214,10 +214,43 @@ public class ResponseQualityGateTests
     [Fact]
     public void Story_LongResponse_DoesNotTriggerCuriosityCheck()
     {
-        // Long responses in Story mode are fine — only Curiosity checks length.
         var longResponse = new string('\u0561', 500);
         var result = ResponseQualityGate.CheckRetry(
             longResponse, "tell me a story", DetectedMode.Story);
+        Assert.Null(result);
+    }
+
+    // --- Mode-aware overload: Game brevity checks ---
+
+    [Fact]
+    public void Game_ShortResponse_PassesGate()
+    {
+        var result = ResponseQualityGate.CheckRetry(
+            new string('\u0561', 100), "lets play", DetectedMode.Game);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Game_Exactly150Chars_PassesGate()
+    {
+        var result = ResponseQualityGate.CheckRetry(
+            new string('\u0561', 150), "lets play", DetectedMode.Game);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Game_LongResponse_TriggersGameTooLong()
+    {
+        var result = ResponseQualityGate.CheckRetry(
+            new string('\u0561', 151), "lets play", DetectedMode.Game);
+        Assert.Equal("game_too_long", result);
+    }
+
+    [Fact]
+    public void Story_LongResponse_DoesNotTriggerGameCheck()
+    {
+        var result = ResponseQualityGate.CheckRetry(
+            new string('\u0561', 500), "tell me a story", DetectedMode.Story);
         Assert.Null(result);
     }
 }

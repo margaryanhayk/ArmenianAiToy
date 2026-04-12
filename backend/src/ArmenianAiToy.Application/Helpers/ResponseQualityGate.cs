@@ -60,6 +60,10 @@ public static class ResponseQualityGate
                 if (response.Length > 200)
                     return "curiosity_too_long";
             }
+
+            // Game: 1-3 short sentences. Over 150 chars is too wordy for a play activity.
+            if (mode == DetectedMode.Game && response.Length > 150)
+                return "game_too_long";
         }
 
         return null;

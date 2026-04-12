@@ -753,6 +753,19 @@ public class ChatService : IChatService
         // --- separators) that survived parsing. Safety net for visible text.
         aiResponse = ResponseCleaner.Clean(aiResponse);
 
+        // Step 10f: Mode-specific punctuation cleanup. Belt-and-suspenders for
+        // when the quality gate retry also produces forbidden punctuation.
+        // Replaces forbidden marks with Armenian period (verjaket ։ U+0589).
+        if (detectedMode == DetectedMode.Calm)
+        {
+            aiResponse = aiResponse.Replace('?', '\u0589').Replace('\u055E', '\u0589')
+                                   .Replace('!', '\u0589').Replace('\u055C', '\u0589');
+        }
+        else if (detectedMode == DetectedMode.Curiosity)
+        {
+            aiResponse = aiResponse.Replace('?', '\u0589').Replace('\u055E', '\u0589');
+        }
+
         // Step 11: Store AI response
         var responseMsg = await _conversations.AddMessageAsync(
             conversation.Id, MessageRole.Assistant, aiResponse, safetyFlag);

@@ -801,4 +801,45 @@ public class ModeDetectorIntegrationTests
         var result = await _chatService.GetResponseAsync(_deviceId, "yes");
         Assert.Null(result.Mode);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Post-processing punctuation cleanup
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CalmMode_QuestionSurvivesRetry_StrippedByPostProcessing()
+    {
+        // Both first and retry responses contain a question mark.
+        // Post-processing should replace it with Armenian period.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053c\u0561\u057e \u0567\u0580?", "\u053c\u0561\u057e \u0567\u0580?");
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "good night");
+
+        Assert.DoesNotContain("?", result.Response);
+        Assert.Contains("\u0589", result.Response);
+    }
+
+    [Fact]
+    public async Task CuriosityMode_QuestionSurvivesRetry_StrippedByPostProcessing()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0531\u0575\u0578?", "\u0531\u0575\u0578?");
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "why is the sky blue");
+
+        Assert.DoesNotContain("?", result.Response);
+    }
+
+    [Fact]
+    public async Task StoryMode_QuestionNotStripped()
+    {
+        // Story mode should NOT strip questions — they're legitimate in stories.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053b\u0576\u0579 \u056f\u056c\u056b\u0576\u056b?\n---\nCHOICE_A:Go\nCHOICE_B:Stay");
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+
+        Assert.Contains("?", result.Response);
+    }
 }
