@@ -580,4 +580,62 @@ public class ModeDetectorIntegrationTests
             Arg.Is<string>(s => s.Contains("Do NOT use trick riddles")),
             Arg.Any<List<(string, string)>>());
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Mode field in ChatResponse
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ModeField_Story_ReturnsStory()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("A fox.\n---\nCHOICE_A:Go\nCHOICE_B:Stay");
+        var result = await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+        Assert.Equal("story", result.Mode);
+    }
+
+    [Fact]
+    public async Task ModeField_Calm_ReturnsCalm()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053c\u0561\u057e \u0567\u0580\u0589");
+        var result = await _chatService.GetResponseAsync(_deviceId, "good night");
+        Assert.Equal("calm", result.Mode);
+    }
+
+    [Fact]
+    public async Task ModeField_Game_ReturnsGame()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053e\u0561\u0583\u056b\u056f \u057f\u0578\u0582\u0580\u0589");
+        var result = await _chatService.GetResponseAsync(_deviceId, "let's play");
+        Assert.Equal("game", result.Mode);
+    }
+
+    [Fact]
+    public async Task ModeField_Riddle_ReturnsRiddle()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053b\u0576\u0579 \u0567 \u0564\u0561\u0589");
+        var result = await _chatService.GetResponseAsync(_deviceId, "give me a riddle");
+        Assert.Equal("riddle", result.Mode);
+    }
+
+    [Fact]
+    public async Task ModeField_Curiosity_ReturnsCuriosity()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567\u0589");
+        var result = await _chatService.GetResponseAsync(_deviceId, "why is the sky blue");
+        Assert.Equal("curiosity", result.Mode);
+    }
+
+    [Fact]
+    public async Task ModeField_NoMode_ReturnsNull()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0532\u0561\u0580\u0587 \u0571\u0565\u0566\u0589");
+        var result = await _chatService.GetResponseAsync(_deviceId, "hello");
+        Assert.Null(result.Mode);
+    }
 }

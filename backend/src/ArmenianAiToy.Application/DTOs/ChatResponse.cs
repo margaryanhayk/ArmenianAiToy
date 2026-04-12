@@ -9,4 +9,5 @@ public record ChatResponse(
     SafetyFlag SafetyFlag,
     string? ChoiceA = null,
     string? ChoiceB = null,
-    Guid? StorySessionId = null);
+    Guid? StorySessionId = null,
+    string? Mode = null);

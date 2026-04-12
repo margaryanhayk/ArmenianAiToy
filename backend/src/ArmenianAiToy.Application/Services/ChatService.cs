@@ -721,7 +721,8 @@ public class ChatService : IChatService
         // Set storySessionId when story choices are present (active story mode)
         Guid? activeStorySession = (choiceA != null || choiceB != null) ? conversation.Id : null;
 
-        return new ChatResponse(aiResponse, conversation.Id, responseMsg.Id, safetyFlag, choiceA, choiceB, activeStorySession);
+        var modeName = detectedMode == DetectedMode.None ? null : detectedMode.ToString().ToLowerInvariant();
+        return new ChatResponse(aiResponse, conversation.Id, responseMsg.Id, safetyFlag, choiceA, choiceB, activeStorySession, modeName);
     }
 
     internal static bool HasStoryIntent(
