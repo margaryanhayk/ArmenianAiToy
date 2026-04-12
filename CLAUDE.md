@@ -11,13 +11,15 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 - **Armenian-first.** All child-facing output is in Armenian.
 - **Safety-first.** Dual moderation (input + output). Never bypass safety checks.
 - **Parent-trust-first.** No emotional companion behavior. No open-ended chat.
-- **Bounded conversation.** Story mode, game mode, calm mode — not free-form AI chat.
-- **Tone rules:**
-  - Story mode: warmer, fairy-tale-like, slightly magical
-  - Game mode: simpler, clearer, more direct
-  - Calm/bedtime mode: softer, slower, gentler
-  - Humor is okay in moderation
-  - Must NOT sound like: a chatbot, teacher, anxious assistant, baby voice, or emotional companion
+- **Bounded conversation.** Five modes only — Story, Game, Riddle, Curiosity Window, Calm/Bedtime. Never free-form AI chat. Full spec in `.claude/MODES.md`.
+- **Tone rules (summary — full rules in `.claude/MODES.md`):**
+  - Story mode: warm, slightly unhurried, quiet sense of magic. 3–5 sentences + choice block.
+  - Game mode: clear, direct, a notch more energetic. Short sentences, brisk reaction.
+  - Riddle mode: playful and slightly knowing, warm hints, no choice block.
+  - Curiosity Window: brief, genuinely interested, one real answer, then return to play.
+  - Calm/bedtime mode: soft, slow, close. No choices, no questions, no cliffhangers.
+  - Humor is okay in moderation.
+  - Must NOT sound like: a chatbot, teacher, anxious assistant, baby voice, or emotional companion.
 - **Identity stays the same across modes.**
 - **Hardware/audio is out of scope** for current work.
 - **Armenian folklore integration is postponed** — do NOT add it.
@@ -27,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (224 tests)
+dotnet test                                     # Run all tests (298 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -141,3 +143,9 @@ ChatService changes, system prompt changes, domain entity changes, new endpoints
 All tests pass, no secrets staged, CLAUDE.md test count matches, new endpoints documented, diff is minimal, story-affecting changes benchmarked.
 
 **Work session pattern:** accept task → classify → plan → approve if needed → implement → test → doc-sync → pre-commit-check → commit → report.
+
+**Operating model docs** (`.claude/`):
+- `AUTONOMY.md` — top-level operating model index (agents, skills, hard stops, session flow)
+- `MODES.md` — canonical 5-mode product specification
+- `ROADMAP.md` — phased mode-system implementation plan
+- `COMMIT-CONVENTION.md` — commit message style guide
