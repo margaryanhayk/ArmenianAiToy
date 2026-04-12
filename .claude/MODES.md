@@ -334,18 +334,22 @@ These are constant across modes and must never drift:
 
 ## Implementation status (as of 2026-04-13)
 
-| Mode             | Detection              | Prompt section                     | Quality gate                          |
-|------------------|------------------------|------------------------------------|---------------------------------------|
-| Story            | `ModeDetector` ✅      | `StoryChoiceInstruction` ✅         | `ResponseQualityGate` ✅ (universal)  |
-| Game             | `ModeDetector` ✅      | `GameModeInstruction` ✅            | universal only                        |
-| Riddle           | `ModeDetector` ✅      | `RiddleModeInstruction` ✅          | universal only                        |
-| Curiosity Window | `ModeDetector` ✅      | `CuriosityWindowInstruction` ✅     | universal only                        |
-| Calm / Bedtime   | `ModeDetector` ✅      | `CalmModeInstruction` ✅            | `calm_question` / `calm_exclamation` ✅ |
+| Mode             | Detection              | Prompt section                     | Quality gate                          | Session persistence |
+|------------------|------------------------|------------------------------------|---------------------------------------|---------------------|
+| Story            | `ModeDetector` ✅      | `StoryChoiceInstruction` ✅         | universal + subject_mismatch ✅       | `PendingChoices` ✅ |
+| Game             | `ModeDetector` ✅      | `GameModeInstruction` ✅            | `game_too_long` (>150 chars) ✅       | `ActiveModes` ✅    |
+| Riddle           | `ModeDetector` ✅      | `RiddleModeInstruction` ✅          | universal ✅                          | `ActiveModes` ✅    |
+| Curiosity Window | `ModeDetector` ✅      | `CuriosityWindowInstruction` ✅     | `curiosity_question` / `too_long` ✅  | one-turn (choices preserved) |
+| Calm / Bedtime   | `ModeDetector` ✅      | `CalmModeInstruction` ✅            | `calm_question` / `exclamation` ✅    | terminal            |
 
-All 5 modes are live. `ModeDetector` is wired into `ChatService` as the
-primary mode classifier (replacing `HasStoryIntent`). Curiosity preserves
-pending story choices for resume. Calm has a mode-specific quality gate
-that retries on `?`/`!`.
+All 5 modes are live with prompt sections, quality gates, and session
+persistence. `ModeDetector` is wired into `ChatService` as the primary
+mode classifier. Game/Riddle sessions persist via `ActiveModes` dictionary
+(30-min expiry). Curiosity preserves pending story choices for resume.
+Post-processing strips forbidden punctuation from Calm (`?!`) and
+Curiosity (`?`) as a belt-and-suspenders after the quality gate retry.
+Emoji codepoints stripped from all responses. Mode-aware safety fallback
+for Calm returns a bedtime message instead of the default.
 
 ---
 
