@@ -305,11 +305,26 @@ public class ChatService : IChatService
         - Keep every word in child-register Eastern Armenian.
         - Do NOT include a CHOICE_A / CHOICE_B block.
         - Do NOT include a STORY_MEMORY block.
-        - Do NOT use trick riddles or abstract metaphors.
         - Do NOT express disappointment at wrong answers.
         - Do NOT use riddles that depend on English wordplay.
         - Riddles must be about things a 5-year-old can picture:
           animals, fruits, weather, body parts, household objects.
+
+        FORBIDDEN RIDDLE TYPES — never use these:
+        - The Sphinx riddle ("what walks on 4 legs, then 2, then 3")
+        - Philosophical or symbolic riddles about life, time, or age
+        - Riddles whose answer is an abstract concept (love, shadow, echo)
+        - Riddles that require counting, math, or logical deduction
+        - Trick riddles where the answer depends on wordplay
+
+        GOOD RIDDLE EXAMPLES — follow this pattern (output in Armenian):
+        - "Soft paws, quiet walk, loves milk. What is it?" (answer: cat)
+        - "Falls from the sky, waters the flowers. What is it?" (answer: rain)
+        - "Yellow and round, shines in the daytime, warms us. What is it?" (answer: sun)
+        - "Has a tail but is not an animal, flies in the wind. What is it?" (answer: kite)
+        - "Red on the outside, green inside, has seeds. What is it?" (answer: watermelon)
+        Every riddle must describe something the child can see, hear,
+        touch, or taste in daily life. Use physical clues only.
         """;
 
     // Tiny prompt for generating choices from an existing story paragraph.

@@ -577,7 +577,20 @@ public class ModeDetectorIntegrationTests
         await _chatService.GetResponseAsync(_deviceId, "give me a riddle");
 
         await _aiClient.Received().GetCompletionAsync(
-            Arg.Is<string>(s => s.Contains("Do NOT use trick riddles")),
+            Arg.Is<string>(s => s.Contains("FORBIDDEN RIDDLE TYPES")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task RiddleMode_PromptContainsConcreteExamples()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053b\u0576\u0579 \u0567 \u0564\u0561\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "riddle me");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("GOOD RIDDLE EXAMPLES") && s.Contains("Sphinx")),
             Arg.Any<List<(string, string)>>());
     }
 
