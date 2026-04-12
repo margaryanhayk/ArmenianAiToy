@@ -382,9 +382,13 @@ public class ChatService : IChatService
             }
         }
 
-        // Step 7: Append story-choice instruction if conversation has story intent
-        bool isStoryMode = explicitStoryContinuation
-            || HasStoryIntent(userMessage, history, hadPendingChoices: pending is not null && DateTime.UtcNow - pending.ExtractedAt < ChoiceExpiry);
+        // Step 7: Detect conversation mode. ModeDetector priority: calm > curiosity
+        // > active story > explicit trigger > history > none. See .claude/MODES.md.
+        var detectedMode = explicitStoryContinuation
+            ? DetectedMode.Story
+            : ModeDetector.Detect(userMessage, history,
+                hasActiveStorySession: pending is not null && DateTime.UtcNow - pending.ExtractedAt < ChoiceExpiry);
+        bool isStoryMode = detectedMode == DetectedMode.Story;
         if (isStoryMode)
         {
             systemPrompt += StoryChoiceInstruction;
