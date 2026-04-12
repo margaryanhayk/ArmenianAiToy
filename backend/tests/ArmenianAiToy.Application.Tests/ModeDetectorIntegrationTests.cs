@@ -123,6 +123,78 @@ public class ModeDetectorIntegrationTests
     }
 
     [Fact]
+    public async Task CalmTrigger_InjectsCalmPrompt()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0531\u0574\u0565\u0576 \u056b\u0576\u0579 \u056c\u0561\u057e \u0567\u0580\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "i'm sleepy");
+
+        // Verify the system prompt contains the calm instruction marker.
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("MODE: CALM / BEDTIME")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task CalmTrigger_PromptForbidsChoiceBlock()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053c\u0561\u057e \u0567\u0580\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "good night");
+
+        // Verify the calm prompt explicitly bans CHOICE_A/CHOICE_B.
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("Do NOT include a CHOICE_A / CHOICE_B block")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task CalmTrigger_PromptForbidsQuestions()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053c\u0561\u057e \u0567\u0580\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "bedtime");
+
+        // Verify the calm prompt explicitly bans questions.
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("Do NOT ask any questions")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task CalmArmenianTrigger_InjectsCalmPrompt()
+    {
+        // Armenian "գիշեր բարի" (good night).
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053c\u0561\u057e \u0567\u0580\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "\u0563\u056b\u0577\u0565\u0580 \u0562\u0561\u0580\u056b");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("MODE: CALM / BEDTIME")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task CalmMode_NoFormatReminderInjected()
+    {
+        // Calm mode must NOT inject the story format reminder into history.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053c\u0561\u057e \u0567\u0580\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "sleep now");
+
+        // Verify the history passed to AI does NOT contain the format reminder.
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Any<string>(),
+            Arg.Is<List<(string, string)>>(h =>
+                !h.Any(m => m.Item2.Contains("FORMAT REMINDER"))));
+    }
+
+    [Fact]
     public async Task ExplicitChoiceSelection_AlwaysStoryMode()
     {
         // Turn 1: Start a story.

@@ -220,6 +220,29 @@ public class ChatService : IChatService
         Do not include a CHOICE_A/CHOICE_B block in this response.
         """;
 
+    internal const string CalmModeInstruction = """
+
+        MODE: CALM / BEDTIME. The child is winding down toward sleep.
+
+        TONE: Soft, slow, close. Energy comes down, warmth stays. Speak
+        the way a parent would whisper near a drowsy child — simple words,
+        gentle rhythm, no surprises.
+
+        RULES:
+        - 2 to 4 short, quiet sentences. Each one a little slower.
+        - Use calm imagery only: warm bed, soft pillow, quiet stars, slow
+          breathing, moonlight, gentle wind, closed eyes, warm blanket.
+        - Do NOT ask any questions.
+        - Do NOT use exclamation marks.
+        - Do NOT introduce new characters, events, or tension.
+        - Do NOT include a CHOICE_A / CHOICE_B block.
+        - Do NOT include a STORY_MEMORY block.
+        - Do NOT use cliffhangers or suspense.
+        - Do NOT use game instructions or riddles.
+        - Keep every word in child-register Eastern Armenian.
+        - End with a soft, restful image or a gentle closing phrase.
+        """;
+
     // Tiny prompt for generating choices from an existing story paragraph.
     private const string ChoiceGenerationPrompt =
         "You are given a short Armenian children's story paragraph. "
@@ -418,6 +441,10 @@ public class ChatService : IChatService
             {
                 systemPrompt += "\n\nprevious_story_choice: unclear";
             }
+        }
+        else if (detectedMode == DetectedMode.Calm)
+        {
+            systemPrompt += CalmModeInstruction;
         }
 
         // Step 7c: Inject format reminder at end of history for story mode.
