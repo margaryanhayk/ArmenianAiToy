@@ -266,4 +266,76 @@ public class ModeDetectorIntegrationTests
         Assert.NotNull(result.ChoiceA);
         Assert.NotNull(result.ChoiceB);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Calm quality gate retry path (end-to-end)
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CalmRetry_QuestionInFirstResponse_ReturnsCleanSecondResponse()
+    {
+        // First AI call returns a response with a question mark (violates calm rules).
+        // Quality gate fires calm_question → retry. Second AI call returns clean text.
+        var badResponse = "\u0531\u0579\u0584\u0565\u0580\u0564 \u0583\u0561\u056f\u056b\u0580, \u056b\u0576\u0579 \u0565\u057d \u0578\u0582\u0566\u0578\u0582\u0574?";
+        var cleanResponse = "\u0531\u0579\u0584\u0565\u0580\u0564 \u0583\u0561\u056f\u056b\u0580, \u0561\u0574\u0565\u0576 \u056b\u0576\u0579 \u056c\u0561\u057e \u0567\u0580\u0589";
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(badResponse, cleanResponse);
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "good night");
+
+        Assert.Equal(cleanResponse, result.Response);
+        Assert.Null(result.ChoiceA);
+        Assert.Null(result.ChoiceB);
+    }
+
+    [Fact]
+    public async Task CalmRetry_ExclamationInFirstResponse_ReturnsCleanSecondResponse()
+    {
+        var badResponse = "\u0548\u0582\u0580\u0561\u056d \u0565\u0576\u0584 \u057e\u0561\u0572\u0568!";
+        var cleanResponse = "\u0531\u0574\u0565\u0576 \u056b\u0576\u0579 \u056c\u0561\u057e \u0567\u0580\u0589";
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(badResponse, cleanResponse);
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "i'm tired");
+
+        Assert.Equal(cleanResponse, result.Response);
+    }
+
+    [Fact]
+    public async Task CalmRetry_LogsRetryReason()
+    {
+        var badResponse = "\u053c\u0561\u057e \u0567\u0580?";
+        var cleanResponse = "\u053c\u0561\u057e \u0567\u0580\u0589";
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(badResponse, cleanResponse);
+
+        await _chatService.GetResponseAsync(_deviceId, "kpnem");
+
+        _logger.Received().Log(
+            LogLevel.Information,
+            Arg.Any<EventId>(),
+            Arg.Is<object>(o => o.ToString()!.Contains("Quality gate retry triggered")
+                && o.ToString()!.Contains("calm_question")),
+            Arg.Any<Exception?>(),
+            Arg.Any<Func<object, Exception?, string>>());
+    }
+
+    [Fact]
+    public async Task CalmRetry_AiCalledTwice()
+    {
+        var badResponse = "\u053c\u0561\u057e \u0567\u0580!";
+        var cleanResponse = "\u053c\u0561\u057e \u0567\u0580\u0589";
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(badResponse, cleanResponse);
+
+        await _chatService.GetResponseAsync(_deviceId, "bedtime");
+
+        // AI should be called exactly twice: initial + retry.
+        await _aiClient.Received(2).GetCompletionAsync(
+            Arg.Any<string>(), Arg.Any<List<(string, string)>>());
+    }
 }
