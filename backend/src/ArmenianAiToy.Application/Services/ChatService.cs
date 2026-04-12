@@ -562,7 +562,7 @@ public class ChatService : IChatService
         // moderation + parse pipeline on the retry result.
         if (safetyFlag != SafetyFlag.Flagged)
         {
-            var retryReason = ResponseQualityGate.CheckRetry(aiResponse, userMessage);
+            var retryReason = ResponseQualityGate.CheckRetry(aiResponse, userMessage, detectedMode);
             if (retryReason is not null)
             {
                 _logger.LogInformation(

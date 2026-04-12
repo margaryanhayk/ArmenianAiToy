@@ -34,6 +34,29 @@ public static class ResponseQualityGate
     };
 
     /// <summary>
+    /// Mode-aware quality gate. Runs all universal checks via the 2-arg
+    /// overload, then adds mode-specific checks. Currently only Calm mode
+    /// has additional rules (no question marks, no exclamation marks).
+    /// </summary>
+    public static string? CheckRetry(string response, string userMessage, DetectedMode mode)
+    {
+        var universal = CheckRetry(response, userMessage);
+        if (universal is not null) return universal;
+
+        if (mode == DetectedMode.Calm && !string.IsNullOrWhiteSpace(response))
+        {
+            // ASCII and Armenian question marks
+            if (response.Contains('?') || response.Contains('\u055E'))
+                return "calm_question";
+            // ASCII and Armenian exclamation marks
+            if (response.Contains('!') || response.Contains('\u055C'))
+                return "calm_exclamation";
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Returns a retry reason ("latin_run", "leaked_tag", "subject_mismatch")
     /// or null if the response passes the gate.
     /// </summary>
