@@ -548,11 +548,11 @@ public class ChatService : IChatService
                 ?? "Արի, մի ուրիշ հետաքրքիր բան խոսենք։";
         }
 
-        // Step 10a: Strip STORY_MEMORY block (always) and store structured memory (if present).
-        // Must run before TailBlockParser so CHOICE_A/CHOICE_B are at end of string.
+        // Step 10a: Strip STORY_MEMORY block (always — cleans leaked markers). Only store
+        // structured memory for story mode; non-story modes must not pollute story state.
         StoryMemoryParser.TryExtract(aiResponse, out var memStripped, out var newMemory);
         aiResponse = memStripped;
-        if (newMemory is not null)
+        if (isStoryMode && newMemory is not null)
         {
             StoryMemories.AddOrUpdate(
                 conversation.Id,
@@ -563,17 +563,21 @@ public class ChatService : IChatService
                 conversation.Id, newMemory.Character, newMemory.Place);
         }
 
-        // Step 10b: Strip tail block and store labels for next request
+        // Step 10b: Strip tail block (always — cleans leaked markers). Only store
+        // choice labels for story mode; non-story modes must not create pending choices.
         string? choiceA = null, choiceB = null;
         if (TailBlockParser.TryExtract(aiResponse, out var cleanedResponse, out var optionA, out var optionB))
         {
-            PendingChoices[conversation.Id] = new PendingChoice(optionA!, optionB!, DateTime.UtcNow);
-            _logger.LogInformation(
-                "Story choice extracted. ConversationId: {ConversationId}, OptionA: {OptionA}, OptionB: {OptionB}",
-                conversation.Id, optionA, optionB);
-            choiceA = optionA;
-            choiceB = optionB;
             aiResponse = cleanedResponse;
+            if (isStoryMode)
+            {
+                PendingChoices[conversation.Id] = new PendingChoice(optionA!, optionB!, DateTime.UtcNow);
+                _logger.LogInformation(
+                    "Story choice extracted. ConversationId: {ConversationId}, OptionA: {OptionA}, OptionB: {OptionB}",
+                    conversation.Id, optionA, optionB);
+                choiceA = optionA;
+                choiceB = optionB;
+            }
         }
 
         // Step 10c: Fallback choice generation when story mode is active but
@@ -649,7 +653,7 @@ public class ChatService : IChatService
                         // Re-run STORY_MEMORY extraction.
                         StoryMemoryParser.TryExtract(retryResp, out var rMemStripped, out var rMem);
                         retryResp = rMemStripped;
-                        if (rMem is not null)
+                        if (isStoryMode && rMem is not null)
                         {
                             StoryMemories.AddOrUpdate(
                                 conversation.Id,
@@ -657,13 +661,16 @@ public class ChatService : IChatService
                                 (_, existing) => StoryMemoryParser.Merge(existing, rMem));
                         }
 
-                        // Re-run tail-block extraction.
+                        // Re-run tail-block extraction (always strip, only store in story mode).
                         if (TailBlockParser.TryExtract(retryResp, out var rCleaned, out var rA, out var rB))
                         {
-                            PendingChoices[conversation.Id] = new PendingChoice(rA!, rB!, DateTime.UtcNow);
-                            choiceA = rA;
-                            choiceB = rB;
                             retryResp = rCleaned;
+                            if (isStoryMode)
+                            {
+                                PendingChoices[conversation.Id] = new PendingChoice(rA!, rB!, DateTime.UtcNow);
+                                choiceA = rA;
+                                choiceB = rB;
+                            }
                         }
 
                         aiResponse = retryResp;

@@ -638,4 +638,49 @@ public class ModeDetectorIntegrationTests
         var result = await _chatService.GetResponseAsync(_deviceId, "hello");
         Assert.Null(result.Mode);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Non-story mode choice-block isolation
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GameMode_LeakedChoiceBlock_DoesNotCreatePendingChoices()
+    {
+        // AI accidentally produces a choice block in Game mode.
+        // The block should be stripped but NOT stored as pending choices.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Play!\n---\nCHOICE_A:Clap\nCHOICE_B:Jump");
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        Assert.Null(result.ChoiceA);
+        Assert.Null(result.ChoiceB);
+        Assert.Null(result.StorySessionId);
+        Assert.False(ChatService.PendingChoices.ContainsKey(_conversationId));
+    }
+
+    [Fact]
+    public async Task CalmMode_LeakedChoiceBlock_DoesNotCreatePendingChoices()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Sleep.\n---\nCHOICE_A:Dream\nCHOICE_B:Rest");
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "good night");
+
+        Assert.Null(result.ChoiceA);
+        Assert.Null(result.ChoiceB);
+        Assert.False(ChatService.PendingChoices.ContainsKey(_conversationId));
+    }
+
+    [Fact]
+    public async Task GameMode_LeakedChoiceBlock_StillStrippedFromResponse()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Play!\n---\nCHOICE_A:Clap\nCHOICE_B:Jump");
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "let's play a game");
+
+        Assert.DoesNotContain("CHOICE_A", result.Response);
+        Assert.DoesNotContain("CHOICE_B", result.Response);
+    }
 }
