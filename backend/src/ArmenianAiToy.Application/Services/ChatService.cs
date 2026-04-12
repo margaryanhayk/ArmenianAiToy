@@ -333,23 +333,6 @@ public class ChatService : IChatService
 
     internal record PendingChoice(string OptionA, string OptionB, DateTime ExtractedAt);
 
-    private static readonly string[] StoryTriggerPhrases =
-    [
-        "tell me a story",
-        "tell a story",
-        "what happens next",
-        " story",                                             // English word (space prefix avoids "history")
-        "\u057a\u0561\u057f\u0574\u056b\u0580",                             // patmir (Armenian script)
-        "\u057a\u0561\u057f\u0574\u0578\u0582\u0569\u0575\u0578\u0582\u0576", // patmutyun (Armenian script)
-        "\u0570\u0565\u0584\u056b\u0561\u0569",                             // heqiat (Armenian script)
-        "\u056b\u0576\u0579 \u056f\u056c\u056b\u0576\u056b",                 // inch klini (Armenian script)
-        "patmir",                                             // transliterated Armenian
-        "patmutyun",                                          // transliterated Armenian
-        "heqiat",                                             // transliterated Armenian
-        "hekiat",                                             // alternate transliteration
-        "heto",                                               // transliterated "then" (u heto?)
-    ];
-
     private readonly IAiChatClient _aiClient;
     private readonly IModerationService _moderation;
     private readonly IConversationService _conversations;
@@ -725,32 +708,4 @@ public class ChatService : IChatService
         return new ChatResponse(aiResponse, conversation.Id, responseMsg.Id, safetyFlag, choiceA, choiceB, activeStorySession, modeName);
     }
 
-    internal static bool HasStoryIntent(
-        string userMessage, List<(string Role, string Content)> history,
-        bool hadPendingChoices = false)
-    {
-        // If the previous turn had active choices, the conversation is in
-        // story mode — any follow-up continues the story.
-        if (hadPendingChoices) return true;
-
-        if (MatchesAnyTrigger(userMessage)) return true;
-
-        int checkedCount = 0;
-        for (int i = history.Count - 1; i >= 0 && checkedCount < 2; i--)
-        {
-            if (string.Equals(history[i].Role, "user", StringComparison.OrdinalIgnoreCase))
-            {
-                if (MatchesAnyTrigger(history[i].Content)) return true;
-                checkedCount++;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool MatchesAnyTrigger(string text)
-    {
-        var lower = text.ToLowerInvariant();
-        return StoryTriggerPhrases.Any(p => lower.Contains(p));
-    }
 }

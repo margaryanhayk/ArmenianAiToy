@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (348 tests)
+dotnet test                                     # Run all tests (326 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -51,7 +51,9 @@ Database (SQLite) auto-creates on first run via `EnsureCreated()`.
 - `ChatService.cs` — main orchestration (story choices, normalization, prompt injection)
 - `ChoiceNormalizer.cs` — heuristic child input → option_a/option_b/unknown
 - `TailBlockParser.cs` — extracts/strips `---\nCHOICE_A:...\nCHOICE_B:...` from AI responses
-- `StoryIntentTriggerTests.cs`, `ChoiceNormalizerTests.cs`, `ChoiceHandoffTests.cs` — test files
+- `ModeDetector.cs` — 5-mode detection (Story/Game/Riddle/Curiosity/Calm) with priority rules
+- `ModeDetectorTests.cs`, `ModeDetectorIntegrationTests.cs` — mode detection and ChatService integration tests
+- `ChoiceNormalizerTests.cs`, `ChoiceHandoffTests.cs` — story choice pipeline tests
 
 **ESP32 Firmware** — Thin client. Proxies to .NET backend. No AI on device.
 
