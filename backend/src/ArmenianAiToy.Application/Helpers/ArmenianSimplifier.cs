@@ -85,7 +85,38 @@ public static class ArmenianSimplifier
 
         // "կային սպասված նրանց" → "սպասում էին նրանց" — broken syntax fix.
         ("կային սպասված նրանց", "սպասում էին նրանց"),
-    ];
+    
+
+        // Phase A word-level quality fixes (evidence from live QA).
+
+        // "մթնոլորտ" → "օդ" — scientific "atmosphere" → child-natural "air".
+        ("մթնոլորտ", "օդ"),
+        ("Մթնոլորտ", "Օդ"),
+
+        // "կուտակվում/կուտակվել" → "հավաքվում/հավաքվել" — formal "accumulate" → simple "gather".
+        ("կուտակվում", "հավաքվում"),
+        ("կուտակվել", "հավաքվել"),
+        ("Կուտակվում", "Հավաքվում"),
+
+        // "ճամփորդել" → "գնալ" — formal "to travel" → simple "to go".
+        ("ճամփորդել", "գնալ"),
+        ("ճամփորդություն", "ճամփա"),
+        ("Ճամփորդել", "Գնալ"),
+        ("Ճամփորդություն", "Ճամփա"),
+
+        // "հրավիրեց/հրավիրել" → "կանչեց/կանչել" — formal "invited" → child-natural "called".
+        ("հրավիրեց", "կանչեց"),
+        ("հրավիրել", "կանչել"),
+        ("Հրավիրեց", "Կանչեց"),
+
+        // "ցուցարկում" → "ցույց տալիս" — formal "exhibiting" → simple "showing".
+        ("ցուցարկում", "ցույց տալիս"),
+        ("ցուցարկել", "ցույց տալ"),
+        ("Ցուցարկում", "Ցույց տալիս"),
+
+        // "այս նպատակի համար" → "դրա համար" — formal phrase "for this purpose" → simple "for that".
+        ("այս նպատակի համար", "դրա համար"),
+];
 
     /// <summary>
     /// Applies all formal→simple word replacements to the given text.

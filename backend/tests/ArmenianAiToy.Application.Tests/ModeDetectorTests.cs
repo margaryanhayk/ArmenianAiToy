@@ -33,6 +33,8 @@ public class ModeDetectorTests
     [InlineData("\u057a\u0561\u057f\u0574\u0578\u0582\u0569\u0575\u0578\u0582\u0576")] // patmutyun
     [InlineData("\u0570\u0565\u0584\u056b\u0561\u0569")]                              // heqiat
     [InlineData("\u056b\u0576\u0579 \u056f\u056c\u056b\u0576\u056b")]                  // inch klini
+    [InlineData("\u0577\u0561\u0580\u0578\u0582\u0576\u0561\u056f\u056b\u0580")]       // sharunakir (continue)
+    [InlineData("\u056b\u0576\u0579 \u0565\u0572\u0561\u057e")]                        // inch eghav (what happened)
     public void Story_ArmenianTrigger_DetectsStory(string message)
     {
         Assert.Equal(DetectedMode.Story, ModeDetector.Detect(message, EmptyHistory));
@@ -67,6 +69,9 @@ public class ModeDetectorTests
     [InlineData("\u056d\u0561\u0572\u0561\u056c")]          // խաղալ
     [InlineData("khaghank")]
     [InlineData("khaghal")]
+    [InlineData("մի խաղ անենք")]                // մի խաղ անենք (mi khagh anenk)
+    [InlineData("ուրիշ խաղ")]                             // ուրիշ խաղ (urish khagh)
+    [InlineData("նոր խաղ")]                                         // նոր խաղ (nor khagh)
     public void Game_ArmenianTrigger_DetectsGame(string message)
     {
         Assert.Equal(DetectedMode.Game, ModeDetector.Detect(message, EmptyHistory));
@@ -116,6 +121,10 @@ public class ModeDetectorTests
     [Theory]
     [InlineData("\u056b\u0576\u0579\u0578\u0582 \u0567 \u0571\u0575\u0578\u0582\u0576\u0568 \u057d\u057a\u056b\u057f\u0561\u056f")] // ինչու է ձյունը սպիտակ
     [InlineData("\u056b\u0576\u0579\u057a\u0565\u057d \u0567 \u0561\u0577\u056d\u0561\u0580\u0570\u0568")]                          // ինչպես է աշխարհը
+    [InlineData("ինչ է սա")]                                                                        // ինչ է սա (what is this)
+    [InlineData("սա ինչ է")]                                                                        // սա ինչ է (this what is)
+    [InlineData("ոնց է աշխատում")]                                     // ոնց է աշխատում (how does it work)
+    [InlineData("ինչի համար է")]                                                 // ինչի համար է (what is it for)
     public void Curiosity_ArmenianStarter_DetectsCuriosity(string message)
     {
         Assert.Equal(DetectedMode.Curiosity, ModeDetector.Detect(message, EmptyHistory));
@@ -167,6 +176,10 @@ public class ModeDetectorTests
     [InlineData("\u0570\u0578\u0563\u0576\u0561\u056e \u0565\u0574")]                  // հոգնած եմ
     [InlineData("\u0563\u056b\u0577\u0565\u0580 \u0562\u0561\u0580\u056b")]            // գիշեր բարի
     [InlineData("\u0576\u0576\u057b\u0565\u056c \u0565\u0574 \u0578\u0582\u0566\u0578\u0582\u0574")] // ննջել եմ ուզում
+    [InlineData("քնեմ ուզում")]                                              // քնեմ ուզում (let me sleep)
+    [InlineData("քնկոտ եմ")]                                                                  // քնկոտ եմ (I am sleepy)
+    [InlineData("բարի գիշեր")]                                                     // բարի գիշեր (good night)
+    [InlineData("հոգնել եմ")]                                                            // հոգնել եմ (got tired)
     public void Calm_ArmenianTrigger_DetectsCalm(string message)
     {
         Assert.Equal(DetectedMode.Calm, ModeDetector.Detect(message, EmptyHistory));

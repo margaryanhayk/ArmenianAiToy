@@ -61,8 +61,9 @@ public static class ResponseQualityGate
                     return "curiosity_too_long";
             }
 
-            // Game: 1-3 short sentences. Over 150 chars is too wordy for a play activity.
-            if (mode == DetectedMode.Game && response.Length > 150)
+            // Game: 1-3 short sentences. Over 200 chars is too wordy for a play activity.
+            // Armenian words average longer than English, so 200 chars ≈ 1-3 short sentences.
+            if (mode == DetectedMode.Game && response.Length > 200)
                 return "game_too_long";
         }
 

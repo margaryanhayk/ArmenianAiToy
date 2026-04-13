@@ -52,6 +52,8 @@ public static class ModeDetector
         "heqiat",
         "hekiat",
         "heto",
+        "շարունակ",       // շարունակ (continue — stem)
+        "ինչ եղավ",              // ինչ եղավ (what happened)
     ];
 
     private static readonly string[] GameTriggers =
@@ -63,6 +65,7 @@ public static class ModeDetector
         "let's play a game",
         "\u056d\u0561\u0572\u0561\u0576\u0584",                   // խաղանք (let's play)
         "\u056d\u0561\u0572\u0561\u056c",                          // խաղալ (to play)
+        "խաղ",                                     // խաղ + space (bare stem — catches նոր խաղ, ուրիշ խաղ, մի խաղ, etc.)
         "\u056d\u0561\u0572 \u056f\u0561",                         // խաղ կա (there is a game)
         "khaghank",
         "khaghal",
@@ -101,6 +104,10 @@ public static class ModeDetector
         "\u0570\u0578\u0563\u0576\u0561\u056e",                    // հոգնած (tired)
         "\u0563\u056b\u0577\u0565\u0580 \u0562\u0561\u0580\u056b", // գիշեր բարի (good night)
         "\u0576\u0576\u057b\u0565\u056c",                          // ննջել (to sleep / rest)
+        "\u0584\u0576\u0565\u0574",                                // քնեմ (let me sleep — conjugated)
+        "\u0584\u0576\u056f\u0578\u057f",                          // քնկոտ (sleepy)
+        "\u0562\u0561\u0580\u056b \u0563\u056b\u0577\u0565\u0580", // բարի գիշեdelays (good night — natural order)
+        "\u0570\u0578\u0563\u0576\u0565\u056c",                    // հdelays (got tired — verb stem)
     ];
 
     // Curiosity starters open a real off-topic question. These are matched as
@@ -123,6 +130,10 @@ public static class ModeDetector
         "how do",
         "\u056b\u0576\u0579\u0578\u0582",                          // ինչու (why)
         "\u056b\u0576\u0579\u057a\u0565\u057d",                    // ինչպես (how)
+        "\u056b\u0576\u0579 \u0567",                               // ինչ է (what is)
+        "\u0578\u0576\u0581",                                      // ոնց (how — colloquial)
+        "\u056b\u0576\u0579\u056b",                                // ինչի (what for)
+        "\u057d\u0561 \u056b\u0576\u0579",                         // սա delays (this what — reversed question)
     ];
 
     /// <summary>

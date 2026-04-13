@@ -149,6 +149,16 @@ public class ChatService : IChatService
         story world — do not speak as a personal companion.
         Start stories quickly — jump into a scene or event right away.
         Avoid long setup or generic filler before something happens.
+        VARIETY IN OPENINGS — STRICT RULE: Do NOT start every story with
+        "Մի անգամ" or "Լինում է, չի լինում". Vary your openings.
+        Use different starts: a character doing something, a sound,
+        a place, a question from a character, an action, a discovery.
+        Examples of GOOD varied openings (in Armenian):
+        - Character action: "Փոքրիկ սկյուռիկը վազում էր ճյուղի վրայով։"
+        - Sound/sense: "Մի տեղից լսվեց հանդարտ ձայն — կարծես մեկը երգում էր։"
+        - Place first: "Բարձր լեռի հետևում կար մի փոքրիկ տնակ։"
+        - Direct speech: "— Նայիր, ծիածան! — բացականչեց նապաստակիկը։"
+        Repeating the same opening pattern across stories is FORBIDDEN.
         End each turn naturally — with a small action, a soft continuation,
         or a gentle hook. Do not end abruptly or force a question.
         If the child's message is unclear or incomplete, try to understand
@@ -239,8 +249,18 @@ public class ChatService : IChatService
         - Do NOT include a STORY_MEMORY block.
         - Do NOT use cliffhangers or suspense.
         - Do NOT use game instructions or riddles.
-        - Keep every word in child-register Eastern Armenian.
         - End with a soft, restful image or a gentle closing phrase.
+
+        ARMENIAN LANGUAGE — STRICT:
+        Use natural, spoken Eastern Armenian a child hears at home.
+        Every word must be real, everyday Armenian. Do NOT invent words.
+        Do NOT translate literally from English.
+        Use calm, simple words: քնիր, հանգստացիր, աստղեր, լուսին, քամի,
+        ջերմ, բարձիկ, հանգիստ.
+        BAD: "ուսումնասիրել" (formal — say "նայել")
+        BAD: "պսպղացող" (literary — say "փայլուն")
+        Every word must be a REAL Armenian word. If any word sounds
+        strange to a 5-year-old, replace it with a simpler word.
         """;
 
     internal const string CuriosityWindowInstruction = """
@@ -252,7 +272,6 @@ public class ChatService : IChatService
 
         RULES:
         - Answer in 1 to 2 short sentences. Be honest and simple.
-        - Keep every word in child-register Eastern Armenian.
         - Do NOT ask any questions back.
         - Do NOT give a lecture, list, or school-style explanation.
         - Do NOT include a CHOICE_A / CHOICE_B block.
@@ -261,6 +280,15 @@ public class ChatService : IChatService
           natural phrase inviting the child back to the story — but only
           if it feels right. Do not force it.
         - Do NOT turn this into a lesson or a quiz.
+
+        ARMENIAN LANGUAGE — STRICT:
+        Use natural, spoken Eastern Armenian a child hears at home.
+        Every word must be real, everyday Armenian. Do NOT invent words.
+        Do NOT translate literally from English.
+        Prefer simple, warm words a child knows.
+        BAD: "ուսումնասիրել" (formal — say "նայել")
+        BAD: "հայտնաբերեց" (bookish — say "գտավ")
+        Every word must be a REAL Armenian word. Verify every word.
         """;
 
     internal const string GameModeInstruction = """
@@ -276,7 +304,6 @@ public class ChatService : IChatService
         - Give one clear, simple instruction or activity at a time.
         - Celebrate briefly when the child responds: one short phrase.
         - Then give the next instruction right away.
-        - Keep every word in child-register Eastern Armenian.
         - Do NOT include a CHOICE_A / CHOICE_B block.
         - Do NOT include a STORY_MEMORY block.
         - Do NOT tell a story or paint a scene.
@@ -285,6 +312,22 @@ public class ChatService : IChatService
         - Do NOT use emotional companion language.
         - Activities: clap-along, count-to, copy-the-sound, color-name,
           animal-sound, body-part-touch, simple rhythm games.
+
+        ARMENIAN LANGUAGE — STRICT:
+        Use natural, spoken Eastern Armenian a child hears at home.
+        Every word must be real, everyday Armenian. Do NOT invent words.
+        Do NOT translate English phrases literally into Armenian.
+        Do NOT use bookish, literary, or formal words.
+        Prefer simple verbs: արի, անենք, գնա, վազիր, լսիր, նստիր.
+        BAD: "ուսումնասիրել" (too formal — say "նայել" instead)
+        BAD: "հայտնաբերեցին" (too complex — say "գտան" instead)
+        BAD: "խնամարկված" (bookish — say "գեղեցիկ" instead)
+        BAD: "պսպղացող" (literary — say "փայլուն" instead)
+        Prefer: գնաց, տեսավ, լսեց, վազեց, նստեց,
+        բացեց, փակեց, ծիծաղեց, ժպտաց,
+        ուրախացավ, զարմացավ.
+        Every word must be a REAL Armenian word. Verify every word.
+        If any word looks invented or unfamiliar to a 5-year-old, replace it.
         """;
 
     internal const string RiddleModeInstruction = """
@@ -323,8 +366,24 @@ public class ChatService : IChatService
         - "Yellow and round, shines in the daytime, warms us. What is it?" (answer: sun)
         - "Has a tail but is not an animal, flies in the wind. What is it?" (answer: kite)
         - "Red on the outside, green inside, has seeds. What is it?" (answer: watermelon)
+        These examples show the PATTERN only. Do NOT reuse them directly.
+        Create ORIGINAL riddles each time — about different animals, fruits,
+        objects, or weather. A child who hears the same riddle twice will
+        be bored. Aim for variety: eggs, apples, snow, mirrors, clocks,
+        umbrellas, shoes, pillows, clouds, butterflies, carrots, etc.
         Every riddle must describe something the child can see, hear,
         touch, or taste in daily life. Use physical clues only.
+
+        ARMENIAN LANGUAGE — STRICT:
+        Use natural, spoken Eastern Armenian a child hears at home.
+        Every word must be real, everyday Armenian. Do NOT invent words.
+        Do NOT translate literally from English.
+        Prefer simple, playful words a child knows.
+        BAD: "ուսումնասիրել" (formal — say "նայել")
+        BAD: "հայտնաբերեց" (bookish — say "գտավ")
+        BAD: "պսպղացող" (literary — say "փայլուն")
+        Every word must be a REAL Armenian word. Verify every word.
+        If any word sounds strange to a 5-year-old, use a simpler word.
         """;
 
     // Tiny prompt for generating choices from an existing story paragraph.
@@ -396,6 +455,25 @@ public class ChatService : IChatService
 
         // Step 1: Consume pending choice labels (always remove to prevent stale entries)
         PendingChoices.TryRemove(conversation.Id, out var pending);
+
+        // Step 1.5: Client-side dangerous-content prefilter. Catches obvious
+        // weapon/explosive/poison/drug keywords that the moderation API misses
+        // (e.g. "how to make a bomb" returns Flagged=false on all categories).
+        if (DangerousInputFilter.IsUnsafe(userMessage))
+        {
+            _logger.LogWarning("Dangerous input prefilter triggered. Device: {DeviceId}, Preview: {Preview}",
+                deviceId, userMessage.Length > 80 ? userMessage[..80] + "..." : userMessage);
+
+            await _conversations.AddMessageAsync(
+                conversation.Id, MessageRole.User, userMessage, SafetyFlag.Blocked);
+
+            var prefilterFallback = _config["SafetyFallbackResponse"]
+                ?? "Արdelays, delays delays delays delays delays:";
+            var prefilterMsg = await _conversations.AddMessageAsync(
+                conversation.Id, MessageRole.Assistant, prefilterFallback, SafetyFlag.Clean);
+
+            return new ChatResponse(prefilterFallback, conversation.Id, prefilterMsg.Id, SafetyFlag.Blocked);
+        }
 
         // Step 2: Pre-moderate user input
         var inputModeration = await _moderation.CheckContentAsync(userMessage);
@@ -764,6 +842,13 @@ public class ChatService : IChatService
         else if (detectedMode == DetectedMode.Curiosity)
         {
             aiResponse = aiResponse.Replace('?', '\u0589').Replace('\u055E', '\u0589');
+        }
+
+        // Step 10g: Collapse doubled Armenian period (verjaket ։) that can appear
+        // when punctuation replacement inserts ։ next to an existing one.
+        if (detectedMode is DetectedMode.Calm or DetectedMode.Curiosity)
+        {
+            aiResponse = aiResponse.Replace("\u0589\u0589", "\u0589");
         }
 
         // Step 11: Store AI response

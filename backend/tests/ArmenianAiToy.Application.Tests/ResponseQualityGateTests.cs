@@ -242,7 +242,7 @@ public class ResponseQualityGateTests
     public void Game_LongResponse_TriggersGameTooLong()
     {
         var result = ResponseQualityGate.CheckRetry(
-            new string('\u0561', 151), "lets play", DetectedMode.Game);
+            new string('\u0561', 201), "lets play", DetectedMode.Game);
         Assert.Equal("game_too_long", result);
     }
 

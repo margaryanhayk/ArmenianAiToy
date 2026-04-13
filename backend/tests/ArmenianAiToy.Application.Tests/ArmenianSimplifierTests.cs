@@ -116,4 +116,56 @@ public class ArmenianSimplifierTests
         var clean = "Փոքրիկ նապաստակը պարտեզում խաղում էր։ Թռչունները երգում էին։";
         Assert.Equal(clean, ArmenianSimplifier.Simplify(clean));
     }
+
+
+    // ─── Phase A word-level simplifications ───
+
+    [Fact]
+    public void Mtnolort_BecomesOd()
+    {
+        Assert.Equal(
+            "Երբ արևի լույսը անցնում է օդի միջով։",
+            ArmenianSimplifier.Simplify("Երբ արևի լույսը անցնում է մթնոլորտի միջով։"));
+    }
+
+    [Fact]
+    public void Kutakvum_BecomesHavaqvum()
+    {
+        Assert.Equal(
+            "Աղերը հավաքվում են ծովում։",
+            ArmenianSimplifier.Simplify("Աղերը կուտակվում են ծովում։"));
+    }
+
+    [Fact]
+    public void Champordel_BecomesGnal()
+    {
+        Assert.Equal(
+            "Թռչունները սիրում են գնալ։",
+            ArmenianSimplifier.Simplify("Թռչունները սիրում են ճամփորդել։"));
+    }
+
+    [Fact]
+    public void Hravirets_BecomesKanchets()
+    {
+        Assert.Equal(
+            "Նա կանչեց իր ընկերներին։",
+            ArmenianSimplifier.Simplify("Նա հրավիրեց իր ընկերներին։"));
+    }
+
+    [Fact]
+    public void Tsitsarkum_BecomesTsuytsTalis()
+    {
+        Assert.Equal(
+            "Նա ցույց տալիս էր աստղերը։",
+            ArmenianSimplifier.Simplify("Նա ցուցարկում էր աստղերը։"));
+    }
+
+    [Fact]
+    public void AysNpatakiHamar_BecomesDraHamar()
+    {
+        Assert.Equal(
+            "Թևերը դրա համար թռչում են։",
+            ArmenianSimplifier.Simplify("Թևերը այս նպատակի համար թռչում են։"));
+    }
+
 }
