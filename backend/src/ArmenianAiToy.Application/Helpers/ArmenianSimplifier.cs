@@ -116,6 +116,23 @@ public static class ArmenianSimplifier
 
         // "այս նպատակի համար" → "դրա համար" — formal phrase "for this purpose" → simple "for that".
         ("այս նպատակի համար", "դրա համար"),
+
+
+        // Phase A follow-up word-level fixes (second-round QA on phase-a-polish).
+
+        // "հմայիչ" → "գեղեցիկ" — adult aesthetic "charming" → child word "beautiful".
+        ("հմայիչ", "գեղեցիկ"),
+        ("Հմայիչ", "Գեղեցիկ"),
+
+        // "փորձարկել" → "փորձել" — scientific "to experiment" → everyday "to try".
+        ("փորձարկել", "փորձել"),
+        ("փորձարկում", "փորձում"),
+        ("փորձարկեց", "փորձեց"),
+        ("Փորձարկել", "Փորձել"),
+
+        // "վայրէջք կատարեց" → "իջավ" — aviation term "performed a landing" → natural "came down".
+        ("վայրէջք կատարեց", "իջավ"),
+        ("վայրէջք կատարել", "իջնել"),
 ];
 
     /// <summary>

@@ -168,4 +168,32 @@ public class ArmenianSimplifierTests
             ArmenianSimplifier.Simplify("Թևերը այս նպատակի համար թռչում են։"));
     }
 
+
+
+    // ─── Phase A follow-up simplifications ───
+
+    [Fact]
+    public void Hmayich_BecomesGeghetsik()
+    {
+        Assert.Equal(
+            "Այդ տեսարանքը գեղեցիկ էր։",
+            ArmenianSimplifier.Simplify("Այդ տեսարանքը հմայիչ էր։"));
+    }
+
+    [Fact]
+    public void Pordzarkel_BecomesPordzel()
+    {
+        Assert.Equal(
+            "Մենք ուզում ենք փորձել ջուրը։",
+            ArmenianSimplifier.Simplify("Մենք ուզում ենք փորձարկել ջուրը։"));
+    }
+
+    [Fact]
+    public void VayrejqKatarets_BecomesIchav()
+    {
+        Assert.Equal(
+            "Թիթեռնիկը իջավ մի մեծ վարդի վրա։",
+            ArmenianSimplifier.Simplify("Թիթեռնիկը վայրէջք կատարեց մի մեծ վարդի վրա։"));
+    }
+
 }
