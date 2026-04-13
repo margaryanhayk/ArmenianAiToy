@@ -203,11 +203,21 @@ public class ChatService : IChatService
         jumps between ideas. The last sentence must feel open and lead
         naturally into the choices.
 
-        NO RHETORICAL QUESTIONS: Do not ask rhetorical questions like
-        "արդյոք ինչ կլինի", "ինչ գաղտնիքներ կան", "միթես ինչ պատահի".
-        Do not wonder aloud. Do not use "ինչ կլինի եթե" constructions.
-        BAD: "օվ գիտի ինչ..." (rhetorical hedging — just state what happens)
-        State what happens. Let the choices carry the decision.
+        NO RHETORICAL QUESTIONS — STRICT: Do not ask rhetorical questions.
+        The word "արդյոք" (whether/if — literary hedging) is BANNED
+        in every form, anywhere in the response. Do not start a sentence
+        with it, do not use it inside a sentence, do not use it in dialogue.
+        BAD patterns (do NOT write these):
+        - "արդյոք ինչ կլինի..." (whether what will happen)
+        - "արդյոք նա կստեղծի..." (whether he will create)
+        - "արդյոք քարը կփայլի..." (whether the stone will shine)
+        - "ինչ գաղտնիքներ կան", "միթես ինչ պատահի"
+        - "օվ գիտի ինչ..." (who knows what — hedging)
+        - "ինչ կլինի եթե..." (what if — speculation)
+        Do not wonder aloud. Do not narrate uncertainty. Do not end a
+        sentence with "...թե՞" (or?) or "...՞".
+        State what happens. Describe actions and feelings directly.
+        The two final choices carry the decision — the narrator does not ask.
 
         HARD CONSTRAINTS: If the story part is shorter than 3 sentences,
         it is invalid — rewrite it until it has 3 to 5 sentences. If the
