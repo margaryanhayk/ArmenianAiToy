@@ -850,6 +850,25 @@ public class ChatService : IChatService
                         conversation.Id);
                 }
             }
+
+            // Step 10c-quater: Post-retry latin_run hard recheck.
+            // Closes the failure mode where the retry passes moderation but
+            // still contains 4+ Latin letters (model stuck on a foreign word).
+            // Scoped intentionally to latin_run only — leaked_tag is handled
+            // downstream by ResponseCleaner. Soft issues (subject_mismatch,
+            // length, mode punctuation) are NOT escalated.
+            if (ResponseQualityGate.CheckRetry(aiResponse, userMessage) == "latin_run")
+            {
+                _logger.LogWarning(
+                    "Post-retry latin_run persists. ConversationId: {ConversationId}. Using safety fallback.",
+                    conversation.Id);
+                var latinFallback = _config["SafetyFallbackResponse"]
+                    ?? DefaultFallbackResponse;
+                aiResponse = detectedMode == DetectedMode.Calm ? CalmFallbackResponse : latinFallback;
+                choiceA = null;
+                choiceB = null;
+                PendingChoices.TryRemove(conversation.Id, out _);
+            }
         }
 
         // Step 10d: Armenian simplification — replace formal/bookish words with

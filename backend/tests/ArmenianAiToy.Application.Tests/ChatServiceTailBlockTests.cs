@@ -165,6 +165,32 @@ public class ChatServiceTailBlockTests
     }
 
     [Fact]
+    public async Task QualityGate_LatinRun_RetryAlsoLatinPassesModeration_FallsBackToSafety()
+    {
+        // Failure mode B: first response has Latin → triggers retry.
+        // Retry response ALSO has Latin (model stuck on a foreign word) but
+        // passes moderation. Without the post-retry recheck, the still-bad
+        // text would replace aiResponse and reach the child unchanged.
+        // Expectation: post-retry latin_run hard check falls back to safety.
+        var firstBad = "Once կար մի աղվես։\n---\nCHOICE_A:Բացենք\nCHOICE_B:Փակենք";
+        var retryAlsoBad = "Forever կար մի աղվես։\n---\nCHOICE_A:Բացենք\nCHOICE_B:Փակենք";
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(firstBad, retryAlsoBad);
+
+        // Default moderation mock returns IsSafe=true for every call.
+        var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "tell me a story");
+
+        // Both AI calls should have happened (original + 1 retry).
+        await _aiClient.Received(2).GetCompletionAsync(
+            Arg.Any<string>(), Arg.Any<List<(string, string)>>());
+        // Final response must NOT contain a 4+ Latin run.
+        Assert.DoesNotMatch("[A-Za-z]{4,}", result.Response);
+        // Choices must be cleared since we fell back to safety.
+        Assert.Null(result.ChoiceA);
+        Assert.Null(result.ChoiceB);
+    }
+
+    [Fact]
     public async Task QualityGate_LatinRun_RetryRejectedByModeration_FallsBackToSafety()
     {
         // First call: contains Latin → triggers latin_run retry.
