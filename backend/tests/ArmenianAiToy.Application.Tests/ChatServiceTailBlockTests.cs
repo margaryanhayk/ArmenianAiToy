@@ -94,7 +94,7 @@ public class ChatServiceTailBlockTests
     [Fact]
     public async Task ResponseWithTailBlock_StoresCleanedText()
     {
-        var rawAiResponse = "Աղվեսը վազեց դեպի գետ։\n---\nCHOICE_A:Help the fox\nCHOICE_B:Cross alone";
+        var rawAiResponse = "Աղվեսը վազեց դեպի գետ։\n---\nCHOICE_A:Օգնել աղվեսին\nCHOICE_B:Մենակ անցնել";
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns(rawAiResponse);
 
@@ -162,6 +162,40 @@ public class ChatServiceTailBlockTests
 
         Assert.Equal("Հեքիաթ։", result.Response);
         Assert.Equal("Հեքիաթ։", _storedAssistantContent);
+    }
+
+    [Fact]
+    public async Task ChoiceLabel_LatinRun_DropsBothChoices_PreservesProse()
+    {
+        // Mock AI returns clean Armenian prose but English choice labels.
+        // Prose passes the post-retry recheck; choices trip the new
+        // choice-label latin_run check. Expectation: prose is preserved,
+        // both choices are cleared (we can't show one without the other).
+        var raw = "Աղվեսը վազեց անտառով։\n---\nCHOICE_A:Find the fox\nCHOICE_B:Open the box";
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(raw);
+
+        var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "tell me a story");
+
+        Assert.Equal("Աղվեսը վազեց անտառով։", result.Response);
+        Assert.Null(result.ChoiceA);
+        Assert.Null(result.ChoiceB);
+        Assert.Null(result.StorySessionId);
+    }
+
+    [Fact]
+    public async Task ChoiceLabel_OnlyOneHasLatin_StillDropsBoth()
+    {
+        // If only one choice has Latin, we still drop both — can't show one
+        // without a counterpart.
+        var raw = "Աղվեսը վազեց։\n---\nCHOICE_A:Բացենք\nCHOICE_B:Find the box";
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(raw);
+
+        var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "tell me a story");
+
+        Assert.Null(result.ChoiceA);
+        Assert.Null(result.ChoiceB);
     }
 
     [Fact]

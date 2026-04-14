@@ -869,6 +869,24 @@ public class ChatService : IChatService
                 choiceB = null;
                 PendingChoices.TryRemove(conversation.Id, out _);
             }
+
+            // Step 10c-quinto: Choice-label latin_run check.
+            // The post-retry recheck above only inspects the prose. Extracted
+            // choiceA/choiceB strings reach the child unchanged, so a model
+            // could leak Latin via "CHOICE_A:Find the fox" style labels.
+            // If either choice has a 4+ Latin run, drop BOTH (we can't show
+            // one without the other) and clear the pending choice entry.
+            // The story prose is preserved.
+            if ((choiceA is not null && System.Text.RegularExpressions.Regex.IsMatch(choiceA, @"[A-Za-z]{4,}"))
+                || (choiceB is not null && System.Text.RegularExpressions.Regex.IsMatch(choiceB, @"[A-Za-z]{4,}")))
+            {
+                _logger.LogWarning(
+                    "Choice label latin_run detected. ConversationId: {ConversationId}. Dropping choices.",
+                    conversation.Id);
+                choiceA = null;
+                choiceB = null;
+                PendingChoices.TryRemove(conversation.Id, out _);
+            }
         }
 
         // Step 10d: Armenian simplification — replace formal/bookish words with

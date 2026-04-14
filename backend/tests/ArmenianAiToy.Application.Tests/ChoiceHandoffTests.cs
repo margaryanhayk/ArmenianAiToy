@@ -71,7 +71,7 @@ public class ChoiceHandoffTests
     public async Task ExtractedLabels_UsedByNormalizerOnNextRequest()
     {
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Ընտրիր մեկը։\n---\nCHOICE_A:Help the fox\nCHOICE_B:Cross alone");
+            .Returns("Ընտրիր մեկը։\n---\nCHOICE_A:Օգնել աղվեսին\nCHOICE_B:Մենակ անցնել");
 
         await _chatService.GetResponseAsync(_deviceId, "tell me a story");
 
@@ -92,7 +92,7 @@ public class ChoiceHandoffTests
     public async Task Labels_ConsumedAfterFirstUse()
     {
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Ընտրիր։\n---\nCHOICE_A:Option A\nCHOICE_B:Option B");
+            .Returns("Ընտրիր։\n---\nCHOICE_A:Տարբերակ Ա\nCHOICE_B:Տարբերակ Բ");
 
         await _chatService.GetResponseAsync(_deviceId, "tell me a story");
 
@@ -111,12 +111,12 @@ public class ChoiceHandoffTests
 
         await _chatService.GetResponseAsync(_deviceId, "right");
 
-        // Verify the original "Option A"/"Option B" labels are NOT in any log —
+        // Verify the original "Տարբերակ Ա"/"Տարբերակ Բ" labels are NOT in any log —
         // they were consumed on the second call.
         _logger.DidNotReceive().Log(
             LogLevel.Information,
             Arg.Any<EventId>(),
-            Arg.Is<object>(o => o.ToString()!.Contains("Option A") || o.ToString()!.Contains("Option B")),
+            Arg.Is<object>(o => o.ToString()!.Contains("Տարբերակ Ա") || o.ToString()!.Contains("Տարբերակ Բ")),
             Arg.Any<Exception?>(),
             Arg.Any<Func<object, Exception?, string>>());
     }
@@ -169,7 +169,7 @@ public class ChoiceHandoffTests
         moderation.CheckContentAsync(Arg.Any<string>())
             .Returns(new ModerationResult(true, new List<string>()));
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Հեքիաթ։\n---\nCHOICE_A:Left\nCHOICE_B:Right");
+            .Returns("Հեքիաթ։\n---\nCHOICE_A:Ձախ\nCHOICE_B:Աջ");
 
         var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
         await svc.GetResponseAsync(deviceId, "tell me a story");
@@ -193,7 +193,7 @@ public class ChoiceHandoffTests
     public async Task LogDoesNotContainRawInput()
     {
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Ընտրիր։\n---\nCHOICE_A:Left\nCHOICE_B:Right");
+            .Returns("Ընտրիր։\n---\nCHOICE_A:Ձախ\nCHOICE_B:Աջ");
 
         await _chatService.GetResponseAsync(_deviceId, "tell me a story");
 
@@ -242,7 +242,7 @@ public class ChoiceHandoffTests
         conversations.GetRecentMessagesAsync(Arg.Any<Guid>(), Arg.Any<int>())
             .Returns(new List<(string Role, string Content)>());
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Ընտրիր մեկը։\n---\nCHOICE_A:Help the fox\nCHOICE_B:Cross alone");
+            .Returns("Ընտրիր մեկը։\n---\nCHOICE_A:Օգնել աղվեսին\nCHOICE_B:Մենակ անցնել");
 
         var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
         await svc.GetResponseAsync(deviceId, "tell me a story");
@@ -296,7 +296,7 @@ public class ChoiceHandoffTests
         conversations.GetRecentMessagesAsync(Arg.Any<Guid>(), Arg.Any<int>())
             .Returns(new List<(string Role, string Content)>());
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Ընտրիր մեկը։\n---\nCHOICE_A:Help the fox\nCHOICE_B:Cross alone");
+            .Returns("Ընտրիր մեկը։\n---\nCHOICE_A:Օգնել աղվեսին\nCHOICE_B:Մենակ անցնել");
 
         var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
         await svc.GetResponseAsync(deviceId, "tell me a story");
@@ -325,7 +325,7 @@ public class ChoiceHandoffTests
     {
         // Directly seed a stale pending choice (31 minutes old)
         ChatService.PendingChoices[_conversationId] = new ChatService.PendingChoice(
-            "Left", "Right", DateTime.UtcNow.AddMinutes(-31));
+            "Ձախ", "Աջ", DateTime.UtcNow.AddMinutes(-31));
 
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns("Continuing...");
@@ -381,7 +381,7 @@ public class ChoiceHandoffTests
 
         // Seed an expired pending choice (31 minutes old)
         ChatService.PendingChoices[convId] = new ChatService.PendingChoice(
-            "Left", "Right", DateTime.UtcNow.AddMinutes(-31));
+            "Ձախ", "Աջ", DateTime.UtcNow.AddMinutes(-31));
 
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns("Continuing...");
