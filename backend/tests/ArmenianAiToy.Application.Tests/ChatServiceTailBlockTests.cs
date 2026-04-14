@@ -94,27 +94,27 @@ public class ChatServiceTailBlockTests
     [Fact]
     public async Task ResponseWithTailBlock_StoresCleanedText()
     {
-        var rawAiResponse = "The fox ran to the river.\n---\nCHOICE_A:Help the fox\nCHOICE_B:Cross alone";
+        var rawAiResponse = "Աղվեսը վազեց դեպի գետ։\n---\nCHOICE_A:Help the fox\nCHOICE_B:Cross alone";
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns(rawAiResponse);
 
         var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "hello");
 
-        Assert.Equal("The fox ran to the river.", result.Response);
-        Assert.Equal("The fox ran to the river.", _storedAssistantContent);
+        Assert.Equal("Աղվեսը վազեց դեպի գետ։", result.Response);
+        Assert.Equal("Աղվեսը վազեց դեպի գետ։", _storedAssistantContent);
     }
 
     [Fact]
     public async Task ResponseWithoutTailBlock_PassesThroughUnchanged()
     {
-        var rawAiResponse = "Just a normal reply.";
+        var rawAiResponse = "Մի սովորական պատասխան։";
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns(rawAiResponse);
 
         var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "hello");
 
-        Assert.Equal("Just a normal reply.", result.Response);
-        Assert.Equal("Just a normal reply.", _storedAssistantContent);
+        Assert.Equal("Մի սովորական պատասխան։", result.Response);
+        Assert.Equal("Մի սովորական պատասխան։", _storedAssistantContent);
     }
 
     [Fact]
@@ -154,14 +154,14 @@ public class ChatServiceTailBlockTests
     {
         // TailBlockParser can't parse this (missing CHOICE_B), so the raw text
         // passes through. ResponseCleaner then strips the leaked artifacts.
-        var rawAiResponse = "Story.\n---\nCHOICE_A:Only one option";
+        var rawAiResponse = "Հեքիաթ։\n---\nCHOICE_A:Only one option";
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns(rawAiResponse);
 
         var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "hello");
 
-        Assert.Equal("Story.", result.Response);
-        Assert.Equal("Story.", _storedAssistantContent);
+        Assert.Equal("Հեքիաթ։", result.Response);
+        Assert.Equal("Հեքիաթ։", _storedAssistantContent);
     }
 
     [Fact]

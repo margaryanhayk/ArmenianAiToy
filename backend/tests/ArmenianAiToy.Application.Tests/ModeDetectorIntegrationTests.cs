@@ -71,7 +71,7 @@ public class ModeDetectorIntegrationTests
     public async Task StoryTrigger_StillActivatesStoryMode()
     {
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("A fox walked.\n---\nCHOICE_A:Help fox\nCHOICE_B:Run away");
+            .Returns("Աղվեսը քայլեց։\n---\nCHOICE_A:Help fox\nCHOICE_B:Run away");
 
         var result = await _chatService.GetResponseAsync(_deviceId, "tell me a story");
 
@@ -85,7 +85,7 @@ public class ModeDetectorIntegrationTests
     {
         // Turn 1: Start a story — establishes pending choices.
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("A fox walked.\n---\nCHOICE_A:Help fox\nCHOICE_B:Run away");
+            .Returns("Աղվեսը քայլեց։\n---\nCHOICE_A:Help fox\nCHOICE_B:Run away");
         await _chatService.GetResponseAsync(_deviceId, "tell me a story");
 
         // Turn 2: Child says "I'm tired" — should exit story mode.
@@ -204,7 +204,7 @@ public class ModeDetectorIntegrationTests
 
         // Turn 2: Explicit selectedChoice=A bypasses ModeDetector entirely.
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Fox went left.\n---\nCHOICE_A:Open door\nCHOICE_B:Climb tree");
+            .Returns("Աղվեսը գնաց ձախ։\n---\nCHOICE_A:Open door\nCHOICE_B:Climb tree");
 
         var result = await _chatService.GetResponseAsync(
             _deviceId, "A", selectedChoice: "A");
@@ -220,7 +220,7 @@ public class ModeDetectorIntegrationTests
         // "tell me a story about sleeping" has both story and calm cues,
         // but story-cue gating in ModeDetector ensures Story wins.
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("A bear slept.\n---\nCHOICE_A:Wake bear\nCHOICE_B:Let bear sleep");
+            .Returns("Արջը քնեց։\n---\nCHOICE_A:Wake bear\nCHOICE_B:Let bear sleep");
 
         var result = await _chatService.GetResponseAsync(
             _deviceId, "tell me a story about sleeping");
@@ -376,7 +376,7 @@ public class ModeDetectorIntegrationTests
     {
         // Turn 1: Start a story → establishes pending choices.
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("A fox walked.\n---\nCHOICE_A:Help fox\nCHOICE_B:Run away");
+            .Returns("Աղվեսը քայլեց։\n---\nCHOICE_A:Help fox\nCHOICE_B:Run away");
         await _chatService.GetResponseAsync(_deviceId, "tell me a story");
 
         // Turn 2: Curiosity detour — choices should be preserved.
@@ -393,7 +393,7 @@ public class ModeDetectorIntegrationTests
     {
         // Turn 1: Start a story.
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("A fox walked.\n---\nCHOICE_A:Help fox\nCHOICE_B:Run away");
+            .Returns("Աղվեսը քայլեց։\n---\nCHOICE_A:Help fox\nCHOICE_B:Run away");
         await _chatService.GetResponseAsync(_deviceId, "tell me a story");
 
         // Turn 2: Curiosity detour.
@@ -404,7 +404,7 @@ public class ModeDetectorIntegrationTests
         // Turn 3: Neutral message — story should resume because preserved choices
         // make hasActiveStorySession true, so ModeDetector returns Story.
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Fox ran fast.\n---\nCHOICE_A:Chase\nCHOICE_B:Hide");
+            .Returns("Աղվեսը արագ վազեց։\n---\nCHOICE_A:Chase\nCHOICE_B:Hide");
 
         var result = await _chatService.GetResponseAsync(_deviceId, "ok");
 

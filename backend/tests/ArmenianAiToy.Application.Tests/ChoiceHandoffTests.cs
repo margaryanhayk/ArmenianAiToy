@@ -71,12 +71,12 @@ public class ChoiceHandoffTests
     public async Task ExtractedLabels_UsedByNormalizerOnNextRequest()
     {
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Pick one!\n---\nCHOICE_A:Help the fox\nCHOICE_B:Cross alone");
+            .Returns("Ընտրիր մեկը։\n---\nCHOICE_A:Help the fox\nCHOICE_B:Cross alone");
 
         await _chatService.GetResponseAsync(_deviceId, "tell me a story");
 
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("The fox was happy!");
+            .Returns("Աղվեսն ուրախացավ։");
 
         await _chatService.GetResponseAsync(_deviceId, "left");
 
@@ -92,7 +92,7 @@ public class ChoiceHandoffTests
     public async Task Labels_ConsumedAfterFirstUse()
     {
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Pick!\n---\nCHOICE_A:Option A\nCHOICE_B:Option B");
+            .Returns("Ընտրիր։\n---\nCHOICE_A:Option A\nCHOICE_B:Option B");
 
         await _chatService.GetResponseAsync(_deviceId, "tell me a story");
 
@@ -169,7 +169,7 @@ public class ChoiceHandoffTests
         moderation.CheckContentAsync(Arg.Any<string>())
             .Returns(new ModerationResult(true, new List<string>()));
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Story.\n---\nCHOICE_A:Left\nCHOICE_B:Right");
+            .Returns("Հեքիաթ։\n---\nCHOICE_A:Left\nCHOICE_B:Right");
 
         var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
         await svc.GetResponseAsync(deviceId, "tell me a story");
@@ -193,7 +193,7 @@ public class ChoiceHandoffTests
     public async Task LogDoesNotContainRawInput()
     {
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Pick!\n---\nCHOICE_A:Left\nCHOICE_B:Right");
+            .Returns("Ընտրիր։\n---\nCHOICE_A:Left\nCHOICE_B:Right");
 
         await _chatService.GetResponseAsync(_deviceId, "tell me a story");
 
@@ -242,7 +242,7 @@ public class ChoiceHandoffTests
         conversations.GetRecentMessagesAsync(Arg.Any<Guid>(), Arg.Any<int>())
             .Returns(new List<(string Role, string Content)>());
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Pick one!\n---\nCHOICE_A:Help the fox\nCHOICE_B:Cross alone");
+            .Returns("Ընտրիր մեկը։\n---\nCHOICE_A:Help the fox\nCHOICE_B:Cross alone");
 
         var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
         await svc.GetResponseAsync(deviceId, "tell me a story");
@@ -252,10 +252,10 @@ public class ChoiceHandoffTests
             .Returns(new List<(string Role, string Content)>
             {
                 ("User", "tell me a story"),
-                ("Assistant", "Pick one!"),
+                ("Assistant", "Ընտրիր մեկը։"),
             });
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("The fox was happy!");
+            .Returns("Աղվեսն ուրախացավ։");
 
         await svc.GetResponseAsync(deviceId, "left");
 
@@ -296,7 +296,7 @@ public class ChoiceHandoffTests
         conversations.GetRecentMessagesAsync(Arg.Any<Guid>(), Arg.Any<int>())
             .Returns(new List<(string Role, string Content)>());
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Pick one!\n---\nCHOICE_A:Help the fox\nCHOICE_B:Cross alone");
+            .Returns("Ընտրիր մեկը։\n---\nCHOICE_A:Help the fox\nCHOICE_B:Cross alone");
 
         var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
         await svc.GetResponseAsync(deviceId, "tell me a story");
@@ -306,11 +306,11 @@ public class ChoiceHandoffTests
             .Returns(new List<(string Role, string Content)>
             {
                 ("User", "tell me a story"),
-                ("Assistant", "Pick one!"),
+                ("Assistant", "Ընտրիր մեկը։"),
             });
         aiClient.ClearReceivedCalls();
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("What do you mean?");
+            .Returns("Ի՞նչ ի նկատի ունես։");
 
         await svc.GetResponseAsync(deviceId, "asdfgh");
 
