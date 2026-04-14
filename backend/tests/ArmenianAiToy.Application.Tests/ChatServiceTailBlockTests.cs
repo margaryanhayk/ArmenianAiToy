@@ -163,4 +163,30 @@ public class ChatServiceTailBlockTests
         Assert.Equal("Story.", result.Response);
         Assert.Equal("Story.", _storedAssistantContent);
     }
+
+    [Fact]
+    public async Task QualityGate_LatinRun_RetryRejectedByModeration_FallsBackToSafety()
+    {
+        // First call: contains Latin → triggers latin_run retry.
+        // Second call (retry): also has Latin (same English).
+        // Moderation: first call passes (default), retry call REJECTS.
+        // Expectation: do NOT silently keep the original Latin response;
+        // instead use the safety fallback so no English text reaches the child.
+        var bad = "Once upon a time there was a fox.\n---\nCHOICE_A:Բացենք\nCHOICE_B:Փակենք";
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(bad);
+
+        // First moderation call (input + output of first AI call): safe.
+        // Retry moderation: unsafe.
+        _moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(
+                new ModerationResult(true, new List<string>()),  // input mod
+                new ModerationResult(true, new List<string>()),  // output mod
+                new ModerationResult(false, new List<string> { "moderation_unavailable" })); // retry mod
+
+        var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "tell me a story");
+
+        // Should NOT contain the Latin text. Should be the safety fallback.
+        Assert.DoesNotMatch("[A-Za-z]{4,}", result.Response);
+    }
 }

@@ -817,9 +817,30 @@ public class ChatService : IChatService
                     }
                     else
                     {
-                        _logger.LogInformation(
-                            "Quality gate retry rejected by moderation. ConversationId: {ConversationId}",
-                            conversation.Id);
+                        // Retry was rejected by moderation. The original response
+                        // (which triggered the retry — i.e. had latin_run, leaked_tag,
+                        // or a mode-policy violation) would otherwise be silently
+                        // kept and shown to the child. For the two structurally-broken
+                        // categories that would leak English text or internal format
+                        // markers, fall back to the safety response instead.
+                        if (retryReason is "latin_run" or "leaked_tag")
+                        {
+                            _logger.LogWarning(
+                                "Retry rejected by moderation and original is structurally broken. ConversationId: {ConversationId}, Reason: {Reason}. Using safety fallback.",
+                                conversation.Id, retryReason);
+                            var hardFallback = _config["SafetyFallbackResponse"]
+                                ?? DefaultFallbackResponse;
+                            aiResponse = detectedMode == DetectedMode.Calm ? CalmFallbackResponse : hardFallback;
+                            choiceA = null;
+                            choiceB = null;
+                            PendingChoices.TryRemove(conversation.Id, out _);
+                        }
+                        else
+                        {
+                            _logger.LogInformation(
+                                "Quality gate retry rejected by moderation. ConversationId: {ConversationId}",
+                                conversation.Id);
+                        }
                     }
                 }
                 catch (Exception ex)
