@@ -365,4 +365,82 @@ public class ModeDetectorTests
             ["0x584", "0x576", "0x565", "0x56c"],
             knel.Select(c => $"0x{(int)c:x}").ToArray());
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // C1: widened Calm fear/can't-sleep triggers + story-gate anti-false-fire
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Calm_FearOfDark_Armenian_DetectsCalm()
+    {
+        Assert.Equal(DetectedMode.Calm,
+            ModeDetector.Detect("\u0574\u0569\u056b\u0581 \u057e\u0561\u056d\u0565\u0576\u0578\u0582\u0574 \u0565\u0574", EmptyHistory));
+    }
+
+    [Theory]
+    [InlineData("i can't sleep")]
+    [InlineData("i cant sleep")]
+    [InlineData("can't sleep")]
+    public void Calm_CantSleep_English_DetectsCalm(string message)
+    {
+        Assert.Equal(DetectedMode.Calm, ModeDetector.Detect(message, EmptyHistory));
+    }
+
+    [Theory]
+    [InlineData("\u0579\u0565\u0574 \u056f\u0561\u0580\u0578\u0572\u0561\u0576\u0578\u0582\u0574 \u0584\u0576\u0565\u056c")] // չեմ կարողանում քնել
+    [InlineData("\u0579\u0565\u0574 \u056f\u0561\u0580\u0578\u0572 \u0584\u0576\u0565\u056c")]                               // չեմ կարող քնել
+    public void Calm_CantSleep_Armenian_DetectsCalm(string message)
+    {
+        Assert.Equal(DetectedMode.Calm, ModeDetector.Detect(message, EmptyHistory));
+    }
+
+    [Theory]
+    [InlineData("scared of the dark")]
+    [InlineData("afraid of the dark")]
+    [InlineData("scared at night")]
+    public void Calm_FearOfDark_English_DetectsCalm(string message)
+    {
+        Assert.Equal(DetectedMode.Calm, ModeDetector.Detect(message, EmptyHistory));
+    }
+
+    [Fact]
+    public void Calm_FearInsideStoryRequest_StaysStory()
+    {
+        // Story-cue gate must win: a story request about being scared of the dark is Story.
+        Assert.Equal(DetectedMode.Story,
+            ModeDetector.Detect("tell me a story about being scared of the dark", EmptyHistory));
+    }
+
+    [Fact]
+    public void Calm_CantSleepInsideStoryRequest_StaysStory()
+    {
+        // Defensive: even with a can't-sleep phrase, a story request stays Story.
+        Assert.Equal(DetectedMode.Story,
+            ModeDetector.Detect("tell me a story about a bunny that can't sleep", EmptyHistory));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // C1: widened Curiosity "where" triggers
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Curiosity_Where_English_DetectsCuriosity()
+    {
+        Assert.Equal(DetectedMode.Curiosity, ModeDetector.Detect("where is the moon", EmptyHistory));
+    }
+
+    [Fact]
+    public void Curiosity_Where_Armenian_DetectsCuriosity()
+    {
+        // որտեղ է ապրում լուսինը
+        Assert.Equal(DetectedMode.Curiosity,
+            ModeDetector.Detect("\u0578\u0580\u057f\u0565\u0572 \u0567 \u0561\u057a\u0580\u0578\u0582\u0574 \u056c\u0578\u0582\u057d\u056b\u0576\u0568", EmptyHistory));
+    }
+
+    [Fact]
+    public void Curiosity_WhereInsideWord_DoesNotFire()
+    {
+        // "somewhere" contains "where" as substring; StartsWithWord must prevent a match.
+        Assert.Equal(DetectedMode.None, ModeDetector.Detect("somewhere over the rainbow", EmptyHistory));
+    }
 }

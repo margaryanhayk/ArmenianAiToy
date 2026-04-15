@@ -803,6 +803,56 @@ public class ModeDetectorIntegrationTests
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // C1: Calm session persistence
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CalmSession_ShortFollowUp_StaysInCalm()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053c\u0561\u057e \u0567\u0580\u0589");
+
+        // Turn 1: enter Calm.
+        var r1 = await _chatService.GetResponseAsync(_deviceId, "\u0584\u0576\u0565\u056c \u0565\u0574 \u0578\u0582\u0566\u0578\u0582\u0574"); // քնել եմ ուզում
+        Assert.Equal("calm", r1.Mode);
+
+        // Turn 2: neutral follow-up — Calm persists.
+        var r2 = await _chatService.GetResponseAsync(_deviceId, "\u056c\u0561\u057e"); // լավ
+        Assert.Equal("calm", r2.Mode);
+
+        // And the Calm prompt is still injected on that follow-up turn.
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("MODE: CALM / BEDTIME")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task CalmSession_ExplicitStoryTrigger_OverridesCalm()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053c\u0561\u057e \u0567\u0580\u0589",
+                     "Fox.\n---\nCHOICE_A:Go\nCHOICE_B:Մնալ");
+
+        await _chatService.GetResponseAsync(_deviceId, "good night");
+        var r2 = await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+        Assert.Equal("story", r2.Mode);
+    }
+
+    [Fact]
+    public async Task CalmSession_CuriosityTrigger_OverridesCalm()
+    {
+        // A real off-topic question after a Calm turn must route to Curiosity,
+        // not get swallowed by Calm persistence.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053c\u0561\u057e \u0567\u0580\u0589",
+                     "\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "good night");
+        var r2 = await _chatService.GetResponseAsync(_deviceId, "why is the sky blue");
+        Assert.Equal("curiosity", r2.Mode);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // Post-processing punctuation cleanup
     // ─────────────────────────────────────────────────────────────────────
 

@@ -745,13 +745,13 @@ public class ChatService : IChatService
         if (detectedMode == DetectedMode.None
             && ActiveModes.TryGetValue(conversation.Id, out var activeMode)
             && DateTime.UtcNow - activeMode.ActivatedAt < ChoiceExpiry
-            && activeMode.Mode is DetectedMode.Game or DetectedMode.Riddle)
+            && activeMode.Mode is DetectedMode.Game or DetectedMode.Riddle or DetectedMode.Calm)
         {
             detectedMode = activeMode.Mode;
         }
 
         // Update active-mode tracker: store on Game/Riddle, clear on anything else.
-        if (detectedMode is DetectedMode.Game or DetectedMode.Riddle)
+        if (detectedMode is DetectedMode.Game or DetectedMode.Riddle or DetectedMode.Calm)
             ActiveModes[conversation.Id] = new ActiveModeEntry(detectedMode, DateTime.UtcNow);
         else
             ActiveModes.TryRemove(conversation.Id, out _);
