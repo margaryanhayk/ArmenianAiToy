@@ -249,4 +249,52 @@ public class ChatServiceTailBlockTests
         // Should NOT contain the Latin text. Should be the safety fallback.
         Assert.DoesNotMatch("[A-Za-z]{4,}", result.Response);
     }
+
+    [Fact]
+    public async Task ChoiceDiversityGuard_SameFirstVerb_TriggersRegenerationPath()
+    {
+        // Phase E E2: first AI response has structurally weak choices
+        // (same first verb, swapped noun). The diversity guard must reject
+        // them and fall through to the Step 10c regeneration path, which
+        // calls the AI again with ChoiceGenerationPrompt. The second call
+        // returns genuinely different verbs — those must be what reaches
+        // the child.
+        var weakPair = "Աղվեսը վազեց անտառով։\n---\nCHOICE_A:Բացենք փոքրիկ տուփը\nCHOICE_B:Բացենք մեծ դուռը";
+        // Regeneration prompt expects raw CHOICE_A/CHOICE_B lines; the
+        // Step 10c code prepends "\n---\n" before parsing.
+        var regeneratedChoices = "CHOICE_A:Կանչենք թռչունիկին\nCHOICE_B:Լսենք զանգակի ձայնը";
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(weakPair, regeneratedChoices);
+
+        var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "tell me a story");
+
+        // Two AI calls: the original story call + the regeneration call.
+        await _aiClient.Received(2).GetCompletionAsync(
+            Arg.Any<string>(), Arg.Any<List<(string, string)>>());
+
+        // The story prose is preserved from the first call.
+        Assert.Equal("Աղվեսը վազեց անտառով։", result.Response);
+
+        // The weak pair must NOT reach the child; the regenerated pair does.
+        Assert.Equal("Կանչենք թռչունիկին", result.ChoiceA);
+        Assert.Equal("Լսենք զանգակի ձայնը", result.ChoiceB);
+    }
+
+    [Fact]
+    public async Task ChoiceDiversityGuard_DifferentVerbs_DoesNotTriggerRegeneration()
+    {
+        // Control: genuinely different verbs must pass the guard and the
+        // single AI call must be the only call made.
+        var goodPair = "Աղվեսը վազեց։\n---\nCHOICE_A:Կանչենք թռչունիկին\nCHOICE_B:Լսենք զանգակի ձայնը";
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(goodPair);
+
+        var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "tell me a story");
+
+        await _aiClient.Received(1).GetCompletionAsync(
+            Arg.Any<string>(), Arg.Any<List<(string, string)>>());
+        Assert.Equal("Կանչենք թռչունիկին", result.ChoiceA);
+        Assert.Equal("Լսենք զանգակի ձայնը", result.ChoiceB);
+    }
 }

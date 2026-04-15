@@ -938,6 +938,20 @@ public class ChatService : IChatService
                     conversation.Id, optionA, optionB);
                 choiceA = optionA;
                 choiceB = optionB;
+
+                // Structural diversity guard (E2). If A and B share the same
+                // first verb token (or a near-identical inflectional variant),
+                // reject the pair and let the Step 10c regeneration path
+                // produce a better one.
+                if (ChoiceDiversity.AreTooSimilar(optionA, optionB))
+                {
+                    _logger.LogInformation(
+                        "Choice diversity guard rejected extracted pair. ConversationId: {ConversationId}, A: {A}, B: {B}",
+                        conversation.Id, optionA, optionB);
+                    PendingChoices.TryRemove(conversation.Id, out _);
+                    choiceA = null;
+                    choiceB = null;
+                }
             }
         }
 
