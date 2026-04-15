@@ -34,6 +34,13 @@ public class OpenAIModerationAdapter : IModerationService
     // (no violence keywords, score 0.35).
     internal const float ViolenceFalsePositiveCeiling = 0.40f;
 
+    // D2: slightly higher ceiling applied ONLY when the input matches a short
+    // story-request pattern (see StoryRequestMarkers). Covers observed false
+    // positives on phrases like «պատմիր կատվի մասին» (scored 0.4507). All
+    // other override conditions still apply — sole-violence category, no
+    // violence keywords — so the compound gate remains tight.
+    internal const float ViolenceFalsePositiveCeilingForStoryRequests = 0.50f;
+
     // Words that are never appropriate in a 4-7 year-old's input, even in
     // fairy-tale context. Kept short and unambiguous on purpose — words like
     // "fight", "hit", "sword" are omitted because they appear in normal
@@ -43,6 +50,19 @@ public class OpenAIModerationAdapter : IModerationService
         "kill", "murder", "bomb", "weapon", "gun", "shoot", "stab",
         "poison", "explode", "suicide", "terrorist", "terror",
         "drug", "alcohol",
+    ];
+
+    // D2: narrow set of opening-story-request markers. Deliberately a subset
+    // of ModeDetector.StoryTriggers (Application) — Infrastructure must not
+    // depend on Application, and the false-positive surface is opening
+    // requests, not mid-story inputs. Checked case-insensitively, substring.
+    internal static readonly string[] StoryRequestMarkers =
+    [
+        "\u057a\u0561\u057f\u0574\u056b\u0580",                               // պատմիր
+        "\u0570\u0565\u0584\u056b\u0561\u0569",                               // հեքիաթ
+        "\u057a\u0561\u057f\u0574\u0578\u0582\u0569\u0575\u0578\u0582\u0576", // պատմություն
+        "tell me a story",
+        "tell a story",
     ];
 
     private readonly ModerationClient _client;
@@ -124,16 +144,18 @@ public class OpenAIModerationAdapter : IModerationService
         if (categories.Harassment.Flagged) flagged.Add("harassment");
 
         // Narrow false-positive override. Conditions are intentionally
-        // strict — see class-level comment for the full rationale.
-        if (flagged.Count == 1
-            && flagged[0] == "violence"
-            && categories.Violence.Score < ViolenceFalsePositiveCeiling
-            && !ContainsViolenceKeyword(content))
+        // strict — see class-level comment for the full rationale. D2 adds
+        // a second ceiling that applies only for short story-request phrases
+        // (see ShouldOverrideViolenceBlock).
+        bool soleViolence = flagged.Count == 1 && flagged[0] == "violence";
+        if (ShouldOverrideViolenceBlock(content, soleViolence, categories.Violence.Score, out var overridePath))
         {
+            var ceiling = overridePath == "story_request"
+                ? ViolenceFalsePositiveCeilingForStoryRequests
+                : ViolenceFalsePositiveCeiling;
             _logger.LogInformation(
-                "Moderation violence false-positive override: score={VioScore:F4} (< {Ceiling:F2}), no violence keywords. ContentPreview: {Preview}",
-                categories.Violence.Score, ViolenceFalsePositiveCeiling,
-                Preview(content));
+                "Moderation violence false-positive override: path={Path} score={VioScore:F4} ceiling={Ceiling:F2} preview={Preview}",
+                overridePath, categories.Violence.Score, ceiling, Preview(content));
             flagged.Clear();
         }
 
@@ -171,6 +193,42 @@ public class OpenAIModerationAdapter : IModerationService
         for (int i = 0; i < ViolenceKeywords.Length; i++)
         {
             if (lower.Contains(ViolenceKeywords[i]))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Decide whether to override a solo-violence block. Returns true with
+    /// <paramref name="path"/> set to "default" (score below the global
+    /// 0.40 ceiling) or "story_request" (score below the 0.50 ceiling AND
+    /// the input looks like a short story request). Violence keyword in
+    /// the input always denies the override. Exposed as <c>protected
+    /// static</c> so test subclasses in other assemblies can exercise the
+    /// branches directly without needing <c>InternalsVisibleTo</c>.
+    /// </summary>
+    protected static bool ShouldOverrideViolenceBlock(
+        string content, bool soleFlaggedCategoryIsViolence, float violenceScore, out string path)
+    {
+        path = "none";
+        if (!soleFlaggedCategoryIsViolence) return false;
+        if (ContainsViolenceKeyword(content)) return false;
+        if (violenceScore < ViolenceFalsePositiveCeiling) { path = "default"; return true; }
+        if (violenceScore < ViolenceFalsePositiveCeilingForStoryRequests
+            && LooksLikeStoryRequest(content)) { path = "story_request"; return true; }
+        return false;
+    }
+
+    /// <summary>
+    /// Case-insensitive substring match against <see cref="StoryRequestMarkers"/>.
+    /// Intentionally narrow — opening story-request phrases only.
+    /// </summary>
+    protected static bool LooksLikeStoryRequest(string content)
+    {
+        var lower = content.ToLowerInvariant();
+        for (int i = 0; i < StoryRequestMarkers.Length; i++)
+        {
+            if (lower.Contains(StoryRequestMarkers[i]))
                 return true;
         }
         return false;

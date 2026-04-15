@@ -186,4 +186,152 @@ public class ModerationFailClosedTests
         public override bool TryGetValues(string name, out IEnumerable<string>? values) { values = null; return false; }
         public override IEnumerator<KeyValuePair<string, string>> GetEnumerator() { yield break; }
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // D2: violence false-positive widening — story-trigger-aware ceiling
+    // ─────────────────────────────────────────────────────────────────────
+
+    // Subclass proxy that surfaces the protected static helpers without
+    // requiring InternalsVisibleTo on the Infrastructure assembly.
+    private sealed class OverrideProbe : OpenAIModerationAdapter
+    {
+        public OverrideProbe()
+            : base(new global::OpenAI.Moderations.ModerationClient(model: "stub", apiKey: "stub"),
+                   Substitute.For<ILogger<OpenAIModerationAdapter>>())
+        { }
+
+        public static bool Decide(string content, bool soleViolence, float score, out string path)
+            => ShouldOverrideViolenceBlock(content, soleViolence, score, out path);
+
+        public static bool IsStoryRequest(string content)
+            => LooksLikeStoryRequest(content);
+    }
+
+    // --- Positive surface (override should fire) ---
+
+    [Fact]
+    public void Override_ObservedArmenianCatStoryRequest_FiresViaStoryPath()
+    {
+        // «պատմիր կատվի մասին», the exact input that D1 smoke observed at 0.4507
+        var fired = OverrideProbe.Decide(
+            "\u057a\u0561\u057f\u0574\u056b\u0580 \u056f\u0561\u057f\u057e\u056b \u0574\u0561\u057d\u056b\u0576",
+            soleViolence: true, score: 0.4507f, out var path);
+
+        Assert.True(fired);
+        Assert.Equal("story_request", path);
+    }
+
+    [Fact]
+    public void Override_ShortArmenianDogStoryRequest_FiresViaStoryPath()
+    {
+        var fired = OverrideProbe.Decide(
+            "\u057a\u0561\u057f\u0574\u056b\u0580 \u0577\u0561\u0576 \u0574\u0561\u057d\u056b\u0576",
+            soleViolence: true, score: 0.46f, out var path);
+
+        Assert.True(fired);
+        Assert.Equal("story_request", path);
+    }
+
+    [Fact]
+    public void Override_EnglishStoryRequest_FiresViaStoryPath()
+    {
+        var fired = OverrideProbe.Decide("tell me a story about a fox",
+            soleViolence: true, score: 0.42f, out var path);
+
+        Assert.True(fired);
+        Assert.Equal("story_request", path);
+    }
+
+    [Fact]
+    public void Override_LowScoreArmenianTrigger_FiresViaDefaultPath()
+    {
+        var fired = OverrideProbe.Decide("\u057a\u0561\u057f\u0574\u056b\u0580",
+            soleViolence: true, score: 0.36f, out var path);
+
+        Assert.True(fired);
+        Assert.Equal("default", path);
+    }
+
+    // --- Negative surface (override must NOT fire) ---
+
+    [Fact]
+    public void Override_InputWithViolenceKeyword_Blocked()
+    {
+        var fired = OverrideProbe.Decide("how to make a bomb",
+            soleViolence: true, score: 0.45f, out var path);
+
+        Assert.False(fired);
+        Assert.Equal("none", path);
+    }
+
+    [Fact]
+    public void Override_StoryRequestWithViolenceKeyword_Blocked()
+    {
+        var fired = OverrideProbe.Decide("\u057a\u0561\u057f\u0574\u056b\u0580 bomb \u0574\u0561\u057d\u056b\u0576",
+            soleViolence: true, score: 0.45f, out var path);
+
+        Assert.False(fired);
+        Assert.Equal("none", path);
+    }
+
+    [Fact]
+    public void Override_ScoreAtStoryCeiling_Blocked()
+    {
+        // Strictly less-than — exactly 0.50 must still block.
+        var fired = OverrideProbe.Decide(
+            "\u057a\u0561\u057f\u0574\u056b\u0580 \u056f\u0561\u057f\u057e\u056b \u0574\u0561\u057d\u056b\u0576",
+            soleViolence: true, score: 0.50f, out var path);
+
+        Assert.False(fired);
+        Assert.Equal("none", path);
+    }
+
+    [Fact]
+    public void Override_ScoreAboveStoryCeiling_Blocked()
+    {
+        var fired = OverrideProbe.Decide(
+            "\u057a\u0561\u057f\u0574\u056b\u0580 \u056f\u0561\u057f\u057e\u056b \u0574\u0561\u057d\u056b\u0576",
+            soleViolence: true, score: 0.65f, out var path);
+
+        Assert.False(fired);
+        Assert.Equal("none", path);
+    }
+
+    [Fact]
+    public void Override_BenignNonStoryArmenian_InWidenedBand_Blocked()
+    {
+        // Proves the widening applies ONLY to story-request patterns. A
+        // benign Armenian input without a story marker in the 0.40–0.50
+        // band must still block — conservative choice.
+        var fired = OverrideProbe.Decide(
+            "\u056f\u0561\u057f\u0578\u0582 \u0578\u0582 \u0577\u0578\u0582\u0576", // «կատու ու շուն»
+            soleViolence: true, score: 0.45f, out var path);
+
+        Assert.False(fired);
+        Assert.Equal("none", path);
+    }
+
+    [Fact]
+    public void Override_MultiCategoryFlag_Blocked()
+    {
+        // Multi-category flag always blocks — unchanged by D2.
+        var fired = OverrideProbe.Decide("anything",
+            soleViolence: false, score: 0.30f, out var path);
+
+        Assert.False(fired);
+        Assert.Equal("none", path);
+    }
+
+    // --- Story-marker helper coverage ---
+
+    [Theory]
+    [InlineData("\u057a\u0561\u057f\u0574\u056b\u0580 \u056f\u0561\u057f\u057e\u056b \u0574\u0561\u057d\u056b\u0576", true)]  // «պատմիր կատվի մասին»
+    [InlineData("tell me a story about a star", true)]
+    [InlineData("\u0540\u0535\u0554\u053b\u0531\u0539", true)]                                                                // ՀԵՔԻԱԹ (uppercase)
+    [InlineData("how to make a bomb", false)]
+    [InlineData("\u056f\u0561\u057f\u0578\u0582", false)]                                                                     // «կատու»
+    public void LooksLikeStoryRequest_MatchesExpected(string content, bool expected)
+    {
+        Assert.Equal(expected, OverrideProbe.IsStoryRequest(content));
+    }
 }
