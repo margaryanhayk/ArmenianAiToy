@@ -169,6 +169,8 @@ public class ChatService : IChatService
         - Texture/sensation: "Ձյան վրա մի փոքրիկ ոտնահետք էր — տաք ու փափուկ։"
         - Small surprise: "Սեղանի վրա հանկարծ հայտնվեց մի կարմիր կոճակ։"
         Repeating the same opening pattern across stories is FORBIDDEN.
+        BAD (time-frame default): "Մի անգամ մի փոքրիկ նապաստակ ապրում էր անտառում։"
+        GOOD (character action, no time frame): "Փոքրիկ նապաստակը ցատկեց քարի վրայից։"
         End each turn naturally — with a small action, a soft continuation,
         or a gentle hook. Do not end abruptly or force a question.
         If the child's message is unclear or incomplete, try to understand
@@ -242,6 +244,8 @@ public class ChatService : IChatService
         sentence with "...թե՞" (or?) or "...՞".
         State what happens. Describe actions and feelings directly.
         The two final choices carry the decision — the narrator does not ask.
+        BAD (rhetorical question tail): "Սակայն նա սկսեց մտածել, թե ինչու՞ է այսպես փայլում։"
+        GOOD (statement form): "Սակայն նա զարմացավ, որ այն այդպես էր փայլում։"
 
         HARD CONSTRAINTS: If the story part is shorter than 3 sentences,
         it is invalid — rewrite it until it has 3 to 5 sentences. If the
@@ -262,6 +266,11 @@ public class ChatService : IChatService
         resolution, or a small scene change. Do not stay frozen in the same
         moment. Do not say "since you didn't choose" or blame the child.
         Do not include a CHOICE_A/CHOICE_B block in this response.
+
+        FINAL STORY CHECK — READ BEFORE SENDING:
+        - Opening is NOT "Մի անգամ…" or "Մի գեղեցիկ X օր/առավոտ/երեկո…" unless the previous turn called for one.
+        - The response does NOT end with "՞" and does NOT contain "արդյոք" in any form.
+        - 3 to 5 short sentences, then CHOICE_A and CHOICE_B on their own lines.
         """;
 
     internal const string CalmModeInstruction = """

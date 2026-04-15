@@ -70,4 +70,72 @@ public class StoryPromptContentTests
         Assert.Contains("CHOICE_A:short Armenian action (3–7 words)", Prompt);
         Assert.Contains("CHOICE_B:short Armenian action (3–7 words)", Prompt);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // C2: compliance hardening (rhetorical-question + time-frame opener)
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void NoRhetoricalQuestions_SectionPresent()
+    {
+        Assert.Contains("NO RHETORICAL QUESTIONS", Prompt);
+        Assert.Contains("արդյոք", Prompt);
+    }
+
+    [Fact]
+    public void NoRhetoricalQuestions_BansQuestionTailMark()
+    {
+        Assert.Contains("\"...թե՞\"", Prompt);
+        Assert.Contains("\"...՞\"", Prompt);
+    }
+
+    [Fact]
+    public void OpeningVariety_BadGoodPair_Present()
+    {
+        Assert.Contains("BAD (time-frame default)", Prompt);
+        Assert.Contains("Փոքրիկ նապաստակը ցատկեց քարի վրայից", Prompt);
+    }
+
+    [Fact]
+    public void RhetoricalQuestion_BadGoodPair_Present()
+    {
+        // Pin the exact leaked fragment observed in B4 QA.
+        Assert.Contains("ինչու՞ է այսպես փայլում", Prompt);
+        Assert.Contains("Սակայն նա զարմացավ", Prompt);
+    }
+
+    [Fact]
+    public void FinalStoryCheck_SectionPresent()
+    {
+        Assert.Contains("FINAL STORY CHECK", Prompt);
+    }
+
+    [Fact]
+    public void FinalStoryCheck_AppearsAfterStoryChoices()
+    {
+        var choicesIdx = Prompt.IndexOf("STORY CHOICES — ADDITIONAL RULES");
+        var finalIdx = Prompt.IndexOf("FINAL STORY CHECK");
+        Assert.True(choicesIdx >= 0, "STORY CHOICES — ADDITIONAL RULES must be present");
+        Assert.True(finalIdx > choicesIdx, "FINAL STORY CHECK must appear after STORY CHOICES");
+    }
+
+    [Fact]
+    public void FinalStoryCheck_ReiteratesTimeFrameBan()
+    {
+        var idx = Prompt.IndexOf("FINAL STORY CHECK");
+        Assert.True(idx >= 0);
+        var tail = Prompt.Substring(idx);
+        Assert.Contains("Մի անգամ", tail);
+        Assert.Contains("Մի գեղեցիկ", tail);
+    }
+
+    [Fact]
+    public void FinalStoryCheck_ReiteratesRhetoricalBan()
+    {
+        var idx = Prompt.IndexOf("FINAL STORY CHECK");
+        Assert.True(idx >= 0);
+        var tail = Prompt.Substring(idx);
+        Assert.Contains("արդյոք", tail);
+        Assert.Contains("՞", tail);
+    }
 }
