@@ -148,4 +148,68 @@ public class StoryPromptContentTests
         Assert.Contains("Նա մտածում էր, արդյոք քարը կարող է կախարդական լինել", Prompt);
         Assert.Contains("քարը գուցե կախարդական է", Prompt);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Choice quality + continuation coherence hardening
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void ChoiceDifferentiation_SectionPresent()
+    {
+        Assert.Contains("CHOICE DIFFERENTIATION", Prompt);
+        Assert.Contains("at least TWO axes", Prompt);
+    }
+
+    [Fact]
+    public void ChoiceDifferentiation_BansSameVerbSwappedNoun()
+    {
+        // Pin the concrete BAD/GOOD counter-examples.
+        Assert.Contains("Բացենք տուփը", Prompt);
+        Assert.Contains("Բացենք դուռը", Prompt);
+        Assert.Contains("Կանչենք թռչունիկին", Prompt);
+    }
+
+    [Fact]
+    public void PostChoiceContinuation_SectionPresent()
+    {
+        Assert.Contains("POST-CHOICE CONTINUATION", Prompt);
+        Assert.Contains("FIRST sentence", Prompt);
+        Assert.Contains("visibly act on that exact choice", Prompt);
+    }
+
+    [Fact]
+    public void NoRecapAfterChoice_SectionPresent()
+    {
+        Assert.Contains("NO RECAP AFTER CHOICE", Prompt);
+        Assert.Contains("do NOT", Prompt);
+        Assert.Contains("restate", Prompt);
+        Assert.Contains("paraphrase", Prompt);
+    }
+
+    [Fact]
+    public void NoRecapAfterChoice_BadGoodPair_Present()
+    {
+        // The BAD example recaps the previous turn; the GOOD jumps straight in.
+        Assert.Contains("Աղվեսը դեռ կանգնած էր ծառի մոտ", Prompt);
+        Assert.Contains("Տուփը բացվեց, և ներսից դուրս թռավ", Prompt);
+    }
+
+    [Fact]
+    public void FinalStoryCheck_ReiteratesChoiceDifferentiation()
+    {
+        var idx = Prompt.IndexOf("FINAL STORY CHECK");
+        Assert.True(idx >= 0);
+        var tail = Prompt.Substring(idx);
+        Assert.Contains("differ on verb AND target", tail);
+    }
+
+    [Fact]
+    public void FinalStoryCheck_ReiteratesNoRecap()
+    {
+        var idx = Prompt.IndexOf("FINAL STORY CHECK");
+        Assert.True(idx >= 0);
+        var tail = Prompt.Substring(idx);
+        Assert.Contains("first sentence visibly acts on it", tail);
+        Assert.Contains("NOT recap", tail);
+    }
 }

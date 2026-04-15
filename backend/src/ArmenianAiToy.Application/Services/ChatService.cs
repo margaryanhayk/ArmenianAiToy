@@ -108,6 +108,22 @@ public class ChatService : IChatService
         ("շարունակել ճանապարհը" vs "գնալ և տեսնել") are INVALID.
         Make the two paths visibly different outcomes.
 
+        CHOICE DIFFERENTIATION — STRICT RULE: CHOICE_A and CHOICE_B must
+        differ on at least TWO axes out of: verb, target object, place,
+        character involved, sense used (look/listen/touch). Same verb
+        with a swapped noun is NOT enough.
+        BAD (same verb, swapped noun): CHOICE_A: "Բացենք տուփը" /
+          CHOICE_B: "Բացենք դուռը" — both are "open X", feels identical.
+        BAD (paraphrase pair): CHOICE_A: "Գնանք անտառ" /
+          CHOICE_B: "Քայլենք ծառերի մեջ" — same action, same place.
+        GOOD (different verb + different target): CHOICE_A:
+          "Բացենք փոքրիկ տուփը" / CHOICE_B: "Կանչենք թռչունիկին" —
+          different verbs, different targets, different outcomes.
+        GOOD (different sense): CHOICE_A: "Լսենք զանգակի ձայնը" /
+          CHOICE_B: "Նայենք պատուհանից դուրս" — listen vs look.
+        If the two choices could both lead to the same next scene,
+        they are INVALID — rewrite one until the forks are real.
+
         COMPANIONS AND CHARACTERS: When introducing a companion or friend
         in the story, make it clearly recognizable — a cat, bunny, bird,
         teddy bear, doll, or a child friend. Do not use confusing or
@@ -258,9 +274,25 @@ public class ChatService : IChatService
         words, a clear action, simple for ages 4–7, and different from
         the other. Write choices in natural Armenian.
 
-        If a previous_story_choice is provided, continue the story following
-        that choice. Do not ask the child to choose again, do not ignore the
-        choice, and do not re-offer the same options.
+        POST-CHOICE CONTINUATION — STRICT RULE: When previous_story_choice
+        is provided (option_a or option_b with a label), the FIRST sentence
+        of your reply must visibly act on that exact choice — name the
+        chosen object, character, or place in the first 1–2 sentences so
+        the child immediately sees their choice took effect. Something new
+        must happen right away (a reaction, a sound, a small surprise,
+        a new character, a step forward). Do not ask the child to choose
+        again, do not ignore the choice, and do not re-offer the same
+        options.
+
+        NO RECAP AFTER CHOICE — STRICT: After a choice is selected, do NOT
+        restate, summarize, or paraphrase the previous scene, feelings,
+        or setup. Do not re-describe the setting the child just heard.
+        Start from the new moment the choice creates.
+        BAD (recap): «Աղվեսը դեռ կանգնած էր ծառի մոտ և մտածում էր։
+          Հետո բացեց տուփը…» (first sentence recaps the prior turn)
+        GOOD (immediate action): «Տուփը բացվեց, և ներսից դուրս թռավ
+          մի փոքրիկ թռչունիկ։»
+        The continuation must feel like the NEXT moment, not a rewind.
 
         If previous_story_choice is "unclear", the child tried to answer but
         their reply was not understood. First respond naturally to what the
@@ -273,6 +305,8 @@ public class ChatService : IChatService
         - Opening is NOT "Մի անգամ…" or "Մի գեղեցիկ X օր/առավոտ/երեկո…" unless the previous turn called for one.
         - The response does NOT end with "՞" and does NOT contain "արդյոք" in any form.
         - 3 to 5 short sentences, then CHOICE_A and CHOICE_B on their own lines.
+        - CHOICE_A and CHOICE_B differ on verb AND target (or place, character, sense) — not the same verb with a swapped noun.
+        - If previous_story_choice was provided, the first sentence visibly acts on it and does NOT recap the previous scene.
         """;
 
     internal const string CalmModeInstruction = """
@@ -750,7 +784,7 @@ public class ChatService : IChatService
             var lastUserIdx = history.FindLastIndex(h => h.Role == "user");
             if (lastUserIdx >= 0)
             {
-                history[lastUserIdx] = ("user", $"[The child selected {normalizedChoice} — {choiceLabel}. Continue the story.]");
+                history[lastUserIdx] = ("user", $"[The child selected {normalizedChoice} — \"{choiceLabel}\". Act on this exact choice in the first sentence. Do not restate the previous scene. Move the story forward immediately.]");
             }
         }
 

@@ -345,6 +345,70 @@ public class ChoiceHandoffTests
     }
 
     [Fact]
+    public async Task ExplicitChoice_InjectsStrengthenedDirectiveIntoHistory()
+    {
+        // Set up a separate instance with controllable history so we can
+        // observe the history content handed to the AI on the second call.
+        var aiClient = Substitute.For<IAiChatClient>();
+        var moderation = Substitute.For<IModerationService>();
+        var conversations = Substitute.For<IConversationService>();
+        var childService = Substitute.For<IChildService>();
+        var logger = Substitute.For<ILogger<ChatService>>();
+        var config = Substitute.For<IConfiguration>();
+        config["SystemPrompt"].Returns("You are a test assistant.");
+
+        var convId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var conv = new Conversation { Id = convId, DeviceId = deviceId, StartedAt = DateTime.UtcNow };
+
+        conversations.GetOrCreateActiveConversationAsync(Arg.Any<Guid>(), Arg.Any<Guid?>()).Returns(conv);
+        moderation.CheckContentAsync(Arg.Any<string>()).Returns(new ModerationResult(true, new List<string>()));
+        childService.GetDefaultChildForDeviceAsync(Arg.Any<Guid>()).Returns((Child?)null);
+        conversations.AddMessageAsync(Arg.Any<Guid>(), Arg.Any<MessageRole>(), Arg.Any<string>(), Arg.Any<SafetyFlag>())
+            .Returns(callInfo => new Message
+            {
+                Id = Guid.NewGuid(), ConversationId = convId,
+                Role = callInfo.ArgAt<MessageRole>(1), Content = callInfo.ArgAt<string>(2),
+                Timestamp = DateTime.UtcNow, SafetyFlag = callInfo.ArgAt<SafetyFlag>(3)
+            });
+
+        // Request 1: seed pending choices via tail block
+        conversations.GetRecentMessagesAsync(Arg.Any<Guid>(), Arg.Any<int>())
+            .Returns(new List<(string Role, string Content)>());
+        aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Ընտրիր մեկը։\n---\nCHOICE_A:Օգնել աղվեսին\nCHOICE_B:Մենակ անցնել");
+
+        var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
+        await svc.GetResponseAsync(deviceId, "tell me a story");
+
+        // Request 2: explicit selectedChoice=A. History should have the raw
+        // "A" message replaced with the strengthened directive.
+        conversations.GetRecentMessagesAsync(Arg.Any<Guid>(), Arg.Any<int>())
+            .Returns(new List<(string Role, string Content)>
+            {
+                ("user", "tell me a story"),
+                ("assistant", "Ընտրիր մեկը։"),
+                ("user", "A"),
+            });
+        aiClient.ClearReceivedCalls();
+        aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Աղվեսը ուրախացավ։\n---\nCHOICE_A:Նոր Ա\nCHOICE_B:Նոր Բ");
+
+        await svc.GetResponseAsync(deviceId, "A", selectedChoice: "A");
+
+        // The last user turn in history should contain the strengthened
+        // directive — chosen label quoted, act-on-choice instruction, and
+        // anti-recap instruction all present.
+        await aiClient.Received().GetCompletionAsync(
+            Arg.Any<string>(),
+            Arg.Is<List<(string, string)>>(h =>
+                h.Any(m => m.Item1 == "user"
+                    && m.Item2.Contains("\"Օգնել աղվեսին\"")
+                    && m.Item2.Contains("Act on this exact choice in the first sentence")
+                    && m.Item2.Contains("Do not restate the previous scene"))));
+    }
+
+    [Fact]
     public async Task ExpiredPendingLabels_DoNotInjectUnclearHint()
     {
         // Set up with controllable history so story intent is active
