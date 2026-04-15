@@ -601,6 +601,13 @@ public class ChatService : IChatService
     internal const string CalmFallbackResponse =
         "\u0554\u0576\u056b\u0580 \u0570\u0561\u0576\u0563\u056b\u057d\u057f, \u0561\u0574\u0565\u0576 \u056b\u0576\u0579 \u056c\u0561\u057e \u0567\u0589";
 
+    // D3-lite: shown when the moderation adapter fail-closes on a transient
+    // issue (adapter flags `moderation_unavailable`). Distinct from genuine
+    // content-flag fallbacks so children and parents can tell infra hiccups
+    // apart from real safety blocks. «Մի րոպե սպասիր, ու նորից փորձենք։»
+    internal const string ModerationUnavailableFallbackResponse =
+        "\u0544\u056b \u0580\u0578\u057a\u0565 \u057d\u057a\u0561\u057d\u056b\u0580, \u0578\u0582 \u0576\u0578\u0580\u056b\u0581 \u0583\u0578\u0580\u0571\u0565\u0576\u0584\u0589";
+
     private readonly IAiChatClient _aiClient;
     private readonly IModerationService _moderation;
     private readonly IConversationService _conversations;
@@ -660,14 +667,17 @@ public class ChatService : IChatService
         var inputModeration = await _moderation.CheckContentAsync(userMessage);
         if (!inputModeration.IsSafe)
         {
-            _logger.LogWarning("User input blocked. Device: {DeviceId}, Categories: {Categories}",
-                deviceId, string.Join(", ", inputModeration.FlaggedCategories));
+            bool moderationUnavailable = inputModeration.FlaggedCategories.Contains("moderation_unavailable");
+            _logger.LogWarning("User input blocked. Device: {DeviceId}, Categories: {Categories}, unavailable={Unavailable}",
+                deviceId, string.Join(", ", inputModeration.FlaggedCategories), moderationUnavailable);
 
             await _conversations.AddMessageAsync(
                 conversation.Id, MessageRole.User, userMessage, SafetyFlag.Blocked);
 
-            var fallback = _config["SafetyFallbackResponse"]
-                ?? "Արի, մի ուրիշ հետաքրքիր բան խոսենք։";
+            var fallback = moderationUnavailable
+                ? ModerationUnavailableFallbackResponse
+                : _config["SafetyFallbackResponse"]
+                    ?? "Արի, մի ուրիշ հետաքրքիր բան խոսենք։";
             var fallbackMsg = await _conversations.AddMessageAsync(
                 conversation.Id, MessageRole.Assistant, fallback, SafetyFlag.Clean);
 
@@ -846,14 +856,23 @@ public class ChatService : IChatService
 
         if (!outputModeration.IsSafe)
         {
-            _logger.LogWarning("AI response flagged. Device: {DeviceId}", deviceId);
+            bool moderationUnavailable = outputModeration.FlaggedCategories.Contains("moderation_unavailable");
+            _logger.LogWarning("AI response flagged. Device: {DeviceId}, unavailable={Unavailable}",
+                deviceId, moderationUnavailable);
             safetyFlag = SafetyFlag.Flagged;
-            var configFallback = _config["SafetyFallbackResponse"];
-            aiResponse = detectedMode == DetectedMode.Calm
-                ? CalmFallbackResponse
-                : string.IsNullOrEmpty(configFallback)
-                    ? DefaultFallbackResponse
-                    : configFallback!;
+            if (moderationUnavailable)
+            {
+                aiResponse = ModerationUnavailableFallbackResponse;
+            }
+            else
+            {
+                var configFallback = _config["SafetyFallbackResponse"];
+                aiResponse = detectedMode == DetectedMode.Calm
+                    ? CalmFallbackResponse
+                    : string.IsNullOrEmpty(configFallback)
+                        ? DefaultFallbackResponse
+                        : configFallback!;
+            }
         }
 
         // Step 10a: Strip STORY_MEMORY block (always — cleans leaked markers). Only store
