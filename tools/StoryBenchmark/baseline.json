@@ -1,0 +1,14 @@
+{
+  "placeholder": true,
+  "total": 0,
+  "startOk": 0,
+  "choiceOk": 0,
+  "contOk": 0,
+  "contEligible": 0,
+  "sameSessionOk": 0,
+  "weakCases": 0,
+  "sameFirstVerb": 0,
+  "continuationNoLabelReference": 0,
+  "startContinuationRecapOverlap": 0,
+  "avgRecapOverlap": 0.0
+}

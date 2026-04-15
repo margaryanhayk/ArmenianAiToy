@@ -3,8 +3,14 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
-var baseUrl = args.Length > 0 ? args[0] : "http://localhost:5000";
+// CLI: first positional arg is baseUrl; --write-baseline saves baseline.json
+// to AppContext.BaseDirectory after the run. Operator copies the generated
+// file to the source tools/StoryBenchmark/baseline.json and commits.
+bool writeBaseline = args.Any(a => a == "--write-baseline");
+var positional = args.Where(a => !a.StartsWith("--")).ToArray();
+var baseUrl = positional.Length > 0 ? positional[0] : "http://localhost:5000";
 var promptsPath = Path.Combine(AppContext.BaseDirectory, "prompts.json");
+var baselinePath = Path.Combine(AppContext.BaseDirectory, "baseline.json");
 var resultsDir = Path.Combine(AppContext.BaseDirectory, "results");
 Directory.CreateDirectory(resultsDir);
 
@@ -13,7 +19,17 @@ const int MinResponseLen = 100;   // 3 Armenian sentences ~100+ chars
 const int MaxResponseLen = 800;   // 5 sentences should be well under 800
 const int MaxChoiceLen = 60;      // 3-7 Armenian words ~15-50 chars, 60 generous
 
+// E3 thresholds (additive signals for E1/E2 validation)
+const int MinTokenLen = 4;        // ignore short stop-tokens when comparing
+const double RecapOverlapThreshold = 0.6;  // Jaccard overlap on first-sentence
+                                           // Armenian tokens ≥ 0.6 is recap
+
 var armenianRegex = new Regex(@"[\u0530-\u058F]");
+var armenianOnlyRegex = new Regex(@"^[\u0530-\u058F]+$");
+
+// Strip trailing punctuation (Latin + Armenian verjaket/question/exclam/comma).
+var trailingPunct = new[] { '.', ',', '!', '?', ';', ':',
+    '\u0589', '\u055E', '\u055C', '\u055D' };
 
 var jsonOpts = new JsonSerializerOptions
 {
@@ -154,6 +170,22 @@ foreach (var prompt in prompts)
         hasWeak = true;
     }
 
+    // E3 signal 1: same_first_verb on extracted choices.
+    // Structurally weak choice pair — E2 guard should normally prevent this
+    // reaching the client, so a non-zero rate here is either E2 missing a
+    // case or the regenerated pair also being weak.
+    if (hasChoiceA && hasChoiceB && choicesDiff)
+    {
+        var firstA = FirstArmenianToken(startResp.ChoiceA, trailingPunct);
+        var firstB = FirstArmenianToken(startResp.ChoiceB, trailingPunct);
+        if (firstA is not null && firstB is not null && firstA == firstB)
+        {
+            result.WeakFlags.Add("same_first_verb");
+            weakCases.Add($"{prompt.Id}: CHOICE_A and CHOICE_B share first token «{firstA}»");
+            hasWeak = true;
+        }
+    }
+
     // --- Step 4: Send continuation if possible ---
     bool contSuccess = false;
     bool sameConv = false;
@@ -218,6 +250,59 @@ foreach (var prompt in prompts)
                     weakCases.Add($"{prompt.Id}: no Armenian letters in continuation");
                     hasWeak = true;
                 }
+
+                // E3 signal 2: continuation_no_label_reference.
+                // Approximates E1's POST-CHOICE CONTINUATION rule: the
+                // continuation should visibly act on the chosen label.
+                // Conservative — we only flag when ChoiceA has at least one
+                // ≥4-char Armenian token we can look for AND none appear
+                // anywhere in the continuation text. Short labels (no
+                // ≥4-char tokens) are skipped, not flagged.
+                if (contHasResponse && !string.IsNullOrWhiteSpace(startResp.ChoiceA))
+                {
+                    var labelTokens = ExtractArmenianTokens(
+                        startResp.ChoiceA, MinTokenLen, trailingPunct, armenianOnlyRegex);
+                    if (labelTokens.Count > 0)
+                    {
+                        var contLower = cont.Response.ToLowerInvariant();
+                        bool anyReferenced = labelTokens.Any(t => contLower.Contains(t));
+                        if (!anyReferenced)
+                        {
+                            result.WeakFlags.Add("continuation_no_label_reference");
+                            weakCases.Add(
+                                $"{prompt.Id}: continuation does not reference any ≥4-char token from CHOICE_A");
+                            hasWeak = true;
+                        }
+                    }
+                }
+
+                // E3 signal 3: start_continuation_recap_overlap.
+                // Approximates E1's NO RECAP AFTER CHOICE rule. Take the
+                // first sentence of start and the first sentence of
+                // continuation (split on verjaket ։). Compute Jaccard
+                // overlap on their ≥4-char Armenian tokens. Threshold
+                // 0.6 is deliberately lenient — two first sentences that
+                // naturally share a character name won't trip it; a
+                // paraphrase will.
+                if (contHasResponse && hasResponse)
+                {
+                    var startFirst = FirstSentence(startResp.Response ?? "");
+                    var contFirst = FirstSentence(cont.Response ?? "");
+                    var startTokens = ExtractArmenianTokens(
+                        startFirst, MinTokenLen, trailingPunct, armenianOnlyRegex);
+                    var contTokens = ExtractArmenianTokens(
+                        contFirst, MinTokenLen, trailingPunct, armenianOnlyRegex);
+                    var overlap = JaccardOverlap(startTokens, contTokens);
+                    result.StartContinuationRecapOverlap = overlap;
+                    if (overlap >= RecapOverlapThreshold
+                        && startTokens.Count >= 2 && contTokens.Count >= 2)
+                    {
+                        result.WeakFlags.Add("start_continuation_recap_overlap");
+                        weakCases.Add(
+                            $"{prompt.Id}: first-sentence Jaccard overlap {overlap:F2} ≥ {RecapOverlapThreshold:F2}");
+                        hasWeak = true;
+                    }
+                }
             }
         }
         catch (Exception ex)
@@ -262,6 +347,9 @@ var mdPath = Path.ChangeExtension(outputPath, ".md");
     md.AppendLine($"| Continuation success | {contOk}/{_contEligible} |");
     md.AppendLine($"| Same session retained | {sameSessionOk}/{_contEligible} |");
     md.AppendLine($"| Weak cases | {weakCases.Count} |");
+    md.AppendLine($"| same_first_verb | {results.Count(r => r.WeakFlags.Contains("same_first_verb"))}/{_total} |");
+    md.AppendLine($"| continuation_no_label_reference | {results.Count(r => r.WeakFlags.Contains("continuation_no_label_reference"))}/{_contEligible} |");
+    md.AppendLine($"| start_continuation_recap_overlap | {results.Count(r => r.WeakFlags.Contains("start_continuation_recap_overlap"))}/{_contEligible} |");
     md.AppendLine();
 
     // Weak cases section
@@ -342,8 +430,82 @@ Console.WriteLine();
 Console.WriteLine($"  Avg start response:     {avgStartLen:F0} chars");
 Console.WriteLine($"  Avg continuation resp:  {avgContLen:F0} chars");
 Console.WriteLine($"  Weak cases:             {weakCases.Count}");
+
+// E3 signal summary
+int sameFirstVerbCount = results.Count(r => r.WeakFlags.Contains("same_first_verb"));
+int noLabelRefCount = results.Count(r => r.WeakFlags.Contains("continuation_no_label_reference"));
+int recapCount = results.Count(r => r.WeakFlags.Contains("start_continuation_recap_overlap"));
+var overlapVals = results.Where(r => r.ContinuationText is not null).Select(r => r.StartContinuationRecapOverlap).ToList();
+double avgOverlap = overlapVals.Count > 0 ? overlapVals.Average() : 0;
+Console.WriteLine();
+Console.WriteLine("  E1/E2 signals");
+Console.WriteLine($"    same_first_verb:                {sameFirstVerbCount}/{total}");
+Console.WriteLine($"    continuation_no_label_reference:{noLabelRefCount}/{contEligible}");
+Console.WriteLine($"    start_continuation_recap_overlap:{recapCount}/{contEligible}");
+Console.WriteLine($"    avg recap-overlap:              {avgOverlap:F3}");
+
 Console.WriteLine($"  Results JSON:           {outputPath}");
 Console.WriteLine($"  Results markdown:       {mdPath}");
+
+// Baseline comparison and optional write.
+var currentMetrics = new BenchmarkMetrics
+{
+    Total = total,
+    StartOk = startOk,
+    ChoiceOk = choiceOk,
+    ContOk = contOk,
+    ContEligible = contEligible,
+    SameSessionOk = sameSessionOk,
+    WeakCases = weakCases.Count,
+    SameFirstVerb = sameFirstVerbCount,
+    ContinuationNoLabelReference = noLabelRefCount,
+    StartContinuationRecapOverlap = recapCount,
+    AvgRecapOverlap = avgOverlap,
+};
+
+if (File.Exists(baselinePath))
+{
+    try
+    {
+        var baseline = JsonSerializer.Deserialize<BenchmarkMetrics>(
+            await File.ReadAllTextAsync(baselinePath), jsonOpts);
+        if (baseline is not null && !baseline.Placeholder)
+        {
+            Console.WriteLine();
+            Console.WriteLine("  Delta vs baseline (negative = improvement for weak counts)");
+            Console.WriteLine($"    weak_cases:                       {Delta(baseline.WeakCases, currentMetrics.WeakCases)}");
+            Console.WriteLine($"    same_first_verb:                  {Delta(baseline.SameFirstVerb, currentMetrics.SameFirstVerb)}");
+            Console.WriteLine($"    continuation_no_label_reference:  {Delta(baseline.ContinuationNoLabelReference, currentMetrics.ContinuationNoLabelReference)}");
+            Console.WriteLine($"    start_continuation_recap_overlap: {Delta(baseline.StartContinuationRecapOverlap, currentMetrics.StartContinuationRecapOverlap)}");
+            Console.WriteLine($"    avg_recap_overlap:                {currentMetrics.AvgRecapOverlap - baseline.AvgRecapOverlap:+0.000;-0.000;0.000}");
+        }
+        else if (baseline is not null && baseline.Placeholder)
+        {
+            Console.WriteLine();
+            Console.WriteLine("  Baseline is a placeholder — run with --write-baseline and commit.");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"  Baseline read failed: {ex.Message}");
+    }
+}
+else
+{
+    Console.WriteLine();
+    Console.WriteLine($"  No baseline at {baselinePath}. Run with --write-baseline, then copy");
+    Console.WriteLine($"  the generated file to tools/StoryBenchmark/baseline.json and commit.");
+}
+
+if (writeBaseline)
+{
+    await File.WriteAllTextAsync(
+        baselinePath,
+        JsonSerializer.Serialize(currentMetrics, jsonOpts));
+    Console.WriteLine();
+    Console.WriteLine($"  Baseline written: {baselinePath}");
+    Console.WriteLine($"  Copy to: tools/StoryBenchmark/baseline.json");
+}
 
 if (failures.Count > 0)
 {
@@ -375,6 +537,70 @@ return (startOk == total && choiceOk == total) ? 0 : 1;
 // --- Helpers ---
 
 static string Pct(int n, int d) => d == 0 ? "N/A" : $"{100 * n / d}%";
+
+// First whitespace-separated token of <s> that contains Armenian letters,
+// lowercased and stripped of trailing punctuation. Null if none.
+static string? FirstArmenianToken(string? s, char[] trailing)
+{
+    if (string.IsNullOrWhiteSpace(s)) return null;
+    foreach (var raw in s.Trim().Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries))
+    {
+        var clean = raw.TrimEnd(trailing);
+        if (clean.Length == 0) continue;
+        // At least one Armenian codepoint (U+0530..U+058F).
+        bool hasArmenian = false;
+        foreach (var c in clean)
+            if (c >= '\u0530' && c <= '\u058F') { hasArmenian = true; break; }
+        if (hasArmenian) return clean.ToLowerInvariant();
+    }
+    return null;
+}
+
+// All ≥minLen whitespace-separated tokens of <s> that are entirely Armenian
+// (after trailing-punct strip). Lowercased, deduplicated.
+static HashSet<string> ExtractArmenianTokens(string? s, int minLen, char[] trailing, Regex armenianOnly)
+{
+    var set = new HashSet<string>();
+    if (string.IsNullOrWhiteSpace(s)) return set;
+    foreach (var raw in s.Split(
+        [' ', '\t', '\n', '\r', '.', ',', '!', '?', ';', ':',
+         '\u0589', '\u055E', '\u055C', '\u055D', '՝', '«', '»', '"', '(', ')', '—', '-'],
+        StringSplitOptions.RemoveEmptyEntries))
+    {
+        var clean = raw.TrimEnd(trailing);
+        if (clean.Length < minLen) continue;
+        if (!armenianOnly.IsMatch(clean)) continue;
+        set.Add(clean.ToLowerInvariant());
+    }
+    return set;
+}
+
+// Jaccard overlap on two sets. 0 when either is empty.
+static double JaccardOverlap(HashSet<string> a, HashSet<string> b)
+{
+    if (a.Count == 0 || b.Count == 0) return 0;
+    int inter = 0;
+    foreach (var x in a) if (b.Contains(x)) inter++;
+    int union = a.Count + b.Count - inter;
+    return union == 0 ? 0 : (double)inter / union;
+}
+
+// First sentence of <s>, terminated by Armenian verjaket ։ (U+0589).
+// Returns the whole string if no verjaket is present.
+static string FirstSentence(string s)
+{
+    if (string.IsNullOrEmpty(s)) return s;
+    var idx = s.IndexOf('\u0589');
+    return idx >= 0 ? s.Substring(0, idx + 1) : s;
+}
+
+// Signed delta display for count metrics. Improvement = fewer weak cases.
+static string Delta(int baseline, int current)
+{
+    var d = current - baseline;
+    var sign = d > 0 ? "+" : (d < 0 ? "" : "");
+    return $"{baseline} -> {current} ({sign}{d})";
+}
 
 static void PrintRow(string id, bool start, bool chA, bool chB, bool diff,
     bool ssid, bool cont, bool sameConv, bool sameSs, bool contCh, bool weak)
@@ -409,6 +635,26 @@ record DeviceReg
     public string ApiKey { get; init; } = "";
 }
 
+// Aggregate metrics snapshot for baseline comparison. Shape is intentionally
+// flat so a committed baseline.json is human-readable and diffable.
+record BenchmarkMetrics
+{
+    public int Total { get; init; }
+    public int StartOk { get; init; }
+    public int ChoiceOk { get; init; }
+    public int ContOk { get; init; }
+    public int ContEligible { get; init; }
+    public int SameSessionOk { get; init; }
+    public int WeakCases { get; init; }
+    public int SameFirstVerb { get; init; }
+    public int ContinuationNoLabelReference { get; init; }
+    public int StartContinuationRecapOverlap { get; init; }
+    public double AvgRecapOverlap { get; init; }
+    // When true, baseline.json is a committed scaffold and should not be
+    // compared against. The tool writes concrete baselines via --write-baseline.
+    public bool Placeholder { get; init; }
+}
+
 record TestResult
 {
     public string Id { get; init; } = "";
@@ -436,6 +682,9 @@ record TestResult
     public bool StartHasArmenian { get; set; }
     public int ContinuationResponseLen { get; set; }
     public bool ContinuationHasArmenian { get; set; }
+    // E3 metric: Jaccard overlap between first sentence of start and
+    // first sentence of continuation (≥4-char Armenian tokens only).
+    public double StartContinuationRecapOverlap { get; set; }
     // Weak-case flags
     public List<string> WeakFlags { get; set; } = [];
     // Errors and raw responses

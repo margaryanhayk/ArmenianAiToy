@@ -25,5 +25,7 @@
   { "id": "T24", "message": "A" },
   { "id": "T25", "message": "B" },
   { "id": "T26", "message": "I don't like that, tell me about a dog" },
-  { "id": "T27", "message": "story" }
+  { "id": "T27", "message": "story" },
+  { "id": "T28", "message": "tell me a story about three doors" },
+  { "id": "T29", "message": "tell me a story about a small box with a surprise" }
 ]
