@@ -138,4 +138,14 @@ public class StoryPromptContentTests
         Assert.Contains("արդյոք", tail);
         Assert.Contains("՞", tail);
     }
+
+    [Fact]
+    public void RhetoricalQuestion_MidBodyArdyokBadGoodPair_Present()
+    {
+        // B1.5: pin the mid-body «արդյոք» BAD/GOOD pair so future edits
+        // can't drop the explicit counter-example.
+        Assert.Contains("mid-body \"արդյոք\" hedge", Prompt);
+        Assert.Contains("Նա մտածում էր, արդյոք քարը կարող է կախարդական լինել", Prompt);
+        Assert.Contains("քարը գուցե կախարդական է", Prompt);
+    }
 }

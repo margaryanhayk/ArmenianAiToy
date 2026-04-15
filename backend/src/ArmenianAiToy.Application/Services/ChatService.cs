@@ -246,6 +246,8 @@ public class ChatService : IChatService
         The two final choices carry the decision — the narrator does not ask.
         BAD (rhetorical question tail): "Սակայն նա սկսեց մտածել, թե ինչու՞ է այսպես փայլում։"
         GOOD (statement form): "Սակայն նա զարմացավ, որ այն այդպես էր փայլում։"
+        BAD (mid-body "արդյոք" hedge): "Նա մտածում էր, արդյոք քարը կարող է կախարդական լինել։"
+        GOOD (direct statement): "Նա մտածում էր, որ քարը գուցե կախարդական է։"
 
         HARD CONSTRAINTS: If the story part is shorter than 3 sentences,
         it is invalid — rewrite it until it has 3 to 5 sentences. If the
