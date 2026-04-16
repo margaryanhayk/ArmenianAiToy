@@ -1132,6 +1132,73 @@ public class ChatService : IChatService
                 choiceB = null;
                 PendingChoices.TryRemove(conversation.Id, out _);
             }
+
+            // Step 10c-sexto: Continuation-fidelity guard (F2). When an explicit
+            // choice was selected, check whether the continuation references at
+            // least one key Armenian word from the chosen label. If not, retry
+            // once with a corrective hint. Mirrors the benchmark's
+            // continuation_no_label_reference signal.
+            if (choiceLabel is not null && ContinuationFidelity.IsMissingReference(choiceLabel, aiResponse))
+            {
+                _logger.LogInformation(
+                    "Continuation-fidelity guard triggered. ConversationId: {ConversationId}, Label: {Label}",
+                    conversation.Id, choiceLabel);
+                try
+                {
+                    // Append a one-shot corrective hint so the model knows why it's retrying.
+                    var fidelityHistory = new List<(string Role, string Content)>(history)
+                    {
+                        ("assistant", aiResponse),
+                        ("user", $"[SYSTEM: Your continuation does not contain any word from the chosen label \"{choiceLabel}\". Rewrite the continuation so the first sentence includes at least one key noun or verb from that label verbatim. Keep the story moving forward, do not recap.]")
+                    };
+                    var fidelityRaw = await _aiClient.GetCompletionAsync(systemPrompt, fidelityHistory);
+                    var fidelityMod = await _moderation.CheckContentAsync(fidelityRaw);
+                    if (fidelityMod.IsSafe)
+                    {
+                        var fidelityResp = fidelityRaw;
+
+                        // Re-run STORY_MEMORY extraction.
+                        StoryMemoryParser.TryExtract(fidelityResp, out var fMemStripped, out var fMem);
+                        fidelityResp = fMemStripped;
+                        if (isStoryMode && fMem is not null)
+                        {
+                            StoryMemories.AddOrUpdate(
+                                conversation.Id,
+                                fMem,
+                                (_, existing) => StoryMemoryParser.Merge(existing, fMem));
+                        }
+
+                        // Re-run tail-block extraction.
+                        if (TailBlockParser.TryExtract(fidelityResp, out var fCleaned, out var fA, out var fB))
+                        {
+                            fidelityResp = fCleaned;
+                            if (isStoryMode)
+                            {
+                                PendingChoices[conversation.Id] = new PendingChoice(fA!, fB!, DateTime.UtcNow);
+                                choiceA = fA;
+                                choiceB = fB;
+                            }
+                        }
+
+                        aiResponse = fidelityResp;
+                        _logger.LogInformation(
+                            "Continuation-fidelity retry accepted. ConversationId: {ConversationId}",
+                            conversation.Id);
+                    }
+                    else
+                    {
+                        _logger.LogInformation(
+                            "Continuation-fidelity retry rejected by moderation. ConversationId: {ConversationId}",
+                            conversation.Id);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Continuation-fidelity retry failed. ConversationId: {ConversationId}",
+                        conversation.Id);
+                }
+            }
         }
 
         // Step 10d: Armenian simplification — replace formal/bookish words with
