@@ -80,7 +80,7 @@ Curiosity preserves pending choices for story resume.
 
 ---
 
-## Phase 5 — Mode-aware benchmark (MEDIUM, low risk if isolated)
+## Phase 5 — Mode-aware benchmark (✅ done)
 
 Extend `tools/StoryBenchmark/prompts.json` with a parallel
 `tools/ModeBenchmark/prompts.json` (separate tool, separate output dir) so

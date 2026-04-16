@@ -1,14 +1,14 @@
 {
   "Total": 29,
   "StartOk": 29,
-  "ChoiceOk": 24,
-  "ContOk": 24,
-  "ContEligible": 24,
-  "SameSessionOk": 23,
-  "WeakCases": 6,
-  "SameFirstVerb": 1,
-  "ContinuationNoLabelReference": 4,
+  "ChoiceOk": 29,
+  "ContOk": 29,
+  "ContEligible": 29,
+  "SameSessionOk": 28,
+  "WeakCases": 1,
+  "SameFirstVerb": 0,
+  "ContinuationNoLabelReference": 1,
   "StartContinuationRecapOverlap": 0,
-  "AvgRecapOverlap": 0.05212931132048779,
+  "AvgRecapOverlap": 0.04852650956719532,
   "Placeholder": false
 }
