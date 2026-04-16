@@ -1,15 +1,15 @@
 {
-  "placeholder": true,
-  "total": 0,
-  "gameTotal": 0,
-  "gameOk": 0,
-  "riddleTotal": 0,
-  "riddleOk": 0,
-  "curiosityTotal": 0,
-  "curiosityOk": 0,
-  "calmTotal": 0,
-  "calmOk": 0,
-  "weakCases": 0,
-  "leakedChoiceBlock": 0,
-  "latinRun": 0
+  "Total": 20,
+  "GameTotal": 5,
+  "GameOk": 5,
+  "RiddleTotal": 5,
+  "RiddleOk": 5,
+  "CuriosityTotal": 5,
+  "CuriosityOk": 5,
+  "CalmTotal": 5,
+  "CalmOk": 5,
+  "WeakCases": 0,
+  "LeakedChoiceBlock": 0,
+  "LatinRun": 0,
+  "Placeholder": false
 }
