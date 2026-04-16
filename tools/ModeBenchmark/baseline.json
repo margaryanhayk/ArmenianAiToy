@@ -1,0 +1,15 @@
+{
+  "placeholder": true,
+  "total": 0,
+  "gameTotal": 0,
+  "gameOk": 0,
+  "riddleTotal": 0,
+  "riddleOk": 0,
+  "curiosityTotal": 0,
+  "curiosityOk": 0,
+  "calmTotal": 0,
+  "calmOk": 0,
+  "weakCases": 0,
+  "leakedChoiceBlock": 0,
+  "latinRun": 0
+}
