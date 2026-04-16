@@ -14,7 +14,7 @@ public static class ResponseCleaner
     // Lines that are purely internal formatting artifacts.
     // Anchored to start-of-line (after optional whitespace).
     private static readonly Regex InternalLineRegex = new(
-        @"^\s*(?:(?:CHOICE_A|CHOICE_B|STORY_MEMORY|FORMAT REMINDER):.*|-{3,}\s*)$",
+        @"^\s*(?:(?:CHOICE_A|CHOICE_B|STORY_MEMORY|FORMAT REMINDER|RIDDLE_ANSWER|RIDDLE_CATEGORY|RIDDLE_DIFFICULTY|RIDDLE_TURN_KIND):.*|-{3,}\s*)$",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
     // Emoji codepoint ranges. Covers the most common blocks (Emoticons, Dingbats,

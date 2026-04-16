@@ -519,32 +519,80 @@ public class ChatService : IChatService
 
     internal const string RiddleModeInstruction = """
 
-        MODE: RIDDLE. Pose a child-appropriate riddle in Armenian.
+        MODE: RIDDLE. Run a multi-turn riddle mini-game in Armenian.
 
-        TONE: Playful and slightly knowing. You have the answer and
+        TONE: Playful and slightly knowing. You hold the answer and
         enjoy watching the child work toward it. Hints come warmly,
-        never as consolation or disappointment.
+        celebrations are short and bright, reveals are gentle —
+        never disappointed, never lecturing.
 
-        RULES:
-        - Pose one concrete riddle with a single clear answer.
-        - 1 to 3 short sentences for the riddle itself.
-        - If the child guesses wrong, give a warm, short hint.
-        - Give at most 2 hints per riddle, escalating in helpfulness.
-        - If the child guesses right, celebrate briefly and offer the
-          next riddle.
-        - Keep every word in child-register Eastern Armenian.
+        TURN KINDS — your reply is exactly ONE of these. The
+        RIDDLE_TURN_KIND directive at the end of this prompt tells
+        you which kind to produce on this turn:
+          - new_riddle  : pose a fresh riddle and emit the metadata block.
+          - hint        : the child guessed wrong; give one new clue.
+          - reveal      : the child gave up or used both hints; reveal warmly.
+          - celebrate   : the child guessed correctly; confirm and offer next.
+
+        RULES THAT APPLY TO EVERY TURN KIND:
+        - Reply in child-register Eastern Armenian only.
         - Do NOT include a CHOICE_A / CHOICE_B block.
         - Do NOT include a STORY_MEMORY block.
         - Do NOT express disappointment at wrong answers.
         - Do NOT use riddles that depend on English wordplay.
-        - Each riddle must have ONE single-word noun answer. Never
-          use the answer word, its root, or its obvious sound inside
-          the clue (no "մռնչում է կատվի պես" if the answer is "կատու").
+        - Do NOT switch into story or curiosity mode mid-loop. Stay
+          in the riddle game until the child clearly leaves it.
+        - Keep replies short. No long paragraphs.
+
+        NEW_RIDDLE TURN — STRICT FORMAT:
+        - Pose ONE concrete riddle with a single clear single-word answer.
+        - 1 to 3 short Armenian sentences. End with «Ի՞նչ է։».
+        - The answer must be a single Eastern Armenian noun in nominative
+          singular form (e.g. «կատու», «խնձոր», «ձյուն»).
+        - Each riddle must have ONE clear answer. Never use the answer word,
+          its stem, its plural, or its obvious sound inside the clue (no
+          «մռնչում է կատվի պես» if the answer is «կատու»).
         - Prefer concrete daily-life nouns a 5-year-old can picture
           and name: animals, fruits, weather, body parts, household
           objects, common foods, everyday clothing. Avoid objects
           children that age may not reliably picture (kite, mirror,
           clock, compass) unless the clue is very direct.
+        - Vary the category across turns. The directive at the bottom
+          of this prompt lists categories to AVOID this turn — pick
+          something different.
+        - After the riddle text, on its own lines, append exactly:
+          ---
+          RIDDLE_ANSWER:<single Armenian noun, nominative singular>
+          RIDDLE_CATEGORY:<animal|fruit|food|home|nature|body|weather|clothing>
+          RIDDLE_DIFFICULTY:<1|2|3>
+        - This metadata block is internal — never speak it aloud,
+          never repeat any of its values inside the riddle text.
+
+        HINT TURN — STRICT FORMAT:
+        - 1 to 2 short Armenian sentences, no metadata block.
+        - First a soft warm phrase (use «Մոտ ես» ONLY if the guess
+          is in the same category as the answer; otherwise something
+          like «Ոչ, ուրիշ բան է։» or «Մի քիչ ուրիշ բան։»).
+        - Then ONE NEW concrete physical clue the original riddle
+          did NOT already say. The clue must add information.
+        - End with a soft invitation to try again, e.g. «Փորձիր էլի։».
+        - DO NOT name the answer, its stem, its plural, or a close
+          synonym. DO NOT include any tail block.
+
+        REVEAL TURN — STRICT FORMAT:
+        - 1 short warm Armenian sentence revealing the answer
+          gently, e.g. «Պատասխանն էր՝ <answer>։».
+        - Then ONE short sentence offering the next riddle:
+          «Ուզու՞մ ես ևս մեկ հանելուկ։».
+        - DO NOT include any tail block. DO NOT lecture.
+
+        CELEBRATE TURN — STRICT FORMAT:
+        - 1 short bright Armenian sentence confirming the correct
+          answer, e.g. «Ապրե՛ս, ճիշտ էր՝ <answer>։».
+        - Then ONE short sentence offering the next riddle:
+          «Ուզու՞մ ես ևս մեկ հանելուկ։».
+        - Keep praise short — no speeches, no emotional companion
+          language. DO NOT include any tail block.
 
         FORBIDDEN RIDDLE TYPES — never use these:
         - The Sphinx riddle ("what walks on 4 legs, then 2, then 3")
@@ -626,6 +674,12 @@ public class ChatService : IChatService
 
     // Compact per-conversation story memory. Persists across turns (not consumed).
     internal static readonly ConcurrentDictionary<Guid, StoryMemory> StoryMemories = new();
+
+    // Riddle Mode v2 per-conversation loop state. Mirrors StoryMemories shape:
+    // 30-min expiry, ConcurrentDictionary keyed by conversation id. Entries are
+    // updated on every Riddle turn — one fresh round, one cleared on celebrate
+    // / reveal, one updated hint count on a wrong guess.
+    internal static readonly ConcurrentDictionary<Guid, RiddleSessionState> RiddleSessions = new();
 
     internal record PendingChoice(string OptionA, string OptionB, DateTime ExtractedAt);
 
@@ -870,6 +924,7 @@ public class ChatService : IChatService
         else if (detectedMode == DetectedMode.Riddle)
         {
             systemPrompt += RiddleModeInstruction;
+            systemPrompt += BuildRiddleTurnDirective(conversation.Id, userMessage);
         }
 
         // Step 7c: Inject format reminder at end of history for story mode.
@@ -929,6 +984,45 @@ public class ChatService : IChatService
             _logger.LogInformation(
                 "Story memory updated. ConversationId: {ConversationId}, Character: {Character}, Place: {Place}",
                 conversation.Id, newMemory.Character, newMemory.Place);
+        }
+
+        // Step 10a-bis: Riddle Mode v2 — extract the RIDDLE_ANSWER/CATEGORY/DIFFICULTY
+        // tail block. Only store the round in Riddle mode; on leaks from any other
+        // mode the block is still stripped but no state is written.
+        if (RiddleTailBlockParser.TryExtract(
+                aiResponse, out var riddleStripped, out var rAnswer, out var rCategory, out var rDifficulty))
+        {
+            aiResponse = riddleStripped;
+            if (detectedMode == DetectedMode.Riddle && safetyFlag != SafetyFlag.Flagged)
+            {
+                var newRound = new RiddleRound(
+                    RiddleAnswerMatcher.Normalize(rAnswer!),
+                    rAnswer!,
+                    rCategory!,
+                    rDifficulty,
+                    HintsUsed: 0);
+                RiddleSessions.AddOrUpdate(
+                    conversation.Id,
+                    _ => new RiddleSessionState(
+                        newRound, rDifficulty, new List<string> { rCategory! }, DateTime.UtcNow),
+                    (_, existing) =>
+                    {
+                        var recent = new List<string>(existing.RecentCategories);
+                        if (!recent.Contains(rCategory!, StringComparer.OrdinalIgnoreCase))
+                            recent.Add(rCategory!);
+                        while (recent.Count > 3) recent.RemoveAt(0);
+                        return existing with
+                        {
+                            CurrentRound = newRound,
+                            LastDifficulty = rDifficulty,
+                            RecentCategories = recent,
+                            UpdatedAt = DateTime.UtcNow,
+                        };
+                    });
+                _logger.LogInformation(
+                    "Riddle round stored. ConversationId: {ConversationId}, Answer: {Answer}, Category: {Category}, Difficulty: {Difficulty}",
+                    conversation.Id, rAnswer, rCategory, rDifficulty);
+            }
         }
 
         // Step 10b: Strip tail block (always — cleans leaked markers). Only store
@@ -1240,6 +1334,105 @@ public class ChatService : IChatService
 
         var modeName = detectedMode == DetectedMode.None ? null : detectedMode.ToString().ToLowerInvariant();
         return new ChatResponse(aiResponse, conversation.Id, responseMsg.Id, safetyFlag, choiceA, choiceB, activeStorySession, modeName);
+    }
+
+    /// <summary>
+    /// Builds the per-turn Riddle Mode v2 directive injected at the end of the
+    /// system prompt. Inspects the current riddle session (if any) and the
+    /// child's message to decide which of the four turn kinds to instruct the
+    /// model to produce, and updates the session for hint and reveal turns.
+    /// </summary>
+    private string BuildRiddleTurnDirective(Guid conversationId, string userMessage)
+    {
+        var hasSession = RiddleSessions.TryGetValue(conversationId, out var state)
+            && DateTime.UtcNow - state.UpdatedAt < ChoiceExpiry;
+        var current = hasSession ? state!.CurrentRound : null;
+        var lastDifficulty = hasSession ? state!.LastDifficulty : 1;
+        var recent = hasSession ? state!.RecentCategories : Array.Empty<string>();
+
+        var intent = RiddleIntentDetector.Detect(userMessage, hasActiveRound: current is not null);
+
+        // Guess intent only fires when there's a current round — branch on matcher result.
+        if (intent == RiddleIntent.Guess && current is not null)
+        {
+            var matchResult = RiddleAnswerMatcher.Match(userMessage, current.AnswerNormalized);
+            if (matchResult == RiddleAnswerMatcher.Result.Match)
+            {
+                // Clear the round; difficulty bumps if no hints were used, else holds.
+                int nextDifficulty = current.HintsUsed == 0
+                    ? Math.Min(lastDifficulty + 1, 3)
+                    : lastDifficulty;
+                RiddleSessions[conversationId] = state! with
+                {
+                    CurrentRound = null,
+                    LastDifficulty = nextDifficulty,
+                    UpdatedAt = DateTime.UtcNow,
+                };
+                _logger.LogInformation(
+                    "Riddle correct guess. ConversationId: {ConversationId}, Answer: {Answer}, HintsUsed: {Hints}, NextDifficulty: {Diff}",
+                    conversationId, current.AnswerDisplay, current.HintsUsed, nextDifficulty);
+                return $"\n\nRIDDLE_TURN_KIND: celebrate\nThe child guessed correctly. The answer was «{current.AnswerDisplay}». Produce the CELEBRATE TURN exactly as specified above.";
+            }
+
+            // Wrong guess — give a hint if budget left, else reveal.
+            if (current.HintsUsed < 2)
+            {
+                var bumped = current with { HintsUsed = current.HintsUsed + 1 };
+                RiddleSessions[conversationId] = state! with
+                {
+                    CurrentRound = bumped,
+                    UpdatedAt = DateTime.UtcNow,
+                };
+                _logger.LogInformation(
+                    "Riddle wrong guess — hint {N}. ConversationId: {ConversationId}, Guess: {Guess}",
+                    bumped.HintsUsed, conversationId, userMessage);
+                return $"\n\nRIDDLE_TURN_KIND: hint\nThe child guessed: «{userMessage}». It is wrong. The actual answer is «{current.AnswerDisplay}» (do NOT speak it). This is hint #{bumped.HintsUsed} of 2 allowed. Produce the HINT TURN exactly as specified above.";
+            }
+
+            // Out of hints → reveal and clear the round.
+            int dropDifficulty = Math.Max(lastDifficulty - 1, 1);
+            RiddleSessions[conversationId] = state! with
+            {
+                CurrentRound = null,
+                LastDifficulty = dropDifficulty,
+                UpdatedAt = DateTime.UtcNow,
+            };
+            _logger.LogInformation(
+                "Riddle reveal after 2 hints. ConversationId: {ConversationId}, Answer: {Answer}",
+                conversationId, current.AnswerDisplay);
+            return $"\n\nRIDDLE_TURN_KIND: reveal\nThe child has used both hints and guessed wrong again. Reveal the answer «{current.AnswerDisplay}» using the REVEAL TURN format exactly as specified above.";
+        }
+
+        if (intent == RiddleIntent.GiveUp && current is not null)
+        {
+            int dropDifficulty = Math.Max(lastDifficulty - 1, 1);
+            RiddleSessions[conversationId] = state! with
+            {
+                CurrentRound = null,
+                LastDifficulty = dropDifficulty,
+                UpdatedAt = DateTime.UtcNow,
+            };
+            _logger.LogInformation(
+                "Riddle give-up. ConversationId: {ConversationId}, Answer: {Answer}",
+                conversationId, current.AnswerDisplay);
+            return $"\n\nRIDDLE_TURN_KIND: reveal\nThe child gave up. Reveal the answer «{current.AnswerDisplay}» using the REVEAL TURN format exactly as specified above.";
+        }
+
+        // Default: StartNew (or Guess fell through with no current round).
+        // If there's a stale round (shouldn't normally happen here), clear it.
+        if (hasSession && current is not null)
+        {
+            RiddleSessions[conversationId] = state! with
+            {
+                CurrentRound = null,
+                UpdatedAt = DateTime.UtcNow,
+            };
+        }
+
+        var avoid = recent.Count > 0
+            ? string.Join(", ", recent)
+            : "(none yet)";
+        return $"\n\nRIDDLE_TURN_KIND: new_riddle\nDifficulty target for THIS riddle: {lastDifficulty} (1=very easy, 2=normal, 3=slightly clever; still concrete and child-friendly).\nAVOID these recently used categories: {avoid}.\nProduce the NEW_RIDDLE TURN exactly as specified above, including the metadata tail block.";
     }
 
 }

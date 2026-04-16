@@ -60,4 +60,47 @@ public class RiddlePromptContentTests
         Assert.Contains("Sphinx", Prompt);
         Assert.Contains("GOOD RIDDLE EXAMPLES", Prompt);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Riddle Mode v2 — multi-turn loop directives
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Prompt_DeclaresFourTurnKinds()
+    {
+        Assert.Contains("new_riddle", Prompt);
+        Assert.Contains("hint", Prompt);
+        Assert.Contains("reveal", Prompt);
+        Assert.Contains("celebrate", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_DefinesMetadataTailBlockShape()
+    {
+        Assert.Contains("RIDDLE_ANSWER:", Prompt);
+        Assert.Contains("RIDDLE_CATEGORY:", Prompt);
+        Assert.Contains("RIDDLE_DIFFICULTY:", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_HintTurnForbidsAnswerWord()
+    {
+        Assert.Contains("HINT TURN", Prompt);
+        Assert.Contains("DO NOT name the answer", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_RevealAndCelebrateOfferNextRiddle()
+    {
+        Assert.Contains("REVEAL TURN", Prompt);
+        Assert.Contains("CELEBRATE TURN", Prompt);
+        Assert.Contains("\u0548\u0582\u0566\u0578\u0582\u055e\u0574 \u0565\u057d \u0587\u057d \u0574\u0565\u056f \u0570\u0561\u0576\u0565\u056c\u0578\u0582\u056f", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_LocksMetadataBlockToNewRiddleTurnsOnly()
+    {
+        // Hint / reveal / celebrate must explicitly forbid the tail block.
+        Assert.Contains("DO NOT include any tail block", Prompt);
+    }
 }
