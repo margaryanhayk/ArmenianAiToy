@@ -404,7 +404,7 @@ public class ChoiceHandoffTests
             Arg.Is<List<(string, string)>>(h =>
                 h.Any(m => m.Item1 == "user"
                     && m.Item2.Contains("\"Օգնել աղվեսին\"")
-                    && m.Item2.Contains("Act on this exact choice in the first sentence")
+                    && m.Item2.Contains("MUST contain at least one key noun or verb from this label verbatim")
                     && m.Item2.Contains("Do not restate the previous scene"))));
     }
 

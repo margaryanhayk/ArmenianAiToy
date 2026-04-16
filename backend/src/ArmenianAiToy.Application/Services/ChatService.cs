@@ -283,6 +283,13 @@ public class ChatService : IChatService
         a new character, a step forward). Do not ask the child to choose
         again, do not ignore the choice, and do not re-offer the same
         options.
+        VERBATIM ANCHOR — MANDATORY: The first sentence of your
+        continuation MUST contain at least one key noun or verb taken
+        directly from the chosen label text. Use the exact same Armenian
+        word (any grammatical case or conjugation is acceptable). Do NOT
+        replace the label word with a synonym, a pronoun, or a generic
+        reference. The child must see the word they chose reappear in
+        the story so they know their choice was heard.
 
         NO RECAP AFTER CHOICE — STRICT: After a choice is selected, do NOT
         restate, summarize, or paraphrase the previous scene, feelings,
@@ -784,7 +791,7 @@ public class ChatService : IChatService
             var lastUserIdx = history.FindLastIndex(h => h.Role == "user");
             if (lastUserIdx >= 0)
             {
-                history[lastUserIdx] = ("user", $"[The child selected {normalizedChoice} — \"{choiceLabel}\". Act on this exact choice in the first sentence. Do not restate the previous scene. Move the story forward immediately.]");
+                history[lastUserIdx] = ("user", $"[The child selected {normalizedChoice} — \"{choiceLabel}\". Your first sentence MUST contain at least one key noun or verb from this label verbatim. Do not replace label words with synonyms. Do not restate the previous scene. Move the story forward immediately.]");
             }
         }
 
