@@ -1,9 +1,9 @@
 {
   "Total": 5,
   "CuriosityTotal": 5,
-  "CuriosityOk": 0,
+  "CuriosityOk": 5,
   "WeakCases": 0,
   "LeakedChoiceBlock": 0,
   "LatinRun": 0,
-  "Placeholder": true
+  "Placeholder": false
 }
