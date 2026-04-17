@@ -518,7 +518,7 @@ public class ChatService : IChatService
 
     internal const string GameModeInstruction = """
 
-        MODE: GAME. Run a short, structured play activity.
+        MODE: GAME. Run a real multi-turn mini-game with a small child.
 
         TONE: Clear, direct, a notch more energetic than a story. Short
         sentences, brisk rhythm. Instruction first, then reaction.
@@ -526,21 +526,70 @@ public class ChatService : IChatService
         Rhythm: Instruction → short reaction → next instruction.
         No narration, no scene-painting, no "imagine we are...".
 
-        RULES:
+        TURN KINDS — your reply is exactly ONE of these. The
+        GAME_TURN_KIND directive at the end of this prompt tells you
+        which kind to produce on this turn:
+          - new_game    : open a fresh activity and emit the metadata block.
+          - continue    : the child responded inside the active activity;
+                          celebrate briefly, then give the next round.
+          - switch_game : the child wants a different game; pick a NEW type
+                          (avoid the listed recent ones) and emit metadata.
+          - stop_game   : the child wants to stop; one warm goodbye line.
+
+        RULES THAT APPLY TO EVERY TURN KIND:
         - 1 to 3 short sentences per turn.
-        - Give one clear, simple instruction or activity at a time.
-        - Celebrate briefly when the child responds: one short phrase.
-        - Then give the next instruction right away.
+        - One clear, simple instruction or reaction at a time.
+        - Speak in child-register Eastern Armenian only.
         - Do NOT include a CHOICE_A / CHOICE_B block.
         - Do NOT include a STORY_MEMORY block.
         - Do NOT tell a story or paint a scene.
         - Do NOT ask open-ended questions.
         - Do NOT give long praise speeches.
         - Do NOT use emotional companion language.
-        - Activities: clap-along, count-to, copy-the-sound, color-name,
-          animal-sound, body-part-touch, simple rhythm games.
-        - Rotate activity types across turns. Do not stay on the same
-          activity type for more than 2–3 turns unless the child asks.
+        - Do NOT switch into story or curiosity mode mid-game. Stay in
+          the game until the child clearly leaves it.
+
+        GAME TYPES — pick ONE per round, age 4–7, no reading required:
+          - animal_sound   : «Հնչեցրու կատվի ձայնը։ Հիմա՝ շան ձայնը։»
+          - color_find     : «Գտիր մի կարմիր բան։ Հիմա՝ կապույտ։»
+          - clap_along     : «Ծափ տանք միասին։ Մեկ, երկու, երեք։»
+          - count_to       : «Հաշվենք մինչև հինգ։ Մեկ, երկու… շարունակիր։»
+          - body_part      : «Դիպչիր քթիդ։ Հիմա՝ ականջիդ։»
+          - copy_sound     : «Արա այսպես՝ բուուու։ Հիմա՝ սս-սս։»
+          - yes_no_silly   : «Ձուկը թռչու՞մ է։ Իսկ թռչունը՝ լողու՞մ։»
+        Use ONLY these game types. Do NOT invent new types or mix two
+        types in one turn.
+
+        NEW_GAME / SWITCH_GAME TURN — STRICT FORMAT:
+        - 1 to 3 short Armenian sentences. Open with a clear, brisk
+          first instruction the child can act on right now.
+        - For SWITCH_GAME: pick a DIFFERENT game type than the recent
+          ones listed in the AVOID directive at the bottom.
+        - Difficulty target on this turn comes from the directive
+          (1=very easy, 2=normal, 3=slightly playful-trickier; still
+          age 4–7 simple).
+        - After the prose, on its own lines, append exactly:
+          ---
+          GAME_TYPE:<one of the seven types above>
+          GAME_DIFFICULTY:<1|2|3>
+        - Metadata is internal — never speak it aloud.
+
+        CONTINUE TURN — STRICT FORMAT:
+        - 1 to 3 short Armenian sentences, NO metadata block.
+        - First a tiny celebration of what the child just did
+          («Ապրե՛ս», «Հա՛, ճիշտ է», «Լավն ես») — exactly one short phrase.
+        - Then ONE next round inside the SAME activity, slightly
+          varied (different color, different animal, faster tempo,
+          next number, etc.). Stay inside the type the directive names.
+        - DO NOT include any tail block. DO NOT ask if the child wants
+          to continue — just go.
+
+        STOP_GAME TURN — STRICT FORMAT:
+        - 1 short warm Armenian sentence acknowledging the child wants
+          to stop, e.g. «Լա՛վ, լավ խաղ էր։».
+        - Optional 1 short follow-up sentence offering to play later
+          if the child wants, e.g. «Երբ նորից ուզես, կանչիր ինձ։».
+        - DO NOT include any tail block. DO NOT plead for more turns.
 
         ARMENIAN EXEMPLAR TURNS — imperative, short, no open-ended
         questions. These show the SHAPE; do NOT reuse them verbatim:
@@ -548,6 +597,7 @@ public class ChatService : IChatService
         - Animal sound:    «Հնչեցրու կատվի ձայնը։ Հիմա՝ շան ձայնը։ Ապրե՛ս։»
         - Color-name:      «Նայիր շուրջդ։ Գտիր մի կարմիր բան։ Հիմա՝ կապույտ։»
         - Body-part touch: «Դիպչիր քթիդ։ Հիմա՝ ականջիդ։ Ապրե՛ս։»
+        - Yes/no silly:    «Ձուկը թռչու՞մ է։ Հա՞, թե՞ ոչ։ Ապրե՛ս՝ ոչ։»
 
         RESPONSE SHAPES — BAD vs GOOD:
         - BAD (storybook drift): «Պատկերացրու, որ մենք ծափ ենք
@@ -559,10 +609,16 @@ public class ChatService : IChatService
         - BAD (lecture / learning-goal tone): «Հիմա սովորենք գույները։
           Կարմիրը կարևոր գույն է, որովհետև...»
           GOOD (playful, imperative): «Գտիր մի կարմիր բան։ Հիմա՝ կապույտ։»
+        - BAD (asking permission to continue): «Ուզու՞մ ես շարունակել։
+          Թե՞ ուրիշ բան անենք։»
+          GOOD (just go): «Ապրե՛ս։ Հիմա՝ կանաչ բան գտիր։»
+        - BAD (mixing two types): «Ծափ տանք միասին։ Իսկ կատվի ձայնը
+          գիտե՞ս։ Հիմա՝ կարմիր գույն գտիր։»
+          GOOD (one type per turn): «Ծափ տանք միասին։ Մեկ, երկու, երեք։»
 
-        CHILD RESPONSE HANDLING:
+        CHILD RESPONSE HANDLING (inside CONTINUE turn):
         - On correct or participating: one short celebration
-          («Ապրե՛ս», «Հա՛, ճիշտ է», «Լավն ես»), then next instruction.
+          («Ապրե՛ս», «Հա՛, ճիշտ է», «Լավն ես»), then next round.
         - On wrong or partial: one short, playful redirect — no
           correction speech. Example: «Մոտ էր։ Գնդակը կարմիր է։
           Հիմա՝ խնձորը գտիր։»
@@ -749,6 +805,11 @@ public class ChatService : IChatService
     // updated on every Riddle turn — one fresh round, one cleared on celebrate
     // / reveal, one updated hint count on a wrong guess.
     internal static readonly ConcurrentDictionary<Guid, RiddleSessionState> RiddleSessions = new();
+
+    // Game Mode v2 per-conversation loop state. Same lifetime/shape as
+    // RiddleSessions. CurrentRound is null between activities; RecentGameTypes
+    // drives variety on switch_game / new_game turns.
+    internal static readonly ConcurrentDictionary<Guid, GameSessionState> GameSessions = new();
 
     internal record PendingChoice(string OptionA, string OptionB, DateTime ExtractedAt);
 
@@ -989,6 +1050,7 @@ public class ChatService : IChatService
         else if (detectedMode == DetectedMode.Game)
         {
             systemPrompt += GameModeInstruction;
+            systemPrompt += BuildGameTurnDirective(conversation.Id, userMessage);
         }
         else if (detectedMode == DetectedMode.Riddle)
         {
@@ -1091,6 +1153,39 @@ public class ChatService : IChatService
                 _logger.LogInformation(
                     "Riddle round stored. ConversationId: {ConversationId}, Answer: {Answer}, Category: {Category}, Difficulty: {Difficulty}",
                     conversation.Id, rAnswer, rCategory, rDifficulty);
+            }
+        }
+
+        // Step 10a-tris: Game Mode v2 — extract the GAME_TYPE/GAME_DIFFICULTY
+        // tail block. Only store the round in Game mode; on leaks from any
+        // other mode the block is still stripped but no state is written.
+        if (GameTailBlockParser.TryExtract(
+                aiResponse, out var gameStripped, out var gType, out var gDifficulty))
+        {
+            aiResponse = gameStripped;
+            if (detectedMode == DetectedMode.Game && safetyFlag != SafetyFlag.Flagged)
+            {
+                var newGameRound = new GameRound(gType!, gDifficulty, TurnsCompleted: 0);
+                GameSessions.AddOrUpdate(
+                    conversation.Id,
+                    _ => new GameSessionState(
+                        newGameRound, new List<string> { gType! }, DateTime.UtcNow),
+                    (_, existing) =>
+                    {
+                        var recent = new List<string>(existing.RecentGameTypes);
+                        if (!recent.Contains(gType!, StringComparer.OrdinalIgnoreCase))
+                            recent.Add(gType!);
+                        while (recent.Count > 3) recent.RemoveAt(0);
+                        return existing with
+                        {
+                            CurrentRound = newGameRound,
+                            RecentGameTypes = recent,
+                            UpdatedAt = DateTime.UtcNow,
+                        };
+                    });
+                _logger.LogInformation(
+                    "Game round stored. ConversationId: {ConversationId}, Type: {Type}, Difficulty: {Difficulty}",
+                    conversation.Id, gType, gDifficulty);
             }
         }
 
@@ -1502,6 +1597,94 @@ public class ChatService : IChatService
             ? string.Join(", ", recent)
             : "(none yet)";
         return $"\n\nRIDDLE_TURN_KIND: new_riddle\nDifficulty target for THIS riddle: {lastDifficulty} (1=very easy, 2=normal, 3=slightly clever; still concrete and child-friendly).\nAVOID these recently used categories: {avoid}.\nProduce the NEW_RIDDLE TURN exactly as specified above, including the metadata tail block.";
+    }
+
+    /// <summary>
+    /// Builds the per-turn Game Mode v2 directive injected at the end of the
+    /// system prompt. Mirrors BuildRiddleTurnDirective: inspects the current
+    /// game session and the child's message to decide which of the four
+    /// turn kinds to instruct the model to produce, and updates the session
+    /// for continue / switch / stop turns.
+    /// </summary>
+    private string BuildGameTurnDirective(Guid conversationId, string userMessage)
+    {
+        var hasSession = GameSessions.TryGetValue(conversationId, out var state)
+            && DateTime.UtcNow - state.UpdatedAt < ChoiceExpiry;
+        var current = hasSession ? state!.CurrentRound : null;
+        var recent = hasSession ? state!.RecentGameTypes : Array.Empty<string>();
+
+        var intent = GameIntentDetector.Detect(userMessage, hasActiveRound: current is not null);
+
+        if (intent == GameIntent.Stop && current is not null)
+        {
+            GameSessions[conversationId] = state! with
+            {
+                CurrentRound = null,
+                UpdatedAt = DateTime.UtcNow,
+            };
+            _logger.LogInformation(
+                "Game stop. ConversationId: {ConversationId}, Type: {Type}",
+                conversationId, current.GameType);
+            return "\n\nGAME_TURN_KIND: stop_game\nThe child wants to stop playing. Produce the STOP_GAME TURN exactly as specified above.";
+        }
+
+        if (intent == GameIntent.SwitchGame)
+        {
+            // Clear the round so the model picks a new type, but KEEP the
+            // RecentGameTypes so the AVOID list still works.
+            if (current is not null)
+            {
+                GameSessions[conversationId] = state! with
+                {
+                    CurrentRound = null,
+                    UpdatedAt = DateTime.UtcNow,
+                };
+            }
+            var avoidSwitch = recent.Count > 0 ? string.Join(", ", recent) : "(none yet)";
+            _logger.LogInformation(
+                "Game switch. ConversationId: {ConversationId}, Avoid: {Avoid}",
+                conversationId, avoidSwitch);
+            return $"\n\nGAME_TURN_KIND: switch_game\nThe child asked for a different game.\nAVOID these recently used game types: {avoidSwitch}.\nDifficulty target for THIS round: 1 (start easy on a fresh game type).\nProduce the SWITCH_GAME TURN exactly as specified above, including the metadata tail block. Pick a NEW game type — never one in the AVOID list.";
+        }
+
+        if (intent == GameIntent.Continue && current is not null)
+        {
+            // Bump turns and gently grow difficulty: 1→2 after 2 turns,
+            // 2→3 after 5 total turns. Stay in the same game type.
+            int newTurns = current.TurnsCompleted + 1;
+            int newDifficulty = current.Difficulty;
+            if (newDifficulty == 1 && newTurns >= 2) newDifficulty = 2;
+            if (newDifficulty == 2 && newTurns >= 5) newDifficulty = 3;
+
+            var bumped = current with
+            {
+                TurnsCompleted = newTurns,
+                Difficulty = newDifficulty,
+            };
+            GameSessions[conversationId] = state! with
+            {
+                CurrentRound = bumped,
+                UpdatedAt = DateTime.UtcNow,
+            };
+            _logger.LogInformation(
+                "Game continue. ConversationId: {ConversationId}, Type: {Type}, Turns: {Turns}, Difficulty: {Diff}",
+                conversationId, bumped.GameType, newTurns, newDifficulty);
+            return $"\n\nGAME_TURN_KIND: continue\nThe child responded inside the active activity «{bumped.GameType}». This is round {newTurns} of this activity. Difficulty target: {newDifficulty}. Produce the CONTINUE TURN exactly as specified above — brief celebration, then ONE next round inside the SAME game type «{bumped.GameType}». Do NOT include any tail block.";
+        }
+
+        // Default: StartNew (or Continue fell through with no current round).
+        if (hasSession && current is not null)
+        {
+            // Defensive: clear any stale round.
+            GameSessions[conversationId] = state! with
+            {
+                CurrentRound = null,
+                UpdatedAt = DateTime.UtcNow,
+            };
+        }
+
+        var avoidNew = recent.Count > 0 ? string.Join(", ", recent) : "(none yet)";
+        return $"\n\nGAME_TURN_KIND: new_game\nDifficulty target for THIS round: 1 (start easy).\nAVOID these recently used game types: {avoidNew}.\nProduce the NEW_GAME TURN exactly as specified above, including the metadata tail block.";
     }
 
 }

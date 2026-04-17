@@ -18,9 +18,14 @@ public class GamePromptContentTests
     }
 
     [Fact]
-    public void Prompt_RotatesActivityTypes()
+    public void Prompt_EnforcesVarietyViaAvoidList()
     {
-        Assert.Contains("Rotate activity types", Prompt);
+        // v2 — variety is no longer hand-waved as "rotate activity types";
+        // it is enforced deterministically by the AVOID list injected from
+        // GameSessions.RecentGameTypes. The prompt must instruct the model
+        // to honour that list on switch_game / new_game turns.
+        Assert.Contains("AVOID", Prompt);
+        Assert.Contains("recent ones", Prompt);
     }
 
     [Fact]
@@ -78,5 +83,59 @@ public class GamePromptContentTests
     public void Prompt_PreservesNoStoryRule()
     {
         Assert.Contains("Do NOT tell a story", Prompt);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Game Mode v2 — multi-turn loop directives
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Prompt_DeclaresFourTurnKinds()
+    {
+        Assert.Contains("new_game", Prompt);
+        Assert.Contains("continue", Prompt);
+        Assert.Contains("switch_game", Prompt);
+        Assert.Contains("stop_game", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_DefinesMetadataTailBlockShape()
+    {
+        Assert.Contains("GAME_TYPE:", Prompt);
+        Assert.Contains("GAME_DIFFICULTY:", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_LocksMetadataToNewOrSwitchTurns()
+    {
+        // Continue / stop turns must explicitly forbid the tail block.
+        Assert.Contains("DO NOT include any tail block", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_LocksGameTypeWhitelist()
+    {
+        Assert.Contains("GAME TYPES", Prompt);
+        Assert.Contains("animal_sound", Prompt);
+        Assert.Contains("color_find", Prompt);
+        Assert.Contains("clap_along", Prompt);
+        Assert.Contains("count_to", Prompt);
+        Assert.Contains("body_part", Prompt);
+        Assert.Contains("copy_sound", Prompt);
+        Assert.Contains("yes_no_silly", Prompt);
+        Assert.Contains("Use ONLY these game types", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_BansMixingTwoTypesPerTurn()
+    {
+        Assert.Contains("mixing two types", Prompt);
+        Assert.Contains("one type per turn", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_BansAskingPermissionToContinue()
+    {
+        Assert.Contains("asking permission to continue", Prompt);
     }
 }
