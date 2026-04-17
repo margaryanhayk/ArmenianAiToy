@@ -1,13 +1,13 @@
 {
   "Total": 15,
   "RiddleTotal": 5,
-  "RiddleOk": 0,
+  "RiddleOk": 5,
   "CuriosityTotal": 5,
-  "CuriosityOk": 0,
+  "CuriosityOk": 5,
   "CalmTotal": 5,
-  "CalmOk": 0,
+  "CalmOk": 5,
   "WeakCases": 0,
   "LeakedChoiceBlock": 0,
   "LatinRun": 0,
-  "Placeholder": true
+  "Placeholder": false
 }
