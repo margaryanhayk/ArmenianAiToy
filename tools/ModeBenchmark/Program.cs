@@ -15,8 +15,9 @@ var resultsDir = Path.Combine(AppContext.BaseDirectory, "results");
 Directory.CreateDirectory(resultsDir);
 
 // --- Mode-specific thresholds ---
-// Game was split out into its own tool (tools/GameBenchmark). ModeBenchmark
-// now covers Riddle / Curiosity / Calm only.
+// Game (tools/GameBenchmark) and Riddle (tools/RiddleBenchmark) have each
+// been split into their own dedicated tools. ModeBenchmark now covers
+// Curiosity / Calm only.
 // Curiosity v2 — bumped from 200 to fit one optional analogy or fun-fact
 // clause. Mirrors ResponseQualityGate.curiosity_too_long.
 const int CuriosityMaxLen = 240;
@@ -61,7 +62,6 @@ var failures = new List<string>();
 var weakCases = new List<string>();
 
 // Per-mode counters
-int riddleTotal = 0, riddleOk = 0;
 int curiosityTotal = 0, curiosityOk = 0;
 int calmTotal = 0, calmOk = 0;
 int leakedChoiceBlock = 0, latinRunCount = 0;
@@ -126,24 +126,6 @@ foreach (var prompt in prompts)
 
     switch (prompt.Mode)
     {
-        case "riddle":
-            riddleTotal++;
-            modeOk = hasResponse && result.HasArmenian && !choiceBlockDetected;
-            if (modeOk) riddleOk++;
-
-            if (!hasResponse) failures.Add($"{prompt.Id}: empty response");
-            if (!result.HasArmenian && hasResponse) failures.Add($"{prompt.Id}: no Armenian");
-            if (choiceBlockDetected) { failures.Add($"{prompt.Id}: choice block in riddle mode"); }
-
-            // Weak: riddle should contain a question
-            if (hasResponse && !hasQuestion)
-            {
-                result.WeakFlags.Add("riddle_no_question");
-                weakCases.Add($"{prompt.Id}: riddle has no question mark");
-                hasWeak = true;
-            }
-            break;
-
         case "curiosity":
             curiosityTotal++;
             modeOk = hasResponse && result.HasArmenian && !choiceBlockDetected;
@@ -216,21 +198,20 @@ foreach (var prompt in prompts)
 }
 
 // --- Step 4: Summary ---
-int totalOk = riddleOk + curiosityOk + calmOk;
+int totalOk = curiosityOk + calmOk;
 int total = prompts.Count;
 
 Console.WriteLine();
 Console.WriteLine("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
-Console.WriteLine("  MODE BENCHMARK SUMMARY (Riddle / Curiosity / Calm)");
+Console.WriteLine("  MODE BENCHMARK SUMMARY (Curiosity / Calm)");
 Console.WriteLine("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
 Console.WriteLine($"  Total prompts:     {total}");
 Console.WriteLine($"  Overall pass:      {totalOk}/{total} ({Pct(totalOk, total)})");
 Console.WriteLine();
-Console.WriteLine($"  Riddle:            {riddleOk}/{riddleTotal} ({Pct(riddleOk, riddleTotal)})");
 Console.WriteLine($"  Curiosity:         {curiosityOk}/{curiosityTotal} ({Pct(curiosityOk, curiosityTotal)})");
 Console.WriteLine($"  Calm:              {calmOk}/{calmTotal} ({Pct(calmOk, calmTotal)})");
 Console.WriteLine();
-Console.WriteLine("  (Game now covered by tools/GameBenchmark)");
+Console.WriteLine("  (Game now covered by tools/GameBenchmark, Riddle by tools/RiddleBenchmark)");
 Console.WriteLine();
 Console.WriteLine($"  Weak cases:        {weakCases.Count}");
 Console.WriteLine($"  Leaked choice:     {leakedChoiceBlock}");
@@ -254,12 +235,11 @@ md.AppendLine($"**Prompts:** {total}");
 md.AppendLine();
 md.AppendLine("| Mode | Pass | Total |");
 md.AppendLine("|------|------|-------|");
-md.AppendLine($"| Riddle | {riddleOk} | {riddleTotal} |");
 md.AppendLine($"| Curiosity | {curiosityOk} | {curiosityTotal} |");
 md.AppendLine($"| Calm | {calmOk} | {calmTotal} |");
 md.AppendLine($"| **Total** | **{totalOk}** | **{total}** |");
 md.AppendLine();
-md.AppendLine("_Game coverage lives in tools/GameBenchmark._");
+md.AppendLine("_Game coverage lives in tools/GameBenchmark. Riddle coverage lives in tools/RiddleBenchmark._");
 md.AppendLine();
 if (weakCases.Count > 0)
 {
@@ -282,7 +262,6 @@ Console.WriteLine($"  Results markdown:  {resultsMd}");
 var currentMetrics = new ModeMetrics
 {
     Total = total,
-    RiddleTotal = riddleTotal, RiddleOk = riddleOk,
     CuriosityTotal = curiosityTotal, CuriosityOk = curiosityOk,
     CalmTotal = calmTotal, CalmOk = calmOk,
     WeakCases = weakCases.Count,
@@ -302,7 +281,6 @@ if (File.Exists(baselinePath))
         {
             Console.WriteLine();
             Console.WriteLine("  Delta vs baseline (negative = improvement for weak counts)");
-            Console.WriteLine($"    riddle_ok:            {Delta(baseline.RiddleOk, currentMetrics.RiddleOk)}");
             Console.WriteLine($"    curiosity_ok:         {Delta(baseline.CuriosityOk, currentMetrics.CuriosityOk)}");
             Console.WriteLine($"    calm_ok:              {Delta(baseline.CalmOk, currentMetrics.CalmOk)}");
             Console.WriteLine($"    weak_cases:           {Delta(baseline.WeakCases, currentMetrics.WeakCases)}");
@@ -411,8 +389,6 @@ record DeviceReg
 record ModeMetrics
 {
     public int Total { get; init; }
-    public int RiddleTotal { get; init; }
-    public int RiddleOk { get; init; }
     public int CuriosityTotal { get; init; }
     public int CuriosityOk { get; init; }
     public int CalmTotal { get; init; }
