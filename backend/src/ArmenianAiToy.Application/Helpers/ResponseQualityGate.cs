@@ -36,7 +36,9 @@ public static class ResponseQualityGate
     /// <summary>
     /// Mode-aware quality gate. Runs all universal checks via the 2-arg
     /// overload, then adds mode-specific checks: Calm forbids question/
-    /// exclamation marks; Curiosity forbids responses over 200 chars.
+    /// exclamation marks; Curiosity forbids responses over 240 chars
+    /// (Curiosity v2 — bumped from 200 to fit one optional analogy or
+    /// fun-fact clause without entering lecture territory).
     /// </summary>
     public static string? CheckRetry(string response, string userMessage, DetectedMode mode)
     {
@@ -57,7 +59,7 @@ public static class ResponseQualityGate
             {
                 if (response.Contains('?') || response.Contains('\u055E'))
                     return "curiosity_question";
-                if (response.Length > 200)
+                if (response.Length > 240)
                     return "curiosity_too_long";
             }
 

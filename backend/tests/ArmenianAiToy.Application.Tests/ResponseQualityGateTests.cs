@@ -195,17 +195,17 @@ public class ResponseQualityGateTests
     [Fact]
     public void Curiosity_LongResponse_TriggersCuriosityTooLong()
     {
-        // >200 chars = lecture territory.
-        var longResponse = new string('\u0561', 201);
+        // >240 chars = lecture territory (Curiosity v2 cap).
+        var longResponse = new string('\u0561', 241);
         var result = ResponseQualityGate.CheckRetry(
             longResponse, "why is the sky blue", DetectedMode.Curiosity);
         Assert.Equal("curiosity_too_long", result);
     }
 
     [Fact]
-    public void Curiosity_Exactly200Chars_PassesGate()
+    public void Curiosity_Exactly240Chars_PassesGate()
     {
-        var exactResponse = new string('\u0561', 200);
+        var exactResponse = new string('\u0561', 240);
         var result = ResponseQualityGate.CheckRetry(
             exactResponse, "why is the sky blue", DetectedMode.Curiosity);
         Assert.Null(result);

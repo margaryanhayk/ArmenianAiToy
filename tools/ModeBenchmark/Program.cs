@@ -16,7 +16,9 @@ Directory.CreateDirectory(resultsDir);
 
 // --- Mode-specific thresholds ---
 const int GameMaxLen = 200;
-const int CuriosityMaxLen = 200;
+// Curiosity v2 — bumped from 200 to fit one optional analogy or fun-fact
+// clause. Mirrors ResponseQualityGate.curiosity_too_long.
+const int CuriosityMaxLen = 240;
 const int CalmMaxLen = 400;
 
 var armenianRegex = new Regex(@"[\u0530-\u058F]");
