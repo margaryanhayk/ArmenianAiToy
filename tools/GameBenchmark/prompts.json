@@ -1,0 +1,58 @@
+[
+  {
+    "id": "GB01",
+    "label": "continue 5 turns variety",
+    "turns": [
+      { "user": "let's play" },
+      { "user": "ok" },
+      { "user": "\u056c\u0561\u057e" },
+      { "user": "ok" },
+      { "user": "ok" }
+    ]
+  },
+  {
+    "id": "GB02",
+    "label": "switch mid-round",
+    "turns": [
+      { "user": "let's play" },
+      { "user": "ok" },
+      { "user": "another game" },
+      { "user": "ok" }
+    ]
+  },
+  {
+    "id": "GB03",
+    "label": "stop after one round",
+    "turns": [
+      { "user": "let's play" },
+      { "user": "ok" },
+      { "user": "\u0562\u0561\u057e \u0567" }
+    ]
+  },
+  {
+    "id": "GB04",
+    "label": "Armenian opener continue",
+    "turns": [
+      { "user": "\u056d\u0561\u0572\u0561\u0576\u0584" },
+      { "user": "\u0561\u0580\u056b" },
+      { "user": "ok" }
+    ]
+  },
+  {
+    "id": "GB05",
+    "label": "stop vs switch precedence",
+    "turns": [
+      { "user": "play a game" },
+      { "user": "stop, let's switch game" }
+    ]
+  },
+  {
+    "id": "GB06",
+    "label": "new continue new",
+    "turns": [
+      { "user": "\u056d\u0561\u0572 \u056f\u0561" },
+      { "user": "ok" },
+      { "user": "new game" }
+    ]
+  }
+]
