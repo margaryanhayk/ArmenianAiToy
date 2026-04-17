@@ -1,0 +1,15 @@
+{
+  "TotalScenarios": 5,
+  "ScenariosOk": 0,
+  "TurnsTotal": 0,
+  "TurnsOk": 0,
+  "WeakCases": 0,
+  "LeakedTail": 0,
+  "LatinRun": 0,
+  "TooLong": 0,
+  "MissingGroundingAnchor": 0,
+  "CompanionLanguageLeak": 0,
+  "EchoedFearWord": 0,
+  "ArcNotWindingDown": 0,
+  "Placeholder": true
+}

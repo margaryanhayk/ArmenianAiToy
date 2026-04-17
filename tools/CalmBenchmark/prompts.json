@@ -1,0 +1,47 @@
+[
+  {
+    "id": "CB01",
+    "label": "tired + wind-down 4 turns",
+    "turns": [
+      { "user": "I'm tired" },
+      { "user": "\u056c\u0561\u057e" },
+      { "user": "\u056c\u0561\u057e" },
+      { "user": "\u056c\u0561\u057e" }
+    ]
+  },
+  {
+    "id": "CB02",
+    "label": "Armenian scared-of-dark distress",
+    "turns": [
+      { "user": "\u0574\u0569\u056b\u0581 \u057e\u0561\u056d\u0565\u0576\u0578\u0582\u0574 \u0565\u0574" },
+      { "user": "\u056c\u0561\u057e" }
+    ]
+  },
+  {
+    "id": "CB03",
+    "label": "can't sleep",
+    "turns": [
+      { "user": "i can't sleep" },
+      { "user": "\u056c\u0561\u057e" },
+      { "user": "\u056c\u0561\u057e" }
+    ]
+  },
+  {
+    "id": "CB04",
+    "label": "Armenian good-night opener",
+    "turns": [
+      { "user": "\u0562\u0561\u0580\u056b \u0563\u056b\u0577\u0565\u0580" },
+      { "user": "\u056c\u0561\u057e" },
+      { "user": "\u056c\u0561\u057e" }
+    ]
+  },
+  {
+    "id": "CB05",
+    "label": "want to sleep opener",
+    "turns": [
+      { "user": "\u0584\u0576\u0565\u056c \u0565\u0574 \u0578\u0582\u0566\u0578\u0582\u0574" },
+      { "user": "\u056c\u0561\u057e" },
+      { "user": "\u056c\u0561\u057e" }
+    ]
+  }
+]
