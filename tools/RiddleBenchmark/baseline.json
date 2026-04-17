@@ -1,0 +1,14 @@
+{
+  "TotalScenarios": 6,
+  "ScenariosOk": 0,
+  "TurnsTotal": 0,
+  "TurnsOk": 0,
+  "WeakCases": 0,
+  "LeakedTail": 0,
+  "LatinRun": 0,
+  "MissingRiddlePose": 0,
+  "MissingRevealMarker": 0,
+  "MissingOfferNext": 0,
+  "TooLong": 0,
+  "Placeholder": true
+}

@@ -1,0 +1,53 @@
+[
+  {
+    "id": "RB01",
+    "label": "new, give up, another",
+    "turns": [
+      { "user": "give me a riddle", "expect": "pose" },
+      { "user": "\u0579\u0563\u056b\u057f\u0565\u0574", "expect": "reveal" },
+      { "user": "\u0587\u057d \u0574\u0565\u056f", "expect": "pose" }
+    ]
+  },
+  {
+    "id": "RB02",
+    "label": "hint flow — three wrong guesses",
+    "turns": [
+      { "user": "give me a riddle", "expect": "pose" },
+      { "user": "cat" },
+      { "user": "\u056f\u0561\u057f\u0578\u0582" },
+      { "user": "\u0571\u0578\u0582\u056f" }
+    ]
+  },
+  {
+    "id": "RB03",
+    "label": "Armenian opener + reveal",
+    "turns": [
+      { "user": "\u0570\u0561\u0576\u0565\u056c\u0578\u0582\u056f", "expect": "pose" },
+      { "user": "\u0561\u057d\u0561 \u057a\u0561\u057f\u0561\u057d\u056d\u0561\u0576\u0568", "expect": "reveal" }
+    ]
+  },
+  {
+    "id": "RB04",
+    "label": "explicit trigger mid-round forces new",
+    "turns": [
+      { "user": "give me a riddle", "expect": "pose" },
+      { "user": "\u0576\u0578\u0580\u056b\u0581", "expect": "pose" }
+    ]
+  },
+  {
+    "id": "RB05",
+    "label": "short follow-up stays in riddle",
+    "turns": [
+      { "user": "riddle me", "expect": "pose" },
+      { "user": "ok" }
+    ]
+  },
+  {
+    "id": "RB06",
+    "label": "haneluk + i don't know",
+    "turns": [
+      { "user": "haneluk", "expect": "pose" },
+      { "user": "i don't know", "expect": "reveal" }
+    ]
+  }
+]
