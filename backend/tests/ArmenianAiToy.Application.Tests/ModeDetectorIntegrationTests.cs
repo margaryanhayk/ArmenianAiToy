@@ -826,6 +826,64 @@ public class ModeDetectorIntegrationTests
             Arg.Any<List<(string, string)>>());
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Calm Mode v2 — wind-down arc directive
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CalmDirective_FirstTurn_SaysTurn1()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053c\u0561\u057e \u0567\u0580\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "good night");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("CALM_TURN_INDEX: 1")
+                && s.Contains("Turn 1")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task CalmDirective_ThirdConsecutiveTurn_SaysTurn3Plus()
+    {
+        // Three consecutive Calm turns — directive should escalate to "Turn 3+".
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053c\u0561\u057e \u0567\u0580\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "i'm tired");
+        await _chatService.GetResponseAsync(_deviceId, "\u056c\u0561\u057e"); // լավ
+
+        _aiClient.ClearReceivedCalls();
+        await _chatService.GetResponseAsync(_deviceId, "\u056c\u0561\u057e"); // լավ — 3rd Calm turn
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("CALM_TURN_INDEX: 3")
+                && s.Contains("Turn 3+")
+                && s.Contains("never longer")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task CalmDirective_ResetsAfterModeSwitch()
+    {
+        // Calm turn → switch to story → switch back to calm should reset
+        // the turn index to 1.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053c\u0561\u057e \u0567\u0580\u0589",
+                     "Fox.\n---\nCHOICE_A:Go\nCHOICE_B:\u0544\u0576\u0561\u056c",
+                     "\u053c\u0561\u057e \u0567\u0580\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "good night");          // calm turn 1
+        await _chatService.GetResponseAsync(_deviceId, "tell me a story");      // story
+        _aiClient.ClearReceivedCalls();
+        await _chatService.GetResponseAsync(_deviceId, "i'm tired");           // calm turn 1 again
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("CALM_TURN_INDEX: 1")),
+            Arg.Any<List<(string, string)>>());
+    }
+
     [Fact]
     public async Task CalmSession_ExplicitStoryTrigger_OverridesCalm()
     {

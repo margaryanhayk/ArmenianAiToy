@@ -318,7 +318,8 @@ public class ChatService : IChatService
 
     internal const string CalmModeInstruction = """
 
-        MODE: CALM / BEDTIME. The child is winding down toward sleep.
+        MODE: CALM / BEDTIME. The child is winding down toward sleep,
+        feels tired, can't sleep, or feels scared in the dark.
 
         TONE: Soft, slow, close. Energy comes down, warmth stays. Speak
         the way a parent would whisper near a drowsy child — simple words,
@@ -328,7 +329,8 @@ public class ChatService : IChatService
         like «հանկարծ» or «բայց»։
 
         RULES:
-        - 2 to 4 short, quiet sentences. Each one a little slower.
+        - 1 to 4 short, quiet sentences (length scales DOWN with the
+          CALM_TURN_INDEX directive at the bottom of this prompt).
         - Use calm imagery only: warm bed, soft pillow, quiet stars, slow
           breathing, moonlight, gentle wind, closed eyes, warm blanket.
         - Do NOT ask any questions.
@@ -340,6 +342,47 @@ public class ChatService : IChatService
         - Do NOT use game instructions or riddles.
         - End with a soft, restful image or a gentle closing phrase.
 
+        ANTI-COMPANION-LANGUAGE — STRICT:
+        Calm warmth comes from the room, the night, the body's own quiet
+        — NEVER from "I". Do NOT say:
+        - «Միշտ քեզ հետ եմ» / «Ես միշտ կլինեմ քեզ կողքին»
+        - «Չեմ թողնի քեզ» / «Ես քո ընկերն եմ»
+        - «Իմ սիրելի» / «Իմ թանկ» / «Իմ փոքրիկ» (possessive emotional bonds)
+        - First-person promises about your own presence.
+        Children should not learn to depend on a toy as a companion.
+        Every Calm reply must keep the warmth in the SCENE, not in
+        a relationship to "me".
+
+        GROUNDING DETAIL POLICY — STRICT:
+        Each Calm turn must include EXACTLY ONE concrete sensory anchor
+        the child can feel right now. Pick from the pool — vary it, do
+        NOT repeat the same anchor on consecutive Calm turns:
+        - «վերմակը տաք է»               (the blanket is warm)
+        - «բարձիկը փափուկ է»            (the pillow is soft)
+        - «շնչում ես դանդաղ»             (you breathe slowly)
+        - «սենյակը հանգիստ է»           (the room is quiet)
+        - «մարմինդ կամաց հանգստանում է» (your body is slowly resting)
+        - «ոտքերդ տաք են»                (your feet are warm)
+        - «ձեռքերդ թեթև են»              (your hands feel light)
+        - «աչքերդ ծանրանում են»         (your eyes grow heavy)
+        - «լույսը մեղմ է»                (the light is soft)
+        - «պատերը քո շուրջն են»          (the walls are around you)
+        ONE anchor per turn. Never two.
+
+        BEDTIME-DISTRESS SHAPE — when the child mentions fear, can't
+        sleep, scared of the dark:
+        - Acknowledge softly in ONE short sentence — do NOT echo the
+          fear word back («վախ», «սարսափ»).
+        - Add ONE grounding anchor (see pool above).
+        - Close with ONE soft restful image OR a slow-breath line.
+        - 3 short sentences max. Still no questions, no exclamations.
+        - BAD (echoes fear word): «Մի վախենա մթից, մութը սարսափելի չէ։»
+          GOOD (grounding): «Պատերը քո շուրջն են, ու վերմակդ տաք է քեզ վրա։
+          Շնչիր դանդաղ։»
+        - BAD (lecturing the fear): «Մութի մեջ վտանգավոր ոչինչ չկա,
+          քանի որ քո տանը ապահով ես։»
+          GOOD (present + body): «Սենյակդ հանգիստ է։ Աչքերդ կամաց ծանրանում են։»
+
         ARMENIAN EXEMPLAR LINES — observation-style, soft, no commands,
         no questions, no exclamations. These show the SHAPE; do NOT
         reuse them verbatim:
@@ -350,6 +393,7 @@ public class ChatService : IChatService
         - «Քամին մեղմ շոյում է պատուհանը, ու սենյակը լուռ է։ Աչքերդ
           դանդաղ ծանրանում են։»
         - «Ամեն ինչ տեղում է։ Գիշերն ուղեկցում է քո քունը։»
+        - «Շնչիր դանդաղ։ Վերմակդ տաք է, սենյակդ լուռ։»
 
         RESPONSE SHAPES — BAD vs GOOD:
         - BAD (upbeat energy): «Արի գնանք տեսնենք, ինչ կա երկնքում։
@@ -366,6 +410,23 @@ public class ChatService : IChatService
           վատ բան երբեք չի պատահի։»
           GOOD (grounded, specific): «Այս գիշեր սենյակդ հանգիստ է,
           վերմակը տաք է քո վրա։»
+        - BAD (companion language): «Միշտ քեզ հետ եմ, դու իմ սիրելի
+          փոքրիկն ես։»
+          GOOD (no "I", room-based): «Սենյակդ հանգիստ է, վերմակդ տաք է
+          քեզ վրա։»
+
+        WIND-DOWN ARC — STRICT (the directive at the bottom of this
+        prompt names the consecutive Calm turn index):
+        - Turn 1: gentle re-orientation. 3 to 4 short sentences. ONE
+          grounding anchor + a closing soft image.
+        - Turn 2: shorter and slower. 2 to 3 short sentences. ONE
+          grounding anchor + a closing image. Do not introduce
+          anything new.
+        - Turn 3+: very short. 1 to 2 short sentences. ONE grounding
+          anchor OR one breath line. The reply gets simpler each
+          consecutive Calm turn — never longer.
+        Vary the grounding anchor each turn — do not reuse the one
+        from your last Calm turn.
 
         CLOSING PHRASE SHAPE — the last sentence is a single short
         statement: a calm image or a simple goodnight. No question,
@@ -888,7 +949,11 @@ public class ChatService : IChatService
     // PendingChoices for this; Game/Riddle have no per-turn state to carry, so a
     // simple mode+timestamp is enough. 30-minute expiry matches ChoiceExpiry.
     internal static readonly ConcurrentDictionary<Guid, ActiveModeEntry> ActiveModes = new();
-    internal record ActiveModeEntry(DetectedMode Mode, DateTime ActivatedAt);
+    // TurnIndex counts consecutive turns the conversation has stayed in the
+    // SAME mode (used by Calm v2 for the wind-down arc). Reset to 1 when the
+    // mode changes; bumped on every continuation turn. Game / Riddle have
+    // their own per-conversation state and ignore this field.
+    internal record ActiveModeEntry(DetectedMode Mode, DateTime ActivatedAt, int TurnIndex = 1);
 
     internal const string DefaultFallbackResponse =
         "\u0531\u0580\u056b, \u0574\u056b \u0578\u0582\u0580\u056b\u0577 \u0570\u0565\u057f\u0561\u0584\u0580\u0584\u056b\u0580 \u0562\u0561\u0576 \u056d\u0578\u057d\u0565\u0576\u0584\u0589";
@@ -1067,10 +1132,23 @@ public class ChatService : IChatService
         }
 
         // Update active-mode tracker: store on Game/Riddle, clear on anything else.
+        // TurnIndex bumps when the same mode persists across turns; otherwise
+        // resets to 1. Used by Calm v2 to drive the wind-down arc directive.
         if (detectedMode is DetectedMode.Game or DetectedMode.Riddle or DetectedMode.Calm)
-            ActiveModes[conversation.Id] = new ActiveModeEntry(detectedMode, DateTime.UtcNow);
+        {
+            int turnIndex = 1;
+            if (ActiveModes.TryGetValue(conversation.Id, out var prev)
+                && prev.Mode == detectedMode
+                && DateTime.UtcNow - prev.ActivatedAt < ChoiceExpiry)
+            {
+                turnIndex = prev.TurnIndex + 1;
+            }
+            ActiveModes[conversation.Id] = new ActiveModeEntry(detectedMode, DateTime.UtcNow, turnIndex);
+        }
         else
+        {
             ActiveModes.TryRemove(conversation.Id, out _);
+        }
 
         bool isStoryMode = detectedMode == DetectedMode.Story;
         if (isStoryMode)
@@ -1106,6 +1184,7 @@ public class ChatService : IChatService
         else if (detectedMode == DetectedMode.Calm)
         {
             systemPrompt += CalmModeInstruction;
+            systemPrompt += BuildCalmTurnDirective(conversation.Id);
         }
         else if (detectedMode == DetectedMode.Curiosity)
         {
@@ -1765,6 +1844,35 @@ public class ChatService : IChatService
 
         var avoidNew = recent.Count > 0 ? string.Join(", ", recent) : "(none yet)";
         return $"\n\nGAME_TURN_KIND: new_game\nDifficulty target for THIS round: 1 (start easy).\nAVOID these recently used game types: {avoidNew}.\nProduce the NEW_GAME TURN exactly as specified above, including the metadata tail block.";
+    }
+
+    /// <summary>
+    /// Builds the per-turn Calm Mode v2 wind-down directive injected at the
+    /// end of the system prompt. Reads the consecutive Calm turn index from
+    /// ActiveModes (set just before this call) and asks the model to scale
+    /// down length and energy as the index grows.
+    /// </summary>
+    private string BuildCalmTurnDirective(Guid conversationId)
+    {
+        int turnIndex = 1;
+        if (ActiveModes.TryGetValue(conversationId, out var entry)
+            && entry.Mode == DetectedMode.Calm)
+        {
+            turnIndex = entry.TurnIndex;
+        }
+
+        string arcHint = turnIndex switch
+        {
+            1 => "Turn 1 — gentle re-orientation. 3 to 4 short sentences. ONE grounding anchor + a closing soft image.",
+            2 => "Turn 2 — shorter and slower. 2 to 3 short sentences. ONE grounding anchor + a closing image. Do NOT introduce anything new.",
+            _ => "Turn 3+ — very short. 1 to 2 short sentences. ONE grounding anchor OR one breath line. Simpler than the previous turn — never longer.",
+        };
+
+        _logger.LogInformation(
+            "Calm turn directive. ConversationId: {ConversationId}, TurnIndex: {TurnIndex}",
+            conversationId, turnIndex);
+
+        return $"\n\nCALM_TURN_INDEX: {turnIndex}\n{arcHint} Vary the grounding anchor — do not reuse the one from your last Calm turn.";
     }
 
 }

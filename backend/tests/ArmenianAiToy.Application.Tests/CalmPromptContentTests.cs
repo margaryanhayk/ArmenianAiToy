@@ -87,4 +87,54 @@ public class CalmPromptContentTests
     {
         Assert.Contains("Do NOT include a CHOICE_A / CHOICE_B block", Prompt);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Calm Mode v2 — anti-companion guard, grounding, wind-down arc
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Prompt_ContainsAntiCompanionLanguageRule()
+    {
+        Assert.Contains("ANTI-COMPANION-LANGUAGE", Prompt);
+        // Banned companion phrases.
+        Assert.Contains("\u0544\u056b\u0577\u057f \u0584\u0565\u0566 \u0570\u0565\u057f \u0565\u0574", Prompt);          // Միշտ քեզ հետ եմ
+        Assert.Contains("\u0535\u057d \u0584\u0578 \u0568\u0576\u056f\u0565\u0580\u0576 \u0565\u0574", Prompt);          // Ես քո ընկերն եմ
+        Assert.Contains("possessive emotional bonds", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_ContainsGroundingDetailPolicy()
+    {
+        Assert.Contains("GROUNDING DETAIL POLICY", Prompt);
+        // A few representative anchors from the pool.
+        Assert.Contains("\u057e\u0565\u0580\u0574\u0561\u056f\u0568 \u057f\u0561\u0584 \u0567", Prompt);                  // վերմակը տաք է
+        Assert.Contains("\u0577\u0576\u0579\u0578\u0582\u0574 \u0565\u057d \u0564\u0561\u0576\u0564\u0561\u0572", Prompt); // շնչում ես դանդաղ
+        Assert.Contains("ONE anchor per turn", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_ContainsBedtimeDistressShape()
+    {
+        Assert.Contains("BEDTIME-DISTRESS SHAPE", Prompt);
+        Assert.Contains("do NOT echo the", Prompt);
+        // GOOD distress example uses a slow-breath line.
+        Assert.Contains("\u0547\u0576\u0579\u056b\u0580 \u0564\u0561\u0576\u0564\u0561\u0572", Prompt); // Շնչիր դանդաղ
+    }
+
+    [Fact]
+    public void Prompt_ContainsWindDownArcLadder()
+    {
+        Assert.Contains("WIND-DOWN ARC", Prompt);
+        Assert.Contains("Turn 1", Prompt);
+        Assert.Contains("Turn 2", Prompt);
+        Assert.Contains("Turn 3+", Prompt);
+        Assert.Contains("never longer", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_ContainsCompanionLanguageBadGoodPair()
+    {
+        Assert.Contains("companion language", Prompt);
+        Assert.Contains("no \"I\", room-based", Prompt);
+    }
 }
