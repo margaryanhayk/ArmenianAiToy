@@ -15,13 +15,12 @@ var resultsDir = Path.Combine(AppContext.BaseDirectory, "results");
 Directory.CreateDirectory(resultsDir);
 
 // --- Mode-specific thresholds ---
-// Game (tools/GameBenchmark) and Riddle (tools/RiddleBenchmark) have each
-// been split into their own dedicated tools. ModeBenchmark now covers
-// Curiosity / Calm only.
+// Game (tools/GameBenchmark), Riddle (tools/RiddleBenchmark), and Calm
+// (tools/CalmBenchmark) have each been split into their own dedicated
+// tools. ModeBenchmark now covers Curiosity only.
 // Curiosity v2 — bumped from 200 to fit one optional analogy or fun-fact
 // clause. Mirrors ResponseQualityGate.curiosity_too_long.
 const int CuriosityMaxLen = 240;
-const int CalmMaxLen = 400;
 
 var armenianRegex = new Regex(@"[\u0530-\u058F]");
 var latinRunRegex = new Regex(@"[A-Za-z]{4,}");
@@ -63,7 +62,6 @@ var weakCases = new List<string>();
 
 // Per-mode counters
 int curiosityTotal = 0, curiosityOk = 0;
-int calmTotal = 0, calmOk = 0;
 int leakedChoiceBlock = 0, latinRunCount = 0;
 
 // Table header
@@ -150,26 +148,6 @@ foreach (var prompt in prompts)
                 hasWeak = true;
             }
             break;
-
-        case "calm":
-            calmTotal++;
-            modeOk = hasResponse && result.HasArmenian && !choiceBlockDetected && !hasQuestion && !hasExclamation;
-            if (modeOk) calmOk++;
-
-            if (!hasResponse) failures.Add($"{prompt.Id}: empty response");
-            if (!result.HasArmenian && hasResponse) failures.Add($"{prompt.Id}: no Armenian");
-            if (choiceBlockDetected) { failures.Add($"{prompt.Id}: choice block in calm mode"); }
-            if (hasQuestion) failures.Add($"{prompt.Id}: calm response has question");
-            if (hasExclamation) failures.Add($"{prompt.Id}: calm response has exclamation");
-
-            // Weak: too long
-            if (hasResponse && result.ResponseLen > CalmMaxLen)
-            {
-                result.WeakFlags.Add("calm_too_long");
-                weakCases.Add($"{prompt.Id}: calm response too long ({result.ResponseLen} chars)");
-                hasWeak = true;
-            }
-            break;
     }
 
     result.ModeOk = modeOk;
@@ -198,20 +176,19 @@ foreach (var prompt in prompts)
 }
 
 // --- Step 4: Summary ---
-int totalOk = curiosityOk + calmOk;
+int totalOk = curiosityOk;
 int total = prompts.Count;
 
 Console.WriteLine();
 Console.WriteLine("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
-Console.WriteLine("  MODE BENCHMARK SUMMARY (Curiosity / Calm)");
+Console.WriteLine("  MODE BENCHMARK SUMMARY (Curiosity)");
 Console.WriteLine("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
 Console.WriteLine($"  Total prompts:     {total}");
 Console.WriteLine($"  Overall pass:      {totalOk}/{total} ({Pct(totalOk, total)})");
 Console.WriteLine();
 Console.WriteLine($"  Curiosity:         {curiosityOk}/{curiosityTotal} ({Pct(curiosityOk, curiosityTotal)})");
-Console.WriteLine($"  Calm:              {calmOk}/{calmTotal} ({Pct(calmOk, calmTotal)})");
 Console.WriteLine();
-Console.WriteLine("  (Game now covered by tools/GameBenchmark, Riddle by tools/RiddleBenchmark)");
+Console.WriteLine("  (Game → tools/GameBenchmark, Riddle → tools/RiddleBenchmark, Calm → tools/CalmBenchmark)");
 Console.WriteLine();
 Console.WriteLine($"  Weak cases:        {weakCases.Count}");
 Console.WriteLine($"  Leaked choice:     {leakedChoiceBlock}");
@@ -236,10 +213,9 @@ md.AppendLine();
 md.AppendLine("| Mode | Pass | Total |");
 md.AppendLine("|------|------|-------|");
 md.AppendLine($"| Curiosity | {curiosityOk} | {curiosityTotal} |");
-md.AppendLine($"| Calm | {calmOk} | {calmTotal} |");
 md.AppendLine($"| **Total** | **{totalOk}** | **{total}** |");
 md.AppendLine();
-md.AppendLine("_Game coverage lives in tools/GameBenchmark. Riddle coverage lives in tools/RiddleBenchmark._");
+md.AppendLine("_Game coverage lives in tools/GameBenchmark. Riddle coverage lives in tools/RiddleBenchmark. Calm coverage lives in tools/CalmBenchmark._");
 md.AppendLine();
 if (weakCases.Count > 0)
 {
@@ -263,7 +239,6 @@ var currentMetrics = new ModeMetrics
 {
     Total = total,
     CuriosityTotal = curiosityTotal, CuriosityOk = curiosityOk,
-    CalmTotal = calmTotal, CalmOk = calmOk,
     WeakCases = weakCases.Count,
     LeakedChoiceBlock = leakedChoiceBlock,
     LatinRun = latinRunCount,
@@ -282,7 +257,6 @@ if (File.Exists(baselinePath))
             Console.WriteLine();
             Console.WriteLine("  Delta vs baseline (negative = improvement for weak counts)");
             Console.WriteLine($"    curiosity_ok:         {Delta(baseline.CuriosityOk, currentMetrics.CuriosityOk)}");
-            Console.WriteLine($"    calm_ok:              {Delta(baseline.CalmOk, currentMetrics.CalmOk)}");
             Console.WriteLine($"    weak_cases:           {Delta(baseline.WeakCases, currentMetrics.WeakCases)}");
             Console.WriteLine($"    leaked_choice_block:  {Delta(baseline.LeakedChoiceBlock, currentMetrics.LeakedChoiceBlock)}");
             Console.WriteLine($"    latin_run:            {Delta(baseline.LatinRun, currentMetrics.LatinRun)}");
@@ -391,8 +365,6 @@ record ModeMetrics
     public int Total { get; init; }
     public int CuriosityTotal { get; init; }
     public int CuriosityOk { get; init; }
-    public int CalmTotal { get; init; }
-    public int CalmOk { get; init; }
     public int WeakCases { get; init; }
     public int LeakedChoiceBlock { get; init; }
     public int LatinRun { get; init; }

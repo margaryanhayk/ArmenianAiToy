@@ -1,11 +1,9 @@
 {
-  "Total": 10,
+  "Total": 5,
   "CuriosityTotal": 5,
-  "CuriosityOk": 5,
-  "CalmTotal": 5,
-  "CalmOk": 5,
+  "CuriosityOk": 0,
   "WeakCases": 0,
   "LeakedChoiceBlock": 0,
   "LatinRun": 0,
-  "Placeholder": false
+  "Placeholder": true
 }
