@@ -1,10 +1,4 @@
 [
-  { "id": "G01", "mode": "game", "message": "let's play" },
-  { "id": "G02", "mode": "game", "message": "play a game" },
-  { "id": "G03", "mode": "game", "message": "\u056d\u0561\u0572\u0561\u0576\u0584" },
-  { "id": "G04", "mode": "game", "message": "let's play a game" },
-  { "id": "G05", "mode": "game", "message": "\u056d\u0561\u0572 \u056f\u0561" },
-
   { "id": "R01", "mode": "riddle", "message": "give me a riddle" },
   { "id": "R02", "mode": "riddle", "message": "\u0570\u0561\u0576\u0565\u056c\u0578\u0582\u056f" },
   { "id": "R03", "mode": "riddle", "message": "ask me a riddle" },
