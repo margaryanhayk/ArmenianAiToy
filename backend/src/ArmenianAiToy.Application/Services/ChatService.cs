@@ -549,16 +549,73 @@ public class ChatService : IChatService
         - Do NOT switch into story or curiosity mode mid-game. Stay in
           the game until the child clearly leaves it.
 
-        GAME TYPES — pick ONE per round, age 4–7, no reading required:
-          - animal_sound   : «Հնչեցրու կատվի ձայնը։ Հիմա՝ շան ձայնը։»
-          - color_find     : «Գտիր մի կարմիր բան։ Հիմա՝ կապույտ։»
-          - clap_along     : «Ծափ տանք միասին։ Մեկ, երկու, երեք։»
-          - count_to       : «Հաշվենք մինչև հինգ։ Մեկ, երկու… շարունակիր։»
-          - body_part      : «Դիպչիր քթիդ։ Հիմա՝ ականջիդ։»
-          - copy_sound     : «Արա այսպես՝ բուուու։ Հիմա՝ սս-սս։»
-          - yes_no_silly   : «Ձուկը թռչու՞մ է։ Իսկ թռչունը՝ լողու՞մ։»
+        GAME TYPES — pick ONE per round, age 4–7, no reading required.
+        Each type has SUBTYPES — vary the subtype across rounds so the
+        same game stays fresh:
+          - animal_sound   subtypes: farm (cow, sheep, pig), wild (lion, wolf, bear),
+                                     forest (owl, frog, bird), water (fish, duck, whale).
+            Example: «Հնչեցրու կատվի ձայնը։ Հիմա՝ շան ձայնը։»
+          - color_find     subtypes: bare color, shape+color, size+color, texture
+                                     («փափուկ», «սառը», «փայլուն»).
+            Example: «Գտիր մի կարմիր բան։ Հիմա՝ կապույտ։»
+          - clap_along     subtypes: tempo (slow→fast), count pattern (1-2-3 / 1-2-3-4-5),
+                                     echo-the-pattern, claps-with-stomps.
+            Example: «Ծափ տանք միասին։ Մեկ, երկու, երեք։»
+          - count_to       subtypes: forward (1→5), backward (5→1), with fingers,
+                                     with claps, count things in the room.
+            Example: «Հաշվենք մինչև հինգ։ Մեկ, երկու… շարունակիր։»
+          - body_part      subtypes: face parts, hands+feet, two-step combo
+                                     («քիթ, հետո՝ ականջ»), silly motion («ցատկիր»).
+            Example: «Դիպչիր քթիդ։ Հիմա՝ ականջիդ։»
+          - copy_sound     subtypes: animals, vehicles («բիբ-բիբ», «չու-չու»),
+                                     weather («շը-շը» անձրև), kitchen
+                                     («թազ-թազ», «շըշշ»).
+            Example: «Արա այսպես՝ բուուու։ Հիմա՝ սս-սս։»
+          - yes_no_silly   subtypes: animal abilities («Ձուկը թռչու՞մ է»),
+                                     food properties («Քարը կարո՞ղ ենք ուտել»),
+                                     absurd swaps («Կատուն հաչու՞մ է»).
+            Example: «Ձուկը թռչու՞մ է։ Իսկ թռչունը՝ լողու՞մ։»
         Use ONLY these game types. Do NOT invent new types or mix two
         types in one turn.
+
+        VARIETY POLICY — STRICT:
+        - On a CONTINUE turn, pick a DIFFERENT subtype than the one the
+          previous round used. Do NOT repeat the same subtype two rounds
+          in a row inside the same game type.
+        - Within a subtype, also rotate the specific item (different
+          animal, different color, different number, different body part).
+        - If the directive at the bottom names a round number ≥ 3,
+          definitely switch the subtype this turn.
+
+        MAGIC PHRASING POLICY — small touches that make the game feel alive:
+        - Allow tiny playful sound-words: «պուփ-պուփ», «թազ-թազ»,
+          «չու-չու», «շը-շը», «փըշշշ» — as part of an instruction or
+          celebration, never as the whole reply.
+        - Allow short warm interjections: «Վա՜յ», «Հե՛յ-հե՛յ», «Հո՜պ»,
+          «Բրա՛վո» — once per turn, not every turn.
+        - Keep magic touches LIGHT — a sprinkle, not a layer. The
+          rhythm is still instruction-first.
+        - Do NOT use cute baby-talk or fake-childish phrasing — the
+          warmth is in the rhythm, not in mimicking a toddler.
+
+        CELEBRATION ROTATION — STRICT:
+        - Rotate celebration phrases across CONTINUE turns. Do NOT use
+          the same celebration two turns in a row.
+        - Pool to draw from (use any natural Armenian one):
+          «Ապրե՛ս», «Հա՛, ճիշտ է», «Լավն ես», «Բրա՛վո», «Հե՛յ, դու
+          կարող ես», «Շա՛տ լավ», «Հիանալի՛», «Ապրի դու», «Վա՜յ, ինչ լավ»,
+          «Ճի՛շտ էր», «Հա՛, ճիշտ ճանապարհին ես».
+        - Pick what fits the moment. Short. One per turn.
+
+        ROUND PROGRESSION — STRICT (the directive at the bottom of this
+        prompt names the round number):
+        - Round 1: set a friendly fun pace. Easy and inviting.
+        - Round 2: bump the energy a touch — slightly faster, a touch
+          more playful. Same game type.
+        - Round 3 or 4: switch the SUBTYPE inside this game type. Same
+          type, fresh angle.
+        - Round 5+: add a tiny silly twist — a goofy sound, a swapped
+          word, a faster tempo, a count-by-twos.
 
         NEW_GAME / SWITCH_GAME TURN — STRICT FORMAT:
         - 1 to 3 short Armenian sentences. Open with a clear, brisk
@@ -584,11 +641,16 @@ public class ChatService : IChatService
         - DO NOT include any tail block. DO NOT ask if the child wants
           to continue — just go.
 
+        SWITCH_GAME OPENER — start with a small fresh-game spark, e.g.
+        «Լավ, նոր խաղ՝ ...» / «Ուրախ եմ՝ ուրիշ խաղ ենք անելու։»
+        Then go straight into the first instruction of the new type.
+
         STOP_GAME TURN — STRICT FORMAT:
         - 1 short warm Armenian sentence acknowledging the child wants
           to stop, e.g. «Լա՛վ, լավ խաղ էր։».
         - Optional 1 short follow-up sentence offering to play later
-          if the child wants, e.g. «Երբ նորից ուզես, կանչիր ինձ։».
+          if the child wants, e.g. «Երբ նորից ուզես, կանչիր ինձ։» or
+          «Հե՜յ, քեզ հետ խաղալը ուրախ էր։ Կտեսնվենք»։
         - DO NOT include any tail block. DO NOT plead for more turns.
 
         ARMENIAN EXEMPLAR TURNS — imperative, short, no open-ended
@@ -615,6 +677,14 @@ public class ChatService : IChatService
         - BAD (mixing two types): «Ծափ տանք միասին։ Իսկ կատվի ձայնը
           գիտե՞ս։ Հիմա՝ կարմիր գույն գտիր։»
           GOOD (one type per turn): «Ծափ տանք միասին։ Մեկ, երկու, երեք։»
+        - BAD (same subtype back-to-back): «Հնչեցրու կատվի ձայնը։»
+          (turn 1) → «Հնչեցրու շան ձայնը։» (turn 2 — both farm-pet
+          subtype, no rotation)
+          GOOD (subtype rotation): «Հնչեցրու կատվի ձայնը։» (turn 1 — farm)
+          → «Հնչեցրու բուի ձայնը։» (turn 2 — forest)
+        - BAD (mechanical praise repeat): «Ապրե՛ս։» (turn 1) →
+          «Ապրե՛ս։» (turn 2) → «Ապրե՛ս։» (turn 3) — same word three times.
+          GOOD (rotated): «Ապրե՛ս։» → «Բրա՛վո։» → «Հե՛յ, դու կարող ես։»
 
         CHILD RESPONSE HANDLING (inside CONTINUE turn):
         - On correct or participating: one short celebration
@@ -1666,10 +1736,20 @@ public class ChatService : IChatService
                 CurrentRound = bumped,
                 UpdatedAt = DateTime.UtcNow,
             };
+            // v3 round-progression hint (mirrors the prompt's ROUND
+            // PROGRESSION rule). Drives subtype rotation and tempo
+            // changes deterministically from state, not just prompt text.
+            string roundHint = newTurns switch
+            {
+                1 => "Round 1 — set a friendly fun pace, easy and inviting.",
+                2 => "Round 2 — slightly bump the energy. Same subtype is OK here, but vary the specific item (different animal, different color, etc.).",
+                3 or 4 => "Round 3+ — switch the SUBTYPE inside this game type. Pick a different angle of the same game.",
+                _ => "Round 5+ — add a tiny silly twist (a goofy sound, a swapped word, a faster tempo, count by twos).",
+            };
             _logger.LogInformation(
                 "Game continue. ConversationId: {ConversationId}, Type: {Type}, Turns: {Turns}, Difficulty: {Diff}",
                 conversationId, bumped.GameType, newTurns, newDifficulty);
-            return $"\n\nGAME_TURN_KIND: continue\nThe child responded inside the active activity «{bumped.GameType}». This is round {newTurns} of this activity. Difficulty target: {newDifficulty}. Produce the CONTINUE TURN exactly as specified above — brief celebration, then ONE next round inside the SAME game type «{bumped.GameType}». Do NOT include any tail block.";
+            return $"\n\nGAME_TURN_KIND: continue\nThe child responded inside the active activity «{bumped.GameType}». This is round {newTurns} of this activity. Difficulty target: {newDifficulty}. {roundHint} Rotate the celebration phrase — do not reuse the one you used last turn. Produce the CONTINUE TURN exactly as specified above — brief celebration, then ONE next round inside the SAME game type «{bumped.GameType}». Do NOT include any tail block.";
         }
 
         // Default: StartNew (or Continue fell through with no current round).

@@ -138,4 +138,71 @@ public class GamePromptContentTests
     {
         Assert.Contains("asking permission to continue", Prompt);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Game Mode v3 — variety, magic phrasing, round progression
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Prompt_DeclaresPerTypeSubtypes()
+    {
+        // Each game type must list a SUBTYPES clause so the model can rotate.
+        Assert.Contains("subtypes:", Prompt);
+        // A representative subtype keyword per major type.
+        Assert.Contains("farm", Prompt);          // animal_sound
+        Assert.Contains("backward", Prompt);      // count_to
+        Assert.Contains("two-step combo", Prompt); // body_part
+    }
+
+    [Fact]
+    public void Prompt_ContainsVarietyPolicy()
+    {
+        Assert.Contains("VARIETY POLICY", Prompt);
+        Assert.Contains("Do NOT repeat the same subtype two rounds", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_ContainsMagicPhrasingPolicy()
+    {
+        Assert.Contains("MAGIC PHRASING POLICY", Prompt);
+        Assert.Contains("\u057a\u0578\u0582\u0583-\u057a\u0578\u0582\u0583", Prompt);  // պուփ-պուփ
+        Assert.Contains("\u0532\u0580\u0561\u055b\u057e\u0578", Prompt);                // Բրա՛վո
+        Assert.Contains("baby-talk", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_ContainsCelebrationRotationRule()
+    {
+        Assert.Contains("CELEBRATION ROTATION", Prompt);
+        Assert.Contains("the same celebration two turns in a row", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_ContainsRoundProgressionLadder()
+    {
+        Assert.Contains("ROUND PROGRESSION", Prompt);
+        Assert.Contains("Round 1", Prompt);
+        Assert.Contains("Round 2", Prompt);
+        Assert.Contains("Round 3 or 4", Prompt);
+        Assert.Contains("Round 5+", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_ContainsSwitchGameOpenerExemplar()
+    {
+        Assert.Contains("SWITCH_GAME OPENER", Prompt);
+        Assert.Contains("\u053c\u0561\u057e, \u0576\u0578\u0580 \u056d\u0561\u0572", Prompt); // Լավ, նոր խաղ
+    }
+
+    [Fact]
+    public void Prompt_ContainsNewBadGoodPair_SubtypeRepeat()
+    {
+        Assert.Contains("same subtype back-to-back", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_ContainsNewBadGoodPair_MechanicalPraise()
+    {
+        Assert.Contains("mechanical praise repeat", Prompt);
+    }
 }

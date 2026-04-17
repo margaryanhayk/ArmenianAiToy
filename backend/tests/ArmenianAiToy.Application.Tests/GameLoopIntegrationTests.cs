@@ -201,6 +201,49 @@ public class GameLoopIntegrationTests
     }
 
     [Fact]
+    public async Task ContinueDirective_IncludesRoundProgressionHint()
+    {
+        // v3: round-counter drives a per-turn playful hint. Round 3 should
+        // tell the model to switch the SUBTYPE inside the same game type.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(GameWithBlock);
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0531\u057a\u0580\u0565\u055b\u057d\u0589 \u0540\u056b\u0574\u0561\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "ok");  // turns=1
+        await _chatService.GetResponseAsync(_deviceId, "ok");  // turns=2
+
+        _aiClient.ClearReceivedCalls();
+        await _chatService.GetResponseAsync(_deviceId, "ok");  // turns=3 → switch SUBTYPE hint
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("GAME_TURN_KIND: continue")
+                && s.Contains("switch the SUBTYPE")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task ContinueDirective_RotateCelebration()
+    {
+        // v3: directive asks the model to rotate the celebration phrase.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(GameWithBlock);
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        _aiClient.ClearReceivedCalls();
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0531\u057a\u0580\u0565\u055b\u057d\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "ok");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("Rotate the celebration phrase")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
     public async Task GameResponse_NeverCarriesStoryChoices()
     {
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
