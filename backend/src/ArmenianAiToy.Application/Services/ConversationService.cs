@@ -123,6 +123,7 @@ public class ConversationService : IConversationService
                 c.EndedAt,
                 MessageCount = c.Messages.Count(),
                 HasFlaggedContent = c.Messages.Any(m => m.SafetyFlag != SafetyFlag.Clean),
+                FlaggedMessageCount = c.Messages.Count(m => m.SafetyFlag != SafetyFlag.Clean),
                 FirstUserContent = c.Messages
                     .Where(m => m.Role == MessageRole.User)
                     .OrderBy(m => m.Timestamp)
@@ -132,6 +133,11 @@ public class ConversationService : IConversationService
                     .Where(m => m.Role == MessageRole.Assistant)
                     .OrderByDescending(m => m.Timestamp)
                     .Select(m => m.Content)
+                    .FirstOrDefault(),
+                LastAssistantSafetyFlag = c.Messages
+                    .Where(m => m.Role == MessageRole.Assistant)
+                    .OrderByDescending(m => m.Timestamp)
+                    .Select(m => (SafetyFlag?)m.SafetyFlag)
                     .FirstOrDefault()
             })
             .ToListAsync();
@@ -143,7 +149,9 @@ public class ConversationService : IConversationService
             c.MessageCount,
             c.HasFlaggedContent,
             MakeSnippet(c.FirstUserContent),
-            MakeSnippet(c.LastAssistantContent)
+            MakeSnippet(c.LastAssistantContent),
+            c.LastAssistantSafetyFlag,
+            c.FlaggedMessageCount
         )).ToList();
     }
 

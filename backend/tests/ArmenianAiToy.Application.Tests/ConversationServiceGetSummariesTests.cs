@@ -164,6 +164,103 @@ public class ConversationServiceGetSummariesTests
     }
 
     [Fact]
+    public async Task GetConversationSummariesAsync_FlaggedMessageCount_ExactCountPerConversation()
+    {
+        // Summary row must carry the exact flagged-message count so the
+        // parent dashboard can show "⚠ N flagged" at scan-speed instead
+        // of a binary badge. HasFlaggedContent is kept as-is (true when
+        // count > 0) for backward compatibility.
+        var (service, db) = CreateService();
+        var deviceId = Guid.NewGuid();
+        var t0 = new DateTime(2026, 4, 12, 12, 0, 0, DateTimeKind.Utc);
+
+        // Conversation A: 2 flagged + 1 clean → FlaggedMessageCount = 2.
+        var convA = NewConversation(deviceId, t0);
+        db.Set<Conversation>().Add(convA);
+        db.Set<Message>().AddRange(
+            NewMessage(convA.Id, MessageRole.User,      "hi",       t0.AddSeconds(1)),
+            NewMessage(convA.Id, MessageRole.User,      "blocked1", t0.AddSeconds(2), SafetyFlag.Blocked),
+            NewMessage(convA.Id, MessageRole.Assistant, "flagged1", t0.AddSeconds(3), SafetyFlag.Flagged)
+        );
+
+        // Conversation B: all clean → FlaggedMessageCount = 0.
+        var convB = NewConversation(deviceId, t0.AddMinutes(10));
+        db.Set<Conversation>().Add(convB);
+        db.Set<Message>().AddRange(
+            NewMessage(convB.Id, MessageRole.User,      "clean u", convB.StartedAt.AddSeconds(1)),
+            NewMessage(convB.Id, MessageRole.Assistant, "clean a", convB.StartedAt.AddSeconds(2))
+        );
+
+        // Conversation C: empty → FlaggedMessageCount = 0, no snippets.
+        var convC = NewConversation(deviceId, t0.AddMinutes(20));
+        db.Set<Conversation>().Add(convC);
+
+        await db.SaveChangesAsync();
+
+        var result = await service.GetConversationSummariesAsync(deviceId);
+
+        // Ordered newest-first: C, B, A.
+        var dtoC = result.Single(r => r.Id == convC.Id);
+        var dtoB = result.Single(r => r.Id == convB.Id);
+        var dtoA = result.Single(r => r.Id == convA.Id);
+
+        Assert.Equal(2, dtoA.FlaggedMessageCount);
+        Assert.True(dtoA.HasFlaggedContent);
+
+        Assert.Equal(0, dtoB.FlaggedMessageCount);
+        Assert.False(dtoB.HasFlaggedContent);
+
+        Assert.Equal(0, dtoC.FlaggedMessageCount);
+        Assert.False(dtoC.HasFlaggedContent);
+    }
+
+    [Fact]
+    public async Task GetConversationSummariesAsync_FlaggedLastAssistant_ExposesSafetyFlag()
+    {
+        // When the last assistant message is a safety fallback (SafetyFlag != Clean),
+        // the summary row must carry that flag so the parent UI can mark the snippet
+        // as "(safe fallback shown)" instead of quoting it like a normal Areg reply.
+        var (service, db) = CreateService();
+        var deviceId = Guid.NewGuid();
+        var conv = NewConversation(deviceId, new DateTime(2026, 4, 10, 12, 0, 0, DateTimeKind.Utc));
+        db.Set<Conversation>().Add(conv);
+
+        db.Set<Message>().AddRange(
+            NewMessage(conv.Id, MessageRole.User, "tell me a story", conv.StartedAt.AddSeconds(1)),
+            NewMessage(conv.Id, MessageRole.Assistant, "normal reply", conv.StartedAt.AddSeconds(2)),
+            NewMessage(conv.Id, MessageRole.Assistant, "fallback reply", conv.StartedAt.AddSeconds(3), SafetyFlag.Flagged)
+        );
+        await db.SaveChangesAsync();
+
+        var dto = (await service.GetConversationSummariesAsync(deviceId)).Single();
+
+        Assert.Equal("fallback reply", dto.LastAssistantSnippet);
+        Assert.Equal(SafetyFlag.Flagged, dto.LastAssistantSafetyFlag);
+
+        // Clean-only conversations must report LastAssistantSafetyFlag = Clean
+        // (not null), so the UI can treat missing-assistant and clean-reply
+        // cases separately.
+        var cleanDeviceId = Guid.NewGuid();
+        var cleanConv = NewConversation(cleanDeviceId, conv.StartedAt);
+        db.Set<Conversation>().Add(cleanConv);
+        db.Set<Message>().Add(NewMessage(cleanConv.Id, MessageRole.Assistant, "clean reply", cleanConv.StartedAt.AddSeconds(1)));
+        await db.SaveChangesAsync();
+
+        var cleanDto = (await service.GetConversationSummariesAsync(cleanDeviceId)).Single();
+        Assert.Equal(SafetyFlag.Clean, cleanDto.LastAssistantSafetyFlag);
+
+        // Conversation with no assistant messages must report null.
+        var emptyDeviceId = Guid.NewGuid();
+        var emptyConv = NewConversation(emptyDeviceId, conv.StartedAt);
+        db.Set<Conversation>().Add(emptyConv);
+        db.Set<Message>().Add(NewMessage(emptyConv.Id, MessageRole.User, "hi", emptyConv.StartedAt.AddSeconds(1)));
+        await db.SaveChangesAsync();
+
+        var emptyDto = (await service.GetConversationSummariesAsync(emptyDeviceId)).Single();
+        Assert.Null(emptyDto.LastAssistantSafetyFlag);
+    }
+
+    [Fact]
     public async Task GetConversationSummariesAsync_RespectsLimitAndOffset()
     {
         var (service, db) = CreateService();

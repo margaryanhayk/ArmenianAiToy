@@ -1,3 +1,5 @@
+using ArmenianAiToy.Domain.Enums;
+
 namespace ArmenianAiToy.Application.DTOs;
 
 /// <summary>
@@ -11,4 +13,6 @@ public record ConversationSummaryDto(
     int MessageCount,
     bool HasFlaggedContent,
     string? FirstUserSnippet,
-    string? LastAssistantSnippet);
+    string? LastAssistantSnippet,
+    SafetyFlag? LastAssistantSafetyFlag = null,
+    int FlaggedMessageCount = 0);
