@@ -52,8 +52,10 @@ public class CalmPromptContentTests
     public void Prompt_ContainsClosingPhraseShape()
     {
         Assert.Contains("CLOSING PHRASE SHAPE", Prompt);
-        Assert.Contains("Քնիր հանգիստ", Prompt);
-        Assert.Contains("Գիշերը հանգիստ է", Prompt);
+        // Closing phrase must carry a pool anchor — examples are
+        // anchor-bearing lines, not a bare goodnight.
+        Assert.Contains("Վերմակդ տաք է", Prompt);
+        Assert.Contains("Աչքերդ ծանրանում են", Prompt);
     }
 
     [Fact]

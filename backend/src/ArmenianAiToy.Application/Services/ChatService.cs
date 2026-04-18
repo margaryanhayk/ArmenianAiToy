@@ -336,6 +336,9 @@ public class ChatService : IChatService
         - Do NOT ask any questions.
         - Do NOT use exclamation marks.
         - Do NOT introduce new characters, events, or tension.
+        - Do NOT introduce fear words («վախ», «սարսափ») unless the
+          child named them first. Never volunteer reassurance about
+          fears the child did not mention.
         - Do NOT include a CHOICE_A / CHOICE_B block.
         - Do NOT include a STORY_MEMORY block.
         - Do NOT use cliffhangers or suspense.
@@ -419,19 +422,21 @@ public class ChatService : IChatService
         prompt names the consecutive Calm turn index):
         - Turn 1: gentle re-orientation. 3 to 4 short sentences. ONE
           grounding anchor + a closing soft image.
-        - Turn 2: shorter and slower. 2 to 3 short sentences. ONE
+        - Turn 2: shorter and slower. Exactly 2 short sentences. ONE
           grounding anchor + a closing image. Do not introduce
           anything new.
-        - Turn 3+: very short. 1 to 2 short sentences. ONE grounding
-          anchor OR one breath line. The reply gets simpler each
-          consecutive Calm turn — never longer.
+        - Turn 3+: very short. Exactly 1 short sentence — ONE grounding
+          anchor OR one breath line, nothing else. The reply gets
+          simpler each consecutive Calm turn — never longer.
         Vary the grounding anchor each turn — do not reuse the one
         from your last Calm turn.
 
         CLOSING PHRASE SHAPE — the last sentence is a single short
-        statement: a calm image or a simple goodnight. No question,
-        no exclamation, no cliffhanger. Examples (SHAPE only):
-        «Քնիր հանգիստ։» / «Գիշերը հանգիստ է, քունդ մոտ է։»
+        statement that ALWAYS carries one anchor from the grounding
+        pool above. No question, no exclamation, no cliffhanger.
+        A bare «Քնիր հանգիստ» without a body-or-room anchor is NOT
+        enough. Examples (SHAPE only):
+        «Վերմակդ տաք է։» / «Աչքերդ ծանրանում են։» / «Շնչիր դանդաղ։»
 
         ARMENIAN LANGUAGE — STRICT:
         Use natural, spoken Eastern Armenian a child hears at home.
@@ -1864,8 +1869,8 @@ public class ChatService : IChatService
         string arcHint = turnIndex switch
         {
             1 => "Turn 1 — gentle re-orientation. 3 to 4 short sentences. ONE grounding anchor + a closing soft image.",
-            2 => "Turn 2 — shorter and slower. 2 to 3 short sentences. ONE grounding anchor + a closing image. Do NOT introduce anything new.",
-            _ => "Turn 3+ — very short. 1 to 2 short sentences. ONE grounding anchor OR one breath line. Simpler than the previous turn — never longer.",
+            2 => "Turn 2 — shorter and slower. Exactly 2 short sentences. ONE grounding anchor + a closing image. Do NOT introduce anything new.",
+            _ => "Turn 3+ — very short. Exactly 1 short sentence — ONE grounding anchor OR one breath line, nothing else. Simpler than the previous turn — never longer.",
         };
 
         _logger.LogInformation(
