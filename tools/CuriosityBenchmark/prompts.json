@@ -1,0 +1,51 @@
+[
+  {
+    "id": "CuB01",
+    "label": "english why pair (sky / sun)",
+    "turns": [
+      { "user": "why is the sky blue" },
+      { "user": "why does the sun rise" }
+    ]
+  },
+  {
+    "id": "CuB02",
+    "label": "Armenian ինչու + ինչ է",
+    "turns": [
+      { "user": "\u056b\u0576\u0579\u0578\u0582 \u0565\u0576 \u0561\u057d\u057f\u0572\u0565\u0580\u0568 \u0583\u0561\u0575\u056c\u0578\u0582\u0574" },
+      { "user": "\u056b\u0576\u0579 \u0567 \u056e\u056b\u0561\u056e\u0561\u0576\u0568" }
+    ]
+  },
+  {
+    "id": "CuB03",
+    "label": "what is — weather pair",
+    "turns": [
+      { "user": "what is snow" },
+      { "user": "what is rain" }
+    ]
+  },
+  {
+    "id": "CuB04",
+    "label": "how do — animal pair",
+    "turns": [
+      { "user": "how do birds fly" },
+      { "user": "how do fish swim" }
+    ]
+  },
+  {
+    "id": "CuB05",
+    "label": "Armenian why-cats + body",
+    "turns": [
+      { "user": "\u056b\u0576\u0579\u0578\u0582 \u0565\u0576 \u056f\u0561\u057f\u0578\u0582\u0576\u0565\u0580\u0568 \u0584\u0576\u0578\u0582\u0574 \u0585\u0580\u057e\u0561 \u0568\u0576\u0569\u0561\u0581\u0584\u0578\u0582\u0574" },
+      { "user": "\u056b\u0576\u0579\u057a\u0565\u057d \u0567 \u0561\u0577\u056d\u0561\u057f\u0578\u0582\u0574 \u057d\u056b\u0580\u057f\u0568" }
+    ]
+  },
+  {
+    "id": "CuB06",
+    "label": "3-turn mixed (grass, wind, ice)",
+    "turns": [
+      { "user": "why is grass green" },
+      { "user": "what is wind" },
+      { "user": "how does ice melt" }
+    ]
+  }
+]
