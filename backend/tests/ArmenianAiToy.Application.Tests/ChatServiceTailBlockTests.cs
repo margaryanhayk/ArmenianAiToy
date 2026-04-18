@@ -222,6 +222,9 @@ public class ChatServiceTailBlockTests
         // Choices must be cleared since we fell back to safety.
         Assert.Null(result.ChoiceA);
         Assert.Null(result.ChoiceB);
+        // SafetyFlag must mark the fallback so the parent dashboard can
+        // distinguish it from a normal toy reply.
+        Assert.Equal(SafetyFlag.Flagged, result.SafetyFlag);
     }
 
     [Fact]
@@ -248,6 +251,9 @@ public class ChatServiceTailBlockTests
 
         // Should NOT contain the Latin text. Should be the safety fallback.
         Assert.DoesNotMatch("[A-Za-z]{4,}", result.Response);
+        // SafetyFlag must mark the fallback so the parent dashboard can
+        // distinguish it from a normal toy reply.
+        Assert.Equal(SafetyFlag.Flagged, result.SafetyFlag);
     }
 
     [Fact]

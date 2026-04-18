@@ -1495,6 +1495,10 @@ public class ChatService : IChatService
                             var hardFallback = _config["SafetyFallbackResponse"]
                                 ?? DefaultFallbackResponse;
                             aiResponse = detectedMode == DetectedMode.Calm ? CalmFallbackResponse : hardFallback;
+                            // Mark the reply as flagged so the parent dashboard can
+                            // distinguish this safe-fallback from a normal toy reply.
+                            // Matches the output-moderation-flagged path at line 1250.
+                            safetyFlag = SafetyFlag.Flagged;
                             choiceA = null;
                             choiceB = null;
                             PendingChoices.TryRemove(conversation.Id, out _);
@@ -1529,6 +1533,10 @@ public class ChatService : IChatService
                 var latinFallback = _config["SafetyFallbackResponse"]
                     ?? DefaultFallbackResponse;
                 aiResponse = detectedMode == DetectedMode.Calm ? CalmFallbackResponse : latinFallback;
+                // Mark the reply as flagged so the parent dashboard can
+                // distinguish this safe-fallback from a normal toy reply.
+                // Matches the output-moderation-flagged path at line 1250.
+                safetyFlag = SafetyFlag.Flagged;
                 choiceA = null;
                 choiceB = null;
                 PendingChoices.TryRemove(conversation.Id, out _);
