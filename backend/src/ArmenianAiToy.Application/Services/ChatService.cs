@@ -1045,8 +1045,15 @@ public class ChatService : IChatService
                 ? ModerationUnavailableFallbackResponse
                 : _config["SafetyFallbackResponse"]
                     ?? "Արի, մի ուրիշ հետաքրքիր բան խոսենք։";
+            // Mark the persisted assistant fallback as Flagged so the parent
+            // dashboard can distinguish this safe-fallback from a normal toy
+            // reply. Matches the output-moderation-flagged path at line 1250
+            // and the latin_run / leaked_tag retry-fallback paths downstream.
+            // Note: the ChatResponse envelope SafetyFlag (below) remains
+            // Blocked — it describes the BLOCKED user turn, not the assistant
+            // fallback, and existing device/test contracts depend on that.
             var fallbackMsg = await _conversations.AddMessageAsync(
-                conversation.Id, MessageRole.Assistant, fallback, SafetyFlag.Clean);
+                conversation.Id, MessageRole.Assistant, fallback, SafetyFlag.Flagged);
 
             return new ChatResponse(fallback, conversation.Id, fallbackMsg.Id, SafetyFlag.Blocked);
         }

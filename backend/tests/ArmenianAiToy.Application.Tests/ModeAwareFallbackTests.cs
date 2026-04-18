@@ -128,7 +128,7 @@ public class ModeAwareFallbackTests
     [Fact]
     public async Task InputModeration_Unavailable_ReturnsUnavailableFallback()
     {
-        var (chatService, deviceId) = BuildChatService(
+        var (chatService, deviceId, _) = BuildChatService(
             firstModeration: new ModerationResult(false, new List<string> { "moderation_unavailable" }),
             secondModeration: null,
             aiResponse: "ignored");
@@ -142,7 +142,7 @@ public class ModeAwareFallbackTests
     [Fact]
     public async Task InputModeration_GenuineFlag_ReturnsSafetyFallback()
     {
-        var (chatService, deviceId) = BuildChatService(
+        var (chatService, deviceId, _) = BuildChatService(
             firstModeration: new ModerationResult(false, new List<string> { "violence" }),
             secondModeration: null,
             aiResponse: "ignored");
@@ -155,13 +155,54 @@ public class ModeAwareFallbackTests
         Assert.Equal(SafetyFlag.Blocked, result.SafetyFlag);
     }
 
+    [Fact]
+    public async Task InputModeration_Unavailable_PersistsAssistantFallbackAsFlagged()
+    {
+        // The assistant fallback saved after an input-moderation block must
+        // carry SafetyFlag.Flagged so the parent dashboard does not render it
+        // as a normal Areg reply. The ChatResponse envelope SafetyFlag stays
+        // Blocked (it describes the blocked USER turn); that is covered by
+        // InputModeration_Unavailable_ReturnsUnavailableFallback above.
+        var (chatService, deviceId, conversations) = BuildChatService(
+            firstModeration: new ModerationResult(false, new List<string> { "moderation_unavailable" }),
+            secondModeration: null,
+            aiResponse: "ignored");
+
+        await chatService.GetResponseAsync(deviceId, "tell me a story");
+
+        await conversations.Received(1).AddMessageAsync(
+            Arg.Any<Guid>(),
+            MessageRole.Assistant,
+            ChatService.ModerationUnavailableFallbackResponse,
+            SafetyFlag.Flagged);
+    }
+
+    [Fact]
+    public async Task InputModeration_GenuineFlag_PersistsAssistantFallbackAsFlagged()
+    {
+        // Same guarantee on the genuine-flag input branch: the persisted
+        // safety-fallback reply is Flagged, not Clean.
+        var (chatService, deviceId, conversations) = BuildChatService(
+            firstModeration: new ModerationResult(false, new List<string> { "violence" }),
+            secondModeration: null,
+            aiResponse: "ignored");
+
+        await chatService.GetResponseAsync(deviceId, "unsafe input");
+
+        await conversations.Received(1).AddMessageAsync(
+            Arg.Any<Guid>(),
+            MessageRole.Assistant,
+            Arg.Any<string>(),
+            SafetyFlag.Flagged);
+    }
+
     [Theory]
     [InlineData("tell me a story")]
     [InlineData("good night")]
     public async Task OutputModeration_Unavailable_ReturnsUnavailableFallback(string userMessage)
     {
         // Input moderation passes, output moderation returns unavailable.
-        var (chatService, deviceId) = BuildChatService(
+        var (chatService, deviceId, _) = BuildChatService(
             firstModeration: new ModerationResult(true, new List<string>()),
             secondModeration: new ModerationResult(false, new List<string> { "moderation_unavailable" }),
             aiResponse: "Some generated response");
@@ -177,7 +218,7 @@ public class ModeAwareFallbackTests
     // Shared builder — mirrors the plumbing in the two pre-existing tests
     // above. Returns a chat service wired to the scripted moderation and AI
     // responses, and the deviceId to pass to GetResponseAsync.
-    private static (ChatService, Guid) BuildChatService(
+    private static (ChatService, Guid, IConversationService) BuildChatService(
         ModerationResult firstModeration,
         ModerationResult? secondModeration,
         string aiResponse)
@@ -226,6 +267,6 @@ public class ModeAwareFallbackTests
         var chatService = new ChatService(
             aiClient, moderation, conversations, childService, config, logger);
 
-        return (chatService, deviceId);
+        return (chatService, deviceId, conversations);
     }
 }
