@@ -1,14 +1,14 @@
 {
   "TotalScenarios": 6,
-  "ScenariosOk": 0,
-  "TurnsTotal": 0,
-  "TurnsOk": 0,
-  "WeakCases": 0,
+  "ScenariosOk": 6,
+  "TurnsTotal": 13,
+  "TurnsOk": 13,
+  "WeakCases": 6,
   "LeakedTail": 0,
   "LatinRun": 0,
   "TooLong": 0,
   "EncyclopediaOpener": 0,
   "ChainedCause": 0,
-  "LengthGrowing": 0,
-  "Placeholder": true
+  "LengthGrowing": 6,
+  "Placeholder": false
 }
