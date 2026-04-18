@@ -258,7 +258,14 @@ foreach (var prompt in prompts)
                 // ≥4-char Armenian token we can look for AND none appear
                 // anywhere in the continuation text. Short labels (no
                 // ≥4-char tokens) are skipped, not flagged.
-                if (contHasResponse && !string.IsNullOrWhiteSpace(startResp.ChoiceA))
+                // Skip when the continuation came back without its own new
+                // choices — that's the signature of the backend's safety
+                // fallback (latin_run / leaked_tag paths in ChatService),
+                // which replaces the LLM reply with a canned string and
+                // clears both choices. That's not the prompt failing the
+                // post-choice rule; the prompt never got its output through.
+                if (contHasResponse && contHasChoices
+                    && !string.IsNullOrWhiteSpace(startResp.ChoiceA))
                 {
                     var labelTokens = ExtractArmenianTokens(
                         startResp.ChoiceA, MinTokenLen, trailingPunct, armenianOnlyRegex);

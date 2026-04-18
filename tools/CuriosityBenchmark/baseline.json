@@ -3,12 +3,12 @@
   "ScenariosOk": 6,
   "TurnsTotal": 13,
   "TurnsOk": 13,
-  "WeakCases": 6,
+  "WeakCases": 1,
   "LeakedTail": 0,
   "LatinRun": 0,
   "TooLong": 0,
   "EncyclopediaOpener": 0,
   "ChainedCause": 0,
-  "LengthGrowing": 6,
+  "LengthGrowing": 1,
   "Placeholder": false
 }

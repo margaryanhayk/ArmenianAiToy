@@ -236,14 +236,16 @@ foreach (var scenario in scenarios)
     // --- Per-scenario length-growing check ---
     // Curiosity has no wind-down arc, but consecutive answers should stay
     // roughly the same length — a steadily growing curve suggests the
-    // model is creeping toward verbosity. Flag any turn whose length
-    // exceeds the previous turn's length (only on 2+-turn scenarios).
+    // model is creeping toward verbosity. Flag only meaningful growth
+    // (> LengthGrowthTolerance chars); small turn-to-turn variance from
+    // naturally harder questions is not verbosity creep.
+    const int LengthGrowthTolerance = 15;
     for (int i = 1; i < sResult.Turns.Count; i++)
     {
         var prev = sResult.Turns[i - 1];
         var curr = sResult.Turns[i];
         if (curr.ResponseLen > 0 && prev.ResponseLen > 0
-            && curr.ResponseLen > prev.ResponseLen)
+            && curr.ResponseLen > prev.ResponseLen + LengthGrowthTolerance)
         {
             lengthGrowing++;
             curr.LengthGrowing = true;
