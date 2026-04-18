@@ -426,6 +426,38 @@ public class ModeDetectorIntegrationTests
     }
 
     [Fact]
+    public async Task CuriosityMidStory_InjectsPreviousModeStoryDirective()
+    {
+        // Turn 1: start a story — establishes pending choices.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0531\u0572\u057e\u0565\u057d\u0568 \u0584\u0561\u0575\u056c\u0565\u0581\u0589\n---\nCHOICE_A:\u0555\u0563\u0576\u0565\u056c \u0561\u0572\u057e\u0565\u057d\u056b\u0576\nCHOICE_B:\u0553\u0561\u056d\u0579\u0565\u056c");
+        await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+
+        // Turn 2: Curiosity detour — directive must be present in system prompt.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567\u0589");
+        await _chatService.GetResponseAsync(_deviceId, "why is the sky blue");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("PREVIOUS_MODE: Story")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task CuriosityNoActiveStory_DoesNotInjectPreviousModeStoryDirective()
+    {
+        // No prior story — pure Curiosity turn. Directive must NOT appear.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "why is the sky blue");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => !s.Contains("PREVIOUS_MODE: Story")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
     public async Task CuriosityMode_NoFormatReminderInjected()
     {
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())

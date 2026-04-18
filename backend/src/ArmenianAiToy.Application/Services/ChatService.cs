@@ -568,7 +568,9 @@ public class ChatService : IChatService
           հեռու։ Որոշները արևից շատ ավելի մեծ են։»
 
         STORY RETURN SHAPE — statement form only, no question back.
-        Use ONLY if a story was already active; otherwise skip.
+        Use ONLY when the PREVIOUS_MODE directive at the end of this
+        prompt indicates a prior Story. If that directive is absent,
+        skip this shape entirely — it is not a default.
         Example: «Հիմա վերադառնանք մեր հեքիաթին։»
 
         ARMENIAN LANGUAGE — STRICT:
@@ -1199,6 +1201,11 @@ public class ChatService : IChatService
             if (pending is not null && DateTime.UtcNow - pending.ExtractedAt < ChoiceExpiry)
             {
                 PendingChoices[conversation.Id] = pending;
+                // Transition signal: tell the model unambiguously that a story
+                // is mid-flight. STORY RETURN SHAPE in the Curiosity prompt
+                // keys off this directive rather than inferring prior activity
+                // from the raw history.
+                systemPrompt += "\n\nPREVIOUS_MODE: Story — a story was active immediately before this question. End your reply with STORY RETURN SHAPE so the thread resumes on the next turn.";
             }
         }
         else if (detectedMode == DetectedMode.Game)
