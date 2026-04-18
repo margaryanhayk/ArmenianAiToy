@@ -43,9 +43,15 @@ public class ChatController : ControllerBase
                 request.StorySessionId, request.SelectedChoice);
             return Ok(response);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return StatusCode(502, new { error = $"AI service error: {ex.Message}" });
+            // Path-5 upstream completion failure. Details are logged
+            // server-side at ChatService.cs:1244; the wire response
+            // intentionally carries a constant, sanitized string so
+            // the device / client never sees raw exception messages
+            // (which for OpenAI SDK classes can include request-ids,
+            // URLs, or other internal detail).
+            return StatusCode(502, new { error = "AI service unavailable. Please try again." });
         }
     }
 }
