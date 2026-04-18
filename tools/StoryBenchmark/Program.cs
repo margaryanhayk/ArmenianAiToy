@@ -531,6 +531,41 @@ if (failures.Count == 0 && weakCases.Count == 0)
 
 Console.WriteLine("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
 
+// --- Suite summary artifact (stable contract consumed by BenchmarkAll) ---
+// Written every run so BenchmarkAll can read structured regression data
+// without parsing stdout. Baseline-less or placeholder baselines produce
+// an "unavailable" verdict rather than a guessed value.
+// When the run itself did not fully succeed (same condition the exit code
+// encodes below) we report "unavailable" too — a partial run's weak-case
+// total is not comparable to the baseline.
+bool runSucceeded = (startOk == total && choiceOk == total);
+int? baselineWeakCasesForSummary = null;
+if (runSucceeded && File.Exists(baselinePath))
+{
+    try
+    {
+        var b = JsonSerializer.Deserialize<BenchmarkMetrics>(
+            await File.ReadAllTextAsync(baselinePath), jsonOpts);
+        if (b is not null && !b.Placeholder)
+            baselineWeakCasesForSummary = b.WeakCases;
+    }
+    catch { /* leave null → verdict stays "unavailable" */ }
+}
+string regressionVerdict = baselineWeakCasesForSummary is null ? "unavailable"
+    : currentMetrics.WeakCases < baselineWeakCasesForSummary.Value ? "improved"
+    : currentMetrics.WeakCases > baselineWeakCasesForSummary.Value ? "regressed"
+    : "unchanged";
+var summaryPath = Path.Combine(resultsDir, "summary.json");
+await File.WriteAllTextAsync(summaryPath, JsonSerializer.Serialize(new
+{
+    timestampUtc = DateTime.UtcNow.ToString(
+        "yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture),
+    benchmarkName = "StoryBenchmark",
+    baselineWeakCases = baselineWeakCasesForSummary,
+    currentWeakCases = currentMetrics.WeakCases,
+    regressionVerdict,
+}, jsonOpts));
+
 // Exit code: 0 if all start+choice checks pass, 1 otherwise
 return (startOk == total && choiceOk == total) ? 0 : 1;
 

@@ -444,6 +444,37 @@ if (failures.Count == 0 && weakCases.Count == 0)
 
 Console.WriteLine("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
 
+// --- Suite summary artifact (stable contract consumed by BenchmarkAll) ---
+// If the run itself did not fully succeed we emit "unavailable" —
+// a partial run's weak-case total is not comparable to the baseline.
+bool runSucceeded = (scenariosOk == scenarios.Count);
+int? baselineWeakCasesForSummary = null;
+if (runSucceeded && File.Exists(baselinePath))
+{
+    try
+    {
+        var b = JsonSerializer.Deserialize<CalmMetrics>(
+            await File.ReadAllTextAsync(baselinePath), jsonOpts);
+        if (b is not null && !b.Placeholder)
+            baselineWeakCasesForSummary = b.WeakCases;
+    }
+    catch { /* leave null → verdict stays "unavailable" */ }
+}
+string regressionVerdict = baselineWeakCasesForSummary is null ? "unavailable"
+    : current.WeakCases < baselineWeakCasesForSummary.Value ? "improved"
+    : current.WeakCases > baselineWeakCasesForSummary.Value ? "regressed"
+    : "unchanged";
+var summaryPath = Path.Combine(resultsDir, "summary.json");
+await File.WriteAllTextAsync(summaryPath, JsonSerializer.Serialize(new
+{
+    timestampUtc = DateTime.UtcNow.ToString(
+        "yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture),
+    benchmarkName = "CalmBenchmark",
+    baselineWeakCases = baselineWeakCasesForSummary,
+    currentWeakCases = current.WeakCases,
+    regressionVerdict,
+}, jsonOpts));
+
 return scenariosOk == scenarios.Count ? 0 : 1;
 
 // --- Helpers ---

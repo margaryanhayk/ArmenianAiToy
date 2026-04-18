@@ -3,6 +3,9 @@ backend/**/bin/
 backend/**/obj/
 tools/**/bin/
 tools/**/obj/
+
+# BenchmarkAll per-run reports (written under source, not bin/)
+tools/BenchmarkAll/results/
 backend/**/*.user
 backend/**/*.suo
 backend/.vs/
