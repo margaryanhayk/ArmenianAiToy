@@ -1241,7 +1241,7 @@ public class ChatService : IChatService
         // Models attend most to the end of context — this boosts choice-block compliance.
         if (isStoryMode)
         {
-            history.Add(("user", "[FORMAT REMINDER: End your response with ---\\nCHOICE_A:<action>\\nCHOICE_B:<action>. This is mandatory. Also append STORY_MEMORY block after choices.]"));
+            history.Add(("user", "[FORMAT REMINDER: End your response with ---\nCHOICE_A:<action>\nCHOICE_B:<action>. This is mandatory. Also append STORY_MEMORY block after choices.]"));
         }
 
         // Step 8: Call AI

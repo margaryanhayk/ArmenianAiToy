@@ -195,6 +195,30 @@ public class ModeDetectorIntegrationTests
     }
 
     [Fact]
+    public async Task StoryMode_FormatReminder_UsesRealNewlinesNotLiteralEscapes()
+    {
+        // Regression for F-PG-2: the Story FORMAT REMINDER used to ship the
+        // two-character sequence backslash-n (C# source "\\n") to the model,
+        // meaning GPT-4o saw "---\nCHOICE_A:" as prose describing a separator
+        // rather than a shaped example with real line breaks. Fix replaces
+        // the escape with a real newline. Pin both sides so a future typo
+        // that reintroduces "\\n" fails this test distinctly.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Story.\n---\nCHOICE_A:Go left\nCHOICE_B:Go right");
+
+        await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Any<string>(),
+            Arg.Is<List<(string, string)>>(h =>
+                h.Any(m =>
+                    m.Item2.Contains("FORMAT REMINDER")
+                    && m.Item2.Contains("---\nCHOICE_A")        // real newline
+                    && m.Item2.Contains("CHOICE_A:<action>\nCHOICE_B:<action>")
+                    && !m.Item2.Contains(@"---\nCHOICE_A"))));  // no literal backslash-n
+    }
+
+    [Fact]
     public async Task ExplicitChoiceSelection_AlwaysStoryMode()
     {
         // Turn 1: Start a story.
