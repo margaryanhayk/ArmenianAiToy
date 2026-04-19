@@ -168,4 +168,22 @@ public class CalmPromptContentTests
         Assert.Contains("companion language", Prompt);
         Assert.Contains("no \"I\", room-based", Prompt);
     }
+
+    [Fact]
+    public void CalmFallback_ContainsClosingPhraseAndAnchor()
+    {
+        // Regression for F1: the Calm safe-fallback response (shown on
+        // moderation/latin_run/leaked_tag / retry-exhaustion fallback
+        // paths mid-Calm) must satisfy the CLOSING PHRASE SHAPE rule
+        // stated in CalmModeInstruction itself at ChatService.cs:437-439:
+        //   "A bare «Քնիր հանգիստ» without a body-or-room anchor is NOT enough."
+        // Pre-fix, CalmFallbackResponse was «Քնիր հանգիստ, ամեն ինչ լավ է։»
+        // — no anchor. Post-fix, it is «Քնիր հանգիստ։ Բարձիկը փափուկ է։»
+        // — closing phrase + one anchor from the pool at
+        // ChatService.cs:363-372. Pin both so a future regression that
+        // reverted to the bare form fails distinctly.
+        var fallback = ChatService.CalmFallbackResponse;
+        Assert.Contains("\u0554\u0576\u056b\u0580 \u0570\u0561\u0576\u0563\u056b\u057d\u057f", fallback); // Քնիր հանգիստ
+        Assert.Contains("\u0532\u0561\u0580\u0571\u056b\u056f", fallback);                              // Բարձիկ (pillow — distinctive anchor token)
+    }
 }

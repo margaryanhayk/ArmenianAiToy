@@ -969,8 +969,13 @@ public class ChatService : IChatService
     internal const string DefaultFallbackResponse =
         "\u0531\u0580\u056b, \u0574\u056b \u0578\u0582\u0580\u056b\u0577 \u0570\u0565\u057f\u0561\u0584\u0580\u0584\u056b\u0580 \u0562\u0561\u0576 \u056d\u0578\u057d\u0565\u0576\u0584\u0589";
 
+    // F1 fix: Calm safe-fallback must satisfy CalmModeInstruction's own
+    // CLOSING PHRASE SHAPE rule at ChatService.cs:437-439 ("A bare
+    // «Քնիր հանգիստ» without a body-or-room anchor is NOT enough").
+    // The fallback carries the closing phrase plus one anchor from the
+    // existing pool at ChatService.cs:363-372 — «Բարձիկը փափուկ է».
     internal const string CalmFallbackResponse =
-        "\u0554\u0576\u056b\u0580 \u0570\u0561\u0576\u0563\u056b\u057d\u057f, \u0561\u0574\u0565\u0576 \u056b\u0576\u0579 \u056c\u0561\u057e \u0567\u0589";
+        "\u0554\u0576\u056b\u0580 \u0570\u0561\u0576\u0563\u056b\u057d\u057f\u0589 \u0532\u0561\u0580\u0571\u056b\u056f\u0568 \u0583\u0561\u0583\u0578\u0582\u056f \u0567\u0589";
 
     // D3-lite: shown when the moderation adapter fail-closes on a transient
     // issue (adapter flags `moderation_unavailable`). Distinct from genuine
