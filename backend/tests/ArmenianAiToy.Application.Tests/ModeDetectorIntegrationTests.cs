@@ -438,6 +438,61 @@ public class ModeDetectorIntegrationTests
     }
 
     [Fact]
+    public async Task StoryPath_UnknownNormalizedGuess_InjectsPreviousChoiceUnclear()
+    {
+        // Regression for F-PG-3: the Story pipeline carries a deliberate
+        // semantic rename from normalizer vocabulary to prompt vocabulary —
+        // ChoiceNormalizer.Normalize returns one of {"option_a", "option_b",
+        // "unknown"}; the Story branch at ChatService.cs:1196-1210 maps
+        // the "unknown" case (normalizedChoice is null, pending unexpired,
+        // not preserved-across-Curiosity) to an injected
+        // `previous_story_choice: unclear` hint. That translation is
+        // intentional but currently unpinned — a future edit that swapped
+        // "unclear" for "unknown" in the injection, or that renamed the
+        // normalizer's "unknown" bucket to something else and broke the
+        // bridging is-null check, would leave the test suite green.
+        //
+        // Turn 1: seed a Story with tail block so PendingChoices populates
+        //         with options "Օգնել աղվեսին" / "Փախչել".
+        // Turn 2: send a neutral non-matching input ("maybe"). It is NOT
+        //         a Curiosity/Calm/Game/Riddle trigger, NOT a positional
+        //         keyword, NOT either option's label. ChoiceNormalizer
+        //         returns "unknown"; normalizedChoice stays null; pending
+        //         is unexpired and not detour-preserved; the else-if at
+        //         ChatService.cs:1197-1202 fires.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Աղվեսը քայլեց։\n---\nCHOICE_A:Օգնել աղվեսին\nCHOICE_B:Փախչել");
+        await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Աղվեսը արագ վազեց։\n---\nCHOICE_A:Հետապնդել\nCHOICE_B:Թաքնվել");
+        _aiClient.ClearReceivedCalls();
+
+        await _chatService.GetResponseAsync(_deviceId, "maybe");
+
+        // Positive: the translated hint is present on the wire with the
+        // exact injection format used at ChatService.cs:1209. The format
+        // "previous_story_choice: unclear" (colon + space + word) appears
+        // ONLY at the injection site — the prompt body uses a different
+        // descriptive shape ('previous_story_choice is "unclear"') — so
+        // this substring unambiguously identifies the runtime translation.
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("previous_story_choice: unclear")),
+            Arg.Any<List<(string, string)>>());
+
+        // Anti-tautology: the Story branch must have fired on this turn.
+        // "MANDATORY OUTPUT FORMAT" is the opening line of
+        // StoryChoiceInstruction and is appended to the system prompt
+        // only in the Story branch. Without this, a routing regression
+        // that sent the turn to any other mode, or a future prompt
+        // reshape that dropped the Story branch's opener, would silently
+        // pass the positive assertion above.
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("MANDATORY OUTPUT FORMAT")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
     public async Task ResumeAfterCuriosityDetour_DoesNotInjectUnclearHint()
     {
         // Regression for F-CB-1: after a Story → Curiosity detour, a neutral
