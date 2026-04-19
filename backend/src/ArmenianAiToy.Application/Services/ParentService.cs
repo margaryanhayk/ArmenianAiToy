@@ -81,6 +81,20 @@ public class ParentService : IParentService
         return true;
     }
 
+    public async Task<bool> UnlinkDeviceAsync(Guid parentId, Guid deviceId)
+    {
+        var link = await _db.Set<ParentDevice>()
+            .FirstOrDefaultAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+
+        if (link == null)
+            return false;
+
+        _db.Set<ParentDevice>().Remove(link);
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Parent {ParentId} unlinked device {DeviceId}", parentId, deviceId);
+        return true;
+    }
+
     public async Task<List<Guid>> GetLinkedDeviceIdsAsync(Guid parentId)
     {
         return await _db.Set<ParentDevice>()

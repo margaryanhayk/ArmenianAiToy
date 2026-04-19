@@ -559,10 +559,59 @@
 
           btn.addEventListener('click', function () { openDevice(d.deviceId); });
           listEl.appendChild(btn);
+
+          // Unlink control, rendered as a sibling so we don't nest a button
+          // inside the clickable row. Styling is inline to keep the diff
+          // narrow and avoid touching the page's CSS block.
+          var unlink = document.createElement('button');
+          unlink.type = 'button';
+          unlink.textContent = 'Unlink';
+          unlink.className = 'unlink-btn';
+          unlink.setAttribute('data-device-id', d.deviceId);
+          unlink.style.cssText =
+            'margin:4px 0 12px;padding:6px 12px;font-size:13px;' +
+            'background:transparent;border:1px solid #c66;color:#c66;' +
+            'border-radius:6px;cursor:pointer;';
+          unlink.addEventListener('click', function () {
+            unlinkDevice(d.deviceId, d.deviceName);
+          });
+          listEl.appendChild(unlink);
         });
       }).catch(function (err) {
         if (err && err.status === 401) return;
         setStatus('devicesStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+      });
+    }
+
+    // Unlink a device from the authenticated parent account. The server
+    // response is idempotent, so the UI simply refreshes the device list
+    // on any 2xx and surfaces any non-2xx as an error.
+    function unlinkDevice(deviceId, deviceName) {
+      var token = getToken();
+      if (!token) { show('loginView'); return; }
+      var label = deviceName || ('device ' + shortId(deviceId));
+      if (!window.confirm('Unlink ' + label + '?\n\nYou can re-link it later with the Device ID and API key.')) return;
+      setStatus('devicesStatus', 'Unlinking…', 'muted');
+      fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/link', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/json'
+        }
+      }).then(function (res) {
+        if (res.status === 401) {
+          clearToken();
+          show('loginView');
+          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          return;
+        }
+        if (!res.ok) {
+          setStatus('devicesStatus', 'Unlink failed (HTTP ' + res.status + ').', 'err');
+          return;
+        }
+        loadDevices();
+      }).catch(function () {
+        setStatus('devicesStatus', 'Unlink failed. Please try again.', 'err');
       });
     }
 

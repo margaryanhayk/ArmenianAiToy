@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (695 tests)
+dotnet test                                     # Run all tests (700 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -69,6 +69,7 @@ no editing, no deletion, no child-facing features.
 
 **Backend endpoints** (all parent-JWT authenticated, ownership-checked against linked devices)
 - `POST /api/parents/login` — issues JWT
+- `DELETE /api/parents/devices/{deviceId}/link` — unlink a device from the authenticated parent account (idempotent; no existence leak)
 - `GET  /api/parents/devices` — list linked device ids
 - `GET  /api/conversations?deviceId=&limit=&offset=` — full conversation history
 - `GET  /api/conversations/summary?deviceId=&limit=&offset=` — lightweight summary rows with snippets

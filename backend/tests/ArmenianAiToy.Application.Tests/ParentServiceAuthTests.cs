@@ -254,4 +254,58 @@ public class ParentServiceAuthTests
 
         Assert.False(result);
     }
+
+    // --- UnlinkDeviceAsync ---
+
+    [Fact]
+    public async Task UnlinkDeviceAsync_WhenLinked_RemovesRow_ReturnsTrue()
+    {
+        var (service, db) = CreateService();
+        var parentId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        db.Set<ParentDevice>().Add(new ParentDevice
+        {
+            ParentId = parentId, DeviceId = deviceId, LinkedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var removed = await service.UnlinkDeviceAsync(parentId, deviceId);
+
+        Assert.True(removed);
+        Assert.Null(await db.Set<ParentDevice>().FindAsync(parentId, deviceId));
+    }
+
+    [Fact]
+    public async Task UnlinkDeviceAsync_WhenNotLinked_ReturnsFalse()
+    {
+        var (service, db) = CreateService();
+
+        var removed = await service.UnlinkDeviceAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.False(removed);
+        // Nothing was added, nothing should have been removed either.
+        Assert.Equal(0, await db.Set<ParentDevice>().CountAsync());
+    }
+
+    [Fact]
+    public async Task UnlinkDeviceAsync_DoesNotRemoveOtherParentsLinks()
+    {
+        // Shared device linked to two parents. Unlink one — the other must
+        // retain their link. Guards against a future refactor that
+        // accidentally widens the delete predicate to drop by DeviceId alone.
+        var (service, db) = CreateService();
+        var deviceId = Guid.NewGuid();
+        var parentA = Guid.NewGuid();
+        var parentB = Guid.NewGuid();
+        db.Set<ParentDevice>().AddRange(
+            new ParentDevice { ParentId = parentA, DeviceId = deviceId, LinkedAt = DateTime.UtcNow },
+            new ParentDevice { ParentId = parentB, DeviceId = deviceId, LinkedAt = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+
+        var removed = await service.UnlinkDeviceAsync(parentA, deviceId);
+
+        Assert.True(removed);
+        Assert.Null(await db.Set<ParentDevice>().FindAsync(parentA, deviceId));
+        Assert.NotNull(await db.Set<ParentDevice>().FindAsync(parentB, deviceId));
+    }
 }

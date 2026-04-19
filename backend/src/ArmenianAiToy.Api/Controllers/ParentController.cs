@@ -82,6 +82,25 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Unlink a device from the authenticated parent account. Idempotent —
+    /// the response is identical whether a link existed or not, so a caller
+    /// cannot probe whether a given (parent, device) pair is real. Removes
+    /// only the join row; the Device, its Children, and its Conversations
+    /// are preserved, and any other parents linked to the same device keep
+    /// their link.
+    /// </summary>
+    [HttpDelete("devices/{deviceId}/link")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> UnlinkDevice(Guid deviceId)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        await _parentService.UnlinkDeviceAsync(parentId, deviceId);
+        return Ok(new { unlinked = true });
+    }
+
+    /// <summary>
     /// List linked devices with child info and last activity.
     /// </summary>
     [HttpGet("devices/details")]
