@@ -35,7 +35,13 @@ public class ChildController : ControllerBase
 
         DateOnly? dob = null;
         if (!string.IsNullOrEmpty(request.DateOfBirth))
-            dob = DateOnly.Parse(request.DateOfBirth);
+        {
+            if (!DateOnly.TryParseExact(request.DateOfBirth, "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var parsed))
+                return BadRequest(new { error = "DateOfBirth must be in yyyy-MM-dd format." });
+            dob = parsed;
+        }
 
         var child = await _childService.CreateChildAsync(request.DeviceId, request.Name, request.Gender, dob);
 
