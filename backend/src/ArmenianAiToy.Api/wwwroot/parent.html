@@ -84,6 +84,20 @@
     }
     .device-context strong { color: #5b3e8a; }
 
+    .legend-box {
+      font-size: 12px;
+      color: #5b3e8a;
+      background: #f5f0ff;
+      border: 1px solid #e4d9f7;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin: 0 0 10px;
+      line-height: 1.45;
+    }
+    .legend-box p { margin: 0 0 4px; }
+    .legend-box p:last-child { margin-bottom: 0; }
+    .legend-box .badge { margin-right: 4px; }
+
     .pager-info {
       font-size: 12px;
       color: #9a8ab5;
@@ -188,6 +202,15 @@
     }
     .msg.flagged { border-left-color: #c62828; background: #fff5f6; }
     .msg.flagged.warn { border-left-color: #e65100; background: #fff8f0; }
+    /* Transient highlight when the parent jumps to a specific message
+       from the Flagged tab. JS adds the class on arrival and removes
+       it after ~1.8s. The box-shadow transition fades the outline out
+       gently so the parent can still spot the message if they look
+       a moment late. */
+    .msg.msg-target-highlight {
+      box-shadow: 0 0 0 3px #b99ae8;
+      transition: box-shadow 1.5s ease-out;
+    }
     .msg .meta {
       font-size: 11px;
       color: #9a8ab5;
@@ -273,6 +296,10 @@
         </span>
       </h2>
       <div id="flaggedDeviceContext" class="device-context"></div>
+      <div class="legend-box" role="note" aria-label="Safety flag legend">
+        <p><span class="badge">⚠ Blocked</span> The toy held this back. If it's a child message, the toy did not respond normally; if it's a toy message, the original reply was not shown to your child — a safe fallback was sent instead.</p>
+        <p><span class="badge warn">⚠ Flagged</span> Noted for review but shown. A softer concern was detected; the conversation continued.</p>
+      </div>
       <div id="flaggedList"></div>
       <div id="flaggedStatus" class="status muted" aria-live="polite"></div>
       <div class="pager">
@@ -341,8 +368,11 @@
     }
 
     function roleLabel(role) {
+      // Parent-facing speaker label. Matches the toy-name "Areg" used
+      // on the main app home page (index.html) so the parent dashboard
+      // and the device home screen speak consistently.
       if (role === 'user') return 'Child';
-      if (role === 'assistant') return 'Assistant';
+      if (role === 'assistant') return 'Areg';
       return String(role || '');
     }
 
@@ -560,7 +590,18 @@
       var timeSpan = document.createElement('span');
       timeSpan.textContent = fmtTime(row.startedAt);
       leftWrap.appendChild(timeSpan);
-      if (row.hasFlaggedContent) {
+      // Badge shows an exact count when the server provides one; falls
+      // back to the older binary "flagged" label if the count field is
+      // absent (older payloads or a server that hasn't updated yet).
+      var flaggedCount = (typeof row.flaggedMessageCount === 'number')
+        ? row.flaggedMessageCount
+        : (row.hasFlaggedContent ? -1 : 0);
+      if (flaggedCount > 0) {
+        var badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = '⚠ ' + flaggedCount + ' flagged';
+        leftWrap.appendChild(badge);
+      } else if (flaggedCount < 0) {
         var badge = document.createElement('span');
         badge.className = 'badge';
         badge.textContent = '⚠ flagged';
@@ -584,7 +625,15 @@
       if (row.lastAssistantSnippet) {
         var a = document.createElement('div');
         a.className = 'snippet assistant';
-        a.textContent = 'Assistant: ' + row.lastAssistantSnippet;
+        // When the last assistant message was itself a safety fallback
+        // (i.e. Areg did not actually reply with that text — it was
+        // replaced before the child saw it), mark the snippet so the
+        // parent doesn't read the fallback as a normal toy reply.
+        var lastFlag = row.lastAssistantSafetyFlag;
+        var isFallback = lastFlag === 'Flagged' || lastFlag === 'Blocked'
+          || lastFlag === 1 || lastFlag === 2;
+        a.textContent = (isFallback ? 'Areg (safe fallback shown): ' : 'Areg: ')
+          + row.lastAssistantSnippet;
         btn.appendChild(a);
       }
 
@@ -671,7 +720,9 @@
 
       var roleTag = document.createElement('span');
       roleTag.className = 'role-tag';
-      roleTag.textContent = String(row.role || '');
+      // Route through roleLabel so this tag shows "Child" / "Areg" like
+      // the rest of the dashboard, not the raw "user" / "assistant".
+      roleTag.textContent = roleLabel(row.role);
       rightWrap.appendChild(roleTag);
 
       top.appendChild(leftWrap);
@@ -689,7 +740,8 @@
       btn.appendChild(fromLine);
 
       var convId = row.conversationId;
-      btn.addEventListener('click', function () { openConversation(convId); });
+      var msgId = row.messageId;
+      btn.addEventListener('click', function () { openConversation(convId, msgId); });
       return btn;
     }
 
@@ -703,7 +755,10 @@
     }
 
     // ---------- detail ----------
-    function openConversation(conversationId) {
+    // Optional targetMessageId: when set (e.g. when opened from the
+    // Flagged tab), the detail view scrolls that message into view
+    // and briefly highlights it so the parent does not have to hunt.
+    function openConversation(conversationId, targetMessageId) {
       show('detailView');
       var metaEl = document.getElementById('detailMeta');
       var msgsEl = document.getElementById('detailMessages');
@@ -718,13 +773,22 @@
           metaEl.textContent = '';
           return;
         }
+        var msgs = c.messages || [];
+        // safetyFlag may serialize as enum string ("Flagged"/"Blocked") or int (1/2).
+        var flaggedCount = 0;
+        for (var i = 0; i < msgs.length; i++) {
+          var f = msgs[i].safetyFlag;
+          if (f === 'Flagged' || f === 'Blocked' || f === 1 || f === 2) flaggedCount++;
+        }
         var metaParts = ['Started ' + fmtTime(c.startedAt)];
         if (c.endedAt) metaParts.push('Ended ' + fmtTime(c.endedAt));
         metaParts.push((c.messageCount || 0) + ' messages');
-        if (c.hasFlaggedContent) metaParts.push('⚠ contains flagged content');
+        if (flaggedCount > 0) {
+          metaParts.push('⚠ ' + flaggedCount + ' flagged message' + (flaggedCount === 1 ? '' : 's'));
+        } else if (c.hasFlaggedContent) {
+          metaParts.push('⚠ contains flagged content');
+        }
         metaEl.textContent = metaParts.join(' · ');
-
-        var msgs = c.messages || [];
         if (msgs.length === 0) {
           setStatus('detailStatus', 'No messages in this conversation.', 'muted');
           return;
@@ -732,6 +796,20 @@
         msgs.forEach(function (m) {
           msgsEl.appendChild(buildMessage(m));
         });
+        // Jump-to-message: if the caller supplied a targetMessageId
+        // (e.g. via a Flagged-tab row click), scroll that message
+        // into view and apply a transient highlight. No-op when the
+        // id isn't in the rendered thread (defensive).
+        if (targetMessageId) {
+          var targetEl = document.getElementById('msg-' + targetMessageId);
+          if (targetEl) {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetEl.classList.add('msg-target-highlight');
+            setTimeout(function () {
+              targetEl.classList.remove('msg-target-highlight');
+            }, 1800);
+          }
+        }
       }).catch(function (err) {
         if (err && err.status === 401) return;
         metaEl.textContent = '';
@@ -742,6 +820,9 @@
     function buildMessage(m) {
       var div = document.createElement('div');
       div.className = 'msg';
+      // Stable per-message id — used by jump-to-message from Flagged
+      // tab. Guarded in case m.id is missing on older payloads.
+      if (m.id) div.id = 'msg-' + m.id;
       // Distinguish Flagged (amber/warn) from Blocked (red) in the detail view.
       var flag = m.safetyFlag;
       if (flag === 'Blocked' || flag === 2) {
