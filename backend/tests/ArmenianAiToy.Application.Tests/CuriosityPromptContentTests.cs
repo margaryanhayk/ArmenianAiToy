@@ -62,6 +62,23 @@ public class CuriosityPromptContentTests
     }
 
     [Fact]
+    public void Prompt_StoryReturnShapeIsGatedOnPreviousModeDirective()
+    {
+        // Regression for F-Cur-1: the STORY RETURN SHAPE section carries a
+        // load-bearing two-sentence gate — it is meant to fire ONLY when the
+        // runtime PREVIOUS_MODE: Story directive is present in the prompt,
+        // and to be skipped entirely otherwise. Without this gate, every
+        // standalone Curiosity answer (e.g. a from-scratch "why is the sky
+        // blue" with no prior story) would tack «Հիմա վերադառնանք մեր
+        // հեքիաթին։» onto the end. The runtime side is already protected by
+        // CuriosityNoActiveStory_DoesNotInjectPreviousModeStoryDirective —
+        // this fact protects the prompt-internal contract introduced in
+        // commit 7104b98 and relied on by c95c2ec.
+        Assert.Contains("Use ONLY when the PREVIOUS_MODE directive", Prompt);
+        Assert.Contains("skip this shape entirely", Prompt);
+    }
+
+    [Fact]
     public void Prompt_PreservesModeHeader()
     {
         Assert.Contains("MODE: CURIOSITY WINDOW", Prompt);
