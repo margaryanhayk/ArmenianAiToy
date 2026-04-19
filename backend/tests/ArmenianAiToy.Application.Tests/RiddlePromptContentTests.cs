@@ -48,6 +48,20 @@ public class RiddlePromptContentTests
     }
 
     [Fact]
+    public void Prompt_HintTurnGatesCloseOnSameCategory()
+    {
+        // Regression for F-Rid-2: HINT TURN fairness — the «Մոտ ես»
+        // encouragement must fire ONLY when the child's guess is in the
+        // same category as the answer, not on any wrong guess. A bare
+        // unconditional «Մոտ ես» for off-category guesses would feel
+        // unfair and mislead the child. The gate lives at
+        // ChatService.cs:836-838; pin it here so a silent removal of
+        // the conditional fails distinctly.
+        Assert.Contains("ONLY if", Prompt);
+        Assert.Contains("same category", Prompt);
+    }
+
+    [Fact]
     public void Prompt_ContainsCelebrationExemplar()
     {
         Assert.Contains("Ապրե՛ս", Prompt);
@@ -87,6 +101,17 @@ public class RiddlePromptContentTests
     {
         Assert.Contains("HINT TURN", Prompt);
         Assert.Contains("DO NOT name the answer", Prompt);
+        // Regression for F-Rid-2: the anti-leak rule must cover not just
+        // the bare answer word but also its stem, its plural, and any
+        // close synonym — otherwise hints can accidentally reveal. The
+        // full sentence at ChatService.cs:842-843 is:
+        //   "DO NOT name the answer, its stem, its plural, or a close synonym."
+        // Pin each distinctive token so a silent weakening of the rule
+        // fails distinctly. "close synonym" is the most distinctive of
+        // the three and serves as the keystone marker.
+        Assert.Contains("stem", Prompt);
+        Assert.Contains("plural", Prompt);
+        Assert.Contains("close synonym", Prompt);
     }
 
     [Fact]
