@@ -225,6 +225,37 @@ public class GameLoopIntegrationTests
     }
 
     [Fact]
+    public async Task ContinueDirective_Round2_SwitchesSubtypeFromRound1()
+    {
+        // Regression for F-Game-1: the Round 2 runtime hint previously read
+        // "Same subtype is OK here, but vary the specific item", which
+        // directly contradicted the VARIETY POLICY and the BAD/GOOD pair
+        // in GameModeInstruction (both require a different subtype on
+        // every CONTINUE turn, including the first one). The Round 2
+        // directive must now instruct the model to switch the subtype.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(GameWithBlock);
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0531\u057a\u0580\u0565\u055b\u057d\u0589 \u0540\u056b\u0574\u0561\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "ok");  // turns=1
+
+        _aiClient.ClearReceivedCalls();
+        await _chatService.GetResponseAsync(_deviceId, "ok");  // turns=2 → Round 2 hint
+
+        // Assert the Round-2-specific wording that distinguishes this arm
+        // from Round 1 ("set a friendly fun pace…") and Round 3+
+        // ("switch the SUBTYPE inside this game type"): the "Do not repeat
+        // the subtype you used in Round 1" phrasing is unique to Round 2.
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("GAME_TURN_KIND: continue")
+                && s.Contains("Do not repeat the subtype you used in Round 1")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
     public async Task ContinueDirective_RotateCelebration()
     {
         // v3: directive asks the model to rotate the celebration phrase.

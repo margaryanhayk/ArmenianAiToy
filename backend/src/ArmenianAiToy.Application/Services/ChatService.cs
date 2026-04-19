@@ -1859,7 +1859,7 @@ public class ChatService : IChatService
             string roundHint = newTurns switch
             {
                 1 => "Round 1 — set a friendly fun pace, easy and inviting.",
-                2 => "Round 2 — slightly bump the energy. Same subtype is OK here, but vary the specific item (different animal, different color, etc.).",
+                2 => "Round 2 — slightly bump the energy, and switch the SUBTYPE inside this game type. Do not repeat the subtype you used in Round 1.",
                 3 or 4 => "Round 3+ — switch the SUBTYPE inside this game type. Pick a different angle of the same game.",
                 _ => "Round 5+ — add a tiny silly twist (a goofy sound, a swapped word, a faster tempo, count by twos).",
             };
