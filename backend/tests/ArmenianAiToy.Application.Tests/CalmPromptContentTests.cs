@@ -124,6 +124,29 @@ public class CalmPromptContentTests
     }
 
     [Fact]
+    public void Prompt_RulesForbidVolunteeringFearWords()
+    {
+        // Regression for F4: commit b865163 added a RULES-level safety
+        // boundary forbidding Areg from volunteering fear framing when the
+        // child did not name fear first. The full line at
+        // ChatService.cs:339-341 is:
+        //   "Do NOT introduce fear words («վախ», «սարսափ») unless the
+        //    child named them first. Never volunteer reassurance about
+        //    fears the child did not mention."
+        //
+        // BEDTIME-DISTRESS SHAPE's "do NOT echo the" gives only partial
+        // residual protection (it covers echoing, not volunteering).
+        // Pin each distinctive substring so a silent weakening of the
+        // RULES-level rule fails distinctly. "Never volunteer reassurance"
+        // is the keystone marker; «վախ» and «սարսափ» are the Armenian
+        // fear-word anchors the rule explicitly names.
+        Assert.Contains("Do NOT introduce fear words", Prompt);
+        Assert.Contains("\u057e\u0561\u056d", Prompt);                         // վախ
+        Assert.Contains("\u057d\u0561\u0580\u057d\u0561\u0583", Prompt);       // սարսափ
+        Assert.Contains("Never volunteer reassurance", Prompt);
+    }
+
+    [Fact]
     public void Prompt_ContainsWindDownArcLadder()
     {
         Assert.Contains("WIND-DOWN ARC", Prompt);
