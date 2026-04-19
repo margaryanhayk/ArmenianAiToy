@@ -946,6 +946,27 @@ public class ModeDetectorIntegrationTests
     }
 
     [Fact]
+    public async Task CalmDirective_SecondTurn_SaysExactly2()
+    {
+        // Regression for F3: commit b865163 tightened the Turn-2 arc step
+        // to the exact cardinality "Exactly 2 short sentences". The runtime
+        // directive in BuildCalmTurnDirective must carry that wording on
+        // the second consecutive Calm turn.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u053c\u0561\u057e \u0567\u0580\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "i'm tired");
+
+        _aiClient.ClearReceivedCalls();
+        await _chatService.GetResponseAsync(_deviceId, "\u056c\u0561\u057e"); // լավ — 2nd Calm turn
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("CALM_TURN_INDEX: 2")
+                && s.Contains("Exactly 2 short sentences")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
     public async Task CalmDirective_ThirdConsecutiveTurn_SaysTurn3Plus()
     {
         // Three consecutive Calm turns — directive should escalate to "Turn 3+".
@@ -961,7 +982,9 @@ public class ModeDetectorIntegrationTests
         await _aiClient.Received().GetCompletionAsync(
             Arg.Is<string>(s => s.Contains("CALM_TURN_INDEX: 3")
                 && s.Contains("Turn 3+")
-                && s.Contains("never longer")),
+                && s.Contains("never longer")
+                // Regression for F3: cardinality tightened in b865163.
+                && s.Contains("Exactly 1 short sentence")),
             Arg.Any<List<(string, string)>>());
     }
 

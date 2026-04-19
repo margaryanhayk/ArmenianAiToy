@@ -131,6 +131,12 @@ public class CalmPromptContentTests
         Assert.Contains("Turn 2", Prompt);
         Assert.Contains("Turn 3+", Prompt);
         Assert.Contains("never longer", Prompt);
+        // Regression for F3: commit b865163 intentionally tightened the
+        // Turn-2 and Turn-3+ cardinalities from "2 to 3" / "1 to 2" to
+        // exact counts, to eliminate arc-drift at the upper bound. Pin
+        // the exact-count wording so a future loosening fails distinctly.
+        Assert.Contains("Exactly 2 short sentences", Prompt);
+        Assert.Contains("Exactly 1 short sentence", Prompt);
     }
 
     [Fact]
