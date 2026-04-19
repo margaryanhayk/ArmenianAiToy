@@ -22,11 +22,8 @@ public class ModerationFailClosedTests
     [Fact]
     public async Task CheckContentAsync_WhenClientThrows_ReturnsUnsafe()
     {
-        // ModerationClient is sealed, so we construct it with invalid credentials.
-        // Any call to ClassifyTextAsync will throw (no valid API key / endpoint).
-        var client = new global::OpenAI.Moderations.ModerationClient(model: "text-moderation-stable", apiKey: "invalid-key");
-        var logger = Substitute.For<ILogger<OpenAIModerationAdapter>>();
-        var adapter = new OpenAIModerationAdapter(client, logger);
+        var adapter = new StubAdapter();
+        adapter.Responses.Enqueue(() => throw new InvalidOperationException("simulated client failure"));
 
         var result = await adapter.CheckContentAsync("test content");
 
@@ -37,13 +34,12 @@ public class ModerationFailClosedTests
     [Fact]
     public async Task CheckContentAsync_WhenClientThrows_LogsError()
     {
-        var client = new global::OpenAI.Moderations.ModerationClient(model: "text-moderation-stable", apiKey: "invalid-key");
-        var logger = Substitute.For<ILogger<OpenAIModerationAdapter>>();
-        var adapter = new OpenAIModerationAdapter(client, logger);
+        var adapter = new StubAdapter();
+        adapter.Responses.Enqueue(() => throw new InvalidOperationException("simulated client failure"));
 
         await adapter.CheckContentAsync("test content");
 
-        logger.Received().Log(
+        adapter.Logger.Received().Log(
             LogLevel.Error,
             Arg.Any<EventId>(),
             Arg.Any<object>(),
@@ -146,11 +142,17 @@ public class ModerationFailClosedTests
     {
         public Queue<Func<Task<ModerationResult>>> Responses { get; } = new();
         public int CallCount { get; private set; }
+        public ILogger<OpenAIModerationAdapter> Logger { get; }
 
         public StubAdapter()
-            : base(new global::OpenAI.Moderations.ModerationClient(model: "stub", apiKey: "stub"),
-                   Substitute.For<ILogger<OpenAIModerationAdapter>>())
+            : this(Substitute.For<ILogger<OpenAIModerationAdapter>>())
         { }
+
+        private StubAdapter(ILogger<OpenAIModerationAdapter> logger)
+            : base(new global::OpenAI.Moderations.ModerationClient(model: "stub", apiKey: "stub"), logger)
+        {
+            Logger = logger;
+        }
 
         protected override Task<ModerationResult> ClassifyOnceAsync(string content)
         {
