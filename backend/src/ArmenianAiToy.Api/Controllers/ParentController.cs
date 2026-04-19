@@ -32,6 +32,10 @@ public class ParentController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
             return BadRequest(new { error = "Email and password are required" });
 
+        const int MinPasswordLength = 8;
+        if (request.Password.Length < MinPasswordLength)
+            return BadRequest(new { error = "Password must be at least 8 characters." });
+
         try
         {
             var parentId = await _parentService.RegisterAsync(request.Email, request.Password);
