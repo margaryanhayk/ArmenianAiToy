@@ -22,8 +22,16 @@ builder.Services.AddSwaggerGen(options =>
 // Infrastructure (DB, OpenAI, services)
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// JWT authentication for parent endpoints
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "ArmenianAiToyDefaultSecretKeyThatShouldBeChanged123!";
+// JWT authentication for parent endpoints.
+// Fail fast if Jwt:Key is missing or set to the legacy insecure literal —
+// a misconfigured instance would sign tokens with a universal, publicly
+// known secret and every parent account would be trivially impersonable.
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey == "ArmenianAiToyDefaultSecretKeyThatShouldBeChanged123!")
+    throw new InvalidOperationException(
+        "Jwt:Key must be configured and must not be the legacy default. " +
+        "Set it via user-secrets (dotnet user-secrets set \"Jwt:Key\" ...) " +
+        "or the JWT__KEY environment variable.");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {

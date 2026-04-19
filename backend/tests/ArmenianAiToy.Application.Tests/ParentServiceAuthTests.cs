@@ -31,14 +31,15 @@ public class ParentServiceAuthTests
         }
     }
 
-    private static (ParentService Service, TestDbContext Db) CreateService()
+    private static (ParentService Service, TestDbContext Db) CreateService(
+        string? jwtKey = "TestSecretKeyThatIsLongEnoughForHmacSha256Validation!")
     {
         var options = new DbContextOptionsBuilder<TestDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         var db = new TestDbContext(options);
         var config = Substitute.For<IConfiguration>();
-        config["Jwt:Key"].Returns("TestSecretKeyThatIsLongEnoughForHmacSha256Validation!");
+        config["Jwt:Key"].Returns(jwtKey);
         config["Jwt:Issuer"].Returns("TestIssuer");
         config["Jwt:Audience"].Returns("TestAudience");
         var logger = Substitute.For<ILogger<ParentService>>();
@@ -128,6 +129,47 @@ public class ParentServiceAuthTests
         var result = await service.LoginAsync("nobody@example.com", "anypass");
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task LoginAsync_WhenJwtKeyMissing_Throws()
+    {
+        // A misconfigured instance must not silently fall back to a universal
+        // signing secret. Valid credentials reach GenerateJwt, which fails fast.
+        var (service, db) = CreateService(jwtKey: null);
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = Guid.NewGuid(),
+            Email = "user@example.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("correctpass"),
+            RegisteredAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.LoginAsync("user@example.com", "correctpass"));
+        Assert.Contains("Jwt:Key", ex.Message);
+    }
+
+    [Fact]
+    public async Task LoginAsync_WhenJwtKeyIsLegacyDefault_Throws()
+    {
+        // The legacy default literal is publicly known (shipped in history);
+        // explicitly reject it so a paste from an old appsettings.json fails.
+        var (service, db) = CreateService(
+            jwtKey: "ArmenianAiToyDefaultSecretKeyThatShouldBeChanged123!");
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = Guid.NewGuid(),
+            Email = "user@example.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("correctpass"),
+            RegisteredAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.LoginAsync("user@example.com", "correctpass"));
+        Assert.Contains("legacy default", ex.Message);
     }
 
     // --- LinkDeviceAsync ---

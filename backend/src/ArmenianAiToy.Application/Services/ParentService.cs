@@ -127,7 +127,12 @@ public class ParentService : IParentService
 
     private string GenerateJwt(Parent parent)
     {
-        var key = _config["Jwt:Key"] ?? "ArmenianAiToyDefaultSecretKeyThatShouldBeChanged123!";
+        var key = _config["Jwt:Key"];
+        if (string.IsNullOrWhiteSpace(key) || key == "ArmenianAiToyDefaultSecretKeyThatShouldBeChanged123!")
+            throw new InvalidOperationException(
+                "Jwt:Key must be configured and must not be the legacy default. " +
+                "Set it via user-secrets (dotnet user-secrets set \"Jwt:Key\" ...) " +
+                "or the JWT__KEY environment variable.");
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
