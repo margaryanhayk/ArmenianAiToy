@@ -874,6 +874,79 @@ public class ModeDetectorIntegrationTests
     }
 
     [Fact]
+    public async Task GameSession_CuriosityDetour_ResumesOnNextNeutralTurn()
+    {
+        // Regression for F-Game-2 / F-Cur-2: Game → Curiosity → neutral "ok"
+        // must re-enter Game mode on the resume turn. Before the fix at
+        // ChatService.cs:1166-1170, the else-clear wiped the ActiveModes
+        // Game pointer on the Curiosity turn, and the neutral resume turn
+        // dropped to None — the child's session felt abandoned.
+        //
+        // Turn 1: seed a real Game round with tail block so GameSessions
+        //         has CurrentRound populated.
+        // Turn 2: Curiosity detour — the preserved predicate now skips
+        //         ActiveModes.TryRemove for Curiosity turns.
+        // Turn 3: neutral "ok" — resume path at ~L1144 promotes detectedMode
+        //         from None to Game via the preserved ActiveModes entry.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(
+                "\u053e\u0561\u0583 \u057f\u0561\u0576\u0584 \u0574\u056b\u0561\u057d\u056b\u0576\u0589\n---\nGAME_TYPE:clap_along\nGAME_DIFFICULTY:1",
+                "\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567\u0589",
+                "\u0531\u057a\u0580\u0565\u055b\u057d\u0589 \u0540\u056b\u0574\u0561\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "lets play");
+        await _chatService.GetResponseAsync(_deviceId, "why is the sky blue");
+
+        _aiClient.ClearReceivedCalls();
+        var r3 = await _chatService.GetResponseAsync(_deviceId, "ok");
+
+        // Top-level mode resolution matches Game.
+        Assert.Equal("game", r3.Mode);
+
+        // Resume turn's system prompt carries the Game-continue directive
+        // AND does NOT carry the CuriosityWindowInstruction header — so a
+        // future regression that clears ActiveModes on Curiosity (restoring
+        // the pre-fix bug) or routes the resume turn back to Curiosity
+        // fails distinctly.
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("GAME_TURN_KIND: continue")
+                && !s.Contains("MODE: CURIOSITY WINDOW")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task RiddleSession_CuriosityDetour_ResumesOnNextNeutralTurn()
+    {
+        // Regression for F-Rid-4 / F-Cur-2: Riddle → Curiosity → a guess
+        // must re-enter Riddle mode on the resume turn. Before the fix,
+        // the preserved RIDDLE_ANSWER was orphaned — the child's next guess
+        // was reclassified StartNew because the ActiveModes pointer was
+        // wiped on the Curiosity turn.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(
+                "\u053f\u0561\u0580\u0574\u056b\u0580 \u0567, \u056f\u056c\u0578\u0580 \u0567, \u056e\u0561\u057c\u056b \u057e\u0580\u0561 \u0567 \u0561\u0573\u0578\u0582\u0574\u0589 \u053b\u055e\u0576\u0579 \u0567\u0589\n---\nRIDDLE_ANSWER:\u056d\u0576\u0571\u0578\u0580\nRIDDLE_CATEGORY:fruit\nRIDDLE_DIFFICULTY:1",
+                "\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567\u0589",
+                "\u0544\u0578\u057f \u0565\u057d\u0589");
+
+        await _chatService.GetResponseAsync(_deviceId, "give me a riddle");
+        await _chatService.GetResponseAsync(_deviceId, "why is the sky blue");
+
+        _aiClient.ClearReceivedCalls();
+        var r3 = await _chatService.GetResponseAsync(_deviceId, "a cat");
+
+        // Top-level mode resolution matches Riddle.
+        Assert.Equal("riddle", r3.Mode);
+
+        // Resume turn's system prompt carries a RIDDLE_TURN_KIND directive
+        // (any kind — the guess will be classified by the runtime) AND does
+        // NOT carry the CuriosityWindowInstruction header.
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("RIDDLE_TURN_KIND:")
+                && !s.Contains("MODE: CURIOSITY WINDOW")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
     public async Task GameSession_ClearedAfterStory()
     {
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())

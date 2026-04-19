@@ -1149,9 +1149,17 @@ public class ChatService : IChatService
             detectedMode = activeMode.Mode;
         }
 
-        // Update active-mode tracker: store on Game/Riddle, clear on anything else.
+        // Update active-mode tracker: store on Game/Riddle/Calm, clear on
+        // Story or None, preserve across Curiosity.
         // TurnIndex bumps when the same mode persists across turns; otherwise
         // resets to 1. Used by Calm v2 to drive the wind-down arc directive.
+        //
+        // Curiosity is a one-turn overlay — it must NOT clear a prior
+        // Game/Riddle/Calm ActiveModes entry, so the post-detour neutral turn
+        // can resume via the fallback at ~L1144-1150 above. GameSessions /
+        // RiddleSessions / Calm turn-index survive naturally in separate
+        // dicts. The 30-min expiry on ActivatedAt (not re-stamped on a
+        // Curiosity turn) still gates staleness.
         if (detectedMode is DetectedMode.Game or DetectedMode.Riddle or DetectedMode.Calm)
         {
             int turnIndex = 1;
@@ -1163,7 +1171,7 @@ public class ChatService : IChatService
             }
             ActiveModes[conversation.Id] = new ActiveModeEntry(detectedMode, DateTime.UtcNow, turnIndex);
         }
-        else
+        else if (detectedMode != DetectedMode.Curiosity)
         {
             ActiveModes.TryRemove(conversation.Id, out _);
         }
