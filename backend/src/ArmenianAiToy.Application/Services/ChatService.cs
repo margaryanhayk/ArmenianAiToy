@@ -949,7 +949,11 @@ public class ChatService : IChatService
     // drives variety on switch_game / new_game turns.
     internal static readonly ConcurrentDictionary<Guid, GameSessionState> GameSessions = new();
 
-    internal record PendingChoice(string OptionA, string OptionB, DateTime ExtractedAt);
+    internal record PendingChoice(
+        string OptionA,
+        string OptionB,
+        DateTime ExtractedAt,
+        bool PreservedAcrossCuriosityDetour = false);
 
     // Active Game/Riddle session tracker. When ModeDetector returns None but an
     // active game/riddle was recently running, the session continues. Story uses
@@ -1190,7 +1194,9 @@ public class ChatService : IChatService
             {
                 systemPrompt += $"\n\nprevious_story_choice: {normalizedChoice} — {choiceLabel}";
             }
-            else if (pending is not null && DateTime.UtcNow - pending.ExtractedAt < ChoiceExpiry)
+            else if (pending is not null
+                     && DateTime.UtcNow - pending.ExtractedAt < ChoiceExpiry
+                     && !pending.PreservedAcrossCuriosityDetour)
             {
                 systemPrompt += "\n\nprevious_story_choice: unclear";
             }
@@ -1205,9 +1211,14 @@ public class ChatService : IChatService
             systemPrompt += CuriosityWindowInstruction;
 
             // Preserve pending choices so the story can resume after this one-turn detour.
+            // Mark the preserved record with PreservedAcrossCuriosityDetour=true so the
+            // Story branch on the resume turn does not mistake a neutral resume ("ok")
+            // for a failed choice attempt and inject `previous_story_choice: unclear`.
+            // Flag is one-shot: TryRemove at the top of the next turn consumes it, and
+            // any new PendingChoice created downstream uses the default false.
             if (pending is not null && DateTime.UtcNow - pending.ExtractedAt < ChoiceExpiry)
             {
-                PendingChoices[conversation.Id] = pending;
+                PendingChoices[conversation.Id] = pending with { PreservedAcrossCuriosityDetour = true };
                 // Transition signal: tell the model unambiguously that a story
                 // is mid-flight. STORY RETURN SHAPE in the Curiosity prompt
                 // keys off this directive rather than inferring prior activity

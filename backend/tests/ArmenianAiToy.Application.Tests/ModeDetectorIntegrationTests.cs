@@ -414,6 +414,51 @@ public class ModeDetectorIntegrationTests
     }
 
     [Fact]
+    public async Task ResumeAfterCuriosityDetour_DoesNotInjectUnclearHint()
+    {
+        // Regression for F-CB-1: after a Story → Curiosity detour, a neutral
+        // resume turn ("ok") used to inject `previous_story_choice: unclear`
+        // into the Story system prompt, which in turn told the model NOT to
+        // emit CHOICE_A/CHOICE_B and framed the child as having failed to
+        // answer. The Curiosity-preservation site now marks the PendingChoice
+        // with PreservedAcrossCuriosityDetour=true so the Story branch skips
+        // the unclear-injection guard on the resume turn.
+        //
+        // Turn 1: seed a story so PendingChoices is populated.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Աղվեսը քայլեց։\n---\nCHOICE_A:Օգնել աղվեսին\nCHOICE_B:Փախչել");
+        await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+
+        // Turn 2: Curiosity detour preserves the PendingChoice with the flag set.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567\u0589");
+        await _chatService.GetResponseAsync(_deviceId, "why is the sky blue");
+
+        // Turn 3: neutral resume. ModeDetector returns Story (active session).
+        // The Story system prompt for this turn must NOT carry the unclear hint.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Աղվեսը արագ վազեց։\n---\nCHOICE_A:Հետապնդել\nCHOICE_B:Թաքնվել");
+        _aiClient.ClearReceivedCalls();
+
+        await _chatService.GetResponseAsync(_deviceId, "ok");
+
+        // Negative assertion: the unclear hint must be absent on the resume turn.
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => !s.Contains("previous_story_choice: unclear")),
+            Arg.Any<List<(string, string)>>());
+
+        // Anti-tautology guard: the Story branch must actually have fired
+        // on this turn. "MANDATORY OUTPUT FORMAT — READ THIS FIRST" is the
+        // opening line of StoryChoiceInstruction and is appended to the
+        // system prompt only in the Story branch. Without this the negative
+        // assertion above would silently pass if Turn 3 were routed to any
+        // non-Story branch, or if the Story branch disappeared entirely.
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("MANDATORY OUTPUT FORMAT")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
     public async Task CuriosityNoActiveStory_DoesNotStoreChoices()
     {
         // No prior story — just a curiosity question from scratch.
