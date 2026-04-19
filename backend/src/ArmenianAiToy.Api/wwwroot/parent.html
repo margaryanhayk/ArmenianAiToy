@@ -105,6 +105,24 @@
       margin-top: 6px;
     }
 
+    /* Empty-state device-linking block. Shown only when the
+       logged-in parent has zero linked devices. Reuses the existing
+       global input / button styles; only the container framing and
+       the small help line are custom here. */
+    .link-device-empty {
+      margin-top: 10px;
+      padding: 14px;
+      border: 1px dashed #d0c2e8;
+      border-radius: 10px;
+      background: #faf7ff;
+    }
+    .link-device-empty .link-device-help {
+      margin: 0 0 10px;
+      font-size: 13px;
+      color: #5b3e8a;
+      line-height: 1.4;
+    }
+
     .tabs {
       display: inline-flex;
       gap: 6px;
@@ -265,6 +283,15 @@
       <h2>Linked devices</h2>
       <div id="devicesList"></div>
       <div id="devicesStatus" class="status muted" aria-live="polite"></div>
+      <div id="linkDeviceEmptyState" class="link-device-empty" hidden>
+        <p class="link-device-help">To link a toy to this account, enter the Device ID and API key shown on the toy's setup card.</p>
+        <label for="linkDeviceIdInput">Device ID</label>
+        <input id="linkDeviceIdInput" type="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
+        <label for="linkApiKeyInput">API key</label>
+        <input id="linkApiKeyInput" type="text" autocomplete="off" placeholder="dtk_…">
+        <button id="linkDeviceBtn" type="button">Link device</button>
+        <div id="linkDeviceStatus" class="status muted" aria-live="polite"></div>
+      </div>
     </section>
 
     <!-- Summaries view -->
@@ -485,14 +512,21 @@
       show('devicesView');
       setStatus('devicesStatus', 'Loading…', 'muted');
       var listEl = document.getElementById('devicesList');
+      var emptyState = document.getElementById('linkDeviceEmptyState');
+      emptyState.hidden = true;
       clearChildren(listEl);
       authedFetch('/api/parents/devices/details').then(function (data) {
         var devices = (data && data.devices) || [];
         if (devices.length === 0) {
           setStatus('devicesStatus', 'No devices linked to this account yet.', 'muted');
+          // Empty state — show the link-device form so the parent has
+          // a direct path to pair a toy without leaving this page.
+          emptyState.hidden = false;
+          setStatus('linkDeviceStatus', '', '');
           return;
         }
         setStatus('devicesStatus', '', '');
+        emptyState.hidden = true;
         devices.forEach(function (d) {
           var btn = document.createElement('button');
           btn.className = 'row';
@@ -529,6 +563,57 @@
       }).catch(function (err) {
         if (err && err.status === 401) return;
         setStatus('devicesStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+      });
+    }
+
+    // Empty-state device-linking submit. Mirrors the plain POST shape
+    // used by doLogin — authedFetch is GET-only, so we inline the
+    // Authorization header here rather than widening the helper.
+    function submitLinkDevice() {
+      var token = getToken();
+      if (!token) { show('loginView'); return; }
+      var idInput = document.getElementById('linkDeviceIdInput');
+      var keyInput = document.getElementById('linkApiKeyInput');
+      var deviceIdRaw = idInput.value.trim();
+      var apiKeyRaw = keyInput.value.trim();
+      if (!deviceIdRaw || !apiKeyRaw) {
+        setStatus('linkDeviceStatus', 'Device ID and API key are required.', 'err');
+        return;
+      }
+      setStatus('linkDeviceStatus', 'Linking…', 'muted');
+      fetch('/api/parents/devices/link', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ deviceId: deviceIdRaw, apiKey: apiKeyRaw })
+      }).then(function (res) {
+        if (res.status === 401) {
+          clearToken();
+          show('loginView');
+          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          return null;
+        }
+        if (res.status === 400) {
+          setStatus('linkDeviceStatus', 'Could not link — check the Device ID and API key.', 'err');
+          return null;
+        }
+        if (!res.ok) {
+          setStatus('linkDeviceStatus', 'Link failed (HTTP ' + res.status + ').', 'err');
+          return null;
+        }
+        return res.json();
+      }).then(function (data) {
+        if (data && data.linked) {
+          idInput.value = '';
+          keyInput.value = '';
+          setStatus('linkDeviceStatus', '', '');
+          loadDevices();
+        }
+      }).catch(function () {
+        setStatus('linkDeviceStatus', 'Link failed. Please try again.', 'err');
       });
     }
 
@@ -872,6 +957,7 @@
     document.getElementById('newerBtn').addEventListener('click', pageNewer);
     document.getElementById('flaggedOlderBtn').addEventListener('click', pageOlderFlagged);
     document.getElementById('flaggedNewerBtn').addEventListener('click', pageNewerFlagged);
+    document.getElementById('linkDeviceBtn').addEventListener('click', submitLinkDevice);
 
     // Tab buttons (in both summaries and flagged views)
     var tabButtons = document.querySelectorAll('.tabs button');
