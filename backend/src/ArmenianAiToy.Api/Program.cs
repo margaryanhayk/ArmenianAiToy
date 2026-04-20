@@ -1,3 +1,4 @@
+using ArmenianAiToy.Api.Health;
 using ArmenianAiToy.Api.Middleware;
 using ArmenianAiToy.Infrastructure;
 using ArmenianAiToy.Infrastructure.Data;
@@ -82,7 +83,19 @@ app.UseStaticFiles();
 
 app.MapControllers();
 
-// Health check
-app.MapGet("/api/health", () => Results.Ok(new { status = "ok", service = "ArmenianAiToy API" }));
+// Health check — probes the one real runtime dependency (SQLite). OpenAI
+// config is validated at startup and deliberately not re-probed here; see
+// HealthProbe class comment for the rationale.
+app.MapGet("/api/health", async (AppDbContext db, CancellationToken ct) =>
+{
+    var dbOk = await HealthProbe.IsDatabaseReachableAsync(db, TimeSpan.FromSeconds(2), ct);
+    var payload = new
+    {
+        status = dbOk ? "ok" : "unhealthy",
+        service = "ArmenianAiToy API",
+        database = dbOk ? "ok" : "unreachable"
+    };
+    return dbOk ? Results.Ok(payload) : Results.Json(payload, statusCode: 503);
+});
 
 app.Run();
