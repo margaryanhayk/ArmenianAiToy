@@ -147,6 +147,50 @@ public class CalmPromptContentTests
     }
 
     [Fact]
+    public void Prompt_PinsTurn2DistressVsArcCardinalityCoexistence()
+    {
+        // Regression for Calm F2 (Turn-2 distress-vs-arc cardinality,
+        // low frequency) — named in the footers of `dec51f3` and
+        // `abfa247`. Two load-bearing cardinality rules coexist in
+        // CalmModeInstruction with incompatible Turn-2+ semantics:
+        //
+        //   - BEDTIME-DISTRESS SHAPE at ChatService.cs:399-411 permits
+        //     up to 3 short sentences ("3 short sentences max" —
+        //     ceiling).
+        //   - WIND-DOWN ARC — STRICT at ChatService.cs:445-456 requires
+        //     "Exactly 2 short sentences" on Turn 2 and "Exactly 1
+        //     short sentence" on Turn 3+ (fixed).
+        //
+        // On Turn 1 the two shapes align (distress's 3-max ⊆ arc's
+        // 3-to-4-range), as `8feea8f`'s commit body explicitly noted.
+        // On Turn 2 and Turn 3+ they do not: a distress input on those
+        // turns activates both rules and the prompt does not state
+        // precedence. F2 is the recognition of this latent contradiction.
+        //
+        // Option A resolution (approved): pin the CURRENT coexistence
+        // rather than resolve the precedence. This documents the
+        // contradiction so any future edit that silently drops either
+        // cardinality surface — the distress ceiling, the Turn-2 arc
+        // exact-count, or the Turn-3+ arc exact-count — fails this
+        // test distinctly. A future product decision to resolve F2 by
+        // tightening BEDTIME-DISTRESS SHAPE (Option B) or by adding an
+        // explicit arc-precedence line (Option C) will make exactly
+        // one of these assertions fail, flagging which side of the
+        // contradiction the new wording dropped.
+        //
+        // Pattern mirrors F1 / F3 / F4 Calm prompt-content pins
+        // earlier in this loop. Test-only, no CalmModeInstruction
+        // edit, no BuildCalmTurnDirective edit, no CalmBenchmark
+        // refresh.
+        Assert.Contains("BEDTIME-DISTRESS SHAPE", Prompt);
+        Assert.Contains("3 short sentences max", Prompt);
+        Assert.Contains("WIND-DOWN ARC", Prompt);
+        Assert.Contains("Turn 2", Prompt);
+        Assert.Contains("Exactly 2 short sentences", Prompt);
+        Assert.Contains("Exactly 1 short sentence", Prompt);
+    }
+
+    [Fact]
     public void Prompt_ContainsWindDownArcLadder()
     {
         Assert.Contains("WIND-DOWN ARC", Prompt);
