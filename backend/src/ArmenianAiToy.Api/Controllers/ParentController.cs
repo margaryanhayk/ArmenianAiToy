@@ -143,6 +143,28 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Delete a child profile and all of its conversations (messages cascade
+    /// at the DB level). The authenticated parent must own the device the
+    /// child belongs to. Silent 404 on ownership miss — indistinguishable
+    /// from an unknown id, so a stranger parent cannot probe existence.
+    /// Idempotent: a second call for the same (already-deleted) child id
+    /// also returns 404 in the same shape.
+    /// </summary>
+    [HttpDelete("children/{childId}")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> DeleteChild(Guid childId)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var deleted = await _parentService.DeleteChildAsync(parentId, childId);
+        if (!deleted)
+            return NotFound(new { error = "Child not found or not owned by this account." });
+        return Ok(new { deleted = true });
+    }
+
+    /// <summary>
     /// Pause a linked device. The authenticated parent must own the device.
     /// While paused, POST /api/chat short-circuits with a canned reply
     /// before any OpenAI call, so cost and conversation writes both stop.

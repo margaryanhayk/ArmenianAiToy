@@ -655,6 +655,34 @@
           btn.addEventListener('click', function () { openDevice(d.deviceId); });
           listEl.appendChild(btn);
 
+          // Per-child remove row. Sibling to the clickable device button so
+          // we can attach per-child action buttons without nesting buttons.
+          // Deleting a child also deletes their conversations (service-side
+          // cascade); the confirmation text makes that explicit.
+          if (d.children && d.children.length > 0) {
+            d.children.forEach(function (c) {
+              var childRow = document.createElement('div');
+              childRow.style.cssText =
+                'margin:2px 0;padding:6px 10px;background:#f7f7f7;' +
+                'border-radius:6px;display:flex;justify-content:space-between;' +
+                'align-items:center;font-size:13px;';
+              var childLabel = document.createElement('span');
+              childLabel.textContent = c.name + (c.age != null ? ' (age ' + c.age + ')' : '');
+              childRow.appendChild(childLabel);
+              var removeChildBtn = document.createElement('button');
+              removeChildBtn.type = 'button';
+              removeChildBtn.textContent = 'Remove';
+              removeChildBtn.style.cssText =
+                'padding:4px 10px;font-size:12px;background:transparent;' +
+                'border:1px solid #c66;color:#c66;border-radius:5px;cursor:pointer;';
+              removeChildBtn.addEventListener('click', function () {
+                deleteChild(c.childId, c.name);
+              });
+              childRow.appendChild(removeChildBtn);
+              listEl.appendChild(childRow);
+            });
+          }
+
           // Pause/Resume control, sibling to the row (not nested in the
           // clickable button). Label flips based on current state. Same
           // inline-style pattern used by the unlink button below.
@@ -718,6 +746,42 @@
         }
         if (!res.ok) {
           setStatus('devicesStatus', (currentlyPaused ? 'Resume' : 'Pause') + ' failed (HTTP ' + res.status + ').', 'err');
+          return;
+        }
+        loadDevices();
+      }).catch(function () {
+        setStatus('devicesStatus', 'Network error.', 'err');
+      });
+    }
+
+    // Delete a child profile and all of their conversations. Confirms
+    // with the parent first — this is a hard delete (service-side cascade
+    // removes conversations and messages) with no recovery path. Reloads
+    // the device list on any 2xx so the removed child disappears.
+    function deleteChild(childId, childName) {
+      var token = getToken();
+      if (!token) { show('loginView'); return; }
+      var label = childName || 'this child';
+      if (!window.confirm(
+            'Delete ' + label + "'s profile?\n\n" +
+            'This also permanently deletes all of ' + label +
+            "'s conversations and messages. This cannot be undone.")) return;
+      setStatus('devicesStatus', 'Deleting…', 'muted');
+      fetch('/api/parents/children/' + encodeURIComponent(childId), {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/json'
+        }
+      }).then(function (res) {
+        if (res.status === 401) {
+          clearToken();
+          show('loginView');
+          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          return;
+        }
+        if (!res.ok) {
+          setStatus('devicesStatus', 'Delete failed (HTTP ' + res.status + ').', 'err');
           return;
         }
         loadDevices();

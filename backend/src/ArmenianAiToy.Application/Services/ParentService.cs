@@ -135,6 +135,44 @@ public class ParentService : IParentService
         return true;
     }
 
+    public async Task<bool> DeleteChildAsync(Guid parentId, Guid childId)
+    {
+        // Ownership: the parent must own the device the child belongs to.
+        // Same shape as SetDevicePauseStateAsync — silent false on a miss,
+        // no existence leak for children owned by other parents.
+        var child = await _db.Set<Child>().FirstOrDefaultAsync(c => c.Id == childId);
+        if (child == null)
+            return false;
+
+        var ownsDevice = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == child.DeviceId);
+        if (!ownsDevice)
+            return false;
+
+        // Service-level cascade for the one non-cascading FK:
+        // Conversation.ChildId → Children is NoAction (initial migration), so
+        // we must delete the child's conversations before removing the Child
+        // row. Messages → Conversations IS Cascade, so Messages go with
+        // their Conversations at the DB level in the same SaveChanges.
+        //
+        // Kept service-level (rather than a schema FK change to Cascade) so
+        // the cascade is auditable in the log line below and easy to adjust
+        // if product ever prefers detach-over-delete semantics.
+        var conversations = await _db.Set<Conversation>()
+            .Where(c => c.ChildId == childId)
+            .ToListAsync();
+        if (conversations.Count > 0)
+            _db.Set<Conversation>().RemoveRange(conversations);
+
+        _db.Set<Child>().Remove(child);
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Parent {ParentId} deleted child {ChildId} on device {DeviceId} ({ConversationCount} conversations cascaded)",
+            parentId, childId, child.DeviceId, conversations.Count);
+        return true;
+    }
+
     public async Task<bool> SetDevicePauseStateAsync(Guid parentId, Guid deviceId, bool paused)
     {
         // Ownership check: the parent must have a ParentDevice link to this
