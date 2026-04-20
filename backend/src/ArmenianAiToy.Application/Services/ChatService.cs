@@ -1505,6 +1505,56 @@ public class ChatService : IChatService
                             }
                         }
 
+                        // F-Rid-1 fix: re-run Riddle tail-block extraction on
+                        // the retry path. ResponseCleaner.InternalLineRegex
+                        // always strips the literal RIDDLE_* markers from the
+                        // visible reply as a safety net, but without this
+                        // block RiddleSessions is never updated with the
+                        // retry's new round — on Riddle's latin_run retry
+                        // the child's next guess would see
+                        // hasActiveRound=false and get reclassified StartNew,
+                        // silently abandoning the riddle. Mirrors the initial
+                        // extraction at ChatService.cs:1315-1349; matches the
+                        // Story retry pattern above by not re-checking
+                        // safetyFlag (latin_run is a post-moderation
+                        // quality-gate trigger; a Flagged response never
+                        // reaches this retry branch).
+                        if (RiddleTailBlockParser.TryExtract(
+                                retryResp, out var rRiddleStripped, out var rrAnswer, out var rrCategory, out var rrDifficulty))
+                        {
+                            retryResp = rRiddleStripped;
+                            if (detectedMode == DetectedMode.Riddle)
+                            {
+                                var retryRound = new RiddleRound(
+                                    RiddleAnswerMatcher.Normalize(rrAnswer!),
+                                    rrAnswer!,
+                                    rrCategory!,
+                                    rrDifficulty,
+                                    HintsUsed: 0);
+                                RiddleSessions.AddOrUpdate(
+                                    conversation.Id,
+                                    _ => new RiddleSessionState(
+                                        retryRound, rrDifficulty, new List<string> { rrCategory! }, DateTime.UtcNow),
+                                    (_, existing) =>
+                                    {
+                                        var recent = new List<string>(existing.RecentCategories);
+                                        if (!recent.Contains(rrCategory!, StringComparer.OrdinalIgnoreCase))
+                                            recent.Add(rrCategory!);
+                                        while (recent.Count > 3) recent.RemoveAt(0);
+                                        return existing with
+                                        {
+                                            CurrentRound = retryRound,
+                                            LastDifficulty = rrDifficulty,
+                                            RecentCategories = recent,
+                                            UpdatedAt = DateTime.UtcNow,
+                                        };
+                                    });
+                                _logger.LogInformation(
+                                    "Riddle round stored on retry. ConversationId: {ConversationId}, Answer: {Answer}, Category: {Category}, Difficulty: {Difficulty}",
+                                    conversation.Id, rrAnswer, rrCategory, rrDifficulty);
+                            }
+                        }
+
                         aiResponse = retryResp;
                         _logger.LogInformation(
                             "Quality gate retry accepted. ConversationId: {ConversationId}",

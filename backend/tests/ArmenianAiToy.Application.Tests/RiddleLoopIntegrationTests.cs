@@ -97,6 +97,54 @@ public class RiddleLoopIntegrationTests
     }
 
     [Fact]
+    public async Task NewRiddle_LatinRunRetry_ExtractsAnswerFromRetryResponse()
+    {
+        // Regression for F-Rid-1: quality-gate latin_run retry path
+        // (10c-bis) must re-run RiddleTailBlockParser and update
+        // RiddleSessions when the retry produces a NEW_RIDDLE response.
+        // Before the fix, the retry's RIDDLE_ANSWER was silently
+        // orphaned — the child's next guess was reclassified StartNew
+        // because RiddleSessions still held no round (initial response
+        // had a Latin run and no usable tail block).
+        //
+        // First response: contains a 4+ Latin run that trips
+        //                 ResponseQualityGate.CheckRetry → "latin_run".
+        //                 No RIDDLE_ANSWER tail block.
+        // Retry response: clean Armenian riddle with a proper
+        //                 RIDDLE_ANSWER:<answer> tail block (reuses
+        //                 the RiddleWithBlock fixture shape).
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(
+                // Initial response — trips latin_run via the long
+                // English phrase. No tail block, no Armenian riddle.
+                "Armenian text here mixed with english prose sentence.",
+                // Retry response — clean riddle + proper tail block.
+                RiddleWithBlock);
+
+        var r = await _chatService.GetResponseAsync(_deviceId, "give me a riddle");
+
+        // Positive: RiddleSessions now carries the retry's extracted
+        // answer. Without the fix, the initial extraction site never
+        // fired (initial response had no RIDDLE_ANSWER block), and the
+        // retry branch didn't re-extract — so RiddleSessions would be
+        // empty and the TryGetValue below would fail distinctly.
+        Assert.Equal("riddle", r.Mode);
+        Assert.True(ChatService.RiddleSessions.TryGetValue(_conversationId, out var state));
+        Assert.NotNull(state!.CurrentRound);
+        Assert.Equal("\u056d\u0576\u0571\u0578\u0580", state.CurrentRound!.AnswerDisplay); // խնձոր
+        Assert.Equal("fruit", state.CurrentRound.Category);
+
+        // Anti-tautology: the child-facing reply does NOT expose the
+        // literal RIDDLE_ANSWER marker. This catches two regressions:
+        // (a) a future edit that leaves the retry's raw response with
+        //     markers intact (ResponseCleaner bypass), and
+        // (b) a future state update that accidentally stores the
+        //     whole raw retry response as the reply text.
+        Assert.DoesNotContain("RIDDLE_ANSWER", r.Response);
+        Assert.DoesNotContain("---", r.Response);
+    }
+
+    [Fact]
     public async Task NewRiddle_PromptIncludesNewRiddleDirective()
     {
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
