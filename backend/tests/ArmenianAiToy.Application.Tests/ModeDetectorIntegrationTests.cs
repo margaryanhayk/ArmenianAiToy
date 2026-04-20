@@ -263,6 +263,53 @@ public class ModeDetectorIntegrationTests
     }
 
     [Fact]
+    public async Task StoryMode_SystemPrompt_BansTimeFrameOpeners()
+    {
+        // Regression for F-PS-1: the Story system prompt carries two
+        // load-bearing banned-opener invariants —
+        // (1) OPENING VARIETY — STRICT RULE at StoryChoiceInstruction
+        //     (ChatService.cs:~173), which flags time/weather-frame
+        //     openers as OVERUSED and enumerates the allowed-only-when-
+        //     called-for openers "Մի անգամ..." / "Մի գեղեցիկ [X]
+        //     օր/առավոտ/երեկո...".
+        // (2) FINAL STORY CHECK first bullet at ChatService.cs:~336:
+        //     'Opening is NOT "Մի անգամ…" or "Մի գեղեցիկ X
+        //     օր/առավոտ/երեկո…" unless the previous turn called for
+        //     one.'
+        // Both surfaces are currently unpinned. A future prompt
+        // refactor that weakened the STRICT RULE framing of OPENING
+        // VARIETY, dropped the FINAL STORY CHECK bullet, or removed
+        // either banned-opener exemplar would leave the test suite
+        // green while silently eroding opener diversity. This test
+        // pins the presence of both invariants as substrings of the
+        // Story-branch system prompt so that drift fails distinctly.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Աղվեսը քայլեց։\n---\nCHOICE_A:Գնալ ձախ\nCHOICE_B:Գնալ աջ");
+
+        await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s =>
+                s.Contains("OPENING VARIETY — STRICT RULE")
+                && s.Contains("Time/weather-frame openers are")
+                && s.Contains("Opening is NOT")
+                && s.Contains("Մի անգամ")
+                && s.Contains("Մի գեղեցիկ")),
+            Arg.Any<List<(string, string)>>());
+
+        // Anti-tautology: the Story branch must have fired on this turn.
+        // "MANDATORY OUTPUT FORMAT" is the opening line of
+        // StoryChoiceInstruction and is appended to the system prompt
+        // only in the Story branch. Without this, a routing regression
+        // that sent the turn to any other mode, or a future prompt
+        // reshape that dropped the Story branch's opener, would silently
+        // pass the positive assertions above.
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("MANDATORY OUTPUT FORMAT")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
     public async Task ExplicitChoiceSelection_AlwaysStoryMode()
     {
         // Turn 1: Start a story.
