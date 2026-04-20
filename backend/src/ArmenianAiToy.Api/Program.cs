@@ -1,11 +1,14 @@
 using ArmenianAiToy.Api.Health;
 using ArmenianAiToy.Api.Middleware;
+using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Infrastructure;
 using ArmenianAiToy.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,6 +58,31 @@ builder.Services.AddCors(options =>
         policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
 
+// Per-device rate limit for /api/chat. Cost-containment layer — sits ahead
+// of DeviceAuthMiddleware so rejected requests never hit the DB lookup or
+// the OpenAI pipeline. See ChatRateLimiter for the keying rationale.
+var chatPermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Chat:PermitLimit")
+    ?? ChatRateLimiter.DefaultPermitLimit;
+var chatWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:Chat:WindowSeconds")
+    ?? ChatRateLimiter.DefaultWindowSeconds;
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(ChatRateLimiter.PolicyName, ctx =>
+        ChatRateLimiter.PolicyFactory(ctx, chatPermitLimit, chatWindowSeconds));
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)retryAfter.TotalSeconds).ToString();
+        }
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new { error = "Too many requests. Please slow down." }, cancellationToken);
+    };
+});
+
 var app = builder.Build();
 
 // Auto-create/migrate database
@@ -73,6 +101,11 @@ if (app.Environment.IsDevelopment())
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Rate limiter runs BEFORE device-auth middleware so 429s short-circuit the
+// DB validation + OpenAI pipeline. Per-endpoint policy is opted-in via
+// [EnableRateLimiting] on ChatController.
+app.UseRateLimiter();
 
 // Device auth middleware (for /api/chat, /api/audio endpoints)
 app.UseMiddleware<DeviceAuthMiddleware>();

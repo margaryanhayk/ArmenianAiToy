@@ -1,6 +1,8 @@
+using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace ArmenianAiToy.Api.Controllers;
 
@@ -9,6 +11,7 @@ namespace ArmenianAiToy.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/chat")]
+[EnableRateLimiting(ChatRateLimiter.PolicyName)]
 public class ChatController : ControllerBase
 {
     private readonly IChatService _chatService;
