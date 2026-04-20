@@ -308,6 +308,30 @@ public class ChatService : IChatService
         moment. Do not say "since you didn't choose" or blame the child.
         Do not include a CHOICE_A/CHOICE_B block in this response.
 
+        STORY_MEMORY BLOCK — STRICT SCHEMA: After the CHOICE_A/CHOICE_B
+        block, append a STORY_MEMORY block so story state is preserved
+        across turns. The child never sees this block — it is internal
+        continuity state, not part of the narrative.
+        Format — a header line followed by zero or more lowercase
+        key:value lines, one per line:
+        STORY_MEMORY:
+        character:<short Armenian phrase>
+        place:<short Armenian phrase>
+        object:<short Armenian phrase>
+        situation:<short Armenian phrase>
+        mood:<short Armenian phrase>
+        Rules:
+        - Header is exactly "STORY_MEMORY:" on its own line.
+        - Allowed keys are only: character, place, object, situation,
+          mood. All lowercase. No other keys. No capitalized variants.
+        - Every field is OPTIONAL — include only the keys that apply to
+          the current scene. Omit the line entirely for any field you do
+          not have a value for.
+        - One key per line. One short Armenian value per key. No quotes,
+          brackets, bullets, or extra punctuation around the value.
+        - The STORY_MEMORY block comes AFTER the CHOICE_A/CHOICE_B block,
+          never before it. Do not put it inside the story sentences.
+
         FINAL STORY CHECK — READ BEFORE SENDING:
         - Opening is NOT "Մի անգամ…" or "Մի գեղեցիկ X օր/առավոտ/երեկո…" unless the previous turn called for one.
         - The response does NOT end with "՞" and does NOT contain "արդյոք" in any form.

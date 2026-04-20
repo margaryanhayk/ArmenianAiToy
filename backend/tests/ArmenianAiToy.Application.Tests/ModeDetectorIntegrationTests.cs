@@ -219,6 +219,50 @@ public class ModeDetectorIntegrationTests
     }
 
     [Fact]
+    public async Task StoryMode_SystemPrompt_DocumentsStoryMemorySchema()
+    {
+        // Regression for F-PG-1: the Story system prompt used to require
+        // the model to emit a STORY_MEMORY block (via the FORMAT REMINDER
+        // and the runtime memory re-injection at ChatService.cs:1189-1202)
+        // without ever documenting the schema in StoryChoiceInstruction.
+        // StoryMemoryParser.cs:63-70 silently drops any key that is not
+        // one of {character, place, object, situation, mood} (lowercase),
+        // so an undocumented schema causes invented keys to vanish and
+        // cross-turn continuity to weaken. Fix: append an explicit
+        // "STORY_MEMORY BLOCK — STRICT SCHEMA" section to the Story
+        // prompt enumerating the five allowed lowercase keys.
+        // Pin the presence of the schema section and each key so a
+        // future edit that renames the parser's bucket or drops the
+        // prompt section fails this test distinctly.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Աղվեսը քայլեց։\n---\nCHOICE_A:Գնալ ձախ\nCHOICE_B:Գնալ աջ");
+
+        await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s =>
+                s.Contains("STORY_MEMORY BLOCK — STRICT SCHEMA")
+                && s.Contains("STORY_MEMORY:")
+                && s.Contains("character:<short Armenian phrase>")
+                && s.Contains("place:<short Armenian phrase>")
+                && s.Contains("object:<short Armenian phrase>")
+                && s.Contains("situation:<short Armenian phrase>")
+                && s.Contains("mood:<short Armenian phrase>")),
+            Arg.Any<List<(string, string)>>());
+
+        // Anti-tautology: the Story branch must have fired on this turn.
+        // "MANDATORY OUTPUT FORMAT" is the opening line of
+        // StoryChoiceInstruction and is appended to the system prompt
+        // only in the Story branch. Without this, a routing regression
+        // that sent the turn to any other mode, or a future prompt
+        // reshape that dropped the Story branch's opener, would silently
+        // pass the positive assertions above.
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("MANDATORY OUTPUT FORMAT")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
     public async Task ExplicitChoiceSelection_AlwaysStoryMode()
     {
         // Turn 1: Start a story.
