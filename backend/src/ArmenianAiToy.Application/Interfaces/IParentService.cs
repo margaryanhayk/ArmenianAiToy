@@ -10,4 +10,5 @@ public interface IParentService
     Task<bool> UnlinkDeviceAsync(Guid parentId, Guid deviceId);
     Task<List<Guid>> GetLinkedDeviceIdsAsync(Guid parentId);
     Task<List<LinkedDeviceDto>> GetLinkedDeviceDetailsAsync(Guid parentId);
+    Task<bool> ChangePasswordAsync(Guid parentId, string currentPassword, string newPassword);
 }

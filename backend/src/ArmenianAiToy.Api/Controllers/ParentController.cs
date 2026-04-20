@@ -63,6 +63,40 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Change the authenticated parent's own password. Requires the current
+    /// password for re-authentication. New password must satisfy the same
+    /// length rule as registration (≥ 8 chars).
+    /// </summary>
+    [HttpPost("password")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> ChangePassword([FromBody] ParentChangePasswordRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.CurrentPassword) ||
+            string.IsNullOrWhiteSpace(request.NewPassword))
+            return BadRequest(new { error = "Current password and new password are required." });
+
+        // Same minimum length as ParentController.Register (ParentController.cs:35).
+        const int MinPasswordLength = 8;
+        if (request.NewPassword.Length < MinPasswordLength)
+            return BadRequest(new { error = "New password must be at least 8 characters." });
+
+        if (request.CurrentPassword == request.NewPassword)
+            return BadRequest(new { error = "New password must be different from the current password." });
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var changed = await _parentService.ChangePasswordAsync(
+            parentId, request.CurrentPassword, request.NewPassword);
+
+        if (!changed)
+            return BadRequest(new { error = "Current password is incorrect." });
+
+        return Ok(new { changed = true });
+    }
+
+    /// <summary>
     /// Link an existing device to the authenticated parent.
     /// </summary>
     [HttpPost("devices/link")]

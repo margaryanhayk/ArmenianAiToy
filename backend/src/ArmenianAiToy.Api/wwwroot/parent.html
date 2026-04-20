@@ -292,6 +292,19 @@
         <button id="linkDeviceBtn" type="button">Link device</button>
         <div id="linkDeviceStatus" class="status muted" aria-live="polite"></div>
       </div>
+      <div class="account-panel">
+        <button id="togglePasswordBtn" class="link" type="button" aria-expanded="false" aria-controls="changePasswordForm">Change password</button>
+        <div id="changePasswordForm" hidden>
+          <label for="currentPasswordInput">Current password</label>
+          <input id="currentPasswordInput" type="password" autocomplete="current-password">
+          <label for="newPasswordInput">New password (min 8 characters)</label>
+          <input id="newPasswordInput" type="password" autocomplete="new-password">
+          <label for="confirmPasswordInput">Confirm new password</label>
+          <input id="confirmPasswordInput" type="password" autocomplete="new-password">
+          <button id="changePasswordBtn" type="button">Update password</button>
+          <div id="changePasswordStatus" class="status muted" aria-live="polite"></div>
+        </div>
+      </div>
     </section>
 
     <!-- Summaries view -->
@@ -492,6 +505,78 @@
         loadDevices();
       }).catch(function () {
         setStatus('loginStatus', 'Network error.', 'err');
+      });
+    }
+
+    function togglePasswordForm() {
+      var btn = document.getElementById('togglePasswordBtn');
+      var form = document.getElementById('changePasswordForm');
+      var nowVisible = form.hidden;
+      form.hidden = !nowVisible;
+      btn.setAttribute('aria-expanded', nowVisible ? 'true' : 'false');
+      if (!nowVisible) {
+        // Collapsing: clear fields and status so a stale error doesn't linger.
+        document.getElementById('currentPasswordInput').value = '';
+        document.getElementById('newPasswordInput').value = '';
+        document.getElementById('confirmPasswordInput').value = '';
+        setStatus('changePasswordStatus', '', '');
+      }
+    }
+
+    function doChangePassword() {
+      var current = document.getElementById('currentPasswordInput').value;
+      var next = document.getElementById('newPasswordInput').value;
+      var confirm = document.getElementById('confirmPasswordInput').value;
+
+      if (!current || !next || !confirm) {
+        setStatus('changePasswordStatus', 'All three fields are required.', 'err');
+        return;
+      }
+      if (next.length < 8) {
+        setStatus('changePasswordStatus', 'New password must be at least 8 characters.', 'err');
+        return;
+      }
+      if (next !== confirm) {
+        setStatus('changePasswordStatus', 'New password and confirmation do not match.', 'err');
+        return;
+      }
+      if (current === next) {
+        setStatus('changePasswordStatus', 'New password must be different from the current password.', 'err');
+        return;
+      }
+
+      var token = getToken();
+      if (!token) { show('loginView'); return; }
+      setStatus('changePasswordStatus', 'Updating…', 'muted');
+      // authedFetch is GET-only, so POST with inline Authorization header —
+      // same pattern as unlinkDevice and submitLinkDevice elsewhere in this file.
+      fetch('/api/parents/password', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ currentPassword: current, newPassword: next })
+      }).then(function (res) {
+        if (res.status === 401) {
+          clearToken();
+          show('loginView');
+          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          return;
+        }
+        return res.json().then(function (data) {
+          if (res.ok && data && data.changed) {
+            document.getElementById('currentPasswordInput').value = '';
+            document.getElementById('newPasswordInput').value = '';
+            document.getElementById('confirmPasswordInput').value = '';
+            setStatus('changePasswordStatus', 'Password updated.', 'ok');
+          } else {
+            setStatus('changePasswordStatus', (data && data.error) || 'Update failed.', 'err');
+          }
+        });
+      }).catch(function () {
+        setStatus('changePasswordStatus', 'Network error.', 'err');
       });
     }
 
@@ -999,6 +1084,8 @@
       if (e.key === 'Enter') doLogin();
     });
     document.getElementById('logoutBtn').addEventListener('click', doLogout);
+    document.getElementById('togglePasswordBtn').addEventListener('click', togglePasswordForm);
+    document.getElementById('changePasswordBtn').addEventListener('click', doChangePassword);
     document.getElementById('backToDevices').addEventListener('click', loadDevices);
     document.getElementById('flaggedBackToDevices').addEventListener('click', loadDevices);
     document.getElementById('backFromDetailBtn').addEventListener('click', backFromDetail);

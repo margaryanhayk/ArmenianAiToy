@@ -103,6 +103,22 @@ public class ParentService : IParentService
             .ToListAsync();
     }
 
+    public async Task<bool> ChangePasswordAsync(Guid parentId, string currentPassword, string newPassword)
+    {
+        var parent = await _db.Set<Parent>().FirstOrDefaultAsync(p => p.Id == parentId);
+        if (parent == null)
+            return false;
+
+        if (!BCrypt.Net.BCrypt.Verify(currentPassword, parent.PasswordHash))
+            return false;
+
+        parent.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Parent {ParentId} changed password", parentId);
+        return true;
+    }
+
     public async Task<List<LinkedDeviceDto>> GetLinkedDeviceDetailsAsync(Guid parentId)
     {
         var links = await _db.Set<ParentDevice>()
