@@ -13,6 +13,14 @@ namespace ArmenianAiToy.Application.Services;
 
 public class ParentService : IParentService
 {
+    /// <summary>
+    /// Current terms-of-service version recorded on newly registered
+    /// Parent rows. Bump this when the parent-facing terms text changes.
+    /// A bump should be accompanied by a separate re-acknowledgement flow
+    /// for existing parents (not in scope for C1).
+    /// </summary>
+    public const string CurrentTermsVersion = "1.0";
+
     private readonly DbContext _db;
     private readonly IConfiguration _config;
     private readonly ILogger<ParentService> _logger;
@@ -24,24 +32,32 @@ public class ParentService : IParentService
         _logger = logger;
     }
 
-    public async Task<Guid> RegisterAsync(string email, string password)
+    public async Task<Guid> RegisterAsync(string email, string password, bool acceptedTerms)
     {
+        if (!acceptedTerms)
+            throw new InvalidOperationException("Terms must be accepted to register.");
+
         var existing = await _db.Set<Parent>().AnyAsync(p => p.Email == email);
         if (existing)
             throw new InvalidOperationException("Email already registered");
 
+        var now = DateTime.UtcNow;
         var parent = new Parent
         {
             Id = Guid.NewGuid(),
             Email = email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
-            RegisteredAt = DateTime.UtcNow
+            RegisteredAt = now,
+            TermsAcceptedAt = now,
+            TermsVersion = CurrentTermsVersion
         };
 
         _db.Set<Parent>().Add(parent);
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Parent registered: {Email}", email);
+        _logger.LogInformation(
+            "Parent registered: {Email}, terms version {TermsVersion}",
+            email, CurrentTermsVersion);
         return parent.Id;
     }
 

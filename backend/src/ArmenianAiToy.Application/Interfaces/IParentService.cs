@@ -4,7 +4,7 @@ namespace ArmenianAiToy.Application.Interfaces;
 
 public interface IParentService
 {
-    Task<Guid> RegisterAsync(string email, string password);
+    Task<Guid> RegisterAsync(string email, string password, bool acceptedTerms);
     Task<ParentLoginResponse?> LoginAsync(string email, string password);
     Task<bool> LinkDeviceAsync(Guid parentId, Guid deviceId, string apiKey);
     Task<bool> UnlinkDeviceAsync(Guid parentId, Guid deviceId);

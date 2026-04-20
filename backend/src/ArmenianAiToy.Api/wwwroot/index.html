@@ -199,6 +199,10 @@
         <input id="parentEmail" placeholder="Email" style="flex:1;padding:8px;border:2px solid #ddd;border-radius:8px" />
         <input id="parentPass" type="password" placeholder="Password" style="flex:1;padding:8px;border:2px solid #ddd;border-radius:8px" />
       </div>
+      <label style="display:block;margin-bottom:8px;font-size:13px;color:#555">
+        <input id="parentAcceptTerms" type="checkbox" style="margin-right:6px">
+        I have read and accepted the terms of service (required for Register).
+      </label>
       <div style="display:flex;gap:8px">
         <button onclick="parentRegister()" style="padding:8px 16px;background:#28a745;color:white;border:none;border-radius:8px;cursor:pointer">Register</button>
         <button onclick="parentLogin()" style="padding:8px 16px;background:#667eea;color:white;border:none;border-radius:8px;cursor:pointer">Login</button>
@@ -334,12 +338,19 @@
   async function parentRegister() {
     const email = document.getElementById('parentEmail').value;
     const password = document.getElementById('parentPass').value;
+    const acceptedTerms = document.getElementById('parentAcceptTerms').checked;
     const status = document.getElementById('parentStatus');
+    if (!acceptedTerms) {
+      status.textContent = 'You must accept the terms to register.';
+      status.className = 'status err';
+      status.style.display = 'block';
+      return;
+    }
     try {
       const res = await fetch('/api/parents/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, acceptedTerms })
       });
       const data = await res.json();
       status.textContent = res.ok ? `Registered! Now login.` : `Error: ${JSON.stringify(data)}`;

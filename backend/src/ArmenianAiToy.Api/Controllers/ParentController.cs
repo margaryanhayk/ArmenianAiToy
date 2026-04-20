@@ -36,9 +36,17 @@ public class ParentController : ControllerBase
         if (request.Password.Length < MinPasswordLength)
             return BadRequest(new { error = "Password must be at least 8 characters." });
 
+        // C1: explicit consent capture. The DTO defaults AcceptedTerms to
+        // false so a caller that omits the field is equivalent to declining.
+        // Rejected at 400 (client error) rather than 409 (conflict) because
+        // the request itself is malformed — no consent means no registration.
+        if (!request.AcceptedTerms)
+            return BadRequest(new { error = "You must accept the terms to register." });
+
         try
         {
-            var parentId = await _parentService.RegisterAsync(request.Email, request.Password);
+            var parentId = await _parentService.RegisterAsync(
+                request.Email, request.Password, request.AcceptedTerms);
             return Created("", new { parentId });
         }
         catch (InvalidOperationException ex)

@@ -49,11 +49,12 @@ public class ParentServiceAuthTests
     // --- RegisterAsync ---
 
     [Fact]
-    public async Task RegisterAsync_Success_ReturnsIdAndPersists()
+    public async Task RegisterAsync_Success_ReturnsIdAndPersistsConsent()
     {
         var (service, db) = CreateService();
+        var before = DateTime.UtcNow;
 
-        var id = await service.RegisterAsync("test@example.com", "password123");
+        var id = await service.RegisterAsync("test@example.com", "password123", acceptedTerms: true);
 
         Assert.NotEqual(Guid.Empty, id);
         var parent = await db.Set<Parent>().FindAsync(id);
@@ -61,6 +62,26 @@ public class ParentServiceAuthTests
         Assert.Equal("test@example.com", parent!.Email);
         Assert.NotEqual("password123", parent.PasswordHash); // hashed, not plaintext
         Assert.True(BCrypt.Net.BCrypt.Verify("password123", parent.PasswordHash));
+        // C1: consent fields recorded on success.
+        Assert.NotNull(parent.TermsAcceptedAt);
+        Assert.True(parent.TermsAcceptedAt >= before && parent.TermsAcceptedAt <= DateTime.UtcNow);
+        Assert.Equal(ParentService.CurrentTermsVersion, parent.TermsVersion);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_TermsNotAccepted_ThrowsAndDoesNotPersist()
+    {
+        // C1 service-level guard: even if a caller somehow reaches the
+        // service with acceptedTerms=false (e.g. a test harness or a future
+        // non-controller entry point), the service must refuse and leave
+        // the Parents table untouched.
+        var (service, db) = CreateService();
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.RegisterAsync("test@example.com", "password123", acceptedTerms: false));
+
+        Assert.Contains("Terms must be accepted", ex.Message);
+        Assert.Equal(0, await db.Set<Parent>().CountAsync());
     }
 
     [Fact]
@@ -77,7 +98,7 @@ public class ParentServiceAuthTests
         await db.SaveChangesAsync();
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.RegisterAsync("existing@example.com", "newpass"));
+            () => service.RegisterAsync("existing@example.com", "newpass", acceptedTerms: true));
 
         Assert.Contains("already registered", ex.Message);
     }
