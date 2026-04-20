@@ -36,7 +36,88 @@ dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 dotnet user-secrets set "OpenAI:ApiKey" "sk-..." --project src/ArmenianAiToy.Api
 ```
 
-Database (SQLite) auto-creates on first run via `EnsureCreated()`.
+Database (SQLite) auto-applies EF Core migrations on first run via
+`db.Database.Migrate()`. See **Database migrations** below.
+
+## Database migrations
+
+The schema is owned by EF Core migrations (not `EnsureCreated()`).
+Migration sources live in
+`backend/src/ArmenianAiToy.Infrastructure/Data/Migrations/`, and
+`dotnet-ef` is pinned to 9.0.3 via `.config/dotnet-tools.json` at the
+repo root.
+
+### First-time setup (fresh clone)
+
+```bash
+dotnet tool restore                              # install pinned dotnet-ef
+```
+
+### Running the API
+
+No action needed — `Program.cs` calls `Migrate()` at startup.
+
+### Adding a new migration
+
+```bash
+# From backend/
+dotnet ef migrations add <Name> \
+  --project src/ArmenianAiToy.Infrastructure \
+  --output-dir Data/Migrations
+```
+
+A design-time `AppDbContextFactory` at
+`Infrastructure/Data/AppDbContextFactory.cs` lets `dotnet ef` build
+contexts without booting `Program.cs`, so generating migrations does
+not require `Jwt:Key` or `OpenAI:ApiKey` to be provisioned.
+
+### Updating a dev DB after pulling new migrations
+
+Just run the API — `Migrate()` applies anything unapplied. Alternatively:
+
+```bash
+dotnet ef database update --project src/ArmenianAiToy.Infrastructure
+```
+
+### Cut-over policy for pre-migrations DBs
+
+This repo **switched from `EnsureCreated()` to `Migrate()`** in the A4
+commit. DBs created before that commit have no `__EFMigrationsHistory`
+table, so `Migrate()` will try to re-create all tables and fail.
+
+Two resolution paths:
+
+1. **delete-and-recreate** (the policy for this commit, and for any
+   local dev DB at `backend/src/ArmenianAiToy.Api/armenian_ai_toy.db*`):
+   simply delete the three SQLite files (`.db`, `.db-shm`, `.db-wal`)
+   before starting the API. `Migrate()` will create a fresh schema.
+   Only safe when the DB contents are disposable (dev laptops).
+
+2. **baseline-adoption** (recommended for future staging / production
+   DBs that carry real data): mark the existing schema as-if the
+   `Initial` migration was already applied, then let `Migrate()`
+   apply any later migrations normally.
+   ```bash
+   # One-time adoption script (run against the legacy DB):
+   sqlite3 armenian_ai_toy.db <<'SQL'
+   CREATE TABLE IF NOT EXISTS __EFMigrationsHistory (
+     MigrationId TEXT NOT NULL CONSTRAINT PK___EFMigrationsHistory PRIMARY KEY,
+     ProductVersion TEXT NOT NULL
+   );
+   INSERT OR IGNORE INTO __EFMigrationsHistory (MigrationId, ProductVersion)
+     VALUES ('20260420201336_Initial', '9.0.3');
+   SQL
+   ```
+   After this, `Migrate()` sees `Initial` as applied and only runs
+   migrations added after it.
+
+### Rule of thumb
+
+- **Never call `EnsureCreated()` on a real DB again.** It bypasses the
+  migrations history and corrupts the adoption contract.
+- Tests using `UseInMemoryDatabase(...)` are unaffected — the
+  in-memory provider does not participate in migrations. They may
+  continue to use the existing pattern.
 
 ## Architecture
 

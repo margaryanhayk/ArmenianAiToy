@@ -85,11 +85,16 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
-// Auto-create/migrate database
+// Apply any unapplied EF Core migrations. Replaces the previous
+// EnsureCreated() call — migrations are now the single source of truth
+// for the schema. First-pull-after-this-commit policy: delete any
+// legacy dev DB file (armenian_ai_toy.db*) before running, because it
+// predates the __EFMigrationsHistory table. See CLAUDE.md § Database
+// migrations for the baseline-adoption alternative used for staging/prod.
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    db.Database.Migrate();
 }
 
 if (app.Environment.IsDevelopment())
