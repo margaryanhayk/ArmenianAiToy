@@ -23,7 +23,11 @@ public class ChatControllerPath5Tests
 
     private static ChatController CreateController(IChatService chatService)
     {
-        var controller = new ChatController(chatService);
+        // IDeviceService.IsDevicePausedAsync returns false by default (NSubstitute
+        // default for Task<bool>), so the pause gate added in the B3 commit is a
+        // no-op here and these Path-5 tests exercise the same code path as before.
+        var deviceService = Substitute.For<IDeviceService>();
+        var controller = new ChatController(chatService, deviceService);
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = Guid.NewGuid();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };

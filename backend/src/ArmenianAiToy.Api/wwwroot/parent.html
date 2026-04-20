@@ -642,8 +642,34 @@
             btn.appendChild(sub);
           }
 
+          if (d.isPaused) {
+            var pausedBadge = document.createElement('div');
+            pausedBadge.textContent = 'Paused by you';
+            pausedBadge.style.cssText =
+              'margin:2px 0 0;padding:2px 8px;display:inline-block;' +
+              'background:#fff3cd;border:1px solid #e0a800;color:#856404;' +
+              'border-radius:4px;font-size:12px;';
+            btn.appendChild(pausedBadge);
+          }
+
           btn.addEventListener('click', function () { openDevice(d.deviceId); });
           listEl.appendChild(btn);
+
+          // Pause/Resume control, sibling to the row (not nested in the
+          // clickable button). Label flips based on current state. Same
+          // inline-style pattern used by the unlink button below.
+          var pauseBtn = document.createElement('button');
+          pauseBtn.type = 'button';
+          pauseBtn.textContent = d.isPaused ? 'Resume' : 'Pause';
+          pauseBtn.setAttribute('data-device-id', d.deviceId);
+          pauseBtn.style.cssText =
+            'margin:4px 8px 12px 0;padding:6px 12px;font-size:13px;' +
+            'background:transparent;border:1px solid #999;color:#555;' +
+            'border-radius:6px;cursor:pointer;';
+          pauseBtn.addEventListener('click', function () {
+            toggleDevicePause(d.deviceId, d.deviceName, d.isPaused);
+          });
+          listEl.appendChild(pauseBtn);
 
           // Unlink control, rendered as a sibling so we don't nest a button
           // inside the clickable row. Styling is inline to keep the diff
@@ -665,6 +691,38 @@
       }).catch(function (err) {
         if (err && err.status === 401) return;
         setStatus('devicesStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+      });
+    }
+
+    // Toggle pause/resume on a linked device. Posts to the appropriate
+    // endpoint and reloads the device list on 2xx so the button label
+    // flips. Idempotent on the server, so a double-click is harmless.
+    function toggleDevicePause(deviceId, deviceName, currentlyPaused) {
+      var token = getToken();
+      if (!token) { show('loginView'); return; }
+      var path = currentlyPaused ? 'resume' : 'pause';
+      var verb = currentlyPaused ? 'Resuming' : 'Pausing';
+      setStatus('devicesStatus', verb + '…', 'muted');
+      fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/' + path, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/json'
+        }
+      }).then(function (res) {
+        if (res.status === 401) {
+          clearToken();
+          show('loginView');
+          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          return;
+        }
+        if (!res.ok) {
+          setStatus('devicesStatus', (currentlyPaused ? 'Resume' : 'Pause') + ' failed (HTTP ' + res.status + ').', 'err');
+          return;
+        }
+        loadDevices();
+      }).catch(function () {
+        setStatus('devicesStatus', 'Network error.', 'err');
       });
     }
 

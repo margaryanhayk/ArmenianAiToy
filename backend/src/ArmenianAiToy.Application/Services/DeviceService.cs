@@ -65,4 +65,17 @@ public class DeviceService : IDeviceService
             await _db.SaveChangesAsync();
         }
     }
+
+    public async Task<bool> IsDevicePausedAsync(Guid deviceId)
+    {
+        // Single-field read — avoids materializing the full Device row
+        // on the hot chat path. Returns false for an unknown device id so
+        // the chat gate's "paused short-circuit" is never triggered by a
+        // deleted/renamed device; the downstream DeviceAuthMiddleware
+        // already 401s invalid credentials earlier in the pipeline.
+        return await _db.Set<Device>()
+            .Where(d => d.Id == deviceId)
+            .Select(d => d.IsPaused)
+            .FirstOrDefaultAsync();
+    }
 }

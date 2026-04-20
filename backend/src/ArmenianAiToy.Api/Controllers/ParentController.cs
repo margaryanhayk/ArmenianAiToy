@@ -135,6 +135,44 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Pause a linked device. The authenticated parent must own the device.
+    /// While paused, POST /api/chat short-circuits with a canned reply
+    /// before any OpenAI call, so cost and conversation writes both stop.
+    /// Idempotent — calling pause on an already-paused device returns 200.
+    /// </summary>
+    [HttpPost("devices/{deviceId}/pause")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> PauseDevice(Guid deviceId)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ok = await _parentService.SetDevicePauseStateAsync(parentId, deviceId, paused: true);
+        if (!ok)
+            return NotFound(new { error = "Device not found or not linked to this account." });
+        return Ok(new { paused = true });
+    }
+
+    /// <summary>
+    /// Resume a paused linked device. Mirror of the pause endpoint.
+    /// Idempotent — calling resume on an already-active device returns 200.
+    /// </summary>
+    [HttpPost("devices/{deviceId}/resume")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> ResumeDevice(Guid deviceId)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ok = await _parentService.SetDevicePauseStateAsync(parentId, deviceId, paused: false);
+        if (!ok)
+            return NotFound(new { error = "Device not found or not linked to this account." });
+        return Ok(new { paused = false });
+    }
+
+    /// <summary>
     /// List linked devices with child info and last activity.
     /// </summary>
     [HttpGet("devices/details")]

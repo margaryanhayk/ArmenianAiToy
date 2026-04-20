@@ -1,6 +1,7 @@
 using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Interfaces;
+using ArmenianAiToy.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -15,10 +16,19 @@ namespace ArmenianAiToy.Api.Controllers;
 public class ChatController : ControllerBase
 {
     private readonly IChatService _chatService;
+    private readonly IDeviceService _deviceService;
 
-    public ChatController(IChatService chatService)
+    // Child-facing canned reply when a parent has paused the device. Kept
+    // short, age-appropriate, and tells the child to involve their parent.
+    // Never passed through AI / moderation — it is a constant.
+    internal const string PausedResponse =
+        "\u0540\u056b\u0574\u0561 \u0570\u0561\u0576\u0563\u057d\u057f\u0561\u0576\u0578\u0582\u0574 \u0565\u0574\u0589 \u053e\u0576\u0578\u0572\u056b\u0564 \u056f\u0561\u0580\u0578\u0572 \u0567 \u0576\u0578\u0580\u056b\u0581 \u0574\u056b\u0561\u0581\u0576\u0565\u056c\u0589";
+        // «Հիմա հանգստանում եմ։ Ծնողդ կարող է նորից միացնել։»
+
+    public ChatController(IChatService chatService, IDeviceService deviceService)
     {
         _chatService = chatService;
+        _deviceService = deviceService;
     }
 
     /// <summary>
@@ -39,6 +49,15 @@ public class ChatController : ControllerBase
             return BadRequest(new { error = "Message is required" });
 
         var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
+
+        // Pause gate — runs before any ChatService call, so a paused device
+        // never reaches moderation, chat generation, or conversation writes.
+        // The response envelope uses SafetyFlag.Clean (not Blocked/Flagged)
+        // because this is a parent-initiated soft-off, not a safety event.
+        if (await _deviceService.IsDevicePausedAsync(deviceId))
+        {
+            return Ok(new ChatResponse(PausedResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
+        }
 
         try
         {

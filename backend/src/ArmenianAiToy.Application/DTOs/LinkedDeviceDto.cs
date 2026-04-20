@@ -11,7 +11,8 @@ public record LinkedDeviceDto(
     DateTime LastSeenAt,
     DateTime LinkedAt,
     DateTime? LastConversationAt,
-    List<LinkedDeviceChildDto> Children);
+    List<LinkedDeviceChildDto> Children,
+    bool IsPaused);
 
 public record LinkedDeviceChildDto(
     Guid ChildId,

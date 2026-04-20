@@ -119,6 +119,37 @@ public class ParentService : IParentService
         return true;
     }
 
+    public async Task<bool> SetDevicePauseStateAsync(Guid parentId, Guid deviceId, bool paused)
+    {
+        // Ownership check: the parent must have a ParentDevice link to this
+        // device id. Silent false on missing link — matches UnlinkDeviceAsync's
+        // no-existence-leak shape. Same pattern used by the
+        // ConversationController read endpoints.
+        var linked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!linked)
+            return false;
+
+        var device = await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == deviceId);
+        if (device == null)
+            return false;
+
+        if (device.IsPaused == paused)
+        {
+            // Idempotent: already in the requested state. Log at debug depth
+            // would be noise; skip the log and return true so the caller
+            // sees success either way.
+            return true;
+        }
+
+        device.IsPaused = paused;
+        await _db.SaveChangesAsync();
+        _logger.LogInformation(
+            "Parent {ParentId} set device {DeviceId} paused={Paused}",
+            parentId, deviceId, paused);
+        return true;
+    }
+
     public async Task<List<LinkedDeviceDto>> GetLinkedDeviceDetailsAsync(Guid parentId)
     {
         var links = await _db.Set<ParentDevice>()
@@ -151,7 +182,8 @@ public class ParentService : IParentService
             lastConversationByDevice.TryGetValue(l.Device.Id, out var lastConv) ? lastConv : null,
             childrenByDevice.TryGetValue(l.Device.Id, out var children)
                 ? children.Select(c => new LinkedDeviceChildDto(c.Id, c.Name, c.GetAge(), c.Gender)).ToList()
-                : new List<LinkedDeviceChildDto>()
+                : new List<LinkedDeviceChildDto>(),
+            l.Device.IsPaused
         )).ToList();
     }
 
