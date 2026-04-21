@@ -281,6 +281,9 @@
     <!-- Devices view -->
     <section id="devicesView" class="card" hidden>
       <h2>Linked devices</h2>
+      <div style="margin:0 0 8px;">
+        <button id="openAuditBtn" class="link" type="button">View your activity →</button>
+      </div>
       <div id="devicesList"></div>
       <div id="devicesStatus" class="status muted" aria-live="polite"></div>
       <div id="linkDeviceEmptyState" class="link-device-empty" hidden>
@@ -368,6 +371,24 @@
       <div id="detailMessages"></div>
       <div id="detailStatus" class="status" aria-live="polite"></div>
     </section>
+
+    <!-- Audit view — parent-facing audit history. Feed is per *actor
+         parent*, not per device: a device shared with another parent
+         does not leak that parent's actions into this feed. -->
+    <section id="auditView" class="card" hidden>
+      <h2><button class="link" id="backFromAudit" aria-label="Back to devices">← Devices</button> Your activity</h2>
+      <p style="color:#555;font-size:13px;margin:4px 0 12px;">
+        Actions you have taken on this account. Per-device activity
+        (conversations, flagged messages) is shown under each device.
+      </p>
+      <div id="auditList"></div>
+      <div id="auditStatus" class="status muted" aria-live="polite"></div>
+      <div class="pager">
+        <button id="auditNewerBtn" class="secondary" aria-label="Newer page">← Newer</button>
+        <button id="auditOlderBtn" class="secondary" aria-label="Older page">Older →</button>
+      </div>
+      <div id="auditPagerInfo" class="pager-info"></div>
+    </section>
   </div>
 
   <script>
@@ -381,9 +402,29 @@
       currentDeviceId: null,
       offset: 0,
       flaggedOffset: 0,
+      auditOffset: 0,
       backFromDetail: null,
       lastSummariesPageSize: 0,
-      lastFlaggedPageSize: 0
+      lastFlaggedPageSize: 0,
+      lastAuditPageSize: 0,
+      // Cache of the most recent /api/parents/devices/details response so
+      // the audit view can resolve TargetDeviceId / TargetChildId to human
+      // names without a second round trip. Updated every loadDevices().
+      lastDevicesResponse: []
+    };
+
+    // B5/audit: friendly labels for audit event types in the dashboard.
+    // Unknown / future event types fall back to the raw enum name, so
+    // rows never disappear if a new event ships before the dashboard
+    // mapping is updated.
+    var AUDIT_LABELS = {
+      ParentAccountDeleted: 'Account deleted',
+      ParentChildDeleted: 'Child profile removed',
+      ParentDeviceUnlinked: 'Device unlinked',
+      ParentPasswordChanged: 'Password changed',
+      ParentDevicePauseStateChanged: 'Device paused/resumed',
+      ParentBedtimeWindowSet: 'Bedtime window updated',
+      ParentDeviceModeFlagsSet: 'Modes updated'
     };
 
     // ---------- helpers ----------
@@ -392,7 +433,7 @@
     function clearToken() { sessionStorage.removeItem(TOKEN_KEY); }
 
     function show(viewId) {
-      var ids = ['loginView', 'devicesView', 'summariesView', 'flaggedView', 'detailView'];
+      var ids = ['loginView', 'devicesView', 'summariesView', 'flaggedView', 'detailView', 'auditView'];
       for (var i = 0; i < ids.length; i++) {
         document.getElementById(ids[i]).hidden = (ids[i] !== viewId);
       }
@@ -675,6 +716,8 @@
       clearChildren(listEl);
       authedFetch('/api/parents/devices/details').then(function (data) {
         var devices = (data && data.devices) || [];
+        // Cache for audit-view target id => display-name resolution.
+        state.lastDevicesResponse = devices;
         if (devices.length === 0) {
           setStatus('devicesStatus', 'No devices linked to this account yet.', 'muted');
           // Empty state — show the link-device form so the parent has
@@ -1450,6 +1493,159 @@
       return div;
     }
 
+    // ---------- audit view ----------
+    function loadAudit() {
+      state.auditOffset = 0;
+      show('auditView');
+      fetchAuditPage();
+    }
+    function pageOlderAudit() {
+      state.auditOffset += PAGE_SIZE;
+      fetchAuditPage();
+    }
+    function pageNewerAudit() {
+      state.auditOffset = Math.max(0, state.auditOffset - PAGE_SIZE);
+      fetchAuditPage();
+    }
+    function fetchAuditPage() {
+      setStatus('auditStatus', 'Loading…', 'muted');
+      var listEl = document.getElementById('auditList');
+      clearChildren(listEl);
+      authedFetch('/api/parents/audit?limit=' + PAGE_SIZE + '&offset=' + state.auditOffset)
+        .then(function (data) {
+          var events = (data && data.events) || [];
+          state.lastAuditPageSize = events.length;
+          if (events.length === 0 && state.auditOffset === 0) {
+            setStatus('auditStatus',
+              'No activity yet. When you take an action (deleting a child, changing a password, ' +
+              'adjusting bedtime, toggling modes), it will show up here.', 'muted');
+          } else {
+            setStatus('auditStatus', '', '');
+            events.forEach(function (e) { listEl.appendChild(renderAuditRow(e)); });
+          }
+          updatePager('auditNewerBtn', 'auditOlderBtn', 'auditPagerInfo',
+            state.auditOffset, state.lastAuditPageSize);
+        })
+        .catch(function (err) {
+          if (err && err.status === 401) return; // authedFetch already redirected
+          setStatus('auditStatus',
+            'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+        });
+    }
+
+    function renderAuditRow(e) {
+      var row = document.createElement('div');
+      row.style.cssText =
+        'padding:8px 10px;margin:4px 0;border-bottom:1px solid #eee;';
+      row.title = e.id;
+
+      var top = document.createElement('div');
+      top.style.cssText =
+        'display:flex;justify-content:space-between;align-items:baseline;gap:10px;';
+      var labelSpan = document.createElement('span');
+      labelSpan.textContent = AUDIT_LABELS[e.eventType] || e.eventType;
+      labelSpan.style.fontWeight = '500';
+      top.appendChild(labelSpan);
+      var timeSpan = document.createElement('span');
+      timeSpan.textContent = fmtTime(e.timestamp);
+      timeSpan.style.cssText = 'color:#888;font-size:12px;white-space:nowrap;';
+      top.appendChild(timeSpan);
+      row.appendChild(top);
+
+      var targetText = resolveAuditTarget(e);
+      if (targetText) {
+        var targetDiv = document.createElement('div');
+        targetDiv.className = 'snippet';
+        targetDiv.textContent = targetText;
+        row.appendChild(targetDiv);
+      }
+
+      var summary = auditMetaSummary(e);
+      if (summary) {
+        var sumDiv = document.createElement('div');
+        sumDiv.className = 'snippet';
+        sumDiv.style.color = '#666';
+        sumDiv.textContent = summary;
+        row.appendChild(sumDiv);
+      }
+      return row;
+    }
+
+    function resolveAuditTarget(e) {
+      var parts = [];
+      if (e.targetDeviceId) {
+        var name = null;
+        var devices = state.lastDevicesResponse || [];
+        for (var i = 0; i < devices.length; i++) {
+          if (devices[i].deviceId === e.targetDeviceId) {
+            name = devices[i].deviceName;
+            break;
+          }
+        }
+        parts.push('Device: ' + (name || shortId(e.targetDeviceId)));
+      }
+      if (e.targetChildId) {
+        var childName = null;
+        var devices2 = state.lastDevicesResponse || [];
+        for (var j = 0; j < devices2.length; j++) {
+          var kids = devices2[j].children || [];
+          for (var k = 0; k < kids.length; k++) {
+            if (kids[k].childId === e.targetChildId) {
+              childName = kids[k].name;
+              break;
+            }
+          }
+          if (childName) break;
+        }
+        parts.push('Child: ' + (childName || shortId(e.targetChildId)));
+      }
+      return parts.join(' · ');
+    }
+
+    function auditMetaSummary(e) {
+      var m = e.metadata;
+      if (!m) return '';
+      switch (e.eventType) {
+        case 'ParentAccountDeleted': {
+          var segs = [];
+          if (m.linked_devices != null) segs.push(m.linked_devices + ' linked device(s)');
+          if (m.orphaned_devices_deleted != null)
+            segs.push(m.orphaned_devices_deleted + ' orphaned device(s) deleted');
+          return segs.join(', ');
+        }
+        case 'ParentChildDeleted':
+          return m.conversations_removed != null
+            ? m.conversations_removed + ' conversation(s) removed'
+            : '';
+        case 'ParentDeviceUnlinked':
+          return m.orphan_cascaded
+            ? 'device + subtree cascaded'
+            : 'still linked to other parents';
+        case 'ParentDevicePauseStateChanged':
+          return m.is_paused ? 'paused' : 'resumed';
+        case 'ParentBedtimeWindowSet':
+          if (m.start && m.end) {
+            return 'window set to ' + String(m.start).substring(0, 5) +
+              '–' + String(m.end).substring(0, 5);
+          }
+          return 'window disabled';
+        case 'ParentDeviceModeFlagsSet': {
+          var enabled = [];
+          var disabled = [];
+          ['story', 'game', 'riddle', 'curiosity'].forEach(function (k) {
+            if (m[k] === true) enabled.push(k);
+            else if (m[k] === false) disabled.push(k);
+          });
+          var out = [];
+          if (enabled.length) out.push('enabled: ' + enabled.join(', '));
+          if (disabled.length) out.push('disabled: ' + disabled.join(', '));
+          return out.join(' · ');
+        }
+        default:
+          return '';
+      }
+    }
+
     function backFromDetail() {
       if (typeof state.backFromDetail === 'function') {
         state.backFromDetail();
@@ -1476,6 +1672,10 @@
     document.getElementById('flaggedOlderBtn').addEventListener('click', pageOlderFlagged);
     document.getElementById('flaggedNewerBtn').addEventListener('click', pageNewerFlagged);
     document.getElementById('linkDeviceBtn').addEventListener('click', submitLinkDevice);
+    document.getElementById('openAuditBtn').addEventListener('click', loadAudit);
+    document.getElementById('backFromAudit').addEventListener('click', loadDevices);
+    document.getElementById('auditOlderBtn').addEventListener('click', pageOlderAudit);
+    document.getElementById('auditNewerBtn').addEventListener('click', pageNewerAudit);
 
     // Tab buttons (in both summaries and flagged views)
     var tabButtons = document.querySelectorAll('.tabs button');

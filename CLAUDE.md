@@ -146,7 +146,7 @@ no editing, no deletion, no child-facing features.
 **UI**
 - `wwwroot/parent.html` — single self-contained static page (HTML + inline CSS + vanilla JS, no framework, no build step).
 - Discoverable via a small link inside the Parent Monitoring panel of `wwwroot/index.html`.
-- Views: login → linked devices → conversation summaries / flagged messages tabs → conversation detail.
+- Views: login → linked devices → conversation summaries / flagged messages tabs → conversation detail. A separate **Your activity** view, reached from the "View your activity →" link in the linked-devices header, renders the per-actor audit feed (see § Audit events). The activity view is deliberately *not* nested under a device because the feed is per actor parent, not per device.
 
 **Backend endpoints** (all parent-JWT authenticated, ownership-checked against linked devices)
 - `POST /api/parents/login` — issues JWT
@@ -156,6 +156,7 @@ no editing, no deletion, no child-facing features.
 - `GET  /api/conversations/summary?deviceId=&limit=&offset=` — lightweight summary rows with snippets
 - `GET  /api/conversations/flagged?deviceId=&limit=&offset=` — flat newest-first list of non-Clean messages
 - `GET  /api/conversations/{conversationId}` — full conversation detail (404 on not-yours, no existence leak)
+- `GET  /api/parents/audit?limit=&offset=` — per-actor audit history; see § Audit events for the response shape.
 
 **Pagination guard**: list endpoints reject `offset < 0` and `limit < 1` with 400, and clamp `limit > 100` to 100. Lives as a private static helper inside `ConversationController`.
 
@@ -167,6 +168,7 @@ no editing, no deletion, no child-facing features.
 5. Pagination: ← Newer disabled on page 1, Older → disabled on last page, "Page N" label visible.
 6. Bad inputs: `?offset=-1` → 400; `?limit=0` → 400; `?limit=500` → 200 with at most 100 rows.
 7. Log out → returns to login view, token cleared from sessionStorage.
+8. **Your activity**: in the linked-devices view, click "View your activity →". Empty-state copy appears for a freshly-registered parent. After triggering a parental action (pause/resume, bedtime window, mode flags toggle, child delete, etc.), refresh: a row appears with the friendly label (e.g. *Device paused/resumed*), timestamp, resolved device/child name where applicable, and one-line metadata summary. Pagination (← Newer / Older →) disables correctly on first page / short final page. ← Devices returns to the linked-devices view.
 
 ## Audit events
 
@@ -214,8 +216,15 @@ another parent does not leak the other parent's actions into this feed.
 "What did I do?" — yes. "What happened to this shared device?" — no;
 that would be a separate slice.
 
-**Endpoint-only in this slice.** No dashboard tab; the parent
-dashboard UI is a follow-on commit.
+**Dashboard surface.** `parent.html` renders the feed in a dedicated
+**Your activity** view, reached from the "View your activity →" link
+on the linked-devices header. Rows show a friendly label (mapped
+client-side with a raw-enum-name fallback for unknown types), the
+timestamp, the resolved device/child name (short id fallback when the
+target has since been deleted), and a one-line metadata summary. No
+filters, no raw-JSON expander, no per-event detail page in this slice.
+The view is placed at the devices-list level deliberately, because the
+feed is per actor parent, not per device.
 
 **Invariants** (do not regress):
 - **No foreign keys** from `AuditEvent` to `Parent` / `Device` / `Child`.
