@@ -18,4 +18,5 @@ public interface IParentService
         bool story, bool game, bool riddle, bool curiosity);
     Task<bool> DeleteChildAsync(Guid parentId, Guid childId);
     Task<bool> DeleteAccountAsync(Guid parentId, string currentPassword);
+    Task<List<AuditEventDto>> GetAuditEventsForParentAsync(Guid parentId, int limit, int offset);
 }

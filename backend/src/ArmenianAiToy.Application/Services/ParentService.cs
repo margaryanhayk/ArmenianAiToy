@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json.Nodes;
 using Microsoft.IdentityModel.Tokens;
 
 namespace ArmenianAiToy.Application.Services;
@@ -416,6 +417,33 @@ public class ParentService : IParentService
             l.Device.GameEnabled,
             l.Device.RiddleEnabled,
             l.Device.CuriosityEnabled
+        )).ToList();
+    }
+
+    public async Task<List<AuditEventDto>> GetAuditEventsForParentAsync(
+        Guid parentId, int limit, int offset)
+    {
+        // Ownership is enforced at the query level — there is no code path
+        // below that could return another parent's row. Caller is already
+        // [Authorize]'d in the controller; the parentId comes from their
+        // JWT claim. Caller is also responsible for clamping limit/offset.
+        var rows = await _db.Set<AuditEvent>()
+            .Where(a => a.ActorParentId == parentId)
+            .OrderByDescending(a => a.Timestamp)
+            .Skip(offset)
+            .Take(limit)
+            .ToListAsync();
+
+        return rows.Select(a => new AuditEventDto(
+            a.Id,
+            a.Timestamp,
+            a.EventType.ToString(),
+            a.TargetDeviceId,
+            a.TargetChildId,
+            // Parsed JsonNode so the wire payload is an actual JSON object,
+            // not an escaped string. Factory code is the only writer so the
+            // blob is always valid JSON (or null).
+            a.Metadata is null ? null : JsonNode.Parse(a.Metadata)
         )).ToList();
     }
 

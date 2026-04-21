@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (787 tests)
+dotnet test                                     # Run all tests (797 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -171,8 +171,8 @@ no editing, no deletion, no child-facing features.
 ## Audit events
 
 An append-only `AuditEvents` table records sensitive parent actions.
-Write-only surface for now — no API, no UI, no query path. Rows are
-written inside the same `SaveChangesAsync` as the action they describe.
+Rows are written inside the same `SaveChangesAsync` as the action they
+describe.
 
 **Events captured** (`AuditEventType`):
 - `ParentAccountDeleted` — emitted in `ParentService.DeleteAccountAsync`.
@@ -190,9 +190,32 @@ written inside the same `SaveChangesAsync` as the action they describe.
   `ParentService.SetBedtimeWindowAsync` on every successful write.
   Metadata carries the post-normalization `start`/`end` (both null when
   the window is disabled or the caller passed half-null).
+- `ParentDeviceModeFlagsSet` — emitted in
+  `ParentService.SetDeviceModeFlagsAsync` on every successful write.
+  Metadata carries the post-save four-bool state
+  (`story`/`game`/`riddle`/`curiosity`).
 
 Register / login / chat / moderation / rate-limit events remain
 deliberately out of scope.
+
+**Parent-facing read endpoint**:
+`GET /api/parents/audit?limit=&offset=` — parent-JWT authenticated;
+returns only rows where `ActorParentId == parentId`, newest first.
+Same pagination contract as the conversation endpoints
+(`offset < 0` and `limit < 1` → 400; `limit > 100` clamped to 100;
+defaults `limit=20`, `offset=0`). Response wrapper:
+`{ "events": [ { id, timestamp, eventType, targetDeviceId, targetChildId, metadata } ] }`.
+`metadata` is returned as a JSON object (parsed from the stored blob),
+not as an escaped JSON string. `ActorParentId` is not exposed on the
+wire — every row a parent reads is their own by the query filter.
+
+**Feed is per *actor parent*, not per device.** A device shared with
+another parent does not leak the other parent's actions into this feed.
+"What did I do?" — yes. "What happened to this shared device?" — no;
+that would be a separate slice.
+
+**Endpoint-only in this slice.** No dashboard tab; the parent
+dashboard UI is a follow-on commit.
 
 **Invariants** (do not regress):
 - **No foreign keys** from `AuditEvent` to `Parent` / `Device` / `Child`.
