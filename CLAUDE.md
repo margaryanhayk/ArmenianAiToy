@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (808 tests)
+dotnet test                                     # Run all tests (829 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -420,7 +420,10 @@ interface without adding that credential.
 | Counter | Tag(s) | Tag value space | Increment site |
 |---|---|---|---|
 | `aat_chat_gate_trip_total` | `gate` | `paused` / `bedtime` / `mode_disabled` | `ChatController.Chat` short-circuit branches |
-| `aat_chat_openai_failure_total` | — | — | `ChatController.Chat` Path-5 catch |
+| `aat_chat_openai_failure_total` | `kind` | `rate_limited` / `timeout` / `upstream_5xx` / `auth_failure` / `other` | `OpenAIReliabilityGate` (after classification) |
+| `aat_chat_openai_retry_total` | — | — | `OpenAIReliabilityGate` (before each retry attempt) |
+| `aat_chat_openai_circuit_trip_total` | — | — | `OpenAIReliabilityGate` on each closed→open transition |
+| `aat_chat_openai_circuit_short_circuit_total` | — | — | `OpenAIReliabilityGate` on each fail-fast while open |
 | `aat_rate_limit_rejected_total` | — | — | `ChatRateLimiter` `OnRejected` handler in `Program.cs` |
 | `aat_health_probe_total` | `result` | `ok` / `unhealthy` | `GET /api/health` endpoint lambda |
 | `aat_audit_events_written_total` | `event_type` | enum names of `AuditEventType` | `ParentService.TrackAndAddAudit` helper on every successful `AuditEvent` write |
@@ -457,6 +460,44 @@ mature in practice).
    output including at minimum `aat_health_probe_total{result="ok"} 1`.
 4. (Optional) Development only — stdout shows a span emitted by the
    console trace exporter for the same request.
+
+### OpenAI reliability
+
+`OpenAIReliabilityGate` wraps the chat SDK call with a classification-
+aware retry policy and a minimal circuit breaker. User-facing response
+shape is **unchanged** — on final failure the gate rethrows the
+classified exception, which `ChatController`'s existing Path-5 catch
+returns as the same sanitized 502.
+
+**Failure classes** (`OpenAIFailureKind`): `RateLimited` (HTTP 429),
+`Timeout` (`OperationCanceledException` / `TimeoutException`),
+`UpstreamServerError` (HTTP 5xx), `AuthFailure` (HTTP 401/403),
+`Other` (everything else).
+
+**Retry policy**: at most one retry (`MaxAttempts = 2`); retryable
+kinds are `RateLimited`, `Timeout`, `UpstreamServerError`.
+`AuthFailure` and `Other` are **never** retried. Backoff is ~500 ms
+with ±25% jitter; 429 honors a `Retry-After` header when present,
+capped at 5 seconds. The existing 30-second adapter timeout is the
+outer ceiling.
+
+**Circuit breaker**: trips after **5 failures within a 30-second
+rolling window**; open for **60 seconds**; at end-of-open one
+half-open probe is allowed — success closes, failure reopens.
+Short-circuited calls throw `OpenAIReliabilityCircuitOpenException`,
+caught by the same Path-5 catch. One `LogWarning` on each
+closed→open transition.
+
+**Scope — moderation is NOT routed through this gate.**
+`OpenAIModerationAdapter` has its own purpose-specific D1 policy
+(single retry on 429, never-retry on 5xx / timeout / auth) and a
+**fail-closed-to-sentinel** contract (`ModerationResult(IsSafe=false,
+["moderation_unavailable"])`) that's child-safety-critical — a
+moderation failure must always surface to `ChatService` as "unsafe,"
+never as an exception. Routing moderation through the general-purpose
+gate would change retry semantics for 5xx and timeout (the gate
+retries them; moderation deliberately does not). See
+`ModerationFailClosedTests` for the safety contract.
 
 ## Engineering Guardrails
 

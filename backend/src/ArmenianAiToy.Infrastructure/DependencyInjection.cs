@@ -31,6 +31,15 @@ public static class DependencyInjection
         services.AddSingleton(openAiClient.GetChatClient(chatModel));
         services.AddSingleton(openAiClient.GetModerationClient(moderationModel));
 
+        // Reliability gate for the chat adapter. Singleton because the
+        // circuit-breaker state (recent-failure window, open-until) must
+        // persist across scoped requests. The moderation adapter
+        // deliberately does NOT route through this gate — it has its own
+        // purpose-specific D1 retry policy and fail-closed-to-sentinel
+        // contract that's child-safety-critical; see CLAUDE.md §
+        // OpenAI reliability for the rationale.
+        services.AddSingleton<OpenAIReliabilityGate>();
+
         // Adapters
         services.AddScoped<IAiChatClient, OpenAIChatClientAdapter>();
         services.AddScoped<IModerationService, OpenAIModerationAdapter>();

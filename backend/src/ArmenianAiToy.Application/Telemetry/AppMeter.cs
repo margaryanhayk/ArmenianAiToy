@@ -43,13 +43,51 @@ public static class AppMeter
             description: "Count of chat-gate short-circuits by gate kind.");
 
     /// <summary>
-    /// Count of Path-5 OpenAI upstream failures caught in
-    /// <c>ChatController.Chat</c>. No tags.
+    /// Count of OpenAI upstream failures classified by the
+    /// <c>OpenAIReliabilityGate</c>. Incremented inside the gate
+    /// immediately after classification, so the <c>kind</c> tag is
+    /// applied at the moment the SDK exception is observed.
+    /// <c>ChatController</c>'s Path-5 catch no longer increments this
+    /// counter — it is responsible only for sanitizing the 502 response
+    /// and server-side logging.
+    /// <para>
+    /// Tag <c>kind</c> is one of: <c>rate_limited</c>, <c>timeout</c>,
+    /// <c>upstream_5xx</c>, <c>auth_failure</c>, <c>other</c>. Bounded
+    /// enum — safe under the no-high-cardinality invariant.
+    /// </para>
     /// </summary>
     public static readonly Counter<long> ChatOpenAIFailure =
         Instance.CreateCounter<long>(
             name: "aat_chat_openai_failure_total",
-            description: "Count of OpenAI upstream failures caught at the Path-5 branch.");
+            description: "Count of OpenAI upstream failures by classified kind.");
+
+    /// <summary>
+    /// Count of retry attempts issued by <c>OpenAIReliabilityGate</c>.
+    /// No tags — the retryable-kind distribution is inferable by
+    /// correlating with <see cref="ChatOpenAIFailure"/>.
+    /// </summary>
+    public static readonly Counter<long> ChatOpenAIRetry =
+        Instance.CreateCounter<long>(
+            name: "aat_chat_openai_retry_total",
+            description: "Count of retry attempts issued by the OpenAI reliability gate.");
+
+    /// <summary>
+    /// Count of closed-to-open transitions of the
+    /// <c>OpenAIReliabilityGate</c>'s circuit breaker. No tags.
+    /// </summary>
+    public static readonly Counter<long> ChatOpenAICircuitTrip =
+        Instance.CreateCounter<long>(
+            name: "aat_chat_openai_circuit_trip_total",
+            description: "Count of OpenAI reliability-gate circuit-breaker trips (closed=>open).");
+
+    /// <summary>
+    /// Count of calls rejected because the
+    /// <c>OpenAIReliabilityGate</c> circuit was already open. No tags.
+    /// </summary>
+    public static readonly Counter<long> ChatOpenAICircuitShortCircuit =
+        Instance.CreateCounter<long>(
+            name: "aat_chat_openai_circuit_short_circuit_total",
+            description: "Count of OpenAI calls short-circuited while the breaker is open.");
 
     /// <summary>
     /// Count of per-device rate-limit rejections. No tags —

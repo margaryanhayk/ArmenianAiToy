@@ -129,7 +129,11 @@ public class ChatController : ControllerBase
             // the device / client never sees raw exception messages
             // (which for OpenAI SDK classes can include request-ids,
             // URLs, or other internal detail).
-            AppMeter.ChatOpenAIFailure.Add(1);
+            //
+            // Metric-side counts live in OpenAIReliabilityGate now —
+            // aat_chat_openai_failure_total with the `kind` tag — so
+            // classification happens where the exception is first seen.
+            // This catch stays as the final sanitization + log safety net.
             return StatusCode(502, new { error = "AI service unavailable. Please try again." });
         }
     }
