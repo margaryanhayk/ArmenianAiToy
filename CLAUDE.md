@@ -240,6 +240,36 @@ Endpoint: `PUT /api/parents/devices/{deviceId}/bedtime-window` with body
 authenticated, ownership-checked against linked devices, silent 404 on
 miss (same shape as pause/resume).
 
+## Structured console logging
+
+Console output is JSON, produced by the built-in
+`JsonConsoleFormatter` and configured via `Logging:Console` in
+`appsettings.json`:
+
+- `FormatterName: "json"` — every log line is a single JSON object.
+- `FormatterOptions.IncludeScopes: true` — ASP.NET Core's automatic
+  request scope (`RequestId`, `RequestPath`, `SpanId`) surfaces in the
+  `Scopes` field so a single HTTP request's lines are correlatable.
+- `FormatterOptions.UseUtcTimestamp: true` +
+  `TimestampFormat: "yyyy-MM-ddTHH:mm:ss.fffZ"` — ISO-like UTC
+  timestamps regardless of host timezone.
+
+Existing `ILogger<T>` call sites were **not changed**. Their named
+template holes (e.g. `"Parent {ParentId} changed password"`) already
+carried structured data inside the logger pipeline; switching the
+formatter is what makes them land as named JSON fields on the wire.
+
+**Complementary to audit rows, not a replacement.** Audit writes to the
+`AuditEvents` DB table for the four destructive/auth-sensitive parent
+actions and provides durability. Structured console logs cover the
+broader operational surface (chat orchestration, moderation outcomes,
+rate-limit rejections, startup, Path-5 failures) and provide live
+visibility. Both channels exist by design — do not dedupe one into the
+other.
+
+No Serilog, no OpenTelemetry, no external sinks, no custom enrichers,
+no request-logging middleware in this slice; stdout-JSON only.
+
 ## Engineering Guardrails
 
 - **No architecture redesign.** Work within existing structure.
