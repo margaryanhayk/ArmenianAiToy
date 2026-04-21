@@ -1,5 +1,6 @@
 using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Domain.Enums;
@@ -64,12 +65,20 @@ public class ChatController : ControllerBase
         // The response envelope uses SafetyFlag.Clean (not Blocked/Flagged)
         // because this is a parent-initiated soft-off, not a safety event.
         //
-        // B4 bedtime window joins the same short-circuit as a second gate.
-        // Pause wins: we check pause first and skip the bedtime query when
-        // the device is already paused.
-        if (await _deviceService.IsDevicePausedAsync(deviceId) ||
-            await _deviceService.IsDeviceInBedtimeWindowAsync(deviceId, DateTime.UtcNow))
+        // Split from bedtime below into sequential ifs (rather than a single
+        // `||`) so the gate-trip metric can distinguish which one fired.
+        // Behavior is identical — pause still wins over bedtime because it's
+        // checked first.
+        if (await _deviceService.IsDevicePausedAsync(deviceId))
         {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "paused"));
+            return Ok(new ChatResponse(PausedResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
+        }
+
+        // B4 bedtime window — same short-circuit shape and canned reply.
+        if (await _deviceService.IsDeviceInBedtimeWindowAsync(deviceId, DateTime.UtcNow))
+        {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "bedtime"));
             return Ok(new ChatResponse(PausedResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
         }
 
@@ -99,6 +108,8 @@ public class ChatController : ControllerBase
                 deviceId, request.ChildId, detectedMode);
             if (!enabled)
             {
+                AppMeter.ChatGateTrip.Add(1,
+                    new KeyValuePair<string, object?>("gate", "mode_disabled"));
                 return Ok(new ChatResponse(
                     ModeDisabledResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
             }
@@ -118,6 +129,7 @@ public class ChatController : ControllerBase
             // the device / client never sees raw exception messages
             // (which for OpenAI SDK classes can include request-ids,
             // URLs, or other internal detail).
+            AppMeter.ChatOpenAIFailure.Add(1);
             return StatusCode(502, new { error = "AI service unavailable. Please try again." });
         }
     }

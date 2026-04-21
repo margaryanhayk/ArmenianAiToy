@@ -1,12 +1,15 @@
 using ArmenianAiToy.Api.Health;
 using ArmenianAiToy.Api.Middleware;
 using ArmenianAiToy.Api.RateLimiting;
+using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Infrastructure;
 using ArmenianAiToy.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using System.Text;
 using System.Threading.RateLimiting;
 
@@ -25,6 +28,33 @@ builder.Services.AddSwaggerGen(options =>
 
 // Infrastructure (DB, OpenAI, services)
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// OpenTelemetry — metrics first, traces auto-collected as a side effect.
+// - Metrics: AspNetCore + Runtime built-ins plus this service's AppMeter,
+//   exported via a Prometheus scrape endpoint wired below
+//   (app.UseOpenTelemetryPrometheusScrapingEndpoint).
+// - Traces: AspNetCore + HttpClient instrumentations register
+//   Activities automatically (no custom spans in this slice). In
+//   Development we pipe them to the console so `dotnet run` makes
+//   them visible; no OTLP endpoint is assumed, and no trace export
+//   happens in Production yet.
+// No latency histograms, no ChatService / ModeDetector spans, no
+// high-cardinality tags — see Telemetry/AppMeter.cs for the rule.
+var otel = builder.Services.AddOpenTelemetry();
+otel.WithMetrics(m => m
+    .AddAspNetCoreInstrumentation()
+    .AddRuntimeInstrumentation()
+    .AddMeter(AppMeter.Name)
+    .AddPrometheusExporter());
+otel.WithTracing(t =>
+{
+    t.AddAspNetCoreInstrumentation()
+     .AddHttpClientInstrumentation();
+    if (builder.Environment.IsDevelopment())
+    {
+        t.AddConsoleExporter();
+    }
+});
 
 // JWT authentication for parent endpoints.
 // Fail fast if Jwt:Key is missing or set to the legacy insecure literal —
@@ -72,6 +102,11 @@ builder.Services.AddRateLimiter(options =>
         ChatRateLimiter.PolicyFactory(ctx, chatPermitLimit, chatWindowSeconds));
     options.OnRejected = async (context, cancellationToken) =>
     {
+        // Count the rejection before mutating the response — if writing
+        // the body fails for any reason, the metric still reflects the
+        // fact that the limiter tripped. No tags: device_id would be
+        // high-cardinality, which the AppMeter contract forbids.
+        AppMeter.RateLimitRejected.Add(1);
         context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
         if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
         {
@@ -121,12 +156,25 @@ app.UseStaticFiles();
 
 app.MapControllers();
 
+// Prometheus scrape surface for the AppMeter + AspNetCore/Runtime
+// counters. Registered UNAUTHENTICATED in this slice as a deliberate
+// tradeoff — the OTel exporter is middleware-based and doesn't plug
+// into MVC's [Authorize] pipeline without distortion, and the
+// AppMeter contract forbids high-cardinality tags so the exposed
+// surface is low-sensitivity (aggregate gate trips, health-probe
+// counts, audit-event-type distribution by enum name). A proper
+// scrape-credential or side-channel binding is deferred to the
+// deploy slice; see CLAUDE.md § Metrics for the full rationale.
+app.UseOpenTelemetryPrometheusScrapingEndpoint();
+
 // Health check — probes the one real runtime dependency (SQLite). OpenAI
 // config is validated at startup and deliberately not re-probed here; see
 // HealthProbe class comment for the rationale.
 app.MapGet("/api/health", async (AppDbContext db, CancellationToken ct) =>
 {
     var dbOk = await HealthProbe.IsDatabaseReachableAsync(db, TimeSpan.FromSeconds(2), ct);
+    AppMeter.HealthProbe.Add(1,
+        new KeyValuePair<string, object?>("result", dbOk ? "ok" : "unhealthy"));
     var payload = new
     {
         status = dbOk ? "ok" : "unhealthy",

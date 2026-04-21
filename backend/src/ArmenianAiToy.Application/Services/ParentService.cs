@@ -1,5 +1,6 @@
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Interfaces;
+using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -119,7 +120,7 @@ public class ParentService : IParentService
             .AnyAsync(pd => pd.DeviceId == deviceId);
         if (stillLinked)
         {
-            _db.Set<AuditEvent>().Add(AuditEvent.ParentDeviceUnlinked(
+            TrackAndAddAudit(AuditEvent.ParentDeviceUnlinked(
                 parentId, deviceId, orphanCascaded: false));
             await _db.SaveChangesAsync();
             _logger.LogInformation(
@@ -136,7 +137,7 @@ public class ParentService : IParentService
         // orphanCascaded captures whether the device row was actually removed.
         // In the rare "device already gone" race it stays false even though
         // this was the last ParentDevice link.
-        _db.Set<AuditEvent>().Add(AuditEvent.ParentDeviceUnlinked(
+        TrackAndAddAudit(AuditEvent.ParentDeviceUnlinked(
             parentId, deviceId, orphanCascaded: device != null));
         await _db.SaveChangesAsync();
         _logger.LogInformation(
@@ -163,7 +164,7 @@ public class ParentService : IParentService
             return false;
 
         parent.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
-        _db.Set<AuditEvent>().Add(AuditEvent.ParentPasswordChanged(parentId));
+        TrackAndAddAudit(AuditEvent.ParentPasswordChanged(parentId));
         await _db.SaveChangesAsync();
 
         _logger.LogInformation("Parent {ParentId} changed password", parentId);
@@ -226,7 +227,7 @@ public class ParentService : IParentService
         }
         // Audit must be written even when no orphan cleanup was needed, so
         // this SaveChangesAsync runs unconditionally now.
-        _db.Set<AuditEvent>().Add(AuditEvent.ParentAccountDeleted(
+        TrackAndAddAudit(AuditEvent.ParentAccountDeleted(
             parentId, linkedDeviceIds.Count, orphanedDevicesDeleted));
         await _db.SaveChangesAsync();
 
@@ -266,7 +267,7 @@ public class ParentService : IParentService
             _db.Set<Conversation>().RemoveRange(conversations);
 
         _db.Set<Child>().Remove(child);
-        _db.Set<AuditEvent>().Add(AuditEvent.ParentChildDeleted(parentId, childId, conversations.Count));
+        TrackAndAddAudit(AuditEvent.ParentChildDeleted(parentId, childId, conversations.Count));
         await _db.SaveChangesAsync();
 
         _logger.LogInformation(
@@ -299,7 +300,7 @@ public class ParentService : IParentService
         }
 
         device.IsPaused = paused;
-        _db.Set<AuditEvent>().Add(
+        TrackAndAddAudit(
             AuditEvent.ParentDevicePauseStateChanged(parentId, deviceId, paused));
         await _db.SaveChangesAsync();
         _logger.LogInformation(
@@ -336,7 +337,7 @@ public class ParentService : IParentService
         // Audit the post-normalization state so the record matches what is
         // actually persisted on the Device row — half-null inputs become
         // {start:null,end:null} here, not {start:"22:00:00",end:null}.
-        _db.Set<AuditEvent>().Add(AuditEvent.ParentBedtimeWindowSet(
+        TrackAndAddAudit(AuditEvent.ParentBedtimeWindowSet(
             parentId, deviceId, device.BedtimeStart, device.BedtimeEnd));
         await _db.SaveChangesAsync();
         _logger.LogInformation(
@@ -367,7 +368,7 @@ public class ParentService : IParentService
         device.RiddleEnabled = riddle;
         device.CuriosityEnabled = curiosity;
 
-        _db.Set<AuditEvent>().Add(AuditEvent.ParentDeviceModeFlagsSet(
+        TrackAndAddAudit(AuditEvent.ParentDeviceModeFlagsSet(
             parentId, deviceId, story, game, riddle, curiosity));
         await _db.SaveChangesAsync();
 
@@ -398,7 +399,7 @@ public class ParentService : IParentService
         child.RiddleEnabled = riddle;
         child.CuriosityEnabled = curiosity;
 
-        _db.Set<AuditEvent>().Add(AuditEvent.ChildModeOverridesSet(
+        TrackAndAddAudit(AuditEvent.ChildModeOverridesSet(
             parentId, childId, story, game, riddle, curiosity));
         await _db.SaveChangesAsync();
 
@@ -478,6 +479,20 @@ public class ParentService : IParentService
             // blob is always valid JSON (or null).
             a.Metadata is null ? null : JsonNode.Parse(a.Metadata)
         )).ToList();
+    }
+
+    // Central write path for audit rows: Adds the entity to the DbSet
+    // AND increments AppMeter.AuditEventsWritten with the event_type tag.
+    // Must be called exactly once per audit entity before the
+    // SaveChangesAsync that persists it — same-transaction discipline
+    // is preserved because the DbSet.Add happens here, not later.
+    // The counter is volatile (process-local, scraped via /metrics) and
+    // complements — does not replace — the durable AuditEvents row.
+    private void TrackAndAddAudit(AuditEvent ev)
+    {
+        _db.Set<AuditEvent>().Add(ev);
+        AppMeter.AuditEventsWritten.Add(1,
+            new KeyValuePair<string, object?>("event_type", ev.EventType.ToString()));
     }
 
     private string GenerateJwt(Parent parent)

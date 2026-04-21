@@ -393,8 +393,70 @@ rate-limit rejections, startup, Path-5 failures) and provide live
 visibility. Both channels exist by design — do not dedupe one into the
 other.
 
-No Serilog, no OpenTelemetry, no external sinks, no custom enrichers,
+No Serilog, no external sinks beyond stdout, no custom enrichers,
 no request-logging middleware in this slice; stdout-JSON only.
+OpenTelemetry metrics + auto-collected HTTP traces are wired in a
+separate layer — see § Metrics below.
+
+## Metrics (OpenTelemetry + Prometheus)
+
+First observability slice beyond logs. Metrics only — no custom trace
+spans, no latency histograms in this slice. Auto-collected HTTP
+traces (AspNetCore + HttpClient instrumentation) are captured for
+free and exported to the console in Development only; no OTLP
+endpoint is assumed.
+
+**Scrape endpoint**: `GET /metrics` (Prometheus text-format exposition),
+registered via `OpenTelemetry.Exporter.Prometheus.AspNetCore`. It is
+deliberately **unauthenticated in this slice** — the OTel Prometheus
+exporter is middleware-based and doesn't plug into MVC `[Authorize]`
+without distortion, and the no-high-cardinality invariant below keeps
+the exposed surface low-sensitivity. A scrape-credential story is
+deferred to the deploy slice. Do not bind this process to a public
+interface without adding that credential.
+
+**Counters exposed (meter name `ArmenianAiToy`)**:
+
+| Counter | Tag(s) | Tag value space | Increment site |
+|---|---|---|---|
+| `aat_chat_gate_trip_total` | `gate` | `paused` / `bedtime` / `mode_disabled` | `ChatController.Chat` short-circuit branches |
+| `aat_chat_openai_failure_total` | — | — | `ChatController.Chat` Path-5 catch |
+| `aat_rate_limit_rejected_total` | — | — | `ChatRateLimiter` `OnRejected` handler in `Program.cs` |
+| `aat_health_probe_total` | `result` | `ok` / `unhealthy` | `GET /api/health` endpoint lambda |
+| `aat_audit_events_written_total` | `event_type` | enum names of `AuditEventType` | `ParentService.TrackAndAddAudit` helper on every successful `AuditEvent` write |
+
+**Invariants (do not regress)**:
+
+- **No high-cardinality tags.** Tag values must come from small,
+  bounded enumerations. Do NOT add `device_id`, `parent_id`,
+  `child_id`, `mac_address`, or any free-form string as a metric
+  tag. If you need that granularity, use the `AuditEvents` table
+  (durable, queryable) or the structured log stream — not metrics.
+- **Complementary to audit, not a replacement.** The audit counter
+  is a volatile "are writes happening at all" pulse; the
+  `AuditEvents` DB table remains the source of truth for which
+  actions happened.
+- **No custom spans in `ChatService`, `ModeDetector`, or the system
+  prompt path.** Those files stay HIGH-risk and untouched by this
+  slice.
+
+**Packages**: `OpenTelemetry.Extensions.Hosting`,
+`OpenTelemetry.Instrumentation.AspNetCore`,
+`OpenTelemetry.Instrumentation.Runtime`,
+`OpenTelemetry.Instrumentation.Http`,
+`OpenTelemetry.Exporter.Console`,
+`OpenTelemetry.Exporter.Prometheus.AspNetCore` (pre-release —
+currently `1.15.3-beta.1`; the OpenTelemetry SIG keeps the
+Prometheus-side exporter in `-beta` deliberately even though it is
+mature in practice).
+
+**Manual QA**:
+1. `dotnet run --project src/ArmenianAiToy.Api`
+2. `curl http://localhost:5000/api/health` → expect `{"status":"ok",…}`.
+3. `curl http://localhost:5000/metrics` → expect Prometheus-format
+   output including at minimum `aat_health_probe_total{result="ok"} 1`.
+4. (Optional) Development only — stdout shows a span emitted by the
+   console trace exporter for the same request.
 
 ## Engineering Guardrails
 
