@@ -1,5 +1,6 @@
 using ArmenianAiToy.Application.Services;
 using ArmenianAiToy.Domain.Entities;
+using ArmenianAiToy.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -143,15 +144,75 @@ public class ParentServiceSetBedtimeWindowTests
     }
 
     [Fact]
-    public async Task SetBedtimeWindowAsync_SuccessPath_DoesNotWriteAuditRow()
+    public async Task SetBedtimeWindowAsync_Success_WritesAuditRowWithStartEnd()
     {
-        // B4 is deliberately log-only in slice 1; audit-scope expansion for
-        // parental-control config changes is a separate later decision.
+        // Updated in the audit-scope-expansion slice: bedtime config changes
+        // now produce a ParentBedtimeWindowSet audit row alongside the log
+        // line, matching the pattern used for destructive actions.
         var (service, db) = CreateService();
         var (parentId, deviceId) = SeedLinkedParentAndDevice(db);
 
         Assert.True(await service.SetBedtimeWindowAsync(
             parentId, deviceId, new TimeOnly(22, 0), new TimeOnly(7, 0)));
+
+        var audits = await db.Set<AuditEvent>().ToListAsync();
+        var audit = Assert.Single(audits);
+        Assert.Equal(AuditEventType.ParentBedtimeWindowSet, audit.EventType);
+        Assert.Equal(parentId, audit.ActorParentId);
+        Assert.Equal(deviceId, audit.TargetDeviceId);
+        Assert.Null(audit.TargetChildId);
+        Assert.NotNull(audit.Metadata);
+        // Metadata records the post-normalization state (TimeOnly → HH:mm:ss).
+        Assert.Contains("\"start\":\"22:00:00\"", audit.Metadata);
+        Assert.Contains("\"end\":\"07:00:00\"", audit.Metadata);
+    }
+
+    [Fact]
+    public async Task SetBedtimeWindowAsync_DisablingWindow_WritesAuditRowWithNullStartEnd()
+    {
+        var (service, db) = CreateService();
+        var (parentId, deviceId) = SeedLinkedParentAndDevice(db);
+
+        Assert.True(await service.SetBedtimeWindowAsync(parentId, deviceId, null, null));
+
+        var audits = await db.Set<AuditEvent>().ToListAsync();
+        var audit = Assert.Single(audits);
+        Assert.Equal(AuditEventType.ParentBedtimeWindowSet, audit.EventType);
+        Assert.Equal(parentId, audit.ActorParentId);
+        Assert.Equal(deviceId, audit.TargetDeviceId);
+        Assert.NotNull(audit.Metadata);
+        // Disabled state should be recorded symmetrically, both null.
+        Assert.Contains("\"start\":null", audit.Metadata);
+        Assert.Contains("\"end\":null", audit.Metadata);
+    }
+
+    [Fact]
+    public async Task SetBedtimeWindowAsync_HalfNullInput_AuditRecordsNormalizedDisabledState()
+    {
+        // Half-null is normalized to disabled server-side; the audit row
+        // should reflect the STORED state (both null), not the raw input.
+        var (service, db) = CreateService();
+        var (parentId, deviceId) = SeedLinkedParentAndDevice(db);
+
+        Assert.True(await service.SetBedtimeWindowAsync(
+            parentId, deviceId, new TimeOnly(22, 0), null));
+
+        var audits = await db.Set<AuditEvent>().ToListAsync();
+        var audit = Assert.Single(audits);
+        Assert.Equal(AuditEventType.ParentBedtimeWindowSet, audit.EventType);
+        Assert.NotNull(audit.Metadata);
+        Assert.Contains("\"start\":null", audit.Metadata);
+        Assert.Contains("\"end\":null", audit.Metadata);
+    }
+
+    [Fact]
+    public async Task SetBedtimeWindowAsync_OwnershipMiss_DoesNotWriteAuditRow()
+    {
+        var (service, db) = CreateService();
+        var (_, deviceId) = SeedLinkedParentAndDevice(db);
+
+        Assert.False(await service.SetBedtimeWindowAsync(
+            Guid.NewGuid(), deviceId, new TimeOnly(22, 0), new TimeOnly(7, 0)));
 
         Assert.Empty(await db.Set<AuditEvent>().ToListAsync());
     }

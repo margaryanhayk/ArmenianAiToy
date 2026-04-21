@@ -91,4 +91,33 @@ public class AuditEvent
         EventType = AuditEventType.ParentPasswordChanged,
         ActorParentId = parentId
     };
+
+    public static AuditEvent ParentDevicePauseStateChanged(
+        Guid parentId, Guid deviceId, bool isPaused) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDevicePauseStateChanged,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            is_paused = isPaused
+        })
+    };
+
+    public static AuditEvent ParentBedtimeWindowSet(
+        Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentBedtimeWindowSet,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            start = start,
+            end = end
+        })
+    };
 }

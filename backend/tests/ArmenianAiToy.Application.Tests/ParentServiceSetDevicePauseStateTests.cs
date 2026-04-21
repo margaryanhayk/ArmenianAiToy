@@ -1,5 +1,6 @@
 using ArmenianAiToy.Application.Services;
 using ArmenianAiToy.Domain.Entities;
+using ArmenianAiToy.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -29,6 +30,7 @@ public class ParentServiceSetDevicePauseStateTests
             modelBuilder.Entity<Device>().Ignore(d => d.ParentDevices);
 
             modelBuilder.Entity<ParentDevice>().HasKey(pd => new { pd.ParentId, pd.DeviceId });
+            modelBuilder.Entity<AuditEvent>().HasKey(a => a.Id);
         }
     }
 
@@ -132,5 +134,48 @@ public class ParentServiceSetDevicePauseStateTests
         Assert.True(result);
         var reloaded = await db.Set<Device>().FindAsync(deviceId);
         Assert.True(reloaded!.IsPaused);
+    }
+
+    [Fact]
+    public async Task SetDevicePauseStateAsync_ActualStateChange_WritesAuditRow()
+    {
+        var (service, db) = CreateService();
+        var (parentId, deviceId) = SeedLinkedParentAndDevice(db, isPaused: false);
+
+        Assert.True(await service.SetDevicePauseStateAsync(parentId, deviceId, paused: true));
+
+        var audits = await db.Set<AuditEvent>().ToListAsync();
+        var audit = Assert.Single(audits);
+        Assert.Equal(AuditEventType.ParentDevicePauseStateChanged, audit.EventType);
+        Assert.Equal(parentId, audit.ActorParentId);
+        Assert.Equal(deviceId, audit.TargetDeviceId);
+        Assert.Null(audit.TargetChildId);
+        Assert.NotNull(audit.Metadata);
+        Assert.Contains("\"is_paused\":true", audit.Metadata);
+    }
+
+    [Fact]
+    public async Task SetDevicePauseStateAsync_OwnershipMiss_DoesNotWriteAuditRow()
+    {
+        var (service, db) = CreateService();
+        var (_, deviceId) = SeedLinkedParentAndDevice(db, isPaused: false);
+
+        Assert.False(await service.SetDevicePauseStateAsync(Guid.NewGuid(), deviceId, paused: true));
+
+        Assert.Empty(await db.Set<AuditEvent>().ToListAsync());
+    }
+
+    [Fact]
+    public async Task SetDevicePauseStateAsync_IdempotentNoChange_DoesNotWriteAuditRow()
+    {
+        // Idempotent same-state call returns true but doesn't mutate
+        // anything. Audit is a system-state-change record, so a non-change
+        // must not produce a row.
+        var (service, db) = CreateService();
+        var (parentId, deviceId) = SeedLinkedParentAndDevice(db, isPaused: true);
+
+        Assert.True(await service.SetDevicePauseStateAsync(parentId, deviceId, paused: true));
+
+        Assert.Empty(await db.Set<AuditEvent>().ToListAsync());
     }
 }

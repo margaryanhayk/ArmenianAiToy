@@ -291,13 +291,15 @@ public class ParentService : IParentService
 
         if (device.IsPaused == paused)
         {
-            // Idempotent: already in the requested state. Log at debug depth
-            // would be noise; skip the log and return true so the caller
-            // sees success either way.
+            // Idempotent: already in the requested state. No mutation, no
+            // log, no audit row — the system state didn't change, so there
+            // is nothing to audit. Parent still sees success.
             return true;
         }
 
         device.IsPaused = paused;
+        _db.Set<AuditEvent>().Add(
+            AuditEvent.ParentDevicePauseStateChanged(parentId, deviceId, paused));
         await _db.SaveChangesAsync();
         _logger.LogInformation(
             "Parent {ParentId} set device {DeviceId} paused={Paused}",
@@ -330,6 +332,11 @@ public class ParentService : IParentService
             device.BedtimeEnd = end;
         }
 
+        // Audit the post-normalization state so the record matches what is
+        // actually persisted on the Device row — half-null inputs become
+        // {start:null,end:null} here, not {start:"22:00:00",end:null}.
+        _db.Set<AuditEvent>().Add(AuditEvent.ParentBedtimeWindowSet(
+            parentId, deviceId, device.BedtimeStart, device.BedtimeEnd));
         await _db.SaveChangesAsync();
         _logger.LogInformation(
             "Parent {ParentId} set bedtime window on device {DeviceId} to {Start}-{End}",

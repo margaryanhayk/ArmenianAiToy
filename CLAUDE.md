@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (773 tests)
+dotnet test                                     # Run all tests (779 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -174,17 +174,25 @@ An append-only `AuditEvents` table records sensitive parent actions.
 Write-only surface for now — no API, no UI, no query path. Rows are
 written inside the same `SaveChangesAsync` as the action they describe.
 
-**Events captured in slice 1** (`AuditEventType`):
+**Events captured** (`AuditEventType`):
 - `ParentAccountDeleted` — emitted in `ParentService.DeleteAccountAsync`.
 - `ParentChildDeleted` — emitted in `ParentService.DeleteChildAsync`.
 - `ParentDeviceUnlinked` — emitted in `ParentService.UnlinkDeviceAsync`
   (both the still-linked path and the orphan-cascade path). Metadata
   carries `orphan_cascaded: bool`.
 - `ParentPasswordChanged` — emitted in `ParentService.ChangePasswordAsync`
-  on success only; wrong-password failures are not audited in slice 1.
+  on success only; wrong-password failures are not audited.
+- `ParentDevicePauseStateChanged` — emitted in
+  `ParentService.SetDevicePauseStateAsync` when the pause flag actually
+  flips. No-op idempotent calls (already in the requested state) do not
+  produce a row. Metadata carries `is_paused: bool`.
+- `ParentBedtimeWindowSet` — emitted in
+  `ParentService.SetBedtimeWindowAsync` on every successful write.
+  Metadata carries the post-normalization `start`/`end` (both null when
+  the window is disabled or the caller passed half-null).
 
-Register / login / device pause-resume / chat / moderation / rate-limit
-events are deliberately out of scope for this slice.
+Register / login / chat / moderation / rate-limit events remain
+deliberately out of scope.
 
 **Invariants** (do not regress):
 - **No foreign keys** from `AuditEvent` to `Parent` / `Device` / `Child`.
@@ -230,10 +238,10 @@ a paused device returns, before any OpenAI call or conversation write.
 - **Midnight-crossing windows** (e.g. 22:00–07:00) are explicitly
   supported: start is inclusive, end is exclusive, wrap-around handled
   in the evaluator.
-- **Log-only in slice 1.** Setting/clearing the window emits a
-  `LogInformation` line but does **not** write an `AuditEvent`. Audit
-  scope for parental-control config changes (pause, bedtime) is a
-  separate later decision taken together.
+- **Audited.** Setting or clearing the window writes a
+  `ParentBedtimeWindowSet` audit row alongside the existing
+  `LogInformation` line. Metadata carries the post-normalization
+  start/end (both null when disabled).
 
 Endpoint: `PUT /api/parents/devices/{deviceId}/bedtime-window` with body
 `{ "start": "HH:mm:ss" | null, "end": "HH:mm:ss" | null }`. Parent-JWT

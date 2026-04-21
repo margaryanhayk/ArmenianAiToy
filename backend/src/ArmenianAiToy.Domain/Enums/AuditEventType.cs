@@ -5,5 +5,7 @@ public enum AuditEventType
     ParentAccountDeleted,
     ParentChildDeleted,
     ParentDeviceUnlinked,
-    ParentPasswordChanged
+    ParentPasswordChanged,
+    ParentDevicePauseStateChanged,
+    ParentBedtimeWindowSet
 }
