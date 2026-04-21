@@ -400,11 +400,11 @@ separate layer — see § Metrics below.
 
 ## Metrics (OpenTelemetry + Prometheus)
 
-First observability slice beyond logs. Metrics only — no custom trace
-spans, no latency histograms in this slice. Auto-collected HTTP
-traces (AspNetCore + HttpClient instrumentation) are captured for
-free and exported to the console in Development only; no OTLP
-endpoint is assumed.
+First observability slice beyond logs. Counters + two latency
+histograms; no custom trace spans. Auto-collected HTTP traces
+(AspNetCore + HttpClient instrumentation) are captured for free and
+exported to the console in Development only; no OTLP endpoint is
+assumed.
 
 **Scrape endpoint**: `GET /metrics` (Prometheus text-format exposition),
 registered via `OpenTelemetry.Exporter.Prometheus.AspNetCore`. It is
@@ -460,6 +460,39 @@ mature in practice).
    output including at minimum `aat_health_probe_total{result="ok"} 1`.
 4. (Optional) Development only — stdout shows a span emitted by the
    console trace exporter for the same request.
+
+### Latency histograms
+
+Two `Histogram<double>` instruments on the `ArmenianAiToy` meter,
+unit = **seconds**:
+
+| Histogram | Where recorded | Scope |
+|---|---|---|
+| `aat_chat_openai_duration_seconds` | `OpenAIReliabilityGate.RunAsync` (outer `try/finally`) | End-to-end gated call — **includes retry/backoff** and near-zero short-circuit samples when the breaker is open. |
+| `aat_moderation_classify_duration_seconds` | `OpenAIModerationAdapter.CheckContentAsync` (outer `try/finally`, reuses the existing `Stopwatch`) | End-to-end moderation call including the D1 single-retry-on-429 and every fail-closed branch. |
+
+Both use identical **explicit** bucket boundaries (seconds), wired
+via `AddView` in `Program.cs`:
+
+```
+0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30
+```
+
+**Untagged in this slice — deliberate.** Splitting by outcome/kind
+would duplicate signal already present on the existing counters
+(`aat_chat_openai_failure_total{kind=…}`, `aat_chat_openai_retry_total`,
+`aat_chat_openai_circuit_*`). The same no-high-cardinality invariant
+from AppMeter applies: do NOT add `device_id`, `parent_id`,
+`child_id`, `mac_address`, `model_name`, or free-form strings as tags
+on these histograms.
+
+**Manual QA**:
+1. `dotnet run --project src/ArmenianAiToy.Api`
+2. Trigger at least one chat request (hits both the moderation path
+   and the gated OpenAI call).
+3. `curl http://localhost:5000/metrics | grep -E 'aat_(chat_openai|moderation_classify)_duration_seconds_(bucket|sum|count)'`
+   → expect `_bucket`, `_sum`, `_count` lines for both histogram
+   families.
 
 ### OpenAI reliability
 

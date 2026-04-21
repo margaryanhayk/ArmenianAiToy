@@ -1,6 +1,7 @@
 using System.ClientModel;
 using System.Diagnostics;
 using ArmenianAiToy.Application.Interfaces;
+using ArmenianAiToy.Application.Telemetry;
 using Microsoft.Extensions.Logging;
 using OpenAI.Moderations;
 using AppModerationResult = ArmenianAiToy.Application.DTOs.ModerationResult;
@@ -76,49 +77,61 @@ public class OpenAIModerationAdapter : IModerationService
 
     public async Task<AppModerationResult> CheckContentAsync(string content)
     {
+        // Reuse the existing Stopwatch — it already drives the
+        // latency_ms field in log messages below. The outer try/finally
+        // records the same elapsed value (in seconds) onto the
+        // OpenTelemetry histogram so success, D1-retry-recovery, and
+        // every fail-closed branch all contribute samples without
+        // touching any of the existing fail-closed logic.
         var sw = Stopwatch.StartNew();
-
         try
         {
-            return await ClassifyOnceAsync(content);
-        }
-        catch (ClientResultException cre) when (cre.Status == 429)
-        {
-            _logger.LogWarning(
-                "Moderation transient 429 — retrying once after {DelayMs} ms. preview={Preview}",
-                (int)RetryDelay.TotalMilliseconds, Preview(content));
             try
             {
-                await Task.Delay(RetryDelay);
-                var result = await ClassifyOnceAsync(content);
-                _logger.LogInformation(
-                    "Moderation transient 429 — recovered on retry. latency_ms={LatencyMs} preview={Preview}",
-                    sw.ElapsedMilliseconds, Preview(content));
-                return result;
+                return await ClassifyOnceAsync(content);
             }
-            catch (Exception retryEx)
+            catch (ClientResultException cre) when (cre.Status == 429)
             {
-                return FailClosed(
-                    reason: "rate_limited_retry_failed",
-                    status: StatusOf(retryEx),
-                    latencyMs: sw.ElapsedMilliseconds,
-                    retryCount: 1,
-                    ex: retryEx,
-                    content: content);
+                _logger.LogWarning(
+                    "Moderation transient 429 — retrying once after {DelayMs} ms. preview={Preview}",
+                    (int)RetryDelay.TotalMilliseconds, Preview(content));
+                try
+                {
+                    await Task.Delay(RetryDelay);
+                    var result = await ClassifyOnceAsync(content);
+                    _logger.LogInformation(
+                        "Moderation transient 429 — recovered on retry. latency_ms={LatencyMs} preview={Preview}",
+                        sw.ElapsedMilliseconds, Preview(content));
+                    return result;
+                }
+                catch (Exception retryEx)
+                {
+                    return FailClosed(
+                        reason: "rate_limited_retry_failed",
+                        status: StatusOf(retryEx),
+                        latencyMs: sw.ElapsedMilliseconds,
+                        retryCount: 1,
+                        ex: retryEx,
+                        content: content);
+                }
+            }
+            catch (ClientResultException cre)
+            {
+                var reason = cre.Status is 401 or 403 ? "auth_error" : "server_error";
+                return FailClosed(reason, cre.Status, sw.ElapsedMilliseconds, 0, cre, content);
+            }
+            catch (OperationCanceledException oce)
+            {
+                return FailClosed("timeout", 0, sw.ElapsedMilliseconds, 0, oce, content);
+            }
+            catch (Exception ex)
+            {
+                return FailClosed("network_error", 0, sw.ElapsedMilliseconds, 0, ex, content);
             }
         }
-        catch (ClientResultException cre)
+        finally
         {
-            var reason = cre.Status is 401 or 403 ? "auth_error" : "server_error";
-            return FailClosed(reason, cre.Status, sw.ElapsedMilliseconds, 0, cre, content);
-        }
-        catch (OperationCanceledException oce)
-        {
-            return FailClosed("timeout", 0, sw.ElapsedMilliseconds, 0, oce, content);
-        }
-        catch (Exception ex)
-        {
-            return FailClosed("network_error", 0, sw.ElapsedMilliseconds, 0, ex, content);
+            AppMeter.ModerationClassifyDuration.Record(sw.Elapsed.TotalSeconds);
         }
     }
 

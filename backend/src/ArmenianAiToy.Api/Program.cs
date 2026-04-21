@@ -38,13 +38,38 @@ builder.Services.AddInfrastructure(builder.Configuration);
 //   Development we pipe them to the console so `dotnet run` makes
 //   them visible; no OTLP endpoint is assumed, and no trace export
 //   happens in Production yet.
-// No latency histograms, no ChatService / ModeDetector spans, no
-// high-cardinality tags — see Telemetry/AppMeter.cs for the rule.
+// Two latency histograms live on AppMeter (chat gate + moderation);
+// their explicit bucket boundaries are wired below via AddView. No
+// ChatService / ModeDetector spans, no high-cardinality tags — see
+// Telemetry/AppMeter.cs for the rule.
+
+// Shared explicit bucket boundaries (seconds) for the OpenAI latency
+// histograms. 10 ms → 30 s spans the useful range between a breaker
+// short-circuit (near zero) and the 30 s adapter timeout ceiling.
+// Keeping the two histograms on identical boundaries makes dashboards
+// and alerts trivially comparable.
+var openAiLatencyBuckets = new double[]
+{
+    0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30
+};
+
 var otel = builder.Services.AddOpenTelemetry();
 otel.WithMetrics(m => m
     .AddAspNetCoreInstrumentation()
     .AddRuntimeInstrumentation()
     .AddMeter(AppMeter.Name)
+    .AddView(
+        instrumentName: "aat_chat_openai_duration_seconds",
+        metricStreamConfiguration: new ExplicitBucketHistogramConfiguration
+        {
+            Boundaries = openAiLatencyBuckets
+        })
+    .AddView(
+        instrumentName: "aat_moderation_classify_duration_seconds",
+        metricStreamConfiguration: new ExplicitBucketHistogramConfiguration
+        {
+            Boundaries = openAiLatencyBuckets
+        })
     .AddPrometheusExporter());
 otel.WithTracing(t =>
 {

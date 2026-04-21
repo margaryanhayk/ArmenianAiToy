@@ -12,8 +12,11 @@ namespace ArmenianAiToy.Application.Telemetry;
 /// BCL (<c>System.Diagnostics.DiagnosticSource</c>) — the OpenTelemetry
 /// SDK in the API project subscribes to it by name.
 ///
-/// This is the first observability slice — metrics only; custom trace
-/// spans and latency histograms are explicit later scope.
+/// Custom trace spans remain explicit later scope. A minimal
+/// latency-histogram follow-on is already present — see
+/// <see cref="ChatOpenAIDuration"/> and
+/// <see cref="ModerationClassifyDuration"/> — still untagged and still
+/// bound by the no-high-cardinality invariant below.
 ///
 /// <para><b>Invariant — no high-cardinality tags.</b> Tag values here
 /// are drawn from small, bounded enumerations (<c>paused|bedtime|
@@ -21,10 +24,11 @@ namespace ArmenianAiToy.Application.Telemetry;
 /// <see cref="ArmenianAiToy.Domain.Enums.AuditEventType"/> name set).
 /// Do NOT add tags whose value space is device-scoped, parent-scoped,
 /// or child-scoped — no <c>device_id</c>, <c>parent_id</c>,
-/// <c>child_id</c>, <c>mac_address</c>, or free-form strings. A new
-/// counter that wants such a tag belongs in a different tier
-/// (the <c>AuditEvents</c> table, the structured log stream) rather
-/// than in Prometheus-scrapable metrics.</para>
+/// <c>child_id</c>, <c>mac_address</c>, <c>model_name</c>, or
+/// free-form strings. A new counter (or histogram) that wants such a
+/// tag belongs in a different tier (the <c>AuditEvents</c> table, the
+/// structured log stream) rather than in Prometheus-scrapable
+/// metrics.</para>
 /// </summary>
 public static class AppMeter
 {
@@ -120,4 +124,51 @@ public static class AppMeter
         Instance.CreateCounter<long>(
             name: "aat_audit_events_written_total",
             description: "Count of audit rows written, tagged by event_type.");
+
+    /// <summary>
+    /// End-to-end duration (unit = <b>seconds</b>) of
+    /// <c>OpenAIReliabilityGate.RunAsync</c>. Covers the entire gated
+    /// path: short-circuit checks, the retry loop, backoff delays, and
+    /// the final breaker-state update — so a tripped-breaker fail-fast
+    /// shows up as a near-zero sample and a retry success shows up as
+    /// initial-call + backoff + retry-call summed.
+    /// <para>
+    /// <b>Untagged in this slice.</b> Splitting by outcome/kind would
+    /// duplicate information already present on
+    /// <see cref="ChatOpenAIFailure"/>,
+    /// <see cref="ChatOpenAIRetry"/>, and the two circuit counters.
+    /// Bucket boundaries are set explicitly via an OTel meter view in
+    /// <c>Program.cs</c>, not on this instrument.
+    /// </para>
+    /// <para>
+    /// The no-high-cardinality invariant documented on the class still
+    /// applies — do NOT add <c>device_id</c>, <c>parent_id</c>,
+    /// <c>child_id</c>, <c>mac_address</c>, <c>model_name</c>, or any
+    /// free-form string as a tag on this histogram.
+    /// </para>
+    /// </summary>
+    public static readonly Histogram<double> ChatOpenAIDuration =
+        Instance.CreateHistogram<double>(
+            name: "aat_chat_openai_duration_seconds",
+            unit: "s",
+            description: "End-to-end duration of the OpenAI chat gated call (incl. retry/backoff).");
+
+    /// <summary>
+    /// End-to-end duration (unit = <b>seconds</b>) of
+    /// <c>OpenAIModerationAdapter.CheckContentAsync</c>. Covers the
+    /// single D1 retry-on-429 path and any fail-closed-to-sentinel
+    /// branch. Untagged for the same reason as
+    /// <see cref="ChatOpenAIDuration"/>. Bucket boundaries are set
+    /// explicitly via an OTel meter view in <c>Program.cs</c>.
+    /// <para>
+    /// Same no-high-cardinality invariant — no <c>device_id</c>,
+    /// <c>parent_id</c>, <c>child_id</c>, <c>mac_address</c>,
+    /// <c>model_name</c>, or free-form strings.
+    /// </para>
+    /// </summary>
+    public static readonly Histogram<double> ModerationClassifyDuration =
+        Instance.CreateHistogram<double>(
+            name: "aat_moderation_classify_duration_seconds",
+            unit: "s",
+            description: "End-to-end duration of the moderation classify call.");
 }

@@ -1,4 +1,5 @@
 using System.ClientModel;
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using ArmenianAiToy.Application.Telemetry;
 using Microsoft.Extensions.Logging;
@@ -85,132 +86,147 @@ public sealed class OpenAIReliabilityGate
     public async Task<T> RunAsync<T>(
         Func<CancellationToken, Task<T>> operation, CancellationToken ct)
     {
-        // ----- Circuit state check -----
-        bool shortCircuit = false;
-        bool isProbe = false;
-        lock (_stateLock)
+        // Measures end-to-end gated-call duration — includes the short-
+        // circuit check, the retry loop with its backoff delay(s), and
+        // the final breaker-state update. The finally still runs on the
+        // rethrow path (ExceptionDispatchInfo.Throw is treated as a
+        // normal throw by the runtime), so failure samples are recorded
+        // too. A tripped-breaker short-circuit records a near-zero
+        // sample.
+        var sw = Stopwatch.StartNew();
+        try
         {
-            if (_openUntil is not null)
+            // ----- Circuit state check -----
+            bool shortCircuit = false;
+            bool isProbe = false;
+            lock (_stateLock)
             {
-                var now = _clock.GetUtcNow();
-                if (now < _openUntil.Value)
+                if (_openUntil is not null)
                 {
-                    shortCircuit = true;
-                }
-                else if (!_probeInFlight)
-                {
-                    isProbe = true;
-                    _probeInFlight = true;
-                }
-                else
-                {
-                    shortCircuit = true;
-                }
-            }
-        }
-
-        if (shortCircuit)
-        {
-            AppMeter.ChatOpenAICircuitShortCircuit.Add(1);
-            throw new OpenAIReliabilityCircuitOpenException(
-                "OpenAI reliability gate is open; call short-circuited.");
-        }
-
-        // ----- Retry loop -----
-        int attempt = 0;
-        Exception? lastException = null;
-        OpenAIFailureKind lastKind = OpenAIFailureKind.Other;
-
-        while (attempt < MaxAttempts)
-        {
-            attempt++;
-            try
-            {
-                var result = await operation(ct).ConfigureAwait(false);
-                // Success — if we were the half-open probe, close the breaker.
-                if (isProbe)
-                {
-                    lock (_stateLock)
+                    var now = _clock.GetUtcNow();
+                    if (now < _openUntil.Value)
                     {
-                        _openUntil = null;
-                        _probeInFlight = false;
-                        _recentFailures.Clear();
+                        shortCircuit = true;
+                    }
+                    else if (!_probeInFlight)
+                    {
+                        isProbe = true;
+                        _probeInFlight = true;
+                    }
+                    else
+                    {
+                        shortCircuit = true;
                     }
                 }
-                return result;
             }
-            catch (Exception ex)
+
+            if (shortCircuit)
             {
-                var kind = OpenAIFailureClassifier.Classify(ex);
-                AppMeter.ChatOpenAIFailure.Add(1,
-                    new KeyValuePair<string, object?>("kind", KindTag(kind)));
-                lastException = ex;
-                lastKind = kind;
+                AppMeter.ChatOpenAICircuitShortCircuit.Add(1);
+                throw new OpenAIReliabilityCircuitOpenException(
+                    "OpenAI reliability gate is open; call short-circuited.");
+            }
 
-                bool canRetry = IsRetryable(kind)
-                    && attempt < MaxAttempts
-                    && !ct.IsCancellationRequested;
-                if (!canRetry)
-                    break;
+            // ----- Retry loop -----
+            int attempt = 0;
+            Exception? lastException = null;
+            OpenAIFailureKind lastKind = OpenAIFailureKind.Other;
 
-                var backoff = ComputeBackoff(kind, ex);
-                AppMeter.ChatOpenAIRetry.Add(1);
+            while (attempt < MaxAttempts)
+            {
+                attempt++;
                 try
                 {
-                    await _delay(backoff, ct).ConfigureAwait(false);
+                    var result = await operation(ct).ConfigureAwait(false);
+                    // Success — if we were the half-open probe, close the breaker.
+                    if (isProbe)
+                    {
+                        lock (_stateLock)
+                        {
+                            _openUntil = null;
+                            _probeInFlight = false;
+                            _recentFailures.Clear();
+                        }
+                    }
+                    return result;
                 }
-                catch (OperationCanceledException)
+                catch (Exception ex)
                 {
-                    // Caller's cancellation budget ran out during backoff —
-                    // skip the retry, let the original classified failure
-                    // bubble.
-                    break;
+                    var kind = OpenAIFailureClassifier.Classify(ex);
+                    AppMeter.ChatOpenAIFailure.Add(1,
+                        new KeyValuePair<string, object?>("kind", KindTag(kind)));
+                    lastException = ex;
+                    lastKind = kind;
+
+                    bool canRetry = IsRetryable(kind)
+                        && attempt < MaxAttempts
+                        && !ct.IsCancellationRequested;
+                    if (!canRetry)
+                        break;
+
+                    var backoff = ComputeBackoff(kind, ex);
+                    AppMeter.ChatOpenAIRetry.Add(1);
+                    try
+                    {
+                        await _delay(backoff, ct).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Caller's cancellation budget ran out during backoff —
+                        // skip the retry, let the original classified failure
+                        // bubble.
+                        break;
+                    }
                 }
             }
-        }
 
-        // ----- Breaker-state update on final failure -----
-        lock (_stateLock)
-        {
-            var now = _clock.GetUtcNow();
-            if (isProbe)
+            // ----- Breaker-state update on final failure -----
+            lock (_stateLock)
             {
-                // Probe failed → reopen the breaker for another OpenDuration.
-                _openUntil = now.Add(OpenDuration);
-                _probeInFlight = false;
-                _logger.LogWarning(
-                    "OpenAI reliability probe failed; reopening breaker for {OpenSeconds}s. last_kind={LastKind}",
-                    (int)OpenDuration.TotalSeconds, lastKind);
-            }
-            else if (_openUntil is null)
-            {
-                // Prune failures outside the rolling window, then record.
-                while (_recentFailures.First is not null
-                       && now - _recentFailures.First.Value > TripWindow)
+                var now = _clock.GetUtcNow();
+                if (isProbe)
                 {
-                    _recentFailures.RemoveFirst();
-                }
-                _recentFailures.AddLast(now);
-
-                if (_recentFailures.Count >= TripThreshold)
-                {
+                    // Probe failed → reopen the breaker for another OpenDuration.
                     _openUntil = now.Add(OpenDuration);
-                    AppMeter.ChatOpenAICircuitTrip.Add(1);
+                    _probeInFlight = false;
                     _logger.LogWarning(
-                        "OpenAI reliability gate tripped: {Failures} failures within {WindowSeconds}s; " +
-                        "opening for {OpenSeconds}s. last_kind={LastKind}",
-                        _recentFailures.Count,
-                        (int)TripWindow.TotalSeconds,
-                        (int)OpenDuration.TotalSeconds,
-                        lastKind);
+                        "OpenAI reliability probe failed; reopening breaker for {OpenSeconds}s. last_kind={LastKind}",
+                        (int)OpenDuration.TotalSeconds, lastKind);
                 }
-            }
-            // else: breaker already open; another concurrent call tripped it.
-            // This call's failure does not re-trip (avoids double-counting).
-        }
+                else if (_openUntil is null)
+                {
+                    // Prune failures outside the rolling window, then record.
+                    while (_recentFailures.First is not null
+                           && now - _recentFailures.First.Value > TripWindow)
+                    {
+                        _recentFailures.RemoveFirst();
+                    }
+                    _recentFailures.AddLast(now);
 
-        ExceptionDispatchInfo.Capture(lastException!).Throw();
-        throw lastException!; // unreachable — ExceptionDispatchInfo.Throw() does not return
+                    if (_recentFailures.Count >= TripThreshold)
+                    {
+                        _openUntil = now.Add(OpenDuration);
+                        AppMeter.ChatOpenAICircuitTrip.Add(1);
+                        _logger.LogWarning(
+                            "OpenAI reliability gate tripped: {Failures} failures within {WindowSeconds}s; " +
+                            "opening for {OpenSeconds}s. last_kind={LastKind}",
+                            _recentFailures.Count,
+                            (int)TripWindow.TotalSeconds,
+                            (int)OpenDuration.TotalSeconds,
+                            lastKind);
+                    }
+                }
+                // else: breaker already open; another concurrent call tripped it.
+                // This call's failure does not re-trip (avoids double-counting).
+            }
+
+            ExceptionDispatchInfo.Capture(lastException!).Throw();
+            throw lastException!; // unreachable — ExceptionDispatchInfo.Throw() does not return
+        }
+        finally
+        {
+            AppMeter.ChatOpenAIDuration.Record(sw.Elapsed.TotalSeconds);
+        }
     }
 
     // ----- Helpers -----
