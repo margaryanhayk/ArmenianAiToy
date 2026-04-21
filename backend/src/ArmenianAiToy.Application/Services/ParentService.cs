@@ -135,6 +135,70 @@ public class ParentService : IParentService
         return true;
     }
 
+    public async Task<bool> DeleteAccountAsync(Guid parentId, string currentPassword)
+    {
+        // Re-authenticate: the JWT proves the caller is logged in as this
+        // parent, but account deletion is destructive enough to warrant a
+        // second factor. Same BCrypt.Verify pattern ChangePasswordAsync
+        // uses; returns silent false on wrong password or unknown parent
+        // so the caller cannot probe.
+        var parent = await _db.Set<Parent>().FirstOrDefaultAsync(p => p.Id == parentId);
+        if (parent == null)
+            return false;
+
+        if (!BCrypt.Net.BCrypt.Verify(currentPassword, parent.PasswordHash))
+            return false;
+
+        // Capture the device ids BEFORE the cascade removes the
+        // ParentDevice rows — otherwise we lose the information needed to
+        // identify orphaned devices below.
+        var linkedDeviceIds = await _db.Set<ParentDevice>()
+            .Where(pd => pd.ParentId == parentId)
+            .Select(pd => pd.DeviceId)
+            .ToListAsync();
+
+        // Delete the Parent. FK ParentDevices → Parents is Cascade, so
+        // every ParentDevice row for this parent is removed in the same
+        // transaction as the Parent row.
+        _db.Set<Parent>().Remove(parent);
+        await _db.SaveChangesAsync();
+
+        // Orphan-aware device cleanup: for each device this parent had
+        // linked, if no ParentDevice rows remain (i.e. this parent was
+        // the last owner), the device and its data (children,
+        // conversations, messages) are unreachable forever. Delete the
+        // device; existing Cascade FKs handle the subtree.
+        //
+        // Devices still linked to another parent are preserved — the
+        // multi-parent-device semantic of the ParentDevice composite key
+        // is respected. This is the same "unlink last parent" shape C2's
+        // DeleteChild deliberately did NOT apply to the unlink endpoint;
+        // here it fires because the parent explicitly requested account
+        // deletion, which is a stronger signal than a single unlink.
+        int orphanedDevicesDeleted = 0;
+        foreach (var deviceId in linkedDeviceIds)
+        {
+            var stillLinked = await _db.Set<ParentDevice>()
+                .AnyAsync(pd => pd.DeviceId == deviceId);
+            if (stillLinked)
+                continue;
+
+            var device = await _db.Set<Device>().FindAsync(deviceId);
+            if (device != null)
+            {
+                _db.Set<Device>().Remove(device);
+                orphanedDevicesDeleted++;
+            }
+        }
+        if (orphanedDevicesDeleted > 0)
+            await _db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Parent {ParentId} deleted account ({LinkedDevices} linked devices, {OrphanedDevices} orphaned devices cascaded)",
+            parentId, linkedDeviceIds.Count, orphanedDevicesDeleted);
+        return true;
+    }
+
     public async Task<bool> DeleteChildAsync(Guid parentId, Guid childId)
     {
         // Ownership: the parent must own the device the child belongs to.

@@ -143,6 +143,32 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Permanently delete the authenticated parent's account. Requires the
+    /// current password as a second factor (re-authentication on top of
+    /// the JWT). Deletes the Parent row, all ParentDevice links (via FK
+    /// cascade), and any devices this parent was the sole owner of
+    /// (orphan-aware, cascades children/conversations/messages). Devices
+    /// still linked to another parent are preserved.
+    /// </summary>
+    [HttpDelete("account")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> DeleteAccount([FromBody] ParentDeleteAccountRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.CurrentPassword))
+            return BadRequest(new { error = "Current password is required." });
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var deleted = await _parentService.DeleteAccountAsync(parentId, request.CurrentPassword);
+        if (!deleted)
+            return BadRequest(new { error = "Current password is incorrect." });
+
+        return Ok(new { deleted = true });
+    }
+
+    /// <summary>
     /// Delete a child profile and all of its conversations (messages cascade
     /// at the DB level). The authenticated parent must own the device the
     /// child belongs to. Silent 404 on ownership miss — indistinguishable

@@ -304,6 +304,18 @@
           <button id="changePasswordBtn" type="button">Update password</button>
           <div id="changePasswordStatus" class="status muted" aria-live="polite"></div>
         </div>
+        <button id="toggleDeleteAccountBtn" class="link" type="button" aria-expanded="false" aria-controls="deleteAccountForm" style="color:#c66;margin-left:12px">Delete account</button>
+        <div id="deleteAccountForm" hidden>
+          <div style="background:#fee2e2;border:1px solid #c66;padding:10px;border-radius:6px;margin:8px 0;font-size:13px;color:#933">
+            <strong>This cannot be undone.</strong> Your account will be deleted. Any devices only you have linked — along with their children, conversations, and messages — will also be permanently deleted. Devices shared with another parent will remain for them.
+          </div>
+          <label for="deleteAccountPasswordInput">Current password</label>
+          <input id="deleteAccountPasswordInput" type="password" autocomplete="current-password">
+          <label for="deleteAccountConfirmInput">Type DELETE to confirm</label>
+          <input id="deleteAccountConfirmInput" type="text" autocomplete="off">
+          <button id="deleteAccountBtn" type="button" style="background:#c66;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:4px">Permanently delete account</button>
+          <div id="deleteAccountStatus" class="status muted" aria-live="polite"></div>
+        </div>
       </div>
     </section>
 
@@ -577,6 +589,67 @@
         });
       }).catch(function () {
         setStatus('changePasswordStatus', 'Network error.', 'err');
+      });
+    }
+
+    function toggleDeleteAccountForm() {
+      var btn = document.getElementById('toggleDeleteAccountBtn');
+      var form = document.getElementById('deleteAccountForm');
+      var nowVisible = form.hidden;
+      form.hidden = !nowVisible;
+      btn.setAttribute('aria-expanded', nowVisible ? 'true' : 'false');
+      if (!nowVisible) {
+        document.getElementById('deleteAccountPasswordInput').value = '';
+        document.getElementById('deleteAccountConfirmInput').value = '';
+        setStatus('deleteAccountStatus', '', '');
+      }
+    }
+
+    function doDeleteAccount() {
+      var password = document.getElementById('deleteAccountPasswordInput').value;
+      var confirmWord = document.getElementById('deleteAccountConfirmInput').value;
+      if (!password) {
+        setStatus('deleteAccountStatus', 'Current password is required.', 'err');
+        return;
+      }
+      if (confirmWord !== 'DELETE') {
+        setStatus('deleteAccountStatus', 'Type DELETE (all caps) to confirm.', 'err');
+        return;
+      }
+      var token = getToken();
+      if (!token) { show('loginView'); return; }
+      setStatus('deleteAccountStatus', 'Deleting account…', 'muted');
+      // DELETE with a JSON body is supported by ASP.NET Core's
+      // [FromBody] binding. Same Bearer-header pattern as the other
+      // authed endpoints in this file.
+      fetch('/api/parents/account', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ currentPassword: password })
+      }).then(function (res) {
+        if (res.status === 401) {
+          clearToken();
+          show('loginView');
+          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          return;
+        }
+        return res.json().then(function (data) {
+          if (res.ok && data && data.deleted) {
+            // Account is gone — wipe the token, return to login, and
+            // surface a success message on the login screen.
+            clearToken();
+            show('loginView');
+            setStatus('loginStatus', 'Account deleted.', 'ok');
+          } else {
+            setStatus('deleteAccountStatus', (data && data.error) || 'Delete failed.', 'err');
+          }
+        });
+      }).catch(function () {
+        setStatus('deleteAccountStatus', 'Network error.', 'err');
       });
     }
 
@@ -1208,6 +1281,8 @@
     document.getElementById('logoutBtn').addEventListener('click', doLogout);
     document.getElementById('togglePasswordBtn').addEventListener('click', togglePasswordForm);
     document.getElementById('changePasswordBtn').addEventListener('click', doChangePassword);
+    document.getElementById('toggleDeleteAccountBtn').addEventListener('click', toggleDeleteAccountForm);
+    document.getElementById('deleteAccountBtn').addEventListener('click', doDeleteAccount);
     document.getElementById('backToDevices').addEventListener('click', loadDevices);
     document.getElementById('flaggedBackToDevices').addEventListener('click', loadDevices);
     document.getElementById('backFromDetailBtn').addEventListener('click', backFromDetail);
