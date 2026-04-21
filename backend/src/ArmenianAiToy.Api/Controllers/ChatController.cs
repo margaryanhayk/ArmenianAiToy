@@ -1,5 +1,6 @@
 using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
@@ -24,6 +25,14 @@ public class ChatController : ControllerBase
     internal const string PausedResponse =
         "\u0540\u056b\u0574\u0561 \u0570\u0561\u0576\u0563\u057d\u057f\u0561\u0576\u0578\u0582\u0574 \u0565\u0574\u0589 \u053e\u0576\u0578\u0572\u056b\u0564 \u056f\u0561\u0580\u0578\u0572 \u0567 \u0576\u0578\u0580\u056b\u0581 \u0574\u056b\u0561\u0581\u0576\u0565\u056c\u0589";
         // «Հիմա հանգստանում եմ։ Ծնողդ կարող է նորից միացնել։»
+
+    // B5: canned reply when the parent has disabled the mode the child's
+    // current message is asking for. Deliberately distinct from PausedResponse
+    // so the two gates are separately identifiable in any future log/audit
+    // inspection. Same envelope shape; no AI call; SafetyFlag.Clean.
+    internal const string ModeDisabledResponse =
+        "Եկ մի ուրիշ բան փորձենք։";
+        // «Եկ մի ուրիշ բան փորձենք։» ("Let's try something else.")
 
     public ChatController(IChatService chatService, IDeviceService deviceService)
     {
@@ -62,6 +71,30 @@ public class ChatController : ControllerBase
             await _deviceService.IsDeviceInBedtimeWindowAsync(deviceId, DateTime.UtcNow))
         {
             return Ok(new ChatResponse(PausedResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
+        }
+
+        // B5 mode-disabled gate — third in the chain (pause > bedtime > mode).
+        // Fires only when ModeDetector makes a definitive Story/Game/Riddle/
+        // Curiosity call AND the corresponding device flag is off. Calm,
+        // None, and ambiguous detections are intentionally NOT blocked:
+        // bedtime cues must always reach Calm handling (safety invariant)
+        // and no-match messages should pass through normally. The detector
+        // is called without history or active-story context because the
+        // controller boundary doesn't own those; this makes the gate
+        // conservative — miss a classification, let the request through.
+        var detectedMode = ModeDetector.Detect(
+            request.Message, history: null, hasActiveStorySession: false);
+        if (detectedMode is DetectedMode.Story
+                or DetectedMode.Game
+                or DetectedMode.Riddle
+                or DetectedMode.Curiosity)
+        {
+            var enabled = await _deviceService.IsDeviceModeEnabledAsync(deviceId, detectedMode);
+            if (!enabled)
+            {
+                return Ok(new ChatResponse(
+                    ModeDisabledResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
+            }
         }
 
         try

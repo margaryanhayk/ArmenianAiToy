@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (779 tests)
+dotnet test                                     # Run all tests (787 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -247,6 +247,43 @@ Endpoint: `PUT /api/parents/devices/{deviceId}/bedtime-window` with body
 `{ "start": "HH:mm:ss" | null, "end": "HH:mm:ss" | null }`. Parent-JWT
 authenticated, ownership-checked against linked devices, silent 404 on
 miss (same shape as pause/resume).
+
+## Mode enable/disable (B5)
+
+Parents can toggle availability of the four configurable modes — **Story,
+Game, Riddle, Curiosity** — per device. When a mode is disabled and the
+child's current message triggers that mode in `ModeDetector`, the chat
+pipeline short-circuits at the HTTP boundary with a warm canned reply
+(no OpenAI call, no conversation write), same envelope shape as the
+pause path.
+
+- **Per-device scope.** Stored on `Device` as four `bool` columns
+  (`StoryEnabled`, `GameEnabled`, `RiddleEnabled`, `CuriosityEnabled`),
+  all default `true`. The additive migration backfills existing rows
+  with `true`, so no device changes behavior until a parent opts out.
+- **Calm is always enabled.** There is no `CalmEnabled` column and no
+  UI toggle by design — bedtime cues must always reach Calm handling
+  regardless of parent config. Safety invariant from MODES.md.
+- **Gate order is `pause > bedtime > mode`.** Pause blocks every
+  request; bedtime blocks every request inside its window; mode only
+  fires when the first two are inactive and `ModeDetector` makes a
+  **definitive** Story/Game/Riddle/Curiosity call. Calm / None /
+  ambiguous detections pass through — conservative "miss a
+  classification, let it through."
+- **No fallback routing.** A disabled mode does not route to another
+  mode (e.g. disabled Story does not fall back to Game or to Calm). The
+  response is a single short Armenian canned reply
+  (`ChatController.ModeDisabledResponse`: "Եկ մի ուրիշ բան փորձենք։").
+- **Audited.** Each successful `PUT` writes a
+  `ParentDeviceModeFlagsSet` audit row with metadata carrying the
+  four-bool post-save state. No migration was needed for the new
+  `AuditEventType` value — the column is already string-converted.
+
+Endpoint: `PUT /api/parents/devices/{deviceId}/mode-flags` with body
+`{ "story": bool, "game": bool, "riddle": bool, "curiosity": bool }`.
+Full-replacement shape — all four always supplied. Parent-JWT
+authenticated, ownership-checked, silent 404 on miss (same shape as
+pause/bedtime).
 
 ## Structured console logging
 

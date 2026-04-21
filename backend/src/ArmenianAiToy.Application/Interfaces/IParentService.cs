@@ -13,6 +13,9 @@ public interface IParentService
     Task<bool> ChangePasswordAsync(Guid parentId, string currentPassword, string newPassword);
     Task<bool> SetDevicePauseStateAsync(Guid parentId, Guid deviceId, bool paused);
     Task<bool> SetBedtimeWindowAsync(Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end);
+    Task<bool> SetDeviceModeFlagsAsync(
+        Guid parentId, Guid deviceId,
+        bool story, bool game, bool riddle, bool curiosity);
     Task<bool> DeleteChildAsync(Guid parentId, Guid childId);
     Task<bool> DeleteAccountAsync(Guid parentId, string currentPassword);
 }

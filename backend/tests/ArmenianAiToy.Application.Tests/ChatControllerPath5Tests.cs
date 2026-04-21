@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ArmenianAiToy.Api.Controllers;
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Domain.Enums;
 using Microsoft.AspNetCore.Http;
@@ -127,6 +128,8 @@ public class ChatControllerPath5Tests
         deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
         deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
             .Returns(false);
+        deviceService.IsDeviceModeEnabledAsync(Arg.Any<Guid>(), Arg.Any<DetectedMode>())
+            .Returns(true);
 
         var controller = new ChatController(chatService, deviceService);
         var httpContext = new DefaultHttpContext();
@@ -139,5 +142,138 @@ public class ChatControllerPath5Tests
         await chatService.Received(1).GetResponseAsync(
             Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
             Arg.Any<Guid?>(), Arg.Any<string?>());
+    }
+
+    // ---------- B5 mode-disabled gate ----------
+
+    private static (ChatController Controller, IChatService Chat, IDeviceService Devices)
+        CreateControllerWithFullGates(bool storyEnabled)
+    {
+        var chatService = Substitute.For<IChatService>();
+        chatService.GetResponseAsync(
+                Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
+                Arg.Any<Guid?>(), Arg.Any<string?>())
+            .Returns(new ChatResponse("ok", Guid.NewGuid(), Guid.NewGuid(), SafetyFlag.Clean));
+        var deviceService = Substitute.For<IDeviceService>();
+        deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
+        deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
+            .Returns(false);
+        // Default: all modes enabled. Tests override the Story branch below.
+        deviceService.IsDeviceModeEnabledAsync(Arg.Any<Guid>(), Arg.Any<DetectedMode>())
+            .Returns(true);
+        deviceService.IsDeviceModeEnabledAsync(Arg.Any<Guid>(), DetectedMode.Story)
+            .Returns(storyEnabled);
+
+        var controller = new ChatController(chatService, deviceService);
+        var httpContext = new DefaultHttpContext();
+        httpContext.Items["DeviceId"] = Guid.NewGuid();
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        return (controller, chatService, deviceService);
+    }
+
+    [Fact]
+    public async Task Chat_WhenDetectedModeIsDisabled_ReturnsCannedReplyAndSkipsChatService()
+    {
+        // Message with a definitive story cue ("tell me a story") lands in
+        // ModeDetector as DetectedMode.Story. With Story disabled on the
+        // device, the controller must short-circuit with the B5 canned reply
+        // and never reach ChatService.
+        var (controller, chat, _) = CreateControllerWithFullGates(storyEnabled: false);
+
+        var result = await controller.Chat(new ChatRequest("tell me a story please"));
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<ChatResponse>(ok.Value);
+        Assert.Equal(SafetyFlag.Clean, body.SafetyFlag);
+        // Short-circuit envelope uses Guid.Empty for both IDs; ChatService
+        // mock above returns Guid.NewGuid() for ConversationId, so this
+        // proves we came from the B5 gate rather than the mocked path.
+        Assert.Equal(Guid.Empty, body.ConversationId);
+        Assert.Equal(Guid.Empty, body.MessageId);
+        Assert.False(string.IsNullOrWhiteSpace(body.Response));
+        await chat.DidNotReceive().GetResponseAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
+            Arg.Any<Guid?>(), Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task Chat_WhenDetectedModeIsEnabled_ReachesChatService()
+    {
+        // Same definitive story message, but Story is enabled on the device.
+        // The mode gate must NOT fire and the request must reach ChatService.
+        var (controller, chat, _) = CreateControllerWithFullGates(storyEnabled: true);
+
+        var result = await controller.Chat(new ChatRequest("tell me a story please"));
+
+        Assert.IsType<OkObjectResult>(result);
+        await chat.Received(1).GetResponseAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
+            Arg.Any<Guid?>(), Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task Chat_WhenDetectedModeIsCalm_IsNeverBlockedByModeGate()
+    {
+        // Safety invariant: a bedtime cue (DetectedMode.Calm) must always
+        // reach ChatService, even if every configurable flag is false. The
+        // mode gate must not even query the device service for Calm.
+        var chatService = Substitute.For<IChatService>();
+        chatService.GetResponseAsync(
+                Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
+                Arg.Any<Guid?>(), Arg.Any<string?>())
+            .Returns(new ChatResponse("shh", Guid.NewGuid(), Guid.NewGuid(), SafetyFlag.Clean));
+        var deviceService = Substitute.For<IDeviceService>();
+        deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
+        deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
+            .Returns(false);
+        // If the gate ever asked about Calm, it would get false. The
+        // controller must never ask.
+        deviceService.IsDeviceModeEnabledAsync(Arg.Any<Guid>(), DetectedMode.Calm)
+            .Returns(false);
+
+        var controller = new ChatController(chatService, deviceService);
+        var httpContext = new DefaultHttpContext();
+        httpContext.Items["DeviceId"] = Guid.NewGuid();
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        var result = await controller.Chat(new ChatRequest("i'm sleepy"));
+
+        Assert.IsType<OkObjectResult>(result);
+        await chatService.Received(1).GetResponseAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
+            Arg.Any<Guid?>(), Arg.Any<string?>());
+        await deviceService.DidNotReceive().IsDeviceModeEnabledAsync(
+            Arg.Any<Guid>(), DetectedMode.Calm);
+    }
+
+    [Fact]
+    public async Task Chat_WhenDetectedModeIsNone_IsNeverBlockedByModeGate()
+    {
+        // A message with no mode cue resolves to DetectedMode.None. The
+        // controller must not query mode enablement and must reach
+        // ChatService normally — missed-classification is conservative.
+        var chatService = Substitute.For<IChatService>();
+        chatService.GetResponseAsync(
+                Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
+                Arg.Any<Guid?>(), Arg.Any<string?>())
+            .Returns(new ChatResponse("ok", Guid.NewGuid(), Guid.NewGuid(), SafetyFlag.Clean));
+        var deviceService = Substitute.For<IDeviceService>();
+        deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
+        deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
+            .Returns(false);
+
+        var controller = new ChatController(chatService, deviceService);
+        var httpContext = new DefaultHttpContext();
+        httpContext.Items["DeviceId"] = Guid.NewGuid();
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        var result = await controller.Chat(new ChatRequest("hello"));
+
+        Assert.IsType<OkObjectResult>(result);
+        await chatService.Received(1).GetResponseAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
+            Arg.Any<Guid?>(), Arg.Any<string?>());
+        await deviceService.DidNotReceive().IsDeviceModeEnabledAsync(
+            Arg.Any<Guid>(), Arg.Any<DetectedMode>());
     }
 }

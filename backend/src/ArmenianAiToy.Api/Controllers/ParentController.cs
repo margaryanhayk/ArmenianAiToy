@@ -252,6 +252,36 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// B5: set the four per-mode availability flags on a linked device. Full
+    /// replacement — the body always supplies all four bools. When a mode is
+    /// disabled, POST /api/chat short-circuits with a warm canned reply when
+    /// the detected mode matches the disabled flag, before any OpenAI call.
+    /// Calm has no flag here by design (safety invariant from MODES.md).
+    /// </summary>
+    [HttpPut("devices/{deviceId}/mode-flags")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> SetDeviceModeFlags(
+        Guid deviceId, [FromBody] DeviceModeFlagsRequest request)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ok = await _parentService.SetDeviceModeFlagsAsync(
+            parentId, deviceId,
+            request.Story, request.Game, request.Riddle, request.Curiosity);
+        if (!ok)
+            return NotFound(new { error = "Device not found or not linked to this account." });
+        return Ok(new { modeFlags = new
+        {
+            story = request.Story,
+            game = request.Game,
+            riddle = request.Riddle,
+            curiosity = request.Curiosity
+        } });
+    }
+
+    /// <summary>
     /// List linked devices with child info and last activity.
     /// </summary>
     [HttpGet("devices/details")]

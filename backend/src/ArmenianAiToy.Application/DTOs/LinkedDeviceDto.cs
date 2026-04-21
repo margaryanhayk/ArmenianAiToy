@@ -14,7 +14,11 @@ public record LinkedDeviceDto(
     List<LinkedDeviceChildDto> Children,
     bool IsPaused,
     TimeOnly? BedtimeStart,
-    TimeOnly? BedtimeEnd);
+    TimeOnly? BedtimeEnd,
+    bool StoryEnabled,
+    bool GameEnabled,
+    bool RiddleEnabled,
+    bool CuriosityEnabled);
 
 public record LinkedDeviceChildDto(
     Guid ChildId,

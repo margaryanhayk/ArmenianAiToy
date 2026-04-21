@@ -120,4 +120,22 @@ public class AuditEvent
             end = end
         })
     };
+
+    public static AuditEvent ParentDeviceModeFlagsSet(
+        Guid parentId, Guid deviceId,
+        bool story, bool game, bool riddle, bool curiosity) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDeviceModeFlagsSet,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            story = story,
+            game = game,
+            riddle = riddle,
+            curiosity = curiosity
+        })
+    };
 }

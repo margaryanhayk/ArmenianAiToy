@@ -830,6 +830,60 @@
           bedtimeRow.appendChild(bedtimeHint);
           listEl.appendChild(bedtimeRow);
 
+          // B5: mode enable/disable row — four checkboxes + Save. Calm is
+          // never represented here (safety invariant: bedtime cues always
+          // reach Calm handling regardless of parent config).
+          var modesRow = document.createElement('div');
+          modesRow.style.cssText =
+            'margin:4px 0 12px;padding:6px 10px;background:#f7f7f7;' +
+            'border-radius:6px;display:flex;flex-wrap:wrap;gap:10px;' +
+            'align-items:center;font-size:13px;';
+          var modesLabel = document.createElement('span');
+          modesLabel.textContent = 'Modes:';
+          modesLabel.style.color = '#555';
+          modesRow.appendChild(modesLabel);
+          var modeDefs = [
+            { key: 'story',     label: 'Story',     flag: d.storyEnabled },
+            { key: 'game',      label: 'Game',      flag: d.gameEnabled },
+            { key: 'riddle',    label: 'Riddle',    flag: d.riddleEnabled },
+            { key: 'curiosity', label: 'Curiosity', flag: d.curiosityEnabled }
+          ];
+          var modeInputs = {};
+          modeDefs.forEach(function (m) {
+            var lbl = document.createElement('label');
+            lbl.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:pointer;';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = m.flag !== false; // undefined on older payloads → treat as enabled
+            cb.setAttribute('data-role', 'mode-' + m.key);
+            modeInputs[m.key] = cb;
+            lbl.appendChild(cb);
+            var txt = document.createElement('span');
+            txt.textContent = m.label;
+            lbl.appendChild(txt);
+            modesRow.appendChild(lbl);
+          });
+          var saveModesBtn = document.createElement('button');
+          saveModesBtn.type = 'button';
+          saveModesBtn.textContent = 'Save modes';
+          saveModesBtn.style.cssText =
+            'padding:4px 10px;font-size:12px;background:transparent;' +
+            'border:1px solid #6a8ec9;color:#2c4a7a;border-radius:5px;cursor:pointer;';
+          saveModesBtn.addEventListener('click', function () {
+            saveDeviceModeFlags(
+              d.deviceId,
+              modeInputs.story.checked,
+              modeInputs.game.checked,
+              modeInputs.riddle.checked,
+              modeInputs.curiosity.checked);
+          });
+          modesRow.appendChild(saveModesBtn);
+          var modesHint = document.createElement('span');
+          modesHint.textContent = 'Calm stays on always · pause & bedtime override';
+          modesHint.style.cssText = 'color:#888;font-size:11px;';
+          modesRow.appendChild(modesHint);
+          listEl.appendChild(modesRow);
+
           // Unlink control, rendered as a sibling so we don't nest a button
           // inside the clickable row. Styling is inline to keep the diff
           // narrow and avoid touching the page's CSS block.
@@ -914,6 +968,42 @@
         }
         if (!res.ok) {
           setStatus('devicesStatus', 'Bedtime save failed (HTTP ' + res.status + ').', 'err');
+          return;
+        }
+        loadDevices();
+      }).catch(function () {
+        setStatus('devicesStatus', 'Network error.', 'err');
+      });
+    }
+
+    // B5: set the four mode flags on a linked device. Full-replacement
+    // shape — always sends all four bools. Calm is not represented here.
+    function saveDeviceModeFlags(deviceId, story, game, riddle, curiosity) {
+      var token = getToken();
+      if (!token) { show('loginView'); return; }
+      setStatus('devicesStatus', 'Saving modes…', 'muted');
+      fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/mode-flags', {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          story: !!story,
+          game: !!game,
+          riddle: !!riddle,
+          curiosity: !!curiosity
+        })
+      }).then(function (res) {
+        if (res.status === 401) {
+          clearToken();
+          show('loginView');
+          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          return;
+        }
+        if (!res.ok) {
+          setStatus('devicesStatus', 'Mode save failed (HTTP ' + res.status + ').', 'err');
           return;
         }
         loadDevices();

@@ -38,6 +38,18 @@ public class Device
     /// </summary>
     public string TimeZone { get; set; } = "Asia/Yerevan";
 
+    /// <summary>
+    /// B5 per-mode availability flags. When false, the chat pipeline short-
+    /// circuits at the HTTP boundary with a warm canned reply (same shape as
+    /// <see cref="IsPaused"/>) rather than calling ChatService. Calm has no
+    /// flag here by design — bedtime cues must always route to Calm for
+    /// safety (see .claude/MODES.md).
+    /// </summary>
+    public bool StoryEnabled { get; set; } = true;
+    public bool GameEnabled { get; set; } = true;
+    public bool RiddleEnabled { get; set; } = true;
+    public bool CuriosityEnabled { get; set; } = true;
+
     public ICollection<Conversation> Conversations { get; set; } = new List<Conversation>();
     public ICollection<ParentDevice> ParentDevices { get; set; } = new List<ParentDevice>();
 }

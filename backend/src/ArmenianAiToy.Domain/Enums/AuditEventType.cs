@@ -7,5 +7,6 @@ public enum AuditEventType
     ParentDeviceUnlinked,
     ParentPasswordChanged,
     ParentDevicePauseStateChanged,
-    ParentBedtimeWindowSet
+    ParentBedtimeWindowSet,
+    ParentDeviceModeFlagsSet
 }

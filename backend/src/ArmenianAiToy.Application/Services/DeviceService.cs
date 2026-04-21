@@ -94,4 +94,42 @@ public class DeviceService : IDeviceService
         return BedtimeWindowEvaluator.IsInWindow(
             gate.BedtimeStart, gate.BedtimeEnd, gate.TimeZone, nowUtc, _logger);
     }
+
+    public async Task<bool> IsDeviceModeEnabledAsync(Guid deviceId, DetectedMode mode)
+    {
+        // Calm always enabled (safety invariant from MODES.md). Any mode
+        // outside the four configurable ones (None) is also treated as
+        // enabled — the chat gate only calls this with a definitive
+        // Story/Game/Riddle/Curiosity, but being permissive on the
+        // non-gated branches avoids surprising callers.
+        if (mode is not DetectedMode.Story
+            and not DetectedMode.Game
+            and not DetectedMode.Riddle
+            and not DetectedMode.Curiosity)
+            return true;
+
+        var flags = await _db.Set<Device>()
+            .Where(d => d.Id == deviceId)
+            .Select(d => new
+            {
+                d.StoryEnabled,
+                d.GameEnabled,
+                d.RiddleEnabled,
+                d.CuriosityEnabled
+            })
+            .FirstOrDefaultAsync();
+        // Unknown device → don't block. DeviceAuthMiddleware already 401s
+        // invalid credentials upstream; this gate must never be the one to
+        // invent a rejection for a missing device.
+        if (flags is null)
+            return true;
+        return mode switch
+        {
+            DetectedMode.Story => flags.StoryEnabled,
+            DetectedMode.Game => flags.GameEnabled,
+            DetectedMode.Riddle => flags.RiddleEnabled,
+            DetectedMode.Curiosity => flags.CuriosityEnabled,
+            _ => true
+        };
+    }
 }

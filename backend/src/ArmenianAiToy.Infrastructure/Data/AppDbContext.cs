@@ -27,6 +27,12 @@ public class AppDbContext : DbContext
             // migration time, so the new non-nullable property never sees a
             // null in-memory and existing rows get the Armenia-first default.
             e.Property(d => d.TimeZone).HasDefaultValue("Asia/Yerevan");
+            // B5: per-mode flags default true — existing devices remain
+            // behaviorally unchanged after migration (all four modes allowed).
+            e.Property(d => d.StoryEnabled).HasDefaultValue(true);
+            e.Property(d => d.GameEnabled).HasDefaultValue(true);
+            e.Property(d => d.RiddleEnabled).HasDefaultValue(true);
+            e.Property(d => d.CuriosityEnabled).HasDefaultValue(true);
         });
 
         modelBuilder.Entity<Child>(e =>

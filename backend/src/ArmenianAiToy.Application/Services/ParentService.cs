@@ -346,6 +346,36 @@ public class ParentService : IParentService
         return true;
     }
 
+    public async Task<bool> SetDeviceModeFlagsAsync(
+        Guid parentId, Guid deviceId,
+        bool story, bool game, bool riddle, bool curiosity)
+    {
+        // Ownership check — same silent-false shape as SetDevicePauseStateAsync
+        // and SetBedtimeWindowAsync.
+        var linked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!linked)
+            return false;
+
+        var device = await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == deviceId);
+        if (device == null)
+            return false;
+
+        device.StoryEnabled = story;
+        device.GameEnabled = game;
+        device.RiddleEnabled = riddle;
+        device.CuriosityEnabled = curiosity;
+
+        _db.Set<AuditEvent>().Add(AuditEvent.ParentDeviceModeFlagsSet(
+            parentId, deviceId, story, game, riddle, curiosity));
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Parent {ParentId} set mode flags on device {DeviceId}: story={Story} game={Game} riddle={Riddle} curiosity={Curiosity}",
+            parentId, deviceId, story, game, riddle, curiosity);
+        return true;
+    }
+
     public async Task<List<LinkedDeviceDto>> GetLinkedDeviceDetailsAsync(Guid parentId)
     {
         var links = await _db.Set<ParentDevice>()
@@ -381,7 +411,11 @@ public class ParentService : IParentService
                 : new List<LinkedDeviceChildDto>(),
             l.Device.IsPaused,
             l.Device.BedtimeStart,
-            l.Device.BedtimeEnd
+            l.Device.BedtimeEnd,
+            l.Device.StoryEnabled,
+            l.Device.GameEnabled,
+            l.Device.RiddleEnabled,
+            l.Device.CuriosityEnabled
         )).ToList();
     }
 
