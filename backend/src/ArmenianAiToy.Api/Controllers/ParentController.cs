@@ -229,6 +229,29 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// B4: set (or disable) the bedtime window on a linked device. While the
+    /// current local time on the device is inside the window, POST /api/chat
+    /// short-circuits with the same canned reply a paused device returns.
+    /// Pause wins — if <c>Device.IsPaused</c> is true, the bedtime window
+    /// is moot. Half-null (one end set, the other null) is accepted and
+    /// normalized to "disabled" — the endpoint is idempotent for clearing.
+    /// </summary>
+    [HttpPut("devices/{deviceId}/bedtime-window")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> SetBedtimeWindow(Guid deviceId, [FromBody] BedtimeWindowRequest request)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ok = await _parentService.SetBedtimeWindowAsync(
+            parentId, deviceId, request.Start, request.End);
+        if (!ok)
+            return NotFound(new { error = "Device not found or not linked to this account." });
+        return Ok(new { bedtimeWindow = new { start = request.Start, end = request.End } });
+    }
+
+    /// <summary>
     /// List linked devices with child info and last activity.
     /// </summary>
     [HttpGet("devices/details")]

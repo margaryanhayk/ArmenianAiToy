@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (749 tests)
+dotnet test                                     # Run all tests (773 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -199,6 +199,46 @@ events are deliberately out of scope for this slice.
   (C1 / C2 / C3 / unlink cascade).
 - The existing `ILogger.LogInformation` lines stay — audit is additive,
   not a replacement.
+
+## Bedtime window (B4)
+
+Parent-configured daily quiet hours on a device. Scheduled analogue of
+`Device.IsPaused`. Fires at the HTTP boundary in `ChatController`:
+while inside the window, `POST /api/chat` returns the same canned reply
+a paused device returns, before any OpenAI call or conversation write.
+
+- **Hard-block semantics.** Not force-Calm — chat is refused during the
+  window, identical to the pause path. This keeps B4 off `ChatService`
+  and `ModeDetector` entirely.
+- **Per-device scope.** Stored on `Device` (`BedtimeStart`, `BedtimeEnd`,
+  `TimeZone`). Siblings sharing one device share one window. Per-child
+  windows require child identification in the chat flow and are a
+  later slice.
+- **Disabled state.** Both `BedtimeStart` and `BedtimeEnd` null → window
+  is off. Half-null is normalized to disabled server-side — the write
+  endpoint is idempotent for "clear the window" and accepts half-null
+  without a 400.
+- **Pause wins.** The chat gate is
+  `IsDevicePausedAsync || IsDeviceInBedtimeWindowAsync`. If a parent has
+  explicitly paused, the bedtime window is moot; pause is the stronger
+  signal.
+- **Timezone handling.** Each device carries an IANA `TimeZone` string,
+  default `"Asia/Yerevan"`. Evaluated with
+  `TimeZoneInfo.FindSystemTimeZoneById` at gate time. If the id fails to
+  resolve on the host, the evaluator logs a warning and falls back to
+  UTC — the window is still enforced, never silently disabled.
+- **Midnight-crossing windows** (e.g. 22:00–07:00) are explicitly
+  supported: start is inclusive, end is exclusive, wrap-around handled
+  in the evaluator.
+- **Log-only in slice 1.** Setting/clearing the window emits a
+  `LogInformation` line but does **not** write an `AuditEvent`. Audit
+  scope for parental-control config changes (pause, bedtime) is a
+  separate later decision taken together.
+
+Endpoint: `PUT /api/parents/devices/{deviceId}/bedtime-window` with body
+`{ "start": "HH:mm:ss" | null, "end": "HH:mm:ss" | null }`. Parent-JWT
+authenticated, ownership-checked against linked devices, silent 404 on
+miss (same shape as pause/resume).
 
 ## Engineering Guardrails
 

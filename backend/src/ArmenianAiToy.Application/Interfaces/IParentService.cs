@@ -12,6 +12,7 @@ public interface IParentService
     Task<List<LinkedDeviceDto>> GetLinkedDeviceDetailsAsync(Guid parentId);
     Task<bool> ChangePasswordAsync(Guid parentId, string currentPassword, string newPassword);
     Task<bool> SetDevicePauseStateAsync(Guid parentId, Guid deviceId, bool paused);
+    Task<bool> SetBedtimeWindowAsync(Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end);
     Task<bool> DeleteChildAsync(Guid parentId, Guid childId);
     Task<bool> DeleteAccountAsync(Guid parentId, string currentPassword);
 }

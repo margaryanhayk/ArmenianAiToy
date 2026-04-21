@@ -19,6 +19,25 @@ public class Device
     /// </summary>
     public bool IsPaused { get; set; }
 
+    /// <summary>
+    /// B4 bedtime window — parent-configured daily quiet hours. When the
+    /// current local time on the device falls inside [BedtimeStart, BedtimeEnd)
+    /// (half-open, midnight-crossing supported) the chat pipeline short-
+    /// circuits at the HTTP boundary just like <see cref="IsPaused"/>.
+    /// Disabled when either end is null. Pause wins over the window.
+    /// </summary>
+    public TimeOnly? BedtimeStart { get; set; }
+    public TimeOnly? BedtimeEnd { get; set; }
+
+    /// <summary>
+    /// IANA time zone id used to evaluate the bedtime window. Default is
+    /// "Asia/Yerevan" (Armenia-first product). If the id cannot be resolved
+    /// by <c>TimeZoneInfo.FindSystemTimeZoneById</c> at evaluation time, the
+    /// bedtime check falls back to UTC and emits a warning; the window is
+    /// still evaluated, not silently disabled.
+    /// </summary>
+    public string TimeZone { get; set; } = "Asia/Yerevan";
+
     public ICollection<Conversation> Conversations { get; set; } = new List<Conversation>();
     public ICollection<ParentDevice> ParentDevices { get; set; } = new List<ParentDevice>();
 }

@@ -12,7 +12,9 @@ public record LinkedDeviceDto(
     DateTime LinkedAt,
     DateTime? LastConversationAt,
     List<LinkedDeviceChildDto> Children,
-    bool IsPaused);
+    bool IsPaused,
+    TimeOnly? BedtimeStart,
+    TimeOnly? BedtimeEnd);
 
 public record LinkedDeviceChildDto(
     Guid ChildId,

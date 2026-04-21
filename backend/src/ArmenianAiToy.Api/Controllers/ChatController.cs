@@ -54,7 +54,12 @@ public class ChatController : ControllerBase
         // never reaches moderation, chat generation, or conversation writes.
         // The response envelope uses SafetyFlag.Clean (not Blocked/Flagged)
         // because this is a parent-initiated soft-off, not a safety event.
-        if (await _deviceService.IsDevicePausedAsync(deviceId))
+        //
+        // B4 bedtime window joins the same short-circuit as a second gate.
+        // Pause wins: we check pause first and skip the bedtime query when
+        // the device is already paused.
+        if (await _deviceService.IsDevicePausedAsync(deviceId) ||
+            await _deviceService.IsDeviceInBedtimeWindowAsync(deviceId, DateTime.UtcNow))
         {
             return Ok(new ChatResponse(PausedResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
         }

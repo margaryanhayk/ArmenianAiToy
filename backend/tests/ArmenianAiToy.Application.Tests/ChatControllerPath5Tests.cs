@@ -85,4 +85,59 @@ public class ChatControllerPath5Tests
 
         Assert.IsType<OkObjectResult>(result);
     }
+
+    [Fact]
+    public async Task Chat_WhenDeviceInBedtimeWindow_ShortCircuitsWithoutCallingChatService()
+    {
+        // B4 gate parallels the pause gate: when IsDeviceInBedtimeWindowAsync
+        // returns true, ChatService must never be invoked. Response envelope
+        // mirrors the pause gate (SafetyFlag.Clean, canned text).
+        var chatService = Substitute.For<IChatService>();
+        var deviceService = Substitute.For<IDeviceService>();
+        deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
+        deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
+            .Returns(true);
+
+        var controller = new ChatController(chatService, deviceService);
+        var httpContext = new DefaultHttpContext();
+        httpContext.Items["DeviceId"] = Guid.NewGuid();
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        var result = await controller.Chat(new ChatRequest("hi"));
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<ChatResponse>(ok.Value);
+        Assert.Equal(SafetyFlag.Clean, body.SafetyFlag);
+        await chatService.DidNotReceive().GetResponseAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
+            Arg.Any<Guid?>(), Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task Chat_WhenDeviceOutsideBedtimeWindowAndNotPaused_CallsChatService()
+    {
+        // Anti-tautology: when both gates are false the controller must
+        // reach ChatService, so "always short-circuit" regressions are caught.
+        var chatService = Substitute.For<IChatService>();
+        chatService.GetResponseAsync(
+                Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
+                Arg.Any<Guid?>(), Arg.Any<string?>())
+            .Returns(new ChatResponse("hi back", Guid.NewGuid(), Guid.NewGuid(), SafetyFlag.Clean));
+        var deviceService = Substitute.For<IDeviceService>();
+        deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
+        deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
+            .Returns(false);
+
+        var controller = new ChatController(chatService, deviceService);
+        var httpContext = new DefaultHttpContext();
+        httpContext.Items["DeviceId"] = Guid.NewGuid();
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        var result = await controller.Chat(new ChatRequest("hi"));
+
+        Assert.IsType<OkObjectResult>(result);
+        await chatService.Received(1).GetResponseAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
+            Arg.Any<Guid?>(), Arg.Any<string?>());
+    }
 }

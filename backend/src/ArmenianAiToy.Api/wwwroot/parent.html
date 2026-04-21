@@ -725,6 +725,20 @@
             btn.appendChild(pausedBadge);
           }
 
+          // B4 bedtime window state badge — only the informational chip;
+          // the editable controls live as siblings below the device row.
+          if (d.bedtimeStart && d.bedtimeEnd) {
+            var bedtimeBadge = document.createElement('div');
+            bedtimeBadge.textContent =
+              'Bedtime ' + d.bedtimeStart.substring(0, 5) +
+              '–' + d.bedtimeEnd.substring(0, 5);
+            bedtimeBadge.style.cssText =
+              'margin:2px 0 0 6px;padding:2px 8px;display:inline-block;' +
+              'background:#e7f0ff;border:1px solid #6a8ec9;color:#2c4a7a;' +
+              'border-radius:4px;font-size:12px;';
+            btn.appendChild(bedtimeBadge);
+          }
+
           btn.addEventListener('click', function () { openDevice(d.deviceId); });
           listEl.appendChild(btn);
 
@@ -771,6 +785,50 @@
             toggleDevicePause(d.deviceId, d.deviceName, d.isPaused);
           });
           listEl.appendChild(pauseBtn);
+
+          // B4: bedtime window row — two time inputs + Save, sibling to
+          // the clickable device row so inputs aren't nested in a button.
+          // Pause is an immediate override; bedtime is a scheduled analogue.
+          var bedtimeRow = document.createElement('div');
+          bedtimeRow.style.cssText =
+            'margin:4px 0 12px;padding:6px 10px;background:#f7f7f7;' +
+            'border-radius:6px;display:flex;flex-wrap:wrap;gap:8px;' +
+            'align-items:center;font-size:13px;';
+          var bedtimeLabel = document.createElement('span');
+          bedtimeLabel.textContent = 'Bedtime:';
+          bedtimeLabel.style.color = '#555';
+          bedtimeRow.appendChild(bedtimeLabel);
+          var bedStart = document.createElement('input');
+          bedStart.type = 'time';
+          bedStart.setAttribute('data-role', 'bedtime-start');
+          if (d.bedtimeStart) bedStart.value = d.bedtimeStart.substring(0, 5);
+          bedStart.style.cssText = 'padding:3px 6px;font-size:13px;';
+          bedtimeRow.appendChild(bedStart);
+          var dash = document.createElement('span');
+          dash.textContent = '–';
+          dash.style.color = '#555';
+          bedtimeRow.appendChild(dash);
+          var bedEnd = document.createElement('input');
+          bedEnd.type = 'time';
+          bedEnd.setAttribute('data-role', 'bedtime-end');
+          if (d.bedtimeEnd) bedEnd.value = d.bedtimeEnd.substring(0, 5);
+          bedEnd.style.cssText = 'padding:3px 6px;font-size:13px;';
+          bedtimeRow.appendChild(bedEnd);
+          var saveBedtimeBtn = document.createElement('button');
+          saveBedtimeBtn.type = 'button';
+          saveBedtimeBtn.textContent = 'Save';
+          saveBedtimeBtn.style.cssText =
+            'padding:4px 10px;font-size:12px;background:transparent;' +
+            'border:1px solid #6a8ec9;color:#2c4a7a;border-radius:5px;cursor:pointer;';
+          saveBedtimeBtn.addEventListener('click', function () {
+            saveBedtimeWindow(d.deviceId, bedStart.value, bedEnd.value);
+          });
+          bedtimeRow.appendChild(saveBedtimeBtn);
+          var bedtimeHint = document.createElement('span');
+          bedtimeHint.textContent = 'clear both to disable · pause overrides';
+          bedtimeHint.style.cssText = 'color:#888;font-size:11px;';
+          bedtimeRow.appendChild(bedtimeHint);
+          listEl.appendChild(bedtimeRow);
 
           // Unlink control, rendered as a sibling so we don't nest a button
           // inside the clickable row. Styling is inline to keep the diff
@@ -819,6 +877,43 @@
         }
         if (!res.ok) {
           setStatus('devicesStatus', (currentlyPaused ? 'Resume' : 'Pause') + ' failed (HTTP ' + res.status + ').', 'err');
+          return;
+        }
+        loadDevices();
+      }).catch(function () {
+        setStatus('devicesStatus', 'Network error.', 'err');
+      });
+    }
+
+    // B4: set or disable the bedtime window on a linked device. Both
+    // inputs blank => disable. Half-null is accepted server-side and
+    // normalized to disabled. System.Text.Json is strict on TimeOnly, so
+    // "HH:mm" from the time input is padded to "HH:mm:00" on the wire.
+    function saveBedtimeWindow(deviceId, startHHMM, endHHMM) {
+      var token = getToken();
+      if (!token) { show('loginView'); return; }
+      var body = {
+        start: startHHMM ? startHHMM + ':00' : null,
+        end:   endHHMM   ? endHHMM   + ':00' : null
+      };
+      setStatus('devicesStatus', 'Saving bedtime…', 'muted');
+      fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/bedtime-window', {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      }).then(function (res) {
+        if (res.status === 401) {
+          clearToken();
+          show('loginView');
+          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          return;
+        }
+        if (!res.ok) {
+          setStatus('devicesStatus', 'Bedtime save failed (HTTP ' + res.status + ').', 'err');
           return;
         }
         loadDevices();

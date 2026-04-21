@@ -1,4 +1,5 @@
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -77,5 +78,20 @@ public class DeviceService : IDeviceService
             .Where(d => d.Id == deviceId)
             .Select(d => d.IsPaused)
             .FirstOrDefaultAsync();
+    }
+
+    public async Task<bool> IsDeviceInBedtimeWindowAsync(Guid deviceId, DateTime nowUtc)
+    {
+        // Projection: only the three bedtime fields, same hot-path
+        // discipline as IsDevicePausedAsync. Unknown device id → false
+        // (same contract as the pause check).
+        var gate = await _db.Set<Device>()
+            .Where(d => d.Id == deviceId)
+            .Select(d => new { d.BedtimeStart, d.BedtimeEnd, d.TimeZone })
+            .FirstOrDefaultAsync();
+        if (gate is null)
+            return false;
+        return BedtimeWindowEvaluator.IsInWindow(
+            gate.BedtimeStart, gate.BedtimeEnd, gate.TimeZone, nowUtc, _logger);
     }
 }

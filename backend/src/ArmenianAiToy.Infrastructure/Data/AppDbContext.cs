@@ -23,6 +23,10 @@ public class AppDbContext : DbContext
             e.HasKey(d => d.Id);
             e.HasIndex(d => d.MacAddress).IsUnique();
             e.HasIndex(d => d.ApiKey).IsUnique();
+            // B4: NOT NULL column with default backfills existing devices at
+            // migration time, so the new non-nullable property never sees a
+            // null in-memory and existing rows get the Armenia-first default.
+            e.Property(d => d.TimeZone).HasDefaultValue("Asia/Yerevan");
         });
 
         modelBuilder.Entity<Child>(e =>

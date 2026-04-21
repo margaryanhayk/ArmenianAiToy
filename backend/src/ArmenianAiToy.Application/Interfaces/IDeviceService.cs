@@ -9,4 +9,5 @@ public interface IDeviceService
     Task<Device?> ValidateDeviceAsync(Guid deviceId, string apiKey);
     Task UpdateLastSeenAsync(Guid deviceId);
     Task<bool> IsDevicePausedAsync(Guid deviceId);
+    Task<bool> IsDeviceInBedtimeWindowAsync(Guid deviceId, DateTime nowUtc);
 }

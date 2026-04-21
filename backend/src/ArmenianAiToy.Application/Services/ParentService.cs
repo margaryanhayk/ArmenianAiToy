@@ -305,6 +305,40 @@ public class ParentService : IParentService
         return true;
     }
 
+    public async Task<bool> SetBedtimeWindowAsync(Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end)
+    {
+        // Ownership check — same silent-false shape as SetDevicePauseStateAsync.
+        var linked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!linked)
+            return false;
+
+        var device = await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == deviceId);
+        if (device == null)
+            return false;
+
+        // Half-null is normalized to disabled; we do not reject with 400.
+        // Keeps the endpoint idempotent for "clear the window".
+        if (start is null || end is null)
+        {
+            device.BedtimeStart = null;
+            device.BedtimeEnd = null;
+        }
+        else
+        {
+            device.BedtimeStart = start;
+            device.BedtimeEnd = end;
+        }
+
+        await _db.SaveChangesAsync();
+        _logger.LogInformation(
+            "Parent {ParentId} set bedtime window on device {DeviceId} to {Start}-{End}",
+            parentId, deviceId,
+            device.BedtimeStart?.ToString() ?? "disabled",
+            device.BedtimeEnd?.ToString() ?? "disabled");
+        return true;
+    }
+
     public async Task<List<LinkedDeviceDto>> GetLinkedDeviceDetailsAsync(Guid parentId)
     {
         var links = await _db.Set<ParentDevice>()
@@ -338,7 +372,9 @@ public class ParentService : IParentService
             childrenByDevice.TryGetValue(l.Device.Id, out var children)
                 ? children.Select(c => new LinkedDeviceChildDto(c.Id, c.Name, c.GetAge(), c.Gender)).ToList()
                 : new List<LinkedDeviceChildDto>(),
-            l.Device.IsPaused
+            l.Device.IsPaused,
+            l.Device.BedtimeStart,
+            l.Device.BedtimeEnd
         )).ToList();
     }
 
