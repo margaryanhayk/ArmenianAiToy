@@ -107,7 +107,32 @@ public class ParentService : IParentService
 
         _db.Set<ParentDevice>().Remove(link);
         await _db.SaveChangesAsync();
-        _logger.LogInformation("Parent {ParentId} unlinked device {DeviceId}", parentId, deviceId);
+
+        // Orphan-aware cleanup: if this unlink removed the last parent link
+        // to the device, the device and its subtree (children, conversations,
+        // messages) become unreachable by any parent API. Delete the Device
+        // and rely on the existing Cascade FKs to take the subtree with it.
+        // Same shape as DeleteAccountAsync's orphan loop, narrowed to a
+        // single device.
+        var stillLinked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.DeviceId == deviceId);
+        if (stillLinked)
+        {
+            _logger.LogInformation(
+                "Parent {ParentId} unlinked device {DeviceId} (still linked to other parents)",
+                parentId, deviceId);
+            return true;
+        }
+
+        var device = await _db.Set<Device>().FindAsync(deviceId);
+        if (device != null)
+        {
+            _db.Set<Device>().Remove(device);
+            await _db.SaveChangesAsync();
+        }
+        _logger.LogInformation(
+            "Parent {ParentId} unlinked last link to device {DeviceId}; device and subtree deleted",
+            parentId, deviceId);
         return true;
     }
 
@@ -171,10 +196,9 @@ public class ParentService : IParentService
         //
         // Devices still linked to another parent are preserved — the
         // multi-parent-device semantic of the ParentDevice composite key
-        // is respected. This is the same "unlink last parent" shape C2's
-        // DeleteChild deliberately did NOT apply to the unlink endpoint;
-        // here it fires because the parent explicitly requested account
-        // deletion, which is a stronger signal than a single unlink.
+        // is respected. UnlinkDeviceAsync applies the same orphan-cleanup
+        // rule per device; this loop is the bulk equivalent when the
+        // whole account goes away at once.
         int orphanedDevicesDeleted = 0;
         foreach (var deviceId in linkedDeviceIds)
         {
