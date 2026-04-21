@@ -132,4 +132,57 @@ public class DeviceService : IDeviceService
             _ => true
         };
     }
+
+    public async Task<bool> IsModeEnabledForRequestAsync(
+        Guid deviceId, Guid? childId, DetectedMode mode)
+    {
+        // Calm / None / ambiguous are never gated — same safety invariant
+        // as the device-level resolver. Mirrors IsDeviceModeEnabledAsync's
+        // first branch.
+        if (mode is not DetectedMode.Story
+            and not DetectedMode.Game
+            and not DetectedMode.Riddle
+            and not DetectedMode.Curiosity)
+            return true;
+
+        // No ChildId on the request → device-level path, unchanged.
+        if (childId is null)
+            return await IsDeviceModeEnabledAsync(deviceId, mode);
+
+        // Look up the child's override, filtered by BOTH childId AND deviceId
+        // so a request carrying a ChildId that belongs to another device
+        // cannot influence this device's gate. Projection pulls only the
+        // four nullable override columns — same hot-path discipline as
+        // IsDeviceModeEnabledAsync.
+        var overrides = await _db.Set<Child>()
+            .Where(c => c.Id == childId.Value && c.DeviceId == deviceId)
+            .Select(c => new
+            {
+                c.StoryEnabled,
+                c.GameEnabled,
+                c.RiddleEnabled,
+                c.CuriosityEnabled
+            })
+            .FirstOrDefaultAsync();
+
+        // Child not found on this device — cross-device probe or unknown
+        // id; fall back to device-level flag. Never apply an override
+        // belonging to another device.
+        if (overrides is null)
+            return await IsDeviceModeEnabledAsync(deviceId, mode);
+
+        bool? childOverride = mode switch
+        {
+            DetectedMode.Story => overrides.StoryEnabled,
+            DetectedMode.Game => overrides.GameEnabled,
+            DetectedMode.Riddle => overrides.RiddleEnabled,
+            DetectedMode.Curiosity => overrides.CuriosityEnabled,
+            _ => null
+        };
+
+        // Non-null child override wins over device flag in both directions.
+        // Null override means inherit — fall through to device flag.
+        return childOverride
+            ?? await IsDeviceModeEnabledAsync(deviceId, mode);
+    }
 }

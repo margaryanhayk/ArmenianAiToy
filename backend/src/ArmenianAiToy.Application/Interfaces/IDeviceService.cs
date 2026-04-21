@@ -12,4 +12,5 @@ public interface IDeviceService
     Task<bool> IsDevicePausedAsync(Guid deviceId);
     Task<bool> IsDeviceInBedtimeWindowAsync(Guid deviceId, DateTime nowUtc);
     Task<bool> IsDeviceModeEnabledAsync(Guid deviceId, DetectedMode mode);
+    Task<bool> IsModeEnabledForRequestAsync(Guid deviceId, Guid? childId, DetectedMode mode);
 }

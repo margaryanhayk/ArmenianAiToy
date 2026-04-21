@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (797 tests)
+dotnet test                                     # Run all tests (808 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -316,6 +316,55 @@ Endpoint: `PUT /api/parents/devices/{deviceId}/mode-flags` with body
 Full-replacement shape — all four always supplied. Parent-JWT
 authenticated, ownership-checked, silent 404 on miss (same shape as
 pause/bedtime).
+
+## Per-child mode overrides
+
+Per-child overrides on top of the B5 device defaults. Lives on `Child`
+as four nullable `bool?` columns (`StoryEnabled`, `GameEnabled`,
+`RiddleEnabled`, `CuriosityEnabled`), each three-valued:
+
+- `null` → **inherit** the device's B5 flag for this mode.
+- `true` → force this mode **on** for this child, even if the device
+  has it off.
+- `false` → force this mode **off** for this child, even if the device
+  has it on.
+
+**Child override wins over device flag in both directions** when
+non-null. Null means inherit, so a child with all four columns null
+behaves exactly like B5's device-level defaults would.
+
+- **Calm has no override column and no UI toggle**, same safety
+  invariant B5 preserved: bedtime cues always reach Calm handling
+  (MODES.md), regardless of device or child config.
+- **Missing `ChildId` on a chat request** (either the firmware didn't
+  supply one or it was null) falls back to the existing B5 device-level
+  resolver. No child layer → device flags alone decide.
+- **Cross-device probe guard**: the override lookup joins on both
+  `Child.Id == childId` **and** `Child.DeviceId == deviceId`. A
+  `ChildId` that belongs to a different device than the one making the
+  request can never influence that device's gate.
+- **Chat gate chain** stays `pause → bedtime → mode`. Only the mode
+  step changed: it now calls
+  `IDeviceService.IsModeEnabledForRequestAsync(deviceId, childId?, mode)`
+  instead of the previous device-only resolver. The B5
+  `IsDeviceModeEnabledAsync` is preserved for the
+  null-ChildId fallback and for backward-compatibility tests.
+- When the effective flag is `false` the existing B5 canned reply
+  (`ModeDisabledResponse`) is used; no new response string, no fallback
+  routing.
+
+Audited: each successful `PUT` writes a `ChildModeOverridesSet` audit
+row with the four post-save nullable states in metadata. No migration
+needed for the new enum value — `EventType` stays string-converted.
+Verified via `dotnet ef migrations has-pending-model-changes`.
+
+Endpoint: `PUT /api/parents/children/{childId}/mode-flags` with body
+`{ "story": bool|null, "game": bool|null, "riddle": bool|null, "curiosity": bool|null }`.
+Parent-JWT authenticated; ownership is "parent must own the device the
+child belongs to" (same shape as `DeleteChildAsync`). 404 on miss.
+Dashboard exposes per-child tri-state selects (Inherit / On / Off)
+with an "Inherit (on)" / "Inherit (off)" hint in the Inherit label so
+parents never wonder what "Inherit" resolves to.
 
 ## Structured console logging
 

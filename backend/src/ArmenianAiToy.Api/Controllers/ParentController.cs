@@ -169,6 +169,36 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Per-child mode override setter. Three-valued per mode:
+    /// null = inherit device, true = force on, false = force off. Calm has
+    /// no override by design (MODES.md safety invariant). Parent must own
+    /// the device the child belongs to; silent 404 on a miss. Full-
+    /// replacement body — all four fields always supplied.
+    /// </summary>
+    [HttpPut("children/{childId}/mode-flags")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> SetChildModeOverrides(
+        Guid childId, [FromBody] ChildModeOverridesRequest request)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ok = await _parentService.SetChildModeOverridesAsync(
+            parentId, childId,
+            request.Story, request.Game, request.Riddle, request.Curiosity);
+        if (!ok)
+            return NotFound(new { error = "Child not found or not owned by this account." });
+        return Ok(new { modeOverrides = new
+        {
+            story = request.Story,
+            game = request.Game,
+            riddle = request.Riddle,
+            curiosity = request.Curiosity
+        } });
+    }
+
+    /// <summary>
     /// Delete a child profile and all of its conversations (messages cascade
     /// at the DB level). The authenticated parent must own the device the
     /// child belongs to. Silent 404 on ownership miss — indistinguishable

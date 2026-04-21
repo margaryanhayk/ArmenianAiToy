@@ -138,4 +138,22 @@ public class AuditEvent
             curiosity = curiosity
         })
     };
+
+    public static AuditEvent ChildModeOverridesSet(
+        Guid parentId, Guid childId,
+        bool? story, bool? game, bool? riddle, bool? curiosity) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ChildModeOverridesSet,
+        ActorParentId = parentId,
+        TargetChildId = childId,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            story = story,
+            game = game,
+            riddle = riddle,
+            curiosity = curiosity
+        })
+    };
 }

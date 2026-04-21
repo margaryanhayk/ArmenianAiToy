@@ -128,7 +128,8 @@ public class ChatControllerPath5Tests
         deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
         deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
             .Returns(false);
-        deviceService.IsDeviceModeEnabledAsync(Arg.Any<Guid>(), Arg.Any<DetectedMode>())
+        deviceService.IsModeEnabledForRequestAsync(
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<DetectedMode>())
             .Returns(true);
 
         var controller = new ChatController(chatService, deviceService);
@@ -159,9 +160,14 @@ public class ChatControllerPath5Tests
         deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
             .Returns(false);
         // Default: all modes enabled. Tests override the Story branch below.
-        deviceService.IsDeviceModeEnabledAsync(Arg.Any<Guid>(), Arg.Any<DetectedMode>())
+        // Controller now calls IsModeEnabledForRequestAsync (per-child
+        // override aware); stubbing that is enough — the B5 device-level
+        // resolver sits behind it and is exercised separately.
+        deviceService.IsModeEnabledForRequestAsync(
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<DetectedMode>())
             .Returns(true);
-        deviceService.IsDeviceModeEnabledAsync(Arg.Any<Guid>(), DetectedMode.Story)
+        deviceService.IsModeEnabledForRequestAsync(
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), DetectedMode.Story)
             .Returns(storyEnabled);
 
         var controller = new ChatController(chatService, deviceService);
@@ -227,8 +233,10 @@ public class ChatControllerPath5Tests
         deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
             .Returns(false);
         // If the gate ever asked about Calm, it would get false. The
-        // controller must never ask.
-        deviceService.IsDeviceModeEnabledAsync(Arg.Any<Guid>(), DetectedMode.Calm)
+        // controller must never ask (safety invariant). Stubbing the
+        // new child-aware resolver covers the actual call site.
+        deviceService.IsModeEnabledForRequestAsync(
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), DetectedMode.Calm)
             .Returns(false);
 
         var controller = new ChatController(chatService, deviceService);
@@ -242,8 +250,8 @@ public class ChatControllerPath5Tests
         await chatService.Received(1).GetResponseAsync(
             Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
             Arg.Any<Guid?>(), Arg.Any<string?>());
-        await deviceService.DidNotReceive().IsDeviceModeEnabledAsync(
-            Arg.Any<Guid>(), DetectedMode.Calm);
+        await deviceService.DidNotReceive().IsModeEnabledForRequestAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid?>(), DetectedMode.Calm);
     }
 
     [Fact]
@@ -273,7 +281,7 @@ public class ChatControllerPath5Tests
         await chatService.Received(1).GetResponseAsync(
             Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
             Arg.Any<Guid?>(), Arg.Any<string?>());
-        await deviceService.DidNotReceive().IsDeviceModeEnabledAsync(
-            Arg.Any<Guid>(), Arg.Any<DetectedMode>());
+        await deviceService.DidNotReceive().IsModeEnabledForRequestAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<DetectedMode>());
     }
 }

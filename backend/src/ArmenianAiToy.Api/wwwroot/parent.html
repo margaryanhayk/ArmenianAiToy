@@ -424,7 +424,8 @@
       ParentPasswordChanged: 'Password changed',
       ParentDevicePauseStateChanged: 'Device paused/resumed',
       ParentBedtimeWindowSet: 'Bedtime window updated',
-      ParentDeviceModeFlagsSet: 'Modes updated'
+      ParentDeviceModeFlagsSet: 'Modes updated',
+      ChildModeOverridesSet: 'Child mode overrides updated'
     };
 
     // ---------- helpers ----------
@@ -810,6 +811,11 @@
               });
               childRow.appendChild(removeChildBtn);
               listEl.appendChild(childRow);
+              // Per-child mode override row — tri-state per mode (Inherit
+              // from device / On / Off). Calm has no control by design.
+              // Effective-state hint shows what the device currently allows
+              // for "Inherit" to reduce silent-disable surprises.
+              listEl.appendChild(renderChildOverridesRow(d, c));
             });
           }
 
@@ -1011,6 +1017,120 @@
         }
         if (!res.ok) {
           setStatus('devicesStatus', 'Bedtime save failed (HTTP ' + res.status + ').', 'err');
+          return;
+        }
+        loadDevices();
+      }).catch(function () {
+        setStatus('devicesStatus', 'Network error.', 'err');
+      });
+    }
+
+    // Per-child mode override row. Four tri-state <select>s (Inherit /
+    // On / Off) + Save button. Effective-state hint per mode shows what
+    // the device's current flag is, so "Inherit" is never a silent mystery.
+    function renderChildOverridesRow(device, child) {
+      var row = document.createElement('div');
+      row.style.cssText =
+        'margin:2px 0 8px;padding:6px 10px;background:#f7f7f7;' +
+        'border-radius:6px;display:flex;flex-wrap:wrap;gap:10px;' +
+        'align-items:center;font-size:12px;color:#555;';
+
+      var prefix = document.createElement('span');
+      prefix.textContent = 'Modes for ' + child.name + ':';
+      prefix.style.fontWeight = '500';
+      row.appendChild(prefix);
+
+      var modeDefs = [
+        { key: 'story', label: 'Story', override: child.storyEnabled, device: device.storyEnabled },
+        { key: 'game', label: 'Game', override: child.gameEnabled, device: device.gameEnabled },
+        { key: 'riddle', label: 'Riddle', override: child.riddleEnabled, device: device.riddleEnabled },
+        { key: 'curiosity', label: 'Curiosity', override: child.curiosityEnabled, device: device.curiosityEnabled }
+      ];
+      var selects = {};
+      modeDefs.forEach(function (m) {
+        var wrap = document.createElement('label');
+        wrap.style.cssText = 'display:inline-flex;align-items:center;gap:3px;';
+        var lbl = document.createElement('span');
+        lbl.textContent = m.label + ':';
+        wrap.appendChild(lbl);
+        var sel = document.createElement('select');
+        sel.style.cssText = 'padding:2px 4px;font-size:12px;';
+        sel.setAttribute('data-role', 'child-override-' + m.key);
+        var inheritLabel = 'Inherit (' + (m.device ? 'on' : 'off') + ')';
+        [
+          { v: 'inherit', t: inheritLabel },
+          { v: 'on', t: 'On' },
+          { v: 'off', t: 'Off' }
+        ].forEach(function (opt) {
+          var o = document.createElement('option');
+          o.value = opt.v;
+          o.textContent = opt.t;
+          sel.appendChild(o);
+        });
+        sel.value = m.override === true ? 'on' : (m.override === false ? 'off' : 'inherit');
+        selects[m.key] = sel;
+        wrap.appendChild(sel);
+        row.appendChild(wrap);
+      });
+
+      var saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.textContent = 'Save';
+      saveBtn.style.cssText =
+        'padding:3px 10px;font-size:12px;background:transparent;' +
+        'border:1px solid #6a8ec9;color:#2c4a7a;border-radius:5px;cursor:pointer;';
+      saveBtn.addEventListener('click', function () {
+        saveChildModeOverrides(
+          child.childId,
+          triToOverride(selects.story.value),
+          triToOverride(selects.game.value),
+          triToOverride(selects.riddle.value),
+          triToOverride(selects.curiosity.value)
+        );
+      });
+      row.appendChild(saveBtn);
+
+      var hint = document.createElement('span');
+      hint.textContent = 'child override wins over device · Calm always on';
+      hint.style.cssText = 'color:#888;font-size:11px;';
+      row.appendChild(hint);
+      return row;
+    }
+
+    function triToOverride(v) {
+      if (v === 'on') return true;
+      if (v === 'off') return false;
+      return null;
+    }
+
+    // Per-child mode overrides: null/true/false per mode. null = inherit
+    // the device's B5 default, true/false = force on/off for this child.
+    function saveChildModeOverrides(childId, story, game, riddle, curiosity) {
+      var token = getToken();
+      if (!token) { show('loginView'); return; }
+      setStatus('devicesStatus', 'Saving child overrides…', 'muted');
+      fetch('/api/parents/children/' + encodeURIComponent(childId) + '/mode-flags', {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          story: story,
+          game: game,
+          riddle: riddle,
+          curiosity: curiosity
+        })
+      }).then(function (res) {
+        if (res.status === 401) {
+          clearToken();
+          show('loginView');
+          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          return;
+        }
+        if (!res.ok) {
+          setStatus('devicesStatus', 'Save failed (HTTP ' + res.status + ').', 'err');
           return;
         }
         loadDevices();

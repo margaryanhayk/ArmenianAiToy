@@ -24,4 +24,8 @@ public record LinkedDeviceChildDto(
     Guid ChildId,
     string Name,
     int? Age,
-    Gender Gender);
+    Gender Gender,
+    bool? StoryEnabled,
+    bool? GameEnabled,
+    bool? RiddleEnabled,
+    bool? CuriosityEnabled);

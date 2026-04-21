@@ -73,15 +73,21 @@ public class ChatController : ControllerBase
             return Ok(new ChatResponse(PausedResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
         }
 
-        // B5 mode-disabled gate — third in the chain (pause > bedtime > mode).
-        // Fires only when ModeDetector makes a definitive Story/Game/Riddle/
-        // Curiosity call AND the corresponding device flag is off. Calm,
+        // B5 + per-child overrides — third gate in the chain
+        // (pause > bedtime > mode). Fires only when ModeDetector makes a
+        // definitive Story/Game/Riddle/Curiosity call AND the effective
+        // flag (child override if present, else device flag) is off. Calm,
         // None, and ambiguous detections are intentionally NOT blocked:
         // bedtime cues must always reach Calm handling (safety invariant)
         // and no-match messages should pass through normally. The detector
         // is called without history or active-story context because the
         // controller boundary doesn't own those; this makes the gate
         // conservative — miss a classification, let the request through.
+        //
+        // ChildId on the request is passed through to
+        // IsModeEnabledForRequestAsync, which enforces both the override
+        // logic and the cross-device probe guard (a ChildId pointing to a
+        // different device does not influence this device's gate).
         var detectedMode = ModeDetector.Detect(
             request.Message, history: null, hasActiveStorySession: false);
         if (detectedMode is DetectedMode.Story
@@ -89,7 +95,8 @@ public class ChatController : ControllerBase
                 or DetectedMode.Riddle
                 or DetectedMode.Curiosity)
         {
-            var enabled = await _deviceService.IsDeviceModeEnabledAsync(deviceId, detectedMode);
+            var enabled = await _deviceService.IsModeEnabledForRequestAsync(
+                deviceId, request.ChildId, detectedMode);
             if (!enabled)
             {
                 return Ok(new ChatResponse(

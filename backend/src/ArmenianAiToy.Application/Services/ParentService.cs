@@ -377,6 +377,37 @@ public class ParentService : IParentService
         return true;
     }
 
+    public async Task<bool> SetChildModeOverridesAsync(
+        Guid parentId, Guid childId,
+        bool? story, bool? game, bool? riddle, bool? curiosity)
+    {
+        // Ownership shape mirrors DeleteChildAsync: parent must own the
+        // device the child belongs to. Silent false on a miss — no
+        // existence leak for children owned by other parents.
+        var child = await _db.Set<Child>().FirstOrDefaultAsync(c => c.Id == childId);
+        if (child == null)
+            return false;
+
+        var ownsDevice = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == child.DeviceId);
+        if (!ownsDevice)
+            return false;
+
+        child.StoryEnabled = story;
+        child.GameEnabled = game;
+        child.RiddleEnabled = riddle;
+        child.CuriosityEnabled = curiosity;
+
+        _db.Set<AuditEvent>().Add(AuditEvent.ChildModeOverridesSet(
+            parentId, childId, story, game, riddle, curiosity));
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Parent {ParentId} set child {ChildId} mode overrides: story={Story} game={Game} riddle={Riddle} curiosity={Curiosity}",
+            parentId, childId, story, game, riddle, curiosity);
+        return true;
+    }
+
     public async Task<List<LinkedDeviceDto>> GetLinkedDeviceDetailsAsync(Guid parentId)
     {
         var links = await _db.Set<ParentDevice>()
@@ -408,7 +439,9 @@ public class ParentService : IParentService
             l.LinkedAt,
             lastConversationByDevice.TryGetValue(l.Device.Id, out var lastConv) ? lastConv : null,
             childrenByDevice.TryGetValue(l.Device.Id, out var children)
-                ? children.Select(c => new LinkedDeviceChildDto(c.Id, c.Name, c.GetAge(), c.Gender)).ToList()
+                ? children.Select(c => new LinkedDeviceChildDto(
+                    c.Id, c.Name, c.GetAge(), c.Gender,
+                    c.StoryEnabled, c.GameEnabled, c.RiddleEnabled, c.CuriosityEnabled)).ToList()
                 : new List<LinkedDeviceChildDto>(),
             l.Device.IsPaused,
             l.Device.BedtimeStart,
