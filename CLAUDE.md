@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (744 tests)
+dotnet test                                     # Run all tests (749 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -167,6 +167,38 @@ no editing, no deletion, no child-facing features.
 5. Pagination: ← Newer disabled on page 1, Older → disabled on last page, "Page N" label visible.
 6. Bad inputs: `?offset=-1` → 400; `?limit=0` → 400; `?limit=500` → 200 with at most 100 rows.
 7. Log out → returns to login view, token cleared from sessionStorage.
+
+## Audit events
+
+An append-only `AuditEvents` table records sensitive parent actions.
+Write-only surface for now — no API, no UI, no query path. Rows are
+written inside the same `SaveChangesAsync` as the action they describe.
+
+**Events captured in slice 1** (`AuditEventType`):
+- `ParentAccountDeleted` — emitted in `ParentService.DeleteAccountAsync`.
+- `ParentChildDeleted` — emitted in `ParentService.DeleteChildAsync`.
+- `ParentDeviceUnlinked` — emitted in `ParentService.UnlinkDeviceAsync`
+  (both the still-linked path and the orphan-cascade path). Metadata
+  carries `orphan_cascaded: bool`.
+- `ParentPasswordChanged` — emitted in `ParentService.ChangePasswordAsync`
+  on success only; wrong-password failures are not audited in slice 1.
+
+Register / login / device pause-resume / chat / moderation / rate-limit
+events are deliberately out of scope for this slice.
+
+**Invariants** (do not regress):
+- **No foreign keys** from `AuditEvent` to `Parent` / `Device` / `Child`.
+  Audit rows must outlive the entities they describe — a cascade that
+  took the audit trail with it would destroy the record of the action
+  at the same moment it is meant to document.
+- **No PII in `Metadata`.** Only counts, booleans, and identifiers
+  already carried in the dedicated `ActorParentId` / `TargetDeviceId` /
+  `TargetChildId` columns. Keeps audit durable without becoming a
+  second copy of data the parent just asked to have erased.
+- Audit rows **survive** parent / device / child deletion cascades
+  (C1 / C2 / C3 / unlink cascade).
+- The existing `ILogger.LogInformation` lines stay — audit is additive,
+  not a replacement.
 
 ## Engineering Guardrails
 

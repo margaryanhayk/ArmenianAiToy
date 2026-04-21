@@ -14,6 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<Parent> Parents => Set<Parent>();
     public DbSet<ParentDevice> ParentDevices => Set<ParentDevice>();
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -60,6 +61,16 @@ public class AppDbContext : DbContext
             e.HasKey(pd => new { pd.ParentId, pd.DeviceId });
             e.HasOne(pd => pd.Parent).WithMany(p => p.ParentDevices).HasForeignKey(pd => pd.ParentId);
             e.HasOne(pd => pd.Device).WithMany(d => d.ParentDevices).HasForeignKey(pd => pd.DeviceId);
+        });
+
+        // AuditEvent is deliberately foreign-key-free (see entity xmldoc):
+        // audit rows outlive their subjects. EventType stored as string,
+        // consistent with other enums (Gender, MessageRole, SafetyFlag).
+        modelBuilder.Entity<AuditEvent>(e =>
+        {
+            e.HasKey(a => a.Id);
+            e.HasIndex(a => a.Timestamp);
+            e.Property(a => a.EventType).HasConversion<string>();
         });
     }
 }

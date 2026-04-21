@@ -184,4 +184,31 @@ public class ParentServiceDeleteAccountTests
 
         Assert.False(result);
     }
+
+    [Fact]
+    public async Task DeleteAccountAsync_SoleOwner_WritesSingleAuditRowWithCounts()
+    {
+        var (service, db, conn) = await CreateServiceAsync();
+        await using var _ = conn;
+        var parentId = SeedParent(db, "oldpass12");
+        var (deviceId, _, _, _) = SeedDeviceWithChildAndConversation(db);
+        db.Set<ParentDevice>().Add(new ParentDevice
+        {
+            ParentId = parentId, DeviceId = deviceId, LinkedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        Assert.True(await service.DeleteAccountAsync(parentId, "oldpass12"));
+
+        var audits = await db.Set<AuditEvent>().ToListAsync();
+        var audit = Assert.Single(audits);
+        Assert.Equal(AuditEventType.ParentAccountDeleted, audit.EventType);
+        Assert.Equal(parentId, audit.ActorParentId);
+        Assert.Null(audit.TargetDeviceId);
+        Assert.Null(audit.TargetChildId);
+        Assert.NotNull(audit.Metadata);
+        // Sole owner of one device → one linked, one orphaned+cascaded.
+        Assert.Contains("\"linked_devices\":1", audit.Metadata);
+        Assert.Contains("\"orphaned_devices_deleted\":1", audit.Metadata);
+    }
 }

@@ -1,5 +1,6 @@
 using ArmenianAiToy.Application.Services;
 using ArmenianAiToy.Domain.Entities;
+using ArmenianAiToy.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,7 @@ public class ParentServiceChangePasswordTests
         {
             modelBuilder.Entity<Parent>().HasKey(p => p.Id);
             modelBuilder.Entity<Parent>().Ignore(p => p.ParentDevices);
+            modelBuilder.Entity<AuditEvent>().HasKey(a => a.Id);
         }
     }
 
@@ -92,5 +94,34 @@ public class ParentServiceChangePasswordTests
             Guid.NewGuid(), "anything", "newPassword456");
 
         Assert.False(result);
+    }
+
+    [Fact]
+    public async Task ChangePasswordAsync_Success_WritesAuditRow()
+    {
+        var (service, db) = CreateService();
+        var parentId = await SeedParentAsync(db, "oldPassword123");
+
+        Assert.True(await service.ChangePasswordAsync(parentId, "oldPassword123", "newPassword456"));
+
+        var audits = await db.Set<AuditEvent>().ToListAsync();
+        var audit = Assert.Single(audits);
+        Assert.Equal(AuditEventType.ParentPasswordChanged, audit.EventType);
+        Assert.Equal(parentId, audit.ActorParentId);
+        Assert.Null(audit.TargetDeviceId);
+        Assert.Null(audit.TargetChildId);
+        Assert.Null(audit.Metadata);
+    }
+
+    [Fact]
+    public async Task ChangePasswordAsync_WrongPassword_DoesNotWriteAuditRow()
+    {
+        // Wrong-password failures are deliberately NOT audited in slice 1.
+        var (service, db) = CreateService();
+        var parentId = await SeedParentAsync(db, "oldPassword123");
+
+        Assert.False(await service.ChangePasswordAsync(parentId, "wrong", "newPassword456"));
+
+        Assert.Empty(await db.Set<AuditEvent>().ToListAsync());
     }
 }

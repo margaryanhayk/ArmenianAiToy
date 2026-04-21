@@ -28,6 +28,7 @@ public class ParentServiceAuthTests
             modelBuilder.Entity<Device>().Ignore(d => d.ParentDevices);
 
             modelBuilder.Entity<ParentDevice>().HasKey(pd => new { pd.ParentId, pd.DeviceId });
+            modelBuilder.Entity<AuditEvent>().HasKey(a => a.Id);
         }
     }
 

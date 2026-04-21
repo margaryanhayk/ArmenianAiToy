@@ -118,6 +118,9 @@ public class ParentService : IParentService
             .AnyAsync(pd => pd.DeviceId == deviceId);
         if (stillLinked)
         {
+            _db.Set<AuditEvent>().Add(AuditEvent.ParentDeviceUnlinked(
+                parentId, deviceId, orphanCascaded: false));
+            await _db.SaveChangesAsync();
             _logger.LogInformation(
                 "Parent {ParentId} unlinked device {DeviceId} (still linked to other parents)",
                 parentId, deviceId);
@@ -128,8 +131,13 @@ public class ParentService : IParentService
         if (device != null)
         {
             _db.Set<Device>().Remove(device);
-            await _db.SaveChangesAsync();
         }
+        // orphanCascaded captures whether the device row was actually removed.
+        // In the rare "device already gone" race it stays false even though
+        // this was the last ParentDevice link.
+        _db.Set<AuditEvent>().Add(AuditEvent.ParentDeviceUnlinked(
+            parentId, deviceId, orphanCascaded: device != null));
+        await _db.SaveChangesAsync();
         _logger.LogInformation(
             "Parent {ParentId} unlinked last link to device {DeviceId}; device and subtree deleted",
             parentId, deviceId);
@@ -154,6 +162,7 @@ public class ParentService : IParentService
             return false;
 
         parent.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        _db.Set<AuditEvent>().Add(AuditEvent.ParentPasswordChanged(parentId));
         await _db.SaveChangesAsync();
 
         _logger.LogInformation("Parent {ParentId} changed password", parentId);
@@ -214,8 +223,11 @@ public class ParentService : IParentService
                 orphanedDevicesDeleted++;
             }
         }
-        if (orphanedDevicesDeleted > 0)
-            await _db.SaveChangesAsync();
+        // Audit must be written even when no orphan cleanup was needed, so
+        // this SaveChangesAsync runs unconditionally now.
+        _db.Set<AuditEvent>().Add(AuditEvent.ParentAccountDeleted(
+            parentId, linkedDeviceIds.Count, orphanedDevicesDeleted));
+        await _db.SaveChangesAsync();
 
         _logger.LogInformation(
             "Parent {ParentId} deleted account ({LinkedDevices} linked devices, {OrphanedDevices} orphaned devices cascaded)",
@@ -253,6 +265,7 @@ public class ParentService : IParentService
             _db.Set<Conversation>().RemoveRange(conversations);
 
         _db.Set<Child>().Remove(child);
+        _db.Set<AuditEvent>().Add(AuditEvent.ParentChildDeleted(parentId, childId, conversations.Count));
         await _db.SaveChangesAsync();
 
         _logger.LogInformation(

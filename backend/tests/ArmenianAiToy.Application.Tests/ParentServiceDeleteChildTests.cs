@@ -159,4 +159,24 @@ public class ParentServiceDeleteChildTests
         Assert.True(await service.DeleteChildAsync(parentId, childId));
         Assert.False(await service.DeleteChildAsync(parentId, childId));
     }
+
+    [Fact]
+    public async Task DeleteChildAsync_Success_WritesAuditRowWithConversationCount()
+    {
+        var (service, db, conn) = await CreateServiceAsync();
+        await using var _ = conn;
+        var (parentId, _, childId, _, _) = await SeedOwnedChildWithConversationAsync(db);
+
+        Assert.True(await service.DeleteChildAsync(parentId, childId));
+
+        var audits = await db.Set<AuditEvent>().ToListAsync();
+        var audit = Assert.Single(audits);
+        Assert.Equal(AuditEventType.ParentChildDeleted, audit.EventType);
+        Assert.Equal(parentId, audit.ActorParentId);
+        Assert.Equal(childId, audit.TargetChildId);
+        Assert.Null(audit.TargetDeviceId);
+        Assert.NotNull(audit.Metadata);
+        // One conversation was seeded for this child.
+        Assert.Contains("\"conversations_removed\":1", audit.Metadata);
+    }
 }

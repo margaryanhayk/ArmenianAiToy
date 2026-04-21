@@ -224,5 +224,33 @@ public class ParentServiceUnlinkDeviceTests
         Assert.NotNull(await db.Set<Child>().FindAsync(childId));
         Assert.NotNull(await db.Set<Conversation>().FindAsync(convId));
         Assert.NotNull(await db.Set<Message>().FindAsync(msgId));
+        // Ownership probe must not leave any audit trace.
+        Assert.Empty(await db.Set<AuditEvent>().ToListAsync());
     }
+
+    [Fact]
+    public async Task UnlinkDeviceAsync_LastLink_WritesAuditRowWithOrphanCascadedTrue()
+    {
+        var (service, db, conn) = await CreateServiceAsync();
+        await using var _ = conn;
+        var parentId = SeedParent(db);
+        var (deviceId, _, _, _) = SeedDeviceWithChildAndConversation(db);
+        db.Set<ParentDevice>().Add(new ParentDevice
+        {
+            ParentId = parentId, DeviceId = deviceId, LinkedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        Assert.True(await service.UnlinkDeviceAsync(parentId, deviceId));
+
+        var audits = await db.Set<AuditEvent>().ToListAsync();
+        var audit = Assert.Single(audits);
+        Assert.Equal(AuditEventType.ParentDeviceUnlinked, audit.EventType);
+        Assert.Equal(parentId, audit.ActorParentId);
+        Assert.Equal(deviceId, audit.TargetDeviceId);
+        Assert.Null(audit.TargetChildId);
+        Assert.NotNull(audit.Metadata);
+        Assert.Contains("\"orphan_cascaded\":true", audit.Metadata);
+    }
+
 }
