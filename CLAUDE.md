@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (892 tests)
+dotnet test                                     # Run all tests (908 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -539,6 +539,40 @@ child belongs to" (same shape as `DeleteChildAsync`). 404 on miss.
 Dashboard exposes per-child tri-state selects (Inherit / On / Off)
 with an "Inherit (on)" / "Inherit (off)" hint in the Inherit label so
 parents never wonder what "Inherit" resolves to.
+
+## JWT key rotation
+
+Parent JWTs support rotation: new tokens are signed with the **primary
+key only**, while the validator accepts the full ordered list of
+configured active keys. During rotation, a token still signed by the
+previous key keeps working for its lifetime without a forced flush.
+
+- **Preferred config** — `Jwt:Keys` ordered array. Index 0 is the
+  primary (signing) key; indexes 1+ are accepted at validation only.
+- **Legacy fallback** — scalar `Jwt:Key` is still honored as a
+  single-element list. Deployments that predate this slice keep
+  working unchanged. When both are present, `Jwt:Keys` wins.
+- **Signing** — `ParentService.GenerateJwt` resolves the list via
+  `JwtKeys.ResolveOrderedKeys` and signs with `JwtKeys.PrimaryKey`
+  (HS256). It never falls back to a previous key for signing.
+- **Validation** — `Program.cs` populates
+  `TokenValidationParameters.IssuerSigningKeys` with every resolved
+  key; existing issuer / audience / lifetime / signature checks are
+  unchanged.
+
+**Invariants (do not regress)**:
+- The legacy-insecure-default literal
+  (`ArmenianAiToyDefaultSecretKeyThatShouldBeChanged123!`) is
+  rejected whether it appears in `Jwt:Key`, in `Jwt:Keys[0]`, or in
+  **any** `Jwt:Keys[n]` — a single poisoned entry poisons the whole
+  set. Guards against a paste from old appsettings history sneaking
+  back in as a "previous key."
+- Empty / whitespace-only entries in `Jwt:Keys` are filtered before
+  the length check. An empty resulting set throws at startup.
+- Signing always uses the first element. If a future edit changes
+  this to scan the list or pick by some other rule, the
+  `SigningSide_TokenSignedWithPrimary_FailsValidationAgainstOnlyPreviousKey`
+  test fails.
 
 ## Rate limiting
 

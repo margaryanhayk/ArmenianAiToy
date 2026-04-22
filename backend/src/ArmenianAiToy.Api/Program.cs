@@ -2,6 +2,7 @@ using ArmenianAiToy.Api.Health;
 using ArmenianAiToy.Api.Middleware;
 using ArmenianAiToy.Api.Observability;
 using ArmenianAiToy.Api.RateLimiting;
+using ArmenianAiToy.Application.Auth;
 using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Infrastructure;
 using ArmenianAiToy.Infrastructure.Data;
@@ -83,15 +84,16 @@ otel.WithTracing(t =>
 });
 
 // JWT authentication for parent endpoints.
-// Fail fast if Jwt:Key is missing or set to the legacy insecure literal —
-// a misconfigured instance would sign tokens with a universal, publicly
-// known secret and every parent account would be trivially impersonable.
-var jwtKey = builder.Configuration["Jwt:Key"];
-if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey == "ArmenianAiToyDefaultSecretKeyThatShouldBeChanged123!")
-    throw new InvalidOperationException(
-        "Jwt:Key must be configured and must not be the legacy default. " +
-        "Set it via user-secrets (dotnet user-secrets set \"Jwt:Key\" ...) " +
-        "or the JWT__KEY environment variable.");
+// Multi-key rotation: the validator accepts the full ordered list from
+// Jwt:Keys (or the legacy scalar Jwt:Key fallback). New tokens are
+// signed with the primary (first) key only — see ParentService.GenerateJwt.
+// The helper fails fast at startup if no key is configured or if any
+// configured entry equals the publicly-known legacy insecure default,
+// so a misconfigured instance cannot silently sign with a known secret.
+var jwtKeys = JwtKeys.ResolveOrderedKeys(builder.Configuration);
+var jwtSigningKeys = jwtKeys
+    .Select(k => new SymmetricSecurityKey(Encoding.UTF8.GetBytes(k)))
+    .ToList();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -103,7 +105,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "ArmenianAiToy",
             ValidAudience = builder.Configuration["Jwt:Audience"] ?? "ArmenianAiToy",
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+            // IssuerSigningKeys (list) accepts any key on the set; a token
+            // still signed by a previous key keeps working for its lifetime
+            // during rotation. Replaces the old single-key IssuerSigningKey.
+            IssuerSigningKeys = jwtSigningKeys
         };
     });
 

@@ -1,3 +1,4 @@
+using ArmenianAiToy.Application.Auth;
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Telemetry;
@@ -712,13 +713,15 @@ public class ParentService : IParentService
 
     private string GenerateJwt(Parent parent)
     {
-        var key = _config["Jwt:Key"];
-        if (string.IsNullOrWhiteSpace(key) || key == "ArmenianAiToyDefaultSecretKeyThatShouldBeChanged123!")
-            throw new InvalidOperationException(
-                "Jwt:Key must be configured and must not be the legacy default. " +
-                "Set it via user-secrets (dotnet user-secrets set \"Jwt:Key\" ...) " +
-                "or the JWT__KEY environment variable.");
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+        // Sign with the PRIMARY key only — the first element of the
+        // ordered list from Jwt:Keys (or the scalar Jwt:Key fallback).
+        // Previous keys on the list, if any, are accepted by the
+        // validator in Program.cs but never used to sign new tokens.
+        // The helper applies the same legacy-insecure-default rejection
+        // the old inline guard did, over the full configured set.
+        var resolvedKeys = JwtKeys.ResolveOrderedKeys(_config);
+        var primary = JwtKeys.PrimaryKey(resolvedKeys);
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(primary));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
