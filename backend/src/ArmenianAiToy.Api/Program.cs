@@ -1,5 +1,6 @@
 using ArmenianAiToy.Api.Health;
 using ArmenianAiToy.Api.Middleware;
+using ArmenianAiToy.Api.Observability;
 using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Infrastructure;
@@ -197,14 +198,34 @@ app.UseStaticFiles();
 app.MapControllers();
 
 // Prometheus scrape surface for the AppMeter + AspNetCore/Runtime
-// counters. Registered UNAUTHENTICATED in this slice as a deliberate
-// tradeoff — the OTel exporter is middleware-based and doesn't plug
-// into MVC's [Authorize] pipeline without distortion, and the
-// AppMeter contract forbids high-cardinality tags so the exposed
-// surface is low-sensitivity (aggregate gate trips, health-probe
-// counts, audit-event-type distribution by enum name). A proper
-// scrape-credential or side-channel binding is deferred to the
-// deploy slice; see CLAUDE.md § Metrics for the full rationale.
+// counters. Guarded by a narrow bearer-token check (see
+// MetricsScrapeAuth): fresh deploys are fail-closed on /metrics until
+// either Metrics:ScrapeToken is set or Metrics:AllowUnauthenticatedScrape
+// is flipped to true. The guard runs BEFORE the OTel scrape middleware
+// so rejected requests never touch the exporter. The AppMeter contract
+// continues to forbid high-cardinality tags — this guard only changes
+// WHO can read the aggregate surface, not what it contains.
+var metricsScrapeToken = builder.Configuration["Metrics:ScrapeToken"];
+var metricsAllowAnon = builder.Configuration
+    .GetValue<bool>("Metrics:AllowUnauthenticatedScrape");
+app.Use(async (ctx, next) =>
+{
+    if (ctx.Request.Path.Equals(
+            MetricsScrapeAuth.MetricsPath, StringComparison.OrdinalIgnoreCase))
+    {
+        var decision = MetricsScrapeAuth.Evaluate(
+            ctx, metricsScrapeToken, metricsAllowAnon);
+        if (decision == MetricsScrapeAuth.Decision.Deny)
+        {
+            // 404 rather than 401: conceals the endpoint from scanners
+            // and avoids mimicking a standard auth challenge scheme the
+            // app is not actually running. See MetricsScrapeAuth xmldoc.
+            ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+    }
+    await next();
+});
 app.UseOpenTelemetryPrometheusScrapingEndpoint();
 
 // Health check — probes the one real runtime dependency (SQLite). OpenAI

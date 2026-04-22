@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (877 tests)
+dotnet test                                     # Run all tests (892 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -626,13 +626,32 @@ exported to the console in Development only; no OTLP endpoint is
 assumed.
 
 **Scrape endpoint**: `GET /metrics` (Prometheus text-format exposition),
-registered via `OpenTelemetry.Exporter.Prometheus.AspNetCore`. It is
-deliberately **unauthenticated in this slice** — the OTel Prometheus
-exporter is middleware-based and doesn't plug into MVC `[Authorize]`
-without distortion, and the no-high-cardinality invariant below keeps
-the exposed surface low-sensitivity. A scrape-credential story is
-deferred to the deploy slice. Do not bind this process to a public
-interface without adding that credential.
+registered via `OpenTelemetry.Exporter.Prometheus.AspNetCore`.
+**Guarded by a narrow `Authorization: Bearer <token>` check** implemented
+in `Observability/MetricsScrapeAuth.cs` and wired as an inline middleware
+immediately before the OTel scrape mapping in `Program.cs`. The guard
+only affects `/metrics`; unrelated endpoints are untouched.
+
+- `Metrics:ScrapeToken` (string, default `""`) — the expected bearer
+  token. Empty means "no token configured."
+- `Metrics:AllowUnauthenticatedScrape` (bool, default `false`) — the
+  explicit dev/local bypass. Tied to this flag, not to the Development
+  environment, so a forgotten dev shortcut cannot silently expose
+  metrics in prod.
+
+**Shipped default is fail-closed.** With both keys at their
+`appsettings.json` defaults, every request to `/metrics` gets a **404**
+(concealment over 401: the scanner learns nothing about the endpoint's
+existence, and we don't mimic a standard auth scheme we are not running).
+Operators opt in by either setting the token and configuring Prometheus
+to send `Authorization: Bearer <token>`, or flipping
+`AllowUnauthenticatedScrape` to `true` in a local overlay. When
+authenticated (or bypass on), the response body is exactly what the OTel
+exporter would have produced — this guard changes who can read the
+aggregate surface, not what the surface contains. Token compare is
+constant-time via `CryptographicOperations.FixedTimeEquals`. The
+no-high-cardinality invariant below continues to apply; this guard is
+about access control, not about cardinality.
 
 **Counters exposed (meter name `ArmenianAiToy`)**:
 
@@ -673,11 +692,18 @@ Prometheus-side exporter in `-beta` deliberately even though it is
 mature in practice).
 
 **Manual QA**:
-1. `dotnet run --project src/ArmenianAiToy.Api`
+1. `dotnet run --project src/ArmenianAiToy.Api` (or set
+   `Metrics:ScrapeToken` via user-secrets / env-var first).
 2. `curl http://localhost:5000/api/health` → expect `{"status":"ok",…}`.
-3. `curl http://localhost:5000/metrics` → expect Prometheus-format
-   output including at minimum `aat_health_probe_total{result="ok"} 1`.
-4. (Optional) Development only — stdout shows a span emitted by the
+3. `curl -I http://localhost:5000/metrics` with no `Authorization`
+   header → expect **404** (fail-closed default).
+4. `curl -H "Authorization: Bearer <your-token>" http://localhost:5000/metrics`
+   → expect Prometheus-format output including at minimum
+   `aat_health_probe_total{result="ok"} 1`.
+5. (Optional) For a no-token local run, export
+   `METRICS__ALLOWUNAUTHENTICATEDSCRAPE=true` and re-verify step 3
+   now returns 200.
+6. (Optional) Development only — stdout shows a span emitted by the
    console trace exporter for the same request.
 
 ### Latency histograms
