@@ -10,5 +10,6 @@ public enum AuditEventType
     ParentBedtimeWindowSet,
     ParentDeviceModeFlagsSet,
     ChildModeOverridesSet,
-    ParentDataExported
+    ParentDataExported,
+    ConversationsPurgedByRetention
 }

@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (837 tests)
+dotnet test                                     # Run all tests (848 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -318,6 +318,89 @@ callable today with any parent JWT.
    `auditEvents`, `excludedFields`.
 4. Re-run the curl immediately → 429 with `Retry-After` header.
 5. Wait past the cooldown → success again.
+
+## Retention
+
+First scheduled-delete layer in the repo. Lives in
+`backend/src/ArmenianAiToy.Infrastructure/Background/RetentionPurgeService.cs`
+— a plain `BackgroundService` registered via
+`AddHostedService<RetentionPurgeService>()` in
+`Infrastructure/DependencyInjection.cs`. No Hangfire, Quartz, or
+Polly; no new NuGet packages.
+
+- **Messages + conversations.** Shipped default
+  `Retention:Messages:MaxAgeDays = 90`. A conversation is eligible iff
+  `max(StartedAt, EndedAt ?? min, most-recent Message.Timestamp) <
+  cutoff`; a conversation with no messages anchors on `StartedAt`. The
+  purge is **hard-delete**: `Conversation` rows are removed by the EF
+  change tracker and `Message` rows cascade at the DB level via the
+  existing schema FK. On every tick that actually deleted something,
+  one `ConversationsPurgedByRetention` audit row is written in the
+  same `SaveChangesAsync`. **Noop ticks write no audit row.**
+  Additional knobs: `Retention:Messages:RunIntervalMinutes` (default
+  `60`, floor-clamped to `15`), `Retention:Messages:MaxBatchSize`
+  (default `500`, clamped to `[1, 10000]`). Query shape is a cheap
+  projection (`Select` over `Conversations` with `Max(Timestamp)` and
+  `Count`) — `Message.Content` is never materialized on this process.
+
+- **System-actor audit event.**
+  `ConversationsPurgedByRetention` is the **first** audit event with
+  `ActorParentId = null`. The null actor is what keeps it out of
+  every parent-facing read surface — `GET /api/parents/audit` and
+  the `auditEvents` slice of `GET /api/parents/export` both filter
+  `ActorParentId == parentId`, so a null-actor row is invisible to
+  every parent by construction. Do not change the factory to
+  populate `ActorParentId`; the invisibility is a contract, not an
+  accident. Metadata is counts-only
+  (`conversations_deleted` / `messages_deleted` / `cutoff_utc` /
+  `batch_size_limit`) — same PII-free discipline as `ParentDataExported`.
+
+- **Disabled mode.** Reached ONLY via an explicit non-positive
+  override (`Retention:Messages:MaxAgeDays <= 0`). Missing config
+  resolves to `90` — never to `0`. Do not ship a
+  `Retention:Messages:MaxAgeDays = 0` setting in
+  `appsettings.Development.json` or any other overlay. When
+  disabled, the worker logs once per tick and issues no DB query.
+
+- **Audit stays forever — unchanged.** This slice does not add any
+  trim/archival of the `AuditEvents` table. The "keep forever, no
+  FK" invariant from § Audit events is preserved. Retention is
+  about messages and conversations, not about the durable record of
+  what happened to them.
+
+- **Structured logs — stdout is the retention boundary.** The
+  JSON-formatted logs (see § Structured console logging) go to
+  stdout only. This repo ships no file sink and no rotation policy
+  in code; log retention is the host's problem. Adding a file sink
+  would create a second PII-adjacent surface (structured template
+  holes carry `ParentId`, `DeviceId`, etc.) that today has no
+  retention owner.
+
+- **Export is never server-persisted.** `GET /api/parents/export`
+  streams JSON; no artifact is written to disk. The 60-second
+  `ExportCooldown` is process-local memory only. Both properties
+  are unchanged by this slice.
+
+**Forward-looking note on audio.** `Message.AudioBlobPath` stores
+paths to audio stored *somewhere external*. No code in this repo
+writes or cleans up those blobs today — the field is a dangling
+reference. When the audio workstream lands, it owns the
+conversation-delete → blob-delete hook; the retention purge here
+will need to be extended at that point so deletions do not leave
+orphaned audio.
+
+**Manual QA**:
+1. `dotnet run --project src/ArmenianAiToy.Api`
+2. Structured logs should show a single "RetentionPurgeService tick:
+   nothing eligible" (or "purged N conversations…") line within the
+   configured interval. With the shipped 60-minute default the first
+   tick is slow to observe; override `Retention:Messages:RunIntervalMinutes`
+   via an environment variable (e.g. `RETENTION__MESSAGES__RUNINTERVALMINUTES=15`)
+   for a smoke run — do not commit that override, and do not override
+   `MaxAgeDays`.
+3. `curl http://localhost:5000/metrics | grep aat_audit_events_written_total`
+   → on a tick-with-deletions, the counter increments with tag
+   `event_type="ConversationsPurgedByRetention"`.
 
 ## Bedtime window (B4)
 

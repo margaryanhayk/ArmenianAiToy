@@ -184,4 +184,49 @@ public class AuditEvent
             audit_events = auditEvents
         })
     };
+
+    /// <summary>
+    /// Emitted by the retention purge <c>BackgroundService</c> on every
+    /// tick that actually deleted at least one conversation. Noop ticks
+    /// write no row — the durable "purge happened and here is the scope"
+    /// signal is what this event exists for, not a heartbeat.
+    /// <para>
+    /// <b>First system-actor audit event.</b>
+    /// <see cref="ActorParentId"/> is deliberately <c>null</c> — no human
+    /// parent initiated this action. That null is also what keeps this
+    /// event out of every parent-facing read surface:
+    /// <c>GET /api/parents/audit</c> and the parent-scoped audit slice of
+    /// <c>GET /api/parents/export</c> both filter
+    /// <c>ActorParentId == parentId</c>, so a null-actor row is invisible
+    /// to every parent by construction. Do not change the factory to
+    /// populate <see cref="ActorParentId"/> — the invisibility of this
+    /// event to parents is a contract, not an accident.
+    /// </para>
+    /// <para>
+    /// <see cref="TargetDeviceId"/> and <see cref="TargetChildId"/> are
+    /// null because a purge tick spans the whole DB, not a single
+    /// target. Metadata is counts-only plus the effective cutoff — no
+    /// PII, consistent with the rest of the audit contract.
+    /// </para>
+    /// </summary>
+    public static AuditEvent ConversationsPurgedByRetention(
+        int conversationsDeleted,
+        int messagesDeleted,
+        DateTime cutoffUtc,
+        int batchSizeLimit) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ConversationsPurgedByRetention,
+        ActorParentId = null,
+        TargetDeviceId = null,
+        TargetChildId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            conversations_deleted = conversationsDeleted,
+            messages_deleted = messagesDeleted,
+            cutoff_utc = cutoffUtc,
+            batch_size_limit = batchSizeLimit
+        })
+    };
 }

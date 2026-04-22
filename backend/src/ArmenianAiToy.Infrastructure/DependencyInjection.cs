@@ -1,6 +1,7 @@
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Services;
+using ArmenianAiToy.Infrastructure.Background;
 using ArmenianAiToy.Infrastructure.Data;
 using ArmenianAiToy.Infrastructure.OpenAI;
 using Microsoft.EntityFrameworkCore;
@@ -57,6 +58,14 @@ public static class DependencyInjection
         // requests for the window to be meaningful. Process-local memory
         // only; see ExportCooldown for the rationale.
         services.AddSingleton<ExportCooldown>();
+
+        // First scheduled-delete worker in the repo. Hard-deletes
+        // conversations (and their cascaded messages) older than
+        // Retention:Messages:MaxAgeDays (default 90). Missing config
+        // resolves to the default — never to "disabled." Disabled mode
+        // requires an explicit non-positive override. See
+        // RetentionPurgeService and CLAUDE.md § Retention.
+        services.AddHostedService<RetentionPurgeService>();
 
         return services;
     }
