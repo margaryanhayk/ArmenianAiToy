@@ -63,6 +63,16 @@ public sealed class RetentionPurgeService : BackgroundService
     public const int MinBatchSize = 1;
     public const int MaxAllowedBatchSize = 10_000;
 
+    /// <summary>
+    /// Grace window (hours) applied to <c>ParentPasswordResetToken</c>
+    /// cleanup: a row is only deleted on expiry grounds once its
+    /// <c>ExpiresAt</c> is older than <c>UtcNow - grace</c>. Consumed
+    /// tokens are deleted unconditionally. 24 h is small enough that
+    /// stale rows do not accumulate, and large enough to absorb
+    /// clock skew and a few worker-tick miss-cycles.
+    /// </summary>
+    public const int DefaultPasswordResetGracePeriodHours = 24;
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IConfiguration _config;
     private readonly ILogger<RetentionPurgeService> _logger;
@@ -120,6 +130,25 @@ public sealed class RetentionPurgeService : BackgroundService
     /// scheduling a real loop. The Infrastructure project does not use
     /// <c>InternalsVisibleTo</c>, so this is the minimum-surface way to
     /// let the test project drive a tick.
+    ///
+    /// <para>
+    /// A tick runs TWO cleanup passes in order:
+    /// </para>
+    /// <list type="number">
+    ///   <item><description><b>Conversation purge</b> — the original
+    ///   worker behavior, audited per tick-with-deletions.</description></item>
+    ///   <item><description><b>Password-reset token cleanup</b> —
+    ///   deletes consumed tokens plus expired tokens past the grace
+    ///   window. Not audited; see the cleanup helper's xmldoc for
+    ///   rationale.</description></item>
+    /// </list>
+    /// <para>
+    /// Both passes share the same disable gate: when <c>MaxAgeDays
+    /// &lt;= 0</c> the whole tick short-circuits. Operators who want
+    /// only token cleanup with conversations disabled would need a
+    /// separate config key — out of scope for this slice, and the
+    /// current "retention worker off" mental model is preserved.
+    /// </para>
     /// </summary>
     public async Task RunTickAsync(CancellationToken stoppingToken)
     {
@@ -132,11 +161,18 @@ public sealed class RetentionPurgeService : BackgroundService
             return;
         }
 
-        var batchSize = ReadBatchSize();
-        var cutoffUtc = DateTime.UtcNow - TimeSpan.FromDays(maxAgeDays);
-
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        await PurgeExpiredConversationsAsync(db, maxAgeDays, stoppingToken);
+        await PurgeStalePasswordResetTokensAsync(db, stoppingToken);
+    }
+
+    private async Task PurgeExpiredConversationsAsync(
+        AppDbContext db, int maxAgeDays, CancellationToken stoppingToken)
+    {
+        var batchSize = ReadBatchSize();
+        var cutoffUtc = DateTime.UtcNow - TimeSpan.FromDays(maxAgeDays);
 
         // Cheap projection — fetch only id + per-conversation aggregates
         // so Message.Content never lands on this process. SQL emits
@@ -204,6 +240,48 @@ public sealed class RetentionPurgeService : BackgroundService
             toDelete.Count, messagesDeleted, cutoffUtc, batchSize);
     }
 
+    /// <summary>
+    /// Deletes stale <c>ParentPasswordResetToken</c> rows that no longer
+    /// serve any purpose:
+    /// <list type="bullet">
+    ///   <item><description>rows with <c>ConsumedAt</c> set — the token
+    ///   is single-use and can never redeem again; no audit value in
+    ///   keeping the breadcrumb around;</description></item>
+    ///   <item><description>rows whose <c>ExpiresAt</c> is older than
+    ///   <c>UtcNow - grace</c> — the token is past its usable window and
+    ///   the grace lets us absorb clock skew without deleting something
+    ///   a client could still redeem.</description></item>
+    /// </list>
+    /// <para>
+    /// <b>No audit row written</b> — these rows are short-lived
+    /// operational state, not destructive parent actions, so they
+    /// don't belong in the durable audit log (same reasoning the
+    /// forgot-password slice documented for zero-metadata audit on
+    /// the reset events themselves). Uses
+    /// <see cref="EntityFrameworkQueryableExtensions.ExecuteDeleteAsync{TSource}(IQueryable{TSource}, CancellationToken)"/>
+    /// for a single <c>DELETE WHERE</c> statement without materializing
+    /// any rows — no hash, no parent id, no timestamp ever touches the
+    /// worker process.
+    /// </para>
+    /// </summary>
+    private async Task PurgeStalePasswordResetTokensAsync(
+        AppDbContext db, CancellationToken stoppingToken)
+    {
+        var graceHours = ReadPasswordResetGracePeriodHours();
+        var expiryCutoff = DateTime.UtcNow - TimeSpan.FromHours(graceHours);
+
+        var deleted = await db.Set<ParentPasswordResetToken>()
+            .Where(t => t.ConsumedAt != null || t.ExpiresAt < expiryCutoff)
+            .ExecuteDeleteAsync(stoppingToken);
+
+        if (deleted > 0)
+        {
+            _logger.LogInformation(
+                "RetentionPurgeService tick: cleaned up {Deleted} stale password-reset token(s) (graceHours={GraceHours}).",
+                deleted, graceHours);
+        }
+    }
+
     // Config reads use the indexer + int.TryParse rather than the
     // IConfiguration.GetValue<T>() extension. GetValue<T> lives in
     // Microsoft.Extensions.Configuration.Binder, which this project
@@ -230,6 +308,20 @@ public sealed class RetentionPurgeService : BackgroundService
             _config["Retention:Messages:RunIntervalMinutes"], DefaultRunIntervalMinutes);
         var clamped = raw < MinRunIntervalMinutes ? MinRunIntervalMinutes : raw;
         return TimeSpan.FromMinutes(clamped);
+    }
+
+    // Password-reset token grace window (hours). Shipped default 24.
+    // Non-positive override collapses to zero grace, which means
+    // "delete the moment the token expires" — still semantically sane
+    // because a just-expired token has no legitimate caller. Missing
+    // config resolves to the shipped default, consistent with the
+    // MaxAgeDays story.
+    private int ReadPasswordResetGracePeriodHours()
+    {
+        var raw = ParseIntOrDefault(
+            _config["Retention:PasswordResetTokens:GracePeriodHours"],
+            DefaultPasswordResetGracePeriodHours);
+        return raw < 0 ? 0 : raw;
     }
 
     private static int ParseIntOrDefault(string? raw, int fallback)

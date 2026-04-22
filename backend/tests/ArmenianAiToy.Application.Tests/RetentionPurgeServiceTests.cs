@@ -43,7 +43,8 @@ public class RetentionPurgeServiceTests
     private static async Task<Harness> CreateHarnessAsync(
         int? maxAgeDays = null,
         int? maxBatchSize = null,
-        int? runIntervalMinutes = null)
+        int? runIntervalMinutes = null,
+        int? passwordResetGracePeriodHours = null)
     {
         var conn = new SqliteConnection("Data Source=:memory:");
         await conn.OpenAsync();
@@ -58,6 +59,9 @@ public class RetentionPurgeServiceTests
             configDict["Retention:Messages:MaxBatchSize"] = maxBatchSize.Value.ToString();
         if (runIntervalMinutes is not null)
             configDict["Retention:Messages:RunIntervalMinutes"] = runIntervalMinutes.Value.ToString();
+        if (passwordResetGracePeriodHours is not null)
+            configDict["Retention:PasswordResetTokens:GracePeriodHours"]
+                = passwordResetGracePeriodHours.Value.ToString();
         IConfiguration config = new ConfigurationBuilder()
             .AddInMemoryCollection(configDict)
             .Build();
@@ -488,5 +492,212 @@ public class RetentionPurgeServiceTests
         // The 200-day row is past the 90-day default; the 1-day row is not.
         Assert.False(await ConversationExistsAsync(h.Db, oldConvId));
         Assert.True(await ConversationExistsAsync(h.Db, recentConvId));
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Password-reset token cleanup — second cleanup pass added to
+    // the same worker. Rule: delete rows where ConsumedAt != null
+    // OR ExpiresAt < UtcNow - grace (default 24h).
+    // ─────────────────────────────────────────────────────────────
+
+    private static Guid SeedParent(AppDbContext db)
+    {
+        var parentId = Guid.NewGuid();
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId,
+            Email = "p-" + Guid.NewGuid().ToString("N")[..8] + "@example.com",
+            PasswordHash = "hash",
+            RegisteredAt = DateTime.UtcNow
+        });
+        return parentId;
+    }
+
+    private static Guid SeedResetToken(
+        AppDbContext db,
+        Guid parentId,
+        DateTime expiresAt,
+        DateTime? consumedAt)
+    {
+        var tokenId = Guid.NewGuid();
+        db.Set<ParentPasswordResetToken>().Add(new ParentPasswordResetToken
+        {
+            Id = tokenId,
+            ParentId = parentId,
+            TokenHash = "hash-" + Guid.NewGuid().ToString("N"),
+            CreatedAt = DateTime.UtcNow.AddHours(-2),
+            ExpiresAt = expiresAt,
+            ConsumedAt = consumedAt
+        });
+        return tokenId;
+    }
+
+    private static async Task<bool> ResetTokenExistsAsync(AppDbContext db, Guid id)
+        => await db.Set<ParentPasswordResetToken>().AsNoTracking().AnyAsync(t => t.Id == id);
+
+    [Fact]
+    public async Task TokenCleanup_ConsumedToken_IsDeleted()
+    {
+        await using var h = await CreateHarnessAsync(maxAgeDays: 90);
+        var parentId = SeedParent(h.Db);
+        // Consumed token with a future ExpiresAt — still within its
+        // usable TTL by expiry but already consumed, so useless.
+        var tokenId = SeedResetToken(
+            h.Db, parentId,
+            expiresAt: DateTime.UtcNow.AddMinutes(30),
+            consumedAt: DateTime.UtcNow.AddMinutes(-1));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.False(await ResetTokenExistsAsync(h.Db, tokenId));
+    }
+
+    [Fact]
+    public async Task TokenCleanup_ExpiredOlderThanGrace_IsDeleted()
+    {
+        await using var h = await CreateHarnessAsync(
+            maxAgeDays: 90, passwordResetGracePeriodHours: 24);
+        var parentId = SeedParent(h.Db);
+        // Expired 2 days ago — well past the 24h grace window.
+        var tokenId = SeedResetToken(
+            h.Db, parentId,
+            expiresAt: DateTime.UtcNow.AddDays(-2),
+            consumedAt: null);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.False(await ResetTokenExistsAsync(h.Db, tokenId));
+    }
+
+    [Fact]
+    public async Task TokenCleanup_ExpiredWithinGrace_IsKept()
+    {
+        await using var h = await CreateHarnessAsync(
+            maxAgeDays: 90, passwordResetGracePeriodHours: 24);
+        var parentId = SeedParent(h.Db);
+        // Expired 6 hours ago — inside the 24h grace window, so the
+        // cleanup must not delete it yet (avoids deleting a token a
+        // client might still try to redeem during clock skew).
+        var tokenId = SeedResetToken(
+            h.Db, parentId,
+            expiresAt: DateTime.UtcNow.AddHours(-6),
+            consumedAt: null);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.True(await ResetTokenExistsAsync(h.Db, tokenId));
+    }
+
+    [Fact]
+    public async Task TokenCleanup_UnconsumedUnexpired_IsKept()
+    {
+        // Critical regression guard — a live, usable token must never
+        // be deleted by this cleanup. If it were, forgot-password would
+        // silently break between the email and the completion click.
+        await using var h = await CreateHarnessAsync(
+            maxAgeDays: 90, passwordResetGracePeriodHours: 24);
+        var parentId = SeedParent(h.Db);
+        var tokenId = SeedResetToken(
+            h.Db, parentId,
+            expiresAt: DateTime.UtcNow.AddMinutes(30),
+            consumedAt: null);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.True(await ResetTokenExistsAsync(h.Db, tokenId));
+    }
+
+    [Fact]
+    public async Task TokenCleanup_Coexists_WithConversationPurge_InSameTick()
+    {
+        // Seeds both an old conversation AND a consumed token. One tick
+        // must clean up both — proving the second cleanup pass runs
+        // regardless of whether the conversation pass found anything.
+        await using var h = await CreateHarnessAsync(maxAgeDays: 90);
+        var deviceId = SeedDevice(h.Db);
+        var (convId, _) = SeedConversationWithMessage(
+            h.Db, deviceId,
+            startedAt: DateTime.UtcNow - TimeSpan.FromDays(200),
+            messageAt: DateTime.UtcNow - TimeSpan.FromDays(200));
+        var parentId = SeedParent(h.Db);
+        var tokenId = SeedResetToken(
+            h.Db, parentId,
+            expiresAt: DateTime.UtcNow.AddDays(-5),
+            consumedAt: null);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.False(await ConversationExistsAsync(h.Db, convId));
+        Assert.False(await ResetTokenExistsAsync(h.Db, tokenId));
+    }
+
+    [Fact]
+    public async Task TokenCleanup_RunsEvenWhenNoConversationIsEligible()
+    {
+        // Previously the worker early-returned on zero eligible
+        // conversations, which would have silently skipped the new
+        // token cleanup. Pins the control-flow: token cleanup must
+        // run even on noop-conversations ticks.
+        await using var h = await CreateHarnessAsync(maxAgeDays: 90);
+        var parentId = SeedParent(h.Db);
+        var tokenId = SeedResetToken(
+            h.Db, parentId,
+            expiresAt: DateTime.UtcNow.AddDays(-5),
+            consumedAt: null);
+        await h.Db.SaveChangesAsync();
+        // No conversations seeded at all → conversation pass is noop.
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.False(await ResetTokenExistsAsync(h.Db, tokenId));
+    }
+
+    [Fact]
+    public async Task TokenCleanup_WorkerDisabled_SkipsTokenCleanupToo()
+    {
+        // MaxAgeDays<=0 is the "retention worker off" gate. Documents
+        // that token cleanup is NOT run independently — the whole
+        // worker is either on or off. If this behavior changes in a
+        // future slice (independent token-cleanup toggle), this test
+        // is the place to state the new contract.
+        await using var h = await CreateHarnessAsync(maxAgeDays: 0);
+        var parentId = SeedParent(h.Db);
+        var tokenId = SeedResetToken(
+            h.Db, parentId,
+            expiresAt: DateTime.UtcNow.AddDays(-5),
+            consumedAt: null);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.True(await ResetTokenExistsAsync(h.Db, tokenId));
+    }
+
+    [Fact]
+    public async Task TokenCleanup_WritesNoAuditRow()
+    {
+        // Token cleanup is short-lived operational state, not a
+        // destructive parent action — it must NOT write audit rows
+        // (no "ConversationsPurgedByRetention"-style event for tokens
+        // in this slice). Pins the "no audit, no metric" invariant.
+        await using var h = await CreateHarnessAsync(maxAgeDays: 90);
+        var parentId = SeedParent(h.Db);
+        SeedResetToken(h.Db, parentId,
+            expiresAt: DateTime.UtcNow.AddDays(-5),
+            consumedAt: null);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        // No conversations-purged row (nothing old enough) AND no new
+        // token-cleanup event type — the audit table should be empty
+        // with respect to any retention-worker writes.
+        var audits = await h.Db.Set<AuditEvent>().AsNoTracking().ToListAsync();
+        Assert.Empty(audits);
     }
 }

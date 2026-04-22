@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (946 tests)
+dotnet test                                     # Run all tests (954 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -381,12 +381,27 @@ Polly; no new NuGet packages.
   (`conversations_deleted` / `messages_deleted` / `cutoff_utc` /
   `batch_size_limit`) — same PII-free discipline as `ParentDataExported`.
 
+- **Password-reset token cleanup.** Second cleanup pass inside the
+  same worker tick. Deletes stale `ParentPasswordResetToken` rows
+  with a single `ExecuteDeleteAsync` — no entity materialization,
+  no audit row, no metric. Rule:
+    `ConsumedAt != null  OR  ExpiresAt < UtcNow - grace`
+  Grace window configurable via
+  `Retention:PasswordResetTokens:GracePeriodHours` (default `24`;
+  clamped to `>= 0`). Usable reset tokens (unconsumed + unexpired
+  OR expired within the grace window) are never deleted. Runs on
+  every tick that the worker is enabled, including ticks where the
+  conversation pass finds nothing eligible. Shares the single
+  disable gate — when `Retention:Messages:MaxAgeDays <= 0`, the
+  whole worker short-circuits and no cleanup runs.
+
 - **Disabled mode.** Reached ONLY via an explicit non-positive
   override (`Retention:Messages:MaxAgeDays <= 0`). Missing config
   resolves to `90` — never to `0`. Do not ship a
   `Retention:Messages:MaxAgeDays = 0` setting in
   `appsettings.Development.json` or any other overlay. When
-  disabled, the worker logs once per tick and issues no DB query.
+  disabled, the worker logs once per tick and issues no DB query —
+  this covers BOTH the conversation pass and the token-cleanup pass.
 
 - **Audit stays forever — unchanged.** This slice does not add any
   trim/archival of the `AuditEvents` table. The "keep forever, no
