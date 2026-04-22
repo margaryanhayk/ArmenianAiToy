@@ -94,13 +94,23 @@ public static class AppMeter
             description: "Count of OpenAI calls short-circuited while the breaker is open.");
 
     /// <summary>
-    /// Count of per-device rate-limit rejections. No tags —
-    /// <c>device_id</c> as a tag would blow up cardinality.
+    /// Count of rate-limit rejections across both named policies
+    /// (<c>chat</c> on <c>/api/chat</c> and <c>auth</c> on the parent
+    /// auth / account-sensitive endpoints). Tag <c>policy</c> is
+    /// exactly one of <c>chat</c> or <c>auth</c> — a bounded
+    /// two-value enumeration derived from the matched endpoint's
+    /// <c>[EnableRateLimiting]</c> metadata by
+    /// <c>RateLimitRejectionPolicy.ResolvePolicyTag</c>. The
+    /// no-high-cardinality invariant still binds: do NOT add
+    /// <c>device_id</c>, <c>ip</c>, <c>route</c>, or any per-caller
+    /// tag on this counter; a future third policy would extend
+    /// <c>policy</c>'s value space by exactly one rather than
+    /// introducing a new tag.
     /// </summary>
     public static readonly Counter<long> RateLimitRejected =
         Instance.CreateCounter<long>(
             name: "aat_rate_limit_rejected_total",
-            description: "Count of rate-limit rejections in the chat pipeline.");
+            description: "Count of rate-limit rejections, tagged by policy.");
 
     /// <summary>
     /// Count of <c>/api/health</c> probes. Tag <c>result</c> is one of

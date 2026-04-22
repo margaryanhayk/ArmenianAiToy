@@ -147,12 +147,14 @@ builder.Services.AddRateLimiter(options =>
         // Count the rejection before mutating the response — if writing
         // the body fails for any reason, the metric still reflects the
         // fact that the limiter tripped. Shared counter across both
-        // policies (chat + auth); no policy tag, because adding one
-        // would duplicate the signal that policy-specific logs already
-        // carry and would not meet the bounded-cardinality bar the
-        // AppMeter contract documents. No device_id / ip tag for the
-        // same reason.
-        AppMeter.RateLimitRejected.Add(1);
+        // policies (chat + auth); bounded `policy` tag ({chat, auth})
+        // derived from the matched endpoint's [EnableRateLimiting]
+        // metadata via RateLimitRejectionPolicy.ResolvePolicyTag. Stays
+        // within the AppMeter no-high-cardinality invariant — no
+        // device_id / ip / route / email tag.
+        var policyTag = RateLimitRejectionPolicy.ResolvePolicyTag(context.HttpContext);
+        AppMeter.RateLimitRejected.Add(1,
+            new KeyValuePair<string, object?>("policy", policyTag));
         context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
         if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
         {

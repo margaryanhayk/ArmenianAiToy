@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (941 tests)
+dotnet test                                     # Run all tests (946 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -733,9 +733,14 @@ requests. Please slow down." }` 429 body).
   behind a parent session (pause/resume, bedtime, mode flags,
   link/unlink, delete-child, delete-conversation). They are not
   brute-force surfaces. Tests pin the non-applied set.
-- Same no-high-cardinality invariant from AppMeter applies to this
-  counter: do not add a `policy` tag, an `ip` tag, or any per-caller
-  tag on `aat_rate_limit_rejected_total`.
+- `aat_rate_limit_rejected_total` carries a **bounded two-value**
+  `policy` tag (`chat` / `auth`). The tag is derived from the matched
+  endpoint's `[EnableRateLimiting]` metadata by
+  `RateLimitRejectionPolicy.ResolvePolicyTag`, not from the request
+  path. A future third policy would extend the `policy` value space
+  by one, not add a new tag. The AppMeter no-high-cardinality
+  invariant still binds: do NOT add `ip`, `device_id`, `route`,
+  `email`, or any per-caller tag on this counter.
 
 ## Structured console logging
 
@@ -814,7 +819,7 @@ about access control, not about cardinality.
 | `aat_chat_openai_retry_total` | — | — | `OpenAIReliabilityGate` (before each retry attempt) |
 | `aat_chat_openai_circuit_trip_total` | — | — | `OpenAIReliabilityGate` on each closed→open transition |
 | `aat_chat_openai_circuit_short_circuit_total` | — | — | `OpenAIReliabilityGate` on each fail-fast while open |
-| `aat_rate_limit_rejected_total` | — | — | Shared `OnRejected` handler in `Program.cs` for both `ChatRateLimiter` and `AuthRateLimiter` policies |
+| `aat_rate_limit_rejected_total` | `policy` | `chat` / `auth` | Shared `OnRejected` handler in `Program.cs`; tag derived from the matched endpoint's `[EnableRateLimiting]` metadata via `RateLimitRejectionPolicy.ResolvePolicyTag` |
 | `aat_health_probe_total` | `result` | `ok` / `unhealthy` | `GET /api/health` endpoint lambda |
 | `aat_audit_events_written_total` | `event_type` | enum names of `AuditEventType` | `ParentService.TrackAndAddAudit` helper on every successful `AuditEvent` write |
 
