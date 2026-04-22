@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (848 tests)
+dotnet test                                     # Run all tests (860 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -156,6 +156,7 @@ no editing, no deletion, no child-facing features.
 - `GET  /api/conversations/summary?deviceId=&limit=&offset=` — lightweight summary rows with snippets
 - `GET  /api/conversations/flagged?deviceId=&limit=&offset=` — flat newest-first list of non-Clean messages
 - `GET  /api/conversations/{conversationId}` — full conversation detail (404 on not-yours, no existence leak)
+- `DELETE /api/conversations/{conversationId}` — hard-delete a single conversation the parent owns. Messages cascade via the existing schema FK. 404 on not-yours or unknown id (same silent-404 phrasing as `DeleteChild`; no existence leak). Writes exactly one `ParentConversationDeleted` audit row on success; failure paths write nothing.
 - `GET  /api/parents/audit?limit=&offset=` — per-actor audit history; see § Audit events for the response shape.
 - `GET  /api/parents/export` — single-JSON full export of the parent's own data; see § Data export.
 
@@ -204,6 +205,17 @@ describe.
   no PII, no content, no identifiers beyond `ActorParentId`. Target
   ids are null because the event describes a whole-account export,
   not a single target.
+- `ParentConversationDeleted` — emitted in
+  `ParentService.DeleteConversationAsync` on every successful
+  `DELETE /api/conversations/{conversationId}`. `ActorParentId` is
+  the authenticated parent; `TargetDeviceId` is the owning device so
+  the dashboard's device-name resolution reuses the existing path.
+  There is no dedicated `TargetConversationId` column — the
+  conversation id lives in metadata
+  (`conversation_id`/`message_count_deleted`/`deleted_at_utc`). No
+  PII, no message content. Failure paths (not found / not owned)
+  write no row. Complements — does not replace — the scheduled
+  `ConversationsPurgedByRetention` event.
 
 Register / login / chat / moderation / rate-limit events remain
 deliberately out of scope.

@@ -277,6 +277,53 @@ public class ParentService : IParentService
         return true;
     }
 
+    /// <summary>
+    /// Manual parent-driven deletion of a single conversation the parent
+    /// owns. Ownership is enforced via the <c>ParentDevice</c> join on
+    /// the conversation's device — same silent-false shape as
+    /// <see cref="DeleteChildAsync"/>. The controller surfaces a miss as
+    /// a 404 indistinguishable from an unknown id, so no existence leak.
+    /// <para>
+    /// Deletion is by conversation; messages go with it via the schema
+    /// FK cascade (same contract the
+    /// <c>ParentServiceDeleteChildTests</c> already prove). No
+    /// soft-delete, no tombstone, no batch, no interaction with the
+    /// retention worker.
+    /// </para>
+    /// <para>
+    /// One <c>ParentConversationDeleted</c> audit row is written in the
+    /// same <c>SaveChangesAsync</c>. Failure paths (not found / not
+    /// owned) write no audit row.
+    /// </para>
+    /// </summary>
+    public async Task<bool> DeleteConversationAsync(Guid parentId, Guid conversationId)
+    {
+        var conversation = await _db.Set<Conversation>()
+            .FirstOrDefaultAsync(c => c.Id == conversationId);
+        if (conversation == null)
+            return false;
+
+        var ownsDevice = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == conversation.DeviceId);
+        if (!ownsDevice)
+            return false;
+
+        // Count messages before the cascade fires so the audit row
+        // reflects what was deleted. Counts only — no content loaded.
+        var messageCount = await _db.Set<Message>()
+            .CountAsync(m => m.ConversationId == conversationId);
+
+        _db.Set<Conversation>().Remove(conversation);
+        TrackAndAddAudit(AuditEvent.ParentConversationDeleted(
+            parentId, conversation.DeviceId, conversationId, messageCount));
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Parent {ParentId} deleted conversation {ConversationId} on device {DeviceId} ({MessageCount} messages cascaded)",
+            parentId, conversationId, conversation.DeviceId, messageCount);
+        return true;
+    }
+
     public async Task<bool> SetDevicePauseStateAsync(Guid parentId, Guid deviceId, bool paused)
     {
         // Ownership check: the parent must have a ParentDevice link to this

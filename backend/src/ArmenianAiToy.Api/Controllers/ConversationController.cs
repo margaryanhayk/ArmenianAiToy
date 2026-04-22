@@ -128,6 +128,29 @@ public class ConversationController : ControllerBase
         return Ok(new { conversation });
     }
 
+    /// <summary>
+    /// Delete a single conversation the authenticated parent owns.
+    /// Messages cascade at the DB level via the schema FK. Silent 404 on
+    /// ownership miss or unknown id — indistinguishable from each other,
+    /// so a stranger parent cannot probe existence. Idempotent: a second
+    /// call for the same (already-deleted) conversation id returns 404
+    /// in the same shape. One <c>ParentConversationDeleted</c> audit row
+    /// is written on success; the failure paths write nothing.
+    /// </summary>
+    [HttpDelete("{conversationId}")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> Delete(Guid conversationId)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var deleted = await _parentService.DeleteConversationAsync(parentId, conversationId);
+        if (!deleted)
+            return NotFound(new { error = "Conversation not found or not owned by this account." });
+        return Ok(new { deleted = true });
+    }
+
     // Validates and clamps pagination inputs for the parent list endpoints.
     // - offset < 0           => reject
     // - limit  < 1           => reject

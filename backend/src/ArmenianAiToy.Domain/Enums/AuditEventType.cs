@@ -11,5 +11,6 @@ public enum AuditEventType
     ParentDeviceModeFlagsSet,
     ChildModeOverridesSet,
     ParentDataExported,
-    ConversationsPurgedByRetention
+    ConversationsPurgedByRetention,
+    ParentConversationDeleted
 }

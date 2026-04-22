@@ -229,4 +229,41 @@ public class AuditEvent
             batch_size_limit = batchSizeLimit
         })
     };
+
+    /// <summary>
+    /// Manual parent-driven conversation deletion via
+    /// <c>DELETE /api/conversations/{id}</c>. Complements the scheduled
+    /// retention sweep: this one has a real human actor (the
+    /// authenticated parent), so it lands in the parent-scoped audit
+    /// feed and the parent-scoped slice of the export — unlike
+    /// <see cref="ConversationsPurgedByRetention"/>, whose
+    /// <see cref="ActorParentId"/> is null by design.
+    /// <para>
+    /// <see cref="TargetDeviceId"/> is populated so the parent
+    /// dashboard's existing device-name resolution works; the
+    /// conversation id lives in metadata because there is no
+    /// dedicated <c>TargetConversationId</c> column (and one is not
+    /// justified by a single event type). Metadata is counts/ids
+    /// only — no PII, no message content.
+    /// </para>
+    /// </summary>
+    public static AuditEvent ParentConversationDeleted(
+        Guid parentId,
+        Guid deviceId,
+        Guid conversationId,
+        int messageCountDeleted) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentConversationDeleted,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId,
+        TargetChildId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            conversation_id = conversationId,
+            message_count_deleted = messageCountDeleted,
+            deleted_at_utc = DateTime.UtcNow
+        })
+    };
 }

@@ -17,6 +17,7 @@ public interface IParentService
         Guid parentId, Guid deviceId,
         bool story, bool game, bool riddle, bool curiosity);
     Task<bool> DeleteChildAsync(Guid parentId, Guid childId);
+    Task<bool> DeleteConversationAsync(Guid parentId, Guid conversationId);
     Task<bool> DeleteAccountAsync(Guid parentId, string currentPassword);
     Task<bool> SetChildModeOverridesAsync(
         Guid parentId, Guid childId,

@@ -366,7 +366,10 @@
 
     <!-- Detail view -->
     <section id="detailView" class="card" hidden>
-      <h2><button class="link" id="backFromDetailBtn" aria-label="Back to list">← Back</button></h2>
+      <h2>
+        <button class="link" id="backFromDetailBtn" aria-label="Back to list">← Back</button>
+        <button id="deleteConversationBtn" type="button" style="color:#c66;margin-left:12px;background:none;border:none;cursor:pointer;font-size:13px" hidden>Delete conversation</button>
+      </h2>
       <div id="detailMeta" class="status muted" aria-live="polite"></div>
       <div id="detailMessages"></div>
       <div id="detailStatus" class="status" aria-live="polite"></div>
@@ -425,7 +428,8 @@
       ParentDevicePauseStateChanged: 'Device paused/resumed',
       ParentBedtimeWindowSet: 'Bedtime window updated',
       ParentDeviceModeFlagsSet: 'Modes updated',
-      ChildModeOverridesSet: 'Child mode overrides updated'
+      ChildModeOverridesSet: 'Child mode overrides updated',
+      ParentConversationDeleted: 'Conversation deleted'
     };
 
     // ---------- helpers ----------
@@ -1211,6 +1215,47 @@
       });
     }
 
+    // Delete a single conversation the parent owns. Confirms with the
+    // parent first — this is a hard delete (messages cascade at the DB
+    // level, no recovery path). On success, falls back to the same
+    // back-navigation the Back button uses so the summaries/flagged
+    // list reloads without the deleted row. Failure paths (404 for
+    // not-yours / unknown, or any non-2xx) surface inline and leave
+    // the detail view in place.
+    function deleteConversation() {
+      var token = getToken();
+      if (!token) { show('loginView'); return; }
+      var conversationId = state.detailConversationId;
+      if (!conversationId) return;
+      if (!window.confirm(
+            'Delete this conversation?\n\n' +
+            'All messages in this conversation will be permanently ' +
+            'removed. This cannot be undone.')) return;
+      setStatus('detailStatus', 'Deleting…', 'muted');
+      fetch('/api/conversations/' + encodeURIComponent(conversationId), {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/json'
+        }
+      }).then(function (res) {
+        if (res.status === 401) {
+          clearToken();
+          show('loginView');
+          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          return;
+        }
+        if (!res.ok) {
+          setStatus('detailStatus', 'Delete failed (HTTP ' + res.status + ').', 'err');
+          return;
+        }
+        state.detailConversationId = null;
+        backFromDetail();
+      }).catch(function () {
+        setStatus('detailStatus', 'Network error.', 'err');
+      });
+    }
+
     // Unlink a device from the authenticated parent account. The server
     // response is idempotent, so the UI simply refreshes the device list
     // on any 2xx and surfaces any non-2xx as an error.
@@ -1524,9 +1569,14 @@
       show('detailView');
       var metaEl = document.getElementById('detailMeta');
       var msgsEl = document.getElementById('detailMessages');
+      var deleteBtn = document.getElementById('deleteConversationBtn');
       metaEl.textContent = 'Loading…';
       clearChildren(msgsEl);
       setStatus('detailStatus', '', '');
+      // Hide the delete button until the conversation actually loads —
+      // a 404/network error must not leave a destructive action primed.
+      deleteBtn.hidden = true;
+      state.detailConversationId = null;
 
       authedFetch('/api/conversations/' + encodeURIComponent(conversationId)).then(function (data) {
         var c = data && data.conversation;
@@ -1535,6 +1585,10 @@
           metaEl.textContent = '';
           return;
         }
+        // Record the currently-open conversation id so the delete
+        // handler can submit the right target, and reveal the button.
+        state.detailConversationId = c.id || conversationId;
+        deleteBtn.hidden = false;
         var msgs = c.messages || [];
         // safetyFlag may serialize as enum string ("Flagged"/"Blocked") or int (1/2).
         var flaggedCount = 0;
@@ -1737,6 +1791,10 @@
           return m.conversations_removed != null
             ? m.conversations_removed + ' conversation(s) removed'
             : '';
+        case 'ParentConversationDeleted':
+          return m.message_count_deleted != null
+            ? m.message_count_deleted + ' message(s) removed'
+            : '';
         case 'ParentDeviceUnlinked':
           return m.orphan_cascaded
             ? 'device + subtree cascaded'
@@ -1787,6 +1845,7 @@
     document.getElementById('backToDevices').addEventListener('click', loadDevices);
     document.getElementById('flaggedBackToDevices').addEventListener('click', loadDevices);
     document.getElementById('backFromDetailBtn').addEventListener('click', backFromDetail);
+    document.getElementById('deleteConversationBtn').addEventListener('click', deleteConversation);
     document.getElementById('olderBtn').addEventListener('click', pageOlder);
     document.getElementById('newerBtn').addEventListener('click', pageNewer);
     document.getElementById('flaggedOlderBtn').addEventListener('click', pageOlderFlagged);
