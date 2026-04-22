@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (908 tests)
+dotnet test                                     # Run all tests (917 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -539,6 +539,44 @@ child belongs to" (same shape as `DeleteChildAsync`). 404 on miss.
 Dashboard exposes per-child tri-state selects (Inherit / On / Off)
 with an "Inherit (on)" / "Inherit (off)" hint in the Inherit label so
 parents never wonder what "Inherit" resolves to.
+
+## Register anti-enumeration
+
+`POST /api/parents/register` is designed so that the new-email and
+already-registered-email paths are externally indistinguishable — the
+endpoint does not serve as an account-existence oracle.
+
+- Both paths return **201 Created** with the identical neutral body
+  `{ "registered": true }`. No `parentId` is echoed; a per-request
+  identifier would be a first-class enumeration signal.
+- The 409 "Email already registered" response is deliberately gone.
+- `ParentService.RegisterAsync` silently no-ops on email collision —
+  no throw, no second row, and **no mutation of the existing row's
+  `PasswordHash` or any other field** (overwriting would be a silent
+  takeover).
+- **Mandatory timing normalization.** BCrypt hashing runs on BOTH
+  paths — the hash is computed before the email-existence check and
+  discarded on the collision path. Skipping it on the collision path
+  would re-introduce the oracle via response latency (~10× gap).
+  Pinned by `Register_HashesPasswordOnBothPaths` via a counting spy
+  injected through `ParentService`'s optional 4th constructor
+  parameter; that seam exists only for this invariant.
+- Request-shape validations (empty fields, password < 8 chars,
+  `AcceptedTerms=false`) still return 400 — these inspect only the
+  submitted payload and do not depend on the registered set, so they
+  do not leak.
+- Auth rate limiter (`[EnableRateLimiting("auth")]`, 10 / 60 s per
+  caller IP) remains attached to the endpoint.
+- **UX debt:** a user who forgot they already have an account sees
+  "registered" and discovers the mistake on their next login attempt.
+  Bounded and self-correcting. A clean async-email flow with a
+  forgot-password path is the future direction but is out of scope
+  for this slice — notifications infra does not yet exist.
+- **Audit:** register remains deliberately out of the audit scope
+  (same posture as `/login`); this slice did not add an event type.
+- **Login is unchanged.** `/api/parents/login` already masks account
+  existence via a uniform 401 for both unknown-email and
+  wrong-password, so this slice did not need to touch it.
 
 ## JWT key rotation
 

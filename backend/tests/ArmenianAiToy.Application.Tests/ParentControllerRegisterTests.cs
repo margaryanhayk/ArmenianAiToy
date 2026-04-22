@@ -38,10 +38,11 @@ public class ParentControllerRegisterTests
     [Fact]
     public async Task Register_WhenPasswordIsValid_DelegatesToService()
     {
-        // Anti-tautology guard: proves the new length check does not
+        // Anti-tautology guard: proves the length check does not
         // incorrectly reject passwords that meet the minimum.
+        // Post-anti-enumeration slice RegisterAsync returns Task (no id),
+        // so nothing to stub; NSubstitute defaults a Task to completed.
         var (controller, parents) = CreateController();
-        parents.RegisterAsync("a@b.com", "strongpass9", true).Returns(Guid.NewGuid());
         var request = new ParentRegisterRequest("a@b.com", "strongpass9", AcceptedTerms: true); // 11 chars
 
         var result = await controller.Register(request);

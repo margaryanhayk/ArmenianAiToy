@@ -26,13 +26,20 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
-    /// Register a new parent account.
+    /// Register a new parent account. Anti-enumeration response: the
+    /// new-email and already-registered-email paths both return 201
+    /// with an identical neutral body, and
+    /// <see cref="IParentService.RegisterAsync"/> pays the same BCrypt
+    /// latency on both paths so response timing cannot be used as an
+    /// account-existence oracle. Request-shape validation still returns
+    /// 400 (empty / short password / consent missing) — those checks
+    /// inspect only the submitted fields and do not leak anything about
+    /// the registered set.
     /// </summary>
     [HttpPost("register")]
     [EnableRateLimiting(AuthRateLimiter.PolicyName)]
     [ProducesResponseType(201)]
     [ProducesResponseType(400)]
-    [ProducesResponseType(409)]
     [ProducesResponseType(429)]
     public async Task<IActionResult> Register([FromBody] ParentRegisterRequest request)
     {
@@ -45,21 +52,21 @@ public class ParentController : ControllerBase
 
         // C1: explicit consent capture. The DTO defaults AcceptedTerms to
         // false so a caller that omits the field is equivalent to declining.
-        // Rejected at 400 (client error) rather than 409 (conflict) because
-        // the request itself is malformed — no consent means no registration.
+        // Rejected at 400 (client error) — the request itself is malformed;
+        // no consent means no registration. The service carries an
+        // equivalent defense-in-depth throw, but the controller is the
+        // normal enforcement point.
         if (!request.AcceptedTerms)
             return BadRequest(new { error = "You must accept the terms to register." });
 
-        try
-        {
-            var parentId = await _parentService.RegisterAsync(
-                request.Email, request.Password, request.AcceptedTerms);
-            return Created("", new { parentId });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { error = ex.Message });
-        }
+        await _parentService.RegisterAsync(
+            request.Email, request.Password, request.AcceptedTerms);
+        // Neutral body — shape matches other parent destructive endpoints
+        // (`{ deleted: true }`, `{ paused: true }`, etc.) and is byte-for-
+        // byte identical whether the email was new or already registered.
+        // `parentId` is deliberately NOT echoed: a per-request identifier
+        // would be a first-class enumeration signal.
+        return Created("", new { registered = true });
     }
 
     /// <summary>

@@ -50,18 +50,23 @@ public class ParentServiceAuthTests
     // --- RegisterAsync ---
 
     [Fact]
-    public async Task RegisterAsync_Success_ReturnsIdAndPersistsConsent()
+    public async Task RegisterAsync_Success_PersistsRowAndConsent()
     {
+        // Post-anti-enumeration slice: RegisterAsync no longer returns
+        // the minted id (so the id itself cannot be used as an
+        // enumeration signal on the wire). The happy-path contract is
+        // therefore "the row exists with the expected fields" rather
+        // than "the returned id is a valid Guid." Consent fields
+        // (TermsAcceptedAt, TermsVersion) and the BCrypt hash are still
+        // assertable directly on the persisted row.
         var (service, db) = CreateService();
         var before = DateTime.UtcNow;
 
-        var id = await service.RegisterAsync("test@example.com", "password123", acceptedTerms: true);
+        await service.RegisterAsync("test@example.com", "password123", acceptedTerms: true);
 
-        Assert.NotEqual(Guid.Empty, id);
-        var parent = await db.Set<Parent>().FindAsync(id);
+        var parent = await db.Set<Parent>().FirstOrDefaultAsync(p => p.Email == "test@example.com");
         Assert.NotNull(parent);
-        Assert.Equal("test@example.com", parent!.Email);
-        Assert.NotEqual("password123", parent.PasswordHash); // hashed, not plaintext
+        Assert.NotEqual("password123", parent!.PasswordHash); // hashed, not plaintext
         Assert.True(BCrypt.Net.BCrypt.Verify("password123", parent.PasswordHash));
         // C1: consent fields recorded on success.
         Assert.NotNull(parent.TermsAcceptedAt);
@@ -86,22 +91,40 @@ public class ParentServiceAuthTests
     }
 
     [Fact]
-    public async Task RegisterAsync_DuplicateEmail_ThrowsInvalidOperation()
+    public async Task RegisterAsync_DuplicateEmail_IsSilentNoOpAndDoesNotMutateExistingRow()
     {
+        // Post-anti-enumeration slice: a duplicate email must not throw,
+        // must not create a second row, and must not mutate the
+        // existing row (in particular its PasswordHash — overwriting it
+        // would be a silent account takeover). The ONLY observable
+        // effect of the collision path is a server-side log line (no
+        // email) and a discarded hash computation.
         var (service, db) = CreateService();
+        var existingId = Guid.NewGuid();
+        var originalHash = BCrypt.Net.BCrypt.HashPassword("original-pass");
+        var originalRegisteredAt = DateTime.UtcNow.AddDays(-3);
         db.Set<Parent>().Add(new Parent
         {
-            Id = Guid.NewGuid(),
+            Id = existingId,
             Email = "existing@example.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("pass"),
-            RegisteredAt = DateTime.UtcNow
+            PasswordHash = originalHash,
+            RegisteredAt = originalRegisteredAt
         });
         await db.SaveChangesAsync();
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.RegisterAsync("existing@example.com", "newpass", acceptedTerms: true));
+        // Must NOT throw.
+        await service.RegisterAsync("existing@example.com", "attacker-guess", acceptedTerms: true);
 
-        Assert.Contains("already registered", ex.Message);
+        // Exactly one row for the email — no duplicate inserted.
+        Assert.Equal(1, await db.Set<Parent>().CountAsync(p => p.Email == "existing@example.com"));
+
+        // Existing row is untouched in every observable field.
+        var parent = await db.Set<Parent>().FindAsync(existingId);
+        Assert.NotNull(parent);
+        Assert.Equal(existingId, parent!.Id);
+        Assert.Equal("existing@example.com", parent.Email);
+        Assert.Equal(originalHash, parent.PasswordHash);
+        Assert.Equal(originalRegisteredAt, parent.RegisteredAt);
     }
 
     // --- LoginAsync ---

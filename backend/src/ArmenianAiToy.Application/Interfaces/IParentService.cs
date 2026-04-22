@@ -4,7 +4,16 @@ namespace ArmenianAiToy.Application.Interfaces;
 
 public interface IParentService
 {
-    Task<Guid> RegisterAsync(string email, string password, bool acceptedTerms);
+    /// <summary>
+    /// Register a new parent account. Anti-enumeration contract: this
+    /// method returns without a differentiating signal whether the email
+    /// was new or already registered — the only outward difference
+    /// between the two paths is internal (DB state). Callers MUST NOT
+    /// try to reconstruct the distinction. Throws only on request-shape
+    /// violations (e.g. consent not accepted) as a defense-in-depth
+    /// check, never on email collision.
+    /// </summary>
+    Task RegisterAsync(string email, string password, bool acceptedTerms);
     Task<ParentLoginResponse?> LoginAsync(string email, string password);
     Task<bool> LinkDeviceAsync(Guid parentId, Guid deviceId, string apiKey);
     Task<bool> UnlinkDeviceAsync(Guid parentId, Guid deviceId);

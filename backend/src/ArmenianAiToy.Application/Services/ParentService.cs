@@ -28,29 +28,92 @@ public class ParentService : IParentService
     private readonly DbContext _db;
     private readonly IConfiguration _config;
     private readonly ILogger<ParentService> _logger;
+    private readonly Func<string, string> _hashPassword;
 
-    public ParentService(DbContext db, IConfiguration config, ILogger<ParentService> logger)
+    /// <summary>
+    /// Standard constructor used by the DI container. The optional
+    /// <paramref name="hashPassword"/> parameter defaults to
+    /// <c>BCrypt.Net.BCrypt.HashPassword</c> and exists so the
+    /// anti-enumeration tests can inject a counting spy to prove the
+    /// "hash runs on both paths" invariant without standing up a full
+    /// integration harness or a new <c>IPasswordHasher</c> abstraction.
+    /// DI resolves it via the single-constructor + optional-param rule.
+    /// </summary>
+    public ParentService(
+        DbContext db,
+        IConfiguration config,
+        ILogger<ParentService> logger,
+        Func<string, string>? hashPassword = null)
     {
         _db = db;
         _config = config;
         _logger = logger;
+        _hashPassword = hashPassword ?? BCrypt.Net.BCrypt.HashPassword;
     }
 
-    public async Task<Guid> RegisterAsync(string email, string password, bool acceptedTerms)
+    /// <summary>
+    /// Register a new parent account with anti-enumeration semantics.
+    /// The new-email and already-registered-email paths are externally
+    /// indistinguishable: both complete without returning an account
+    /// existence signal to the caller, and both pay the same BCrypt
+    /// latency so the response time cannot be used as an oracle.
+    ///
+    /// <para>Control flow:</para>
+    /// <list type="number">
+    ///   <item><description>Request-shape guard: consent must be
+    ///   accepted. The controller 400s this earlier; the throw here is
+    ///   defense-in-depth.</description></item>
+    ///   <item><description><b>Hash the submitted password first</b>
+    ///   on every call. This is the mandatory timing normalization —
+    ///   it runs before the email-existence check so both paths pay
+    ///   the same latency floor.</description></item>
+    ///   <item><description>If the email is already registered, return
+    ///   silently. Do NOT throw, do NOT persist, do NOT mutate the
+    ///   existing row (its <c>PasswordHash</c> stays exactly as it
+    ///   was — only the hash computed for THIS call is discarded).
+    ///   Logs a server-side "silent no-op" breadcrumb without the
+    ///   email.</description></item>
+    ///   <item><description>Otherwise, persist a new Parent with the
+    ///   already-computed hash, using the consent timestamps from
+    ///   <c>DateTime.UtcNow</c>.</description></item>
+    /// </list>
+    ///
+    /// <para>
+    /// <b>No audit row.</b> Register/login remain deliberately out of
+    /// the audit scope documented in CLAUDE.md § Audit events.
+    /// </para>
+    /// </summary>
+    public async Task RegisterAsync(string email, string password, bool acceptedTerms)
     {
         if (!acceptedTerms)
             throw new InvalidOperationException("Terms must be accepted to register.");
 
+        // Mandatory timing normalization — BCrypt runs on both paths.
+        // Computing the hash BEFORE the email-existence check means the
+        // collision path pays the same latency as the new-email path.
+        // The value is discarded on the collision branch below.
+        var hash = _hashPassword(password);
+
         var existing = await _db.Set<Parent>().AnyAsync(p => p.Email == email);
         if (existing)
-            throw new InvalidOperationException("Email already registered");
+        {
+            // Anti-enumeration: silent no-op on collision. The hash
+            // just computed is intentionally discarded; the existing
+            // Parent row is not touched. Server-side log is
+            // email-less to avoid a log-scraping back-channel.
+            _logger.LogInformation(
+                "Parent register: silent no-op on collision " +
+                "(terms version {TermsVersion})",
+                CurrentTermsVersion);
+            return;
+        }
 
         var now = DateTime.UtcNow;
         var parent = new Parent
         {
             Id = Guid.NewGuid(),
             Email = email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+            PasswordHash = hash,
             RegisteredAt = now,
             TermsAcceptedAt = now,
             TermsVersion = CurrentTermsVersion
@@ -62,7 +125,6 @@ public class ParentService : IParentService
         _logger.LogInformation(
             "Parent registered: {Email}, terms version {TermsVersion}",
             email, CurrentTermsVersion);
-        return parent.Id;
     }
 
     public async Task<ParentLoginResponse?> LoginAsync(string email, string password)
