@@ -6,3 +6,5 @@ public record ParentLoginResponse(string Token);
 public record LinkDeviceRequest(Guid DeviceId, string ApiKey);
 public record ParentChangePasswordRequest(string CurrentPassword, string NewPassword);
 public record ParentDeleteAccountRequest(string CurrentPassword);
+public record ParentPasswordResetRequest(string Email);
+public record ParentPasswordResetCompleteRequest(string Token, string NewPassword);

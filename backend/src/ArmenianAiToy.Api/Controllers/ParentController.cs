@@ -123,6 +123,67 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Begin a password-reset flow. Anti-enumeration response: the
+    /// known-email and unknown-email paths both return <b>202 Accepted</b>
+    /// with the identical neutral body
+    /// <c>{ "resetRequested": true }</c>. The service pays the same
+    /// BCrypt latency on both paths (same seam
+    /// <see cref="ParentController.Register"/> uses) so response timing
+    /// cannot be used as an account-existence oracle. No authentication
+    /// required — the parent has, by definition, forgotten their
+    /// password. Rate-limited via the auth policy.
+    /// </summary>
+    [HttpPost("password/reset-request")]
+    [EnableRateLimiting(AuthRateLimiter.PolicyName)]
+    [ProducesResponseType(202)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(429)]
+    public async Task<IActionResult> RequestPasswordReset(
+        [FromBody] ParentPasswordResetRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+            return BadRequest(new { error = "Email is required." });
+
+        await _parentService.RequestPasswordResetAsync(request.Email);
+        // Byte-identical body on both paths. No parent id, no token,
+        // no "sent to <email>" echo — all of those would leak existence.
+        return Accepted(new { resetRequested = true });
+    }
+
+    /// <summary>
+    /// Complete a password reset with a previously-issued token. On any
+    /// failure — unknown token, expired, already consumed — the response
+    /// is a uniform 400 without distinguishing the reason. No JWT is
+    /// issued; the parent logs in separately after a successful reset.
+    /// Rate-limited via the auth policy.
+    /// </summary>
+    [HttpPost("password/reset")]
+    [EnableRateLimiting(AuthRateLimiter.PolicyName)]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(429)]
+    public async Task<IActionResult> CompletePasswordReset(
+        [FromBody] ParentPasswordResetCompleteRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.NewPassword))
+            return BadRequest(new { error = "Reset link is invalid or expired." });
+
+        // Same minimum-length rule as Register / ChangePassword. Reject
+        // before touching the DB so an obviously-weak password can't
+        // consume a single-use token.
+        const int MinPasswordLength = 8;
+        if (request.NewPassword.Length < MinPasswordLength)
+            return BadRequest(new { error = "Reset link is invalid or expired." });
+
+        var ok = await _parentService.CompletePasswordResetAsync(
+            request.Token, request.NewPassword);
+        if (!ok)
+            return BadRequest(new { error = "Reset link is invalid or expired." });
+
+        return Ok(new { reset = true });
+    }
+
+    /// <summary>
     /// Link an existing device to the authenticated parent.
     /// </summary>
     [HttpPost("devices/link")]

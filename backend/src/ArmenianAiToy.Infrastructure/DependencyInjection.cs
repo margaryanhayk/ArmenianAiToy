@@ -1,8 +1,10 @@
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
+using ArmenianAiToy.Application.Notifications;
 using ArmenianAiToy.Application.Services;
 using ArmenianAiToy.Infrastructure.Background;
 using ArmenianAiToy.Infrastructure.Data;
+using ArmenianAiToy.Infrastructure.Notifications;
 using ArmenianAiToy.Infrastructure.OpenAI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -52,6 +54,12 @@ public static class DependencyInjection
         services.AddScoped<IDeviceService, DeviceService>();
         services.AddScoped<IParentService, ParentService>();
         services.AddScoped<IChildService, ChildService>();
+
+        // Minimal outbound-notification seam. Log-only by default; a
+        // future deploy slice can swap in an email / webhook / provider
+        // SDK without changing any call site. Introduced as part of the
+        // forgot-password slice — see INotifier xmldoc.
+        services.AddScoped<INotifier, LoggingNotifier>();
 
         // Per-parent cooldown guard for the data-export endpoint.
         // Singleton because the cooldown map must persist across scoped

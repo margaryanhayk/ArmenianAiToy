@@ -1,6 +1,7 @@
 using ArmenianAiToy.Application.Auth;
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Interfaces;
+using ArmenianAiToy.Application.Notifications;
 using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Domain.Enums;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.IdentityModel.Tokens;
@@ -29,26 +31,51 @@ public class ParentService : IParentService
     private readonly IConfiguration _config;
     private readonly ILogger<ParentService> _logger;
     private readonly Func<string, string> _hashPassword;
+    private readonly INotifier _notifier;
 
     /// <summary>
-    /// Standard constructor used by the DI container. The optional
-    /// <paramref name="hashPassword"/> parameter defaults to
-    /// <c>BCrypt.Net.BCrypt.HashPassword</c> and exists so the
-    /// anti-enumeration tests can inject a counting spy to prove the
-    /// "hash runs on both paths" invariant without standing up a full
-    /// integration harness or a new <c>IPasswordHasher</c> abstraction.
-    /// DI resolves it via the single-constructor + optional-param rule.
+    /// Standard constructor used by the DI container. Two test-facing
+    /// optional parameters, both defaulted, so no existing
+    /// ParentService-constructing test needs updating:
+    /// <list type="bullet">
+    ///   <item><description><paramref name="hashPassword"/> — defaults
+    ///   to <c>BCrypt.Net.BCrypt.HashPassword</c>. Exists so the
+    ///   anti-enumeration tests (register + password-reset) can inject
+    ///   a counting spy to prove the "hash runs on both paths" timing
+    ///   invariant without a full integration harness.</description></item>
+    ///   <item><description><paramref name="notifier"/> — defaults to
+    ///   <see cref="NullNotifier.Instance"/>. Real DI always registers
+    ///   <c>LoggingNotifier</c>; the null fallback exists only so
+    ///   unit tests for unrelated flows (pause, bedtime, mode flags,
+    ///   etc.) can construct a bare ParentService without threading a
+    ///   notifier substitute everywhere.</description></item>
+    /// </list>
+    /// Forgot-password-specific tests pass an explicit
+    /// <see cref="INotifier"/> substitute.
     /// </summary>
     public ParentService(
         DbContext db,
         IConfiguration config,
         ILogger<ParentService> logger,
-        Func<string, string>? hashPassword = null)
+        Func<string, string>? hashPassword = null,
+        INotifier? notifier = null)
     {
         _db = db;
         _config = config;
         _logger = logger;
         _hashPassword = hashPassword ?? BCrypt.Net.BCrypt.HashPassword;
+        _notifier = notifier ?? NullNotifier.Instance;
+    }
+
+    // Private no-op notifier. Used as the safe default when no
+    // INotifier is supplied — keeps existing tests that construct
+    // ParentService directly from needing a stub.
+    private sealed class NullNotifier : INotifier
+    {
+        public static readonly NullNotifier Instance = new();
+        public Task SendPasswordResetAsync(
+            string email, string resetToken, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     /// <summary>
@@ -233,6 +260,130 @@ public class ParentService : IParentService
 
         _logger.LogInformation("Parent {ParentId} changed password", parentId);
         return true;
+    }
+
+    // Default TTL for reset tokens. Overridable via
+    // Auth:PasswordResetTokenTtlMinutes in config, read through the
+    // plain-string IConfiguration indexer (Application project does
+    // not reference the Configuration.Binder package — same pattern
+    // the retention worker documents).
+    private const int DefaultPasswordResetTtlMinutes = 60;
+
+    public async Task RequestPasswordResetAsync(
+        string email, CancellationToken cancellationToken = default)
+    {
+        // Mandatory timing normalization — BCrypt runs on both paths.
+        // Computing a throwaway hash BEFORE the email lookup means the
+        // unknown-email path pays the same latency as the known-email
+        // path. Mirrors the RegisterAsync anti-enumeration slice. The
+        // value is discarded in both branches below.
+        _ = _hashPassword(email);
+
+        var parent = await _db.Set<Parent>()
+            .FirstOrDefaultAsync(p => p.Email == email, cancellationToken);
+        if (parent == null)
+        {
+            // Silent no-op on unknown email — part of the
+            // enumeration-resistance contract. No token row, no
+            // notifier call, no audit row. Server-side log is
+            // email-less to avoid a log-scraping back-channel.
+            _logger.LogInformation(
+                "Password reset request: silent no-op (unknown email)");
+            return;
+        }
+
+        // Generate a high-entropy raw token and persist ONLY its hash.
+        // A DB exfil therefore does not yield usable tokens.
+        var rawToken = GenerateRawResetToken();
+        var tokenHash = ComputeTokenHash(rawToken);
+        var ttl = TimeSpan.FromMinutes(ReadPasswordResetTtlMinutes());
+        var now = DateTime.UtcNow;
+
+        _db.Set<ParentPasswordResetToken>().Add(new ParentPasswordResetToken
+        {
+            Id = Guid.NewGuid(),
+            ParentId = parent.Id,
+            TokenHash = tokenHash,
+            CreatedAt = now,
+            ExpiresAt = now.Add(ttl),
+            ConsumedAt = null
+        });
+        TrackAndAddAudit(AuditEvent.ParentPasswordResetRequested(parent.Id));
+        await _db.SaveChangesAsync(cancellationToken);
+
+        // Notifier is called AFTER SaveChangesAsync so a DB write
+        // failure short-circuits before we hand out a token the DB
+        // does not know about. LoggingNotifier does not actually
+        // deliver; a future transport will.
+        await _notifier.SendPasswordResetAsync(email, rawToken, cancellationToken);
+
+        _logger.LogInformation(
+            "Password reset token issued for parent {ParentId}", parent.Id);
+    }
+
+    public async Task<bool> CompletePasswordResetAsync(string token, string newPassword)
+    {
+        if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(newPassword))
+            return false;
+
+        var tokenHash = ComputeTokenHash(token);
+        var row = await _db.Set<ParentPasswordResetToken>()
+            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
+
+        var now = DateTime.UtcNow;
+        // Uniform false on any of: unknown / expired / already consumed.
+        // Controller maps this to a single 400 response with no reason
+        // leak, so the three failure paths are indistinguishable on
+        // the wire AND in the audit log (no row written).
+        if (row is null || row.ConsumedAt is not null || row.ExpiresAt <= now)
+            return false;
+
+        var parent = await _db.Set<Parent>()
+            .FirstOrDefaultAsync(p => p.Id == row.ParentId);
+        if (parent == null)
+            return false; // parent deleted between issue and completion; token is moot
+
+        parent.PasswordHash = _hashPassword(newPassword);
+        row.ConsumedAt = now;
+        TrackAndAddAudit(AuditEvent.ParentPasswordResetCompleted(parent.Id));
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Parent {ParentId} completed password reset", parent.Id);
+        return true;
+    }
+
+    private static string GenerateRawResetToken()
+    {
+        // 32 bytes of CSPRNG, base64-url encoded so the token is safe
+        // in a URL / email body without further escaping. URL-safe
+        // alphabet; trailing '=' padding stripped since callers do
+        // not need to decode the token — we only hash it.
+        Span<byte> bytes = stackalloc byte[32];
+        RandomNumberGenerator.Fill(bytes);
+        return Convert.ToBase64String(bytes)
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
+    }
+
+    private static string ComputeTokenHash(string rawToken)
+    {
+        // SHA-256 hex. The raw token is already high-entropy (32-byte
+        // CSPRNG), so no salt / HMAC is required — the hash exists
+        // only so a DB exfil does not expose usable tokens. Constant-
+        // time compare is also not required here because lookup is
+        // by equality on the hash column (the DB index does the work).
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(rawToken));
+        return Convert.ToHexString(hash);
+    }
+
+    private int ReadPasswordResetTtlMinutes()
+    {
+        var raw = _config["Auth:PasswordResetTokenTtlMinutes"];
+        if (int.TryParse(raw, out var parsed) && parsed > 0)
+            return parsed;
+        return DefaultPasswordResetTtlMinutes;
     }
 
     public async Task<bool> DeleteAccountAsync(Guid parentId, string currentPassword)

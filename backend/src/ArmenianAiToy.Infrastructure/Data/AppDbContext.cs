@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<Parent> Parents => Set<Parent>();
     public DbSet<ParentDevice> ParentDevices => Set<ParentDevice>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<ParentPasswordResetToken> ParentPasswordResetTokens => Set<ParentPasswordResetToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -81,6 +82,23 @@ public class AppDbContext : DbContext
             e.HasKey(a => a.Id);
             e.HasIndex(a => a.Timestamp);
             e.Property(a => a.EventType).HasConversion<string>();
+        });
+
+        // ParentPasswordResetToken — single-use forgot-password state.
+        // FK cascade to Parent: a deleted parent takes their pending
+        // reset tokens with them, by design (pending tokens are not
+        // audit material and should not linger as orphans). Unique
+        // index on TokenHash so the completion endpoint can look up by
+        // hash alone.
+        modelBuilder.Entity<ParentPasswordResetToken>(e =>
+        {
+            e.HasKey(t => t.Id);
+            e.HasOne(t => t.Parent)
+                .WithMany()
+                .HasForeignKey(t => t.ParentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(t => t.TokenHash).IsUnique();
+            e.HasIndex(t => t.ParentId);
         });
     }
 }

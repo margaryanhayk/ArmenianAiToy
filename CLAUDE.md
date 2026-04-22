@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (917 tests)
+dotnet test                                     # Run all tests (941 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -157,6 +157,8 @@ no editing, no deletion, no child-facing features.
 - `GET  /api/conversations/flagged?deviceId=&limit=&offset=` — flat newest-first list of non-Clean messages
 - `GET  /api/conversations/{conversationId}` — full conversation detail (404 on not-yours, no existence leak)
 - `DELETE /api/conversations/{conversationId}` — hard-delete a single conversation the parent owns. Messages cascade via the existing schema FK. 404 on not-yours or unknown id (same silent-404 phrasing as `DeleteChild`; no existence leak). Writes exactly one `ParentConversationDeleted` audit row on success; failure paths write nothing.
+- `POST /api/parents/password/reset-request` — begin a password-reset flow. Anti-enumeration: returns 202 with identical body `{ resetRequested: true }` for known and unknown emails, with BCrypt timing normalization on both paths. See § Password reset.
+- `POST /api/parents/password/reset` — complete a reset with a previously-issued token + new password. 200 with `{ reset: true }` on success; uniform 400 "Reset link is invalid or expired." for any failure (unknown / expired / already consumed / too-short password). Does NOT re-issue a JWT — the parent logs in separately.
 - `GET  /api/parents/audit?limit=&offset=` — per-actor audit history; see § Audit events for the response shape.
 - `GET  /api/parents/export` — single-JSON full export of the parent's own data; see § Data export.
 
@@ -216,6 +218,18 @@ describe.
   PII, no message content. Failure paths (not found / not owned)
   write no row. Complements — does not replace — the scheduled
   `ConversationsPurgedByRetention` event.
+- `ParentPasswordResetRequested` — emitted in
+  `ParentService.RequestPasswordResetAsync` on the known-email path
+  only. `ActorParentId` is the parent whose account was targeted;
+  target ids are null; metadata is deliberately empty (no token, no
+  token hash, no email). The unknown-email path writes no audit row
+  — enumeration-resistance contract would fail if it did.
+- `ParentPasswordResetCompleted` — emitted in
+  `ParentService.CompletePasswordResetAsync` on successful token
+  redemption. `ActorParentId` is the parent whose password just
+  changed; metadata empty. Failure paths (unknown / expired /
+  already-consumed token) write no row — the 400 response is
+  uniform and the audit trail mirrors that uniformity.
 
 Register / login / chat / moderation / rate-limit events remain
 deliberately out of scope.
@@ -539,6 +553,72 @@ child belongs to" (same shape as `DeleteChildAsync`). 404 on miss.
 Dashboard exposes per-child tri-state selects (Inherit / On / Off)
 with an "Inherit (on)" / "Inherit (off)" hint in the Inherit label so
 parents never wonder what "Inherit" resolves to.
+
+## Password reset
+
+Parents who forget their password can recover their account via a
+single-use, time-limited token flow. Two endpoints:
+
+- `POST /api/parents/password/reset-request` body `{ email }`
+  — begins the flow. **Always** returns 202 with body
+  `{ resetRequested: true }` regardless of whether the email is
+  known. Both paths pay the same BCrypt latency (same
+  `_hashPassword` seam the register slice uses), so response timing
+  cannot be used as an account-existence oracle. For a known email:
+  generates a 32-byte CSPRNG token, stores only its SHA-256 hash in
+  `ParentPasswordResetTokens`, calls `INotifier.SendPasswordResetAsync`
+  with the raw token, and writes one `ParentPasswordResetRequested`
+  audit row. For an unknown email: no token row, no notifier call,
+  no audit row. Rate-limited via `[EnableRateLimiting("auth")]`.
+- `POST /api/parents/password/reset` body `{ token, newPassword }`
+  — completes the flow. Returns 200 with `{ reset: true }` on
+  success; uniform 400 with `{ error: "Reset link is invalid or
+  expired." }` on any failure (unknown / expired / already consumed
+  / new password too short). Single-use is enforced by
+  `ConsumedAt` on the token row. **No JWT is re-issued** — the
+  parent logs in separately. Rate-limited via the auth policy.
+
+**Token persistence.** `ParentPasswordResetToken` is a new entity
+with FK cascade to `Parent`, so deleting a parent takes any
+pending tokens with them. Only the **hash** of the token is
+stored — the raw token travels exactly once, from the request
+endpoint through `INotifier` to the parent's email. A DB exfil
+therefore does not yield usable tokens. Default TTL is 60 minutes,
+configurable via `Auth:PasswordResetTokenTtlMinutes`.
+
+**Invariants (do not regress)**:
+- Reset-request response is byte-identical across known and unknown
+  emails (status + body). Pinned by
+  `RequestPasswordReset_UnknownEmail_Returns202WithIdenticalBody`.
+- BCrypt runs on both reset-request paths. Pinned by
+  `RequestPasswordReset_HashesOnBothPaths_TimingNormalization` via
+  the counting-spy seam. Skipping the unknown-email path would
+  re-open the oracle through response latency.
+- Reset-completion returns the **same** 400 body for every failure
+  reason (unknown / expired / consumed / short password). Pinned
+  by `CompletePasswordReset_ServiceReturnsFalse_ReturnsUniform400`
+  and `CompletePasswordReset_ShortPassword_Returns400_WithoutCallingService`.
+- The token is stored only as a hash — the raw token string never
+  appears in the DB row. Pinned by
+  `RequestPasswordReset_StoredRow_DoesNotContainRawToken`.
+- Single-use: a successfully-completed token cannot be reused.
+  Pinned by `CompletePasswordReset_TokenReused_ReturnsFalseAndWritesNoSecondAudit`.
+- Account deletion cascades pending tokens. Pinned by
+  `AccountDelete_CascadesPendingResetTokens`.
+- `LoggingNotifier` never logs the raw token — not even a prefix.
+  Pinned by `LoggingNotifierTests.SendPasswordResetAsync_DoesNotLogRawToken`.
+
+**Notifier seam.** Minimal `INotifier` abstraction in
+`Application/Notifications/INotifier.cs` with a single typed method
+`SendPasswordResetAsync(email, resetToken, ct)`. Default
+`LoggingNotifier` implementation in
+`Infrastructure/Notifications/LoggingNotifier.cs` writes one
+structured log line per call and does not actually deliver
+anything. A future deploy slice can register a second
+implementation (SMTP / webhook / provider SDK) without changing
+any caller. **Typed methods, not a generic envelope** — future
+consumers (dormant-purge warnings, register-collision mail, etc.)
+extend the interface with their own method when they land.
 
 ## Register anti-enumeration
 

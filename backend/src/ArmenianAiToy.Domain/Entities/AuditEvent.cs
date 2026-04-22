@@ -266,4 +266,39 @@ public class AuditEvent
             deleted_at_utc = DateTime.UtcNow
         })
     };
+
+    /// <summary>
+    /// Emitted on successful <c>POST /api/parents/password/reset-request</c>
+    /// for a known email. The unknown-email path writes no audit row
+    /// (part of the enumeration-resistance contract — an audit side
+    /// effect would re-introduce a signal an attacker with DB read
+    /// could observe). Metadata is deliberately empty: the raw token
+    /// MUST NOT appear, the token hash MUST NOT appear, and there is
+    /// no counts-shaped fact worth recording beyond "the event
+    /// happened." Mirrors <see cref="ParentPasswordChanged"/>.
+    /// </summary>
+    public static AuditEvent ParentPasswordResetRequested(Guid parentId) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentPasswordResetRequested,
+        ActorParentId = parentId
+    };
+
+    /// <summary>
+    /// Emitted on successful <c>POST /api/parents/password/reset</c>.
+    /// Written in the same <c>SaveChangesAsync</c> as the password
+    /// update and the token's <c>ConsumedAt</c> stamp. Failure paths
+    /// (unknown / expired / already-consumed token) write NO row —
+    /// the 400 response is uniform and the audit trail MUST NOT
+    /// differentiate those paths either. Zero metadata for the same
+    /// reason as the request event.
+    /// </summary>
+    public static AuditEvent ParentPasswordResetCompleted(Guid parentId) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentPasswordResetCompleted,
+        ActorParentId = parentId
+    };
 }

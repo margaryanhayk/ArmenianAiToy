@@ -12,5 +12,7 @@ public enum AuditEventType
     ChildModeOverridesSet,
     ParentDataExported,
     ConversationsPurgedByRetention,
-    ParentConversationDeleted
+    ParentConversationDeleted,
+    ParentPasswordResetRequested,
+    ParentPasswordResetCompleted
 }

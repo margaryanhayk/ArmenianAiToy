@@ -1,4 +1,5 @@
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Notifications;
 
 namespace ArmenianAiToy.Application.Interfaces;
 
@@ -28,6 +29,29 @@ public interface IParentService
     Task<bool> DeleteChildAsync(Guid parentId, Guid childId);
     Task<bool> DeleteConversationAsync(Guid parentId, Guid conversationId);
     Task<bool> DeleteAccountAsync(Guid parentId, string currentPassword);
+
+    /// <summary>
+    /// Begin a password-reset flow for the given email. Anti-enumeration
+    /// contract: this method returns without a differentiating signal
+    /// whether the email was known or unknown. Callers MUST NOT try to
+    /// reconstruct the distinction. For a known email, a single-use
+    /// reset token is generated, its hash is persisted, and the
+    /// registered <see cref="INotifier"/> is invoked with the raw
+    /// token. For an unknown email, the method fakes equivalent
+    /// timing (via the same BCrypt seam the register anti-enumeration
+    /// slice uses) and then returns silently — no token row, no
+    /// notifier call, no audit row.
+    /// </summary>
+    Task RequestPasswordResetAsync(string email, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Complete a password reset with a previously-issued token.
+    /// Returns <c>true</c> on success, <c>false</c> on any failure
+    /// (token unknown / expired / already consumed). Failure reasons
+    /// are deliberately not distinguished on the wire — the controller
+    /// maps <c>false</c> to a uniform 400 response.
+    /// </summary>
+    Task<bool> CompletePasswordResetAsync(string token, string newPassword);
     Task<bool> SetChildModeOverridesAsync(
         Guid parentId, Guid childId,
         bool? story, bool? game, bool? riddle, bool? curiosity);
