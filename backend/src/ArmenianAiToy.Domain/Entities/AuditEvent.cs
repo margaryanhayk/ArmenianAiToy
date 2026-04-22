@@ -156,4 +156,32 @@ public class AuditEvent
             curiosity = curiosity
         })
     };
+
+    /// <summary>
+    /// Emitted on every successful <c>GET /api/parents/export</c>. Metadata
+    /// carries only counts — no PII, no content, no identifiers beyond
+    /// <see cref="ActorParentId"/>. Target*Id are null because the event
+    /// describes the parent's whole-account export, not a single target.
+    /// </summary>
+    public static AuditEvent ParentDataExported(
+        Guid parentId,
+        int devices,
+        int children,
+        int conversations,
+        int messages,
+        int auditEvents) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDataExported,
+        ActorParentId = parentId,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            devices = devices,
+            children = children,
+            conversations = conversations,
+            messages = messages,
+            audit_events = auditEvents
+        })
+    };
 }

@@ -1,3 +1,4 @@
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Services;
 using ArmenianAiToy.Infrastructure.Data;
@@ -50,6 +51,12 @@ public static class DependencyInjection
         services.AddScoped<IDeviceService, DeviceService>();
         services.AddScoped<IParentService, ParentService>();
         services.AddScoped<IChildService, ChildService>();
+
+        // Per-parent cooldown guard for the data-export endpoint.
+        // Singleton because the cooldown map must persist across scoped
+        // requests for the window to be meaningful. Process-local memory
+        // only; see ExportCooldown for the rationale.
+        services.AddSingleton<ExportCooldown>();
 
         return services;
     }

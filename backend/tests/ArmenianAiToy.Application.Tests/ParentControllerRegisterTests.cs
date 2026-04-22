@@ -1,5 +1,6 @@
 using ArmenianAiToy.Api.Controllers;
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using NSubstitute;
@@ -17,7 +18,7 @@ public class ParentControllerRegisterTests
     private static (ParentController Controller, IParentService Parents) CreateController()
     {
         var parents = Substitute.For<IParentService>();
-        return (new ParentController(parents), parents);
+        return (new ParentController(parents, new ExportCooldown()), parents);
     }
 
     [Fact]

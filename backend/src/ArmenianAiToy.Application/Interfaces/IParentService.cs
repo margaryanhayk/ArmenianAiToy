@@ -22,4 +22,5 @@ public interface IParentService
         Guid parentId, Guid childId,
         bool? story, bool? game, bool? riddle, bool? curiosity);
     Task<List<AuditEventDto>> GetAuditEventsForParentAsync(Guid parentId, int limit, int offset);
+    Task<ParentExport?> BuildExportAsync(Guid parentId);
 }

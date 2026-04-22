@@ -1,4 +1,5 @@
 using ArmenianAiToy.Api.Controllers;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -26,7 +27,7 @@ public class ParentControllerUnlinkDeviceTests
     {
         var parents = Substitute.For<IParentService>();
         var parentId = Guid.NewGuid();
-        var controller = new ParentController(parents);
+        var controller = new ParentController(parents, new ExportCooldown());
         var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
         {
             new Claim(ClaimTypes.NameIdentifier, parentId.ToString())

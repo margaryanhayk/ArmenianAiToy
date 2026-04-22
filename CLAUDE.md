@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (829 tests)
+dotnet test                                     # Run all tests (837 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -157,6 +157,7 @@ no editing, no deletion, no child-facing features.
 - `GET  /api/conversations/flagged?deviceId=&limit=&offset=` — flat newest-first list of non-Clean messages
 - `GET  /api/conversations/{conversationId}` — full conversation detail (404 on not-yours, no existence leak)
 - `GET  /api/parents/audit?limit=&offset=` — per-actor audit history; see § Audit events for the response shape.
+- `GET  /api/parents/export` — single-JSON full export of the parent's own data; see § Data export.
 
 **Pagination guard**: list endpoints reject `offset < 0` and `limit < 1` with 400, and clamp `limit > 100` to 100. Lives as a private static helper inside `ConversationController`.
 
@@ -196,6 +197,13 @@ describe.
   `ParentService.SetDeviceModeFlagsAsync` on every successful write.
   Metadata carries the post-save four-bool state
   (`story`/`game`/`riddle`/`curiosity`).
+- `ParentDataExported` — emitted in
+  `ParentService.BuildExportAsync` on every successful
+  `GET /api/parents/export`. Metadata is counts-only
+  (`devices`/`children`/`conversations`/`messages`/`audit_events`) —
+  no PII, no content, no identifiers beyond `ActorParentId`. Target
+  ids are null because the event describes a whole-account export,
+  not a single target.
 
 Register / login / chat / moderation / rate-limit events remain
 deliberately out of scope.
@@ -239,6 +247,77 @@ feed is per actor parent, not per device.
   (C1 / C2 / C3 / unlink cascade).
 - The existing `ILogger.LogInformation` lines stay — audit is additive,
   not a replacement.
+
+## Data export
+
+`GET /api/parents/export` — parent-JWT authenticated. Returns a
+single JSON document containing the parent's own scope:
+
+- **parent**: safe profile fields only — `Id`, `Email`,
+  `RegisteredAt`, `TermsAcceptedAt`, `TermsVersion`. **Never**
+  `PasswordHash`.
+- **devices**: linked devices with safe fields only — device
+  identity (`Id`, `MacAddress`, `Name`), `RegisteredAt` /
+  `LastSeenAt`, pause state, bedtime window (start/end/timezone),
+  and the four B5 mode flags. **Never** `ApiKey`. Each device
+  nests:
+  - **children** — id, device id, name, gender, date of birth /
+    age, and the four per-child mode overrides.
+  - **conversations** — reuses the existing
+    `ConversationDto` / `MessageDto` shape (same as
+    `GET /api/conversations/{id}`), newest-first.
+- **auditEvents**: unpaginated per-actor audit feed, same shape as
+  `GET /api/parents/audit` (the authenticated parent's own rows
+  only).
+- **schemaVersion** = `"1"` and **generatedAt** at the top so
+  downstream readers can evolve with the shape. **excludedFields**
+  documents intentional omissions inline
+  (`Parent.PasswordHash`, `Device.ApiKey`).
+
+Response headers: `Content-Type: application/json` and
+`Content-Disposition: attachment; filename="areg-export-<utcts>.json"`.
+The filename is timestamp-only — no email, no PII.
+
+**Scope invariants** (do not regress):
+- Every nested collection is filtered by the authenticated parent's
+  id at query time via the `ParentDevice` join. A device shared
+  with another parent exposes only *this* parent's audit rows in
+  the export.
+- No credential material ever appears in the body; the DTO shapes
+  in `ParentExport.cs` omit `PasswordHash` / `ApiKey` by
+  construction, and a test asserts the unique seeded markers never
+  appear in the serialized response.
+- No system telemetry (metrics, logs, histograms) and no moderation
+  / prompt / model internals beyond what parent-facing read
+  endpoints already surface.
+
+**Audited.** Each successful export writes a `ParentDataExported`
+audit row in the same transaction. Metadata is counts-only:
+`devices`, `children`, `conversations`, `messages`, `audit_events`
+— no PII. Target ids are null because the event describes a
+whole-account export.
+
+**Guarded.** `ExportCooldown` (singleton, process-local) enforces a
+per-parent cooldown — default **60 seconds**. Repeated calls inside
+the window get `429 Too Many Requests` with a whole-seconds
+`Retry-After` header. The existing `ChatRateLimiter` is deliberately
+not reused: it keys off the `X-Device-Id` header, not the JWT
+parent claim.
+
+**Out of scope for this slice** (deliberate): no filtering query
+params, no async prepared exports, no zip format, no email
+delivery, no signed URLs, no dashboard button. The endpoint is
+callable today with any parent JWT.
+
+**Manual QA**:
+1. `dotnet run --project src/ArmenianAiToy.Api`
+2. `POST /api/parents/login` to get a JWT.
+3. `curl -H "Authorization: Bearer <jwt>" -OJ http://localhost:5000/api/parents/export`
+   → writes a `areg-export-<utcts>.json` file. Open it and confirm
+   top-level `schemaVersion`, `generatedAt`, `parent`, `devices`,
+   `auditEvents`, `excludedFields`.
+4. Re-run the curl immediately → 429 with `Retry-After` header.
+5. Wait past the cooldown → success again.
 
 ## Bedtime window (B4)
 

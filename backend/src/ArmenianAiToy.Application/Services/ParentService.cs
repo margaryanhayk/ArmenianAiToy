@@ -2,6 +2,7 @@ using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Domain.Entities;
+using ArmenianAiToy.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -452,6 +453,173 @@ public class ParentService : IParentService
             l.Device.RiddleEnabled,
             l.Device.CuriosityEnabled
         )).ToList();
+    }
+
+    /// <summary>
+    /// Collates the authenticated parent's full data export scope and
+    /// writes a <c>ParentDataExported</c> audit row in the same
+    /// transaction. Returns <c>null</c> when the parent row no longer
+    /// exists (JWT was valid but the account was deleted between
+    /// token issue and this call) — controller converts this to an
+    /// ambiguous 404 / no-body, matching the repo's silent-miss
+    /// convention for parent-owned reads.
+    /// <para>
+    /// Scope invariants enforced here:
+    /// </para>
+    /// <list type="bullet">
+    /// <item><description>Every nested collection is filtered by
+    /// <paramref name="parentId"/> at query time (via the
+    /// <c>ParentDevice</c> join). No cross-parent bleed.</description></item>
+    /// <item><description>Neither <c>Parent.PasswordHash</c> nor
+    /// <c>Device.ApiKey</c> is projected — they simply do not appear
+    /// on the <see cref="ParentExportProfile"/> /
+    /// <see cref="ParentExportDevice"/> records.</description></item>
+    /// <item><description>Audit rows included are this parent's own
+    /// only (same <c>ActorParentId == parentId</c> filter the audit
+    /// read endpoint uses) and deliberately <b>unpaginated</b> — an
+    /// export is a complete-history snapshot, not a viewport.</description></item>
+    /// </list>
+    /// </summary>
+    public async Task<ParentExport?> BuildExportAsync(Guid parentId)
+    {
+        var parent = await _db.Set<Parent>().FirstOrDefaultAsync(p => p.Id == parentId);
+        if (parent == null)
+            return null;
+
+        var linkedDeviceIds = await _db.Set<ParentDevice>()
+            .Where(pd => pd.ParentId == parentId)
+            .Select(pd => pd.DeviceId)
+            .ToListAsync();
+
+        var devices = linkedDeviceIds.Count == 0
+            ? new List<Device>()
+            : await _db.Set<Device>()
+                .Where(d => linkedDeviceIds.Contains(d.Id))
+                .ToListAsync();
+
+        var children = linkedDeviceIds.Count == 0
+            ? new List<Child>()
+            : await _db.Set<Child>()
+                .Where(c => linkedDeviceIds.Contains(c.DeviceId))
+                .ToListAsync();
+
+        var conversations = linkedDeviceIds.Count == 0
+            ? new List<Conversation>()
+            : await _db.Set<Conversation>()
+                .Where(c => linkedDeviceIds.Contains(c.DeviceId))
+                .Include(c => c.Messages.OrderBy(m => m.Timestamp))
+                .OrderByDescending(c => c.StartedAt)
+                .ToListAsync();
+
+        // Per-parent audit feed — same filter shape the read endpoint
+        // uses, but unpaginated because an export is a full-history
+        // snapshot. The AppMeter.AuditEventsWritten tag is bounded and
+        // the underlying table is parent-scoped at the row level.
+        var auditRows = await _db.Set<AuditEvent>()
+            .Where(a => a.ActorParentId == parentId)
+            .OrderByDescending(a => a.Timestamp)
+            .ToListAsync();
+
+        var conversationsByDevice = conversations
+            .GroupBy(c => c.DeviceId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+        var childrenByDevice = children
+            .GroupBy(c => c.DeviceId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var deviceExports = devices.Select(d => new ParentExportDevice(
+            d.Id,
+            d.MacAddress,
+            d.Name,
+            d.RegisteredAt,
+            d.LastSeenAt,
+            d.IsPaused,
+            d.BedtimeStart,
+            d.BedtimeEnd,
+            d.TimeZone,
+            d.StoryEnabled,
+            d.GameEnabled,
+            d.RiddleEnabled,
+            d.CuriosityEnabled,
+            childrenByDevice.TryGetValue(d.Id, out var deviceChildren)
+                ? deviceChildren.Select(c => new ParentExportChild(
+                    c.Id,
+                    c.DeviceId,
+                    c.Name,
+                    c.Gender,
+                    c.DateOfBirth,
+                    c.GetAge(),
+                    new ParentExportChildModeOverrides(
+                        c.StoryEnabled, c.GameEnabled, c.RiddleEnabled, c.CuriosityEnabled)
+                )).ToList()
+                : new List<ParentExportChild>(),
+            conversationsByDevice.TryGetValue(d.Id, out var deviceConvos)
+                ? deviceConvos.Select(c => new ConversationDto(
+                    c.Id,
+                    c.DeviceId,
+                    c.StartedAt,
+                    c.EndedAt,
+                    c.Messages.Count,
+                    c.Messages.Any(m => m.SafetyFlag != SafetyFlag.Clean),
+                    c.Messages.Select(m => new MessageDto(
+                        m.Id,
+                        m.Role.ToString().ToLower(),
+                        m.Content,
+                        m.Timestamp,
+                        m.SafetyFlag
+                    )).ToList()
+                )).ToList()
+                : new List<ConversationDto>()
+        )).ToList();
+
+        var auditDtos = auditRows.Select(a => new AuditEventDto(
+            a.Id,
+            a.Timestamp,
+            a.EventType.ToString(),
+            a.TargetDeviceId,
+            a.TargetChildId,
+            a.Metadata is null ? null : JsonNode.Parse(a.Metadata)
+        )).ToList();
+
+        int messageCount = conversations.Sum(c => c.Messages.Count);
+        // Same-transaction audit write. Counts only — no PII, no content,
+        // no identifiers beyond ActorParentId (already carried in the
+        // dedicated column). Includes the audit-row count computed BEFORE
+        // this write so the number reflects the rows that appear in the
+        // export body.
+        TrackAndAddAudit(AuditEvent.ParentDataExported(
+            parentId,
+            devices: devices.Count,
+            children: children.Count,
+            conversations: conversations.Count,
+            messages: messageCount,
+            auditEvents: auditRows.Count));
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Parent {ParentId} exported data ({Devices} devices, {Children} children, {Conversations} conversations, {Messages} messages, {AuditEvents} audit events)",
+            parentId, devices.Count, children.Count, conversations.Count, messageCount, auditRows.Count);
+
+        return new ParentExport(
+            SchemaVersion: "1",
+            GeneratedAt: DateTime.UtcNow,
+            Parent: new ParentExportProfile(
+                parent.Id,
+                parent.Email,
+                parent.RegisteredAt,
+                parent.TermsAcceptedAt,
+                parent.TermsVersion),
+            Devices: deviceExports,
+            AuditEvents: auditDtos,
+            ExcludedFields: new[]
+            {
+                // Reader-facing disclosure of what was intentionally left out.
+                // Keep this list in sync with the projection shapes above —
+                // any field added to Parent / Device that is credential-like
+                // or system-only belongs here.
+                "Parent.PasswordHash",
+                "Device.ApiKey"
+            });
     }
 
     public async Task<List<AuditEventDto>> GetAuditEventsForParentAsync(

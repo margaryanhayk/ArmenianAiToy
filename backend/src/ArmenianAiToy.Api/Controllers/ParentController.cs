@@ -1,4 +1,5 @@
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,10 +15,12 @@ namespace ArmenianAiToy.Api.Controllers;
 public class ParentController : ControllerBase
 {
     private readonly IParentService _parentService;
+    private readonly ExportCooldown _exportCooldown;
 
-    public ParentController(IParentService parentService)
+    public ParentController(IParentService parentService, ExportCooldown exportCooldown)
     {
         _parentService = parentService;
+        _exportCooldown = exportCooldown;
     }
 
     /// <summary>
@@ -337,5 +340,50 @@ public class ParentController : ControllerBase
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var deviceIds = await _parentService.GetLinkedDeviceIdsAsync(parentId);
         return Ok(new { devices = deviceIds });
+    }
+
+    /// <summary>
+    /// Download a full JSON export of the authenticated parent's own data:
+    /// profile (safe fields), linked devices (safe fields) with nested
+    /// children and conversations, and the per-actor audit feed. Response
+    /// is a single JSON document delivered as a timestamp-named attachment.
+    /// Password hash and device API keys are deliberately omitted; the
+    /// response envelope's <c>excludedFields</c> array documents the
+    /// exclusions inline.
+    /// <para>
+    /// Guarded by a per-parent cooldown (see
+    /// <see cref="ExportCooldown"/>); exceeded callers receive 429 with a
+    /// <c>Retry-After</c> header. Each successful call writes one
+    /// <c>ParentDataExported</c> audit row with counts-only metadata.
+    /// </para>
+    /// </summary>
+    [HttpGet("export")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(429)]
+    public async Task<IActionResult> Export()
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        if (!_exportCooldown.TryReserve(parentId, out var retryAfter))
+        {
+            // Whole-seconds rounding keeps the header consistent with the
+            // same convention ASP.NET's rate limiter uses on its 429s.
+            var seconds = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds));
+            Response.Headers.RetryAfter = seconds.ToString();
+            return StatusCode(StatusCodes.Status429TooManyRequests,
+                new { error = "Export already requested recently. Please retry shortly.", retryAfterSeconds = seconds });
+        }
+
+        var export = await _parentService.BuildExportAsync(parentId);
+        if (export is null)
+            return NotFound();
+
+        // Timestamp-only filename — no email or other PII in Content-Disposition.
+        var filename = "areg-export-" + export.GeneratedAt.ToString("yyyyMMddTHHmmssZ") + ".json";
+        Response.Headers.ContentDisposition = $"attachment; filename=\"{filename}\"";
+        return Ok(export);
     }
 }
