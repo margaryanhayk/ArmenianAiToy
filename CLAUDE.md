@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (860 tests)
+dotnet test                                     # Run all tests (877 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -540,6 +540,51 @@ Dashboard exposes per-child tri-state selects (Inherit / On / Off)
 with an "Inherit (on)" / "Inherit (off)" hint in the Inherit label so
 parents never wonder what "Inherit" resolves to.
 
+## Rate limiting
+
+Two named ASP.NET rate-limit policies, both fixed-window, both
+served by the same `OnRejected` handler in `Program.cs` (shared
+`aat_rate_limit_rejected_total` counter and `{ error: "Too many
+requests. Please slow down." }` 429 body).
+
+- **`chat`** — per-device bucket keyed on the `X-Device-Id` header.
+  Applied via `[EnableRateLimiting("chat")]` on `ChatController`.
+  Defaults: `RateLimiting:Chat:PermitLimit = 30`,
+  `RateLimiting:Chat:WindowSeconds = 60`. Cost-containment: sits
+  ahead of `DeviceAuthMiddleware` so rejected requests never hit
+  the DB or OpenAI. See `RateLimiting/ChatRateLimiter.cs`.
+
+- **`auth`** — per-caller-IP bucket keyed on
+  `Connection.RemoteIpAddress`. Applied per-action to the four
+  parent auth / account-sensitive endpoints:
+  `POST /api/parents/register`, `POST /api/parents/login`,
+  `POST /api/parents/password`, `DELETE /api/parents/account`.
+  Defaults: `RateLimiting:Auth:PermitLimit = 10`,
+  `RateLimiting:Auth:WindowSeconds = 60` (tighter than chat —
+  these are authentication actions, not a per-utterance pipeline).
+  See `RateLimiting/AuthRateLimiter.cs`.
+
+**Invariants (do not regress)**:
+- The two policies are **separate buckets** — do not merge, do not
+  let chat traffic consume the auth quota or vice versa.
+- The `auth` policy keys on `Connection.RemoteIpAddress` only.
+  **`X-Forwarded-For` is attacker-controlled today** — the repo does
+  not configure `ForwardedHeaders` middleware. Proxy-aware keying
+  is a deploy-slice concern: enabling it requires the operator to
+  wire `ForwardedHeaders` with an explicit trusted-proxy list
+  before the limiter's key is changed. A regression test
+  (`AuthRateLimiterTests.PolicyFactory_IgnoresXForwardedForHeader_InThisSlice`)
+  pins this contract.
+- Do not apply `[EnableRateLimiting("auth")]` to read-only parent
+  endpoints (device listings, conversation reads, audit history,
+  export) or to control endpoints that are already JWT-gated
+  behind a parent session (pause/resume, bedtime, mode flags,
+  link/unlink, delete-child, delete-conversation). They are not
+  brute-force surfaces. Tests pin the non-applied set.
+- Same no-high-cardinality invariant from AppMeter applies to this
+  counter: do not add a `policy` tag, an `ip` tag, or any per-caller
+  tag on `aat_rate_limit_rejected_total`.
+
 ## Structured console logging
 
 Console output is JSON, produced by the built-in
@@ -598,7 +643,7 @@ interface without adding that credential.
 | `aat_chat_openai_retry_total` | — | — | `OpenAIReliabilityGate` (before each retry attempt) |
 | `aat_chat_openai_circuit_trip_total` | — | — | `OpenAIReliabilityGate` on each closed→open transition |
 | `aat_chat_openai_circuit_short_circuit_total` | — | — | `OpenAIReliabilityGate` on each fail-fast while open |
-| `aat_rate_limit_rejected_total` | — | — | `ChatRateLimiter` `OnRejected` handler in `Program.cs` |
+| `aat_rate_limit_rejected_total` | — | — | Shared `OnRejected` handler in `Program.cs` for both `ChatRateLimiter` and `AuthRateLimiter` policies |
 | `aat_health_probe_total` | `result` | `ok` / `unhealthy` | `GET /api/health` endpoint lambda |
 | `aat_audit_events_written_total` | `event_type` | enum names of `AuditEventType` | `ParentService.TrackAndAddAudit` helper on every successful `AuditEvent` write |
 

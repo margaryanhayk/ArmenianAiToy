@@ -120,17 +120,32 @@ var chatPermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Chat:Pe
     ?? ChatRateLimiter.DefaultPermitLimit;
 var chatWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:Chat:WindowSeconds")
     ?? ChatRateLimiter.DefaultWindowSeconds;
+// Per-caller-IP rate limit for parent auth / account-sensitive endpoints
+// (register / login / password / delete-account). Separate policy from chat
+// so the two buckets don't share quota. See AuthRateLimiter for the keying
+// rationale and the explicit note on ForwardedHeaders middleware being a
+// deploy-slice concern, not this slice's job.
+var authPermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Auth:PermitLimit")
+    ?? AuthRateLimiter.DefaultPermitLimit;
+var authWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:Auth:WindowSeconds")
+    ?? AuthRateLimiter.DefaultWindowSeconds;
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddPolicy(ChatRateLimiter.PolicyName, ctx =>
         ChatRateLimiter.PolicyFactory(ctx, chatPermitLimit, chatWindowSeconds));
+    options.AddPolicy(AuthRateLimiter.PolicyName, ctx =>
+        AuthRateLimiter.PolicyFactory(ctx, authPermitLimit, authWindowSeconds));
     options.OnRejected = async (context, cancellationToken) =>
     {
         // Count the rejection before mutating the response — if writing
         // the body fails for any reason, the metric still reflects the
-        // fact that the limiter tripped. No tags: device_id would be
-        // high-cardinality, which the AppMeter contract forbids.
+        // fact that the limiter tripped. Shared counter across both
+        // policies (chat + auth); no policy tag, because adding one
+        // would duplicate the signal that policy-specific logs already
+        // carry and would not meet the bounded-cardinality bar the
+        // AppMeter contract documents. No device_id / ip tag for the
+        // same reason.
         AppMeter.RateLimitRejected.Add(1);
         context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
         if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))

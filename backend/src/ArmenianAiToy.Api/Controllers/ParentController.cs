@@ -1,8 +1,10 @@
+using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace ArmenianAiToy.Api.Controllers;
@@ -27,9 +29,11 @@ public class ParentController : ControllerBase
     /// Register a new parent account.
     /// </summary>
     [HttpPost("register")]
+    [EnableRateLimiting(AuthRateLimiter.PolicyName)]
     [ProducesResponseType(201)]
     [ProducesResponseType(400)]
     [ProducesResponseType(409)]
+    [ProducesResponseType(429)]
     public async Task<IActionResult> Register([FromBody] ParentRegisterRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
@@ -62,8 +66,10 @@ public class ParentController : ControllerBase
     /// Log in and receive a JWT token.
     /// </summary>
     [HttpPost("login")]
+    [EnableRateLimiting(AuthRateLimiter.PolicyName)]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
+    [ProducesResponseType(429)]
     public async Task<IActionResult> Login([FromBody] ParentLoginRequest request)
     {
         var result = await _parentService.LoginAsync(request.Email, request.Password);
@@ -80,9 +86,11 @@ public class ParentController : ControllerBase
     /// </summary>
     [HttpPost("password")]
     [Authorize]
+    [EnableRateLimiting(AuthRateLimiter.PolicyName)]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]
+    [ProducesResponseType(429)]
     public async Task<IActionResult> ChangePassword([FromBody] ParentChangePasswordRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.CurrentPassword) ||
@@ -155,9 +163,11 @@ public class ParentController : ControllerBase
     /// </summary>
     [HttpDelete("account")]
     [Authorize]
+    [EnableRateLimiting(AuthRateLimiter.PolicyName)]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]
+    [ProducesResponseType(429)]
     public async Task<IActionResult> DeleteAccount([FromBody] ParentDeleteAccountRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.CurrentPassword))
