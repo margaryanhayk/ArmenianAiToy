@@ -64,6 +64,16 @@ public static class DependencyInjection
         // send with a broken transport. See CLAUDE.md § Password reset
         // / § Notification transport.
         var notifierImpl = NotifierTransport.ResolveImplementation(config);
+
+        // Dormancy-warn transport precondition. If the warn-only pass
+        // is enabled, the notifier MUST be SMTP — LoggingNotifier
+        // always returns "delivered" to the worker without ever
+        // reaching real parents, which would silently advance
+        // DormancyWarnedAt on every tick. Fail-fast at DI-time rather
+        // than at first-tick time so a misconfigured environment
+        // cannot start.
+        DormancyTransportPrecondition.Enforce(config, notifierImpl);
+
         services.AddScoped(typeof(INotifier), notifierImpl);
 
         // Per-parent cooldown guard for the data-export endpoint.

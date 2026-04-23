@@ -40,4 +40,24 @@ public sealed class LoggingNotifier : INotifier
             false);
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Log-only implementation of the dormancy warning — always
+    /// "delivered" to the log, never throws, so the worker will stamp
+    /// and audit on every call. This is why the DI-time precondition
+    /// rejects <c>WarnAfterDays &gt; 0</c> paired with log transport:
+    /// LoggingNotifier returning <c>true</c> with no actual email
+    /// delivery would let the worker mark parents as warned without
+    /// reaching them.
+    /// </summary>
+    public Task<bool> SendDormancyWarningAsync(
+        string email, DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Notification send-attempt: type={NotificationType}, email={Email}, delivered={Delivered}",
+            "dormancy_warning",
+            email,
+            false);
+        return Task.FromResult(true);
+    }
 }

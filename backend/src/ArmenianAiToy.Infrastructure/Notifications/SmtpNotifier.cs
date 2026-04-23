@@ -138,6 +138,81 @@ public sealed class SmtpNotifier : INotifier
         }
     }
 
+    /// <summary>
+    /// Dormant-account warning email to a parent whose
+    /// <c>LastLoginAt</c> is past the configured threshold. Returns
+    /// <c>true</c> on successful delivery, <c>false</c> on a
+    /// swallowed send failure — the calling worker uses this bool to
+    /// decide whether to stamp <c>DormancyWarnedAt</c> and write an
+    /// audit row. Deliberately different from
+    /// <see cref="SendPasswordResetAsync"/>'s fire-and-log-only
+    /// behavior because the dormancy caller owns retry semantics and
+    /// needs the outcome.
+    /// <para>
+    /// <paramref name="deleteAtUtc"/> is unused by this slice (warn-
+    /// only); the outgoing copy never references an imminent delete
+    /// date. The parameter is carried on the interface so the later
+    /// delete-action slice can populate it without a signature change.
+    /// </para>
+    /// <para>
+    /// Same Armenian-first plain-text shape as the reset email and
+    /// the same no-secret-logging discipline — only the recipient
+    /// address, the notification type, the transport, the
+    /// delivered-bool, and (on failure) the exception type name land
+    /// in the log.
+    /// </para>
+    /// </summary>
+    public async Task<bool> SendDormancyWarningAsync(
+        string email, DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
+    {
+        // deleteAtUtc is intentionally ignored in this slice. Reserved
+        // parameter for the future delete-action slice — keeping the
+        // method signature stable now means that later slice is a
+        // body-only change.
+        _ = deleteAtUtc;
+
+        var fromAddress = _config["Notifications:Smtp:FromAddress"] ?? "";
+
+        using var message = new MailMessage
+        {
+            From = new MailAddress(fromAddress),
+            Subject = "Ձեր հաշիվը երկար ժամանակ անգործուն է",
+            Body = BuildDormancyWarningBody(),
+            BodyEncoding = Encoding.UTF8,
+            SubjectEncoding = Encoding.UTF8,
+            IsBodyHtml = false
+        };
+        message.To.Add(email);
+
+        try
+        {
+            await _sendMail(message, cancellationToken);
+            _logger.LogInformation(
+                "Notification send-attempt: type={NotificationType}, email={Email}, transport={Transport}, delivered={Delivered}",
+                "dormancy_warning", email, "smtp", true);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            // Worker cancellation propagates — lets the hosted service
+            // shut down cleanly rather than continuing a zombie send.
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Swallow the exception, log a structured warning, and
+            // signal "not delivered" back to the worker. The worker
+            // will skip the DormancyWarnedAt stamp and the audit row,
+            // so the next tick retries this parent. Exception type is
+            // the only "what broke" signal in the log template; full
+            // stack trace travels as the LogWarning first argument.
+            _logger.LogWarning(ex,
+                "Notification send-attempt: type={NotificationType}, email={Email}, transport={Transport}, delivered={Delivered}, error_category={ErrorCategory}",
+                "dormancy_warning", email, "smtp", false, ex.GetType().Name);
+            return false;
+        }
+    }
+
     // Default wire call. Pulls credentials / host / port off
     // IConfiguration on every send so a config reload (via a restart)
     // is picked up without recycling the singleton. Scoped registration
@@ -191,5 +266,19 @@ public sealed class SmtpNotifier : INotifier
             "Այս հղումը վավեր է սահմանափակ ժամանակ։",
             "Եթե Դուք այս խնդրանքը չեք արել, անտեսեք այս նամակը։",
             resetLink);
+    }
+
+    private static string BuildDormancyWarningBody()
+    {
+        // Eastern Armenian, warm but neutral. No urgency, no scary
+        // "your account will be deleted" copy — this slice is
+        // warn-only and the delete action does not yet exist. Tells
+        // the parent what happened (account unused for a while),
+        // what to do (log in), and where (the parent dashboard).
+        // Matches the Armenian-first product posture.
+        return string.Join("\n\n",
+            "Ձեր հաշիվը վերջերս չի օգտագործվել։",
+            "Եթե դեռ ցանկանում եք պահպանել Ձեր հաշիվը և տվյալները, խնդրում ենք կրկին մուտք գործել։",
+            "Եթե Դուք այլևս չեք օգտագործում այս հաշիվը, այս նամակը կարող եք անտեսել։");
     }
 }

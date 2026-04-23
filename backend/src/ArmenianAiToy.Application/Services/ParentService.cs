@@ -76,6 +76,9 @@ public class ParentService : IParentService
         public Task SendPasswordResetAsync(
             string email, string resetToken, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+        public Task<bool> SendDormancyWarningAsync(
+            string email, DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
     }
 
     /// <summary>

@@ -1,3 +1,4 @@
+using ArmenianAiToy.Application.Notifications;
 using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Infrastructure.Data;
@@ -72,6 +73,26 @@ public sealed class RetentionPurgeService : BackgroundService
     /// clock skew and a few worker-tick miss-cycles.
     /// </summary>
     public const int DefaultPasswordResetGracePeriodHours = 24;
+
+    /// <summary>
+    /// Fallback value for <c>Dormancy:Parent:WarnAfterDays</c> when the
+    /// key is missing or unparseable. <b>0 (disabled)</b> — unlike the
+    /// conversation-purge path, the warn-only pass has an external
+    /// dependency (SMTP) and requires an explicit operator opt-in. The
+    /// recommended production value when enabling is 180 days (see
+    /// CLAUDE.md § Retention). The shipped <c>appsettings.json</c>
+    /// carries 0 so a fresh <c>dotnet run</c> does not trigger the
+    /// transport precondition before SMTP is configured.
+    /// </summary>
+    public const int DefaultDormancyWarnAfterDays = 0;
+
+    /// <summary>
+    /// Fallback for <c>Dormancy:Parent:WarnRefireIntervalDays</c>. A
+    /// parent already warned within this window is not warned again
+    /// on subsequent ticks. Minimum 1 day; the config reader
+    /// floor-clamps.
+    /// </summary>
+    public const int DefaultDormancyRefireIntervalDays = 30;
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IConfiguration _config;
@@ -166,6 +187,7 @@ public sealed class RetentionPurgeService : BackgroundService
 
         await PurgeExpiredConversationsAsync(db, maxAgeDays, stoppingToken);
         await PurgeStalePasswordResetTokensAsync(db, stoppingToken);
+        await WarnDormantParentsAsync(scope.ServiceProvider, db, stoppingToken);
     }
 
     private async Task PurgeExpiredConversationsAsync(
@@ -264,6 +286,114 @@ public sealed class RetentionPurgeService : BackgroundService
     /// worker process.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Warn-only dormant-parent pass. Finds parents whose
+    /// <see cref="Parent.LastLoginAt"/> is past the configured
+    /// threshold and that either have never been warned or were last
+    /// warned before the refire interval, sends a warning email via
+    /// the configured <see cref="INotifier"/>, and — on successful
+    /// delivery only — stamps <see cref="Parent.DormancyWarnedAt"/>
+    /// and writes one <see cref="Domain.Enums.AuditEventType.ParentDormancyWarned"/>
+    /// audit row.
+    /// <para>
+    /// <b>Non-destructive by design.</b> No deletes, no disables, no
+    /// unlinks, no cascades. A failed notifier call (bool <c>false</c>)
+    /// leaves the parent row untouched so the next tick retries; the
+    /// audit row is NOT written on failure, preserving the "audit
+    /// reflects what actually happened" invariant.
+    /// </para>
+    /// <para>
+    /// <b>Null <c>LastLoginAt</c> parents are excluded entirely</b> —
+    /// the column was introduced recently and pre-migration rows
+    /// carry null; thresholding them would warn accounts the repo has
+    /// no activity signal on, which is not a safe default. Those
+    /// parents enter the dormant set only once they log in at least
+    /// once under the current schema.
+    /// </para>
+    /// </summary>
+    private async Task WarnDormantParentsAsync(
+        IServiceProvider scopedProvider, AppDbContext db, CancellationToken stoppingToken)
+    {
+        var warnAfterDays = ReadDormancyWarnAfterDays();
+        if (warnAfterDays <= 0)
+        {
+            // Disabled. Silently skip — no log spam per tick. The
+            // outer MaxAgeDays<=0 disable gate already logged a
+            // once-per-tick "worker disabled" line.
+            return;
+        }
+        var refireIntervalDays = ReadDormancyRefireIntervalDays();
+        var nowUtc = DateTime.UtcNow;
+        var dormantCutoff = nowUtc - TimeSpan.FromDays(warnAfterDays);
+        var refireCutoff = nowUtc - TimeSpan.FromDays(refireIntervalDays);
+
+        // Eligibility: signal exists, past threshold, not already
+        // warned inside the refire window. The explicit `!= null`
+        // guard makes the SQL translator emit `IS NOT NULL` rather
+        // than relying on null-comparison semantics.
+        var eligible = await db.Set<Parent>()
+            .Where(p =>
+                p.LastLoginAt != null
+                && p.LastLoginAt < dormantCutoff
+                && (p.DormancyWarnedAt == null || p.DormancyWarnedAt < refireCutoff))
+            .ToListAsync(stoppingToken);
+
+        if (eligible.Count == 0)
+            return;
+
+        var notifier = scopedProvider.GetRequiredService<INotifier>();
+        int warned = 0;
+        foreach (var parent in eligible)
+        {
+            bool delivered;
+            try
+            {
+                delivered = await notifier.SendDormancyWarningAsync(
+                    parent.Email, deleteAtUtc: null, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Worker is shutting down. Let the cancellation bubble
+                // up; the outer ExecuteAsync catches it and exits
+                // cleanly.
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Defensive: the SmtpNotifier already swallows non-OCE
+                // exceptions and returns false, but a future notifier
+                // impl might not. Treat an unexpected throw as "not
+                // delivered" so we do not stamp or audit a send that
+                // did not happen.
+                _logger.LogWarning(ex,
+                    "RetentionPurgeService warn pass: notifier threw unexpectedly for Parent {ParentId}; treating as not delivered.",
+                    parent.Id);
+                delivered = false;
+            }
+
+            if (!delivered)
+                continue;
+
+            parent.DormancyWarnedAt = nowUtc;
+            var audit = AuditEvent.ParentDormancyWarned(
+                lastLoginAtUtc: parent.LastLoginAt!.Value,
+                warnThresholdDays: warnAfterDays,
+                refireIntervalDays: refireIntervalDays);
+            db.Set<AuditEvent>().Add(audit);
+            AppMeter.AuditEventsWritten.Add(1,
+                new KeyValuePair<string, object?>("event_type", audit.EventType.ToString()));
+            warned++;
+        }
+
+        if (warned > 0)
+        {
+            await db.SaveChangesAsync(stoppingToken);
+            _logger.LogInformation(
+                "RetentionPurgeService tick: sent dormancy warnings to {Warned} parent(s) (threshold={WarnAfterDays}d, refire={RefireIntervalDays}d).",
+                warned, warnAfterDays, refireIntervalDays);
+        }
+    }
+
     private async Task PurgeStalePasswordResetTokensAsync(
         AppDbContext db, CancellationToken stoppingToken)
     {
@@ -322,6 +452,27 @@ public sealed class RetentionPurgeService : BackgroundService
             _config["Retention:PasswordResetTokens:GracePeriodHours"],
             DefaultPasswordResetGracePeriodHours);
         return raw < 0 ? 0 : raw;
+    }
+
+    // Dormancy:Parent:WarnAfterDays — fallback 0 (disabled). Deliberately
+    // different from MaxAgeDays' "default is the shipped production
+    // value" story because the warn pass has an external dependency
+    // (SMTP) that requires explicit operator opt-in. Missing key =
+    // disabled; explicit 0 = disabled; explicit positive = enabled
+    // (and the startup precondition enforces SMTP).
+    private int ReadDormancyWarnAfterDays()
+        => ParseIntOrDefault(
+            _config["Dormancy:Parent:WarnAfterDays"], DefaultDormancyWarnAfterDays);
+
+    // Dormancy:Parent:WarnRefireIntervalDays — fallback 30 days.
+    // Floor-clamped to 1 so a pathological 0/-5 override does not
+    // turn the pass into a re-warn-every-tick storm.
+    private int ReadDormancyRefireIntervalDays()
+    {
+        var raw = ParseIntOrDefault(
+            _config["Dormancy:Parent:WarnRefireIntervalDays"],
+            DefaultDormancyRefireIntervalDays);
+        return raw < 1 ? 1 : raw;
     }
 
     private static int ParseIntOrDefault(string? raw, int fallback)

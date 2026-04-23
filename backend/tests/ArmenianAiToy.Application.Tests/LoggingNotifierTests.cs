@@ -34,4 +34,22 @@ public class LoggingNotifierTests
             }
         }
     }
+
+    [Fact]
+    public async Task SendDormancyWarningAsync_ReturnsTrue()
+    {
+        // LoggingNotifier is the "no-op" implementation for dormancy
+        // warnings — it always returns true so any worker consumer
+        // with a log-only transport would naively mark every parent
+        // as warned. The DormancyTransportPrecondition at DI-time is
+        // what prevents that pairing from running in practice; this
+        // test just pins the notifier's own contract.
+        var logger = Substitute.For<ILogger<LoggingNotifier>>();
+        var notifier = new LoggingNotifier(logger);
+
+        var result = await notifier.SendDormancyWarningAsync(
+            "owner@example.com", deleteAtUtc: null);
+
+        Assert.True(result);
+    }
 }

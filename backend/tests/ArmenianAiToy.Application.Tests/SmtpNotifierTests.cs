@@ -177,6 +177,106 @@ public class SmtpNotifierTests
             () => notifier.SendPasswordResetAsync("parent@example.com", "t"));
     }
 
+    // --- Dormancy warning (worker consumer, returns bool) ---
+
+    [Fact]
+    public async Task SendDormancyWarningAsync_Success_ReturnsTrueAndComposesMessage()
+    {
+        // Captures the MailMessage. Pins: recipient, from address,
+        // non-empty Armenian subject, plain-text body. The body
+        // deliberately does NOT contain `deleteAtUtc` copy in this
+        // slice — it is warn-only.
+        MailMessage? captured = null;
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (msg, _) =>
+            {
+                captured = msg;
+                return Task.CompletedTask;
+            });
+
+        var delivered = await notifier.SendDormancyWarningAsync(
+            "parent@example.com", deleteAtUtc: null);
+
+        Assert.True(delivered);
+        Assert.NotNull(captured);
+        Assert.Equal("noreply@example.com", captured!.From!.Address);
+        Assert.Single(captured.To);
+        Assert.Equal("parent@example.com", captured.To[0].Address);
+        Assert.False(string.IsNullOrWhiteSpace(captured.Subject));
+        Assert.False(captured.IsBodyHtml);
+        Assert.False(string.IsNullOrWhiteSpace(captured.Body));
+    }
+
+    [Fact]
+    public async Task SendDormancyWarningAsync_SmtpSendThrows_ReturnsFalseAndDoesNotPropagate()
+    {
+        // The bool return is load-bearing for the worker: `false`
+        // means "do NOT stamp DormancyWarnedAt, do NOT write audit,
+        // retry next tick." A regression that either propagated the
+        // exception OR returned true on failure would silently
+        // advance the stamp / emit phantom audit rows for sends that
+        // never reached the parent.
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (_, _) => throw new SmtpException("relay broken"));
+
+        var delivered = await notifier.SendDormancyWarningAsync(
+            "parent@example.com", deleteAtUtc: null);
+
+        Assert.False(delivered);
+        // Failure emits a Warning log — pinned so a future refactor
+        // that accidentally silenced the breadcrumb would fail.
+        logger.Received().Log(
+            LogLevel.Warning,
+            Arg.Any<EventId>(),
+            Arg.Any<object>(),
+            Arg.Any<Exception>(),
+            Arg.Any<Func<object, Exception?, string>>());
+    }
+
+    [Fact]
+    public async Task SendDormancyWarningAsync_OperationCanceled_DoesPropagate()
+    {
+        // Cancellation is the worker shutting down, not an SMTP
+        // failure. It must propagate so ExecuteAsync can exit cleanly
+        // rather than continuing a zombie tick.
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (_, _) => throw new OperationCanceledException());
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            notifier.SendDormancyWarningAsync("parent@example.com", null));
+    }
+
+    [Fact]
+    public async Task SendDormancyWarningAsync_DeleteAtUtcParam_IsIgnoredInWarnOnlySlice()
+    {
+        // The method accepts a nullable deleteAtUtc so the next slice
+        // (delete action) is a body-only change. In THIS slice, the
+        // value must never leak into the outgoing message — the copy
+        // is warn-only, and a caller passing a non-null deleteAtUtc
+        // (e.g. during integration testing before that slice ships)
+        // must not produce scary "your account will be deleted on X"
+        // copy in the body.
+        MailMessage? captured = null;
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (msg, _) => { captured = msg; return Task.CompletedTask; });
+
+        var futureDeleteDate = new DateTime(2099, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        await notifier.SendDormancyWarningAsync(
+            "parent@example.com", deleteAtUtc: futureDeleteDate);
+
+        Assert.NotNull(captured);
+        Assert.DoesNotContain("2099", captured!.Body);
+        Assert.DoesNotContain(futureDeleteDate.ToString("O"), captured.Body);
+    }
+
     [Fact]
     public async Task SendPasswordResetAsync_Success_LogsDeliveredTrue()
     {

@@ -44,13 +44,24 @@ public class RetentionPurgeServiceTests
         int? maxAgeDays = null,
         int? maxBatchSize = null,
         int? runIntervalMinutes = null,
-        int? passwordResetGracePeriodHours = null)
+        int? passwordResetGracePeriodHours = null,
+        int? dormancyWarnAfterDays = null,
+        int? dormancyWarnRefireIntervalDays = null,
+        ArmenianAiToy.Application.Notifications.INotifier? notifier = null)
     {
         var conn = new SqliteConnection("Data Source=:memory:");
         await conn.OpenAsync();
 
         var services = new ServiceCollection();
         services.AddDbContext<AppDbContext>(options => options.UseSqlite(conn));
+
+        // The warn-only dormancy pass resolves INotifier from the
+        // per-tick scope. Register a test double when the caller
+        // wants to exercise the warn path; otherwise register a
+        // no-op so existing tests that only drive the conversation /
+        // token passes keep working without touching INotifier.
+        services.AddScoped<ArmenianAiToy.Application.Notifications.INotifier>(
+            _ => notifier ?? new NoOpNotifier());
 
         var configDict = new Dictionary<string, string?>();
         if (maxAgeDays is not null)
@@ -62,6 +73,12 @@ public class RetentionPurgeServiceTests
         if (passwordResetGracePeriodHours is not null)
             configDict["Retention:PasswordResetTokens:GracePeriodHours"]
                 = passwordResetGracePeriodHours.Value.ToString();
+        if (dormancyWarnAfterDays is not null)
+            configDict["Dormancy:Parent:WarnAfterDays"]
+                = dormancyWarnAfterDays.Value.ToString();
+        if (dormancyWarnRefireIntervalDays is not null)
+            configDict["Dormancy:Parent:WarnRefireIntervalDays"]
+                = dormancyWarnRefireIntervalDays.Value.ToString();
         IConfiguration config = new ConfigurationBuilder()
             .AddInMemoryCollection(configDict)
             .Build();
@@ -699,5 +716,241 @@ public class RetentionPurgeServiceTests
         // with respect to any retention-worker writes.
         var audits = await h.Db.Set<AuditEvent>().AsNoTracking().ToListAsync();
         Assert.Empty(audits);
+    }
+
+    // --- Warn-only dormant-parent pass -------------------------------
+
+    // Test notifier: captures the bool return the worker sees, plus
+    // the email addresses dispatched to. No real email, no throws —
+    // the warn pass must not care whether the notifier went to SMTP
+    // or memory, only whether the bool says "delivered."
+    private sealed class CapturingNotifier : ArmenianAiToy.Application.Notifications.INotifier
+    {
+        public List<string> SentEmails { get; } = new();
+        public bool DeliverResult { get; set; } = true;
+
+        public Task SendPasswordResetAsync(
+            string email, string resetToken, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task<bool> SendDormancyWarningAsync(
+            string email, DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
+        {
+            SentEmails.Add(email);
+            return Task.FromResult(DeliverResult);
+        }
+    }
+
+    private sealed class NoOpNotifier : ArmenianAiToy.Application.Notifications.INotifier
+    {
+        public Task SendPasswordResetAsync(
+            string email, string resetToken, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+        public Task<bool> SendDormancyWarningAsync(
+            string email, DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
+    }
+
+    private static Guid SeedParent(
+        AppDbContext db,
+        DateTime? lastLoginAt,
+        DateTime? dormancyWarnedAt = null)
+    {
+        var id = Guid.NewGuid();
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = id,
+            Email = $"p-{id:N}@example.com",
+            PasswordHash = "x",
+            RegisteredAt = DateTime.UtcNow.AddDays(-400),
+            LastLoginAt = lastLoginAt,
+            DormancyWarnedAt = dormancyWarnedAt
+        });
+        return id;
+    }
+
+    [Fact]
+    public async Task WarnPass_EligibleParent_IsWarnedStampedAndAudited()
+    {
+        // Eligible: LastLoginAt 200 days ago, threshold 180, never
+        // warned before. One warn, one stamp, one audit row.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180, notifier: notifier);
+        var parentId = SeedParent(h.Db, lastLoginAt: DateTime.UtcNow.AddDays(-200));
+        await h.Db.SaveChangesAsync();
+        var before = DateTime.UtcNow;
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        var row = await h.Db.Set<Parent>().AsNoTracking().FirstAsync(p => p.Id == parentId);
+        Assert.NotNull(row.DormancyWarnedAt);
+        Assert.InRange(row.DormancyWarnedAt!.Value, before, DateTime.UtcNow);
+        Assert.Single(notifier.SentEmails);
+        Assert.Equal(row.Email, notifier.SentEmails[0]);
+
+        var audits = await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.ParentDormancyWarned)
+            .ToListAsync();
+        var audit = Assert.Single(audits);
+        Assert.Null(audit.ActorParentId);         // system actor invariant
+        Assert.Null(audit.TargetDeviceId);
+        Assert.Null(audit.TargetChildId);
+        Assert.NotNull(audit.Metadata);
+        var metaNode = JsonNode.Parse(audit.Metadata!);
+        Assert.NotNull(metaNode);
+        Assert.Equal(180, (int)metaNode!["warn_threshold_days"]!);
+        Assert.Equal(30, (int)metaNode["refire_interval_days"]!);
+        // Metadata must not contain email / parent id.
+        Assert.DoesNotContain(row.Email, audit.Metadata!);
+        Assert.DoesNotContain(parentId.ToString(), audit.Metadata!);
+    }
+
+    [Fact]
+    public async Task WarnPass_NullLastLoginAt_ParentIsExcluded()
+    {
+        // Pre-migration parents have LastLoginAt=null. Warning them
+        // would threshold on a non-signal. Pin that they are NEVER
+        // in the eligible set.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180, notifier: notifier);
+        var parentId = SeedParent(h.Db, lastLoginAt: null);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Empty(notifier.SentEmails);
+        var row = await h.Db.Set<Parent>().AsNoTracking().FirstAsync(p => p.Id == parentId);
+        Assert.Null(row.DormancyWarnedAt);
+        Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.ParentDormancyWarned).ToListAsync());
+    }
+
+    [Fact]
+    public async Task WarnPass_RecentlyActiveParent_IsNotWarned()
+    {
+        // LastLoginAt 30 days ago, threshold 180. Not eligible.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180, notifier: notifier);
+        SeedParent(h.Db, lastLoginAt: DateTime.UtcNow.AddDays(-30));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Empty(notifier.SentEmails);
+    }
+
+    [Fact]
+    public async Task WarnPass_AlreadyWarnedInsideRefireInterval_IsNotWarnedAgain()
+    {
+        // Parent is dormant (LastLoginAt 200d ago, threshold 180) but
+        // was warned 10 days ago — inside the 30d refire window. Must
+        // NOT be re-warned on this tick.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180,
+            dormancyWarnRefireIntervalDays: 30,
+            notifier: notifier);
+        SeedParent(h.Db,
+            lastLoginAt: DateTime.UtcNow.AddDays(-200),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-10));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Empty(notifier.SentEmails);
+    }
+
+    [Fact]
+    public async Task WarnPass_AlreadyWarnedOutsideRefireInterval_IsWarnedAgain()
+    {
+        // Parent was warned 40 days ago — outside the 30d refire
+        // window. Eligible for a re-warn. DormancyWarnedAt must
+        // advance to the new tick's timestamp.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180,
+            dormancyWarnRefireIntervalDays: 30,
+            notifier: notifier);
+        var oldStamp = DateTime.UtcNow.AddDays(-40);
+        var parentId = SeedParent(h.Db,
+            lastLoginAt: DateTime.UtcNow.AddDays(-200),
+            dormancyWarnedAt: oldStamp);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Single(notifier.SentEmails);
+        var row = await h.Db.Set<Parent>().AsNoTracking().FirstAsync(p => p.Id == parentId);
+        Assert.NotNull(row.DormancyWarnedAt);
+        Assert.True(row.DormancyWarnedAt > oldStamp,
+            "DormancyWarnedAt must advance on a re-warn, not stay at the old value.");
+    }
+
+    [Fact]
+    public async Task WarnPass_NotifierReturnsFalse_NoStampNoAudit()
+    {
+        // Notifier signals "not delivered" — SmtpNotifier does this
+        // on a swallowed SMTP failure. The worker must NOT stamp the
+        // parent row and MUST NOT write an audit row; next tick
+        // retries from scratch.
+        var notifier = new CapturingNotifier { DeliverResult = false };
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180, notifier: notifier);
+        var parentId = SeedParent(h.Db, lastLoginAt: DateTime.UtcNow.AddDays(-200));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Single(notifier.SentEmails); // attempt was made
+        var row = await h.Db.Set<Parent>().AsNoTracking().FirstAsync(p => p.Id == parentId);
+        Assert.Null(row.DormancyWarnedAt);
+        Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.ParentDormancyWarned).ToListAsync());
+    }
+
+    [Fact]
+    public async Task WarnPass_DisabledByDefault_DoesNotWarnAnyone()
+    {
+        // No dormancyWarnAfterDays set — falls back to 0 (disabled).
+        // The pass must skip eligibility entirely even though a
+        // clearly-dormant parent is sitting in the DB.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(notifier: notifier);
+        SeedParent(h.Db, lastLoginAt: DateTime.UtcNow.AddDays(-400));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Empty(notifier.SentEmails);
+    }
+
+    [Fact]
+    public async Task WarnPass_SystemActorAuditRow_IsInvisibleToParentReadSurfaces()
+    {
+        // Pins the ActorParentId==null contract's read-surface
+        // consequence: a parent's audit-read query filtered by
+        // ActorParentId==parentId returns zero rows even though a
+        // ParentDormancyWarned row for that parent exists.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180, notifier: notifier);
+        var parentId = SeedParent(h.Db, lastLoginAt: DateTime.UtcNow.AddDays(-200));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        // System-actor row exists...
+        var systemAudits = await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.ParentDormancyWarned).ToListAsync();
+        Assert.Single(systemAudits);
+
+        // ...but the parent-scoped read filter returns nothing.
+        var parentAudits = await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.ActorParentId == parentId)
+            .ToListAsync();
+        Assert.Empty(parentAudits);
     }
 }

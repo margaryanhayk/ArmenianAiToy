@@ -301,4 +301,46 @@ public class AuditEvent
         EventType = AuditEventType.ParentPasswordResetCompleted,
         ActorParentId = parentId
     };
+
+    /// <summary>
+    /// Emitted by the scheduled dormant-parent warn pass on every
+    /// successful notifier delivery (one row per warned parent). A
+    /// notifier-side swallowed failure writes NO row — the next tick
+    /// retries.
+    /// <para>
+    /// <b>System-actor event.</b> <see cref="ActorParentId"/> is
+    /// deliberately <c>null</c> — the worker, not the parent, is the
+    /// actor. That null is also what keeps this event out of every
+    /// parent-facing read surface (<c>GET /api/parents/audit</c> and
+    /// the parent-scoped audit slice of <c>GET /api/parents/export</c>
+    /// both filter <c>ActorParentId == parentId</c>). Same
+    /// invisibility contract as <see cref="ConversationsPurgedByRetention"/>.
+    /// </para>
+    /// <para>
+    /// Metadata is counts-only / operational — last-login timestamp,
+    /// the effective warn threshold, and the refire interval in use
+    /// at send time. <b>No email, no parent identifier, no PII.</b>
+    /// The audit row is a "something happened" signal with operational
+    /// context; per-parent reconstruction (if ever needed) is done by
+    /// querying <c>Parents</c> filtered by <c>DormancyWarnedAt</c>.
+    /// </para>
+    /// </summary>
+    public static AuditEvent ParentDormancyWarned(
+        DateTime lastLoginAtUtc,
+        int warnThresholdDays,
+        int refireIntervalDays) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDormancyWarned,
+        ActorParentId = null,
+        TargetDeviceId = null,
+        TargetChildId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            last_login_at_utc = lastLoginAtUtc,
+            warn_threshold_days = warnThresholdDays,
+            refire_interval_days = refireIntervalDays
+        })
+    };
 }

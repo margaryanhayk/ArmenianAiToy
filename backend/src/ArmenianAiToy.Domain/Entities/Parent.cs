@@ -40,5 +40,23 @@ public class Parent
     /// </summary>
     public DateTime? LastLoginAt { get; set; }
 
+    /// <summary>
+    /// Timestamp of the most recent dormant-account warning email
+    /// dispatched to this parent by the scheduled warn pass. Null for
+    /// parents who have never been warned (the shipped default for
+    /// every row). Stamped only on successful notifier delivery —
+    /// a failed or swallowed send leaves this field untouched so the
+    /// next worker tick retries. See CLAUDE.md § Retention for the
+    /// warn-only eligibility rules and refire interval semantics.
+    /// <para>
+    /// Paired with <see cref="LastLoginAt"/> on the eligibility query:
+    /// a successful login refreshes <c>LastLoginAt</c> and naturally
+    /// removes the parent from the dormant set on the next tick, so
+    /// <c>DormancyWarnedAt</c> becoming stale is harmless — no
+    /// explicit "clear warning" side effect is needed.
+    /// </para>
+    /// </summary>
+    public DateTime? DormancyWarnedAt { get; set; }
+
     public ICollection<ParentDevice> ParentDevices { get; set; } = new List<ParentDevice>();
 }

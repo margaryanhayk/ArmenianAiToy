@@ -46,4 +46,33 @@ public interface INotifier
     /// </summary>
     Task SendPasswordResetAsync(
         string email, string resetToken, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deliver a dormant-account warning email to the supplied parent.
+    /// Called only by the scheduled warn pass in
+    /// <c>RetentionPurgeService</c> on parents whose <c>LastLoginAt</c>
+    /// is past the configured threshold.
+    /// <para>
+    /// <b>Returns</b> <c>true</c> on successful delivery,
+    /// <c>false</c> on a swallowed send failure. The worker uses this
+    /// bool to decide whether to stamp <c>DormancyWarnedAt</c> and
+    /// write the audit row — a <c>false</c> return leaves both
+    /// untouched so the next tick retries. This is a deliberate
+    /// departure from <see cref="SendPasswordResetAsync"/>, which
+    /// returns <c>Task</c> because its HTTP-handler caller must not
+    /// break on an SMTP failure (anti-enumeration 202 contract). The
+    /// worker-consumer here owns retry semantics, so the delivery
+    /// outcome must be observable.
+    /// </para>
+    /// <para>
+    /// <paramref name="deleteAtUtc"/> is nullable because the current
+    /// slice ships warn-only — the delete action is a separate
+    /// future slice. The parameter exists today so the method's
+    /// shape is stable for that slice; implementations may omit or
+    /// parameterise the delete-date reference in the outgoing copy
+    /// when it is null.
+    /// </para>
+    /// </summary>
+    Task<bool> SendDormancyWarningAsync(
+        string email, DateTime? deleteAtUtc, CancellationToken cancellationToken = default);
 }

@@ -14,5 +14,6 @@ public enum AuditEventType
     ConversationsPurgedByRetention,
     ParentConversationDeleted,
     ParentPasswordResetRequested,
-    ParentPasswordResetCompleted
+    ParentPasswordResetCompleted,
+    ParentDormancyWarned
 }
