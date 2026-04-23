@@ -172,7 +172,7 @@ no editing, no deletion, no child-facing features.
 5. Pagination: ← Newer disabled on page 1, Older → disabled on last page, "Page N" label visible.
 6. Bad inputs: `?offset=-1` → 400; `?limit=0` → 400; `?limit=500` → 200 with at most 100 rows.
 7. Log out → returns to login view, token cleared from sessionStorage.
-8. **Your activity**: in the linked-devices view, click "View your activity →". Empty-state copy appears for a freshly-registered parent. After triggering a parental action (pause/resume, bedtime window, mode flags toggle, child delete, etc.), refresh: a row appears with the friendly label (e.g. *Device paused/resumed*), timestamp, resolved device/child name where applicable, and one-line metadata summary. Pagination (← Newer / Older →) disables correctly on first page / short final page. ← Devices returns to the linked-devices view.
+8. **Your activity**: in the linked-devices view, click "View your activity →". Empty-state copy appears for a freshly-registered parent. After triggering a parental action (pause/resume, bedtime window, mode flags toggle, child delete, etc.), refresh: a row appears with the friendly label (e.g. *Device paused/resumed*), timestamp, resolved device/child name where applicable, and one-line metadata summary. Pagination (← Newer / Older →) disables correctly on first page / short final page. ← Devices returns to the linked-devices view. **Every shipped parent-actor event type maps to a friendly label** — no raw CamelCase enum names should appear. Spot-check by exercising: data export (*Data export downloaded*), forgot-password request + completion (*Password reset requested* / *Password reset completed*), email verification (*Email verified*), and Google sign-in (*Signed in with Google*).
 
 ## Audit events
 
