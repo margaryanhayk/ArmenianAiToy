@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<ParentDevice> ParentDevices => Set<ParentDevice>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<ParentPasswordResetToken> ParentPasswordResetTokens => Set<ParentPasswordResetToken>();
+    public DbSet<ParentEmailVerificationToken> ParentEmailVerificationTokens => Set<ParentEmailVerificationToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -91,6 +92,20 @@ public class AppDbContext : DbContext
         // index on TokenHash so the completion endpoint can look up by
         // hash alone.
         modelBuilder.Entity<ParentPasswordResetToken>(e =>
+        {
+            e.HasKey(t => t.Id);
+            e.HasOne(t => t.Parent)
+                .WithMany()
+                .HasForeignKey(t => t.ParentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(t => t.TokenHash).IsUnique();
+            e.HasIndex(t => t.ParentId);
+        });
+
+        // ParentEmailVerificationToken — single-use email-verification
+        // state. Same shape as ParentPasswordResetToken (FK cascade,
+        // unique TokenHash, ParentId index).
+        modelBuilder.Entity<ParentEmailVerificationToken>(e =>
         {
             e.HasKey(t => t.Id);
             e.HasOne(t => t.Parent)

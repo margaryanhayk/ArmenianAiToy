@@ -277,6 +277,8 @@
       <button id="loginBtn">Log in</button>
       <button id="forgotPasswordBtn" class="link" type="button"
               style="margin-left:8px;">Forgot password?</button>
+      <button id="verifyEmailRequestBtn" class="link" type="button"
+              style="margin-left:8px;">Didn't get a verification email?</button>
       <div id="loginStatus" class="status" aria-live="polite"></div>
     </section>
 
@@ -295,6 +297,44 @@
       <button id="resetRequestBackBtn" class="link" type="button"
               style="margin-left:8px;">Back to login</button>
       <div id="resetRequestStatus" class="status" aria-live="polite"></div>
+    </section>
+
+    <!--
+      Email-verification request view. Reached from the
+      "Didn't get a verification email?" affordance on the login view.
+      Anti-enumeration: the backend returns an identical 202 across
+      known-unverified / known-verified / unknown-email paths; this UI
+      shows one neutral success message. Do not branch on the response
+      body.
+    -->
+    <section id="verifyEmailRequestView" class="card" hidden>
+      <h2>Send verification email</h2>
+      <label for="verifyEmailInput">Email</label>
+      <input id="verifyEmailInput" type="email" autocomplete="username">
+      <button id="verifyEmailRequestSubmitBtn">Send verification email</button>
+      <button id="verifyEmailRequestBackBtn" class="link" type="button"
+              style="margin-left:8px;">Back to login</button>
+      <div id="verifyEmailRequestStatus" class="status" aria-live="polite"></div>
+    </section>
+
+    <!--
+      Email-verification complete view. Activated on page load when
+      ?verifyToken=... is present in the URL. The token is captured
+      into a module-scoped variable and immediately stripped from the
+      URL (history.replaceState) so it is not left in browser history /
+      bookmarks / shared URLs — same pattern as the reset-password
+      flow. Backend returns a uniform 400 with a fixed error message
+      for any failure reason; this UI surfaces that message verbatim.
+    -->
+    <section id="verifyEmailCompleteView" class="card" hidden>
+      <h2>Verify your email</h2>
+      <p style="margin:0 0 12px;color:#6b5b8a;font-size:13px;">
+        Click below to confirm your email address.
+      </p>
+      <button id="verifyEmailCompleteBtn">Verify email</button>
+      <button id="verifyEmailCompleteBackBtn" class="link" type="button"
+              style="margin-left:8px;">Back to login</button>
+      <div id="verifyEmailCompleteStatus" class="status" aria-live="polite"></div>
     </section>
 
     <!--
@@ -490,14 +530,18 @@
 
     function show(viewId) {
       var ids = ['loginView', 'resetRequestView', 'resetPasswordView',
+                 'verifyEmailRequestView', 'verifyEmailCompleteView',
                  'devicesView', 'summariesView', 'flaggedView', 'detailView', 'auditView'];
       for (var i = 0; i < ids.length; i++) {
         document.getElementById(ids[i]).hidden = (ids[i] !== viewId);
       }
       // Log-out only makes sense for authenticated, post-login views.
-      // loginView, resetRequestView, and resetPasswordView are all
-      // pre-authentication surfaces.
-      var preAuthViews = { loginView: 1, resetRequestView: 1, resetPasswordView: 1 };
+      // All five pre-auth surfaces hide logoutBtn.
+      var preAuthViews = {
+        loginView: 1,
+        resetRequestView: 1, resetPasswordView: 1,
+        verifyEmailRequestView: 1, verifyEmailCompleteView: 1
+      };
       document.getElementById('logoutBtn').hidden = !!preAuthViews[viewId];
     }
 
@@ -755,6 +799,109 @@
       document.getElementById('resetPasswordConfirmInput').value = '';
       setStatus('resetRequestStatus', '', '');
       setStatus('resetPasswordStatus', '', '');
+      show('loginView');
+    }
+
+    // ---------- email verification (request + complete) -----------
+
+    // Captured from the URL on boot when a verification link is
+    // opened. Same closure-scoped pattern the reset flow uses — the
+    // token never lands in sessionStorage / localStorage / URL after
+    // the initial strip.
+    var pendingVerifyToken = null;
+
+    function showVerifyEmailRequest() {
+      show('verifyEmailRequestView');
+      document.getElementById('verifyEmailInput').value = '';
+      setStatus('verifyEmailRequestStatus', '', '');
+    }
+
+    function submitVerifyEmailRequest() {
+      var email = document.getElementById('verifyEmailInput').value.trim();
+      if (!email) {
+        setStatus('verifyEmailRequestStatus', 'Email is required.', 'err');
+        return;
+      }
+      setStatus('verifyEmailRequestStatus', 'Sending…', 'muted');
+      fetch('/api/parents/verify-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+      }).then(function (res) {
+        // 202 on all three backend branches (known-unverified,
+        // known-verified, unknown-email). Single neutral message
+        // — do not branch on response body. Matches the password-
+        // reset-request UI posture.
+        if (res.status === 202) {
+          setStatus('verifyEmailRequestStatus',
+            'If that email is registered and not yet verified, a verification ' +
+            'email has been sent. Check your inbox.', 'ok');
+          document.getElementById('verifyEmailInput').value = '';
+          return;
+        }
+        if (res.status === 429) {
+          setStatus('verifyEmailRequestStatus',
+            'Too many requests. Please slow down.', 'err');
+          return;
+        }
+        if (res.status === 400) {
+          setStatus('verifyEmailRequestStatus',
+            'Please enter a valid email.', 'err');
+          return;
+        }
+        setStatus('verifyEmailRequestStatus', 'Error: HTTP ' + res.status, 'err');
+      }).catch(function () {
+        setStatus('verifyEmailRequestStatus', 'Network error.', 'err');
+      });
+    }
+
+    function showVerifyEmailComplete(token) {
+      pendingVerifyToken = token;
+      // Strip the token from the URL bar immediately — same rationale
+      // as the reset flow: don't leave it in history / bookmarks /
+      // shared-URL pastes.
+      try {
+        history.replaceState(null, '', window.location.pathname);
+      } catch (e) { /* ignore */ }
+      show('verifyEmailCompleteView');
+      setStatus('verifyEmailCompleteStatus', '', '');
+    }
+
+    function submitVerifyEmailComplete() {
+      if (!pendingVerifyToken) {
+        setStatus('verifyEmailCompleteStatus',
+          'Verification link is invalid or expired.', 'err');
+        return;
+      }
+      setStatus('verifyEmailCompleteStatus', 'Verifying…', 'muted');
+      fetch('/api/parents/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: pendingVerifyToken })
+      }).then(function (res) {
+        return res.json().catch(function () { return null; })
+          .then(function (data) { return { status: res.status, data: data }; });
+      }).then(function (r) {
+        if (r.status === 200 && r.data && r.data.verified) {
+          pendingVerifyToken = null;
+          show('loginView');
+          setStatus('loginStatus',
+            'Your email has been verified. You can now log in.', 'ok');
+          return;
+        }
+        // Uniform backend 400 — surface the error body verbatim.
+        var msg = (r.data && r.data.error) || 'Verification link is invalid or expired.';
+        setStatus('verifyEmailCompleteStatus', msg, 'err');
+      }).catch(function () {
+        setStatus('verifyEmailCompleteStatus', 'Network error.', 'err');
+      });
+    }
+
+    function backFromVerifyToLogin() {
+      pendingVerifyToken = null;
+      document.getElementById('verifyEmailInput').value = '';
+      setStatus('verifyEmailRequestStatus', '', '');
+      setStatus('verifyEmailCompleteStatus', '', '');
       show('loginView');
     }
 
@@ -2092,6 +2239,17 @@
       if (e.key === 'Enter') submitResetPassword();
     });
     document.getElementById('resetPasswordBackBtn').addEventListener('click', backFromResetToLogin);
+
+    // Email-verification flow: login-view affordance, verify-request
+    // form, verify-complete form activated by ?verifyToken=... on boot.
+    document.getElementById('verifyEmailRequestBtn').addEventListener('click', showVerifyEmailRequest);
+    document.getElementById('verifyEmailRequestSubmitBtn').addEventListener('click', submitVerifyEmailRequest);
+    document.getElementById('verifyEmailInput').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') submitVerifyEmailRequest();
+    });
+    document.getElementById('verifyEmailRequestBackBtn').addEventListener('click', backFromVerifyToLogin);
+    document.getElementById('verifyEmailCompleteBtn').addEventListener('click', submitVerifyEmailComplete);
+    document.getElementById('verifyEmailCompleteBackBtn').addEventListener('click', backFromVerifyToLogin);
     document.getElementById('togglePasswordBtn').addEventListener('click', togglePasswordForm);
     document.getElementById('changePasswordBtn').addEventListener('click', doChangePassword);
     document.getElementById('toggleDeleteAccountBtn').addEventListener('click', toggleDeleteAccountForm);
@@ -2126,19 +2284,28 @@
     }
 
     // ---------- boot ----------
-    // Reset-token detection takes priority over every other routing
-    // decision: a parent holding a fresh reset link is by definition
-    // in a recovery flow, not active use. URLSearchParams is available
-    // on every browser this dashboard targets; the try/catch is
-    // defensive for environments where window.location is unusable.
+    // Pre-auth URL tokens take priority over every other routing
+    // decision: a parent holding a fresh reset or verification link
+    // is by definition in a pre-auth recovery flow, not active use.
+    // Reset-token (?token=...) and verify-token (?verifyToken=...)
+    // use distinct query params so the router can disambiguate
+    // without overlap. URLSearchParams is available on every browser
+    // this dashboard targets; the try/catch is defensive for
+    // environments where window.location is unusable.
     (function bootRouter() {
-      var urlToken = null;
+      var resetToken = null;
+      var verifyToken = null;
       try {
         var params = new URLSearchParams(window.location.search);
-        urlToken = params.get('token');
+        resetToken = params.get('token');
+        verifyToken = params.get('verifyToken');
       } catch (e) { /* fall through to normal routing */ }
-      if (urlToken) {
-        showResetPassword(urlToken);
+      if (resetToken) {
+        showResetPassword(resetToken);
+        return;
+      }
+      if (verifyToken) {
+        showVerifyEmailComplete(verifyToken);
         return;
       }
       if (getToken()) {

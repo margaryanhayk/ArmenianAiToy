@@ -79,6 +79,9 @@ public class ParentService : IParentService
         public Task<bool> SendDormancyWarningAsync(
             string email, DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
             => Task.FromResult(true);
+        public Task SendEmailVerificationAsync(
+            string email, string verificationToken, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     /// <summary>
@@ -149,8 +152,33 @@ public class ParentService : IParentService
             TermsVersion = CurrentTermsVersion
         };
 
+        // Email-verification token for the new parent. Collision
+        // path (above) deliberately does NOT issue a token — that
+        // preserves the silent-no-op anti-enum contract at the
+        // SMTP layer (server-to-server, not observable to external
+        // attackers). New-email path always issues and always
+        // sends, so a real user who registered a new account
+        // always receives a verification email.
+        var rawVerificationToken = GenerateRawResetToken();
+        var verificationTokenHash = ComputeTokenHash(rawVerificationToken);
+        var verificationTtl = TimeSpan.FromHours(ReadEmailVerificationTtlHours());
+        _db.Set<ParentEmailVerificationToken>().Add(new ParentEmailVerificationToken
+        {
+            Id = Guid.NewGuid(),
+            ParentId = parent.Id,
+            TokenHash = verificationTokenHash,
+            CreatedAt = now,
+            ExpiresAt = now.Add(verificationTtl),
+            ConsumedAt = null
+        });
+
         _db.Set<Parent>().Add(parent);
         await _db.SaveChangesAsync();
+
+        // Send AFTER SaveChangesAsync so a DB-write failure
+        // short-circuits before the notifier is invoked — same
+        // ordering the password-reset flow uses.
+        await _notifier.SendEmailVerificationAsync(email, rawVerificationToken);
 
         _logger.LogInformation(
             "Parent registered: {Email}, terms version {TermsVersion}",
@@ -403,6 +431,124 @@ public class ParentService : IParentService
         if (int.TryParse(raw, out var parsed) && parsed > 0)
             return parsed;
         return DefaultPasswordResetTtlMinutes;
+    }
+
+    // Default TTL for email-verification tokens: 7 days. Longer than
+    // password-reset because verification is less time-sensitive —
+    // a parent registering today may not open the email until the
+    // weekend. Overridable via Auth:EmailVerificationTokenTtlHours.
+    private const int DefaultEmailVerificationTtlHours = 168;
+
+    private int ReadEmailVerificationTtlHours()
+    {
+        var raw = _config["Auth:EmailVerificationTokenTtlHours"];
+        if (int.TryParse(raw, out var parsed) && parsed > 0)
+            return parsed;
+        return DefaultEmailVerificationTtlHours;
+    }
+
+    /// <summary>
+    /// Begin email verification for the given address. Anti-enum
+    /// contract: known-unverified / known-verified / unknown email
+    /// must be externally indistinguishable. A throwaway BCrypt on
+    /// the email normalizes the latency floor across all three
+    /// branches (same seam Register and RequestPasswordResetAsync
+    /// use). Only the known-unverified branch issues a token and
+    /// calls the notifier.
+    /// </summary>
+    public async Task RequestEmailVerificationAsync(
+        string email, CancellationToken cancellationToken = default)
+    {
+        // Mandatory timing normalization — BCrypt runs on every
+        // branch. Value is discarded; it exists only to make the
+        // response time invariant across the three eligibility
+        // outcomes below.
+        _ = _hashPassword(email);
+
+        var parent = await _db.Set<Parent>()
+            .FirstOrDefaultAsync(p => p.Email == email, cancellationToken);
+        if (parent == null)
+        {
+            // Unknown-email path — silent. No token, no notifier call,
+            // no audit row. Server-side log line is email-less to
+            // avoid a log-scraping back-channel.
+            _logger.LogInformation(
+                "Email verification request: silent no-op (unknown email)");
+            return;
+        }
+        if (parent.EmailVerifiedAt != null)
+        {
+            // Already-verified path — also silent. A real parent
+            // accidentally hitting the verify-request endpoint again
+            // does not receive a fresh email (no point), but the
+            // HTTP response is identical to the other two branches.
+            _logger.LogInformation(
+                "Email verification request: silent no-op (already verified) for parent {ParentId}",
+                parent.Id);
+            return;
+        }
+
+        // Known-unverified: issue token + persist hash + notify.
+        // Multiple active tokens per parent are permitted (same
+        // contract as password-reset), so repeated verify-request
+        // calls simply add more tokens; the retention worker's
+        // cleanup pass handles the resulting accumulation.
+        var rawToken = GenerateRawResetToken();
+        var tokenHash = ComputeTokenHash(rawToken);
+        var ttl = TimeSpan.FromHours(ReadEmailVerificationTtlHours());
+        var now = DateTime.UtcNow;
+
+        _db.Set<ParentEmailVerificationToken>().Add(new ParentEmailVerificationToken
+        {
+            Id = Guid.NewGuid(),
+            ParentId = parent.Id,
+            TokenHash = tokenHash,
+            CreatedAt = now,
+            ExpiresAt = now.Add(ttl),
+            ConsumedAt = null
+        });
+        await _db.SaveChangesAsync(cancellationToken);
+
+        await _notifier.SendEmailVerificationAsync(email, rawToken, cancellationToken);
+
+        _logger.LogInformation(
+            "Email verification token issued for parent {ParentId}", parent.Id);
+    }
+
+    /// <summary>
+    /// Complete email verification with a previously-issued token.
+    /// Returns true on success, false on any failure (unknown /
+    /// expired / already-consumed / empty). Same uniform-failure
+    /// contract as CompletePasswordResetAsync. Writes exactly one
+    /// <see cref="AuditEventType.ParentEmailVerified"/> audit row
+    /// on success; failures write none.
+    /// </summary>
+    public async Task<bool> CompleteEmailVerificationAsync(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return false;
+
+        var tokenHash = ComputeTokenHash(token);
+        var row = await _db.Set<ParentEmailVerificationToken>()
+            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
+
+        var now = DateTime.UtcNow;
+        if (row is null || row.ConsumedAt is not null || row.ExpiresAt <= now)
+            return false;
+
+        var parent = await _db.Set<Parent>()
+            .FirstOrDefaultAsync(p => p.Id == row.ParentId);
+        if (parent == null)
+            return false; // parent deleted between issue and completion
+
+        parent.EmailVerifiedAt = now;
+        row.ConsumedAt = now;
+        TrackAndAddAudit(AuditEvent.ParentEmailVerified(parent.Id));
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Parent {ParentId} verified email", parent.Id);
+        return true;
     }
 
     // Default threshold for the derived LinkedDeviceDto.IsDormant flag.
@@ -945,7 +1091,8 @@ public class ParentService : IParentService
                 parent.RegisteredAt,
                 parent.TermsAcceptedAt,
                 parent.TermsVersion,
-                parent.LastLoginAt),
+                parent.LastLoginAt,
+                parent.EmailVerifiedAt),
             Devices: deviceExports,
             AuditEvents: auditDtos,
             ExcludedFields: new[]

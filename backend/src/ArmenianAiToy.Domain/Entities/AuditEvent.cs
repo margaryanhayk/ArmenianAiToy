@@ -390,4 +390,24 @@ public class AuditEvent
             orphan_devices_cascaded = orphanDevicesCascaded
         })
     };
+
+    /// <summary>
+    /// Emitted on successful <c>POST /api/parents/verify</c>. Written
+    /// in the same <c>SaveChangesAsync</c> as the
+    /// <see cref="Parent.EmailVerifiedAt"/> stamp and the token's
+    /// <c>ConsumedAt</c>. Failure paths (unknown / expired /
+    /// already-consumed token) write NO row — the uniform 400
+    /// response on failure is mirrored in the audit trail by
+    /// absence. Zero metadata for the same reason as
+    /// <see cref="ParentPasswordResetCompleted"/>: the event
+    /// happening is the fact; there is no counts-shaped additional
+    /// context worth recording.
+    /// </summary>
+    public static AuditEvent ParentEmailVerified(Guid parentId) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentEmailVerified,
+        ActorParentId = parentId
+    };
 }

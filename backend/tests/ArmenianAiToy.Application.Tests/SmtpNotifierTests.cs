@@ -304,6 +304,106 @@ public class SmtpNotifierTests
             "Warn-only body must not contain any yyyy-MM-dd date string.");
     }
 
+    // --- Email verification (HTTP-synchronous caller) ---
+
+    [Fact]
+    public async Task SendEmailVerificationAsync_ComposesMessage_WithVerifyLink()
+    {
+        // Pin the body shape: recipient, non-empty Armenian subject,
+        // plain-text body, verification link with URL-encoded token,
+        // verifyToken param name (distinct from reset's `token`).
+        MailMessage? captured = null;
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (msg, _) =>
+            {
+                captured = msg;
+                return Task.CompletedTask;
+            });
+
+        const string rawToken = "VERIFY-test-token-abc123_XYZ";
+        await notifier.SendEmailVerificationAsync("parent@example.com", rawToken);
+
+        Assert.NotNull(captured);
+        Assert.Equal("noreply@example.com", captured!.From!.Address);
+        Assert.Single(captured.To);
+        Assert.Equal("parent@example.com", captured.To[0].Address);
+        Assert.False(string.IsNullOrWhiteSpace(captured.Subject));
+        Assert.False(captured.IsBodyHtml);
+        Assert.Contains(rawToken, captured.Body);
+        Assert.Contains("verifyToken=", captured.Body);
+        Assert.Contains("https://example.com/reset", captured.Body);
+    }
+
+    [Fact]
+    public async Task SendEmailVerificationAsync_DoesNotLogRawToken()
+    {
+        // No-raw-token invariant on the verification path — mirrors
+        // the pinned invariant on SendPasswordResetAsync. Scan every
+        // argument of every Log call.
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (_, _) => Task.CompletedTask);
+
+        const string rawToken = "super-secret-verification-token-UNIQUE-XY9";
+        await notifier.SendEmailVerificationAsync("parent@example.com", rawToken);
+
+        foreach (var call in logger.ReceivedCalls())
+        {
+            foreach (var arg in call.GetArguments())
+            {
+                if (arg is null) continue;
+                Assert.DoesNotContain(rawToken, arg.ToString() ?? "",
+                    StringComparison.Ordinal);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task SendEmailVerificationAsync_FailurePath_DoesNotLogRawToken()
+    {
+        // Same scrub discipline on the LogWarning branch.
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (_, _) => throw new SmtpException("relay broken"));
+
+        const string rawToken = "failure-path-verify-token-UNIQUE-ZZ9";
+        await notifier.SendEmailVerificationAsync("parent@example.com", rawToken);
+
+        foreach (var call in logger.ReceivedCalls())
+        {
+            foreach (var arg in call.GetArguments())
+            {
+                if (arg is null) continue;
+                Assert.DoesNotContain(rawToken, arg.ToString() ?? "",
+                    StringComparison.Ordinal);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task SendEmailVerificationAsync_SmtpSendThrows_DoesNotPropagate()
+    {
+        // HTTP-synchronous caller's anti-enum response must not break
+        // on an SMTP failure. Same contract as SendPasswordResetAsync.
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (_, _) => throw new SmtpException("relay broken"));
+
+        await notifier.SendEmailVerificationAsync("parent@example.com", "any-token");
+
+        logger.Received().Log(
+            LogLevel.Warning,
+            Arg.Any<EventId>(),
+            Arg.Any<object>(),
+            Arg.Any<Exception>(),
+            Arg.Any<Func<object, Exception?, string>>());
+    }
+
     [Fact]
     public async Task SendPasswordResetAsync_Success_LogsDeliveredTrue()
     {

@@ -74,5 +74,21 @@ public class Parent
     /// </summary>
     public DateTime? AnonymizedAt { get; set; }
 
+    /// <summary>
+    /// Timestamp at which the parent completed the email verification
+    /// flow via <c>POST /api/parents/verify</c>. Null means not yet
+    /// verified — includes every row migrated in before this column
+    /// existed (R-null retroactive handling). See CLAUDE.md §
+    /// Email verification for the tracking-only tier contract.
+    /// <para>
+    /// In the shipped T1 tier this field gates exactly one thing: the
+    /// dormant-parent warn pass skips parents with
+    /// <c>EmailVerifiedAt == null</c>. Login, forgot-password,
+    /// password change, account delete, export, and every other
+    /// parent endpoint are unaffected.
+    /// </para>
+    /// </summary>
+    public DateTime? EmailVerifiedAt { get; set; }
+
     public ICollection<ParentDevice> ParentDevices { get; set; } = new List<ParentDevice>();
 }

@@ -745,6 +745,10 @@ public class RetentionPurgeServiceTests
             Calls.Add((email, deleteAtUtc));
             return Task.FromResult(DeliverResult);
         }
+
+        public Task SendEmailVerificationAsync(
+            string email, string verificationToken, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     private sealed class NoOpNotifier : ArmenianAiToy.Application.Notifications.INotifier
@@ -755,14 +759,27 @@ public class RetentionPurgeServiceTests
         public Task<bool> SendDormancyWarningAsync(
             string email, DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
             => Task.FromResult(true);
+        public Task SendEmailVerificationAsync(
+            string email, string verificationToken, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     private static Guid SeedParent(
         AppDbContext db,
         DateTime? lastLoginAt,
-        DateTime? dormancyWarnedAt = null)
+        DateTime? dormancyWarnedAt = null,
+        DateTime? emailVerifiedAt = null,
+        bool autoVerify = true)
     {
+        // `autoVerify = true` is the default so every pre-existing
+        // warn test continues to seed a verified parent without
+        // having to thread a new argument through every call site.
+        // Tests that want to exercise the "unverified parent is
+        // excluded from the warn pass" invariant explicitly pass
+        // `autoVerify: false`.
         var id = Guid.NewGuid();
+        var verifiedAt = emailVerifiedAt
+            ?? (autoVerify ? DateTime.UtcNow.AddDays(-30) : (DateTime?)null);
         db.Set<Parent>().Add(new Parent
         {
             Id = id,
@@ -770,7 +787,8 @@ public class RetentionPurgeServiceTests
             PasswordHash = "x",
             RegisteredAt = DateTime.UtcNow.AddDays(-400),
             LastLoginAt = lastLoginAt,
-            DormancyWarnedAt = dormancyWarnedAt
+            DormancyWarnedAt = dormancyWarnedAt,
+            EmailVerifiedAt = verifiedAt
         });
         return id;
     }
@@ -1326,6 +1344,113 @@ public class RetentionPurgeServiceTests
 
         var call = Assert.Single(notifier.Calls);
         Assert.Null(call.DeleteAtUtc);
+    }
+
+    [Fact]
+    public async Task WarnPass_UnverifiedParent_IsExcluded()
+    {
+        // T1 email-verification gate: warn pass skips parents whose
+        // EmailVerifiedAt is null. The parent is otherwise perfectly
+        // warn-eligible (200d inactive, past 180d threshold). The
+        // helper's `autoVerify: false` flag seeds EmailVerifiedAt as
+        // null to make this an explicit test of the new filter.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180, notifier: notifier);
+        var parentId = SeedParent(h.Db,
+            lastLoginAt: DateTime.UtcNow.AddDays(-200),
+            autoVerify: false);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Empty(notifier.SentEmails);
+        var row = await h.Db.Set<Parent>().AsNoTracking().FirstAsync(p => p.Id == parentId);
+        Assert.Null(row.DormancyWarnedAt);
+    }
+
+    [Fact]
+    public async Task WarnPass_VerifiedParent_IsStillWarned()
+    {
+        // Explicit positive case to complement the unverified-
+        // exclusion test — a verified parent (emailVerifiedAt set
+        // by default in SeedParent) continues to be warned under
+        // the same conditions that applied before the T1 gate
+        // landed.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180, notifier: notifier);
+        SeedParent(h.Db, lastLoginAt: DateTime.UtcNow.AddDays(-200));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Single(notifier.SentEmails);
+    }
+
+    // --- Email-verification token cleanup pass -----------------------
+
+    [Fact]
+    public async Task VerificationTokenCleanup_ConsumedTokens_AreDeleted()
+    {
+        await using var h = await CreateHarnessAsync(maxAgeDays: 90);
+        var parentId = SeedParent(h.Db, lastLoginAt: DateTime.UtcNow);
+        var consumedId = SeedVerificationToken(h.Db, parentId,
+            expiresAt: DateTime.UtcNow.AddDays(3),
+            consumedAt: DateTime.UtcNow.AddMinutes(-5));
+        var unconsumedId = SeedVerificationToken(h.Db, parentId,
+            expiresAt: DateTime.UtcNow.AddDays(3),
+            consumedAt: null);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.False(await h.Db.Set<ParentEmailVerificationToken>().AsNoTracking()
+            .AnyAsync(t => t.Id == consumedId));
+        Assert.True(await h.Db.Set<ParentEmailVerificationToken>().AsNoTracking()
+            .AnyAsync(t => t.Id == unconsumedId));
+    }
+
+    [Fact]
+    public async Task VerificationTokenCleanup_ExpiredPastGrace_AreDeleted()
+    {
+        await using var h = await CreateHarnessAsync(maxAgeDays: 90);
+        var parentId = SeedParent(h.Db, lastLoginAt: DateTime.UtcNow);
+        // Expired 48h ago; default grace is 24h, so past grace.
+        var expiredPastGraceId = SeedVerificationToken(h.Db, parentId,
+            expiresAt: DateTime.UtcNow.AddHours(-48),
+            consumedAt: null);
+        // Expired 2h ago; inside the 24h grace window.
+        var expiredInGraceId = SeedVerificationToken(h.Db, parentId,
+            expiresAt: DateTime.UtcNow.AddHours(-2),
+            consumedAt: null);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.False(await h.Db.Set<ParentEmailVerificationToken>().AsNoTracking()
+            .AnyAsync(t => t.Id == expiredPastGraceId));
+        Assert.True(await h.Db.Set<ParentEmailVerificationToken>().AsNoTracking()
+            .AnyAsync(t => t.Id == expiredInGraceId));
+    }
+
+    private static Guid SeedVerificationToken(
+        AppDbContext db,
+        Guid parentId,
+        DateTime expiresAt,
+        DateTime? consumedAt)
+    {
+        var tokenId = Guid.NewGuid();
+        db.Set<ParentEmailVerificationToken>().Add(new ParentEmailVerificationToken
+        {
+            Id = tokenId,
+            ParentId = parentId,
+            TokenHash = "hash-" + tokenId.ToString("N"),
+            CreatedAt = DateTime.UtcNow.AddDays(-1),
+            ExpiresAt = expiresAt,
+            ConsumedAt = consumedAt
+        });
+        return tokenId;
     }
 
     [Fact]

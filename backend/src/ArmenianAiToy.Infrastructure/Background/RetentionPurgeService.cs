@@ -75,6 +75,18 @@ public sealed class RetentionPurgeService : BackgroundService
     public const int DefaultPasswordResetGracePeriodHours = 24;
 
     /// <summary>
+    /// Grace window (hours) applied to
+    /// <c>ParentEmailVerificationToken</c> cleanup. Same semantics as
+    /// <see cref="DefaultPasswordResetGracePeriodHours"/>: consumed
+    /// tokens delete unconditionally; expired tokens delete once
+    /// <c>ExpiresAt &lt; UtcNow - grace</c>. Longer TTL (7 days by
+    /// default) means the accumulation window is wider but the grace
+    /// is still 24 h — clock skew and miss-cycles dominate the
+    /// correctness concern, not the TTL.
+    /// </summary>
+    public const int DefaultEmailVerificationGracePeriodHours = 24;
+
+    /// <summary>
     /// Fallback value for <c>Dormancy:Parent:WarnAfterDays</c> when the
     /// key is missing or unparseable. <b>0 (disabled)</b> — unlike the
     /// conversation-purge path, the warn-only pass has an external
@@ -211,6 +223,7 @@ public sealed class RetentionPurgeService : BackgroundService
 
         await PurgeExpiredConversationsAsync(db, maxAgeDays, stoppingToken);
         await PurgeStalePasswordResetTokensAsync(db, stoppingToken);
+        await PurgeStaleEmailVerificationTokensAsync(db, stoppingToken);
         // Anonymize before warn is deliberate. If warn ran first it
         // would stamp DormancyWarnedAt to "now" for every refire-due
         // parent, and the 7-day grace-floor condition on anonymize
@@ -377,6 +390,7 @@ public sealed class RetentionPurgeService : BackgroundService
         var eligible = await db.Set<Parent>()
             .Where(p =>
                 p.AnonymizedAt == null
+                && p.EmailVerifiedAt != null
                 && p.LastLoginAt != null
                 && p.LastLoginAt < dormantCutoff
                 && (p.DormancyWarnedAt == null || p.DormancyWarnedAt < refireCutoff))
@@ -634,6 +648,35 @@ public sealed class RetentionPurgeService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Deletes stale <c>ParentEmailVerificationToken</c> rows. Same
+    /// rule as <see cref="PurgeStalePasswordResetTokensAsync"/>:
+    /// consumed tokens are deleted unconditionally; expired tokens
+    /// are deleted once they are past the configured grace window.
+    /// No audit row — short-lived operational state, not a
+    /// destructive parent action. Uses <c>ExecuteDeleteAsync</c>
+    /// for a single <c>DELETE WHERE</c> statement without
+    /// materializing any rows; no hash, no parent id, no timestamp
+    /// lands on the worker process.
+    /// </summary>
+    private async Task PurgeStaleEmailVerificationTokensAsync(
+        AppDbContext db, CancellationToken stoppingToken)
+    {
+        var graceHours = ReadEmailVerificationGracePeriodHours();
+        var expiryCutoff = DateTime.UtcNow - TimeSpan.FromHours(graceHours);
+
+        var deleted = await db.Set<ParentEmailVerificationToken>()
+            .Where(t => t.ConsumedAt != null || t.ExpiresAt < expiryCutoff)
+            .ExecuteDeleteAsync(stoppingToken);
+
+        if (deleted > 0)
+        {
+            _logger.LogInformation(
+                "RetentionPurgeService tick: cleaned up {Deleted} stale email-verification token(s) (graceHours={GraceHours}).",
+                deleted, graceHours);
+        }
+    }
+
     // Config reads use the indexer + int.TryParse rather than the
     // IConfiguration.GetValue<T>() extension. GetValue<T> lives in
     // Microsoft.Extensions.Configuration.Binder, which this project
@@ -673,6 +716,16 @@ public sealed class RetentionPurgeService : BackgroundService
         var raw = ParseIntOrDefault(
             _config["Retention:PasswordResetTokens:GracePeriodHours"],
             DefaultPasswordResetGracePeriodHours);
+        return raw < 0 ? 0 : raw;
+    }
+
+    // Email-verification token grace window. Same shape and
+    // semantics as the password-reset grace reader.
+    private int ReadEmailVerificationGracePeriodHours()
+    {
+        var raw = ParseIntOrDefault(
+            _config["Retention:EmailVerificationTokens:GracePeriodHours"],
+            DefaultEmailVerificationGracePeriodHours);
         return raw < 0 ? 0 : raw;
     }
 

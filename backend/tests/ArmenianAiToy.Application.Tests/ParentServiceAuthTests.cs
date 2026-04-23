@@ -29,6 +29,8 @@ public class ParentServiceAuthTests
 
             modelBuilder.Entity<ParentDevice>().HasKey(pd => new { pd.ParentId, pd.DeviceId });
             modelBuilder.Entity<AuditEvent>().HasKey(a => a.Id);
+            modelBuilder.Entity<ParentEmailVerificationToken>().HasKey(t => t.Id);
+            modelBuilder.Entity<ParentEmailVerificationToken>().Ignore(t => t.Parent);
         }
     }
 
@@ -88,6 +90,91 @@ public class ParentServiceAuthTests
 
         Assert.Contains("Terms must be accepted", ex.Message);
         Assert.Equal(0, await db.Set<Parent>().CountAsync());
+    }
+
+    [Fact]
+    public async Task RegisterAsync_NewEmail_IssuesVerificationTokenAndCallsNotifier()
+    {
+        // T1 email-verification contract — new-email path always
+        // issues a token, persists the hash, and calls
+        // SendEmailVerificationAsync exactly once.
+        var spy = new CountingNotifier();
+        var (service, db) = CreateServiceWith(notifier: spy);
+
+        await service.RegisterAsync("new@example.com", "password123", acceptedTerms: true);
+
+        var tokens = await db.Set<ParentEmailVerificationToken>().AsNoTracking().ToListAsync();
+        var token = Assert.Single(tokens);
+        Assert.False(string.IsNullOrWhiteSpace(token.TokenHash));
+        Assert.Null(token.ConsumedAt);
+        Assert.Equal(1, spy.VerificationSendCount);
+        Assert.Equal("new@example.com", spy.LastVerificationEmail);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_DuplicateEmail_DoesNotIssueTokenNorCallVerificationNotifier()
+    {
+        // Collision path must preserve the silent-no-op contract at
+        // the SMTP layer too: zero verification tokens inserted, zero
+        // notifier calls. Register anti-enum would be compromised if
+        // the collision path silently sent an email to the existing
+        // parent's address every time an attacker probed.
+        var spy = new CountingNotifier();
+        var (service, db) = CreateServiceWith(notifier: spy);
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = Guid.NewGuid(),
+            Email = "existing@example.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("original-pass"),
+            RegisteredAt = DateTime.UtcNow.AddDays(-3)
+        });
+        await db.SaveChangesAsync();
+
+        await service.RegisterAsync("existing@example.com", "attacker-guess", acceptedTerms: true);
+
+        Assert.Empty(await db.Set<ParentEmailVerificationToken>().AsNoTracking().ToListAsync());
+        Assert.Equal(0, spy.VerificationSendCount);
+    }
+
+    private sealed class CountingNotifier : ArmenianAiToy.Application.Notifications.INotifier
+    {
+        public int VerificationSendCount { get; private set; }
+        public string? LastVerificationEmail { get; private set; }
+        public int ResetSendCount { get; private set; }
+
+        public Task SendPasswordResetAsync(
+            string email, string resetToken, CancellationToken cancellationToken = default)
+        {
+            ResetSendCount++;
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> SendDormancyWarningAsync(
+            string email, DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
+
+        public Task SendEmailVerificationAsync(
+            string email, string verificationToken, CancellationToken cancellationToken = default)
+        {
+            VerificationSendCount++;
+            LastVerificationEmail = email;
+            return Task.CompletedTask;
+        }
+    }
+
+    private static (ParentService Service, TestDbContext Db) CreateServiceWith(
+        ArmenianAiToy.Application.Notifications.INotifier notifier)
+    {
+        var options = new DbContextOptionsBuilder<TestDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        var db = new TestDbContext(options);
+        var config = Substitute.For<IConfiguration>();
+        config["Jwt:Key"].Returns("TestSecretKeyThatIsLongEnoughForHmacSha256Validation!");
+        config["Jwt:Issuer"].Returns("TestIssuer");
+        config["Jwt:Audience"].Returns("TestAudience");
+        var logger = Substitute.For<ILogger<ParentService>>();
+        return (new ParentService(db, config, logger, hashPassword: null, notifier: notifier), db);
     }
 
     [Fact]

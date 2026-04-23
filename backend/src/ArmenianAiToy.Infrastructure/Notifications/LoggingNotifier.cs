@@ -60,4 +60,23 @@ public sealed class LoggingNotifier : INotifier
             false);
         return Task.FromResult(true);
     }
+
+    /// <summary>
+    /// Log-only implementation of the email-verification send.
+    /// Never logs the raw token (pinned by test). Does not actually
+    /// deliver anything — a parent receiving no verification link on
+    /// a log-transport deployment still has access to every other
+    /// flow (login, forgot-password, etc.); verification is tracking-
+    /// only in T1 and nothing breaks when the email doesn't land.
+    /// </summary>
+    public Task SendEmailVerificationAsync(
+        string email, string verificationToken, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Notification send-attempt: type={NotificationType}, email={Email}, delivered={Delivered}",
+            "email_verification",
+            email,
+            false);
+        return Task.CompletedTask;
+    }
 }

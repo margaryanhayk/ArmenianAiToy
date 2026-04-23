@@ -184,6 +184,60 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Begin an email-verification flow for the given email.
+    /// Anti-enumeration contract: known-unverified, known-verified,
+    /// and unknown-email paths all return <b>202 Accepted</b> with
+    /// the identical neutral body <c>{ "verificationRequested": true }</c>.
+    /// The service pays the same BCrypt latency on every branch so
+    /// response timing cannot be used as an account-existence or
+    /// verification-state oracle. No authentication required — the
+    /// parent may not yet be able to log in. Rate-limited via the
+    /// auth policy.
+    /// </summary>
+    [HttpPost("verify-request")]
+    [EnableRateLimiting(AuthRateLimiter.PolicyName)]
+    [ProducesResponseType(202)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(429)]
+    public async Task<IActionResult> RequestEmailVerification(
+        [FromBody] ParentEmailVerificationRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+            return BadRequest(new { error = "Email is required." });
+
+        await _parentService.RequestEmailVerificationAsync(request.Email);
+        // Byte-identical body on all three branches. No parent id, no
+        // token, no state echo — all of those would leak existence
+        // or verification state.
+        return Accepted(new { verificationRequested = true });
+    }
+
+    /// <summary>
+    /// Complete email verification with a previously-issued token.
+    /// On any failure — unknown token, expired, already consumed,
+    /// empty — the response is a uniform 400 without distinguishing
+    /// the reason, mirroring the password-reset completion contract.
+    /// No JWT is issued. Rate-limited via the auth policy.
+    /// </summary>
+    [HttpPost("verify")]
+    [EnableRateLimiting(AuthRateLimiter.PolicyName)]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(429)]
+    public async Task<IActionResult> CompleteEmailVerification(
+        [FromBody] ParentEmailVerificationCompleteRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Token))
+            return BadRequest(new { error = "Verification link is invalid or expired." });
+
+        var ok = await _parentService.CompleteEmailVerificationAsync(request.Token);
+        if (!ok)
+            return BadRequest(new { error = "Verification link is invalid or expired." });
+
+        return Ok(new { verified = true });
+    }
+
+    /// <summary>
     /// Link an existing device to the authenticated parent.
     /// </summary>
     [HttpPost("devices/link")]

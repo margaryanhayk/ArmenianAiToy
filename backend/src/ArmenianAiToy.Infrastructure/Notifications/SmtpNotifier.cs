@@ -213,6 +213,63 @@ public sealed class SmtpNotifier : INotifier
         }
     }
 
+    /// <summary>
+    /// Email-verification link send. Reuses
+    /// <c>Notifications:PasswordResetLinkBase</c> for the URL prefix
+    /// — the dashboard page is the same; only the query-param key
+    /// (<c>verifyToken</c>) disambiguates from the forgot-password
+    /// <c>token</c> parameter.
+    /// <para>
+    /// Same failure-containment as <see cref="SendPasswordResetAsync"/>:
+    /// non-cancellation exceptions are swallowed into a structured
+    /// warning log and do not propagate. The HTTP-synchronous
+    /// caller's anti-enum response shape is preserved regardless of
+    /// delivery outcome.
+    /// </para>
+    /// <para>
+    /// <b>No-raw-token invariant.</b> The raw verification token
+    /// appears only in the outgoing message body. It is NEVER placed
+    /// into a log line — same pinned contract as
+    /// <see cref="SendPasswordResetAsync"/>.
+    /// </para>
+    /// </summary>
+    public async Task SendEmailVerificationAsync(
+        string email, string verificationToken, CancellationToken cancellationToken = default)
+    {
+        var link = BuildVerificationLink(
+            _config["Notifications:PasswordResetLinkBase"] ?? "", verificationToken);
+        var fromAddress = _config["Notifications:Smtp:FromAddress"] ?? "";
+
+        using var message = new MailMessage
+        {
+            From = new MailAddress(fromAddress),
+            Subject = "Հաստատեք Ձեր էլ. փոստը",
+            Body = BuildEmailVerificationBody(link),
+            BodyEncoding = Encoding.UTF8,
+            SubjectEncoding = Encoding.UTF8,
+            IsBodyHtml = false
+        };
+        message.To.Add(email);
+
+        try
+        {
+            await _sendMail(message, cancellationToken);
+            _logger.LogInformation(
+                "Notification send-attempt: type={NotificationType}, email={Email}, transport={Transport}, delivered={Delivered}",
+                "email_verification", email, "smtp", true);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Notification send-attempt: type={NotificationType}, email={Email}, transport={Transport}, delivered={Delivered}, error_category={ErrorCategory}",
+                "email_verification", email, "smtp", false, ex.GetType().Name);
+        }
+    }
+
     // Default wire call. Pulls credentials / host / port off
     // IConfiguration on every send so a config reload (via a restart)
     // is picked up without recycling the singleton. Scoped registration
@@ -266,6 +323,33 @@ public sealed class SmtpNotifier : INotifier
             "Այս հղումը վավեր է սահմանափակ ժամանակ։",
             "Եթե Դուք այս խնդրանքը չեք արել, անտեսեք այս նամակը։",
             resetLink);
+    }
+
+    private static string BuildVerificationLink(string linkBase, string rawToken)
+    {
+        // Parallel to BuildResetLink — uses `verifyToken` instead of
+        // `token` so the dashboard boot router can distinguish the
+        // two flows by query-param name. URL-encoded even though the
+        // current token charset is URL-safe, for caller-expected
+        // behavior.
+        var prefix = string.IsNullOrWhiteSpace(linkBase) ? "" : linkBase.Trim();
+        var separator = prefix.Contains('?') ? '&' : '?';
+        return $"{prefix}{separator}verifyToken={Uri.EscapeDataString(rawToken)}";
+    }
+
+    private static string BuildEmailVerificationBody(string verificationLink)
+    {
+        // Eastern Armenian, warm and neutral. Lead: what happened
+        // (someone registered with this email). Middle: what to do
+        // (click the link). Footer: how long the link lives, and
+        // what to do if they didn't register (ignore). No urgency
+        // copy — verification isn't time-critical.
+        return string.Join("\n\n",
+            "Բարև, Ձեր էլ. փոստի հասցեն օգտագործվել է Areg-ի հաշիվ ստեղծելու համար։",
+            "Խնդրում ենք հաստատել, որ այս հասցեն Ձերն է՝ սեղմելով ստորև դրված հղման վրա։",
+            "Հղումը վավեր է 7 օրվա ընթացքում։",
+            "Եթե Դուք հաշիվ չեք ստեղծել, այս նամակը կարող եք անտեսել։",
+            verificationLink);
     }
 
     private static string BuildDormancyWarningBody(DateTime? deleteAtUtc)

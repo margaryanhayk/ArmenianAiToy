@@ -65,6 +65,27 @@ public interface IParentService
     /// maps <c>false</c> to a uniform 400 response.
     /// </summary>
     Task<bool> CompletePasswordResetAsync(string token, string newPassword);
+
+    /// <summary>
+    /// Begin the email-verification flow for the given email.
+    /// Anti-enumeration contract: returns without a differentiating
+    /// signal whether the email was unknown, known-verified, or
+    /// known-unverified. The known-unverified path issues a token
+    /// and calls <c>INotifier.SendEmailVerificationAsync</c>; the
+    /// other two paths return silently. BCrypt-on-every-path timing
+    /// normalization applies. Callers MUST NOT try to distinguish
+    /// the three branches.
+    /// </summary>
+    Task RequestEmailVerificationAsync(string email, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Complete email verification with a previously-issued token.
+    /// Returns <c>true</c> on success, <c>false</c> on any failure
+    /// (unknown / expired / already-consumed / empty). Failure
+    /// reasons are deliberately not distinguished — the controller
+    /// maps <c>false</c> to a uniform 400 response.
+    /// </summary>
+    Task<bool> CompleteEmailVerificationAsync(string token);
     Task<bool> SetChildModeOverridesAsync(
         Guid parentId, Guid childId,
         bool? story, bool? game, bool? riddle, bool? curiosity);

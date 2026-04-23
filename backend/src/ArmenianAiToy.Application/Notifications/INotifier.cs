@@ -75,4 +75,28 @@ public interface INotifier
     /// </summary>
     Task<bool> SendDormancyWarningAsync(
         string email, DateTime? deleteAtUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deliver a single-use email-verification link to the supplied
+    /// address. Called by <c>ParentService.RegisterAsync</c> on the
+    /// new-email path (not the collision path) and by
+    /// <c>RequestEmailVerificationAsync</c> on the known-unverified
+    /// path (not the known-verified or unknown paths).
+    /// <para>
+    /// Returns <c>Task</c> (not <c>Task&lt;bool&gt;</c>) because the
+    /// consumer is an HTTP-synchronous handler, not a worker — the
+    /// response shape must stay anti-enum-compliant regardless of
+    /// delivery outcome. Failed sends must be swallowed into a
+    /// structured log line by the implementation, not propagated.
+    /// Same shape as <see cref="SendPasswordResetAsync"/>.
+    /// </para>
+    /// <para>
+    /// <b>No-raw-token invariant.</b> Implementations MUST NOT log,
+    /// store, or otherwise retain the raw <paramref name="verificationToken"/>.
+    /// The token travels exactly once from this method to the parent's
+    /// inbox.
+    /// </para>
+    /// </summary>
+    Task SendEmailVerificationAsync(
+        string email, string verificationToken, CancellationToken cancellationToken = default);
 }

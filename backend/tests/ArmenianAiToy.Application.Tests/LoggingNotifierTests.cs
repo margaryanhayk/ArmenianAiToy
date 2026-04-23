@@ -52,4 +52,26 @@ public class LoggingNotifierTests
 
         Assert.True(result);
     }
+
+    [Fact]
+    public async Task SendEmailVerificationAsync_DoesNotLogRawToken()
+    {
+        // Pin the no-raw-token invariant for the verification path,
+        // same discipline as SendPasswordResetAsync. A careless edit
+        // that included {Token} in the template would leak.
+        var logger = Substitute.For<ILogger<LoggingNotifier>>();
+        var notifier = new LoggingNotifier(logger);
+
+        const string rawToken = "super-secret-verification-token-do-not-log-UNIQUE77";
+        await notifier.SendEmailVerificationAsync("owner@example.com", rawToken);
+
+        foreach (var call in logger.ReceivedCalls())
+        {
+            foreach (var arg in call.GetArguments())
+            {
+                if (arg is null) continue;
+                Assert.DoesNotContain(rawToken, arg.ToString() ?? "", StringComparison.Ordinal);
+            }
+        }
+    }
 }

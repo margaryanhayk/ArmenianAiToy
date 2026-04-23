@@ -16,5 +16,6 @@ public enum AuditEventType
     ParentPasswordResetRequested,
     ParentPasswordResetCompleted,
     ParentDormancyWarned,
-    ParentDormancyAnonymized
+    ParentDormancyAnonymized,
+    ParentEmailVerified
 }

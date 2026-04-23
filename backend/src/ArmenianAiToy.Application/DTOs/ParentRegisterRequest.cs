@@ -8,3 +8,5 @@ public record ParentChangePasswordRequest(string CurrentPassword, string NewPass
 public record ParentDeleteAccountRequest(string CurrentPassword);
 public record ParentPasswordResetRequest(string Email);
 public record ParentPasswordResetCompleteRequest(string Token, string NewPassword);
+public record ParentEmailVerificationRequest(string Email);
+public record ParentEmailVerificationCompleteRequest(string Token);
