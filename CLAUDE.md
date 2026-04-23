@@ -635,6 +635,61 @@ any caller. **Typed methods, not a generic envelope** — future
 consumers (dormant-purge warnings, register-collision mail, etc.)
 extend the interface with their own method when they land.
 
+**Dashboard UI.** `parent.html` closes the browser-visible loop for
+this flow. The login view carries a subtle **Forgot password?**
+affordance that routes to a small reset-request form (email-only,
+POSTs to `/api/parents/password/reset-request`). The request UI
+surfaces a single neutral message on any 202 response — *"If an
+account exists for that email, a reset link has been sent. Check
+your inbox."* — identical for known and unknown emails, mirroring
+the backend's anti-enumeration contract. Clicking the emailed link
+opens the dashboard with `?token=...`; the boot router captures the
+token into a closure-scoped variable, strips it from the URL via
+`history.replaceState` (so it is not left in browser history /
+bookmarks / shared URLs), and shows a reset-password form that
+POSTs to `/api/parents/password/reset`. Success routes back to the
+login view with a success message; the backend does NOT re-issue
+a JWT on reset, and the UI does NOT auto-log-in — the parent must
+log in separately. Failure surfaces the backend's uniform 400
+error message (`"Reset link is invalid or expired."`) verbatim,
+preserving the "all failure reasons look identical on the wire"
+contract at the UI layer too.
+
+**Manual QA for the full browser flow:**
+1. `dotnet run --project src/ArmenianAiToy.Api` → open
+   `http://localhost:5000/parent.html`.
+2. On the login view, confirm the **Forgot password?** link is visible
+   next to the Log in button.
+3. Click **Forgot password?** → reset-request form appears with an
+   Email input and **Send reset link** button.
+4. Submit a KNOWN email → see *"If an account exists for that email,
+   a reset link has been sent…"* Status: success-muted green.
+5. Submit an UNKNOWN email → see the **identical** message (no "email
+   not found" leak, no timing oracle — also pinned by the backend
+   anti-enumeration tests).
+6. Check the stdout log → one structured line per call; for a
+   log-transport run the delivery is simulated and the token is NOT
+   in any log template hole.
+7. With `Notifications:Transport=smtp` and a real relay configured,
+   open the email, click the link (which goes to
+   `Notifications:PasswordResetLinkBase?token=...`).
+8. The dashboard opens on the reset-password view; confirm the URL
+   bar no longer contains `?token=...` (stripped by
+   `history.replaceState`).
+9. Enter a password < 8 chars → client-side validation rejects
+   before a network call is made.
+10. Enter mismatched new-password / confirm → client-side validation
+    rejects.
+11. Enter a valid new password → success routes back to login with a
+    "Your password has been reset. Please log in." status message.
+    Log in with the new password → works.
+12. Re-click the same emailed link (now single-use-consumed) → see
+    the uniform *"Reset link is invalid or expired."* error
+    (identical for consumed / expired / unknown tokens).
+13. Open an obviously-invalid URL like
+    `http://localhost:5000/parent.html?token=garbage` → same uniform
+    error; no crash.
+
 ## Register anti-enumeration
 
 `POST /api/parents/register` is designed so that the new-email and

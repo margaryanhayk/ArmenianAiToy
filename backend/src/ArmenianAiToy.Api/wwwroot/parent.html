@@ -275,7 +275,47 @@
       <label for="passwordInput">Password</label>
       <input id="passwordInput" type="password" autocomplete="current-password">
       <button id="loginBtn">Log in</button>
+      <button id="forgotPasswordBtn" class="link" type="button"
+              style="margin-left:8px;">Forgot password?</button>
       <div id="loginStatus" class="status" aria-live="polite"></div>
+    </section>
+
+    <!--
+      Reset-request view. Reached from the "Forgot password?" affordance
+      on the login view. Anti-enumeration: the backend returns an
+      identical 202 for known and unknown emails; this UI shows a
+      single neutral success message either way. Do not branch on the
+      response body.
+    -->
+    <section id="resetRequestView" class="card" hidden>
+      <h2>Reset your password</h2>
+      <label for="resetRequestEmailInput">Email</label>
+      <input id="resetRequestEmailInput" type="email" autocomplete="username">
+      <button id="resetRequestBtn">Send reset link</button>
+      <button id="resetRequestBackBtn" class="link" type="button"
+              style="margin-left:8px;">Back to login</button>
+      <div id="resetRequestStatus" class="status" aria-live="polite"></div>
+    </section>
+
+    <!--
+      Reset-password view. Activated on page load when ?token=... is
+      present in the URL. The token is captured into a module-scoped
+      variable and immediately stripped from the URL (history.replaceState)
+      so it is not left in browser history / bookmarks / shared URLs.
+      Backend returns a uniform 400 with a fixed error message for every
+      failure reason (unknown / expired / already consumed / too-short);
+      this UI surfaces that message verbatim.
+    -->
+    <section id="resetPasswordView" class="card" hidden>
+      <h2>Choose a new password</h2>
+      <label for="resetPasswordNewInput">New password</label>
+      <input id="resetPasswordNewInput" type="password" autocomplete="new-password">
+      <label for="resetPasswordConfirmInput">Confirm new password</label>
+      <input id="resetPasswordConfirmInput" type="password" autocomplete="new-password">
+      <button id="resetPasswordSubmitBtn">Set new password</button>
+      <button id="resetPasswordBackBtn" class="link" type="button"
+              style="margin-left:8px;">Back to login</button>
+      <div id="resetPasswordStatus" class="status" aria-live="polite"></div>
     </section>
 
     <!-- Devices view -->
@@ -449,11 +489,16 @@
     function clearToken() { sessionStorage.removeItem(TOKEN_KEY); }
 
     function show(viewId) {
-      var ids = ['loginView', 'devicesView', 'summariesView', 'flaggedView', 'detailView', 'auditView'];
+      var ids = ['loginView', 'resetRequestView', 'resetPasswordView',
+                 'devicesView', 'summariesView', 'flaggedView', 'detailView', 'auditView'];
       for (var i = 0; i < ids.length; i++) {
         document.getElementById(ids[i]).hidden = (ids[i] !== viewId);
       }
-      document.getElementById('logoutBtn').hidden = (viewId === 'loginView');
+      // Log-out only makes sense for authenticated, post-login views.
+      // loginView, resetRequestView, and resetPasswordView are all
+      // pre-authentication surfaces.
+      var preAuthViews = { loginView: 1, resetRequestView: 1, resetPasswordView: 1 };
+      document.getElementById('logoutBtn').hidden = !!preAuthViews[viewId];
     }
 
     function setStatus(elId, text, kind) {
@@ -575,6 +620,142 @@
       }).catch(function () {
         setStatus('loginStatus', 'Network error.', 'err');
       });
+    }
+
+    // ---------- forgot password (reset request + reset complete) ----------
+
+    // Captured from the URL on boot when a reset link is opened. Kept
+    // in a closure-scoped variable so it never lands in sessionStorage
+    // / localStorage / URL after the initial strip.
+    var pendingResetToken = null;
+
+    function showResetRequest() {
+      show('resetRequestView');
+      document.getElementById('resetRequestEmailInput').value = '';
+      setStatus('resetRequestStatus', '', '');
+    }
+
+    function submitResetRequest() {
+      var email = document.getElementById('resetRequestEmailInput').value.trim();
+      if (!email) {
+        setStatus('resetRequestStatus', 'Email is required.', 'err');
+        return;
+      }
+      setStatus('resetRequestStatus', 'Sending…', 'muted');
+      fetch('/api/parents/password/reset-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+      }).then(function (res) {
+        // 202 is the anti-enumeration success response on BOTH the
+        // known-email and unknown-email paths. Show a single neutral
+        // message either way so the UI does not become an
+        // account-existence oracle. Do not inspect the response body.
+        if (res.status === 202) {
+          setStatus('resetRequestStatus',
+            'If an account exists for that email, a reset link has been sent. ' +
+            'Check your inbox.', 'ok');
+          document.getElementById('resetRequestEmailInput').value = '';
+          return;
+        }
+        if (res.status === 429) {
+          setStatus('resetRequestStatus',
+            'Too many requests. Please slow down.', 'err');
+          return;
+        }
+        if (res.status === 400) {
+          // The backend uses 400 only for request-shape problems here
+          // (empty email), never to distinguish known from unknown.
+          setStatus('resetRequestStatus',
+            'Please enter a valid email.', 'err');
+          return;
+        }
+        setStatus('resetRequestStatus', 'Error: HTTP ' + res.status, 'err');
+      }).catch(function () {
+        setStatus('resetRequestStatus', 'Network error.', 'err');
+      });
+    }
+
+    function showResetPassword(token) {
+      pendingResetToken = token;
+      // Strip the token from the URL immediately. The token is now in
+      // memory; leaving it in the address bar puts it into history,
+      // bookmarks, and any shared-URL paste. history.replaceState is
+      // best-effort; very old browsers that lack it will simply leave
+      // the URL as-is, which is no worse than today's state.
+      try {
+        history.replaceState(null, '', window.location.pathname);
+      } catch (e) { /* ignore */ }
+      show('resetPasswordView');
+      document.getElementById('resetPasswordNewInput').value = '';
+      document.getElementById('resetPasswordConfirmInput').value = '';
+      setStatus('resetPasswordStatus', '', '');
+    }
+
+    function submitResetPassword() {
+      var pw = document.getElementById('resetPasswordNewInput').value;
+      var confirmPw = document.getElementById('resetPasswordConfirmInput').value;
+      // Client-side guards are UX-only; the backend remains the source
+      // of truth. Backend rejects passwords < 8 with the same uniform
+      // 400 it uses for every other failure reason — but surfacing a
+      // local "too short" message avoids a round-trip.
+      if (!pw || pw.length < 8) {
+        setStatus('resetPasswordStatus',
+          'Password must be at least 8 characters.', 'err');
+        return;
+      }
+      if (pw !== confirmPw) {
+        setStatus('resetPasswordStatus',
+          'The two passwords do not match.', 'err');
+        return;
+      }
+      if (!pendingResetToken) {
+        // Shouldn't happen in the normal flow (view is only shown when
+        // a token was captured on boot), but guard defensively.
+        setStatus('resetPasswordStatus',
+          'Reset link is invalid or expired.', 'err');
+        return;
+      }
+      setStatus('resetPasswordStatus', 'Saving…', 'muted');
+      fetch('/api/parents/password/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: pendingResetToken, newPassword: pw })
+      }).then(function (res) {
+        return res.json().catch(function () { return null; })
+          .then(function (data) { return { status: res.status, data: data }; });
+      }).then(function (r) {
+        if (r.status === 200 && r.data && r.data.reset) {
+          // Success. Deliberately do NOT auto-login — the backend does
+          // not re-issue a JWT on reset, and forcing the parent through
+          // a fresh login proves they know the new password end-to-end.
+          pendingResetToken = null;
+          document.getElementById('resetPasswordNewInput').value = '';
+          document.getElementById('resetPasswordConfirmInput').value = '';
+          show('loginView');
+          setStatus('loginStatus',
+            'Your password has been reset. Please log in.', 'ok');
+          return;
+        }
+        // The backend returns a uniform 400 with a fixed error message
+        // for every failure reason (unknown / expired / already
+        // consumed / too-short password) — surface it as-is so we
+        // match the anti-enumeration posture.
+        var msg = (r.data && r.data.error) || 'Reset link is invalid or expired.';
+        setStatus('resetPasswordStatus', msg, 'err');
+      }).catch(function () {
+        setStatus('resetPasswordStatus', 'Network error.', 'err');
+      });
+    }
+
+    function backFromResetToLogin() {
+      pendingResetToken = null;
+      document.getElementById('resetRequestEmailInput').value = '';
+      document.getElementById('resetPasswordNewInput').value = '';
+      document.getElementById('resetPasswordConfirmInput').value = '';
+      setStatus('resetRequestStatus', '', '');
+      setStatus('resetPasswordStatus', '', '');
+      show('loginView');
     }
 
     function togglePasswordForm() {
@@ -1897,6 +2078,20 @@
       if (e.key === 'Enter') doLogin();
     });
     document.getElementById('logoutBtn').addEventListener('click', doLogout);
+
+    // Forgot-password flow: login-view affordance, reset-request form,
+    // and reset-password form. Enter-to-submit on the obvious fields.
+    document.getElementById('forgotPasswordBtn').addEventListener('click', showResetRequest);
+    document.getElementById('resetRequestBtn').addEventListener('click', submitResetRequest);
+    document.getElementById('resetRequestEmailInput').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') submitResetRequest();
+    });
+    document.getElementById('resetRequestBackBtn').addEventListener('click', backFromResetToLogin);
+    document.getElementById('resetPasswordSubmitBtn').addEventListener('click', submitResetPassword);
+    document.getElementById('resetPasswordConfirmInput').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') submitResetPassword();
+    });
+    document.getElementById('resetPasswordBackBtn').addEventListener('click', backFromResetToLogin);
     document.getElementById('togglePasswordBtn').addEventListener('click', togglePasswordForm);
     document.getElementById('changePasswordBtn').addEventListener('click', doChangePassword);
     document.getElementById('toggleDeleteAccountBtn').addEventListener('click', toggleDeleteAccountForm);
@@ -1931,11 +2126,27 @@
     }
 
     // ---------- boot ----------
-    if (getToken()) {
-      loadDevices();
-    } else {
-      show('loginView');
-    }
+    // Reset-token detection takes priority over every other routing
+    // decision: a parent holding a fresh reset link is by definition
+    // in a recovery flow, not active use. URLSearchParams is available
+    // on every browser this dashboard targets; the try/catch is
+    // defensive for environments where window.location is unusable.
+    (function bootRouter() {
+      var urlToken = null;
+      try {
+        var params = new URLSearchParams(window.location.search);
+        urlToken = params.get('token');
+      } catch (e) { /* fall through to normal routing */ }
+      if (urlToken) {
+        showResetPassword(urlToken);
+        return;
+      }
+      if (getToken()) {
+        loadDevices();
+      } else {
+        show('loginView');
+      }
+    })();
   })();
   </script>
 </body>
