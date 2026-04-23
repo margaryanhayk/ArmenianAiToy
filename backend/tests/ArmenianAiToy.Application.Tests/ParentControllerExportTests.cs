@@ -211,6 +211,56 @@ public class ParentControllerExportTests
     }
 
     [Fact]
+    public async Task Export_ParentProfileIncludesLastLoginAt()
+    {
+        // The parent-activity signal slice added LastLoginAt to the
+        // Parent entity and to ParentExportProfile. This test pins:
+        //   - a never-logged-in parent exports LastLoginAt as null
+        //   - a parent with a stamped LastLoginAt exports that exact
+        //     value (tick-accurate; the export does not re-compute or
+        //     normalize the timestamp).
+        var neverLoggedInId = Guid.NewGuid();
+        var stampedId = Guid.NewGuid();
+        var stamp = new DateTime(2026, 4, 15, 9, 30, 45, DateTimeKind.Utc);
+
+        // Never-logged-in parent path.
+        {
+            var (controller, db, conn, _, _) = await CreateControllerAsync(neverLoggedInId);
+            await using var _conn = conn;
+            db.Set<Parent>().Add(new Parent
+            {
+                Id = neverLoggedInId,
+                Email = "never@example.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("pw12345678"),
+                RegisteredAt = DateTime.UtcNow,
+                LastLoginAt = null
+            });
+            await db.SaveChangesAsync();
+
+            var export = GetExport(await controller.Export());
+            Assert.Null(export.Parent.LastLoginAt);
+        }
+
+        // Stamped parent path.
+        {
+            var (controller, db, conn, _, _) = await CreateControllerAsync(stampedId);
+            await using var _conn = conn;
+            db.Set<Parent>().Add(new Parent
+            {
+                Id = stampedId,
+                Email = "stamped@example.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("pw12345678"),
+                RegisteredAt = DateTime.UtcNow,
+                LastLoginAt = stamp
+            });
+            await db.SaveChangesAsync();
+
+            var export = GetExport(await controller.Export());
+            Assert.Equal(stamp, export.Parent.LastLoginAt);
+        }
+    }
+
+    [Fact]
     public async Task Export_SuccessWritesParentDataExportedAuditRow()
     {
         var parentId = Guid.NewGuid();

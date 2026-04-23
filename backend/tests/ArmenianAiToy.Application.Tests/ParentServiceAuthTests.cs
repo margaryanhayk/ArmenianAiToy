@@ -176,6 +176,110 @@ public class ParentServiceAuthTests
         Assert.Null(result);
     }
 
+    // --- LoginAsync LastLoginAt stamp (parent-activity signal slice) ---
+
+    [Fact]
+    public async Task LoginAsync_Success_StampsLastLoginAt()
+    {
+        // Pins the canonical parent-activity signal contract: a
+        // successful credentials-plus-JWT exchange overwrites
+        // Parent.LastLoginAt with DateTime.UtcNow and persists. Failed
+        // branches (asserted in the sibling tests below) must never
+        // touch the column.
+        var (service, db) = CreateService();
+        var parentId = Guid.NewGuid();
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId,
+            Email = "user@example.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("correctpass"),
+            RegisteredAt = DateTime.UtcNow.AddDays(-30),
+            LastLoginAt = null // never logged in before this call
+        });
+        await db.SaveChangesAsync();
+        var before = DateTime.UtcNow;
+
+        var result = await service.LoginAsync("user@example.com", "correctpass");
+
+        Assert.NotNull(result);
+        Assert.False(string.IsNullOrEmpty(result!.Token)); // response shape unchanged
+        var stamped = await db.Set<Parent>()
+            .AsNoTracking()
+            .FirstAsync(p => p.Id == parentId);
+        Assert.NotNull(stamped.LastLoginAt);
+        Assert.InRange(stamped.LastLoginAt!.Value, before, DateTime.UtcNow);
+    }
+
+    [Fact]
+    public async Task LoginAsync_WrongPassword_DoesNotStampLastLoginAt()
+    {
+        // Failed-BCrypt path must leave LastLoginAt untouched. A
+        // pre-existing stamp proves "was this specific row mutated,"
+        // which a brute-force attacker probing this email would try to
+        // exploit to mask activity or force a write storm.
+        var (service, db) = CreateService();
+        var parentId = Guid.NewGuid();
+        var preExistingStamp = DateTime.UtcNow.AddDays(-5);
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId,
+            Email = "user@example.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("correctpass"),
+            RegisteredAt = DateTime.UtcNow.AddDays(-30),
+            LastLoginAt = preExistingStamp
+        });
+        await db.SaveChangesAsync();
+
+        var result = await service.LoginAsync("user@example.com", "wrongpass");
+
+        Assert.Null(result);
+        var unchanged = await db.Set<Parent>()
+            .AsNoTracking()
+            .FirstAsync(p => p.Id == parentId);
+        Assert.Equal(preExistingStamp, unchanged.LastLoginAt);
+    }
+
+    [Fact]
+    public async Task LoginAsync_UnknownEmail_DoesNotCreateOrStampAnything()
+    {
+        // Unknown-email path must short-circuit before any DB write.
+        // A regression that accidentally created a Parent row on
+        // unknown-email would both leak account-existence (via a
+        // follow-up Parents count) and silently populate LastLoginAt
+        // for an account the caller does not own.
+        var (service, db) = CreateService();
+
+        var result = await service.LoginAsync("nobody@example.com", "anypass");
+
+        Assert.Null(result);
+        Assert.Equal(0, await db.Set<Parent>().CountAsync());
+    }
+
+    [Fact]
+    public async Task LoginAsync_Success_DoesNotWriteAuditRow()
+    {
+        // Login stays out of audit scope (CLAUDE.md § Audit events). The
+        // LastLoginAt stamp is the ONLY side effect of a successful
+        // login; a regression that accidentally wired
+        // `TrackAndAddAudit` into LoginAsync would re-open the audit
+        // write-path for an endpoint that has deliberately stayed out.
+        var (service, db) = CreateService();
+        var parentId = Guid.NewGuid();
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId,
+            Email = "user@example.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("correctpass"),
+            RegisteredAt = DateTime.UtcNow.AddDays(-30)
+        });
+        await db.SaveChangesAsync();
+
+        var result = await service.LoginAsync("user@example.com", "correctpass");
+
+        Assert.NotNull(result);
+        Assert.Equal(0, await db.Set<AuditEvent>().CountAsync());
+    }
+
     [Fact]
     public async Task LoginAsync_WhenJwtKeyMissing_Throws()
     {

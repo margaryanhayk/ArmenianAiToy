@@ -38,7 +38,8 @@ public record ParentExportProfile(
     string Email,
     DateTime RegisteredAt,
     DateTime? TermsAcceptedAt,
-    string? TermsVersion);
+    string? TermsVersion,
+    DateTime? LastLoginAt);
 
 /// <summary>
 /// Safe device fields only — no <c>ApiKey</c>. All settings here are

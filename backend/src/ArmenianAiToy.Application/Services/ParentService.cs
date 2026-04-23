@@ -160,7 +160,16 @@ public class ParentService : IParentService
         if (parent == null || !BCrypt.Net.BCrypt.Verify(password, parent.PasswordHash))
             return null;
 
+        // JWT generation runs BEFORE the LastLoginAt stamp so a
+        // misconfig (missing/legacy Jwt:Key) fails fast without
+        // persisting a login-success signal the caller never actually
+        // received. Only a fully successful credentials + JWT exchange
+        // mutates the column. Failed-BCrypt and unknown-email paths
+        // have already short-circuited above and leave the DB untouched
+        // — same contract as before this slice.
         var token = GenerateJwt(parent);
+        parent.LastLoginAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
         return new ParentLoginResponse(token);
     }
 
@@ -893,7 +902,8 @@ public class ParentService : IParentService
                 parent.Email,
                 parent.RegisteredAt,
                 parent.TermsAcceptedAt,
-                parent.TermsVersion),
+                parent.TermsVersion,
+                parent.LastLoginAt),
             Devices: deviceExports,
             AuditEvents: auditDtos,
             ExcludedFields: new[]
