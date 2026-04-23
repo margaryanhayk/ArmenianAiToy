@@ -55,11 +55,16 @@ public static class DependencyInjection
         services.AddScoped<IParentService, ParentService>();
         services.AddScoped<IChildService, ChildService>();
 
-        // Minimal outbound-notification seam. Log-only by default; a
-        // future deploy slice can swap in an email / webhook / provider
-        // SDK without changing any call site. Introduced as part of the
-        // forgot-password slice — see INotifier xmldoc.
-        services.AddScoped<INotifier, LoggingNotifier>();
+        // Minimal outbound-notification seam. `Notifications:Transport`
+        // picks the implementation at startup — `log` (shipped default,
+        // no real delivery) or `smtp` (BCL SmtpClient-backed send).
+        // Unknown values and missing required SMTP config both fail
+        // fast here via NotifierTransport.ResolveImplementation, so a
+        // misconfigured process never reaches the first reset-email
+        // send with a broken transport. See CLAUDE.md § Password reset
+        // / § Notification transport.
+        var notifierImpl = NotifierTransport.ResolveImplementation(config);
+        services.AddScoped(typeof(INotifier), notifierImpl);
 
         // Per-parent cooldown guard for the data-export endpoint.
         // Singleton because the cooldown map must persist across scoped
