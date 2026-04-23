@@ -792,7 +792,8 @@ public class RetentionPurgeServiceTests
         DateTime? lastLoginAt,
         DateTime? dormancyWarnedAt = null,
         DateTime? emailVerifiedAt = null,
-        bool autoVerify = true)
+        bool autoVerify = true,
+        string? googleSubject = null)
     {
         // `autoVerify = true` is the default so every pre-existing
         // warn test continues to seed a verified parent without
@@ -800,6 +801,10 @@ public class RetentionPurgeServiceTests
         // Tests that want to exercise the "unverified parent is
         // excluded from the warn pass" invariant explicitly pass
         // `autoVerify: false`.
+        // `googleSubject` is optional so only the one anonymize-
+        // scrub test that exercises it has to thread a value in;
+        // every other warn/anonymize caller seeds a null sub,
+        // which mirrors a password-only parent.
         var id = Guid.NewGuid();
         var verifiedAt = emailVerifiedAt
             ?? (autoVerify ? DateTime.UtcNow.AddDays(-30) : (DateTime?)null);
@@ -811,7 +816,8 @@ public class RetentionPurgeServiceTests
             RegisteredAt = DateTime.UtcNow.AddDays(-400),
             LastLoginAt = lastLoginAt,
             DormancyWarnedAt = dormancyWarnedAt,
-            EmailVerifiedAt = verifiedAt
+            EmailVerifiedAt = verifiedAt,
+            GoogleSubject = googleSubject
         });
         return id;
     }
@@ -1030,9 +1036,17 @@ public class RetentionPurgeServiceTests
             dormancyWarnRefireIntervalDays: 30,
             dormancyAnonymizeAfterDays: 60,
             notifier: notifier);
+        // Stamp a GoogleSubject on the seeded row so the post-scrub
+        // assertion can directly pin that anonymize nulls it out.
+        // Without this, the invariant is only covered indirectly by
+        // GoogleSignIn_AnonymizedEmailMatch_IsNotReused_CreatesFreshRow,
+        // which would still pass if the scrub was silently removed
+        // (that test exercises a DIFFERENT rule — the AnonymizedAt
+        // filter — and does not read GoogleSubject back from the row).
         var parentId = SeedParent(h.Db,
             lastLoginAt: DateTime.UtcNow.AddDays(-260),
-            dormancyWarnedAt: DateTime.UtcNow.AddDays(-30));
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-30),
+            googleSubject: "gsub-anonymize-scrub-test");
         await h.Db.SaveChangesAsync();
         var before = DateTime.UtcNow;
 
@@ -1041,6 +1055,7 @@ public class RetentionPurgeServiceTests
         var row = await h.Db.Set<Parent>().AsNoTracking().FirstAsync(p => p.Id == parentId);
         Assert.Equal("", row.Email);
         Assert.Equal("", row.PasswordHash);
+        Assert.Null(row.GoogleSubject);
         Assert.Null(row.LastLoginAt);
         Assert.Null(row.DormancyWarnedAt);
         Assert.NotNull(row.AnonymizedAt);
