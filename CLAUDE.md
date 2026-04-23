@@ -406,6 +406,34 @@ Polly; no new NuGet packages.
   disabled, the worker logs once per tick and issues no DB query —
   this covers BOTH the conversation pass and the token-cleanup pass.
 
+- **Device destructive pass (`Dormancy:Devices:DeleteAfterDays`).**
+  Runs LAST in the tick, immediately after the device-warn pass.
+  Deletes a dormant `Device` (per-device, whole device — NOT
+  per-parent link) when all three hold:
+  `Device.LastSeenAt < UtcNow - WarnAfterDays`,
+  `Device.DormancyWarnedAt != null`, AND
+  `Device.DormancyWarnedAt < UtcNow - DeleteAfterDays`. FK cascade
+  removes children, conversations, messages, and `ParentDevice`
+  join rows in the same transaction; one system-actor
+  `DeviceDormancyDeleted` audit row per deleted device carries
+  counts-only metadata (`warn_after_days`, `delete_after_days`,
+  `last_seen_at_utc`, `linked_parents_at_delete`,
+  `children_deleted`, `conversations_deleted`, `messages_deleted`
+  — no device name, no parent ids, no emails). Shipped default
+  `DeleteAfterDays = 0` (disabled). Positive values clamp to >= 1
+  so a same-tick warn + delete race is structurally impossible.
+  **Operator-facing invariant**: set
+  `Dormancy:Devices:WarnRefireIntervalDays > Dormancy:Devices:DeleteAfterDays`
+  — the warn pass's refire logic updates `DormancyWarnedAt` on
+  every tick past the refire window, resetting the destructive
+  clock. Recommended pairing: refire=90, delete=60. The DI-time
+  precondition (Guard 4) additionally requires SMTP transport
+  and `WarnAfterDays > 0` when `DeleteAfterDays > 0`. The
+  existing device-warn email carries the effective delete date
+  in its body via the notifier's pre-reserved `deleteAtUtc`
+  parameter — no new notifier method, no separate "final notice"
+  pass.
+
 - **Audit stays forever — unchanged.** This slice does not add any
   trim/archival of the `AuditEvents` table. The "keep forever, no
   FK" invariant from § Audit events is preserved. Retention is

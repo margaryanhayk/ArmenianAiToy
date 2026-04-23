@@ -506,6 +506,75 @@ public class SmtpNotifierTests
     }
 
     [Fact]
+    public async Task SendDormantDeviceWarningAsync_NonNullDeleteAtUtc_IncludesDeleteDate()
+    {
+        // Destructive-tier activation: when the caller (worker's
+        // warn pass with DeleteAfterDays > 0) passes a non-null
+        // deleteAtUtc, the body MUST include that date in plain
+        // yyyy-MM-dd form so the parent is forewarned. Mirrors the
+        // BuildDormancyWarningBody conditional the parent-anonymize
+        // slice already shipped.
+        MailMessage? captured = null;
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (msg, _) => { captured = msg; return Task.CompletedTask; });
+
+        var lastSeen = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var deleteAt = new DateTime(2026, 5, 15, 0, 0, 0, DateTimeKind.Utc);
+        await notifier.SendDormantDeviceWarningAsync(
+            "parent@example.com", "Areg", lastSeen, deleteAt);
+
+        Assert.NotNull(captured);
+        // Both dates must appear: last-seen (2025-01-01) and delete
+        // date (2026-05-15) — two yyyy-MM-dd substrings in the body.
+        Assert.Contains("2025-01-01", captured!.Body, StringComparison.Ordinal);
+        Assert.Contains("2026-05-15", captured.Body, StringComparison.Ordinal);
+        var dateMatches = System.Text.RegularExpressions.Regex.Matches(
+            captured.Body, @"\d{4}-\d{2}-\d{2}");
+        Assert.Equal(2, dateMatches.Count);
+    }
+
+    [Fact]
+    public async Task SendDormantDeviceWarningAsync_NonNullDeleteAtUtc_SmtpSendThrows_ReturnsFalse()
+    {
+        // Failure semantics must be identical whether deleteAtUtc is
+        // null or not — non-OCE exception → return false, log warning.
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (_, _) => throw new SmtpException("relay broken"));
+
+        var delivered = await notifier.SendDormantDeviceWarningAsync(
+            "parent@example.com", "Areg",
+            DateTime.UtcNow.AddDays(-400),
+            deleteAtUtc: DateTime.UtcNow.AddDays(30));
+
+        Assert.False(delivered);
+    }
+
+    [Fact]
+    public async Task SendDormantDeviceWarningAsync_NonNullDeleteAtUtc_OperationCanceled_Propagates()
+    {
+        // OCE propagation is identical on both branches — the worker
+        // must be able to shut down cleanly regardless of whether
+        // the destructive tier is active.
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (_, ct) => throw new OperationCanceledException(ct));
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            notifier.SendDormantDeviceWarningAsync(
+                "parent@example.com", "Areg",
+                DateTime.UtcNow.AddDays(-400),
+                deleteAtUtc: DateTime.UtcNow.AddDays(30),
+                cts.Token));
+    }
+
+    [Fact]
     public async Task SendPasswordResetAsync_Success_LogsDeliveredTrue()
     {
         // Happy-path log line: one LogInformation with delivered=true.

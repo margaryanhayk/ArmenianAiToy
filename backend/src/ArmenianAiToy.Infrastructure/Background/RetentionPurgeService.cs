@@ -155,6 +155,17 @@ public sealed class RetentionPurgeService : BackgroundService
     /// </summary>
     public const int DefaultDormancyDevicesWarnRefireIntervalDays = 30;
 
+    /// <summary>
+    /// Fallback for <c>Dormancy:Devices:DeleteAfterDays</c>. Missing
+    /// key resolves to <b>0 (disabled)</b> — the same opt-in posture
+    /// as every other destructive-tier knob. Positive values are
+    /// clamped to >= 1 by <see cref="ReadDormancyDevicesDeleteAfterDays"/>
+    /// so a same-tick warn-then-delete race is impossible; the warn
+    /// pass's stamp must age past this grace window before the
+    /// destructive pass treats the device as eligible.
+    /// </summary>
+    public const int DefaultDormancyDevicesDeleteAfterDays = 0;
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IConfiguration _config;
     private readonly ILogger<RetentionPurgeService> _logger;
@@ -261,12 +272,18 @@ public sealed class RetentionPurgeService : BackgroundService
         // refire on the same tick, so no warn is lost.
         await AnonymizeDormantParentsAsync(db, stoppingToken);
         await WarnDormantParentsAsync(scope.ServiceProvider, db, stoppingToken);
-        // Device-warn slots LAST. Independent of parent passes —
-        // device dormancy is per-device, recipient list is the
-        // device's verified linked parents, and partial fan-out
-        // failure handling is local to this pass. Disabled gate
-        // (Dormancy:Devices:WarnAfterDays <= 0) short-circuits.
+        // Device-warn runs before device-delete so a freshly-warned
+        // device's DormancyWarnedAt stamp is at most "this tick's now"
+        // when the destructive pass enumerates; the destructive
+        // eligibility's DormancyWarnedAt < UtcNow - DeleteAfterDays
+        // check (with DeleteAfterDays >= 1) guarantees a same-tick
+        // warn-then-delete race is impossible.
         await WarnDormantDevicesAsync(scope.ServiceProvider, db, stoppingToken);
+        // Device-delete slots LAST. Independent of every parent pass —
+        // uses Device columns only (LastSeenAt + DormancyWarnedAt +
+        // DeleteAfterDays). Disabled gate (DeleteAfterDays <= 0)
+        // short-circuits.
+        await DeleteDormantDevicesAsync(db, stoppingToken);
     }
 
     private async Task PurgeExpiredConversationsAsync(
@@ -711,9 +728,20 @@ public sealed class RetentionPurgeService : BackgroundService
             return;
         }
         var refireIntervalDays = ReadDormancyDevicesWarnRefireIntervalDays();
+        // DeleteAfterDays is read here — and only here — to decide
+        // whether the outgoing warn email carries a delete date.
+        // When disabled (<= 0), deleteAtUtc stays null and the email
+        // remains the existing warn-only copy. When enabled, the
+        // email carries a delete date the destructive pass will
+        // honor on a later tick (DeleteAfterDays >= 1 is clamped at
+        // read-time so the date is always at least one day out).
+        var deleteAfterDays = ReadDormancyDevicesDeleteAfterDays();
         var nowUtc = DateTime.UtcNow;
         var dormantCutoff = nowUtc - TimeSpan.FromDays(warnAfterDays);
         var refireCutoff = nowUtc - TimeSpan.FromDays(refireIntervalDays);
+        DateTime? deleteAtUtcForEmail = deleteAfterDays > 0
+            ? nowUtc + TimeSpan.FromDays(deleteAfterDays)
+            : (DateTime?)null;
 
         // Eligibility: device past threshold; not yet warned (or
         // warned past refire); has at least one verified linked
@@ -765,7 +793,7 @@ public sealed class RetentionPurgeService : BackgroundService
                 {
                     delivered = await notifier.SendDormantDeviceWarningAsync(
                         parent.Email, device.Name, device.LastSeenAt,
-                        deleteAtUtc: null, stoppingToken);
+                        deleteAtUtc: deleteAtUtcForEmail, stoppingToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -820,6 +848,151 @@ public sealed class RetentionPurgeService : BackgroundService
             _logger.LogInformation(
                 "RetentionPurgeService tick: warned {DevicesWarned} dormant device(s) (threshold={WarnAfterDays}d, refire={RefireIntervalDays}d).",
                 devicesWarned, warnAfterDays, refireIntervalDays);
+        }
+    }
+
+    /// <summary>
+    /// Destructive counterpart to <see cref="WarnDormantDevicesAsync"/>.
+    /// Deletes the <see cref="Device"/> row (and everything cascading
+    /// under it via existing schema FKs — children, conversations,
+    /// messages, parent-device links) for devices that were warned at
+    /// least <c>Dormancy:Devices:DeleteAfterDays</c> ago and are still
+    /// past the warn threshold.
+    ///
+    /// <para>
+    /// <b>Eligibility gate</b> (all must hold):
+    /// </para>
+    /// <list type="bullet">
+    ///   <item><description><c>DeleteAfterDays &gt; 0</c> —
+    ///   disabled-by-default shipping posture.</description></item>
+    ///   <item><description><c>Device.LastSeenAt &lt; UtcNow - WarnAfterDays</c>
+    ///   — still genuinely dormant.</description></item>
+    ///   <item><description><c>Device.DormancyWarnedAt != null</c> — a
+    ///   warn email was delivered (guaranteed by the warn pass's
+    ///   "at least one recipient succeeded" stamp rule).</description></item>
+    ///   <item><description><c>Device.DormancyWarnedAt &lt; UtcNow - DeleteAfterDays</c>
+    ///   — the grace window has elapsed. With <c>DeleteAfterDays</c>
+    ///   clamped to &gt;= 1, a device warned on the same tick can
+    ///   never satisfy this and is excluded (same-tick warn + delete
+    ///   is blocked).</description></item>
+    /// </list>
+    ///
+    /// <para>
+    /// <b>Delete semantics</b>: per-device, not per-parent. One
+    /// <c>Device.Remove</c>; existing DB-level FK cascade handles
+    /// children (Cascade), conversations (Cascade), messages
+    /// (Cascade via Conversation), and <c>ParentDevice</c> join rows
+    /// (Cascade). The manual <c>UnlinkDeviceAsync</c> code path is
+    /// NOT called — this pass writes a single
+    /// <see cref="AuditEventType.DeviceDormancyDeleted"/> audit row
+    /// rather than a <c>ParentDeviceUnlinked</c> row per link.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Cascade counts</b> are captured from cheap projections
+    /// BEFORE the delete so the audit row's metadata matches the
+    /// actual rows that went away. No entity materialization beyond
+    /// the device row itself.
+    /// </para>
+    ///
+    /// <para>
+    /// Per-device atomicity: one <c>SaveChangesAsync</c> per device.
+    /// A worker crash mid-pass leaves already-deleted devices fully
+    /// recorded and not-yet-processed devices untouched.
+    /// </para>
+    /// </summary>
+    private async Task DeleteDormantDevicesAsync(
+        AppDbContext db, CancellationToken stoppingToken)
+    {
+        var deleteAfterDays = ReadDormancyDevicesDeleteAfterDays();
+        if (deleteAfterDays <= 0)
+        {
+            // Disabled. Outer MaxAgeDays<=0 disable gate already
+            // logged a once-per-tick "worker disabled" line; no
+            // extra log here so disabled ticks are quiet.
+            return;
+        }
+        var warnAfterDays = ReadDormancyDevicesWarnAfterDays();
+        if (warnAfterDays <= 0)
+        {
+            // Defense-in-depth: the DI-time precondition already
+            // enforces delete-enabled => warn-enabled. If a future
+            // code path reaches here with warn disabled (tests that
+            // skip DI bootstrap, config-reload races), skip cleanly
+            // rather than fire destructively without a warn channel.
+            return;
+        }
+        var nowUtc = DateTime.UtcNow;
+        var dormantCutoff = nowUtc - TimeSpan.FromDays(warnAfterDays);
+        var deleteGraceCutoff = nowUtc - TimeSpan.FromDays(deleteAfterDays);
+
+        // Cheap projection — device id + the three count columns we
+        // need for the audit row. Message.Content never lands on this
+        // process. LinkedParents / Children / Conversations / Messages
+        // are aggregates over existing FK-indexed columns.
+        var eligible = await db.Set<Device>()
+            .Where(d =>
+                d.LastSeenAt < dormantCutoff
+                && d.DormancyWarnedAt != null
+                && d.DormancyWarnedAt < deleteGraceCutoff)
+            .Select(d => new
+            {
+                d.Id,
+                d.LastSeenAt,
+                LinkedParentsAtDelete = db.Set<ParentDevice>()
+                    .Count(pd => pd.DeviceId == d.Id),
+                ChildrenCount = db.Set<Child>()
+                    .Count(c => c.DeviceId == d.Id),
+                ConversationsCount = db.Set<Conversation>()
+                    .Count(c => c.DeviceId == d.Id),
+                MessagesCount = db.Set<Message>()
+                    .Count(m => db.Set<Conversation>()
+                        .Any(c => c.Id == m.ConversationId && c.DeviceId == d.Id))
+            })
+            .ToListAsync(stoppingToken);
+
+        if (eligible.Count == 0)
+            return;
+
+        int devicesDeleted = 0;
+        foreach (var row in eligible)
+        {
+            // Load the bare device row so the change tracker can
+            // issue the DELETE. Children / conversations / messages /
+            // ParentDevice cascade at the DB FK level (see
+            // 20260420201336_Initial for the Cascade declarations on
+            // Children.DeviceId and Conversations.DeviceId).
+            var device = await db.Set<Device>()
+                .FindAsync(new object?[] { row.Id }, stoppingToken);
+            if (device is null)
+                continue; // raced with another deleter; skip cleanly
+
+            db.Set<Device>().Remove(device);
+
+            var audit = AuditEvent.DeviceDormancyDeleted(
+                deviceId: row.Id,
+                warnAfterDays: warnAfterDays,
+                deleteAfterDays: deleteAfterDays,
+                lastSeenAtUtc: row.LastSeenAt,
+                linkedParentsAtDelete: row.LinkedParentsAtDelete,
+                childrenDeleted: row.ChildrenCount,
+                conversationsDeleted: row.ConversationsCount,
+                messagesDeleted: row.MessagesCount);
+            db.Set<AuditEvent>().Add(audit);
+            AppMeter.AuditEventsWritten.Add(1,
+                new KeyValuePair<string, object?>("event_type", audit.EventType.ToString()));
+
+            // Per-device atomicity: device delete (with cascades) +
+            // audit insert flush together.
+            await db.SaveChangesAsync(stoppingToken);
+            devicesDeleted++;
+        }
+
+        if (devicesDeleted > 0)
+        {
+            _logger.LogInformation(
+                "RetentionPurgeService tick: deleted {DevicesDeleted} dormant device(s) (warn={WarnAfterDays}d, delete={DeleteAfterDays}d).",
+                devicesDeleted, warnAfterDays, deleteAfterDays);
         }
     }
 
@@ -939,6 +1112,24 @@ public sealed class RetentionPurgeService : BackgroundService
         var raw = ParseIntOrDefault(
             _config["Dormancy:Devices:WarnRefireIntervalDays"],
             DefaultDormancyDevicesWarnRefireIntervalDays);
+        return raw < 1 ? 1 : raw;
+    }
+
+    // Dormancy:Devices:DeleteAfterDays — fallback 0 (disabled). Non-
+    // positive values disable the destructive device pass entirely.
+    // Positive values are floor-clamped to >= 1 so the eligibility's
+    // DormancyWarnedAt < UtcNow - DeleteAfterDays check always
+    // excludes a device warned on the same tick (same-tick warn +
+    // delete race is structurally impossible). The DI-time
+    // precondition (DormancyTransportPrecondition Guard 4) has
+    // already enforced that delete-enabled implies warn-enabled +
+    // SMTP before we get here.
+    private int ReadDormancyDevicesDeleteAfterDays()
+    {
+        var raw = ParseIntOrDefault(
+            _config["Dormancy:Devices:DeleteAfterDays"],
+            DefaultDormancyDevicesDeleteAfterDays);
+        if (raw <= 0) return 0;
         return raw < 1 ? 1 : raw;
     }
 

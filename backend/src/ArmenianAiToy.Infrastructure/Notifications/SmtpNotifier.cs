@@ -299,19 +299,13 @@ public sealed class SmtpNotifier : INotifier
         DateTime? deleteAtUtc,
         CancellationToken cancellationToken = default)
     {
-        // deleteAtUtc is intentionally unused in this slice. Reserved
-        // parameter for the future destructive device-action slice —
-        // keeping the method signature stable means that slice is a
-        // body-only change.
-        _ = deleteAtUtc;
-
         var fromAddress = _config["Notifications:Smtp:FromAddress"] ?? "";
 
         using var message = new MailMessage
         {
             From = new MailAddress(fromAddress),
             Subject = "Ձեր երեխայի խաղալիքը վերջերս չի օգտագործվել",
-            Body = BuildDormantDeviceWarningBody(deviceName, lastSeenAtUtc),
+            Body = BuildDormantDeviceWarningBody(deviceName, lastSeenAtUtc, deleteAtUtc),
             BodyEncoding = Encoding.UTF8,
             SubjectEncoding = Encoding.UTF8,
             IsBodyHtml = false
@@ -408,21 +402,31 @@ public sealed class SmtpNotifier : INotifier
     }
 
     private static string BuildDormantDeviceWarningBody(
-        string deviceName, DateTime lastSeenAtUtc)
+        string deviceName, DateTime lastSeenAtUtc, DateTime? deleteAtUtc)
     {
-        // Eastern Armenian, warm but neutral. No destructive language —
-        // this slice is warn-only and the device-unlink action does
-        // not yet exist. Tells the parent: what (the device hasn't
-        // been used), when (last-seen date in plain yyyy-MM-dd —
-        // no time, no locale-specific format, no ISO-with-T-and-Z),
-        // what to do (use it again to keep it active), and the
-        // opt-out (ignore if no longer using the toy).
+        // Eastern Armenian, warm but neutral in the warn-only case;
+        // factual-without-panic when a destructive date is attached.
+        // Mirrors BuildDormancyWarningBody's shape. When deleteAtUtc
+        // is non-null the body swaps in an explicit delete-date line
+        // so the parent is forewarned before the destructive pass
+        // fires on a later tick. No time component, no locale-
+        // specific format — plain yyyy-MM-dd so a regex-assert test
+        // can pin the shape.
         var lastSeenStr = lastSeenAtUtc.ToString("yyyy-MM-dd");
-        return string.Join("\n\n",
+        var lines = new System.Collections.Generic.List<string>
+        {
             $"Բարև։ Ձեր Areg հաշվին կապված սարք-ը — {deviceName} — վերջերս չի օգտագործվել։",
             $"Վերջին ակտիվությունը: {lastSeenStr}.",
-            "Եթե դեռ ցանկանում եք պահպանել այս սարքը ակտիվ, պարզապես կրկին օգտագործեք այն։",
-            "Եթե այլևս չեք օգտագործում այս սարքը, այս նամակը կարող եք անտեսել։");
+            "Եթե դեռ ցանկանում եք պահպանել այս սարքը ակտիվ, պարզապես կրկին օգտագործեք այն։"
+        };
+        if (deleteAtUtc.HasValue)
+        {
+            var deleteStr = deleteAtUtc.Value.ToString("yyyy-MM-dd");
+            lines.Add(
+                $"Եթե մինչև {deleteStr} սարքը չօգտագործվի, այն և իր տվյալները ինքնաբար կհեռացվեն։");
+        }
+        lines.Add("Եթե այլևս չեք օգտագործում այս սարքը, այս նամակը կարող եք անտեսել։");
+        return string.Join("\n\n", lines);
     }
 
     private static string BuildEmailVerificationBody(string verificationLink)

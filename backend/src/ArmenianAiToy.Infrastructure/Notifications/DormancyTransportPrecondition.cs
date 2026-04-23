@@ -26,6 +26,7 @@ public static class DormancyTransportPrecondition
     public const string WarnAfterDaysKey = "Dormancy:Parent:WarnAfterDays";
     public const string AnonymizeAfterDaysKey = "Dormancy:Parent:AnonymizeAfterDays";
     public const string DevicesWarnAfterDaysKey = "Dormancy:Devices:WarnAfterDays";
+    public const string DevicesDeleteAfterDaysKey = "Dormancy:Devices:DeleteAfterDays";
 
     /// <summary>
     /// Enforces the dormancy + transport pairing invariants at DI
@@ -107,9 +108,8 @@ public static class DormancyTransportPrecondition
         // every dormant device on every tick while no parent received
         // anything. Fail-fast at process start.
         var devicesWarnRaw = config[DevicesWarnAfterDaysKey];
-        if (int.TryParse(devicesWarnRaw, out var devicesWarnAfterDays)
-            && devicesWarnAfterDays > 0
-            && notifierImpl != typeof(SmtpNotifier))
+        var devicesWarnAfterDays = int.TryParse(devicesWarnRaw, out var dw) ? dw : 0;
+        if (devicesWarnAfterDays > 0 && notifierImpl != typeof(SmtpNotifier))
         {
             throw new System.InvalidOperationException(
                 $"{DevicesWarnAfterDaysKey} is enabled ({devicesWarnAfterDays} > 0) but " +
@@ -119,6 +119,41 @@ public static class DormancyTransportPrecondition
                 "without reaching their linked parents. Either disable the device-warn " +
                 $"pass by setting {DevicesWarnAfterDaysKey} to 0, or configure SMTP " +
                 "via Notifications:Transport=smtp and the required SMTP keys.");
+        }
+
+        // Guard 4: device-delete enabled requires (a) device-warn also
+        // enabled — destructive action without a warn channel is a
+        // policy error (parents must receive the warning email carrying
+        // the delete date before any irreversible device removal fires)
+        // — and (b) SMTP. Same pairing as Guard 2 for parent anonymize.
+        var devicesDeleteRaw = config[DevicesDeleteAfterDaysKey];
+        if (int.TryParse(devicesDeleteRaw, out var devicesDeleteAfterDays)
+            && devicesDeleteAfterDays > 0)
+        {
+            if (devicesWarnAfterDays <= 0)
+            {
+                throw new System.InvalidOperationException(
+                    $"{DevicesDeleteAfterDaysKey} is enabled ({devicesDeleteAfterDays} > 0) but " +
+                    $"{DevicesWarnAfterDaysKey} is not ({devicesWarnRaw ?? "unset"}). " +
+                    "Destructive dormant-device action requires the device-warn pass to " +
+                    "be enabled — linked parents must receive a warning email carrying " +
+                    "the delete date before any device is deleted. Either disable " +
+                    $"destructive device action by setting {DevicesDeleteAfterDaysKey} " +
+                    $"to 0, or enable device-warn by setting {DevicesWarnAfterDaysKey} " +
+                    "to a positive value.");
+            }
+            if (notifierImpl != typeof(SmtpNotifier))
+            {
+                throw new System.InvalidOperationException(
+                    $"{DevicesDeleteAfterDaysKey} is enabled ({devicesDeleteAfterDays} > 0) but " +
+                    $"Notifications:Transport does not resolve to '{NotifierTransport.Smtp}' " +
+                    $"(currently: '{resolvedName}'). A destructive dormant-device action " +
+                    "cannot run against a log transport — the warning email would never " +
+                    "reach linked parents, and the delete would fire without notice. " +
+                    $"Either disable destructive device action by setting {DevicesDeleteAfterDaysKey} " +
+                    "to 0, or configure SMTP via Notifications:Transport=smtp and the " +
+                    "required SMTP keys.");
+            }
         }
     }
 }

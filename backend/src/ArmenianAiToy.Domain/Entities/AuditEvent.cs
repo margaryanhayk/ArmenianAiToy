@@ -464,6 +464,55 @@ public class AuditEvent
         })
     };
 
+    /// <summary>
+    /// Emitted by the scheduled dormant-device destructive pass on
+    /// every successful whole-device delete (one row per deleted
+    /// device, not per linked parent).
+    /// <para>
+    /// <b>System-actor event.</b> <see cref="ActorParentId"/> is
+    /// <c>null</c> — the worker, not a parent, is the actor. That
+    /// null keeps this row out of every parent-facing read surface
+    /// (<c>GET /api/parents/audit</c> and the audit slice of
+    /// <c>GET /api/parents/export</c> both filter
+    /// <c>ActorParentId == parentId</c>). Same invisibility
+    /// contract as <see cref="DeviceDormancyWarned"/> and every
+    /// other system-actor event.
+    /// </para>
+    /// <para>
+    /// <see cref="TargetDeviceId"/> is populated (the deleted
+    /// device's id at the time of delete); <see cref="TargetChildId"/>
+    /// remains null. Metadata is counts-only / operational — no
+    /// device name, no parent emails, no parent ids.
+    /// </para>
+    /// </summary>
+    public static AuditEvent DeviceDormancyDeleted(
+        Guid deviceId,
+        int warnAfterDays,
+        int deleteAfterDays,
+        DateTime lastSeenAtUtc,
+        int linkedParentsAtDelete,
+        int childrenDeleted,
+        int conversationsDeleted,
+        int messagesDeleted) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.DeviceDormancyDeleted,
+        ActorParentId = null,
+        TargetDeviceId = deviceId,
+        TargetChildId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            warn_after_days = warnAfterDays,
+            delete_after_days = deleteAfterDays,
+            last_seen_at_utc = lastSeenAtUtc,
+            linked_parents_at_delete = linkedParentsAtDelete,
+            children_deleted = childrenDeleted,
+            conversations_deleted = conversationsDeleted,
+            messages_deleted = messagesDeleted
+        })
+    };
+
     public static AuditEvent DeviceDormancyWarned(
         Guid deviceId,
         int warnAfterDays,

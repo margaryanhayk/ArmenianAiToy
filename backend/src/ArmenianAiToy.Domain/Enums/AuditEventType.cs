@@ -19,5 +19,6 @@ public enum AuditEventType
     ParentDormancyAnonymized,
     ParentEmailVerified,
     DeviceDormancyWarned,
-    ParentGoogleSignIn
+    ParentGoogleSignIn,
+    DeviceDormancyDeleted
 }

@@ -22,12 +22,14 @@ public class DormancyTransportPreconditionTests
     private static IConfiguration Config(
         string? warnAfterDays = null,
         string? anonymizeAfterDays = null,
-        string? devicesWarnAfterDays = null)
+        string? devicesWarnAfterDays = null,
+        string? devicesDeleteAfterDays = null)
     {
         var config = Substitute.For<IConfiguration>();
         config[DormancyTransportPrecondition.WarnAfterDaysKey].Returns(warnAfterDays);
         config[DormancyTransportPrecondition.AnonymizeAfterDaysKey].Returns(anonymizeAfterDays);
         config[DormancyTransportPrecondition.DevicesWarnAfterDaysKey].Returns(devicesWarnAfterDays);
+        config[DormancyTransportPrecondition.DevicesDeleteAfterDaysKey].Returns(devicesDeleteAfterDays);
         return config;
     }
 
@@ -233,6 +235,81 @@ public class DormancyTransportPreconditionTests
         // All three guards pass.
         DormancyTransportPrecondition.Enforce(
             Config(warnAfterDays: "180", anonymizeAfterDays: "60", devicesWarnAfterDays: "365"),
+            typeof(SmtpNotifier));
+    }
+
+    // --- Guard 4: device-delete enabled requires warn + SMTP ---------
+
+    [Fact]
+    public void Enforce_DevicesDeleteEnabled_DevicesWarnDisabled_Throws()
+    {
+        // Destructive device action without a warn channel is a
+        // policy error: linked parents must receive the warning
+        // email (carrying the delete date) before the device is
+        // irreversibly removed. The error message must name both
+        // keys so an operator can fix the pairing in one round-trip.
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            DormancyTransportPrecondition.Enforce(
+                Config(warnAfterDays: "0",
+                       devicesWarnAfterDays: "0",
+                       devicesDeleteAfterDays: "30"),
+                typeof(SmtpNotifier)));
+
+        Assert.Contains(DormancyTransportPrecondition.DevicesDeleteAfterDaysKey, ex.Message);
+        Assert.Contains(DormancyTransportPrecondition.DevicesWarnAfterDaysKey, ex.Message);
+    }
+
+    [Fact]
+    public void Enforce_DevicesDeleteEnabled_WarnEnabled_LogTransport_Throws()
+    {
+        // Even with device-warn enabled, if the transport is log,
+        // destructive would silently fire while warning emails go to
+        // stdout. Guard 3 (warn + log) trips FIRST so the outer
+        // error message names the warn-key path; either way, startup
+        // must throw.
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            DormancyTransportPrecondition.Enforce(
+                Config(warnAfterDays: "0",
+                       devicesWarnAfterDays: "365",
+                       devicesDeleteAfterDays: "30"),
+                typeof(LoggingNotifier)));
+
+        // Guard 3 catches this first — the message names the warn key.
+        Assert.Contains(DormancyTransportPrecondition.DevicesWarnAfterDaysKey, ex.Message);
+    }
+
+    [Fact]
+    public void Enforce_DevicesDeleteEnabled_WarnEnabled_SmtpTransport_DoesNotThrow()
+    {
+        // Intended production shape for the destructive device tier:
+        // both passes enabled, SMTP transport. Must pass.
+        DormancyTransportPrecondition.Enforce(
+            Config(warnAfterDays: "0",
+                   devicesWarnAfterDays: "365",
+                   devicesDeleteAfterDays: "30"),
+            typeof(SmtpNotifier));
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-5")]
+    [InlineData("")]
+    [InlineData(null)]
+    [InlineData("not-an-int")]
+    public void Enforce_DevicesDeleteDisabled_AnyTransport_DoesNotThrow(string? raw)
+    {
+        // Every disabled shape (zero / negative / empty / missing /
+        // non-integer) must skip Guard 4 entirely. Keep every other
+        // guard off too so Guard 4 is exercised in isolation.
+        DormancyTransportPrecondition.Enforce(
+            Config(warnAfterDays: "0",
+                   devicesWarnAfterDays: "0",
+                   devicesDeleteAfterDays: raw),
+            typeof(LoggingNotifier));
+        DormancyTransportPrecondition.Enforce(
+            Config(warnAfterDays: "0",
+                   devicesWarnAfterDays: "0",
+                   devicesDeleteAfterDays: raw),
             typeof(SmtpNotifier));
     }
 }

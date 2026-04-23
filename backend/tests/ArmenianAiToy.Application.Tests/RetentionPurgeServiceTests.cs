@@ -1525,6 +1525,8 @@ public class RetentionPurgeServiceTests
     private static async Task<Harness> CreateDeviceWarnHarnessAsync(
         int? devicesWarnAfterDays = null,
         int? devicesRefireIntervalDays = null,
+        int? devicesDeleteAfterDays = null,
+        int? maxAgeDays = null,
         ArmenianAiToy.Application.Notifications.INotifier? notifier = null)
     {
         var conn = new SqliteConnection("Data Source=:memory:");
@@ -1539,6 +1541,17 @@ public class RetentionPurgeServiceTests
         if (devicesRefireIntervalDays is not null)
             configDict["Dormancy:Devices:WarnRefireIntervalDays"]
                 = devicesRefireIntervalDays.Value.ToString();
+        if (devicesDeleteAfterDays is not null)
+            configDict["Dormancy:Devices:DeleteAfterDays"]
+                = devicesDeleteAfterDays.Value.ToString();
+        // Tests exercising device-delete cascade counts need to NOT
+        // have the conversations purge pass race ahead and delete old
+        // conversations before the device-delete pass counts them.
+        // Default: harness leaves MaxAgeDays at the production 90-day
+        // default. Cascade-count tests pass a large value to suppress
+        // the conversations pass.
+        if (maxAgeDays is not null)
+            configDict["Retention:Messages:MaxAgeDays"] = maxAgeDays.Value.ToString();
         IConfiguration config = new ConfigurationBuilder()
             .AddInMemoryCollection(configDict)
             .Build();
@@ -1948,5 +1961,342 @@ public class RetentionPurgeServiceTests
         await h.Service.RunTickAsync(CancellationToken.None);
 
         Assert.Single(notifier.DeviceCalls);
+    }
+
+    // --- Device dormant delete pass -----------------------------------
+
+    [Fact]
+    public async Task DeviceDeletePass_DisabledByDefault_DoesNotDelete()
+    {
+        // Default posture: DeleteAfterDays not configured (treated as
+        // 0). Even an obviously-eligible device (past warn threshold,
+        // warned long ago) must NOT be deleted. Shipping safety.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365, notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-500),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-120));
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.NotNull(await h.Db.Set<Device>().AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == deviceId));
+        Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.DeviceDormancyDeleted)
+            .ToListAsync());
+    }
+
+    [Fact]
+    public async Task DeviceDeletePass_NotYetWarned_IsNotDeleted()
+    {
+        // Device past the warn threshold but never warned (stamp is
+        // null). Must NOT be deleted — warn is a hard prerequisite.
+        // The warn pass will stamp it on THIS tick (365-day threshold
+        // met); the destructive pass's DormancyWarnedAt < UtcNow -
+        // DeleteAfterDays guard then excludes a same-tick-warned
+        // device.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365,
+            devicesDeleteAfterDays: 30,
+            notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-500),
+            dormancyWarnedAt: null);
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        var device = await h.Db.Set<Device>().AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == deviceId);
+        Assert.NotNull(device);
+        // Warned by this tick, not deleted.
+        Assert.NotNull(device!.DormancyWarnedAt);
+        Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.DeviceDormancyDeleted)
+            .ToListAsync());
+    }
+
+    [Fact]
+    public async Task DeviceDeletePass_SameTickWarnThenDelete_IsBlocked()
+    {
+        // Explicit pin on the same-tick warn+delete race invariant.
+        // A device NEVER warned but past the warn threshold is
+        // warned on this tick; DormancyWarnedAt stamps to ~now; the
+        // destructive eligibility requires DormancyWarnedAt <
+        // UtcNow - DeleteAfterDays (with DeleteAfterDays >= 1), so
+        // the just-warned device cannot be deleted this tick.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365,
+            devicesDeleteAfterDays: 1,
+            notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-500),
+            dormancyWarnedAt: null);
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.NotNull(await h.Db.Set<Device>().AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == deviceId));
+        Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.DeviceDormancyDeleted)
+            .ToListAsync());
+    }
+
+    [Fact]
+    public async Task DeviceDeletePass_WarnedWithinGrace_IsNotDeleted()
+    {
+        // DormancyWarnedAt 10 days ago, DeleteAfterDays 30 → within
+        // grace, must not delete.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365,
+            devicesDeleteAfterDays: 30,
+            notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-500),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-10));
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.NotNull(await h.Db.Set<Device>().AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == deviceId));
+        Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.DeviceDormancyDeleted)
+            .ToListAsync());
+    }
+
+    [Fact]
+    public async Task DeviceDeletePass_WarnedPastGrace_IsDeletedWithSystemActorAudit()
+    {
+        // Eligible: warn threshold 365, delete threshold 30,
+        // LastSeenAt 500 days ago, DormancyWarnedAt 60 days ago
+        // (60 > 30 grace). Refire interval is 90 so the warn pass
+        // does NOT re-fire on this tick (60 < 90) and leaves the
+        // -60d stamp intact for the destructive pass to consume.
+        // Operator-facing invariant: refire > delete for destructive
+        // to ever fire (see CLAUDE.md § Retention).
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365,
+            devicesRefireIntervalDays: 90,
+            devicesDeleteAfterDays: 30,
+            notifier: notifier);
+        var warnedAt = DateTime.UtcNow.AddDays(-60);
+        var lastSeenAt = DateTime.UtcNow.AddDays(-500);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: lastSeenAt,
+            dormancyWarnedAt: warnedAt);
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        // Device and its ParentDevice join row are gone (FK cascade).
+        Assert.Null(await h.Db.Set<Device>().AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == deviceId));
+        Assert.False(await h.Db.Set<ParentDevice>().AsNoTracking()
+            .AnyAsync(pd => pd.DeviceId == deviceId));
+
+        var audit = await h.Db.Set<AuditEvent>().AsNoTracking()
+            .SingleAsync(a => a.EventType == AuditEventType.DeviceDormancyDeleted);
+        Assert.Null(audit.ActorParentId); // system actor
+        Assert.Equal(deviceId, audit.TargetDeviceId);
+        Assert.Null(audit.TargetChildId);
+        var meta = JsonNode.Parse(audit.Metadata!);
+        Assert.NotNull(meta);
+        Assert.Equal(365, (int)meta!["warn_after_days"]!);
+        Assert.Equal(30, (int)meta["delete_after_days"]!);
+        Assert.Equal(1, (int)meta["linked_parents_at_delete"]!);
+        Assert.Equal(0, (int)meta["children_deleted"]!);
+        Assert.Equal(0, (int)meta["conversations_deleted"]!);
+        Assert.Equal(0, (int)meta["messages_deleted"]!);
+    }
+
+    [Fact]
+    public async Task DeviceDeletePass_CascadeCounts_MatchChildrenConversationsMessages()
+    {
+        // Seed a device with children / conversations / messages so
+        // the captured counts are non-zero. After delete the cascade
+        // should remove all of them, and the audit metadata should
+        // match the pre-delete counts exactly.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365,
+            devicesRefireIntervalDays: 90,
+            devicesDeleteAfterDays: 30,
+            maxAgeDays: 10_000, // suppress the conversations-purge pass
+            notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-500),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-60));
+        var parentA = SeedParentSimple(h.Db, emailVerified: true,
+            email: "a@example.com");
+        var parentB = SeedParentSimple(h.Db, emailVerified: true,
+            email: "b@example.com");
+        LinkParentToDevice(h.Db, parentA, deviceId);
+        LinkParentToDevice(h.Db, parentB, deviceId);
+        // 2 children
+        var childA = Guid.NewGuid();
+        var childB = Guid.NewGuid();
+        h.Db.Set<Child>().Add(new Child
+        {
+            Id = childA, Name = "Alice", DeviceId = deviceId,
+            Gender = Gender.Girl
+        });
+        h.Db.Set<Child>().Add(new Child
+        {
+            Id = childB, Name = "Bob", DeviceId = deviceId,
+            Gender = Gender.Boy
+        });
+        // 3 conversations (2 under childA, 1 under childB)
+        var convs = new[]
+        {
+            (Id: Guid.NewGuid(), Child: childA),
+            (Id: Guid.NewGuid(), Child: childA),
+            (Id: Guid.NewGuid(), Child: childB)
+        };
+        foreach (var c in convs)
+        {
+            h.Db.Set<Conversation>().Add(new Conversation
+            {
+                Id = c.Id, DeviceId = deviceId, ChildId = c.Child,
+                StartedAt = DateTime.UtcNow.AddDays(-400)
+            });
+        }
+        // 5 messages — 2 in convs[0], 1 in convs[1], 2 in convs[2]
+        var msgPerConv = new[] { 2, 1, 2 };
+        for (int i = 0; i < convs.Length; i++)
+        {
+            for (int m = 0; m < msgPerConv[i]; m++)
+            {
+                h.Db.Set<Message>().Add(new Message
+                {
+                    Id = Guid.NewGuid(),
+                    ConversationId = convs[i].Id,
+                    Role = MessageRole.User,
+                    Content = $"msg-{i}-{m}",
+                    Timestamp = DateTime.UtcNow.AddDays(-400),
+                    SafetyFlag = SafetyFlag.Clean
+                });
+            }
+        }
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        // Everything cascaded.
+        Assert.Null(await h.Db.Set<Device>().AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == deviceId));
+        Assert.Equal(0, await h.Db.Set<Child>().AsNoTracking()
+            .CountAsync(c => c.DeviceId == deviceId));
+        Assert.Equal(0, await h.Db.Set<Conversation>().AsNoTracking()
+            .CountAsync(c => c.DeviceId == deviceId));
+        Assert.Equal(0, await h.Db.Set<Message>().AsNoTracking()
+            .CountAsync(m => convs.Select(cc => cc.Id).Contains(m.ConversationId)));
+
+        // Audit metadata matches actual pre-delete counts.
+        var audit = await h.Db.Set<AuditEvent>().AsNoTracking()
+            .SingleAsync(a => a.EventType == AuditEventType.DeviceDormancyDeleted);
+        var meta = JsonNode.Parse(audit.Metadata!);
+        Assert.Equal(2, (int)meta!["linked_parents_at_delete"]!);
+        Assert.Equal(2, (int)meta["children_deleted"]!);
+        Assert.Equal(3, (int)meta["conversations_deleted"]!);
+        Assert.Equal(5, (int)meta["messages_deleted"]!);
+    }
+
+    [Fact]
+    public async Task DeviceDeletePass_SystemActorInvisibleToParentReads()
+    {
+        // Parent-facing audit read filters ActorParentId == parentId.
+        // Our new event is system-actor (null), so it must not show
+        // up in any parent's audit query. Refire 90d > delete 30d so
+        // warn does not re-fire and reset the destructive clock.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365,
+            devicesRefireIntervalDays: 90,
+            devicesDeleteAfterDays: 30,
+            notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-500),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-60));
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        // Parent row was not deleted by this pass (only the device
+        // was) so the parent-scope filter applies normally.
+        var parentScopedRows = await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.ActorParentId == parentId)
+            .ToListAsync();
+        Assert.Empty(parentScopedRows);
+        // But a system-actor row exists.
+        Assert.Single(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.DeviceDormancyDeleted)
+            .ToListAsync());
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_DeleteEnabled_PopulatesDeleteAtUtcOnNotifier()
+    {
+        // When DeleteAfterDays > 0, the warn-pass call to the
+        // notifier carries a non-null deleteAtUtc so the parent is
+        // forewarned. The date is UtcNow + DeleteAfterDays (within
+        // a loose tolerance for the tick's elapsed time).
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365,
+            devicesDeleteAfterDays: 30,
+            notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-400));
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        var expectedLower = DateTime.UtcNow + TimeSpan.FromDays(30) - TimeSpan.FromMinutes(1);
+        await h.Service.RunTickAsync(CancellationToken.None);
+        var expectedUpper = DateTime.UtcNow + TimeSpan.FromDays(30) + TimeSpan.FromMinutes(1);
+
+        var call = Assert.Single(notifier.DeviceCalls);
+        Assert.NotNull(call.DeleteAtUtc);
+        Assert.InRange(call.DeleteAtUtc!.Value, expectedLower, expectedUpper);
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_DeleteDisabled_DeleteAtUtcIsNullOnNotifier()
+    {
+        // When DeleteAfterDays is unset / <= 0, warn-only posture is
+        // preserved: notifier receives null for deleteAtUtc.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365, notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-400));
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        var call = Assert.Single(notifier.DeviceCalls);
+        Assert.Null(call.DeleteAtUtc);
     }
 }
