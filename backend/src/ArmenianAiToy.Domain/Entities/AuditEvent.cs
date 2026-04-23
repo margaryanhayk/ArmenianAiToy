@@ -343,4 +343,51 @@ public class AuditEvent
             refire_interval_days = refireIntervalDays
         })
     };
+
+    /// <summary>
+    /// Emitted by the scheduled destructive dormant-parent pass on
+    /// every successful anonymize (one row per anonymized parent).
+    /// <para>
+    /// <b>System-actor event.</b> <see cref="ActorParentId"/> is
+    /// deliberately <c>null</c> — the worker, not the parent, is the
+    /// actor. That null is what keeps this event out of every
+    /// parent-facing read surface (<c>GET /api/parents/audit</c> and
+    /// the parent-scoped audit slice of <c>GET /api/parents/export</c>
+    /// both filter <c>ActorParentId == parentId</c>). Same
+    /// invisibility contract as <see cref="ConversationsPurgedByRetention"/>
+    /// and <see cref="ParentDormancyWarned"/>.
+    /// </para>
+    /// <para>
+    /// Metadata is counts-only / operational — the effective warn /
+    /// anonymize thresholds and refire interval at action time, plus
+    /// device-cascade counts. <b>No email, no parent identifier, no
+    /// PII.</b> The audit row signals "a destructive action fired
+    /// with these parameters" — per-parent identity can be
+    /// reconstructed by querying the <c>Parents</c> table for
+    /// <c>AnonymizedAt</c> in a matching timestamp window if
+    /// post-facto analysis is ever needed.
+    /// </para>
+    /// </summary>
+    public static AuditEvent ParentDormancyAnonymized(
+        int warnAfterDays,
+        int anonymizeAfterDays,
+        int warnRefireIntervalDays,
+        int linkedDevicesUnlinked,
+        int orphanDevicesCascaded) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDormancyAnonymized,
+        ActorParentId = null,
+        TargetDeviceId = null,
+        TargetChildId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            warn_after_days = warnAfterDays,
+            anonymize_after_days = anonymizeAfterDays,
+            warn_refire_interval_days = warnRefireIntervalDays,
+            linked_devices_unlinked = linkedDevicesUnlinked,
+            orphan_devices_cascaded = orphanDevicesCascaded
+        })
+    };
 }

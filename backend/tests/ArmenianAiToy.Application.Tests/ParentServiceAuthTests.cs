@@ -256,6 +256,44 @@ public class ParentServiceAuthTests
     }
 
     [Fact]
+    public async Task LoginAsync_AnonymizedParent_ReturnsNull()
+    {
+        // Pin the "anonymize needs no disable flag" invariant. After
+        // the dormancy anonymize pass scrubs a parent's Email and
+        // PasswordHash to empty strings, login with their ORIGINAL
+        // email and password must fail — because (a) the original
+        // email no longer matches any row, and (b) BCrypt.Verify
+        // against an empty-string hash cannot succeed. This is why
+        // the anonymize slice did NOT introduce a Parent.IsDisabled
+        // column: the scrub itself blocks login by construction.
+        var (service, db) = CreateService();
+        var parentId = Guid.NewGuid();
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId,
+            Email = "",              // scrubbed by anonymize pass
+            PasswordHash = "",       // scrubbed by anonymize pass
+            RegisteredAt = DateTime.UtcNow.AddDays(-400),
+            LastLoginAt = null,
+            DormancyWarnedAt = null,
+            AnonymizedAt = DateTime.UtcNow.AddDays(-5)
+        });
+        await db.SaveChangesAsync();
+
+        // Try to log in with the parent's pre-anonymize email +
+        // correct password. Both must fail.
+        var withOriginalEmail = await service.LoginAsync(
+            "user@example.com", "correctpass");
+        Assert.Null(withOriginalEmail);
+
+        // Also pin: login with the empty-string email (someone
+        // submitting blanks) against the correct password ALSO fails
+        // because BCrypt.Verify(_, "") returns false.
+        var withEmptyEmail = await service.LoginAsync("", "correctpass");
+        Assert.Null(withEmptyEmail);
+    }
+
+    [Fact]
     public async Task LoginAsync_Success_DoesNotWriteAuditRow()
     {
         // Login stays out of audit scope (CLAUDE.md § Audit events). The

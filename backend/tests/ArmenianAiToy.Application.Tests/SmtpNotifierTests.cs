@@ -253,28 +253,55 @@ public class SmtpNotifierTests
     }
 
     [Fact]
-    public async Task SendDormancyWarningAsync_DeleteAtUtcParam_IsIgnoredInWarnOnlySlice()
+    public async Task SendDormancyWarningAsync_WithDeleteAtUtc_IncludesDateInBody()
     {
-        // The method accepts a nullable deleteAtUtc so the next slice
-        // (delete action) is a body-only change. In THIS slice, the
-        // value must never leak into the outgoing message — the copy
-        // is warn-only, and a caller passing a non-null deleteAtUtc
-        // (e.g. during integration testing before that slice ships)
-        // must not produce scary "your account will be deleted on X"
-        // copy in the body.
+        // The anonymize slice activates the `deleteAtUtc` parameter:
+        // a non-null value must land in the outgoing body as a plain
+        // yyyy-MM-dd date so the parent sees an honest calendar date
+        // they can verify against their own calendar. No time
+        // component, no ISO-with-T-and-Z format.
         MailMessage? captured = null;
         var logger = Substitute.For<ILogger<SmtpNotifier>>();
         var config = BuildConfig();
         var notifier = new SmtpNotifier(logger, config,
             sendMail: (msg, _) => { captured = msg; return Task.CompletedTask; });
 
-        var futureDeleteDate = new DateTime(2099, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var futureDeleteDate = new DateTime(2099, 1, 15, 6, 30, 45, DateTimeKind.Utc);
         await notifier.SendDormancyWarningAsync(
             "parent@example.com", deleteAtUtc: futureDeleteDate);
 
         Assert.NotNull(captured);
-        Assert.DoesNotContain("2099", captured!.Body);
+        // Plain yyyy-MM-dd — NOT ISO with time, NOT locale-specific.
+        Assert.Contains("2099-01-15", captured!.Body);
+        // Does not leak the time component or full ISO O-format.
+        Assert.DoesNotContain("06:30:45", captured.Body);
         Assert.DoesNotContain(futureDeleteDate.ToString("O"), captured.Body);
+    }
+
+    [Fact]
+    public async Task SendDormancyWarningAsync_WithoutDeleteAtUtc_DoesNotLeakDate()
+    {
+        // Warn-only mode (deleteAtUtc=null): body must stay exactly
+        // warn-only copy. No scheduled-date sentence, no plausible
+        // yyyy-MM-dd string. Regression guard against a future edit
+        // that accidentally renders a default/sentinel date.
+        MailMessage? captured = null;
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (msg, _) => { captured = msg; return Task.CompletedTask; });
+
+        await notifier.SendDormancyWarningAsync(
+            "parent@example.com", deleteAtUtc: null);
+
+        Assert.NotNull(captured);
+        // A yyyy-MM-dd pattern hit would indicate the destructive-
+        // date sentence accidentally rendered even with null input.
+        // Match any 4-2-2 date shape; captured.Body is Armenian text
+        // otherwise and won't contain this pattern naturally.
+        var datePattern = new System.Text.RegularExpressions.Regex(@"\d{4}-\d{2}-\d{2}");
+        Assert.False(datePattern.IsMatch(captured!.Body),
+            "Warn-only body must not contain any yyyy-MM-dd date string.");
     }
 
     [Fact]

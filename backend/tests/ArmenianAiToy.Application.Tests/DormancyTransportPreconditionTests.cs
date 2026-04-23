@@ -19,10 +19,13 @@ namespace ArmenianAiToy.Application.Tests;
 /// </summary>
 public class DormancyTransportPreconditionTests
 {
-    private static IConfiguration Config(string? warnAfterDays = null)
+    private static IConfiguration Config(
+        string? warnAfterDays = null,
+        string? anonymizeAfterDays = null)
     {
         var config = Substitute.For<IConfiguration>();
         config[DormancyTransportPrecondition.WarnAfterDaysKey].Returns(warnAfterDays);
+        config[DormancyTransportPrecondition.AnonymizeAfterDaysKey].Returns(anonymizeAfterDays);
         return config;
     }
 
@@ -86,5 +89,87 @@ public class DormancyTransportPreconditionTests
                 Config(warnAfterDays: "1"), typeof(LoggingNotifier)));
 
         Assert.Contains("1", ex.Message);
+    }
+
+    // --- Anonymize-enabled guards ------------------------------------
+
+    [Fact]
+    public void Enforce_AnonymizeEnabled_WarnDisabled_Throws()
+    {
+        // Destructive without warn is a policy error: a parent must
+        // receive a warning email before any irreversible action
+        // fires. The error message must name both keys so an
+        // operator can fix the pairing in one round-trip.
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            DormancyTransportPrecondition.Enforce(
+                Config(warnAfterDays: "0", anonymizeAfterDays: "60"),
+                typeof(SmtpNotifier)));
+
+        Assert.Contains(DormancyTransportPrecondition.AnonymizeAfterDaysKey, ex.Message);
+        Assert.Contains(DormancyTransportPrecondition.WarnAfterDaysKey, ex.Message);
+    }
+
+    [Fact]
+    public void Enforce_AnonymizeEnabled_WarnMissingKey_Throws()
+    {
+        // Same failure as explicit 0 for warn: missing key parses to
+        // 0 via the same TryParse fallback, so destructive-without-
+        // warn still fails fast.
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            DormancyTransportPrecondition.Enforce(
+                Config(warnAfterDays: null, anonymizeAfterDays: "60"),
+                typeof(SmtpNotifier)));
+
+        Assert.Contains(DormancyTransportPrecondition.AnonymizeAfterDaysKey, ex.Message);
+        Assert.Contains(DormancyTransportPrecondition.WarnAfterDaysKey, ex.Message);
+    }
+
+    [Fact]
+    public void Enforce_AnonymizeEnabled_WarnEnabled_LogTransport_Throws()
+    {
+        // Even with warn enabled, if the transport is log, destructive
+        // would silently fire while warning emails go to stdout. The
+        // first guard catches the warn+log mismatch before the second
+        // guard gets to check anonymize+log — either way, startup
+        // throws. Verify the first guard's behavior here explicitly.
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            DormancyTransportPrecondition.Enforce(
+                Config(warnAfterDays: "180", anonymizeAfterDays: "60"),
+                typeof(LoggingNotifier)));
+
+        // Warn-enabled + log is rejected by Guard 1 first. Error must
+        // still name the warn key.
+        Assert.Contains(DormancyTransportPrecondition.WarnAfterDaysKey, ex.Message);
+    }
+
+    [Fact]
+    public void Enforce_AnonymizeEnabled_WarnEnabled_SmtpTransport_DoesNotThrow()
+    {
+        // The intended production shape: both passes enabled,
+        // transport is SMTP. Must pass without throwing.
+        DormancyTransportPrecondition.Enforce(
+            Config(warnAfterDays: "180", anonymizeAfterDays: "60"),
+            typeof(SmtpNotifier));
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-5")]
+    [InlineData("")]
+    [InlineData(null)]
+    [InlineData("not-an-int")]
+    public void Enforce_AnonymizeDisabled_AnyTransport_DoesNotThrow(string? anonymizeRaw)
+    {
+        // Every disabled shape (zero, negative, missing, empty,
+        // non-integer) must skip Guard 2 entirely. Guard 1 still
+        // applies if warn is enabled, which is why we pass warn=0
+        // here — to ensure we're testing the anonymize-disabled path
+        // in isolation.
+        DormancyTransportPrecondition.Enforce(
+            Config(warnAfterDays: "0", anonymizeAfterDays: anonymizeRaw),
+            typeof(LoggingNotifier));
+        DormancyTransportPrecondition.Enforce(
+            Config(warnAfterDays: "0", anonymizeAfterDays: anonymizeRaw),
+            typeof(SmtpNotifier));
     }
 }

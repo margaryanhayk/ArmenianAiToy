@@ -24,35 +24,79 @@ namespace ArmenianAiToy.Infrastructure.Notifications;
 public static class DormancyTransportPrecondition
 {
     public const string WarnAfterDaysKey = "Dormancy:Parent:WarnAfterDays";
+    public const string AnonymizeAfterDaysKey = "Dormancy:Parent:AnonymizeAfterDays";
 
     /// <summary>
-    /// Throws <see cref="System.InvalidOperationException"/> when
-    /// <c>Dormancy:Parent:WarnAfterDays &gt; 0</c> and
-    /// <paramref name="notifierImpl"/> is not <see cref="SmtpNotifier"/>.
-    /// Silently returns otherwise — an unparseable / missing / non-
-    /// positive value disables the warn pass entirely, so the
-    /// precondition doesn't fire.
+    /// Enforces the dormancy + transport pairing invariants at DI
+    /// time. Two guards:
+    /// <list type="number">
+    ///   <item><description>If <c>Dormancy:Parent:WarnAfterDays &gt; 0</c>
+    ///   then the notifier must resolve to <see cref="SmtpNotifier"/>.
+    ///   <see cref="LoggingNotifier"/> "delivers" to stdout without
+    ///   reaching real parents, and the worker would stamp
+    ///   <c>DormancyWarnedAt</c> on every parent on every tick.</description></item>
+    ///   <item><description>If
+    ///   <c>Dormancy:Parent:AnonymizeAfterDays &gt; 0</c> then
+    ///   <c>Dormancy:Parent:WarnAfterDays &gt; 0</c> AND the notifier
+    ///   must resolve to <see cref="SmtpNotifier"/>. Destructive
+    ///   action without a warn channel is a policy error; destructive
+    ///   action on a log transport would silently anonymize parents
+    ///   who never received the warning email.</description></item>
+    /// </list>
+    /// Silently returns when both passes are disabled — the shipped
+    /// defaults in <c>appsettings.json</c> are both 0, so a fresh
+    /// <c>dotnet run</c> does not trip either guard.
     /// </summary>
     public static void Enforce(IConfiguration config, System.Type notifierImpl)
     {
-        var raw = config[WarnAfterDaysKey];
-        if (!int.TryParse(raw, out var warnAfterDays) || warnAfterDays <= 0)
-            return;
-
-        if (notifierImpl == typeof(SmtpNotifier))
-            return;
+        var warnRaw = config[WarnAfterDaysKey];
+        var warnAfterDays = int.TryParse(warnRaw, out var w) ? w : 0;
+        var anonymizeRaw = config[AnonymizeAfterDaysKey];
+        var anonymizeAfterDays = int.TryParse(anonymizeRaw, out var a) ? a : 0;
 
         var resolvedName = notifierImpl == typeof(LoggingNotifier)
             ? NotifierTransport.Log
-            : notifierImpl.Name;
+            : (notifierImpl == typeof(SmtpNotifier) ? NotifierTransport.Smtp : notifierImpl.Name);
 
-        throw new System.InvalidOperationException(
-            $"{WarnAfterDaysKey} is enabled ({warnAfterDays} > 0) but " +
-            $"Notifications:Transport does not resolve to '{NotifierTransport.Smtp}' " +
-            $"(currently: '{resolvedName}'). A dormant-parent warning email " +
-            "cannot go to stdout — the worker would mark parents as warned " +
-            "without reaching them. Either disable the warn pass by setting " +
-            $"{WarnAfterDaysKey} to 0, or configure SMTP via " +
-            "Notifications:Transport=smtp and the required SMTP keys.");
+        // Guard 1: warn enabled requires SMTP.
+        if (warnAfterDays > 0 && notifierImpl != typeof(SmtpNotifier))
+        {
+            throw new System.InvalidOperationException(
+                $"{WarnAfterDaysKey} is enabled ({warnAfterDays} > 0) but " +
+                $"Notifications:Transport does not resolve to '{NotifierTransport.Smtp}' " +
+                $"(currently: '{resolvedName}'). A dormant-parent warning email " +
+                "cannot go to stdout — the worker would mark parents as warned " +
+                "without reaching them. Either disable the warn pass by setting " +
+                $"{WarnAfterDaysKey} to 0, or configure SMTP via " +
+                "Notifications:Transport=smtp and the required SMTP keys.");
+        }
+
+        // Guard 2: anonymize enabled requires warn enabled AND SMTP.
+        if (anonymizeAfterDays > 0)
+        {
+            if (warnAfterDays <= 0)
+            {
+                throw new System.InvalidOperationException(
+                    $"{AnonymizeAfterDaysKey} is enabled ({anonymizeAfterDays} > 0) but " +
+                    $"{WarnAfterDaysKey} is not ({warnRaw ?? "unset"}). " +
+                    "Destructive dormant-parent action requires the warn pass to be " +
+                    "enabled — parents must receive a warning email before any " +
+                    "irreversible action fires. Either disable destructive action " +
+                    $"by setting {AnonymizeAfterDaysKey} to 0, or enable warn by " +
+                    $"setting {WarnAfterDaysKey} to a positive value.");
+            }
+            if (notifierImpl != typeof(SmtpNotifier))
+            {
+                throw new System.InvalidOperationException(
+                    $"{AnonymizeAfterDaysKey} is enabled ({anonymizeAfterDays} > 0) but " +
+                    $"Notifications:Transport does not resolve to '{NotifierTransport.Smtp}' " +
+                    $"(currently: '{resolvedName}'). A destructive dormancy action " +
+                    "cannot run against a log transport — the warning email would " +
+                    "never reach the parent, and the action would fire without notice. " +
+                    $"Either disable destructive action by setting {AnonymizeAfterDaysKey} " +
+                    "to 0, or configure SMTP via Notifications:Transport=smtp and the " +
+                    "required SMTP keys.");
+            }
+        }
     }
 }

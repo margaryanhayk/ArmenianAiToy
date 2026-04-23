@@ -47,6 +47,7 @@ public class RetentionPurgeServiceTests
         int? passwordResetGracePeriodHours = null,
         int? dormancyWarnAfterDays = null,
         int? dormancyWarnRefireIntervalDays = null,
+        int? dormancyAnonymizeAfterDays = null,
         ArmenianAiToy.Application.Notifications.INotifier? notifier = null)
     {
         var conn = new SqliteConnection("Data Source=:memory:");
@@ -79,6 +80,9 @@ public class RetentionPurgeServiceTests
         if (dormancyWarnRefireIntervalDays is not null)
             configDict["Dormancy:Parent:WarnRefireIntervalDays"]
                 = dormancyWarnRefireIntervalDays.Value.ToString();
+        if (dormancyAnonymizeAfterDays is not null)
+            configDict["Dormancy:Parent:AnonymizeAfterDays"]
+                = dormancyAnonymizeAfterDays.Value.ToString();
         IConfiguration config = new ConfigurationBuilder()
             .AddInMemoryCollection(configDict)
             .Build();
@@ -727,6 +731,7 @@ public class RetentionPurgeServiceTests
     private sealed class CapturingNotifier : ArmenianAiToy.Application.Notifications.INotifier
     {
         public List<string> SentEmails { get; } = new();
+        public List<(string Email, DateTime? DeleteAtUtc)> Calls { get; } = new();
         public bool DeliverResult { get; set; } = true;
 
         public Task SendPasswordResetAsync(
@@ -737,6 +742,7 @@ public class RetentionPurgeServiceTests
             string email, DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
         {
             SentEmails.Add(email);
+            Calls.Add((email, deleteAtUtc));
             return Task.FromResult(DeliverResult);
         }
     }
@@ -952,5 +958,402 @@ public class RetentionPurgeServiceTests
             .Where(a => a.ActorParentId == parentId)
             .ToListAsync();
         Assert.Empty(parentAudits);
+    }
+
+    // --- Anonymize pass -------------------------------------------------
+
+    private static Guid SeedDeviceLinkedTo(AppDbContext db, params Guid[] parentIds)
+    {
+        var deviceId = SeedDevice(db);
+        foreach (var pid in parentIds)
+        {
+            db.Set<ParentDevice>().Add(new ParentDevice
+            {
+                ParentId = pid,
+                DeviceId = deviceId,
+                LinkedAt = DateTime.UtcNow.AddDays(-400)
+            });
+        }
+        return deviceId;
+    }
+
+    [Fact]
+    public async Task AnonymizePass_EligibleParent_IsAnonymizedStampedAndAudited()
+    {
+        // Parent warned 30 days ago (past 7-day grace), last login
+        // 260 days ago (past 180+60=240 threshold), not re-logged in
+        // since warning. One anonymize operation.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180,
+            dormancyWarnRefireIntervalDays: 30,
+            dormancyAnonymizeAfterDays: 60,
+            notifier: notifier);
+        var parentId = SeedParent(h.Db,
+            lastLoginAt: DateTime.UtcNow.AddDays(-260),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-30));
+        await h.Db.SaveChangesAsync();
+        var before = DateTime.UtcNow;
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        var row = await h.Db.Set<Parent>().AsNoTracking().FirstAsync(p => p.Id == parentId);
+        Assert.Equal("", row.Email);
+        Assert.Equal("", row.PasswordHash);
+        Assert.Null(row.LastLoginAt);
+        Assert.Null(row.DormancyWarnedAt);
+        Assert.NotNull(row.AnonymizedAt);
+        Assert.InRange(row.AnonymizedAt!.Value, before, DateTime.UtcNow);
+
+        var audits = await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.ParentDormancyAnonymized)
+            .ToListAsync();
+        var audit = Assert.Single(audits);
+        Assert.Null(audit.ActorParentId);        // system actor
+        Assert.Null(audit.TargetDeviceId);
+        Assert.Null(audit.TargetChildId);
+        Assert.NotNull(audit.Metadata);
+        var metaNode = JsonNode.Parse(audit.Metadata!);
+        Assert.NotNull(metaNode);
+        Assert.Equal(180, (int)metaNode!["warn_after_days"]!);
+        Assert.Equal(60, (int)metaNode["anonymize_after_days"]!);
+        Assert.Equal(30, (int)metaNode["warn_refire_interval_days"]!);
+        // No PII in metadata (no email, no parent id).
+        Assert.DoesNotContain(parentId.ToString(), audit.Metadata!);
+    }
+
+    [Fact]
+    public async Task AnonymizePass_NullLastLoginAt_IsExcluded()
+    {
+        // Pre-migration / never-logged-in parents are never
+        // destructively acted upon — the same safety floor that
+        // warn-pass has.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180,
+            dormancyAnonymizeAfterDays: 60,
+            notifier: notifier);
+        var parentId = SeedParent(h.Db,
+            lastLoginAt: null,
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-30));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        var row = await h.Db.Set<Parent>().AsNoTracking().FirstAsync(p => p.Id == parentId);
+        Assert.Null(row.AnonymizedAt);
+        Assert.NotEqual("", row.Email);
+    }
+
+    [Fact]
+    public async Task AnonymizePass_WarnedButLoggedInAfter_IsExcluded()
+    {
+        // Parent was warned 40 days ago, then logged in 35 days ago.
+        // LastLoginAt > DormancyWarnedAt — parent came back; MUST NOT
+        // be anonymized. Eligibility condition 5 (DormancyWarnedAt
+        // must be > LastLoginAt).
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180,
+            dormancyAnonymizeAfterDays: 60,
+            notifier: notifier);
+        var parentId = SeedParent(h.Db,
+            // LastLoginAt 35d ago — NOT past the 180+60=240 threshold
+            // anyway; also strictly > DormancyWarnedAt.
+            lastLoginAt: DateTime.UtcNow.AddDays(-35),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-40));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        var row = await h.Db.Set<Parent>().AsNoTracking().FirstAsync(p => p.Id == parentId);
+        Assert.Null(row.AnonymizedAt);
+    }
+
+    [Fact]
+    public async Task AnonymizePass_AlreadyAnonymized_NotReprocessed()
+    {
+        // Parent already anonymized (AnonymizedAt != null): Email
+        // already "", PasswordHash already "", LastLoginAt null.
+        // Must NOT be reprocessed and must NOT produce a second
+        // audit row.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180,
+            dormancyAnonymizeAfterDays: 60,
+            notifier: notifier);
+        var parentId = Guid.NewGuid();
+        var alreadyAnonymizedAt = DateTime.UtcNow.AddDays(-100);
+        h.Db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId,
+            Email = "",
+            PasswordHash = "",
+            RegisteredAt = DateTime.UtcNow.AddDays(-400),
+            LastLoginAt = null,
+            DormancyWarnedAt = null,
+            AnonymizedAt = alreadyAnonymizedAt
+        });
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        var row = await h.Db.Set<Parent>().AsNoTracking().FirstAsync(p => p.Id == parentId);
+        // AnonymizedAt must NOT advance — it is byte-identical.
+        Assert.Equal(alreadyAnonymizedAt, row.AnonymizedAt);
+        Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.ParentDormancyAnonymized).ToListAsync());
+    }
+
+    [Fact]
+    public async Task AnonymizePass_WithinGracePeriod_IsExcluded()
+    {
+        // Parent warned 3 days ago — inside the hardcoded 7-day
+        // grace floor. Must NOT be anonymized yet even though total
+        // inactivity is past threshold.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180,
+            dormancyAnonymizeAfterDays: 60,
+            notifier: notifier);
+        var parentId = SeedParent(h.Db,
+            lastLoginAt: DateTime.UtcNow.AddDays(-260),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-3));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        var row = await h.Db.Set<Parent>().AsNoTracking().FirstAsync(p => p.Id == parentId);
+        Assert.Null(row.AnonymizedAt);
+    }
+
+    [Fact]
+    public async Task AnonymizePass_MultiParentDevice_DeviceSurvives_OnlyLinkRemoved()
+    {
+        // Device X linked to both ParentA (to-be-anonymized) and
+        // ParentB (active). After anonymize: X lives on under
+        // ParentB; A-to-X link gone; B-to-X link intact; X's
+        // children and conversations untouched.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180,
+            dormancyAnonymizeAfterDays: 60,
+            notifier: notifier);
+        var parentA = SeedParent(h.Db,
+            lastLoginAt: DateTime.UtcNow.AddDays(-260),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-30));
+        var parentB = Guid.NewGuid();
+        h.Db.Set<Parent>().Add(new Parent
+        {
+            Id = parentB, Email = "b@example.com", PasswordHash = "x",
+            RegisteredAt = DateTime.UtcNow.AddDays(-400),
+            LastLoginAt = DateTime.UtcNow.AddDays(-1) // active
+        });
+        var deviceX = SeedDeviceLinkedTo(h.Db, parentA, parentB);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        // Device X still exists.
+        Assert.NotNull(await h.Db.Set<Device>().AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == deviceX));
+        // ParentA-to-X link is gone.
+        Assert.False(await h.Db.Set<ParentDevice>().AsNoTracking()
+            .AnyAsync(pd => pd.ParentId == parentA && pd.DeviceId == deviceX));
+        // ParentB-to-X link is intact.
+        Assert.True(await h.Db.Set<ParentDevice>().AsNoTracking()
+            .AnyAsync(pd => pd.ParentId == parentB && pd.DeviceId == deviceX));
+        // Audit row says 1 link unlinked, 0 orphans cascaded.
+        var audit = await h.Db.Set<AuditEvent>().AsNoTracking()
+            .FirstAsync(a => a.EventType == AuditEventType.ParentDormancyAnonymized);
+        var meta = JsonNode.Parse(audit.Metadata!);
+        Assert.Equal(1, (int)meta!["linked_devices_unlinked"]!);
+        Assert.Equal(0, (int)meta["orphan_devices_cascaded"]!);
+    }
+
+    [Fact]
+    public async Task AnonymizePass_LastLinkedDevice_OrphanCascaded()
+    {
+        // ParentA is the SOLE link to DeviceX. After anonymize:
+        // DeviceX is deleted (via schema FK cascade from the
+        // orphan-device delete pattern). Children/conversations
+        // under X go with it.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180,
+            dormancyAnonymizeAfterDays: 60,
+            notifier: notifier);
+        var parentA = SeedParent(h.Db,
+            lastLoginAt: DateTime.UtcNow.AddDays(-260),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-30));
+        var deviceX = SeedDeviceLinkedTo(h.Db, parentA);
+        // Seed a conversation under X so we can verify cascade.
+        var (convId, _) = SeedConversationWithMessage(
+            h.Db, deviceX,
+            startedAt: DateTime.UtcNow.AddDays(-1),
+            messageAt: DateTime.UtcNow.AddDays(-1));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        // Device X is gone.
+        Assert.Null(await h.Db.Set<Device>().AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == deviceX));
+        // Conversation cascaded via schema FK.
+        Assert.Null(await h.Db.Set<Conversation>().AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == convId));
+        // Audit: 1 link unlinked, 1 orphan cascaded.
+        var audit = await h.Db.Set<AuditEvent>().AsNoTracking()
+            .FirstAsync(a => a.EventType == AuditEventType.ParentDormancyAnonymized);
+        var meta = JsonNode.Parse(audit.Metadata!);
+        Assert.Equal(1, (int)meta!["linked_devices_unlinked"]!);
+        Assert.Equal(1, (int)meta["orphan_devices_cascaded"]!);
+    }
+
+    [Fact]
+    public async Task AnonymizePass_DoesNotWriteParentDeviceUnlinkedAudit()
+    {
+        // Per-device unlinks during anonymize must NOT write a
+        // ParentDeviceUnlinked audit row — that would carry
+        // ActorParentId=parentA and leak the anonymized parent's
+        // identity into the audit feed. Only the aggregate
+        // ParentDormancyAnonymized system-actor row is written.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180,
+            dormancyAnonymizeAfterDays: 60,
+            notifier: notifier);
+        var parentA = SeedParent(h.Db,
+            lastLoginAt: DateTime.UtcNow.AddDays(-260),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-30));
+        SeedDeviceLinkedTo(h.Db, parentA);
+        SeedDeviceLinkedTo(h.Db, parentA); // two devices to unlink
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        // Exactly one ParentDormancyAnonymized audit row.
+        Assert.Single(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.ParentDormancyAnonymized).ToListAsync());
+        // Zero ParentDeviceUnlinked audit rows — regression guard.
+        Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.ParentDeviceUnlinked).ToListAsync());
+    }
+
+    [Fact]
+    public async Task AnonymizePass_DisabledByDefault_DoesNotAnonymizeAnyone()
+    {
+        // Destructive disabled (AnonymizeAfterDays missing -> 0).
+        // Must skip even a clearly-eligible parent.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180, notifier: notifier);
+        var parentId = SeedParent(h.Db,
+            lastLoginAt: DateTime.UtcNow.AddDays(-400),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-100));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        var row = await h.Db.Set<Parent>().AsNoTracking().FirstAsync(p => p.Id == parentId);
+        Assert.Null(row.AnonymizedAt);
+        Assert.NotEqual("", row.Email);
+    }
+
+    [Fact]
+    public async Task AnonymizePass_SystemActorInvisibleToParentReads()
+    {
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180,
+            dormancyAnonymizeAfterDays: 60,
+            notifier: notifier);
+        var parentId = SeedParent(h.Db,
+            lastLoginAt: DateTime.UtcNow.AddDays(-260),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-30));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        // System-actor row exists...
+        Assert.Single(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.ParentDormancyAnonymized).ToListAsync());
+        // ...invisible to parent-scoped read filter.
+        Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.ActorParentId == parentId).ToListAsync());
+    }
+
+    [Fact]
+    public async Task WarnPass_DestructiveEnabled_PassesDeleteAtUtc()
+    {
+        // When AnonymizeAfterDays > 0, every warn call receives a
+        // non-null deleteAtUtc equal to LastLoginAt + WarnAfterDays
+        // + AnonymizeAfterDays. Also exercises that warn and
+        // anonymize coexist on the same tick without tripping each
+        // other's eligibility.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180,
+            dormancyAnonymizeAfterDays: 60,
+            notifier: notifier);
+        // Warn-eligible but NOT yet anonymize-eligible (200d inactive,
+        // past 180 warn threshold; 200 < 180+60=240 destructive
+        // threshold, so only warn fires).
+        var lastLogin = DateTime.UtcNow.AddDays(-200);
+        SeedParent(h.Db, lastLoginAt: lastLogin);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        var call = Assert.Single(notifier.Calls);
+        Assert.NotNull(call.DeleteAtUtc);
+        var expected = lastLogin.AddDays(180 + 60);
+        Assert.Equal(expected, call.DeleteAtUtc);
+    }
+
+    [Fact]
+    public async Task WarnPass_DestructiveDisabled_PassesNullDeleteAtUtc()
+    {
+        // When destructive is disabled, deleteAtUtc must be null —
+        // preserves the pre-slice warn-only body.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180, notifier: notifier);
+        SeedParent(h.Db, lastLoginAt: DateTime.UtcNow.AddDays(-200));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        var call = Assert.Single(notifier.Calls);
+        Assert.Null(call.DeleteAtUtc);
+    }
+
+    [Fact]
+    public async Task AnonymizedParent_NotWarnedAgain()
+    {
+        // An already-anonymized parent has Email="", LastLoginAt=null,
+        // AnonymizedAt non-null. The warn pass's eligibility filter
+        // excludes them (LastLoginAt != null is false, AnonymizedAt
+        // == null is false). Defensive regression guard.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180,
+            dormancyAnonymizeAfterDays: 60,
+            notifier: notifier);
+        h.Db.Set<Parent>().Add(new Parent
+        {
+            Id = Guid.NewGuid(),
+            Email = "",
+            PasswordHash = "",
+            RegisteredAt = DateTime.UtcNow.AddDays(-400),
+            LastLoginAt = null,
+            DormancyWarnedAt = null,
+            AnonymizedAt = DateTime.UtcNow.AddDays(-5)
+        });
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Empty(notifier.Calls);
     }
 }

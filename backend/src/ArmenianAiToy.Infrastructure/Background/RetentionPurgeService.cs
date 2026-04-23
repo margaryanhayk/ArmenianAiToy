@@ -94,6 +94,30 @@ public sealed class RetentionPurgeService : BackgroundService
     /// </summary>
     public const int DefaultDormancyRefireIntervalDays = 30;
 
+    /// <summary>
+    /// Fallback value for <c>Dormancy:Parent:AnonymizeAfterDays</c>
+    /// when the key is missing or unparseable. <b>0 (disabled)</b> —
+    /// destructive action is explicit operator opt-in. The
+    /// recommended production value when enabling is 60 days past
+    /// the warning stamp (total inactivity ≈ 8 months with the
+    /// recommended <c>WarnAfterDays=180</c>). The shipped
+    /// <c>appsettings.json</c> carries 0 so a fresh <c>dotnet run</c>
+    /// does not trigger the transport / warn-pair precondition.
+    /// </summary>
+    public const int DefaultDormancyAnonymizeAfterDays = 0;
+
+    /// <summary>
+    /// Hardcoded safety floor between the parent's most recent
+    /// warning and destructive action. Ensures the parent's final
+    /// warn email has been in their inbox for at least this long
+    /// before anonymize fires. NOT a config knob — a policy invariant.
+    /// Protects against an operator flipping
+    /// <c>Dormancy:Parent:AnonymizeAfterDays</c> from 0 to a positive
+    /// value and immediately anonymizing parents who were warned
+    /// yesterday.
+    /// </summary>
+    public const int DormancyAnonymizeGraceDays = 7;
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IConfiguration _config;
     private readonly ILogger<RetentionPurgeService> _logger;
@@ -187,6 +211,17 @@ public sealed class RetentionPurgeService : BackgroundService
 
         await PurgeExpiredConversationsAsync(db, maxAgeDays, stoppingToken);
         await PurgeStalePasswordResetTokensAsync(db, stoppingToken);
+        // Anonymize before warn is deliberate. If warn ran first it
+        // would stamp DormancyWarnedAt to "now" for every refire-due
+        // parent, and the 7-day grace-floor condition on anonymize
+        // would then exclude them for another week — effectively
+        // adding 7 days of extra inactivity per refire cycle. Running
+        // anonymize first lets eligible parents be scrubbed on the
+        // same tick where the refire would have fired; the warn pass
+        // then naturally skips them via its AnonymizedAt == null
+        // filter. Non-anonymize-eligible parents get their normal
+        // refire on the same tick, so no warn is lost.
+        await AnonymizeDormantParentsAsync(db, stoppingToken);
         await WarnDormantParentsAsync(scope.ServiceProvider, db, stoppingToken);
     }
 
@@ -323,17 +358,26 @@ public sealed class RetentionPurgeService : BackgroundService
             return;
         }
         var refireIntervalDays = ReadDormancyRefireIntervalDays();
+        // Read the destructive threshold too — drives deleteAtUtc on
+        // each warn email so the parent sees the scheduled action
+        // date from the first warning onwards when destructive is
+        // enabled. 0 (disabled) means every warn carries null.
+        var anonymizeAfterDays = ReadDormancyAnonymizeAfterDays();
         var nowUtc = DateTime.UtcNow;
         var dormantCutoff = nowUtc - TimeSpan.FromDays(warnAfterDays);
         var refireCutoff = nowUtc - TimeSpan.FromDays(refireIntervalDays);
 
         // Eligibility: signal exists, past threshold, not already
-        // warned inside the refire window. The explicit `!= null`
-        // guard makes the SQL translator emit `IS NOT NULL` rather
-        // than relying on null-comparison semantics.
+        // warned inside the refire window, and not already anonymized.
+        // The explicit `!= null` guard makes the SQL translator emit
+        // `IS NOT NULL` rather than relying on null-comparison
+        // semantics. AnonymizedAt == null is defensively explicit
+        // even though a scrubbed parent has LastLoginAt == null
+        // (which would already exclude them via the next check).
         var eligible = await db.Set<Parent>()
             .Where(p =>
-                p.LastLoginAt != null
+                p.AnonymizedAt == null
+                && p.LastLoginAt != null
                 && p.LastLoginAt < dormantCutoff
                 && (p.DormancyWarnedAt == null || p.DormancyWarnedAt < refireCutoff))
             .ToListAsync(stoppingToken);
@@ -345,11 +389,22 @@ public sealed class RetentionPurgeService : BackgroundService
         int warned = 0;
         foreach (var parent in eligible)
         {
+            // Compute the scheduled anonymize date when destructive is
+            // enabled so the outgoing email body can state it plainly.
+            // Based on the parent's LastLoginAt (never null here — the
+            // eligibility Where clause filtered those out), plus the
+            // configured warn + anonymize thresholds. When destructive
+            // is disabled (AnonymizeAfterDays <= 0), deleteAtUtc stays
+            // null and the warn-only body renders unchanged.
+            DateTime? deleteAtUtc = anonymizeAfterDays > 0
+                ? parent.LastLoginAt!.Value.AddDays(warnAfterDays + anonymizeAfterDays)
+                : null;
+
             bool delivered;
             try
             {
                 delivered = await notifier.SendDormancyWarningAsync(
-                    parent.Email, deleteAtUtc: null, stoppingToken);
+                    parent.Email, deleteAtUtc, stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -392,6 +447,173 @@ public sealed class RetentionPurgeService : BackgroundService
                 "RetentionPurgeService tick: sent dormancy warnings to {Warned} parent(s) (threshold={WarnAfterDays}d, refire={RefireIntervalDays}d).",
                 warned, warnAfterDays, refireIntervalDays);
         }
+    }
+
+    /// <summary>
+    /// Destructive dormant-parent pass. Anonymizes parents who have
+    /// been warned at least <see cref="DormancyAnonymizeGraceDays"/>
+    /// days ago, have total inactivity past
+    /// <c>WarnAfterDays + AnonymizeAfterDays</c>, and have not logged
+    /// in since the warning fired. <b>Irreversible</b> at the
+    /// application level — scrubs <see cref="Parent.Email"/> /
+    /// <see cref="Parent.PasswordHash"/> to empty strings, nulls
+    /// <see cref="Parent.LastLoginAt"/> and
+    /// <see cref="Parent.DormancyWarnedAt"/>, stamps
+    /// <see cref="Parent.AnonymizedAt"/>. The <c>Parent</c> row
+    /// survives as an anchor for audit-event FKs / structural
+    /// references; credential material does not.
+    /// <para>
+    /// Per eligible parent: removes all <c>ParentDevice</c> rows, and
+    /// for each device newly orphaned, cascade-deletes via the same
+    /// pattern <c>ParentService.DeleteAccountAsync</c> uses —
+    /// schema FK cascades handle children / conversations / messages
+    /// once the <c>Device</c> row is removed. Devices still linked
+    /// to another parent are preserved; only the ParentDevice link
+    /// for this parent is removed.
+    /// </para>
+    /// <para>
+    /// <b>Atomicity</b> is per-parent (one <c>SaveChangesAsync</c>
+    /// per eligible parent). A worker crash mid-pass leaves
+    /// already-anonymized parents fully written and not-yet-processed
+    /// parents untouched. The orphan walk uses an explicit
+    /// <c>pd.ParentId != parentId</c> filter because the just-queued
+    /// <c>ParentDevice</c> removals are change-tracker-Deleted but
+    /// still visible to DB queries until the per-parent save fires.
+    /// </para>
+    /// <para>
+    /// One <see cref="Domain.Enums.AuditEventType.ParentDormancyAnonymized"/>
+    /// row per anonymized parent (system actor,
+    /// <c>ActorParentId = null</c>, invisible to parent-facing reads).
+    /// No <c>ParentDeviceUnlinked</c> rows are written during the
+    /// cascade — their <c>ActorParentId</c> would leak the anonymized
+    /// parent's identity into the audit feed, which breaks the
+    /// "minimize retained PII" ethos. Counts-only metadata on the
+    /// anonymize row captures the same information in aggregate.
+    /// </para>
+    /// </summary>
+    private async Task AnonymizeDormantParentsAsync(
+        AppDbContext db, CancellationToken stoppingToken)
+    {
+        var anonymizeAfterDays = ReadDormancyAnonymizeAfterDays();
+        if (anonymizeAfterDays <= 0)
+        {
+            // Disabled. Shipped default and code fallback both 0.
+            // Silently skip — the DI-time precondition has already
+            // enforced that an enabled destructive pass requires
+            // warn-enabled + SMTP at startup, so we do not need to
+            // re-check those here.
+            return;
+        }
+
+        // Re-read warn thresholds here too so the anonymize pass is
+        // self-contained — it computes its own cutoff purely from
+        // config, without depending on state set by the warn pass.
+        var warnAfterDays = ReadDormancyWarnAfterDays();
+        var warnRefireIntervalDays = ReadDormancyRefireIntervalDays();
+
+        var nowUtc = DateTime.UtcNow;
+        var destructiveCutoff = nowUtc - TimeSpan.FromDays(warnAfterDays + anonymizeAfterDays);
+        var graceCutoff = nowUtc - TimeSpan.FromDays(DormancyAnonymizeGraceDays);
+
+        // Six-condition eligibility. See CLAUDE.md § Parent anonymize
+        // for the full contract. The two `!= null` / `== null` guards
+        // are defensively explicit even where a prior inequality
+        // would also exclude null rows.
+        var eligible = await db.Set<Parent>()
+            .Where(p =>
+                p.AnonymizedAt == null
+                && p.LastLoginAt != null
+                && p.LastLoginAt < destructiveCutoff
+                && p.DormancyWarnedAt != null
+                && p.DormancyWarnedAt > p.LastLoginAt
+                && p.DormancyWarnedAt < graceCutoff)
+            .ToListAsync(stoppingToken);
+
+        if (eligible.Count == 0)
+            return;
+
+        int anonymized = 0;
+        foreach (var parent in eligible)
+        {
+            var parentId = parent.Id;
+
+            // Snapshot linked device ids BEFORE queueing the
+            // ParentDevice removals — otherwise the orphan walk
+            // below would see an empty device set.
+            var linkedDeviceIds = await db.Set<ParentDevice>()
+                .Where(pd => pd.ParentId == parentId)
+                .Select(pd => pd.DeviceId)
+                .ToListAsync(stoppingToken);
+
+            // Queue removal of all ParentDevice rows for this parent.
+            var links = await db.Set<ParentDevice>()
+                .Where(pd => pd.ParentId == parentId)
+                .ToListAsync(stoppingToken);
+            if (links.Count > 0)
+                db.Set<ParentDevice>().RemoveRange(links);
+
+            // Orphan-aware device cleanup. The `ParentId != parentId`
+            // filter excludes the change-tracker-Deleted rows from
+            // this iteration — they are still in the DB until the
+            // per-parent SaveChangesAsync below fires. Any remaining
+            // link to the device from a different parent keeps the
+            // device alive.
+            int orphansDeleted = 0;
+            foreach (var deviceId in linkedDeviceIds)
+            {
+                var stillLinked = await db.Set<ParentDevice>()
+                    .AnyAsync(pd => pd.DeviceId == deviceId && pd.ParentId != parentId,
+                              stoppingToken);
+                if (stillLinked)
+                    continue;
+
+                var device = await db.Set<Device>()
+                    .FindAsync(new object?[] { deviceId }, stoppingToken);
+                if (device != null)
+                {
+                    db.Set<Device>().Remove(device);
+                    orphansDeleted++;
+                }
+            }
+
+            // Scrub the Parent row in place. Post-save:
+            //   Email = "", PasswordHash = "", LastLoginAt = null,
+            //   DormancyWarnedAt = null, AnonymizedAt = nowUtc.
+            // The row persists as an audit-event anchor; credential
+            // material does not. Login naturally fails for this row
+            // because BCrypt.Verify against an empty hash cannot
+            // succeed — no separate "disabled" flag is required.
+            parent.Email = "";
+            parent.PasswordHash = "";
+            parent.LastLoginAt = null;
+            parent.DormancyWarnedAt = null;
+            parent.AnonymizedAt = nowUtc;
+
+            // System-actor audit row — counts-only metadata, no email,
+            // no parent id, no PII. The ActorParentId=null contract
+            // keeps this row invisible to every parent-facing read
+            // surface via the existing ActorParentId==parentId filter.
+            var audit = AuditEvent.ParentDormancyAnonymized(
+                warnAfterDays: warnAfterDays,
+                anonymizeAfterDays: anonymizeAfterDays,
+                warnRefireIntervalDays: warnRefireIntervalDays,
+                linkedDevicesUnlinked: linkedDeviceIds.Count,
+                orphanDevicesCascaded: orphansDeleted);
+            db.Set<AuditEvent>().Add(audit);
+            AppMeter.AuditEventsWritten.Add(1,
+                new KeyValuePair<string, object?>("event_type", audit.EventType.ToString()));
+
+            // Per-parent atomicity: everything above (link removals,
+            // orphan device deletes, parent scrub, audit insert)
+            // flushes together. A crash between parents leaves prior
+            // anonymizes complete; next tick picks up the remainder.
+            await db.SaveChangesAsync(stoppingToken);
+            anonymized++;
+        }
+
+        _logger.LogInformation(
+            "RetentionPurgeService tick: anonymized {Anonymized} dormant parent(s) (threshold={WarnAfterDays}+{AnonymizeAfterDays}d, grace={GraceDays}d).",
+            anonymized, warnAfterDays, anonymizeAfterDays, DormancyAnonymizeGraceDays);
     }
 
     private async Task PurgeStalePasswordResetTokensAsync(
@@ -474,6 +696,17 @@ public sealed class RetentionPurgeService : BackgroundService
             DefaultDormancyRefireIntervalDays);
         return raw < 1 ? 1 : raw;
     }
+
+    // Dormancy:Parent:AnonymizeAfterDays — fallback 0 (disabled).
+    // Positive value enables the destructive pass; the DI-time
+    // precondition already enforced that warn-enabled + SMTP are
+    // paired before we get here. Non-positive values disable the
+    // pass entirely; no clamp is applied because 0 is the safe
+    // disable signal.
+    private int ReadDormancyAnonymizeAfterDays()
+        => ParseIntOrDefault(
+            _config["Dormancy:Parent:AnonymizeAfterDays"],
+            DefaultDormancyAnonymizeAfterDays);
 
     private static int ParseIntOrDefault(string? raw, int fallback)
         => int.TryParse(raw, out var parsed) ? parsed : fallback;

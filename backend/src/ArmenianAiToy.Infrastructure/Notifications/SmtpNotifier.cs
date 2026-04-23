@@ -165,19 +165,19 @@ public sealed class SmtpNotifier : INotifier
     public async Task<bool> SendDormancyWarningAsync(
         string email, DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
     {
-        // deleteAtUtc is intentionally ignored in this slice. Reserved
-        // parameter for the future delete-action slice — keeping the
-        // method signature stable now means that later slice is a
-        // body-only change.
-        _ = deleteAtUtc;
-
+        // deleteAtUtc carries the scheduled destructive-action date
+        // when the anonymize pass is enabled. Null when destructive is
+        // disabled (warn-only mode). The body helper renders an extra
+        // sentence naming the date only when non-null, so parents who
+        // are merely being nudged do not see scary "will be removed"
+        // copy.
         var fromAddress = _config["Notifications:Smtp:FromAddress"] ?? "";
 
         using var message = new MailMessage
         {
             From = new MailAddress(fromAddress),
             Subject = "Ձեր հաշիվը երկար ժամանակ անգործուն է",
-            Body = BuildDormancyWarningBody(),
+            Body = BuildDormancyWarningBody(deleteAtUtc),
             BodyEncoding = Encoding.UTF8,
             SubjectEncoding = Encoding.UTF8,
             IsBodyHtml = false
@@ -268,17 +268,29 @@ public sealed class SmtpNotifier : INotifier
             resetLink);
     }
 
-    private static string BuildDormancyWarningBody()
+    private static string BuildDormancyWarningBody(DateTime? deleteAtUtc)
     {
-        // Eastern Armenian, warm but neutral. No urgency, no scary
-        // "your account will be deleted" copy — this slice is
-        // warn-only and the delete action does not yet exist. Tells
-        // the parent what happened (account unused for a while),
-        // what to do (log in), and where (the parent dashboard).
-        // Matches the Armenian-first product posture.
-        return string.Join("\n\n",
+        // Eastern Armenian, warm but neutral in the warn-only case;
+        // factual-without-panic when a destructive date is attached.
+        // The ordering is: what happened → what to do → (optional)
+        // when it will be acted upon → opt-out note. The extra
+        // middle sentence only appears when the destructive pass is
+        // enabled (deleteAtUtc non-null).
+        var lines = new System.Collections.Generic.List<string>
+        {
             "Ձեր հաշիվը վերջերս չի օգտագործվել։",
-            "Եթե դեռ ցանկանում եք պահպանել Ձեր հաշիվը և տվյալները, խնդրում ենք կրկին մուտք գործել։",
-            "Եթե Դուք այլևս չեք օգտագործում այս հաշիվը, այս նամակը կարող եք անտեսել։");
+            "Եթե դեռ ցանկանում եք պահպանել Ձեր հաշիվը և տվյալները, խնդրում ենք կրկին մուտք գործել։"
+        };
+        if (deleteAtUtc.HasValue)
+        {
+            // Plain yyyy-MM-dd — no locale-specific formatting, no
+            // time component. The parent sees a bounded calendar
+            // date they can verify against their calendar.
+            var dateStr = deleteAtUtc.Value.ToString("yyyy-MM-dd");
+            lines.Add(
+                $"Եթե մինչև {dateStr} չմտնեք, Ձեր անձնական տվյալները ինքնաբար կհեռացվեն։");
+        }
+        lines.Add("Եթե Դուք այլևս չեք օգտագործում այս հաշիվը, այս նամակը կարող եք անտեսել։");
+        return string.Join("\n\n", lines);
     }
 }

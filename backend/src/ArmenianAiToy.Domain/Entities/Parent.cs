@@ -58,5 +58,21 @@ public class Parent
     /// </summary>
     public DateTime? DormancyWarnedAt { get; set; }
 
+    /// <summary>
+    /// Timestamp at which this parent was anonymized by the scheduled
+    /// destructive dormant-parent pass. Null for active accounts (the
+    /// shipped default). When non-null, the <c>Email</c> and
+    /// <c>PasswordHash</c> columns are scrubbed to empty strings by
+    /// construction, and <c>LastLoginAt</c> + <c>DormancyWarnedAt</c>
+    /// are null. Anonymize is irreversible at the application level:
+    /// the row is kept so audit-event FKs and structural references
+    /// remain intact, but no credential material survives. See
+    /// CLAUDE.md § Retention and § Parent anonymize for the policy
+    /// contract. Login naturally fails for anonymized parents
+    /// because BCrypt verification against an empty-string hash
+    /// cannot succeed — no separate "disabled" flag is required.
+    /// </summary>
+    public DateTime? AnonymizedAt { get; set; }
+
     public ICollection<ParentDevice> ParentDevices { get; set; } = new List<ParentDevice>();
 }

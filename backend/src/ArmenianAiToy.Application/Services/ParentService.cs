@@ -159,7 +159,14 @@ public class ParentService : IParentService
 
     public async Task<ParentLoginResponse?> LoginAsync(string email, string password)
     {
-        var parent = await _db.Set<Parent>().FirstOrDefaultAsync(p => p.Email == email);
+        // Filter anonymized rows at the query level — their Email is
+        // empty-string by construction, so an empty-email login probe
+        // would otherwise match one of those rows and BCrypt.Verify
+        // against an empty PasswordHash throws rather than returning
+        // false. No login-side "IsDisabled" flag is required: the
+        // scrubbed row is simply invisible to the login lookup.
+        var parent = await _db.Set<Parent>()
+            .FirstOrDefaultAsync(p => p.Email == email && p.AnonymizedAt == null);
         if (parent == null || !BCrypt.Net.BCrypt.Verify(password, parent.PasswordHash))
             return null;
 
