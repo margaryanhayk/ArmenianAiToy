@@ -38,3 +38,35 @@ public record LinkedDeviceChildDto(
     bool? GameEnabled,
     bool? RiddleEnabled,
     bool? CuriosityEnabled);
+
+/// <summary>
+/// Small self-scoped dormancy-reporting summary exposed alongside the
+/// linked-device list on <c>GET /api/parents/devices/details</c>.
+/// Observational only — NOT an action signal, NOT a policy threshold.
+/// <para>
+/// <c>LastLoginAt</c> is the raw <c>Parent.LastLoginAt</c> value
+/// (nullable). No "parent is dormant" boolean is derived — there is no
+/// authoritative threshold for parent-level dormancy in this repo yet,
+/// and surfacing a misleading boolean would create a signal the
+/// dashboard can't honestly interpret.
+/// </para>
+/// <para>
+/// <c>TotalDevices</c> / <c>DormantDevices</c> are counted directly from
+/// the already-derived <see cref="LinkedDeviceDto.IsDormant"/> values on
+/// the same response — there is exactly one dormancy-derivation site
+/// (<see cref="ArmenianAiToy.Application.Services.ParentService.GetLinkedDeviceDetailsAsync"/>).
+/// </para>
+/// </summary>
+public record DormancySummaryDto(
+    int TotalDevices,
+    int DormantDevices,
+    DateTime? LastLoginAt);
+
+/// <summary>
+/// Response envelope for <c>GET /api/parents/devices/details</c>.
+/// Additive extension: pre-slice clients reading only <c>Devices</c>
+/// continue to work unchanged; the dashboard reads both.
+/// </summary>
+public record LinkedDevicesResponse(
+    List<LinkedDeviceDto> Devices,
+    DormancySummaryDto Summary);

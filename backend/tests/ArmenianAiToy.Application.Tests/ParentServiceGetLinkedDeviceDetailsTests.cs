@@ -339,4 +339,161 @@ public class ParentServiceGetLinkedDeviceDetailsTests
         Assert.Equal(myFresh.Id, dto.DeviceId);
         Assert.False(dto.IsDormant);
     }
+
+    // --- Dormancy summary slice: devices + lastLoginAt wrapper. --------
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsWithSummaryAsync_MixedDormancy_CountsMatchDevices()
+    {
+        // Two dormant, one fresh. Pins that the summary's
+        // DormantDevices count is derived from the same IsDormant
+        // booleans the response DTOs carry — a future refactor that
+        // silently re-derives dormancy in the wrapper (or miscounts
+        // fresh devices) would break this.
+        var (service, db) = CreateServiceWithConfig(notSeenDays: null);
+        var parentId = Guid.NewGuid();
+        var t0 = DateTime.UtcNow;
+        var dStale1 = NewDevice("Stale1", t0.AddDays(-365));
+        var dStale2 = NewDevice("Stale2", t0.AddDays(-200));
+        var dFresh = NewDevice("Fresh", t0.AddDays(-5));
+        var stamped = t0.AddDays(-10);
+
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId, Email = "p@x.com", PasswordHash = "x",
+            RegisteredAt = t0.AddDays(-366),
+            LastLoginAt = stamped
+        });
+        db.Set<Device>().AddRange(dStale1, dStale2, dFresh);
+        db.Set<ParentDevice>().AddRange(
+            new ParentDevice { ParentId = parentId, DeviceId = dStale1.Id, LinkedAt = t0 },
+            new ParentDevice { ParentId = parentId, DeviceId = dStale2.Id, LinkedAt = t0 },
+            new ParentDevice { ParentId = parentId, DeviceId = dFresh.Id, LinkedAt = t0 });
+        await db.SaveChangesAsync();
+
+        var result = await service.GetLinkedDeviceDetailsWithSummaryAsync(parentId);
+
+        Assert.Equal(3, result.Devices.Count);
+        Assert.Equal(3, result.Summary.TotalDevices);
+        Assert.Equal(2, result.Summary.DormantDevices);
+        Assert.Equal(result.Devices.Count(d => d.IsDormant), result.Summary.DormantDevices);
+        Assert.Equal(stamped, result.Summary.LastLoginAt);
+    }
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsWithSummaryAsync_NullLastLoginAt_FlowsThroughAsNull()
+    {
+        // Never-logged-in parent path: LastLoginAt is null on the Parent
+        // row, must surface as null on the summary (not DateTime.MinValue
+        // or any other sentinel). The dashboard renders "not available
+        // yet" based on this exact null.
+        var (service, db) = CreateServiceWithConfig(notSeenDays: null);
+        var parentId = Guid.NewGuid();
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId, Email = "p@x.com", PasswordHash = "x",
+            RegisteredAt = DateTime.UtcNow,
+            LastLoginAt = null
+        });
+        await db.SaveChangesAsync();
+
+        var result = await service.GetLinkedDeviceDetailsWithSummaryAsync(parentId);
+
+        Assert.Null(result.Summary.LastLoginAt);
+        Assert.Equal(0, result.Summary.TotalDevices);
+        Assert.Equal(0, result.Summary.DormantDevices);
+    }
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsWithSummaryAsync_NoDevices_ReturnsEmptyDevicesAndZeroCounts()
+    {
+        // Parent exists and has logged in but has no linked devices.
+        // Summary must carry TotalDevices=0 / DormantDevices=0 without
+        // any /0 hazard and must still surface LastLoginAt.
+        var (service, db) = CreateServiceWithConfig(notSeenDays: null);
+        var parentId = Guid.NewGuid();
+        var stamped = DateTime.UtcNow.AddDays(-2);
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId, Email = "p@x.com", PasswordHash = "x",
+            RegisteredAt = DateTime.UtcNow.AddDays(-30),
+            LastLoginAt = stamped
+        });
+        await db.SaveChangesAsync();
+
+        var result = await service.GetLinkedDeviceDetailsWithSummaryAsync(parentId);
+
+        Assert.Empty(result.Devices);
+        Assert.Equal(0, result.Summary.TotalDevices);
+        Assert.Equal(0, result.Summary.DormantDevices);
+        Assert.Equal(stamped, result.Summary.LastLoginAt);
+    }
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsWithSummaryAsync_OtherParentDormantDevices_DoNotCount()
+    {
+        // Scope invariant: another parent's dormant devices must NEVER
+        // inflate this parent's summary counts, regardless of shared-
+        // device scenarios or a future query refactor that accidentally
+        // widens the filter. Mirrors the existing
+        // GetLinkedDeviceDetailsAsync_IsDormantRespectsOwnership test
+        // at the summary layer.
+        var (service, db) = CreateServiceWithConfig(notSeenDays: null);
+        var mine = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var t0 = DateTime.UtcNow;
+        var myFresh = NewDevice("Mine", t0);
+        var theirsStale1 = NewDevice("Theirs1", t0.AddDays(-365));
+        var theirsStale2 = NewDevice("Theirs2", t0.AddDays(-365));
+
+        db.Set<Parent>().AddRange(
+            new Parent { Id = mine, Email = "me@x.com", PasswordHash = "x", RegisteredAt = t0,
+                         LastLoginAt = t0.AddHours(-1) },
+            new Parent { Id = other, Email = "you@x.com", PasswordHash = "x", RegisteredAt = t0 });
+        db.Set<Device>().AddRange(myFresh, theirsStale1, theirsStale2);
+        db.Set<ParentDevice>().AddRange(
+            new ParentDevice { ParentId = mine, DeviceId = myFresh.Id, LinkedAt = t0 },
+            new ParentDevice { ParentId = other, DeviceId = theirsStale1.Id, LinkedAt = t0 },
+            new ParentDevice { ParentId = other, DeviceId = theirsStale2.Id, LinkedAt = t0 });
+        await db.SaveChangesAsync();
+
+        var result = await service.GetLinkedDeviceDetailsWithSummaryAsync(mine);
+
+        Assert.Single(result.Devices);
+        Assert.Equal(1, result.Summary.TotalDevices);
+        Assert.Equal(0, result.Summary.DormantDevices);
+    }
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsWithSummaryAsync_DoesNotDuplicateDormancyDerivation()
+    {
+        // Asserts the summary's DormantDevices is a pure aggregation
+        // over the devices list — for every device in the list,
+        // IsDormant is the single source of truth. A regression that
+        // re-derived dormancy in the wrapper under a different
+        // threshold (e.g. a hardcoded 90 when config says 30) would
+        // break the equality below.
+        var (service, db) = CreateServiceWithConfig(notSeenDays: "30");
+        var parentId = Guid.NewGuid();
+        var t0 = DateTime.UtcNow;
+        // 29 days is under the 30-day threshold (fresh);
+        // 31 days is over (dormant).
+        var dFresh = NewDevice("F", t0.AddDays(-29));
+        var dStale = NewDevice("S", t0.AddDays(-31));
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId, Email = "p@x.com", PasswordHash = "x", RegisteredAt = t0
+        });
+        db.Set<Device>().AddRange(dFresh, dStale);
+        db.Set<ParentDevice>().AddRange(
+            new ParentDevice { ParentId = parentId, DeviceId = dFresh.Id, LinkedAt = t0 },
+            new ParentDevice { ParentId = parentId, DeviceId = dStale.Id, LinkedAt = t0 });
+        await db.SaveChangesAsync();
+
+        var result = await service.GetLinkedDeviceDetailsWithSummaryAsync(parentId);
+
+        Assert.Equal(1, result.Summary.DormantDevices);
+        Assert.Equal(result.Devices.Count(d => d.IsDormant),
+                     result.Summary.DormantDevices);
+    }
 }

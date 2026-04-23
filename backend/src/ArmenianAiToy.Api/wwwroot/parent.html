@@ -284,6 +284,17 @@
       <div style="margin:0 0 8px;">
         <button id="openAuditBtn" class="link" type="button">View your activity →</button>
       </div>
+      <!--
+        Observational dormancy summary — populated by loadDevices().
+        Reporting-only: no CTA, no deletion wording, no warning styling.
+        Hidden while empty; shown as soon as there is at least one line
+        of content to display.
+      -->
+      <div id="dormancySummary"
+           hidden
+           style="margin:0 0 12px;padding:8px 12px;
+                  background:#f7f7f7;border:1px solid #ddd;
+                  border-radius:6px;font-size:13px;color:#555;"></div>
       <div id="devicesList"></div>
       <div id="devicesStatus" class="status muted" aria-live="polite"></div>
       <div id="linkDeviceEmptyState" class="link-device-empty" hidden>
@@ -712,17 +723,49 @@
     }
 
     // ---------- devices ----------
+
+    // Populate the observational dormancy summary block. Reporting-only:
+    // "Last login: ..." always shown; "Dormant devices: N of M" only
+    // when M > 0 so a parent with zero linked devices doesn't see the
+    // vacuous "0 of 0" line. No CTA, no warning styling, no deletion
+    // copy — just two neutral facts.
+    function renderDormancySummary(summaryEl, summary, totalDevices) {
+      if (!summary) {
+        summaryEl.hidden = true;
+        return;
+      }
+      var lines = [];
+      var loginLabel = summary.lastLoginAt
+        ? 'Last login: ' + fmtTime(summary.lastLoginAt)
+        : 'Last login: not available yet';
+      lines.push(loginLabel);
+      if (totalDevices > 0) {
+        lines.push('Dormant devices: ' +
+          (summary.dormantDevices || 0) + ' of ' + totalDevices);
+      }
+      lines.forEach(function (text) {
+        var row = document.createElement('div');
+        row.textContent = text;
+        summaryEl.appendChild(row);
+      });
+      summaryEl.hidden = lines.length === 0;
+    }
+
     function loadDevices() {
       show('devicesView');
       setStatus('devicesStatus', 'Loading…', 'muted');
       var listEl = document.getElementById('devicesList');
       var emptyState = document.getElementById('linkDeviceEmptyState');
+      var summaryEl = document.getElementById('dormancySummary');
+      summaryEl.hidden = true;
+      clearChildren(summaryEl);
       emptyState.hidden = true;
       clearChildren(listEl);
       authedFetch('/api/parents/devices/details').then(function (data) {
         var devices = (data && data.devices) || [];
         // Cache for audit-view target id => display-name resolution.
         state.lastDevicesResponse = devices;
+        renderDormancySummary(summaryEl, data && data.summary, devices.length);
         if (devices.length === 0) {
           setStatus('devicesStatus', 'No devices linked to this account yet.', 'muted');
           // Empty state — show the link-device form so the parent has

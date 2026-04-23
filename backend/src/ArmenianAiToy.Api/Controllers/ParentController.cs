@@ -393,7 +393,11 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
-    /// List linked devices with child info and last activity.
+    /// List linked devices with child info and last activity. The
+    /// response envelope also carries a small self-scoped dormancy
+    /// summary (device counts + raw <c>LastLoginAt</c>) — reporting-
+    /// only, backward-compatible: pre-slice clients reading only
+    /// <c>devices</c> continue to work unchanged.
     /// </summary>
     [HttpGet("devices/details")]
     [Authorize]
@@ -402,8 +406,8 @@ public class ParentController : ControllerBase
     public async Task<IActionResult> GetDeviceDetails()
     {
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var devices = await _parentService.GetLinkedDeviceDetailsAsync(parentId);
-        return Ok(new { devices });
+        var response = await _parentService.GetLinkedDeviceDetailsWithSummaryAsync(parentId);
+        return Ok(response);
     }
 
     /// <summary>

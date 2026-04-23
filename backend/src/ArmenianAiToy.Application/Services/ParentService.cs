@@ -750,6 +750,38 @@ public class ParentService : IParentService
     }
 
     /// <summary>
+    /// Devices + small self-scoped dormancy summary. The summary is
+    /// observational — device counts are aggregated from the already-
+    /// derived <see cref="LinkedDeviceDto.IsDormant"/> booleans returned
+    /// by <see cref="GetLinkedDeviceDetailsAsync"/> (single derivation
+    /// site), and <c>LastLoginAt</c> is the raw nullable column on
+    /// <c>Parent</c>. No threshold policy is applied to the parent-level
+    /// signal; a "parent is dormant" boolean would be misleading at this
+    /// stage and is deliberately omitted.
+    /// </summary>
+    public async Task<LinkedDevicesResponse> GetLinkedDeviceDetailsWithSummaryAsync(Guid parentId)
+    {
+        var devices = await GetLinkedDeviceDetailsAsync(parentId);
+
+        // Single-column read — projects only LastLoginAt off the Parent
+        // row. AsNoTracking is irrelevant on a projected scalar, and
+        // FirstOrDefaultAsync on a DateTime? selector returns null when
+        // the parent is missing or the column is null. Both branches
+        // collapse to the same "not available yet" display.
+        var lastLoginAt = await _db.Set<Parent>()
+            .Where(p => p.Id == parentId)
+            .Select(p => p.LastLoginAt)
+            .FirstOrDefaultAsync();
+
+        var summary = new DormancySummaryDto(
+            TotalDevices: devices.Count,
+            DormantDevices: devices.Count(d => d.IsDormant),
+            LastLoginAt: lastLoginAt);
+
+        return new LinkedDevicesResponse(devices, summary);
+    }
+
+    /// <summary>
     /// Collates the authenticated parent's full data export scope and
     /// writes a <c>ParentDataExported</c> audit row in the same
     /// transaction. Returns <c>null</c> when the parent row no longer

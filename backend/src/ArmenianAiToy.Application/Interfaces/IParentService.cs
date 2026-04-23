@@ -20,6 +20,19 @@ public interface IParentService
     Task<bool> UnlinkDeviceAsync(Guid parentId, Guid deviceId);
     Task<List<Guid>> GetLinkedDeviceIdsAsync(Guid parentId);
     Task<List<LinkedDeviceDto>> GetLinkedDeviceDetailsAsync(Guid parentId);
+
+    /// <summary>
+    /// Parent linked-device list PLUS a small self-scoped dormancy
+    /// summary (device counts + raw <c>LastLoginAt</c>). Wraps
+    /// <see cref="GetLinkedDeviceDetailsAsync"/> — single dormancy-
+    /// derivation site, counts are aggregated from the already-derived
+    /// <see cref="LinkedDeviceDto.IsDormant"/> booleans.
+    /// <para>
+    /// Reporting-only. No deletion / unlink / warning / notifier
+    /// behavior is tied to this response.
+    /// </para>
+    /// </summary>
+    Task<LinkedDevicesResponse> GetLinkedDeviceDetailsWithSummaryAsync(Guid parentId);
     Task<bool> ChangePasswordAsync(Guid parentId, string currentPassword, string newPassword);
     Task<bool> SetDevicePauseStateAsync(Guid parentId, Guid deviceId, bool paused);
     Task<bool> SetBedtimeWindowAsync(Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end);
