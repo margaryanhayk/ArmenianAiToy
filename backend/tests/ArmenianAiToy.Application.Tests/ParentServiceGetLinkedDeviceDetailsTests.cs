@@ -175,4 +175,168 @@ public class ParentServiceGetLinkedDeviceDetailsTests
         var dto = Assert.Single(result);
         Assert.Equal("A's device", dto.DeviceName);
     }
+
+    // --- Dormancy slice: derived IsDormant reporting-only flag. --------
+
+    private static (ParentService Service, TestDbContext Db) CreateServiceWithConfig(
+        string? notSeenDays)
+    {
+        var options = new DbContextOptionsBuilder<TestDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        var db = new TestDbContext(options);
+        var config = Substitute.For<IConfiguration>();
+        // Only seed the key when a caller actually wants a non-default —
+        // a null raw value exercises the default-threshold branch.
+        if (notSeenDays is not null)
+            config["Dormancy:Devices:NotSeenDays"].Returns(notSeenDays);
+        var logger = Substitute.For<ILogger<ParentService>>();
+        return (new ParentService(db, config, logger), db);
+    }
+
+    private static async Task<Guid> SeedLinkedDeviceAsync(
+        TestDbContext db, Guid parentId, DateTime lastSeen)
+    {
+        var device = NewDevice("Areg", lastSeen);
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId,
+            Email = $"{parentId:N}@x.com",
+            PasswordHash = "x",
+            RegisteredAt = lastSeen.AddDays(-1)
+        });
+        db.Set<Device>().Add(device);
+        db.Set<ParentDevice>().Add(new ParentDevice
+        {
+            ParentId = parentId,
+            DeviceId = device.Id,
+            LinkedAt = lastSeen.AddDays(-1)
+        });
+        await db.SaveChangesAsync();
+        return device.Id;
+    }
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsAsync_DeviceOlderThanDefaultThreshold_ReturnsIsDormantTrue()
+    {
+        // 181 days silent > default 180-day threshold. Uses the default
+        // branch (no config key seeded).
+        var (service, db) = CreateServiceWithConfig(notSeenDays: null);
+        var parentId = Guid.NewGuid();
+        await SeedLinkedDeviceAsync(db, parentId, DateTime.UtcNow.AddDays(-181));
+
+        var result = await service.GetLinkedDeviceDetailsAsync(parentId);
+
+        var dto = Assert.Single(result);
+        Assert.True(dto.IsDormant);
+    }
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsAsync_DeviceNewerThanDefaultThreshold_ReturnsIsDormantFalse()
+    {
+        // 30 days silent — well inside the default 180-day threshold.
+        var (service, db) = CreateServiceWithConfig(notSeenDays: null);
+        var parentId = Guid.NewGuid();
+        await SeedLinkedDeviceAsync(db, parentId, DateTime.UtcNow.AddDays(-30));
+
+        var result = await service.GetLinkedDeviceDetailsAsync(parentId);
+
+        var dto = Assert.Single(result);
+        Assert.False(dto.IsDormant);
+    }
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsAsync_ThresholdConfigIsHonored()
+    {
+        // Device 45 days silent is dormant under threshold=30
+        // but NOT dormant under the default threshold=180. Pins that
+        // the config key flows through, not just the default constant.
+        var lastSeen = DateTime.UtcNow.AddDays(-45);
+
+        var (tightService, tightDb) = CreateServiceWithConfig(notSeenDays: "30");
+        var tightParent = Guid.NewGuid();
+        await SeedLinkedDeviceAsync(tightDb, tightParent, lastSeen);
+        var tight = Assert.Single(await tightService.GetLinkedDeviceDetailsAsync(tightParent));
+        Assert.True(tight.IsDormant);
+
+        var (looseService, looseDb) = CreateServiceWithConfig(notSeenDays: null);
+        var looseParent = Guid.NewGuid();
+        await SeedLinkedDeviceAsync(looseDb, looseParent, lastSeen);
+        var loose = Assert.Single(await looseService.GetLinkedDeviceDetailsAsync(looseParent));
+        Assert.False(loose.IsDormant);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-5")]
+    public async Task GetLinkedDeviceDetailsAsync_ZeroOrNegativeThreshold_ClampsToOneDay(
+        string rawThreshold)
+    {
+        // Clamp floor = 1 day. A device seen 2 days ago is dormant under
+        // the clamped threshold — if the clamp regressed to "accept 0",
+        // even just-seen devices would flip to dormant and this test
+        // would fail via the recent-device counter-check below.
+        var (service, db) = CreateServiceWithConfig(notSeenDays: rawThreshold);
+        var parentId = Guid.NewGuid();
+        var device = NewDevice("Areg", DateTime.UtcNow.AddDays(-2));
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId, Email = "p@x.com", PasswordHash = "x",
+            RegisteredAt = DateTime.UtcNow.AddDays(-3)
+        });
+        db.Set<Device>().Add(device);
+        db.Set<ParentDevice>().Add(new ParentDevice
+        {
+            ParentId = parentId, DeviceId = device.Id,
+            LinkedAt = DateTime.UtcNow.AddDays(-3)
+        });
+        // Counter-device: seen "now", must stay IsDormant=false even
+        // under the clamp floor.
+        var fresh = NewDevice("Fresh", DateTime.UtcNow);
+        db.Set<Device>().Add(fresh);
+        db.Set<ParentDevice>().Add(new ParentDevice
+        {
+            ParentId = parentId, DeviceId = fresh.Id, LinkedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var result = await service.GetLinkedDeviceDetailsAsync(parentId);
+
+        Assert.Equal(2, result.Count);
+        var oldDto = Assert.Single(result, r => r.DeviceId == device.Id);
+        Assert.True(oldDto.IsDormant);
+        var freshDto = Assert.Single(result, r => r.DeviceId == fresh.Id);
+        Assert.False(freshDto.IsDormant);
+    }
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsAsync_IsDormantRespectsOwnership()
+    {
+        // Reinforces the existing ownership invariant: another parent's
+        // dormant device does NOT leak into this parent's response,
+        // regardless of the IsDormant flag. Protects against a future
+        // refactor that might widen the query in the name of dormancy
+        // reporting.
+        var (service, db) = CreateServiceWithConfig(notSeenDays: null);
+        var mine = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var t0 = DateTime.UtcNow;
+        var myFresh = NewDevice("Mine", t0);
+        var theirsStale = NewDevice("Theirs", t0.AddDays(-365));
+
+        db.Set<Parent>().AddRange(
+            new Parent { Id = mine, Email = "me@x.com", PasswordHash = "x", RegisteredAt = t0 },
+            new Parent { Id = other, Email = "you@x.com", PasswordHash = "x", RegisteredAt = t0 });
+        db.Set<Device>().AddRange(myFresh, theirsStale);
+        db.Set<ParentDevice>().AddRange(
+            new ParentDevice { ParentId = mine, DeviceId = myFresh.Id, LinkedAt = t0 },
+            new ParentDevice { ParentId = other, DeviceId = theirsStale.Id, LinkedAt = t0 });
+        await db.SaveChangesAsync();
+
+        var result = await service.GetLinkedDeviceDetailsAsync(mine);
+
+        var dto = Assert.Single(result);
+        Assert.Equal(myFresh.Id, dto.DeviceId);
+        Assert.False(dto.IsDormant);
+    }
 }

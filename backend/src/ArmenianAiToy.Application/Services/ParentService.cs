@@ -386,6 +386,21 @@ public class ParentService : IParentService
         return DefaultPasswordResetTtlMinutes;
     }
 
+    // Default threshold for the derived LinkedDeviceDto.IsDormant flag.
+    // Overridable via Dormancy:Devices:NotSeenDays; missing / unparseable
+    // config falls back to the shipped default. MinDormancyNotSeenDays
+    // clamps a pathological override (0, negative) so a bad config can
+    // never flip every device to IsDormant=true at once.
+    private const int DefaultDormancyNotSeenDays = 180;
+    private const int MinDormancyNotSeenDays = 1;
+
+    private int ReadDormancyNotSeenDays()
+    {
+        var raw = _config["Dormancy:Devices:NotSeenDays"];
+        var parsed = int.TryParse(raw, out var n) ? n : DefaultDormancyNotSeenDays;
+        return parsed < MinDormancyNotSeenDays ? MinDormancyNotSeenDays : parsed;
+    }
+
     public async Task<bool> DeleteAccountAsync(Guid parentId, string currentPassword)
     {
         // Re-authenticate: the JWT proves the caller is logged in as this
@@ -695,6 +710,14 @@ public class ParentService : IParentService
             .Select(g => new { DeviceId = g.Key, LastStartedAt = g.Max(c => c.StartedAt) })
             .ToDictionaryAsync(x => x.DeviceId, x => x.LastStartedAt);
 
+        // Single computation site for IsDormant. Snapshot UtcNow and the
+        // threshold once per call so every device in this response is
+        // evaluated against the same cutoff (no drift across the loop).
+        // Reporting-only: this flag does NOT feed into chat gates,
+        // retention, or any behavior change.
+        var nowUtc = DateTime.UtcNow;
+        var dormancyCutoff = nowUtc.AddDays(-ReadDormancyNotSeenDays());
+
         return links.Select(l => new LinkedDeviceDto(
             l.Device.Id,
             l.Device.Name,
@@ -712,7 +735,8 @@ public class ParentService : IParentService
             l.Device.StoryEnabled,
             l.Device.GameEnabled,
             l.Device.RiddleEnabled,
-            l.Device.CuriosityEnabled
+            l.Device.CuriosityEnabled,
+            IsDormant: l.Device.LastSeenAt <= dormancyCutoff
         )).ToList();
     }
 
