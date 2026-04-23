@@ -60,59 +60,27 @@ public class ChatController : ControllerBase
 
         var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
 
-        // Pause gate — runs before any ChatService call, so a paused device
-        // never reaches moderation, chat generation, or conversation writes.
-        // The response envelope uses SafetyFlag.Clean (not Blocked/Flagged)
-        // because this is a parent-initiated soft-off, not a safety event.
-        //
-        // Split from bedtime below into sequential ifs (rather than a single
-        // `||`) so the gate-trip metric can distinguish which one fired.
-        // Behavior is identical — pause still wins over bedtime because it's
-        // checked first.
-        if (await _deviceService.IsDevicePausedAsync(deviceId))
+        // Paused / bedtime / mode-disabled gate. Shared with the voice
+        // chat endpoint via ChatGateEvaluator — same ordering, same
+        // semantics, same ModeDetector parameters the text path shipped
+        // with. AppMeter tags stay here (the two callers emit metrics
+        // differently and keeping them out of the evaluator keeps it
+        // pure). Response envelope uses SafetyFlag.Clean for all three
+        // gates — parent-initiated soft-offs are not safety events.
+        var gate = await ChatGateEvaluator.EvaluateAsync(
+            _deviceService, deviceId, request.Message, request.ChildId, DateTime.UtcNow);
+        switch (gate)
         {
-            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "paused"));
-            return Ok(new ChatResponse(PausedResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
-        }
-
-        // B4 bedtime window — same short-circuit shape and canned reply.
-        if (await _deviceService.IsDeviceInBedtimeWindowAsync(deviceId, DateTime.UtcNow))
-        {
-            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "bedtime"));
-            return Ok(new ChatResponse(PausedResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
-        }
-
-        // B5 + per-child overrides — third gate in the chain
-        // (pause > bedtime > mode). Fires only when ModeDetector makes a
-        // definitive Story/Game/Riddle/Curiosity call AND the effective
-        // flag (child override if present, else device flag) is off. Calm,
-        // None, and ambiguous detections are intentionally NOT blocked:
-        // bedtime cues must always reach Calm handling (safety invariant)
-        // and no-match messages should pass through normally. The detector
-        // is called without history or active-story context because the
-        // controller boundary doesn't own those; this makes the gate
-        // conservative — miss a classification, let the request through.
-        //
-        // ChildId on the request is passed through to
-        // IsModeEnabledForRequestAsync, which enforces both the override
-        // logic and the cross-device probe guard (a ChildId pointing to a
-        // different device does not influence this device's gate).
-        var detectedMode = ModeDetector.Detect(
-            request.Message, history: null, hasActiveStorySession: false);
-        if (detectedMode is DetectedMode.Story
-                or DetectedMode.Game
-                or DetectedMode.Riddle
-                or DetectedMode.Curiosity)
-        {
-            var enabled = await _deviceService.IsModeEnabledForRequestAsync(
-                deviceId, request.ChildId, detectedMode);
-            if (!enabled)
-            {
-                AppMeter.ChatGateTrip.Add(1,
-                    new KeyValuePair<string, object?>("gate", "mode_disabled"));
+            case ChatGateEvaluator.GateDecision.Paused:
+                AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "paused"));
+                return Ok(new ChatResponse(PausedResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
+            case ChatGateEvaluator.GateDecision.Bedtime:
+                AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "bedtime"));
+                return Ok(new ChatResponse(PausedResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
+            case ChatGateEvaluator.GateDecision.ModeDisabled:
+                AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "mode_disabled"));
                 return Ok(new ChatResponse(
                     ModeDisabledResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
-            }
         }
 
         try

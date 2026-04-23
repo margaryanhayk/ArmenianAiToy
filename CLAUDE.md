@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1111 tests)
+dotnet test                                     # Run all tests (1151 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -1225,6 +1225,107 @@ never as an exception. Routing moderation through the general-purpose
 gate would change retry semantics for 5xx and timeout (the gate
 retries them; moderation deliberately does not). See
 `ModerationFailClosedTests` for the safety contract.
+
+## Voice chat (C1 — Toy MVP)
+
+First voice path in the repo. The product identity is a physical
+Armenian-speaking toy; C1 ships the **backend half** of the
+button-to-talk loop so a later firmware slice can attach to a
+working endpoint.
+
+- **Endpoint**: `POST /api/chat/audio`, device-authenticated via
+  the existing `X-Device-Id` / `X-Api-Key` headers, rate-limited
+  on the same `chat` policy as `POST /api/chat`. Request body is
+  raw audio (default `audio/wav`); response body is MP3
+  (`audio/mpeg`). Buffered response in C1; streaming is a C2+
+  follow-up.
+- **Voice is transport, text is canonical.** Audio in →
+  `IAudioTranscriptionService` (OpenAI Whisper, forced
+  `Language = "hy"`) → existing `ChatService.GetResponseAsync`
+  pipeline **unchanged** → `IAudioSynthesisService` (OpenAI TTS
+  `tts-1`, voice `Nova`, default MP3) → audio out.
+  `Message.Content` remains the canonical textual record; audio
+  is an attachment referenced by the existing
+  `Message.AudioBlobPath` column (no new column, no migration).
+- **Gates preserved**: paused / bedtime / Story-disabled short-
+  circuit **before STT** — zero upstream cost on a gated
+  request. Paused + bedtime reuse the extracted
+  `ChatGateEvaluator` (same helper the text path now calls);
+  Story-disabled on the voice path is checked directly against
+  `IsModeEnabledForRequestAsync(deviceId, null, DetectedMode.Story)`
+  because C1 voice is Story-only (other modes over voice come
+  later).
+- **Persistence**: both blobs. Child audio stored at
+  `{convId:N}/{userMsgId:N}.{ext}` (extension from inbound
+  Content-Type, default `.wav`); assistant audio stored at
+  `{convId:N}/{assistantMsgId:N}.mp3`. Paths are relative — the
+  DB column does not carry an absolute filesystem path.
+  `Message.AudioBlobPath` is updated with an additional
+  `SaveChangesAsync` after the blob writes (ChatService's
+  persistence is not changed). The user-message id is recovered
+  by querying the conversation for the most-recent `Role=User`
+  row — ChatService writes it synchronously before the LLM
+  call, so ordering by `Timestamp DESC` yields it deterministically.
+- **Moderation fallback** flows through unchanged: ChatService
+  returns the safety-fallback message as an `Assistant` row
+  with `SafetyFlag.Blocked`; the audio controller TTS-renders
+  that fallback text and stores both blobs normally. No new
+  moderation surface on the voice path.
+- **Canned fallback audio** for gated paths uses a tiny in-
+  memory lazy cache (`CannedVoiceClips`): first gated hit
+  renders via TTS and caches for the process lifetime. Zero
+  committed audio files, zero manual audio-asset work — a
+  later phase can swap to on-disk pre-rendered clips without
+  changing any caller. Copy: paused / bedtime reuse the
+  existing `ChatController.PausedResponse` text verbatim;
+  mode-disabled reuses `ChatController.ModeDisabledResponse`.
+- **Blob store**: `LocalDiskAudioBlobStore` under
+  `Audio:BlobStoreRoot` (default `audio-blobs`). No
+  `DeleteAsync` method — retention cascade on
+  conversation-delete / device-delete / parent-anonymize is
+  explicitly deferred to C2. Bench-scale usage is fine; local
+  runs can `rm -rf` the root between sessions.
+- **Failures are sanitized**: STT / TTS / ChatService
+  exceptions collapse to the same 502 with body
+  `{ "error": "AI service unavailable. Please try again." }`
+  the text path already returns. No provider detail on the
+  wire. Existing `ChatControllerPath5Tests` contract is
+  mirrored by new `AudioChatControllerTests`.
+- **No new**: migration, DB column, NuGet package, audit event
+  type, rate-limit policy, dashboard view, metric counter.
+
+**Not in C1**:
+- Streaming response body (buffered only).
+- Parent-dashboard "▶ Listen" button + blob-read endpoint (C2).
+- Retention cascade for audio blobs (C2).
+- Orphan blob sweeper (C2).
+- Audio inclusion / exclusion in `GET /api/parents/export` (C2).
+- Wake word / voice biometrics / barge-in / latency
+  instrumentation split / second mode over voice / firmware
+  code.
+
+**Manual QA (backend-only, C1)**:
+1. `dotnet user-secrets set "OpenAI:ApiKey" "sk-..." --project src/ArmenianAiToy.Api`
+2. `dotnet run --project src/ArmenianAiToy.Api`
+3. Register a device via the existing `POST /api/devices/register`
+   path and note the returned `DeviceId` + `ApiKey`.
+4. Record a short Armenian WAV (16 kHz mono) — e.g. a phone
+   memo saying *"Պատմիր հեքիաթ"*. `curl -X POST
+   http://localhost:5000/api/chat/audio \
+     -H "X-Device-Id: <guid>" -H "X-Api-Key: dtk_..." \
+     -H "Content-Type: audio/wav" --data-binary @story.wav \
+     -o reply.mp3`
+5. Play `reply.mp3` — it should be a warm Armenian narrator
+   opening a short story with two spoken choices.
+6. Record *"Ա"*, repeat the curl — the story should continue.
+7. Inspect `./audio-blobs/` — two files per turn (one `.wav`
+   for the child's utterance, one `.mp3` for Areg's reply).
+   Inspect the DB: both `Message` rows for each turn have
+   `AudioBlobPath` populated; `Message.Content` holds the
+   canonical transcript / assistant text.
+8. Pause the device via the parent dashboard, retry the curl
+   — the response body is the cached canned paused MP3; no
+   STT, no LLM, no new `Message` rows.
 
 ## Engineering Guardrails
 

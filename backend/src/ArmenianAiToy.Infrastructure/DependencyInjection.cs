@@ -1,8 +1,10 @@
+using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.Auth;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Notifications;
 using ArmenianAiToy.Application.Services;
+using ArmenianAiToy.Infrastructure.Audio;
 using ArmenianAiToy.Infrastructure.Auth;
 using ArmenianAiToy.Infrastructure.Background;
 using ArmenianAiToy.Infrastructure.Data;
@@ -11,7 +13,9 @@ using ArmenianAiToy.Infrastructure.OpenAI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using OpenAI;
+using OpenAI.Audio;
 using OpenAI.Chat;
 using OpenAI.Moderations;
 
@@ -36,6 +40,30 @@ public static class DependencyInjection
         var openAiClient = new OpenAIClient(apiKey);
         services.AddSingleton(openAiClient.GetChatClient(chatModel));
         services.AddSingleton(openAiClient.GetModerationClient(moderationModel));
+
+        // C1 audio seams. Whisper for STT, OpenAI TTS for synthesis —
+        // same OpenAI SDK, zero new NuGet dependency, reuses
+        // OpenAI:ApiKey. Two distinct AudioClient instances (one per
+        // model) wired directly into their adapters via factory
+        // lambdas so we do not need to register AudioClient itself
+        // under two keyed types.
+        var whisperModel = config["OpenAI:TranscriptionModel"] ?? "whisper-1";
+        var ttsModel = config["OpenAI:TtsModel"] ?? "tts-1";
+        var whisperClient = openAiClient.GetAudioClient(whisperModel);
+        var ttsClient = openAiClient.GetAudioClient(ttsModel);
+        services.AddSingleton<IAudioTranscriptionService>(sp =>
+            new OpenAIWhisperTranscriptionService(
+                whisperClient,
+                sp.GetRequiredService<ILogger<OpenAIWhisperTranscriptionService>>()));
+        services.AddSingleton<IAudioSynthesisService>(sp =>
+            new OpenAITtsSynthesisService(
+                ttsClient,
+                sp.GetRequiredService<ILogger<OpenAITtsSynthesisService>>()));
+        services.AddSingleton<IAudioBlobStore, LocalDiskAudioBlobStore>();
+        // Canned-clip cache is process-local state keyed on the TTS
+        // service; singleton so the cache survives across requests
+        // for the process lifetime.
+        services.AddSingleton<CannedVoiceClips>();
 
         // Reliability gate for the chat adapter. Singleton because the
         // circuit-breaker state (recent-failure window, open-until) must
