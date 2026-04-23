@@ -32,6 +32,7 @@ public class ParentService : IParentService
     private readonly ILogger<ParentService> _logger;
     private readonly Func<string, string> _hashPassword;
     private readonly INotifier _notifier;
+    private readonly IGoogleIdTokenValidator? _googleValidator;
 
     /// <summary>
     /// Standard constructor used by the DI container. Two test-facing
@@ -58,13 +59,15 @@ public class ParentService : IParentService
         IConfiguration config,
         ILogger<ParentService> logger,
         Func<string, string>? hashPassword = null,
-        INotifier? notifier = null)
+        INotifier? notifier = null,
+        IGoogleIdTokenValidator? googleValidator = null)
     {
         _db = db;
         _config = config;
         _logger = logger;
         _hashPassword = hashPassword ?? BCrypt.Net.BCrypt.HashPassword;
         _notifier = notifier ?? NullNotifier.Instance;
+        _googleValidator = googleValidator;
     }
 
     // Private no-op notifier. Used as the safe default when no
@@ -553,6 +556,153 @@ public class ParentService : IParentService
         _logger.LogInformation(
             "Parent {ParentId} verified email", parent.Id);
         return true;
+    }
+
+    /// <summary>
+    /// Exchange a Google ID token for a parent JWT. See
+    /// <see cref="IParentService.GoogleSignInAsync"/> for the full
+    /// contract and CLAUDE.md § Google sign-in for the shipped rules.
+    /// </summary>
+    public async Task<GoogleSignInResult> GoogleSignInAsync(
+        string idToken, bool acceptedTerms, CancellationToken cancellationToken = default)
+    {
+        // Validator is nullable at the service layer so unit tests that
+        // construct ParentService directly don't have to thread a stub
+        // in when they aren't exercising this path. The production DI
+        // container always registers a concrete implementation.
+        // Missing validator + empty ClientId are both treated as
+        // "feature off" from the service's perspective and collapse
+        // to the uniform InvalidToken failure — the controller is the
+        // surface that renders "feature off" as a fail-closed 404.
+        if (_googleValidator is null)
+            return new GoogleSignInResult(GoogleSignInStatus.InvalidToken, null);
+
+        var clientId = _config["GoogleAuth:ClientId"];
+        if (string.IsNullOrWhiteSpace(clientId))
+            return new GoogleSignInResult(GoogleSignInStatus.InvalidToken, null);
+
+        var identity = await _googleValidator.ValidateAsync(idToken, cancellationToken);
+        if (identity is null)
+            return new GoogleSignInResult(GoogleSignInStatus.InvalidToken, null);
+
+        // Hard reject: Google's email_verified claim is load-bearing.
+        // An attacker-controlled unverified external address on a
+        // Google profile must never stamp EmailVerifiedAt on a row
+        // they don't own.
+        if (!identity.EmailVerified)
+            return new GoogleSignInResult(GoogleSignInStatus.InvalidToken, null);
+
+        // Defensive audience check mirrored out of the library layer —
+        // ValidateAsync already rejects mismatched aud, but an
+        // implementation seam might be swapped for a test double that
+        // doesn't enforce it. Pinning both sides keeps the contract
+        // explicit.
+        if (!string.Equals(identity.Audience, clientId, StringComparison.Ordinal))
+            return new GoogleSignInResult(GoogleSignInStatus.InvalidToken, null);
+
+        var sub = identity.Subject;
+        var email = identity.Email;
+        if (string.IsNullOrWhiteSpace(sub) || string.IsNullOrWhiteSpace(email))
+            return new GoogleSignInResult(GoogleSignInStatus.InvalidToken, null);
+
+        // Rule 4: returning user — lookup by GoogleSubject first.
+        // Anonymized rows (Email == "") are filtered out by the
+        // AnonymizedAt == null predicate so a scrubbed row cannot be
+        // resurrected via its stamped subject.
+        var bySub = await _db.Set<Parent>()
+            .FirstOrDefaultAsync(
+                p => p.GoogleSubject == sub && p.AnonymizedAt == null,
+                cancellationToken);
+        if (bySub is not null)
+        {
+            var token = GenerateJwt(bySub);
+            bySub.LastLoginAt = DateTime.UtcNow;
+            TrackAndAddAudit(AuditEvent.ParentGoogleSignIn(
+                bySub.Id, firstTime: false, linkedToPasswordAccount: false));
+            await _db.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation(
+                "Parent {ParentId} signed in via Google (returning)", bySub.Id);
+            return new GoogleSignInResult(GoogleSignInStatus.Success, token);
+        }
+
+        // Rule 5: existing row with matching email — link or reject.
+        var byEmail = await _db.Set<Parent>()
+            .FirstOrDefaultAsync(
+                p => p.Email == email && p.AnonymizedAt == null,
+                cancellationToken);
+        if (byEmail is not null)
+        {
+            // Subject collision: the email row is already claimed by a
+            // different Google identity. Never overwrite — that would
+            // be an account-takeover primitive.
+            if (byEmail.GoogleSubject is not null && byEmail.GoogleSubject != sub)
+                return new GoogleSignInResult(GoogleSignInStatus.InvalidToken, null);
+
+            // First-time-link terms gate: only enforced when the row
+            // has no prior terms acceptance. Password-registered
+            // parents always have TermsAcceptedAt set at register
+            // time, so in the common "parent already registered, now
+            // wants Google" flow this does not trigger.
+            if (byEmail.TermsAcceptedAt is null && !acceptedTerms)
+                return new GoogleSignInResult(GoogleSignInStatus.TermsRequired, null);
+
+            var now = DateTime.UtcNow;
+            byEmail.GoogleSubject = sub;
+            // Stamp EmailVerifiedAt ONLY if currently null — never
+            // overwrite a pre-existing verification timestamp. An
+            // email verified in 2026-04 via the email-verify flow
+            // keeps that timestamp when Google-links later.
+            if (byEmail.EmailVerifiedAt is null)
+                byEmail.EmailVerifiedAt = now;
+            if (byEmail.TermsAcceptedAt is null)
+            {
+                byEmail.TermsAcceptedAt = now;
+                byEmail.TermsVersion = CurrentTermsVersion;
+            }
+            byEmail.LastLoginAt = now;
+
+            var token = GenerateJwt(byEmail);
+            TrackAndAddAudit(AuditEvent.ParentGoogleSignIn(
+                byEmail.Id, firstTime: true, linkedToPasswordAccount: true));
+            await _db.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation(
+                "Parent {ParentId} linked Google sign-in to existing account", byEmail.Id);
+            return new GoogleSignInResult(GoogleSignInStatus.Success, token);
+        }
+
+        // Rule 6: new Google-only parent. Terms must be accepted
+        // because there is no prior row to inherit acceptance from.
+        if (!acceptedTerms)
+            return new GoogleSignInResult(GoogleSignInStatus.TermsRequired, null);
+
+        var createdAt = DateTime.UtcNow;
+        var parent = new Parent
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            // Empty-string PasswordHash mirrors the anonymize convention:
+            // the row has no usable password and BCrypt.Verify against
+            // "" cannot succeed, so /login naturally rejects a bare
+            // Google parent with "Invalid email or password". The
+            // forgot-password flow can later stamp a real hash if the
+            // parent wants a password too.
+            PasswordHash = string.Empty,
+            GoogleSubject = sub,
+            EmailVerifiedAt = createdAt,
+            RegisteredAt = createdAt,
+            TermsAcceptedAt = createdAt,
+            TermsVersion = CurrentTermsVersion,
+            LastLoginAt = createdAt
+        };
+        _db.Set<Parent>().Add(parent);
+        TrackAndAddAudit(AuditEvent.ParentGoogleSignIn(
+            parent.Id, firstTime: true, linkedToPasswordAccount: false));
+
+        var newToken = GenerateJwt(parent);
+        await _db.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation(
+            "Parent {ParentId} created via Google sign-in", parent.Id);
+        return new GoogleSignInResult(GoogleSignInStatus.Success, newToken);
     }
 
     // Default threshold for the derived LinkedDeviceDto.IsDormant flag.

@@ -280,6 +280,22 @@
       <button id="verifyEmailRequestBtn" class="link" type="button"
               style="margin-left:8px;">Didn't get a verification email?</button>
       <div id="loginStatus" class="status" aria-live="polite"></div>
+      <!--
+        Google sign-in block. Hidden by default; unhidden by the boot
+        router only when GET /api/parents/google-config returns a
+        non-null clientId. First-time signups of an unknown email must
+        check the terms box before the GSI callback will POST the
+        token — the backend enforces the same rule server-side.
+      -->
+      <div id="googleSignInBlock" hidden
+           style="margin-top:16px;padding-top:12px;border-top:1px solid #eee;">
+        <div id="googleSignInButton" style="margin-bottom:6px;"></div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#555;cursor:pointer;">
+          <input id="googleAcceptTerms" type="checkbox">
+          <span>I accept the terms (required for first-time Google sign-up).</span>
+        </label>
+        <div id="googleSignInStatus" class="status" aria-live="polite"></div>
+      </div>
     </section>
 
     <!--
@@ -520,7 +536,8 @@
       ParentBedtimeWindowSet: 'Bedtime window updated',
       ParentDeviceModeFlagsSet: 'Modes updated',
       ChildModeOverridesSet: 'Child mode overrides updated',
-      ParentConversationDeleted: 'Conversation deleted'
+      ParentConversationDeleted: 'Conversation deleted',
+      ParentGoogleSignIn: 'Signed in with Google'
     };
 
     // ---------- helpers ----------
@@ -2364,6 +2381,111 @@
       })(tabButtons[i]);
     }
 
+    // ---------- google sign-in ----------
+    //
+    // Minimal integration with Google Identity Services. The GSI
+    // library is only injected when GET /api/parents/google-config
+    // returns a non-null clientId — that keeps the feature-off
+    // deployment free of any third-party script load. The callback
+    // receives response.credential (a Google ID token JWT); we POST
+    // it to /api/parents/google-login and handle success / failure
+    // the same way password login does.
+    var googleFeatureOn = false;
+
+    function initGoogleSignIn() {
+      fetch('/api/parents/google-config', { credentials: 'omit' })
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (data) {
+          if (!data || !data.clientId) return;
+          googleFeatureOn = true;
+          document.getElementById('googleSignInBlock').hidden = false;
+          loadGoogleLibrary(function () {
+            if (!window.google || !window.google.accounts ||
+                !window.google.accounts.id) return;
+            window.google.accounts.id.initialize({
+              client_id: data.clientId,
+              callback: onGoogleCredential,
+              auto_select: false
+            });
+            window.google.accounts.id.renderButton(
+              document.getElementById('googleSignInButton'),
+              { theme: 'outline', size: 'large', text: 'continue_with' }
+            );
+          });
+        })
+        .catch(function () { /* feature stays off */ });
+    }
+
+    function loadGoogleLibrary(ready) {
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        ready();
+        return;
+      }
+      var existing = document.getElementById('googleSignInScript');
+      if (existing) {
+        existing.addEventListener('load', ready);
+        return;
+      }
+      var s = document.createElement('script');
+      s.id = 'googleSignInScript';
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.async = true;
+      s.defer = true;
+      s.onload = ready;
+      document.head.appendChild(s);
+    }
+
+    function onGoogleCredential(response) {
+      if (!response || !response.credential) {
+        setStatus('googleSignInStatus', 'Google sign-in failed.', 'err');
+        return;
+      }
+      var accepted = !!document.getElementById('googleAcceptTerms').checked;
+      setStatus('googleSignInStatus', 'Signing in…', 'muted');
+      fetch('/api/parents/google-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: response.credential, acceptedTerms: accepted })
+      }).then(function (res) {
+        if (res.status === 200) {
+          return res.json().then(function (data) {
+            if (!data || !data.token) {
+              setStatus('googleSignInStatus', 'Sign-in response missing token.', 'err');
+              return;
+            }
+            setToken(data.token);
+            setStatus('googleSignInStatus', '', '');
+            loadDevices();
+          });
+        }
+        if (res.status === 400) {
+          return res.json().then(function (data) {
+            var msg = (data && data.error) ||
+              'Please accept the terms to continue.';
+            setStatus('googleSignInStatus', msg, 'err');
+          });
+        }
+        if (res.status === 401) {
+          setStatus('googleSignInStatus', 'Sign-in failed.', 'err');
+          return;
+        }
+        if (res.status === 404) {
+          // Feature flipped off between page load and click. Hide
+          // the block so the parent does not retry into the void.
+          document.getElementById('googleSignInBlock').hidden = true;
+          return;
+        }
+        if (res.status === 429) {
+          setStatus('googleSignInStatus',
+            'Too many requests. Please slow down.', 'err');
+          return;
+        }
+        setStatus('googleSignInStatus', 'Error: HTTP ' + res.status, 'err');
+      }).catch(function () {
+        setStatus('googleSignInStatus', 'Network error.', 'err');
+      });
+    }
+
     // ---------- boot ----------
     // Pre-auth URL tokens take priority over every other routing
     // decision: a parent holding a fresh reset or verification link
@@ -2394,6 +2516,10 @@
       } else {
         show('loginView');
       }
+      // Feature-flag probe runs after the view is decided so the GSI
+      // block appears on whichever pre-auth view is shown. No-op when
+      // the clientId is empty.
+      initGoogleSignIn();
     })();
   })();
   </script>

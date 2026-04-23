@@ -1,7 +1,9 @@
+using ArmenianAiToy.Application.Auth;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Notifications;
 using ArmenianAiToy.Application.Services;
+using ArmenianAiToy.Infrastructure.Auth;
 using ArmenianAiToy.Infrastructure.Background;
 using ArmenianAiToy.Infrastructure.Data;
 using ArmenianAiToy.Infrastructure.Notifications;
@@ -53,6 +55,16 @@ public static class DependencyInjection
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<IDeviceService, DeviceService>();
         services.AddScoped<IParentService, ParentService>();
+
+        // Google sign-in token validator. Always registered — the
+        // validator itself fails closed (returns null) when
+        // GoogleAuth:ClientId is empty, and the controller short-
+        // circuits feature-off requests with a 404 before calling
+        // the service. Scoped for symmetry with IParentService; the
+        // implementation carries no per-request state so singleton
+        // would work too but scoped lets future versions take
+        // DbContext or other scoped deps without a DI change.
+        services.AddScoped<IGoogleIdTokenValidator, GoogleIdTokenValidator>();
         services.AddScoped<IChildService, ChildService>();
 
         // Minimal outbound-notification seam. `Notifications:Transport`

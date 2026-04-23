@@ -622,14 +622,19 @@ public sealed class RetentionPurgeService : BackgroundService
             }
 
             // Scrub the Parent row in place. Post-save:
-            //   Email = "", PasswordHash = "", LastLoginAt = null,
-            //   DormancyWarnedAt = null, AnonymizedAt = nowUtc.
+            //   Email = "", PasswordHash = "", GoogleSubject = null,
+            //   LastLoginAt = null, DormancyWarnedAt = null,
+            //   AnonymizedAt = nowUtc.
             // The row persists as an audit-event anchor; credential
             // material does not. Login naturally fails for this row
             // because BCrypt.Verify against an empty hash cannot
             // succeed — no separate "disabled" flag is required.
+            // GoogleSubject is scrubbed so a later fresh Google sign-in
+            // from the same identity can create a new Parent row
+            // without colliding with the filtered unique index.
             parent.Email = "";
             parent.PasswordHash = "";
+            parent.GoogleSubject = null;
             parent.LastLoginAt = null;
             parent.DormancyWarnedAt = null;
             parent.AnonymizedAt = nowUtc;

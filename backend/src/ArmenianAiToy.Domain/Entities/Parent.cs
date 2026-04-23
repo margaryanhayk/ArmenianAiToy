@@ -90,5 +90,20 @@ public class Parent
     /// </summary>
     public DateTime? EmailVerifiedAt { get; set; }
 
+    /// <summary>
+    /// Google account identifier (<c>sub</c> claim from a validated
+    /// Google ID token). Null means this parent has never signed in
+    /// with Google — every row created before the Google sign-in slice
+    /// carries null. A filtered unique index enforces one Parent row
+    /// per Google <c>sub</c>; null entries are excluded from the
+    /// uniqueness constraint so password-only parents coexist freely.
+    /// <para>
+    /// Once stamped, <see cref="Email"/> remains the Parent's primary
+    /// identifier for UI / password flows — Google sign-in is an
+    /// additive authentication method, not a replacement.
+    /// </para>
+    /// </summary>
+    public string? GoogleSubject { get; set; }
+
     public ICollection<ParentDevice> ParentDevices { get; set; } = new List<ParentDevice>();
 }

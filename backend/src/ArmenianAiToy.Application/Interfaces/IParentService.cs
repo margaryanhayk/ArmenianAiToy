@@ -97,6 +97,31 @@ public interface IParentService
     /// other parent-owned read endpoints.
     /// </summary>
     Task<ParentMeResponse?> GetMeAsync(Guid parentId);
+
+    /// <summary>
+    /// Exchange a Google ID token for a parent JWT. First-class
+    /// additive auth method: returns the same JWT shape as password
+    /// login on success. Internally validates the token via
+    /// <c>IGoogleIdTokenValidator</c>, rejects unverified emails and
+    /// audience mismatches, and applies the linking rules documented
+    /// in CLAUDE.md § Google sign-in:
+    /// <list type="number">
+    /// <item><description>existing row with matching <c>GoogleSubject</c>
+    /// → sign in (returning user);</description></item>
+    /// <item><description>else existing row with matching <c>Email</c>
+    /// (and <c>AnonymizedAt == null</c>) and <c>GoogleSubject == null</c>
+    /// → link;</description></item>
+    /// <item><description>else existing row with matching <c>Email</c>
+    /// and non-null different <c>GoogleSubject</c> →
+    /// <see cref="GoogleSignInStatus.InvalidToken"/>;</description></item>
+    /// <item><description>else create a new parent.</description></item>
+    /// </list>
+    /// Anonymized rows are never matched/reused. Existing
+    /// <c>EmailVerifiedAt</c> is never overwritten. Audits exactly
+    /// one <c>ParentGoogleSignIn</c> row on success.
+    /// </summary>
+    Task<GoogleSignInResult> GoogleSignInAsync(
+        string idToken, bool acceptedTerms, CancellationToken cancellationToken = default);
     Task<bool> SetChildModeOverridesAsync(
         Guid parentId, Guid childId,
         bool? story, bool? game, bool? riddle, bool? curiosity);

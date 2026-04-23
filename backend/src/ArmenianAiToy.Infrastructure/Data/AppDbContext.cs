@@ -66,6 +66,14 @@ public class AppDbContext : DbContext
         {
             e.HasKey(p => p.Id);
             e.HasIndex(p => p.Email).IsUnique();
+            // Filtered unique index on GoogleSubject: null entries
+            // (every password-only parent) are excluded from the
+            // uniqueness constraint, so they coexist freely; once a
+            // parent has a stamped sub, the DB guarantees one Parent
+            // row per Google identity.
+            e.HasIndex(p => p.GoogleSubject)
+                .IsUnique()
+                .HasFilter("\"GoogleSubject\" IS NOT NULL");
         });
 
         modelBuilder.Entity<ParentDevice>(e =>

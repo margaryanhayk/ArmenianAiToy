@@ -442,6 +442,28 @@ public class AuditEvent
     /// no device name.</b>
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Emitted on every successful
+    /// <c>POST /api/parents/google-login</c>. Actor is the parent who
+    /// just authenticated. Metadata carries the minimum needed to
+    /// distinguish returning sign-in from first-time link / first-time
+    /// signup without leaking any PII — no email, no Google subject,
+    /// no token, no timestamp beyond the row's own <see cref="Timestamp"/>.
+    /// </summary>
+    public static AuditEvent ParentGoogleSignIn(
+        Guid parentId, bool firstTime, bool linkedToPasswordAccount) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentGoogleSignIn,
+        ActorParentId = parentId,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            first_time = firstTime,
+            linked_to_password_account = linkedToPasswordAccount
+        })
+    };
+
     public static AuditEvent DeviceDormancyWarned(
         Guid deviceId,
         int warnAfterDays,

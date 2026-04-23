@@ -23,3 +23,52 @@ public record ParentEmailVerificationCompleteRequest(string Token);
 /// settings — and not a place to start adding more fields.
 /// </summary>
 public record ParentMeResponse(string Email, DateTime? EmailVerifiedAt);
+
+/// <summary>
+/// Request body for <c>POST /api/parents/google-login</c>. The id
+/// token is the opaque JWT Google Identity Services returns from the
+/// one-tap / button callback; the server validates signature and
+/// audience before trusting any claim inside. <c>AcceptedTerms</c> is
+/// only consulted for first-time signups (unknown email); returning
+/// users and existing parents with <c>TermsAcceptedAt != null</c>
+/// bypass the check.
+/// </summary>
+public record ParentGoogleLoginRequest(string IdToken, bool AcceptedTerms = false);
+
+/// <summary>
+/// Internal service-to-controller result from
+/// <c>IParentService.GoogleSignInAsync</c>. The controller maps the
+/// three cases to 200 / 401 / 400 — failure reasons are deliberately
+/// not disambiguated on the wire.
+/// </summary>
+public enum GoogleSignInStatus
+{
+    /// <summary>Token valid, identity accepted, JWT issued.</summary>
+    Success,
+
+    /// <summary>
+    /// Any of: invalid token, unverified email, audience mismatch,
+    /// GoogleSubject collision on an email-matched parent. All four
+    /// collapse to a single uniform auth-failure on the wire.
+    /// </summary>
+    InvalidToken,
+
+    /// <summary>
+    /// First-time signup / first-time link path, but
+    /// <see cref="ParentGoogleLoginRequest.AcceptedTerms"/> was false
+    /// and the parent row has no prior terms acceptance. Mapped to
+    /// 400 so the UI can surface a "please accept the terms" message.
+    /// </summary>
+    TermsRequired
+}
+
+public record GoogleSignInResult(GoogleSignInStatus Status, string? Token);
+
+/// <summary>
+/// Response body for the public <c>GET /api/parents/google-config</c>
+/// probe. Exposes the UI-visible Google client id so the dashboard
+/// can decide whether to render the "Continue with Google" button.
+/// An empty / null client id means the feature is disabled; the
+/// dashboard hides the button.
+/// </summary>
+public record GoogleAuthConfigResponse(string? ClientId);

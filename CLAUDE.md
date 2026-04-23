@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1085 tests)
+dotnet test                                     # Run all tests (1111 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -804,6 +804,120 @@ endpoint does not serve as an account-existence oracle.
 - **Login is unchanged.** `/api/parents/login` already masks account
   existence via a uniform 401 for both unknown-email and
   wrong-password, so this slice did not need to touch it.
+
+## Google sign-in
+
+Additive parent-auth method alongside email/password. Implemented
+Google-specifically — there is deliberately no provider-agnostic
+external-auth abstraction, no Apple/Facebook/phone shim, and no
+refresh-token or disconnect-google flow in this slice.
+
+- **Feature gate.** Controlled by `GoogleAuth:ClientId`. Empty /
+  missing config means the feature is off: `POST /api/parents/google-login`
+  returns **404** (concealment fail-closed, same posture as
+  `/metrics`) and `GET /api/parents/google-config` returns
+  `{ clientId: null }` so the dashboard hides the "Continue with
+  Google" button. Enabling the feature is a one-config-key flip —
+  no code change, no redeploy beyond config.
+
+- **Endpoints.**
+  - `POST /api/parents/google-login` — body
+    `{ idToken: string, acceptedTerms: bool }`. Exchanges a Google
+    ID token for a parent JWT. Returns the same
+    `ParentLoginResponse { token }` shape as
+    `POST /api/parents/login`. `[EnableRateLimiting("auth")]` —
+    shares the per-IP auth bucket with register / login / password-
+    change / delete-account.
+  - `GET /api/parents/google-config` — public, returns the
+    configured Google client id or `null`. Not rate-limited (static
+    per deployment; not an account-existence signal).
+
+- **Linking rules** (in order — first match wins):
+  1. Lookup by `Parent.GoogleSubject == sub` (and `AnonymizedAt == null`)
+     → sign in (returning user), stamp `LastLoginAt`, audit
+     `first_time=false linked_to_password_account=false`.
+  2. Lookup by `Parent.Email == claimEmail` (and `AnonymizedAt == null`)
+     with `GoogleSubject == null` → link: stamp `GoogleSubject`,
+     stamp `EmailVerifiedAt` **only if currently null** (never
+     overwrite), stamp `LastLoginAt`, audit `first_time=true
+     linked_to_password_account=true`.
+  3. Email match with non-null different `GoogleSubject` → uniform
+     auth failure (never overwrite; takeover primitive).
+  4. Else create a new Parent row with `PasswordHash = ""`,
+     `EmailVerifiedAt = UtcNow`, `TermsAcceptedAt = UtcNow`,
+     `TermsVersion = current`, `LastLoginAt = UtcNow`. Requires
+     `acceptedTerms == true`; else returns `TermsRequired` (400).
+
+- **`email_verified: true` is load-bearing.** The Google ID token's
+  `email_verified` claim MUST be true — any false / missing value
+  is rejected with the uniform auth-failure response. This is the
+  gate that makes "Google-linked accounts set `EmailVerifiedAt`"
+  safe: an attacker-controlled unverified external address on a
+  Google profile cannot stamp verification onto a row they don't
+  own. Audience (`aud`) must equal `GoogleAuth:ClientId`; the
+  validator library enforces this and the service re-checks
+  defensively.
+
+- **No password-flow changes.** Register, login, password change,
+  forgot-password (request + reset), email verification (request +
+  complete), account delete — all endpoints, anti-enumeration
+  contracts, timing normalization, and uniform-400 failure shapes
+  are unchanged. Google sign-in is additive, not a replacement.
+
+- **Audit.** Each successful sign-in writes exactly one
+  `ParentGoogleSignIn` row with metadata
+  `{ first_time, linked_to_password_account }`. No email, no
+  subject, no token, no device id. Failure paths write nothing.
+
+- **Schema.** One additive column: `Parent.GoogleSubject : string?`
+  with a filtered unique index (`WHERE "GoogleSubject" IS NOT NULL`)
+  so password-only parents (sub null) coexist freely. The
+  anonymize scrub nulls this column along with `Email` / `PasswordHash`
+  so a later fresh Google sign-in using a previously-anonymized
+  identity can create a new Parent row without colliding.
+
+- **Validator seam.** `IGoogleIdTokenValidator` in
+  `Application/Auth/`, with a production
+  `GoogleIdTokenValidator` (`Infrastructure/Auth/`) wrapping
+  `Google.Apis.Auth.GoogleJsonWebSignature.ValidateAsync` — JWKS
+  fetch, `kid` rotation, `iss`/`aud`/`exp` checks all handled by
+  the library. Tests swap a fake double; no test hits real Google
+  endpoints.
+
+**Manual QA**:
+1. `dotnet run --project src/ArmenianAiToy.Api` → open
+   `http://localhost:5000/parent.html`. With `GoogleAuth:ClientId`
+   **empty** (shipped default): the "Continue with Google" button
+   is hidden and `curl -i http://localhost:5000/api/parents/google-login`
+   with any body returns **404**.
+2. Set `GoogleAuth:ClientId` to a real Google OAuth Web Client Id
+   via user-secrets / env var (e.g.
+   `dotnet user-secrets set "GoogleAuth:ClientId" "...apps.googleusercontent.com"`).
+   Reload the dashboard: the "Continue with Google" button is
+   visible on the login view.
+3. **Existing password account links correctly.** Pre-register a
+   parent via the password flow
+   (`POST /api/parents/register` with the same email you'll use on
+   Google). Sign in with Google using that email → success; reload
+   devices tab and confirm the same linked devices appear as
+   before (one Parent row, not two). Second Google sign-in with
+   the same identity signs in via the sub-lookup branch
+   (`first_time=false` in the audit feed).
+4. **Unknown email + accepted terms signs up correctly.** In an
+   incognito window, sign in with Google using an email that is
+   NOT in the Parents table. Check the terms checkbox first; the
+   backend creates a new Parent row with empty `PasswordHash`,
+   stamped `EmailVerifiedAt`, and stamped terms. The devices tab
+   opens empty (no links yet) and a "Signed in with Google" audit
+   row appears in **Your activity**.
+5. Repeat step 4 with terms un-checked → UI surfaces "You must
+   accept the terms to continue." (400); no Parent row created.
+6. **Feature-off hides the button and 404s the endpoint.** Re-clear
+   `GoogleAuth:ClientId` (`dotnet user-secrets remove "GoogleAuth:ClientId"`)
+   and restart the API. Reload the dashboard → button gone; `curl
+   -i -X POST http://localhost:5000/api/parents/google-login -H
+   'Content-Type: application/json' -d '{"idToken":"x","acceptedTerms":true}'`
+   → **404**. Existing password login continues to work unchanged.
 
 ## JWT key rotation
 

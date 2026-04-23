@@ -5,6 +5,7 @@ using ArmenianAiToy.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
 
 namespace ArmenianAiToy.Api.Controllers;
@@ -18,11 +19,25 @@ public class ParentController : ControllerBase
 {
     private readonly IParentService _parentService;
     private readonly ExportCooldown _exportCooldown;
+    private readonly IConfiguration? _config;
 
-    public ParentController(IParentService parentService, ExportCooldown exportCooldown)
+    /// <summary>
+    /// DI constructor. <paramref name="config"/> is nullable so
+    /// existing controller tests that construct this type directly
+    /// (without going through the DI container) don't have to thread
+    /// an IConfiguration through. Only the Google sign-in paths
+    /// consult it; every other endpoint is config-independent at
+    /// this layer. Production DI always supplies a real
+    /// IConfiguration.
+    /// </summary>
+    public ParentController(
+        IParentService parentService,
+        ExportCooldown exportCooldown,
+        IConfiguration? config = null)
     {
         _parentService = parentService;
         _exportCooldown = exportCooldown;
+        _config = config;
     }
 
     /// <summary>
@@ -235,6 +250,67 @@ public class ParentController : ControllerBase
             return BadRequest(new { error = "Verification link is invalid or expired." });
 
         return Ok(new { verified = true });
+    }
+
+    /// <summary>
+    /// Exchange a Google ID token for a parent JWT. Additive to the
+    /// email/password flow — returns the same response shape as
+    /// <see cref="Login"/> on success. Feature-gated: when
+    /// <c>GoogleAuth:ClientId</c> is missing/empty, the endpoint
+    /// returns 404 (concealment rather than a loud 503, same
+    /// fail-closed posture as <c>/metrics</c>). Uniform auth-failure
+    /// shape for every rejection reason — invalid token / unverified
+    /// email / audience mismatch / GoogleSubject collision — to avoid
+    /// turning the endpoint into an oracle for any of those states.
+    /// Rate-limited via the auth policy.
+    /// </summary>
+    [HttpPost("google-login")]
+    [EnableRateLimiting(AuthRateLimiter.PolicyName)]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(429)]
+    public async Task<IActionResult> GoogleLogin([FromBody] ParentGoogleLoginRequest request)
+    {
+        // Feature-off fail-closed — same concealment posture as
+        // MetricsScrapeAuth. A scanner that finds this URL learns
+        // nothing about whether Google sign-in is "on but broken" vs
+        // "not configured."
+        var clientId = _config?["GoogleAuth:ClientId"];
+        if (string.IsNullOrWhiteSpace(clientId))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(request.IdToken))
+            return Unauthorized(new { error = "Sign-in failed." });
+
+        var result = await _parentService.GoogleSignInAsync(
+            request.IdToken, request.AcceptedTerms);
+        return result.Status switch
+        {
+            GoogleSignInStatus.Success =>
+                Ok(new ParentLoginResponse(result.Token!)),
+            GoogleSignInStatus.TermsRequired =>
+                BadRequest(new { error = "You must accept the terms to continue." }),
+            _ => Unauthorized(new { error = "Sign-in failed." })
+        };
+    }
+
+    /// <summary>
+    /// Public UI-visibility probe: returns the configured Google
+    /// client id so the dashboard can decide whether to render the
+    /// "Continue with Google" button. Returns <c>null</c> when the
+    /// feature is off; the dashboard hides the button in that case.
+    /// Not rate-limited — the payload is static per deployment and
+    /// not an account-existence signal.
+    /// </summary>
+    [HttpGet("google-config")]
+    [ProducesResponseType(200)]
+    public IActionResult GetGoogleConfig()
+    {
+        var clientId = _config?["GoogleAuth:ClientId"];
+        return Ok(new GoogleAuthConfigResponse(
+            string.IsNullOrWhiteSpace(clientId) ? null : clientId));
     }
 
     /// <summary>
