@@ -280,8 +280,11 @@ feed is per actor parent, not per device.
 single JSON document containing the parent's own scope:
 
 - **parent**: safe profile fields only — `Id`, `Email`,
-  `RegisteredAt`, `TermsAcceptedAt`, `TermsVersion`. **Never**
-  `PasswordHash`.
+  `RegisteredAt`, `TermsAcceptedAt`, `TermsVersion`,
+  `LastLoginAt`, `EmailVerifiedAt`, and `GoogleSubject` (null for
+  password-only parents; the stamped Google `sub` claim for
+  Google-linked parents — user-owned data, not credential material,
+  so it is included in the export body). **Never** `PasswordHash`.
 - **devices**: linked devices with safe fields only — device
   identity (`Id`, `MacAddress`, `Name`), `RegisteredAt` /
   `LastSeenAt`, pause state, bedtime window (start/end/timezone),

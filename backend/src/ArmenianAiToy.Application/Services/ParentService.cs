@@ -1268,7 +1268,8 @@ public class ParentService : IParentService
                 parent.TermsAcceptedAt,
                 parent.TermsVersion,
                 parent.LastLoginAt,
-                parent.EmailVerifiedAt),
+                parent.EmailVerifiedAt,
+                parent.GoogleSubject),
             Devices: deviceExports,
             AuditEvents: auditDtos,
             ExcludedFields: new[]

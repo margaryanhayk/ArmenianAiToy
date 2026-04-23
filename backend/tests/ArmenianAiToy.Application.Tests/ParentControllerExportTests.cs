@@ -462,4 +462,72 @@ public class ParentControllerExportTests
         var ok = Assert.IsType<OkObjectResult>(result);
         return Assert.IsType<ParentExport>(ok.Value);
     }
+
+    // --- GoogleSubject surfacing -------------------------------------
+
+    [Fact]
+    public async Task Export_PasswordOnlyParent_GoogleSubjectIsNull()
+    {
+        // Password-registered parent has no Google link; the exported
+        // profile must carry GoogleSubject explicitly as null — not
+        // missing, not empty — so downstream consumers reading the
+        // field get the expected nullable-string shape.
+        var parentId = Guid.NewGuid();
+        var (controller, db, conn, _, _) = await CreateControllerAsync(parentId);
+        await using var _ = conn;
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId,
+            Email = "password-only@example.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("pw12345678"),
+            RegisteredAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var result = await controller.Export();
+
+        var export = GetExport(result);
+        Assert.Null(export.Parent.GoogleSubject);
+        // excludedFields contract must remain exactly the shipped pair
+        // even with the new GoogleSubject field added. Pinning this
+        // makes a future "let's put GoogleSubject back in exclusions"
+        // edit fail loudly.
+        Assert.Equal(
+            new[] { "Parent.PasswordHash", "Device.ApiKey" },
+            export.ExcludedFields);
+    }
+
+    [Fact]
+    public async Task Export_GoogleLinkedParent_GoogleSubjectIsSurfaced()
+    {
+        // Parent row with a stamped GoogleSubject — the export body
+        // must round-trip the exact value. Verified via both the DTO
+        // assertion and a JSON-substring check, so a refactor to a
+        // different export shape would still be caught.
+        const string SubjectMarker = "1234567890-gsub-export-test";
+        var parentId = Guid.NewGuid();
+        var (controller, db, conn, _, _) = await CreateControllerAsync(parentId);
+        await using var _ = conn;
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId,
+            Email = "linked@example.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("pw12345678"),
+            GoogleSubject = SubjectMarker,
+            EmailVerifiedAt = DateTime.UtcNow.AddDays(-1),
+            RegisteredAt = DateTime.UtcNow.AddDays(-10)
+        });
+        await db.SaveChangesAsync();
+
+        var result = await controller.Export();
+
+        var export = GetExport(result);
+        Assert.Equal(SubjectMarker, export.Parent.GoogleSubject);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(
+            export, System.Text.Json.JsonSerializerOptions.Web);
+        Assert.Contains(SubjectMarker, json, StringComparison.Ordinal);
+        // Negative: neither credential-material marker leaks alongside.
+        Assert.DoesNotContain("$2a$", json, StringComparison.Ordinal);
+    }
 }

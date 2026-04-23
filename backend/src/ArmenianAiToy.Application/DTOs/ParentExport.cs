@@ -32,7 +32,14 @@ public record ParentExport(
     List<AuditEventDto> AuditEvents,
     string[] ExcludedFields);
 
-/// <summary>Safe parent fields only — no password hash.</summary>
+/// <summary>
+/// Safe parent fields only — no password hash. <c>GoogleSubject</c>
+/// is included because it is the Google account identifier already
+/// visible to the parent in their Google account settings; it is
+/// user-owned data, not credential material, so an export that
+/// omitted it would misrepresent the shape of a Google-linked
+/// account. Null for password-only parents.
+/// </summary>
 public record ParentExportProfile(
     Guid Id,
     string Email,
@@ -40,7 +47,8 @@ public record ParentExportProfile(
     DateTime? TermsAcceptedAt,
     string? TermsVersion,
     DateTime? LastLoginAt,
-    DateTime? EmailVerifiedAt);
+    DateTime? EmailVerifiedAt,
+    string? GoogleSubject);
 
 /// <summary>
 /// Safe device fields only — no <c>ApiKey</c>. All settings here are
