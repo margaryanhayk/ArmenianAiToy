@@ -99,4 +99,44 @@ public interface INotifier
     /// </summary>
     Task SendEmailVerificationAsync(
         string email, string verificationToken, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deliver a dormant-device warning email to one of the device's
+    /// verified linked parents. Called by the scheduled
+    /// <c>WarnDormantDevicesAsync</c> pass once per verified linked
+    /// parent of a dormant device (multi-parent fan-out).
+    /// <para>
+    /// <b>Returns</b> <c>true</c> on successful delivery,
+    /// <c>false</c> on a swallowed send failure. The worker
+    /// aggregates per-recipient results: a device is stamped as
+    /// warned (and audited) iff at least one of the per-recipient
+    /// calls returned <c>true</c>; if every call returned
+    /// <c>false</c>, the device is left unstamped so the next tick
+    /// retries. This mirrors <see cref="SendDormancyWarningAsync"/>'s
+    /// worker-consumer contract.
+    /// </para>
+    /// <para>
+    /// <paramref name="deleteAtUtc"/> is reserved-but-null in the
+    /// warn-only first slice. Passed through to keep the method
+    /// signature stable for any future destructive device-action
+    /// slice — exactly the same posture
+    /// <see cref="SendDormancyWarningAsync"/> took with its own
+    /// <c>deleteAtUtc</c> parameter before the parent-anonymize
+    /// slice activated it. Implementations MUST NOT include
+    /// destructive-date copy in the body when this parameter is
+    /// null.
+    /// </para>
+    /// <para>
+    /// <b>No-PII-in-logs invariant.</b> Implementations MUST NOT
+    /// retain the recipient email beyond the structured log line
+    /// the existing notifier impls already use, and MUST NOT log
+    /// the device name in a way that leaks beyond ops visibility.
+    /// </para>
+    /// </summary>
+    Task<bool> SendDormantDeviceWarningAsync(
+        string parentEmail,
+        string deviceName,
+        DateTime lastSeenAtUtc,
+        DateTime? deleteAtUtc,
+        CancellationToken cancellationToken = default);
 }

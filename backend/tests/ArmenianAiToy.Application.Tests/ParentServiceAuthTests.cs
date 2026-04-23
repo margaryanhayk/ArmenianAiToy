@@ -160,6 +160,11 @@ public class ParentServiceAuthTests
             LastVerificationEmail = email;
             return Task.CompletedTask;
         }
+
+        public Task<bool> SendDormantDeviceWarningAsync(
+            string parentEmail, string deviceName, DateTime lastSeenAtUtc,
+            DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
     }
 
     private static (ParentService Service, TestDbContext Db) CreateServiceWith(

@@ -749,6 +749,25 @@ public class RetentionPurgeServiceTests
         public Task SendEmailVerificationAsync(
             string email, string verificationToken, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+
+        // Captures the per-recipient device-warn fan-out so tests
+        // can assert call counts and per-call (parent, device,
+        // last-seen) tuples. The DeviceDeliverResults dictionary
+        // lets a test stub specific recipient-result pairs (keyed
+        // by parent email) for partial-failure scenarios; default
+        // is true (delivered).
+        public List<(string ParentEmail, string DeviceName, DateTime LastSeenAtUtc, DateTime? DeleteAtUtc)> DeviceCalls { get; }
+            = new();
+        public Dictionary<string, bool> DeviceDeliverResults { get; } = new();
+
+        public Task<bool> SendDormantDeviceWarningAsync(
+            string parentEmail, string deviceName, DateTime lastSeenAtUtc,
+            DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
+        {
+            DeviceCalls.Add((parentEmail, deviceName, lastSeenAtUtc, deleteAtUtc));
+            var delivered = DeviceDeliverResults.TryGetValue(parentEmail, out var v) ? v : true;
+            return Task.FromResult(delivered);
+        }
     }
 
     private sealed class NoOpNotifier : ArmenianAiToy.Application.Notifications.INotifier
@@ -762,6 +781,10 @@ public class RetentionPurgeServiceTests
         public Task SendEmailVerificationAsync(
             string email, string verificationToken, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+        public Task<bool> SendDormantDeviceWarningAsync(
+            string parentEmail, string deviceName, DateTime lastSeenAtUtc,
+            DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
     }
 
     private static Guid SeedParent(
@@ -1480,5 +1503,435 @@ public class RetentionPurgeServiceTests
         await h.Service.RunTickAsync(CancellationToken.None);
 
         Assert.Empty(notifier.Calls);
+    }
+
+    // --- Device dormant warn pass -------------------------------------
+
+    private static async Task<Harness> CreateDeviceWarnHarnessAsync(
+        int? devicesWarnAfterDays = null,
+        int? devicesRefireIntervalDays = null,
+        ArmenianAiToy.Application.Notifications.INotifier? notifier = null)
+    {
+        var conn = new SqliteConnection("Data Source=:memory:");
+        await conn.OpenAsync();
+        var services = new ServiceCollection();
+        services.AddDbContext<AppDbContext>(options => options.UseSqlite(conn));
+        services.AddScoped<ArmenianAiToy.Application.Notifications.INotifier>(
+            _ => notifier ?? new NoOpNotifier());
+        var configDict = new Dictionary<string, string?>();
+        if (devicesWarnAfterDays is not null)
+            configDict["Dormancy:Devices:WarnAfterDays"] = devicesWarnAfterDays.Value.ToString();
+        if (devicesRefireIntervalDays is not null)
+            configDict["Dormancy:Devices:WarnRefireIntervalDays"]
+                = devicesRefireIntervalDays.Value.ToString();
+        IConfiguration config = new ConfigurationBuilder()
+            .AddInMemoryCollection(configDict)
+            .Build();
+        var provider = services.BuildServiceProvider();
+        using (var seedScope = provider.CreateScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await seedDb.Database.EnsureCreatedAsync();
+        }
+        var outerScope = provider.CreateScope();
+        var db = outerScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var logger = Substitute.For<ILogger<RetentionPurgeService>>();
+        var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
+        var service = new RetentionPurgeService(scopeFactory, config, logger);
+        return new Harness(service, db, conn, provider);
+    }
+
+    private static Guid SeedDeviceWithLastSeen(
+        AppDbContext db,
+        DateTime lastSeen,
+        DateTime? dormancyWarnedAt = null,
+        string name = "Areg")
+    {
+        var deviceId = Guid.NewGuid();
+        db.Set<Device>().Add(new Device
+        {
+            Id = deviceId,
+            MacAddress = "mac-" + Guid.NewGuid().ToString("N")[..10],
+            Name = name,
+            ApiKey = "dtk_" + Guid.NewGuid().ToString("N"),
+            RegisteredAt = DateTime.UtcNow.AddDays(-400),
+            LastSeenAt = lastSeen,
+            DormancyWarnedAt = dormancyWarnedAt
+        });
+        return deviceId;
+    }
+
+    private static Guid SeedParentSimple(
+        AppDbContext db,
+        bool emailVerified,
+        bool anonymized = false,
+        string? email = null)
+    {
+        var id = Guid.NewGuid();
+        var realEmail = email ?? $"p-{id:N}@example.com";
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = id,
+            Email = anonymized ? "" : realEmail,
+            PasswordHash = anonymized ? "" : "x",
+            RegisteredAt = DateTime.UtcNow.AddDays(-400),
+            LastLoginAt = anonymized ? null : DateTime.UtcNow.AddDays(-1),
+            EmailVerifiedAt = (emailVerified && !anonymized) ? DateTime.UtcNow.AddDays(-30) : (DateTime?)null,
+            AnonymizedAt = anonymized ? DateTime.UtcNow.AddDays(-1) : (DateTime?)null
+        });
+        return id;
+    }
+
+    private static void LinkParentToDevice(
+        AppDbContext db, Guid parentId, Guid deviceId)
+    {
+        db.Set<ParentDevice>().Add(new ParentDevice
+        {
+            ParentId = parentId,
+            DeviceId = deviceId,
+            LinkedAt = DateTime.UtcNow.AddDays(-100)
+        });
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_EligibleDevice_OneVerifiedParent_IsWarnedStampedAndAudited()
+    {
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365, notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-400), name: "Bedroom Areg");
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+        var before = DateTime.UtcNow;
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        var device = await h.Db.Set<Device>().AsNoTracking()
+            .FirstAsync(d => d.Id == deviceId);
+        Assert.NotNull(device.DormancyWarnedAt);
+        Assert.InRange(device.DormancyWarnedAt!.Value, before, DateTime.UtcNow);
+        Assert.Single(notifier.DeviceCalls);
+        Assert.Equal("Bedroom Areg", notifier.DeviceCalls[0].DeviceName);
+
+        var audit = await h.Db.Set<AuditEvent>().AsNoTracking()
+            .SingleAsync(a => a.EventType == AuditEventType.DeviceDormancyWarned);
+        Assert.Null(audit.ActorParentId);
+        Assert.Equal(deviceId, audit.TargetDeviceId);
+        Assert.Null(audit.TargetChildId);
+        var meta = JsonNode.Parse(audit.Metadata!);
+        Assert.NotNull(meta);
+        Assert.Equal(365, (int)meta!["warn_after_days"]!);
+        Assert.Equal(30, (int)meta["warn_refire_interval_days"]!);
+        Assert.Equal(1, (int)meta["linked_parents_total"]!);
+        Assert.Equal(1, (int)meta["linked_parents_verified"]!);
+        Assert.Equal(1, (int)meta["verified_recipients_notified"]!);
+        // No PII / no parent ids / no device name in metadata.
+        Assert.DoesNotContain(parentId.ToString(), audit.Metadata!);
+        Assert.DoesNotContain("Bedroom Areg", audit.Metadata!);
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_NoVerifiedParents_DoesNotWarn()
+    {
+        // Device with one linked parent who is NOT verified -> no
+        // notifier call, no stamp, no audit.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365, notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-400));
+        var parentId = SeedParentSimple(h.Db, emailVerified: false);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Empty(notifier.DeviceCalls);
+        var device = await h.Db.Set<Device>().AsNoTracking()
+            .FirstAsync(d => d.Id == deviceId);
+        Assert.Null(device.DormancyWarnedAt);
+        Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.DeviceDormancyWarned).ToListAsync());
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_MixedVerifiedUnverifiedParents_OnlyVerifiedReceive()
+    {
+        // Device linked to 1 verified + 1 unverified parent → only
+        // the verified parent gets a notifier call. Audit metadata
+        // reflects the split.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365, notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-400));
+        var verifiedId = SeedParentSimple(h.Db, emailVerified: true,
+            email: "verified@example.com");
+        var unverifiedId = SeedParentSimple(h.Db, emailVerified: false,
+            email: "unverified@example.com");
+        LinkParentToDevice(h.Db, verifiedId, deviceId);
+        LinkParentToDevice(h.Db, unverifiedId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Single(notifier.DeviceCalls);
+        Assert.Equal("verified@example.com", notifier.DeviceCalls[0].ParentEmail);
+
+        var audit = await h.Db.Set<AuditEvent>().AsNoTracking()
+            .SingleAsync(a => a.EventType == AuditEventType.DeviceDormancyWarned);
+        var meta = JsonNode.Parse(audit.Metadata!);
+        Assert.Equal(2, (int)meta!["linked_parents_total"]!);
+        Assert.Equal(1, (int)meta["linked_parents_verified"]!);
+        Assert.Equal(1, (int)meta["verified_recipients_notified"]!);
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_AnonymizedLinkedParent_IsExcluded()
+    {
+        // Anonymized parents (Email = "", AnonymizedAt != null) are
+        // excluded from the recipient set even if their pre-anonymize
+        // verification stamp survived. Defensive — anonymize scrubs
+        // EmailVerifiedAt to null too, so this should already exclude
+        // them, but the explicit AnonymizedAt == null filter is the
+        // belt-and-suspenders.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365, notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-400));
+        var anonId = SeedParentSimple(h.Db, emailVerified: false, anonymized: true);
+        LinkParentToDevice(h.Db, anonId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Empty(notifier.DeviceCalls);
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_WithinRefireWindow_IsNotReWarned()
+    {
+        // Device warned 10 days ago, refire window 30 days → not
+        // re-warned this tick.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365,
+            devicesRefireIntervalDays: 30,
+            notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-400),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-10));
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Empty(notifier.DeviceCalls);
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_OutsideRefireWindow_IsReWarned()
+    {
+        // Device warned 40 days ago, refire window 30 days → re-warned;
+        // DormancyWarnedAt advances.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365,
+            devicesRefireIntervalDays: 30,
+            notifier: notifier);
+        var oldStamp = DateTime.UtcNow.AddDays(-40);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-400),
+            dormancyWarnedAt: oldStamp);
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Single(notifier.DeviceCalls);
+        var device = await h.Db.Set<Device>().AsNoTracking()
+            .FirstAsync(d => d.Id == deviceId);
+        Assert.NotNull(device.DormancyWarnedAt);
+        Assert.True(device.DormancyWarnedAt > oldStamp);
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_NoLinkedParents_IsNotWarned()
+    {
+        // Defensive: orphan device (no ParentDevice rows). Should not
+        // happen in practice (last-link unlink cascades the device
+        // away), but the eligibility query must not match.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365, notifier: notifier);
+        SeedDeviceWithLastSeen(h.Db, lastSeen: DateTime.UtcNow.AddDays(-400));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Empty(notifier.DeviceCalls);
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_MultiParentDevice_FansOutToAllVerifiedParents()
+    {
+        // Device linked to 3 verified parents → 3 notifier calls;
+        // audit counts reflect 3 verified + 3 notified.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365, notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-400));
+        var p1 = SeedParentSimple(h.Db, emailVerified: true, email: "a@x.com");
+        var p2 = SeedParentSimple(h.Db, emailVerified: true, email: "b@x.com");
+        var p3 = SeedParentSimple(h.Db, emailVerified: true, email: "c@x.com");
+        LinkParentToDevice(h.Db, p1, deviceId);
+        LinkParentToDevice(h.Db, p2, deviceId);
+        LinkParentToDevice(h.Db, p3, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Equal(3, notifier.DeviceCalls.Count);
+        var emailsCalled = notifier.DeviceCalls.Select(c => c.ParentEmail).ToHashSet();
+        Assert.Equal(new[] { "a@x.com", "b@x.com", "c@x.com" }.ToHashSet(), emailsCalled);
+
+        var audit = await h.Db.Set<AuditEvent>().AsNoTracking()
+            .SingleAsync(a => a.EventType == AuditEventType.DeviceDormancyWarned);
+        var meta = JsonNode.Parse(audit.Metadata!);
+        Assert.Equal(3, (int)meta!["linked_parents_total"]!);
+        Assert.Equal(3, (int)meta["linked_parents_verified"]!);
+        Assert.Equal(3, (int)meta["verified_recipients_notified"]!);
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_PartialFailure_StampsAndAuditsIfAtLeastOneSucceeded()
+    {
+        // 3 verified parents, 1 succeeds + 2 fail → device stamped,
+        // audit verified_recipients_notified = 1.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365, notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-400));
+        var p1 = SeedParentSimple(h.Db, emailVerified: true, email: "win@x.com");
+        var p2 = SeedParentSimple(h.Db, emailVerified: true, email: "fail1@x.com");
+        var p3 = SeedParentSimple(h.Db, emailVerified: true, email: "fail2@x.com");
+        LinkParentToDevice(h.Db, p1, deviceId);
+        LinkParentToDevice(h.Db, p2, deviceId);
+        LinkParentToDevice(h.Db, p3, deviceId);
+        notifier.DeviceDeliverResults["fail1@x.com"] = false;
+        notifier.DeviceDeliverResults["fail2@x.com"] = false;
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Equal(3, notifier.DeviceCalls.Count);
+        var device = await h.Db.Set<Device>().AsNoTracking()
+            .FirstAsync(d => d.Id == deviceId);
+        Assert.NotNull(device.DormancyWarnedAt);
+        var audit = await h.Db.Set<AuditEvent>().AsNoTracking()
+            .SingleAsync(a => a.EventType == AuditEventType.DeviceDormancyWarned);
+        var meta = JsonNode.Parse(audit.Metadata!);
+        Assert.Equal(1, (int)meta!["verified_recipients_notified"]!);
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_AllRecipientsFailed_NoStampNoAudit()
+    {
+        // 2 verified parents, both fail → no stamp, no audit, next
+        // tick retries.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365, notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-400));
+        var p1 = SeedParentSimple(h.Db, emailVerified: true, email: "a@x.com");
+        var p2 = SeedParentSimple(h.Db, emailVerified: true, email: "b@x.com");
+        LinkParentToDevice(h.Db, p1, deviceId);
+        LinkParentToDevice(h.Db, p2, deviceId);
+        notifier.DeviceDeliverResults["a@x.com"] = false;
+        notifier.DeviceDeliverResults["b@x.com"] = false;
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Equal(2, notifier.DeviceCalls.Count);
+        var device = await h.Db.Set<Device>().AsNoTracking()
+            .FirstAsync(d => d.Id == deviceId);
+        Assert.Null(device.DormancyWarnedAt);
+        Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.DeviceDormancyWarned).ToListAsync());
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_DisabledByDefault_DoesNotWarn()
+    {
+        // No Dormancy:Devices:WarnAfterDays config -> code fallback 0
+        // -> disabled. Dormant device with verified linked parent
+        // gets nothing.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-400));
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Empty(notifier.DeviceCalls);
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_SystemActorAuditRow_IsInvisibleToParentReadFilter()
+    {
+        // Mirrors the parent-warn invisibility test. The audit row
+        // has TargetDeviceId = deviceId but ActorParentId = null,
+        // so a parent-scoped read filtered by ActorParentId returns
+        // zero rows.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365, notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-400));
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Single(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.DeviceDormancyWarned).ToListAsync());
+        Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.ActorParentId == parentId).ToListAsync());
+    }
+
+    [Fact]
+    public async Task DeviceWarnPass_RefireIntervalFloorClamp_AppliesAtOne()
+    {
+        // RefireIntervalDays < 1 should clamp to 1 (matches parent's
+        // pattern). Seed a device warned 2 days ago with a configured
+        // refire of 0 (clamped to 1) → device IS re-warned (2 > 1).
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 365,
+            devicesRefireIntervalDays: 0,
+            notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-400),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-2));
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.Single(notifier.DeviceCalls);
     }
 }

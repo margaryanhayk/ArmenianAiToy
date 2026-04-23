@@ -41,6 +41,11 @@ public class ParentServiceEmailVerificationTests
             LastRawToken = verificationToken;
             return Task.CompletedTask;
         }
+
+        public Task<bool> SendDormantDeviceWarningAsync(
+            string parentEmail, string deviceName, DateTime lastSeenAtUtc,
+            DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
     }
 
     private sealed class CountingHasher

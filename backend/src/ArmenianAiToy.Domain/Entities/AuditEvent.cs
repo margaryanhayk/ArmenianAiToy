@@ -410,4 +410,61 @@ public class AuditEvent
         EventType = AuditEventType.ParentEmailVerified,
         ActorParentId = parentId
     };
+
+    /// <summary>
+    /// Emitted by the scheduled dormant-device warn pass on every
+    /// tick where a device was successfully warned (at least one of
+    /// its verified linked parents received the email). One row per
+    /// warned device, not per recipient.
+    /// <para>
+    /// <b>System-actor event.</b> <see cref="ActorParentId"/> is
+    /// deliberately <c>null</c> — the worker, not a parent, is the
+    /// actor. That null is what keeps this event out of every
+    /// parent-facing read surface (<c>GET /api/parents/audit</c> and
+    /// the parent-scoped audit slice of <c>GET /api/parents/export</c>
+    /// both filter <c>ActorParentId == parentId</c>). Same
+    /// invisibility contract as <see cref="ConversationsPurgedByRetention"/>,
+    /// <see cref="ParentDormancyWarned"/>, and
+    /// <see cref="ParentDormancyAnonymized"/>.
+    /// </para>
+    /// <para>
+    /// <b>Distinct from the parent dormancy events</b> in that
+    /// <see cref="TargetDeviceId"/> IS populated here — the device
+    /// id is the natural target of a device-level audit row, and
+    /// the column already exists from the manual-unlink audit
+    /// shape. <see cref="TargetChildId"/> remains null.
+    /// </para>
+    /// <para>
+    /// Metadata is counts-only / operational — the effective
+    /// thresholds, the device's last-seen-at timestamp, and the
+    /// fan-out tally (linked-parents-total, of which verified, of
+    /// which actually delivered to). <b>No emails, no parent ids,
+    /// no device name.</b>
+    /// </para>
+    /// </summary>
+    public static AuditEvent DeviceDormancyWarned(
+        Guid deviceId,
+        int warnAfterDays,
+        int warnRefireIntervalDays,
+        DateTime lastSeenAtUtc,
+        int linkedParentsTotal,
+        int linkedParentsVerified,
+        int verifiedRecipientsNotified) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.DeviceDormancyWarned,
+        ActorParentId = null,
+        TargetDeviceId = deviceId,
+        TargetChildId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            warn_after_days = warnAfterDays,
+            warn_refire_interval_days = warnRefireIntervalDays,
+            last_seen_at_utc = lastSeenAtUtc,
+            linked_parents_total = linkedParentsTotal,
+            linked_parents_verified = linkedParentsVerified,
+            verified_recipients_notified = verifiedRecipientsNotified
+        })
+    };
 }

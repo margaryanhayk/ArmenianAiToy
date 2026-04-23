@@ -25,6 +25,7 @@ public static class DormancyTransportPrecondition
 {
     public const string WarnAfterDaysKey = "Dormancy:Parent:WarnAfterDays";
     public const string AnonymizeAfterDaysKey = "Dormancy:Parent:AnonymizeAfterDays";
+    public const string DevicesWarnAfterDaysKey = "Dormancy:Devices:WarnAfterDays";
 
     /// <summary>
     /// Enforces the dormancy + transport pairing invariants at DI
@@ -97,6 +98,27 @@ public static class DormancyTransportPrecondition
                     "to 0, or configure SMTP via Notifications:Transport=smtp and the " +
                     "required SMTP keys.");
             }
+        }
+
+        // Guard 3: device-warn enabled requires SMTP. Same posture as
+        // Guard 1 — LoggingNotifier always returns "delivered" to the
+        // worker without a real send, and the dormant-device worker
+        // pass would silently advance Device.DormancyWarnedAt for
+        // every dormant device on every tick while no parent received
+        // anything. Fail-fast at process start.
+        var devicesWarnRaw = config[DevicesWarnAfterDaysKey];
+        if (int.TryParse(devicesWarnRaw, out var devicesWarnAfterDays)
+            && devicesWarnAfterDays > 0
+            && notifierImpl != typeof(SmtpNotifier))
+        {
+            throw new System.InvalidOperationException(
+                $"{DevicesWarnAfterDaysKey} is enabled ({devicesWarnAfterDays} > 0) but " +
+                $"Notifications:Transport does not resolve to '{NotifierTransport.Smtp}' " +
+                $"(currently: '{resolvedName}'). A dormant-device warning email " +
+                "cannot go to stdout — the worker would mark devices as warned " +
+                "without reaching their linked parents. Either disable the device-warn " +
+                $"pass by setting {DevicesWarnAfterDaysKey} to 0, or configure SMTP " +
+                "via Notifications:Transport=smtp and the required SMTP keys.");
         }
     }
 }

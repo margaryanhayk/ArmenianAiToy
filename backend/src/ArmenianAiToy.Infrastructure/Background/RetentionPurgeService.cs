@@ -130,6 +130,31 @@ public sealed class RetentionPurgeService : BackgroundService
     /// </summary>
     public const int DormancyAnonymizeGraceDays = 7;
 
+    /// <summary>
+    /// Fallback value for <c>Dormancy:Devices:WarnAfterDays</c> when
+    /// the key is missing or unparseable. <b>0 (disabled)</b> —
+    /// destructive operator opt-in. The recommended production value
+    /// when enabling is 365 days. The shipped <c>appsettings.json</c>
+    /// carries 0 so a fresh <c>dotnet run</c> does not trigger the
+    /// transport precondition before SMTP is configured.
+    /// <para>
+    /// Deliberately <b>distinct</b> from the existing
+    /// <c>Dormancy:Devices:NotSeenDays</c> (which drives the
+    /// dashboard's reporting flag) so reporting and action thresholds
+    /// can evolve independently. Reusing the reporting key would
+    /// conflate two concerns and force them to move together.
+    /// </para>
+    /// </summary>
+    public const int DefaultDormancyDevicesWarnAfterDays = 0;
+
+    /// <summary>
+    /// Fallback for <c>Dormancy:Devices:WarnRefireIntervalDays</c>.
+    /// Same shape as the parent's <c>WarnRefireIntervalDays</c>: a
+    /// device already warned within this window is not re-warned on
+    /// subsequent ticks. Floor-clamped to 1.
+    /// </summary>
+    public const int DefaultDormancyDevicesWarnRefireIntervalDays = 30;
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IConfiguration _config;
     private readonly ILogger<RetentionPurgeService> _logger;
@@ -236,6 +261,12 @@ public sealed class RetentionPurgeService : BackgroundService
         // refire on the same tick, so no warn is lost.
         await AnonymizeDormantParentsAsync(db, stoppingToken);
         await WarnDormantParentsAsync(scope.ServiceProvider, db, stoppingToken);
+        // Device-warn slots LAST. Independent of parent passes —
+        // device dormancy is per-device, recipient list is the
+        // device's verified linked parents, and partial fan-out
+        // failure handling is local to this pass. Disabled gate
+        // (Dormancy:Devices:WarnAfterDays <= 0) short-circuits.
+        await WarnDormantDevicesAsync(scope.ServiceProvider, db, stoppingToken);
     }
 
     private async Task PurgeExpiredConversationsAsync(
@@ -630,6 +661,163 @@ public sealed class RetentionPurgeService : BackgroundService
             anonymized, warnAfterDays, anonymizeAfterDays, DormancyAnonymizeGraceDays);
     }
 
+    /// <summary>
+    /// Warn-only dormant-device pass. Finds devices whose
+    /// <see cref="Device.LastSeenAt"/> is past
+    /// <c>Dormancy:Devices:WarnAfterDays</c> (or whose existing
+    /// <see cref="Device.DormancyWarnedAt"/> is past the refire
+    /// window) and that have at least one verified linked parent,
+    /// fans out a notifier call per verified linked parent, and —
+    /// on at-least-one-success — stamps
+    /// <see cref="Device.DormancyWarnedAt"/> and writes one
+    /// <see cref="Domain.Enums.AuditEventType.DeviceDormancyWarned"/>
+    /// audit row.
+    /// <para>
+    /// <b>Non-destructive by design.</b> No deletes, no unlinks, no
+    /// cascade. The first slice ships warn-only; a future slice may
+    /// revisit destructive action with operational data in hand.
+    /// </para>
+    /// <para>
+    /// <b>Verified-recipient gate</b>: only parents with
+    /// <c>EmailVerifiedAt != null</c> AND <c>AnonymizedAt == null</c>
+    /// receive notifications. A device whose entire linked-parent
+    /// set is unverified and/or anonymized is silently skipped — no
+    /// stamp, no audit row.
+    /// </para>
+    /// <para>
+    /// <b>Partial-failure rule</b>: if at least one of the per-
+    /// recipient notifier calls returned <c>true</c>, the device is
+    /// stamped and audited. If every call returned <c>false</c>
+    /// (every per-recipient send swallowed an SMTP failure), the
+    /// device is left unstamped so the next tick retries. Audit
+    /// metadata's <c>verified_recipients_notified</c> reflects the
+    /// successful-send count, not the attempt count.
+    /// </para>
+    /// </summary>
+    private async Task WarnDormantDevicesAsync(
+        IServiceProvider scopedProvider, AppDbContext db, CancellationToken stoppingToken)
+    {
+        var warnAfterDays = ReadDormancyDevicesWarnAfterDays();
+        if (warnAfterDays <= 0)
+        {
+            // Disabled. Silently skip — no log spam per tick. The
+            // outer MaxAgeDays<=0 disable gate already logged a
+            // once-per-tick "worker disabled" line.
+            return;
+        }
+        var refireIntervalDays = ReadDormancyDevicesWarnRefireIntervalDays();
+        var nowUtc = DateTime.UtcNow;
+        var dormantCutoff = nowUtc - TimeSpan.FromDays(warnAfterDays);
+        var refireCutoff = nowUtc - TimeSpan.FromDays(refireIntervalDays);
+
+        // Eligibility: device past threshold; not yet warned (or
+        // warned past refire); has at least one verified linked
+        // parent (existence check, not the recipient list — recipient
+        // enumeration happens per-device below for the fan-out).
+        var eligibleDevices = await db.Set<Device>()
+            .Where(d =>
+                d.LastSeenAt < dormantCutoff
+                && (d.DormancyWarnedAt == null || d.DormancyWarnedAt < refireCutoff)
+                && db.Set<ParentDevice>()
+                    .Where(pd => pd.DeviceId == d.Id)
+                    .Join(db.Set<Parent>(), pd => pd.ParentId, p => p.Id,
+                        (pd, p) => p)
+                    .Any(p => p.EmailVerifiedAt != null && p.AnonymizedAt == null))
+            .ToListAsync(stoppingToken);
+
+        if (eligibleDevices.Count == 0)
+            return;
+
+        var notifier = scopedProvider.GetRequiredService<INotifier>();
+        int devicesWarned = 0;
+
+        foreach (var device in eligibleDevices)
+        {
+            // Materialize the device's linked-parent set in two slices
+            // so the audit metadata can carry the total + verified
+            // counts even if no notifier calls go out.
+            var linkedParents = await db.Set<ParentDevice>()
+                .Where(pd => pd.DeviceId == device.Id)
+                .Join(db.Set<Parent>(), pd => pd.ParentId, p => p.Id,
+                    (pd, p) => p)
+                .ToListAsync(stoppingToken);
+            var linkedParentsTotal = linkedParents.Count;
+            var verifiedLinkedParents = linkedParents
+                .Where(p => p.EmailVerifiedAt != null && p.AnonymizedAt == null)
+                .ToList();
+            var linkedParentsVerified = verifiedLinkedParents.Count;
+            // Defensive: the eligibility query already filtered for
+            // at-least-one-verified, but if a row was anonymized
+            // between the query and this enumeration, skip cleanly.
+            if (linkedParentsVerified == 0)
+                continue;
+
+            int verifiedRecipientsNotified = 0;
+            foreach (var parent in verifiedLinkedParents)
+            {
+                bool delivered;
+                try
+                {
+                    delivered = await notifier.SendDormantDeviceWarningAsync(
+                        parent.Email, device.Name, device.LastSeenAt,
+                        deleteAtUtc: null, stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    // Same defensive shape as the parent-warn pass —
+                    // a future notifier impl that throws on non-OCE
+                    // is treated as "not delivered" for this recipient.
+                    _logger.LogWarning(ex,
+                        "RetentionPurgeService device-warn pass: notifier threw unexpectedly for Parent {ParentId} / Device {DeviceId}; treating as not delivered.",
+                        parent.Id, device.Id);
+                    delivered = false;
+                }
+                if (delivered)
+                    verifiedRecipientsNotified++;
+            }
+
+            if (verifiedRecipientsNotified == 0)
+            {
+                // All recipients failed this tick. Leave the device
+                // unstamped so the next tick retries. No audit row —
+                // the audit reflects what actually happened, and
+                // nothing happened from a delivery perspective.
+                continue;
+            }
+
+            device.DormancyWarnedAt = nowUtc;
+            var audit = AuditEvent.DeviceDormancyWarned(
+                deviceId: device.Id,
+                warnAfterDays: warnAfterDays,
+                warnRefireIntervalDays: refireIntervalDays,
+                lastSeenAtUtc: device.LastSeenAt,
+                linkedParentsTotal: linkedParentsTotal,
+                linkedParentsVerified: linkedParentsVerified,
+                verifiedRecipientsNotified: verifiedRecipientsNotified);
+            db.Set<AuditEvent>().Add(audit);
+            AppMeter.AuditEventsWritten.Add(1,
+                new KeyValuePair<string, object?>("event_type", audit.EventType.ToString()));
+
+            // Per-device atomicity: stamp + audit + linked changes
+            // flush together. A worker crash mid-pass leaves
+            // already-warned devices fully recorded and not-yet-
+            // processed devices untouched.
+            await db.SaveChangesAsync(stoppingToken);
+            devicesWarned++;
+        }
+
+        if (devicesWarned > 0)
+        {
+            _logger.LogInformation(
+                "RetentionPurgeService tick: warned {DevicesWarned} dormant device(s) (threshold={WarnAfterDays}d, refire={RefireIntervalDays}d).",
+                devicesWarned, warnAfterDays, refireIntervalDays);
+        }
+    }
+
     private async Task PurgeStalePasswordResetTokensAsync(
         AppDbContext db, CancellationToken stoppingToken)
     {
@@ -727,6 +915,26 @@ public sealed class RetentionPurgeService : BackgroundService
             _config["Retention:EmailVerificationTokens:GracePeriodHours"],
             DefaultEmailVerificationGracePeriodHours);
         return raw < 0 ? 0 : raw;
+    }
+
+    // Dormancy:Devices:WarnAfterDays — fallback 0 (disabled).
+    // Distinct from Dormancy:Devices:NotSeenDays (the dashboard
+    // reporting threshold). Reporting and action thresholds are
+    // decoupled by design so they can evolve independently.
+    private int ReadDormancyDevicesWarnAfterDays()
+        => ParseIntOrDefault(
+            _config["Dormancy:Devices:WarnAfterDays"],
+            DefaultDormancyDevicesWarnAfterDays);
+
+    // Dormancy:Devices:WarnRefireIntervalDays — fallback 30, floor
+    // clamp 1. Same shape as the parent's
+    // WarnRefireIntervalDays reader.
+    private int ReadDormancyDevicesWarnRefireIntervalDays()
+    {
+        var raw = ParseIntOrDefault(
+            _config["Dormancy:Devices:WarnRefireIntervalDays"],
+            DefaultDormancyDevicesWarnRefireIntervalDays);
+        return raw < 1 ? 1 : raw;
     }
 
     // Dormancy:Parent:WarnAfterDays — fallback 0 (disabled). Deliberately

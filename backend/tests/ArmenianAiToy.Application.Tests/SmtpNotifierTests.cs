@@ -404,6 +404,107 @@ public class SmtpNotifierTests
             Arg.Any<Func<object, Exception?, string>>());
     }
 
+    // --- Dormant-device warning (worker consumer, returns bool) ---
+
+    [Fact]
+    public async Task SendDormantDeviceWarningAsync_Success_ComposesMessage()
+    {
+        // Pin the body shape: recipient, From address, non-empty
+        // Armenian subject, plain-text body containing the device
+        // name AND the last-seen date in plain yyyy-MM-dd. Returns
+        // true on success.
+        MailMessage? captured = null;
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (msg, _) => { captured = msg; return Task.CompletedTask; });
+
+        var lastSeen = new DateTime(2025, 11, 7, 10, 30, 45, DateTimeKind.Utc);
+        var delivered = await notifier.SendDormantDeviceWarningAsync(
+            "parent@example.com", "Bedroom Areg", lastSeen, deleteAtUtc: null);
+
+        Assert.True(delivered);
+        Assert.NotNull(captured);
+        Assert.Equal("noreply@example.com", captured!.From!.Address);
+        Assert.Single(captured.To);
+        Assert.Equal("parent@example.com", captured.To[0].Address);
+        Assert.False(string.IsNullOrWhiteSpace(captured.Subject));
+        Assert.False(captured.IsBodyHtml);
+        Assert.Contains("Bedroom Areg", captured.Body);
+        // Plain yyyy-MM-dd, NOT ISO with T/Z.
+        Assert.Contains("2025-11-07", captured.Body);
+        Assert.DoesNotContain("10:30:45", captured.Body);
+        Assert.DoesNotContain(lastSeen.ToString("O"), captured.Body);
+    }
+
+    [Fact]
+    public async Task SendDormantDeviceWarningAsync_NullDeleteAtUtc_DoesNotLeakDestructiveCopy()
+    {
+        // Warn-only slice contract: when deleteAtUtc is null, the
+        // body MUST NOT include any "your device will be removed
+        // on X" copy. A future destructive slice will activate
+        // deleteAtUtc; this slice must not leak forward-looking
+        // language.
+        MailMessage? captured = null;
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (msg, _) => { captured = msg; return Task.CompletedTask; });
+
+        await notifier.SendDormantDeviceWarningAsync(
+            "parent@example.com", "Areg",
+            new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            deleteAtUtc: null);
+
+        Assert.NotNull(captured);
+        // Defensive: the body has exactly one yyyy-MM-dd date — the
+        // last-seen date. A regression that included a destructive-
+        // date sentence would produce a SECOND date.
+        var dateMatches = System.Text.RegularExpressions.Regex.Matches(
+            captured!.Body, @"\d{4}-\d{2}-\d{2}");
+        Assert.Single(dateMatches);
+    }
+
+    [Fact]
+    public async Task SendDormantDeviceWarningAsync_SmtpSendThrows_ReturnsFalseAndDoesNotPropagate()
+    {
+        // Worker consumer's bool return is load-bearing for fan-out
+        // partial-failure handling: false means "this recipient
+        // failed; the device may still be stamped if at least one
+        // OTHER recipient succeeded." Throwing would break the
+        // fan-out loop.
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (_, _) => throw new SmtpException("relay broken"));
+
+        var delivered = await notifier.SendDormantDeviceWarningAsync(
+            "parent@example.com", "Areg",
+            DateTime.UtcNow.AddDays(-400), deleteAtUtc: null);
+
+        Assert.False(delivered);
+        logger.Received().Log(
+            LogLevel.Warning,
+            Arg.Any<EventId>(),
+            Arg.Any<object>(),
+            Arg.Any<Exception>(),
+            Arg.Any<Func<object, Exception?, string>>());
+    }
+
+    [Fact]
+    public async Task SendDormantDeviceWarningAsync_OperationCanceled_DoesPropagate()
+    {
+        var logger = Substitute.For<ILogger<SmtpNotifier>>();
+        var config = BuildConfig();
+        var notifier = new SmtpNotifier(logger, config,
+            sendMail: (_, _) => throw new OperationCanceledException());
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            notifier.SendDormantDeviceWarningAsync(
+                "parent@example.com", "Areg",
+                DateTime.UtcNow.AddDays(-400), deleteAtUtc: null));
+    }
+
     [Fact]
     public async Task SendPasswordResetAsync_Success_LogsDeliveredTrue()
     {

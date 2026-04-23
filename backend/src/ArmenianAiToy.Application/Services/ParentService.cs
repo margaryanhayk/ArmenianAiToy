@@ -82,6 +82,10 @@ public class ParentService : IParentService
         public Task SendEmailVerificationAsync(
             string email, string verificationToken, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+        public Task<bool> SendDormantDeviceWarningAsync(
+            string parentEmail, string deviceName, DateTime lastSeenAtUtc,
+            DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
     }
 
     /// <summary>

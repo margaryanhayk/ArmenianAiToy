@@ -270,6 +270,76 @@ public sealed class SmtpNotifier : INotifier
         }
     }
 
+    /// <summary>
+    /// Dormant-device warning email to one verified linked parent
+    /// of a device that has not checked in for the configured
+    /// threshold. Returns <c>true</c> on successful delivery,
+    /// <c>false</c> on a swallowed send failure. The calling worker
+    /// aggregates per-recipient bools across the device's verified
+    /// linked parents — see CLAUDE.md § Retention for the fan-out
+    /// + partial-failure rules.
+    /// <para>
+    /// <paramref name="deleteAtUtc"/> is reserved-but-null in the
+    /// warn-only first slice; the body MUST NOT include any
+    /// destructive-date copy when this parameter is null. The
+    /// parameter exists today so the future destructive-device
+    /// slice is a body-only change.
+    /// </para>
+    /// <para>
+    /// Same swallow-and-log failure posture as the parent dormancy
+    /// warning — non-cancellation exceptions become a structured
+    /// warning log + return false; OperationCanceledException
+    /// propagates so the worker can shut down cleanly.
+    /// </para>
+    /// </summary>
+    public async Task<bool> SendDormantDeviceWarningAsync(
+        string parentEmail,
+        string deviceName,
+        DateTime lastSeenAtUtc,
+        DateTime? deleteAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        // deleteAtUtc is intentionally unused in this slice. Reserved
+        // parameter for the future destructive device-action slice —
+        // keeping the method signature stable means that slice is a
+        // body-only change.
+        _ = deleteAtUtc;
+
+        var fromAddress = _config["Notifications:Smtp:FromAddress"] ?? "";
+
+        using var message = new MailMessage
+        {
+            From = new MailAddress(fromAddress),
+            Subject = "Ձեր երեխայի խաղալիքը վերջերս չի օգտագործվել",
+            Body = BuildDormantDeviceWarningBody(deviceName, lastSeenAtUtc),
+            BodyEncoding = Encoding.UTF8,
+            SubjectEncoding = Encoding.UTF8,
+            IsBodyHtml = false
+        };
+        message.To.Add(parentEmail);
+
+        try
+        {
+            await _sendMail(message, cancellationToken);
+            _logger.LogInformation(
+                "Notification send-attempt: type={NotificationType}, email={Email}, device_name={DeviceName}, transport={Transport}, delivered={Delivered}",
+                "dormant_device_warning", parentEmail, deviceName, "smtp", true);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            // Worker cancellation propagates — host shutdown.
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Notification send-attempt: type={NotificationType}, email={Email}, device_name={DeviceName}, transport={Transport}, delivered={Delivered}, error_category={ErrorCategory}",
+                "dormant_device_warning", parentEmail, deviceName, "smtp", false, ex.GetType().Name);
+            return false;
+        }
+    }
+
     // Default wire call. Pulls credentials / host / port off
     // IConfiguration on every send so a config reload (via a restart)
     // is picked up without recycling the singleton. Scoped registration
@@ -335,6 +405,24 @@ public sealed class SmtpNotifier : INotifier
         var prefix = string.IsNullOrWhiteSpace(linkBase) ? "" : linkBase.Trim();
         var separator = prefix.Contains('?') ? '&' : '?';
         return $"{prefix}{separator}verifyToken={Uri.EscapeDataString(rawToken)}";
+    }
+
+    private static string BuildDormantDeviceWarningBody(
+        string deviceName, DateTime lastSeenAtUtc)
+    {
+        // Eastern Armenian, warm but neutral. No destructive language —
+        // this slice is warn-only and the device-unlink action does
+        // not yet exist. Tells the parent: what (the device hasn't
+        // been used), when (last-seen date in plain yyyy-MM-dd —
+        // no time, no locale-specific format, no ISO-with-T-and-Z),
+        // what to do (use it again to keep it active), and the
+        // opt-out (ignore if no longer using the toy).
+        var lastSeenStr = lastSeenAtUtc.ToString("yyyy-MM-dd");
+        return string.Join("\n\n",
+            $"Բարև։ Ձեր Areg հաշվին կապված սարք-ը — {deviceName} — վերջերս չի օգտագործվել։",
+            $"Վերջին ակտիվությունը: {lastSeenStr}.",
+            "Եթե դեռ ցանկանում եք պահպանել այս սարքը ակտիվ, պարզապես կրկին օգտագործեք այն։",
+            "Եթե այլևս չեք օգտագործում այս սարքը, այս նամակը կարող եք անտեսել։");
     }
 
     private static string BuildEmailVerificationBody(string verificationLink)

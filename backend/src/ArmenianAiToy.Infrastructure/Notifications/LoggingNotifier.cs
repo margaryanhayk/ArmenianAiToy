@@ -79,4 +79,28 @@ public sealed class LoggingNotifier : INotifier
             false);
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Log-only implementation of the dormant-device warning. Always
+    /// returns true so any worker consumer with a log-only transport
+    /// would naively mark every device as warned. The
+    /// DormancyTransportPrecondition's third guard (added with this
+    /// slice) rejects WarnAfterDays > 0 paired with log transport at
+    /// DI-time, which is the actual safeguard. This impl exists so
+    /// log-transport environments don't crash if the worker pass
+    /// somehow fires (e.g. in test harnesses).
+    /// </summary>
+    public Task<bool> SendDormantDeviceWarningAsync(
+        string parentEmail, string deviceName, DateTime lastSeenAtUtc,
+        DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Notification send-attempt: type={NotificationType}, email={Email}, device_name={DeviceName}, last_seen_at_utc={LastSeenAtUtc:O}, delivered={Delivered}",
+            "dormant_device_warning",
+            parentEmail,
+            deviceName,
+            lastSeenAtUtc,
+            false);
+        return Task.FromResult(true);
+    }
 }

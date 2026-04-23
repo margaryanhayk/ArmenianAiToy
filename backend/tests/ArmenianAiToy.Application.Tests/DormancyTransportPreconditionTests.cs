@@ -21,11 +21,13 @@ public class DormancyTransportPreconditionTests
 {
     private static IConfiguration Config(
         string? warnAfterDays = null,
-        string? anonymizeAfterDays = null)
+        string? anonymizeAfterDays = null,
+        string? devicesWarnAfterDays = null)
     {
         var config = Substitute.For<IConfiguration>();
         config[DormancyTransportPrecondition.WarnAfterDaysKey].Returns(warnAfterDays);
         config[DormancyTransportPrecondition.AnonymizeAfterDaysKey].Returns(anonymizeAfterDays);
+        config[DormancyTransportPrecondition.DevicesWarnAfterDaysKey].Returns(devicesWarnAfterDays);
         return config;
     }
 
@@ -170,6 +172,67 @@ public class DormancyTransportPreconditionTests
             typeof(LoggingNotifier));
         DormancyTransportPrecondition.Enforce(
             Config(warnAfterDays: "0", anonymizeAfterDays: anonymizeRaw),
+            typeof(SmtpNotifier));
+    }
+
+    // --- Guard 3: device-warn enabled requires SMTP -----------------
+
+    [Fact]
+    public void Enforce_DevicesWarnEnabled_LogTransport_Throws()
+    {
+        // The device-warn equivalent of Guard 1. LoggingNotifier
+        // would always return delivered=true to the worker, which
+        // would silently advance Device.DormancyWarnedAt for every
+        // dormant device on every tick while no parent received
+        // anything. The error message must name the device-warn
+        // config key + Notifications:Transport + smtp.
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            DormancyTransportPrecondition.Enforce(
+                Config(warnAfterDays: "0", devicesWarnAfterDays: "365"),
+                typeof(LoggingNotifier)));
+
+        Assert.Contains(DormancyTransportPrecondition.DevicesWarnAfterDaysKey, ex.Message);
+        Assert.Contains("Notifications:Transport", ex.Message);
+        Assert.Contains("smtp", ex.Message);
+    }
+
+    [Fact]
+    public void Enforce_DevicesWarnEnabled_SmtpTransport_DoesNotThrow()
+    {
+        // Production shape: device-warn enabled, SMTP transport.
+        DormancyTransportPrecondition.Enforce(
+            Config(warnAfterDays: "0", devicesWarnAfterDays: "365"),
+            typeof(SmtpNotifier));
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-5")]
+    [InlineData("")]
+    [InlineData(null)]
+    [InlineData("not-an-int")]
+    public void Enforce_DevicesWarnDisabled_AnyTransport_DoesNotThrow(string? raw)
+    {
+        // Every disabled shape (zero / negative / empty / missing /
+        // non-integer) must skip Guard 3 entirely. Guards 1+2 are
+        // also off here (warn=0, anonymize=null) so this test
+        // exercises Guard 3 in isolation.
+        DormancyTransportPrecondition.Enforce(
+            Config(warnAfterDays: "0", devicesWarnAfterDays: raw),
+            typeof(LoggingNotifier));
+        DormancyTransportPrecondition.Enforce(
+            Config(warnAfterDays: "0", devicesWarnAfterDays: raw),
+            typeof(SmtpNotifier));
+    }
+
+    [Fact]
+    public void Enforce_AllThreeGuardsEnabled_SmtpTransport_DoesNotThrow()
+    {
+        // Multi-feature production shape: parent-warn enabled,
+        // anonymize enabled, device-warn enabled, SMTP transport.
+        // All three guards pass.
+        DormancyTransportPrecondition.Enforce(
+            Config(warnAfterDays: "180", anonymizeAfterDays: "60", devicesWarnAfterDays: "365"),
             typeof(SmtpNotifier));
     }
 }

@@ -50,6 +50,22 @@ public class Device
     public bool RiddleEnabled { get; set; } = true;
     public bool CuriosityEnabled { get; set; } = true;
 
+    /// <summary>
+    /// Timestamp of the most recent dormant-device warning email
+    /// dispatched to this device's verified linked parents by the
+    /// scheduled <c>WarnDormantDevicesAsync</c> pass. Null for
+    /// devices that have never been warned (the shipped default for
+    /// every row). Stamped on a per-device basis when at least one
+    /// of the device's verified linked parents successfully received
+    /// the email this tick — partial-failure across multi-parent
+    /// fan-out still counts as "warned" if any recipient was reached.
+    /// A tick where every per-recipient notifier call returns
+    /// <c>false</c> leaves this field untouched so the next tick
+    /// retries. See CLAUDE.md § Retention for the warn-only
+    /// eligibility rules and refire interval semantics.
+    /// </summary>
+    public DateTime? DormancyWarnedAt { get; set; }
+
     public ICollection<Conversation> Conversations { get; set; } = new List<Conversation>();
     public ICollection<ParentDevice> ParentDevices { get; set; } = new List<ParentDevice>();
 }
