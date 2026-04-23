@@ -60,7 +60,8 @@ public record LinkedDeviceChildDto(
 public record DormancySummaryDto(
     int TotalDevices,
     int DormantDevices,
-    DateTime? LastLoginAt);
+    DateTime? LastLoginAt,
+    DateTime? EmailVerifiedAt);
 
 /// <summary>
 /// Response envelope for <c>GET /api/parents/devices/details</c>.

@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1052 tests)
+dotnet test                                     # Run all tests (1060 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -689,6 +689,83 @@ contract at the UI layer too.
 13. Open an obviously-invalid URL like
     `http://localhost:5000/parent.html?token=garbage` → same uniform
     error; no crash.
+
+## Email verification
+
+Tracking-only (T1) email-verification flow. `Parent.EmailVerifiedAt`
+is stamped on successful completion of the verify-request → verify
+round-trip. The only behavior gated on verification is the dormant-
+parent warn pass — login, forgot-password, password change, account
+delete, export, and every other parent endpoint are unaffected.
+See § Retention for the warn-pass gate's full eligibility rules.
+
+**Endpoints**:
+- `POST /api/parents/verify-request` — anti-enum 202 on
+  known-unverified / known-verified / unknown-email; only the
+  known-unverified branch issues a token + calls the notifier.
+  Rate-limited via the auth policy. BCrypt-on-every-path timing
+  normalization preserved.
+- `POST /api/parents/verify` — 200 `{ verified: true }` on success;
+  uniform 400 `{ error: "Verification link is invalid or expired." }`
+  on any failure (unknown / expired / already consumed / empty).
+  Stamps `Parent.EmailVerifiedAt` and writes one
+  `ParentEmailVerified` audit row in the same `SaveChangesAsync`.
+  No JWT re-issue.
+- `GET /api/parents/me` — minimal authenticated profile lookup
+  returning `{ email, emailVerifiedAt }`. Used by the dashboard's
+  verification-visibility surface so the "Send verification email"
+  button can pass the parent's email to verify-request without a
+  form input. Returns 404 on a parent whose row no longer exists or
+  has been anonymized.
+
+**Tokens**: `ParentEmailVerificationToken` entity, parallel shape to
+`ParentPasswordResetToken`. SHA-256-hex hash, 32-byte CSPRNG raw
+token, FK cascade to Parent, ConsumedAt single-use tombstone.
+TTL via `Auth:EmailVerificationTokenTtlHours` (default 168 = 7
+days). Cleanup via the existing `RetentionPurgeService`'s
+`PurgeStaleEmailVerificationTokensAsync` pass —
+`Retention:EmailVerificationTokens:GracePeriodHours` (default 24).
+
+**Anti-enumeration invariants** (do not regress):
+- Register: new-email path issues + sends; collision path is silent
+  no-op (no token, no notifier call). HTTP response identical
+  (`{ registered: true }`). BCrypt-on-both-paths timing.
+- Verify-request: identical 202 across known-unverified /
+  known-verified / unknown-email. BCrypt-on-every-path. Only
+  known-unverified issues a token and calls the notifier.
+- Verify-complete: uniform 400 across every failure reason.
+- Dashboard: post-click confirmation message is the same neutral
+  text regardless of backend response.
+
+**Dashboard surface.** The login view carries a "Didn't get a
+verification email?" link reaching a self-serve verify-request
+form. Clicking the emailed link with `?verifyToken=...` opens a
+small confirm view; success routes back to login with an info
+message. The token is captured into a closure-scoped variable and
+immediately stripped from the URL via `history.replaceState`. The
+linked-devices summary block additionally surfaces an
+unobtrusive `Email not verified yet.` line with a `Send
+verification email` action when the authenticated parent is
+unverified — verified parents see no extra UI.
+
+**Manual QA for the dashboard verification-visibility surface**:
+1. Log in as an UNVERIFIED parent (a freshly-registered one whose
+   verification email was logged but never clicked).
+2. On the linked-devices summary block, confirm an additional line
+   `Email not verified yet.` with a small `Send verification email`
+   action button is visible.
+3. Click `Send verification email`. The line text flips to
+   `Verification email sent — check your inbox.`. The button hides.
+4. Hit the auth-rate-limiter (rapid clicks across the same IP) →
+   line shows `Too many requests. Please try again shortly.` and
+   the button re-enables for retry.
+5. Open the emailed link → verify the email per the existing flow
+   (steps 7–11 of § Password reset are equivalent shape).
+6. Reload the dashboard. The `Email not verified yet.` line should
+   be gone (verified parents see no extra UI).
+7. Cross-check: the login-view `Didn't get a verification email?`
+   link still opens the standalone verify-request form — both
+   surfaces remain available.
 
 ## Register anti-enumeration
 

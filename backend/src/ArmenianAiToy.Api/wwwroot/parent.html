@@ -1057,6 +1057,15 @@
     // when M > 0 so a parent with zero linked devices doesn't see the
     // vacuous "0 of 0" line. No CTA, no warning styling, no deletion
     // copy — just two neutral facts.
+    //
+    // Verification visibility (added in a later slice): when
+    // summary.emailVerifiedAt is null, we add a subtle info-styled
+    // line "Email not verified yet." with a small inline "Send
+    // verification email" button. Verified parents see no extra UI —
+    // verified is the unremarkable default. The button calls the
+    // existing /api/parents/verify-request endpoint, anti-enum-
+    // compliant: the post-click message is the same neutral text
+    // regardless of backend response shape.
     function renderDormancySummary(summaryEl, summary, totalDevices) {
       if (!summary) {
         summaryEl.hidden = true;
@@ -1076,7 +1085,79 @@
         row.textContent = text;
         summaryEl.appendChild(row);
       });
-      summaryEl.hidden = lines.length === 0;
+      // Verification visibility line — only when the parent is
+      // unverified. Verified parents see no extra block to keep the
+      // summary calm.
+      if (summary.emailVerifiedAt == null) {
+        var verifyRow = document.createElement('div');
+        verifyRow.id = 'dashVerifyRow';
+        verifyRow.style.cssText = 'margin-top:4px;';
+        var verifyText = document.createElement('span');
+        verifyText.id = 'dashVerifyText';
+        verifyText.textContent = 'Email not verified yet.';
+        verifyRow.appendChild(verifyText);
+        var verifyBtn = document.createElement('button');
+        verifyBtn.id = 'dashVerifySendBtn';
+        verifyBtn.type = 'button';
+        verifyBtn.className = 'link';
+        verifyBtn.textContent = 'Send verification email';
+        verifyBtn.style.cssText = 'margin-left:8px;';
+        verifyBtn.addEventListener('click', sendDashboardVerifyRequest);
+        verifyRow.appendChild(verifyBtn);
+        summaryEl.appendChild(verifyRow);
+      }
+      summaryEl.hidden = summaryEl.childNodes.length === 0;
+    }
+
+    // Resend a verification email from inside the authenticated
+    // dashboard. Two-step:
+    //   1. GET /api/parents/me to retrieve the parent's email
+    //      (the JWT carries it as a claim, but resolving it via a
+    //      server endpoint avoids JS-side JWT-claim parsing — a
+    //      pattern this repo doesn't use elsewhere and shouldn't
+    //      introduce just for this slice).
+    //   2. POST /api/parents/verify-request with that email.
+    // The post-click confirmation text is identical regardless of
+    // backend response shape — the dashboard MUST NOT branch on
+    // whether the parent was already verified, unknown, or freshly
+    // emailed. All three backend branches return 202; the UI
+    // neutralizes any difference at the surface layer too.
+    function sendDashboardVerifyRequest() {
+      var btn = document.getElementById('dashVerifySendBtn');
+      var label = document.getElementById('dashVerifyText');
+      if (btn) btn.disabled = true;
+      if (label) label.textContent = 'Sending…';
+      authedFetch('/api/parents/me').then(function (me) {
+        if (!me || !me.email) {
+          if (label) label.textContent = 'Could not load profile.';
+          if (btn) btn.disabled = false;
+          return;
+        }
+        return fetch('/api/parents/verify-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: me.email })
+        }).then(function (res) {
+          // Neutral message regardless of HTTP status — anti-enum
+          // posture preservation. 202 = sent (or backend silenced
+          // because verified/unknown — UI cannot tell). 429 = rate
+          // limited. Both surface the same "check your inbox"
+          // copy except 429 explicitly because slowing-down isn't
+          // an account-existence signal.
+          if (res.status === 429) {
+            if (label) label.textContent = 'Too many requests. Please try again shortly.';
+            if (btn) btn.disabled = false;
+            return;
+          }
+          if (label) label.textContent = 'Verification email sent — check your inbox.';
+          // Hide the now-pressed button to avoid encouraging
+          // immediate re-press (auth limiter would 429 anyway).
+          if (btn) btn.hidden = true;
+        });
+      }).catch(function () {
+        if (label) label.textContent = 'Network error.';
+        if (btn) btn.disabled = false;
+      });
     }
 
     function loadDevices() {

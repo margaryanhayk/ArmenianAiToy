@@ -919,22 +919,44 @@ public class ParentService : IParentService
     {
         var devices = await GetLinkedDeviceDetailsAsync(parentId);
 
-        // Single-column read — projects only LastLoginAt off the Parent
-        // row. AsNoTracking is irrelevant on a projected scalar, and
-        // FirstOrDefaultAsync on a DateTime? selector returns null when
-        // the parent is missing or the column is null. Both branches
-        // collapse to the same "not available yet" display.
-        var lastLoginAt = await _db.Set<Parent>()
+        // Two-column projection in one round-trip — fetches LastLoginAt
+        // AND EmailVerifiedAt from the Parent row. The intermediate
+        // anonymous-type projection avoids materializing the full
+        // Parent entity onto this process. Both fields are nullable
+        // and collapse to "not available yet" / "not verified" on
+        // the dashboard side.
+        var profile = await _db.Set<Parent>()
             .Where(p => p.Id == parentId)
-            .Select(p => p.LastLoginAt)
+            .Select(p => new { p.LastLoginAt, p.EmailVerifiedAt })
             .FirstOrDefaultAsync();
 
         var summary = new DormancySummaryDto(
             TotalDevices: devices.Count,
             DormantDevices: devices.Count(d => d.IsDormant),
-            LastLoginAt: lastLoginAt);
+            LastLoginAt: profile?.LastLoginAt,
+            EmailVerifiedAt: profile?.EmailVerifiedAt);
 
         return new LinkedDevicesResponse(devices, summary);
+    }
+
+    /// <summary>
+    /// Minimal authenticated-parent profile read used by the
+    /// dashboard's verification-visibility surface to know the
+    /// parent's email (so the "Send verification email" button can
+    /// pass it to <c>POST /api/parents/verify-request</c>) and the
+    /// verification timestamp. Single-row two-column projection.
+    /// Returns null when the parent row no longer exists — controller
+    /// maps null to a 404, matching the silent-miss convention for
+    /// parent-owned reads. Anonymized parents (Email == "") are
+    /// filtered at the query level so a stale-JWT-against-anonymized-
+    /// row case behaves identically to a missing row.
+    /// </summary>
+    public async Task<ParentMeResponse?> GetMeAsync(Guid parentId)
+    {
+        return await _db.Set<Parent>()
+            .Where(p => p.Id == parentId && p.AnonymizedAt == null)
+            .Select(p => new ParentMeResponse(p.Email, p.EmailVerifiedAt))
+            .FirstOrDefaultAsync();
     }
 
     /// <summary>

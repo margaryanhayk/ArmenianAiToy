@@ -86,6 +86,17 @@ public interface IParentService
     /// maps <c>false</c> to a uniform 400 response.
     /// </summary>
     Task<bool> CompleteEmailVerificationAsync(string token);
+
+    /// <summary>
+    /// Minimal authenticated-parent profile lookup. Returns
+    /// <see cref="ParentMeResponse"/> with the parent's email and
+    /// verification timestamp. Returns <c>null</c> when the parent
+    /// row no longer exists (JWT was valid but the account was
+    /// deleted / anonymized between token issue and this call) — the
+    /// controller maps null to a 404 in the same shape used by
+    /// other parent-owned read endpoints.
+    /// </summary>
+    Task<ParentMeResponse?> GetMeAsync(Guid parentId);
     Task<bool> SetChildModeOverridesAsync(
         Guid parentId, Guid childId,
         bool? story, bool? game, bool? riddle, bool? curiosity);

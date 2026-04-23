@@ -238,6 +238,29 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Minimal authenticated-parent profile lookup. Returns email
+    /// and verification timestamp only. Used by the dashboard's
+    /// verification-visibility surface so the "Send verification
+    /// email" button can pass the parent's email to
+    /// <see cref="RequestEmailVerification"/> without a form input.
+    /// 404 on a parent whose row no longer exists or has been
+    /// anonymized — same shape as other parent-owned read endpoints.
+    /// </summary>
+    [HttpGet("me")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetMe()
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var me = await _parentService.GetMeAsync(parentId);
+        if (me is null)
+            return NotFound();
+        return Ok(me);
+    }
+
+    /// <summary>
     /// Link an existing device to the authenticated parent.
     /// </summary>
     [HttpPost("devices/link")]

@@ -496,4 +496,65 @@ public class ParentServiceGetLinkedDeviceDetailsTests
         Assert.Equal(result.Devices.Count(d => d.IsDormant),
                      result.Summary.DormantDevices);
     }
+
+    // --- Verification visibility on summary --------------------------
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsWithSummaryAsync_VerifiedParent_StampedEmailVerifiedAtFlowsThrough()
+    {
+        var (service, db) = CreateServiceWithConfig(notSeenDays: null);
+        var parentId = Guid.NewGuid();
+        var verifiedAt = new DateTime(2026, 4, 10, 9, 0, 0, DateTimeKind.Utc);
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId,
+            Email = "verified@example.com",
+            PasswordHash = "x",
+            RegisteredAt = DateTime.UtcNow.AddDays(-30),
+            EmailVerifiedAt = verifiedAt
+        });
+        await db.SaveChangesAsync();
+
+        var result = await service.GetLinkedDeviceDetailsWithSummaryAsync(parentId);
+
+        Assert.Equal(verifiedAt, result.Summary.EmailVerifiedAt);
+    }
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsWithSummaryAsync_UnverifiedParent_EmailVerifiedAtIsNull()
+    {
+        // Pin the unverified-flows-through-as-null contract — the
+        // dashboard renders the "Email not verified yet." line on
+        // exactly this null.
+        var (service, db) = CreateServiceWithConfig(notSeenDays: null);
+        var parentId = Guid.NewGuid();
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId,
+            Email = "unverified@example.com",
+            PasswordHash = "x",
+            RegisteredAt = DateTime.UtcNow.AddDays(-30),
+            EmailVerifiedAt = null
+        });
+        await db.SaveChangesAsync();
+
+        var result = await service.GetLinkedDeviceDetailsWithSummaryAsync(parentId);
+
+        Assert.Null(result.Summary.EmailVerifiedAt);
+    }
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsWithSummaryAsync_MissingParent_EmailVerifiedAtIsNull()
+    {
+        // Defensive: stale-JWT-without-row case. The summary's
+        // existing LastLoginAt also collapses to null here; the new
+        // EmailVerifiedAt field follows the same defensive shape.
+        var (service, _) = CreateServiceWithConfig(notSeenDays: null);
+        var parentId = Guid.NewGuid();
+
+        var result = await service.GetLinkedDeviceDetailsWithSummaryAsync(parentId);
+
+        Assert.Null(result.Summary.LastLoginAt);
+        Assert.Null(result.Summary.EmailVerifiedAt);
+    }
 }
