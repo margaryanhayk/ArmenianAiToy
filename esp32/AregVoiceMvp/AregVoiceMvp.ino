@@ -226,6 +226,17 @@ void setup() {
     delay(200);
     Serial.println();
     Serial.println("[boot] AregVoiceMvp starting");
+    // Echo bench config up front so the first real bring-up log
+    // unambiguously shows what this build targets. No secrets
+    // printed (SSID is already logged by voice_wifi_begin;
+    // Wi-Fi password / device id / api key are intentionally not).
+    Serial.printf("[boot] backend=%s\n", AREG_BACKEND_URL);
+    Serial.printf("[boot] pins button=%d led=%d\n",
+                  AREG_PIN_BUTTON, AREG_PIN_LED);
+    Serial.printf("[boot] mic_i2s bck=%d ws=%d sd=%d\n",
+                  AREG_PIN_MIC_BCK, AREG_PIN_MIC_WS, AREG_PIN_MIC_DATA);
+    Serial.printf("[boot] amp_i2s bck=%d lrc=%d din=%d\n",
+                  AREG_PIN_AMP_BCK, AREG_PIN_AMP_LRC, AREG_PIN_AMP_DATA);
 
     s_led.begin();
     s_led.setBrightness(60);
