@@ -32,3 +32,7 @@ ArmenianAiToy_Project_Status.pdf
 .vscode/
 *.swp
 *.swo
+
+# C1 voice path runtime artifacts (LocalDiskAudioBlobStore writes child
+# WAV + assistant MP3 here; not source).
+backend/src/ArmenianAiToy.Api/audio-blobs/
