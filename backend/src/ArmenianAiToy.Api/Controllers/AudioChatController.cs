@@ -153,11 +153,18 @@ public class AudioChatController : ControllerBase
 
         // Text → existing ChatService pipeline, unchanged.
         ChatResponseShape chatResult;
+        string ttsText;
         try
         {
             var response = await _chatService.GetResponseAsync(deviceId, transcript);
             chatResult = new ChatResponseShape(
                 response.Response, response.ConversationId, response.MessageId);
+            // Canonical Message.Content (already persisted by ChatService) is the
+            // stripped story text. The toy has no screen — the choice handoff has
+            // to be spoken. Compose a Story-only TTS-only bridge so the child
+            // hears «Ի՞նչ անենք՝ առաջինը՝ X, թե՞ երկրորդը՝ Y։» after the opening.
+            ttsText = AudioStoryResponseComposer.ComposeTtsText(
+                response.Response, response.ChoiceA, response.ChoiceB, response.Mode);
         }
         catch (Exception ex)
         {
@@ -173,7 +180,7 @@ public class AudioChatController : ControllerBase
         try
         {
             tts = await _synthesis.SynthesizeArmenianAsync(
-                chatResult.Text, cancellationToken);
+                ttsText, cancellationToken);
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)

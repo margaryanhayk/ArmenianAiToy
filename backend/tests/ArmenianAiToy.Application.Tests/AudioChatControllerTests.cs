@@ -507,4 +507,163 @@ public class AudioChatControllerTests
         Assert.All(messages, m => Assert.Equal(SafetyFlag.Blocked, m.SafetyFlag));
         Assert.All(messages, m => Assert.False(string.IsNullOrEmpty(m.AudioBlobPath)));
     }
+
+    // --- Spoken-choice bridge (C1 voice Story UX) -------------------
+    //
+    // The physical toy has no screen. When a Story turn emits a valid
+    // tail block, the child must HEAR the two choices — otherwise the
+    // turn ends mid-interaction. These tests pin:
+    //   1. Story turns with both choices: TTS receives the composed
+    //      bridge; canonical Message.Content does NOT.
+    //   2. Story turns with missing choice: TTS receives canonical
+    //      text verbatim (no bridge fabricated from a single option).
+    //   3. Non-Story turns: TTS receives canonical text verbatim
+    //      even if ChoiceA/ChoiceB happen to be populated.
+    //
+    // Canonical-text invariant: the bridge is constructed per-request
+    // for TTS only. It never reaches Message.Content. This is
+    // enforced by ChatService owning the persistence write before the
+    // controller runs, and by the controller not writing back.
+
+    private static void WireStoryTurnWithChoices(
+        Harness h,
+        string transcript,
+        string assistantText,
+        string choiceA,
+        string choiceB,
+        string? mode,
+        byte[] ttsExpectedInputBytes)
+    {
+        h.DeviceService.IsDevicePausedAsync(h.DeviceId).Returns(false);
+        h.DeviceService.IsDeviceInBedtimeWindowAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(false);
+        h.DeviceService.IsModeEnabledForRequestAsync(
+            h.DeviceId, (Guid?)null, DetectedMode.Story).Returns(true);
+
+        h.Transcription.TranscribeArmenianAsync(
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(transcript);
+
+        // Capture whatever text the controller hands to TTS.
+        h.Synthesis.SynthesizeArmenianAsync(
+                Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisResult(ttsExpectedInputBytes, MimeMp3));
+
+        h.ChatService.GetResponseAsync(
+                h.DeviceId, transcript,
+                Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<string?>())
+            .Returns(ci =>
+            {
+                var convId = Guid.NewGuid();
+                var userMsgId = Guid.NewGuid();
+                var assistantMsgId = Guid.NewGuid();
+                h.Db.Set<Device>().Add(new Device
+                {
+                    Id = h.DeviceId,
+                    MacAddress = "mac-" + Guid.NewGuid().ToString("N")[..8],
+                    Name = "Test",
+                    ApiKey = "dtk_" + Guid.NewGuid().ToString("N"),
+                    RegisteredAt = DateTime.UtcNow,
+                    LastSeenAt = DateTime.UtcNow
+                });
+                h.Db.Set<Conversation>().Add(new Conversation
+                {
+                    Id = convId, DeviceId = h.DeviceId, StartedAt = DateTime.UtcNow
+                });
+                h.Db.Set<Message>().Add(new Message
+                {
+                    Id = userMsgId, ConversationId = convId,
+                    Role = MessageRole.User, Content = transcript,
+                    Timestamp = DateTime.UtcNow.AddMilliseconds(-50),
+                    SafetyFlag = SafetyFlag.Clean
+                });
+                h.Db.Set<Message>().Add(new Message
+                {
+                    Id = assistantMsgId, ConversationId = convId,
+                    Role = MessageRole.Assistant, Content = assistantText,
+                    Timestamp = DateTime.UtcNow,
+                    SafetyFlag = SafetyFlag.Clean
+                });
+                h.Db.SaveChanges();
+                return new ChatResponse(
+                    assistantText, convId, assistantMsgId, SafetyFlag.Clean,
+                    ChoiceA: choiceA, ChoiceB: choiceB, StorySessionId: null, Mode: mode);
+            });
+    }
+
+    [Fact]
+    public async Task AudioChat_StoryWithBothChoices_TtsInputIncludesSpokenBridge()
+    {
+        await using var h = await CreateAsync();
+        const string story = "Փոքրիկ նապաստակը վազում էր մարգագետնում։";
+        const string a = "Վերցնենք քարը";
+        const string b = "Լսենք քարի ձայնը";
+        WireStoryTurnWithChoices(h, "պատմիր հեքիաթ", story, a, b, "story", TtsMp3);
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+        Assert.IsType<FileContentResult>(result);
+
+        // The controller must have handed TTS the story + spoken bridge,
+        // not the canonical story alone.
+        var ttsArg = (string)h.Synthesis.ReceivedCalls()
+            .Single(c => c.GetMethodInfo().Name == nameof(IAudioSynthesisService.SynthesizeArmenianAsync))
+            .GetArguments()[0]!;
+        Assert.StartsWith(story, ttsArg);
+        Assert.Contains("Ի՞նչ անենք՝ առաջինը՝ Վերցնենք քարը, թե՞ երկրորդը՝ Լսենք քարի ձայնը։", ttsArg);
+    }
+
+    [Fact]
+    public async Task AudioChat_StoryWithBothChoices_PersistedMessageContentDoesNotIncludeBridge()
+    {
+        await using var h = await CreateAsync();
+        const string story = "Փոքրիկ նապաստակը վազում էր մարգագետնում։";
+        WireStoryTurnWithChoices(h, "պատմիր հեքիաթ", story,
+            "Վերցնենք քարը", "Լսենք քարի ձայնը", "story", TtsMp3);
+
+        await h.Controller.Chat(CancellationToken.None);
+
+        var assistantRow = await h.Db.Set<Message>()
+            .AsNoTracking()
+            .Where(m => m.Role == MessageRole.Assistant)
+            .SingleAsync();
+        Assert.Equal(story, assistantRow.Content);
+        Assert.DoesNotContain("Ի՞նչ անենք", assistantRow.Content);
+        Assert.DoesNotContain("առաջինը", assistantRow.Content);
+    }
+
+    [Fact]
+    public async Task AudioChat_StoryWithOnlyChoiceA_TtsInputIsCanonicalVerbatim()
+    {
+        await using var h = await CreateAsync();
+        const string story = "Փոքրիկ նապաստակը վազում էր մարգագետնում։";
+        WireStoryTurnWithChoices(h, "պատմիր հեքիաթ", story,
+            choiceA: "Վերցնենք քարը", choiceB: "", mode: "story", ttsExpectedInputBytes: TtsMp3);
+
+        await h.Controller.Chat(CancellationToken.None);
+
+        var ttsArg = (string)h.Synthesis.ReceivedCalls()
+            .Single(c => c.GetMethodInfo().Name == nameof(IAudioSynthesisService.SynthesizeArmenianAsync))
+            .GetArguments()[0]!;
+        Assert.Equal(story, ttsArg);
+    }
+
+    [Fact]
+    public async Task AudioChat_NonStoryTurnWithChoices_TtsInputIsCanonicalVerbatim()
+    {
+        await using var h = await CreateAsync();
+        const string reply = "Այո՛, գիտեմ — կարապները թռչում են հարավ։";
+        // mode "curiosity" is a non-Story mode that would never actually
+        // populate ChoiceA/B in production, but pin the composer gate:
+        // even if they are present, a non-Story turn must not grow a
+        // Story-shaped spoken bridge.
+        WireStoryTurnWithChoices(h, "ինչու են թռչուններ գաղթում", reply,
+            "Նայենք այնտեղ", "Գնանք այնտեղ", "curiosity", TtsMp3);
+
+        await h.Controller.Chat(CancellationToken.None);
+
+        var ttsArg = (string)h.Synthesis.ReceivedCalls()
+            .Single(c => c.GetMethodInfo().Name == nameof(IAudioSynthesisService.SynthesizeArmenianAsync))
+            .GetArguments()[0]!;
+        Assert.Equal(reply, ttsArg);
+    }
 }
