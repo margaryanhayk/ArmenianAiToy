@@ -1,4 +1,5 @@
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Services;
 using ArmenianAiToy.Domain.Entities;
@@ -61,7 +62,8 @@ public class ModeAwareFallbackTests
             .Returns("Some flagged AI response");
 
         var chatService = new ChatService(
-            aiClient, moderation, conversations, childService, config, logger);
+            aiClient, moderation, conversations, childService, config, logger,
+            new StoryChoiceCoherenceGate());
 
         var result = await chatService.GetResponseAsync(deviceId, "good night");
 
@@ -114,7 +116,8 @@ public class ModeAwareFallbackTests
             .Returns("Some flagged story response");
 
         var chatService = new ChatService(
-            aiClient, moderation, conversations, childService, config, logger);
+            aiClient, moderation, conversations, childService, config, logger,
+            new StoryChoiceCoherenceGate());
 
         var result = await chatService.GetResponseAsync(deviceId, "tell me a story");
 
@@ -265,7 +268,8 @@ public class ModeAwareFallbackTests
             .Returns(aiResponse);
 
         var chatService = new ChatService(
-            aiClient, moderation, conversations, childService, config, logger);
+            aiClient, moderation, conversations, childService, config, logger,
+            new StoryChoiceCoherenceGate());
 
         return (chatService, deviceId, conversations);
     }

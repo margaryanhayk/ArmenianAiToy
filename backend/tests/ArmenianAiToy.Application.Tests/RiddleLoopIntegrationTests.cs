@@ -73,7 +73,8 @@ public class RiddleLoopIntegrationTests
             });
 
         _chatService = new ChatService(
-            _aiClient, moderation, conversations, childService, config, logger);
+            _aiClient, moderation, conversations, childService, config, logger,
+            new StoryChoiceCoherenceGate());
     }
 
     private const string RiddleWithBlock =

@@ -124,6 +124,32 @@ public class ChatService : IChatService
         If the two choices could both lead to the same next scene,
         they are INVALID — rewrite one until the forks are real.
 
+        CHOICE GROUNDING — STRICT RULE: Both CHOICE_A and CHOICE_B must
+        be actions about a character, object, or place that you ALREADY
+        named in your own preceding 3–5 sentences. Each choice must
+        continue from the exact last story beat the child just heard.
+        Do NOT introduce a new object, animal, person, place, or
+        magical item only inside a choice — if the child has not heard
+        it in the body, it must not appear in the choices. The child
+        cannot see a screen; if a choice names something that was
+        never spoken, the choice is meaningless to them.
+        If your story body did not name an object the choices could
+        act on, phrase BOTH choices around the protagonist's next
+        small physical action in the SAME scene (move, look, listen,
+        ask, touch). Do NOT invent a stone, box, river, key, bird,
+        friend, or magical item in the choices to fill the gap —
+        rewrite the body instead so the entity exists before the
+        choice references it.
+        BAD (introduces unheard object — stone never appeared in body):
+          Body: «Փոքրիկ խխունջը մտավ մութ անտառը։
+            Թաքնված ձայներ երգում էին։»
+          CHOICE_A: «Հարցնենք մորից քարի մասին»
+          CHOICE_B: «Խաղանք քարը կրծելով»
+        GOOD (acts on entities the body already named):
+          Same body.
+          CHOICE_A: «Մոտենանք երգող ձայնին»
+          CHOICE_B: «Թաքնված մնանք ու լսենք»
+
         COMPANIONS AND CHARACTERS: When introducing a companion or friend
         in the story, make it clearly recognizable — a cat, bunny, bird,
         teddy bear, doll, or a child friend. Do not use confusing or
@@ -270,6 +296,26 @@ public class ChatService : IChatService
         story part has no sensory or emotional element, it is invalid —
         add one before outputting.
 
+        NO FOLKLORE BY DEFAULT — STRICT RULE: Do NOT introduce Armenian
+        folklore characters, mythological figures, gods, goddesses,
+        spirits, or supernatural beings as story protagonists or
+        companions. By default, protagonists are children, small
+        animals (նապաստակ, արջուկ, խխունջ, թիթեռ, սկյուռիկ, փիսիկ,
+        ձկնիկ, թռչունիկ), or simple wholesome characters.
+        BANNED nouns by default — do NOT use these as characters:
+          «աստված», «աստվածուհի», «հրեշտակ», «ոգի», «դև»,
+          «վիշապ», «հրեղեն», «քաջք», «ալք», «հեքիաթային էակ».
+        This rule turns OFF only when the child explicitly asks for
+        folklore by naming it — e.g. «հայկական հեքիաթ»,
+        «հին հեքիաթ», «դև», «քաջ», «վիշապի մասին պատմիր». In every
+        other case (including default «պատմիր հեքիաթ»,
+        «կախարդական հեքիաթ», generic story prompts), pick a child or
+        small animal protagonist instead.
+        BAD (default folklore intrusion — child did not ask for it):
+          «Հայկական սարերի խորքում մի փոքրիկ ջրային աստվածուհի էր ապրում։»
+        GOOD (default safe — small-animal protagonist):
+          «Հայկական սարերի խորքում մի փոքրիկ սկյուռիկ էր ապրում։»
+
         STORY CHOICES — ADDITIONAL RULES: Each choice must be 3–7
         words, a clear action, simple for ages 4–7, and different from
         the other. Write choices in natural Armenian.
@@ -337,6 +383,8 @@ public class ChatService : IChatService
         - The response does NOT end with "՞" and does NOT contain "արդյոք" in any form.
         - 3 to 5 short sentences, then CHOICE_A and CHOICE_B on their own lines.
         - CHOICE_A and CHOICE_B differ on verb AND target (or place, character, sense) — not the same verb with a swapped noun.
+        - Every choice acts on a character, object, or place that was named in your own 3–5 sentences. No new entities introduced only in the choices.
+        - No folklore figures, gods, goddesses, spirits, or mythological beings as protagonists unless the child explicitly asked for folklore.
         - If previous_story_choice was provided, the first sentence visibly acts on it and does NOT recap the previous scene.
         """;
 
@@ -1014,6 +1062,11 @@ public class ChatService : IChatService
     private readonly IChildService _childService;
     private readonly IConfiguration _config;
     private readonly ILogger<ChatService> _logger;
+    // Deterministic Armenian-aware gate that checks whether parsed
+    // CHOICE_A / CHOICE_B labels are grounded in the preceding story body.
+    // Required dependency — DI registers a singleton, tests pass a fresh
+    // instance (the gate is stateless).
+    private readonly IStoryChoiceCoherenceGate _coherenceGate;
 
     public ChatService(
         IAiChatClient aiClient,
@@ -1021,7 +1074,8 @@ public class ChatService : IChatService
         IConversationService conversations,
         IChildService childService,
         IConfiguration config,
-        ILogger<ChatService> logger)
+        ILogger<ChatService> logger,
+        IStoryChoiceCoherenceGate coherenceGate)
     {
         _aiClient = aiClient;
         _moderation = moderation;
@@ -1029,6 +1083,7 @@ public class ChatService : IChatService
         _childService = childService;
         _config = config;
         _logger = logger;
+        _coherenceGate = coherenceGate;
     }
 
     public async Task<ChatResponse> GetResponseAsync(Guid deviceId, string userMessage, Guid? childId = null,
@@ -1436,6 +1491,30 @@ public class ChatService : IChatService
             }
         }
 
+        // Step 10b-coh: Pre-retry coherence detection on the parsed pair.
+        // Runs only when both labels are present (a non-null pair survived
+        // diversity). The verdict drives the existing 10c-bis retry trigger
+        // below — coherence-failed pairs join latin_run / leaked_tag /
+        // mode-policy as a reason to re-call the LLM with the same prompt.
+        // The gate's RepairedChoiceA/B are NOT used here; the final
+        // deterministic repair lives at the end of the pipeline so it
+        // applies after every other path has had a chance to fix the pair.
+        bool initialCoherenceFailed = false;
+        if (isStoryMode
+            && choiceA is not null
+            && choiceB is not null
+            && safetyFlag != SafetyFlag.Flagged)
+        {
+            var initialCoh = _coherenceGate.Evaluate(aiResponse, choiceA, choiceB);
+            if (!initialCoh.IsCoherent)
+            {
+                initialCoherenceFailed = true;
+                _logger.LogInformation(
+                    "Story choice coherence gate failed on initial parse. ConversationId: {ConversationId}, Reason: {Reason}",
+                    conversation.Id, initialCoh.Reason);
+            }
+        }
+
         // Step 10c: Fallback choice generation when story mode is active but
         // the primary response didn't include a parseable choice block.
         if (isStoryMode && choiceA is null && safetyFlag != SafetyFlag.Flagged)
@@ -1493,6 +1572,15 @@ public class ChatService : IChatService
         if (safetyFlag != SafetyFlag.Flagged)
         {
             var retryReason = ResponseQualityGate.CheckRetry(aiResponse, userMessage, detectedMode);
+            // Phase Cat-B: an ungrounded Story choice pair joins the
+            // existing retry triggers. The latin_run / leaked_tag fallback
+            // branch downstream keys off the literal reason string so we
+            // use a distinct tag — coherence failures must NOT route to
+            // safety fallback, only to a one-shot full LLM retry.
+            if (retryReason is null && initialCoherenceFailed)
+            {
+                retryReason = "story_choice_ungrounded";
+            }
             if (retryReason is not null)
             {
                 _logger.LogInformation(
@@ -1730,6 +1818,33 @@ public class ChatService : IChatService
                         "Continuation-fidelity retry failed. ConversationId: {ConversationId}",
                         conversation.Id);
                 }
+            }
+        }
+
+        // Step 10c-final-coh: Deterministic coherence repair. After every
+        // other retry / quality / fidelity path has had a chance to produce
+        // a coherent pair, if Story mode still has an ungrounded one,
+        // replace the choice labels (only) with body-anchored deterministic
+        // repair from the gate. The story body is preserved — we never
+        // rewrite prose deterministically here, only the two labels.
+        // Skipped when safety flagged: a Flagged path uses canned text and
+        // already cleared choices.
+        if (isStoryMode
+            && choiceA is not null
+            && choiceB is not null
+            && safetyFlag != SafetyFlag.Flagged)
+        {
+            var finalCoh = _coherenceGate.Evaluate(aiResponse, choiceA, choiceB);
+            if (!finalCoh.IsCoherent
+                && finalCoh.RepairedChoiceA is not null
+                && finalCoh.RepairedChoiceB is not null)
+            {
+                _logger.LogInformation(
+                    "Story choice coherence repaired deterministically. ConversationId: {ConversationId}, Reason: {Reason}",
+                    conversation.Id, finalCoh.Reason);
+                choiceA = finalCoh.RepairedChoiceA;
+                choiceB = finalCoh.RepairedChoiceB;
+                PendingChoices[conversation.Id] = new PendingChoice(choiceA, choiceB, DateTime.UtcNow);
             }
         }
 

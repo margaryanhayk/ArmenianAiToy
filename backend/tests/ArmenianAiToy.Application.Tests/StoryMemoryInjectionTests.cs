@@ -72,7 +72,8 @@ public class StoryMemoryInjectionTests
             });
 
         _chatService = new ChatService(
-            _aiClient, moderation, conversations, childService, config, logger);
+            _aiClient, moderation, conversations, childService, config, logger,
+            new StoryChoiceCoherenceGate());
     }
 
     [Fact]

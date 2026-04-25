@@ -79,6 +79,7 @@ public static class DependencyInjection
         services.AddScoped<IModerationService, OpenAIModerationAdapter>();
 
         // Application services
+        services.AddSingleton<IStoryChoiceCoherenceGate, StoryChoiceCoherenceGate>();
         services.AddScoped<IChatService, ChatService>();
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<IDeviceService, DeviceService>();

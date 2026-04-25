@@ -212,4 +212,112 @@ public class StoryPromptContentTests
         Assert.Contains("first sentence visibly acts on it", tail);
         Assert.Contains("NOT recap", tail);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Choice grounding + folklore-by-default guards (Phase 2 evaluator
+    // findings — choice/body decoupling at 70% incidence + folklore
+    // intrusion guardrail breach in fresh-conversation evidence).
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void ChoiceGrounding_SectionPresent()
+    {
+        Assert.Contains("CHOICE GROUNDING", Prompt);
+        Assert.Contains("ALREADY", Prompt);
+        Assert.Contains("preceding 3–5 sentences", Prompt);
+    }
+
+    [Fact]
+    public void ChoiceGrounding_BansNewEntitiesOnlyInChoices()
+    {
+        Assert.Contains(
+            "Do NOT introduce a new object, animal, person, place, or",
+            Prompt);
+        Assert.Contains("only inside a choice", Prompt);
+        Assert.Contains("rewrite the body instead", Prompt);
+    }
+
+    [Fact]
+    public void ChoiceGrounding_BadGoodPair_Present()
+    {
+        // Anchor the BAD example to Phase 2 case-05's signature failure
+        // (snail body, choices that introduced an unheard «քար»).
+        Assert.Contains("stone never appeared in body", Prompt);
+        Assert.Contains("Հարցնենք մորից քարի մասին", Prompt);
+        Assert.Contains("Մոտենանք երգող ձայնին", Prompt);
+    }
+
+    [Fact]
+    public void NoFolkloreByDefault_SectionPresent()
+    {
+        Assert.Contains("NO FOLKLORE BY DEFAULT", Prompt);
+        Assert.Contains("explicitly asks for", Prompt);
+    }
+
+    [Fact]
+    public void NoFolkloreByDefault_PinsBannedNounList()
+    {
+        // Pin the explicit ban list so a future edit cannot quietly
+        // drop the Armenian-specific deities or spirits from it.
+        Assert.Contains("«աստված»", Prompt);
+        Assert.Contains("«աստվածուհի»", Prompt);
+        Assert.Contains("«ոգի»", Prompt);
+        Assert.Contains("«դև»", Prompt);
+        Assert.Contains("«վիշապ»", Prompt);
+    }
+
+    [Fact]
+    public void NoFolkloreByDefault_BadGoodPair_Present()
+    {
+        // Anchor the BAD example to Phase 2 case-01's signature failure
+        // (default «պատմիր հեքիաթ» produced a «ջրային աստվածուհի»
+        // protagonist — the explicit folklore-postponed guardrail in
+        // CLAUDE.md).
+        Assert.Contains("ջրային աստվածուհի", Prompt);
+        Assert.Contains("փոքրիկ սկյուռիկ", Prompt);
+    }
+
+    [Fact]
+    public void FinalStoryCheck_ReiteratesChoiceGrounding()
+    {
+        var idx = Prompt.IndexOf("FINAL STORY CHECK");
+        Assert.True(idx >= 0);
+        var tail = Prompt.Substring(idx);
+        Assert.Contains("named in your own 3–5 sentences", tail);
+        Assert.Contains("No new entities introduced only in the choices", tail);
+    }
+
+    [Fact]
+    public void FinalStoryCheck_ReiteratesNoFolklore()
+    {
+        var idx = Prompt.IndexOf("FINAL STORY CHECK");
+        Assert.True(idx >= 0);
+        var tail = Prompt.Substring(idx);
+        Assert.Contains("No folklore figures", tail);
+        Assert.Contains("explicitly asked for folklore", tail);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Cat-B: anchor-resistant prompt invariant. The runtime coherence gate
+    // (StoryChoiceCoherenceGate) is now responsible for catching ungrounded
+    // CHOICE_A / CHOICE_B labels. To prevent the prompt from inadvertently
+    // teaching the model the very nouns we expect the gate to reject, the
+    // prompt must NOT contain a cluster of tempting concrete BAD-example
+    // nouns — «բանալի», «թագավոր», «փերի», «կախարդական դուռ» — as inline
+    // story / choice example text. The folklore-ban category list still
+    // names «վիշապ» as a banned noun (intentional; that is a category
+    // gate, not a story example), so this invariant deliberately excludes
+    // that one and the long-standing «քարանձավ» BAD-example used elsewhere
+    // in the prompt.
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("բանալի")]                                                                                                                     // բանալի
+    [InlineData("թագավոր")]                                                                                              // թագավոր
+    [InlineData("փերի")]                                                                                                                                                // փերի
+    [InlineData("կախարդական դուռ")]   // կախարդական դուռ
+    public void StoryChoiceInstruction_DoesNotAnchorOnTemptingBadExampleNouns(string badNoun)
+    {
+        Assert.DoesNotContain(badNoun, Prompt);
+    }
 }

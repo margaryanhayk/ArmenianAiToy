@@ -64,7 +64,8 @@ public class ModeDetectorIntegrationTests
             });
 
         _chatService = new ChatService(
-            _aiClient, moderation, conversations, childService, config, _logger);
+            _aiClient, moderation, conversations, childService, config, _logger,
+            new StoryChoiceCoherenceGate());
     }
 
     [Fact]

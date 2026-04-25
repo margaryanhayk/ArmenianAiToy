@@ -1,4 +1,5 @@
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Services;
 using ArmenianAiToy.Domain.Entities;
@@ -64,7 +65,8 @@ public class ChoiceHandoffTests
             });
 
         _chatService = new ChatService(
-            _aiClient, moderation, conversations, childService, config, _logger);
+            _aiClient, moderation, conversations, childService, config, _logger,
+            new StoryChoiceCoherenceGate());
     }
 
     [Fact]
@@ -171,7 +173,7 @@ public class ChoiceHandoffTests
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns("Հեքիաթ։\n---\nCHOICE_A:Ձախ\nCHOICE_B:Աջ");
 
-        var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
+        var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger, new StoryChoiceCoherenceGate());
         await svc.GetResponseAsync(deviceId, "tell me a story");
 
         // Request 2: moderation BLOCKS the child input
@@ -244,7 +246,7 @@ public class ChoiceHandoffTests
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns("Ընտրիր մեկը։\n---\nCHOICE_A:Օգնել աղվեսին\nCHOICE_B:Մենակ անցնել");
 
-        var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
+        var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger, new StoryChoiceCoherenceGate());
         await svc.GetResponseAsync(deviceId, "tell me a story");
 
         // Request 2: history now contains "tell me a story" (story intent active)
@@ -298,7 +300,7 @@ public class ChoiceHandoffTests
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns("Ընտրիր մեկը։\n---\nCHOICE_A:Օգնել աղվեսին\nCHOICE_B:Մենակ անցնել");
 
-        var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
+        var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger, new StoryChoiceCoherenceGate());
         await svc.GetResponseAsync(deviceId, "tell me a story");
 
         // Request 2: history has story trigger, but child says gibberish → unknown
@@ -372,27 +374,32 @@ public class ChoiceHandoffTests
                 Timestamp = DateTime.UtcNow, SafetyFlag = callInfo.ArgAt<SafetyFlag>(3)
             });
 
-        // Request 1: seed pending choices via tail block
+        // Request 1: seed pending choices via tail block.
+        // Body grounds both choices (աղվես + մենակ + անցն) so the new
+        // runtime coherence gate stays quiet and the strengthened-directive
+        // assertion below is the only behavior under test.
         conversations.GetRecentMessagesAsync(Arg.Any<Guid>(), Arg.Any<int>())
             .Returns(new List<(string Role, string Content)>());
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Ընտրիր մեկը։\n---\nCHOICE_A:Օգնել աղվեսին\nCHOICE_B:Մենակ անցնել");
+            .Returns("Աղվեսը մենակ քայլեց ճանապարհով։ Ընտրիր մեկը։\n---\nCHOICE_A:Օգնել աղվեսին\nCHOICE_B:Մենակ անցնել");
 
-        var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
+        var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger, new StoryChoiceCoherenceGate());
         await svc.GetResponseAsync(deviceId, "tell me a story");
 
         // Request 2: explicit selectedChoice=A. History should have the raw
         // "A" message replaced with the strengthened directive.
+        // Body grounds both follow-up choices (աղվես in body grounds Ա/Բ
+        // labels) so the coherence gate stays quiet.
         conversations.GetRecentMessagesAsync(Arg.Any<Guid>(), Arg.Any<int>())
             .Returns(new List<(string Role, string Content)>
             {
                 ("user", "tell me a story"),
-                ("assistant", "Ընտրիր մեկը։"),
+                ("assistant", "Աղվեսը մենակ քայլեց ճանապարհով։ Ընտրիր մեկը։"),
                 ("user", "A"),
             });
         aiClient.ClearReceivedCalls();
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns("Աղվեսը ուրախացավ։\n---\nCHOICE_A:Նոր Ա\nCHOICE_B:Նոր Բ");
+            .Returns("Աղվեսը ուրախացավ։ Քամին մեղմ էր։\n---\nCHOICE_A:Մոտենանք աղվեսին\nCHOICE_B:Լսենք քամին");
 
         await svc.GetResponseAsync(deviceId, "A", selectedChoice: "A");
 
@@ -450,7 +457,7 @@ public class ChoiceHandoffTests
         aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns("Continuing...");
 
-        var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger);
+        var svc = new ChatService(aiClient, moderation, conversations, childService, config, logger, new StoryChoiceCoherenceGate());
         await svc.GetResponseAsync(deviceId, "asdfgh");
 
         // Expired labels should NOT inject any previous_story_choice hint

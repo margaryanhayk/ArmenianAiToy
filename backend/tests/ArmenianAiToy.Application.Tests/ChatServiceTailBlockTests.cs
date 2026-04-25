@@ -1,4 +1,5 @@
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Services;
 using ArmenianAiToy.Domain.Entities;
@@ -88,7 +89,8 @@ public class ChatServiceTailBlockTests
             });
 
         _chatService = new ChatService(
-            _aiClient, _moderation, _conversations, childService, config, logger);
+            _aiClient, _moderation, _conversations, childService, config, logger,
+            new StoryChoiceCoherenceGate());
     }
 
     [Fact]
@@ -138,7 +140,10 @@ public class ChatServiceTailBlockTests
     [Fact]
     public async Task QualityGate_CleanResponse_DoesNotRetry()
     {
-        var good = "Կար մի նապաստակ։\n---\nCHOICE_A:Բացենք տուփը\nCHOICE_B:Փակենք տուփը";
+        // Body grounds both choice nouns (նապաստակ + տուփ) so the new
+        // runtime coherence gate stays quiet and this test continues to
+        // verify only the quality-gate retry path.
+        var good = "Կար մի նապաստակ։ Նա նայեց փոքրիկ տուփին։\n---\nCHOICE_A:Բացենք տուփը\nCHOICE_B:Փակենք տուփը";
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns(good);
 
@@ -146,7 +151,7 @@ public class ChatServiceTailBlockTests
 
         await _aiClient.Received(1).GetCompletionAsync(
             Arg.Any<string>(), Arg.Any<List<(string, string)>>());
-        Assert.Equal("Կար մի նապաստակ։", result.Response);
+        Assert.Equal("Կար մի նապաստակ։ Նա նայեց փոքրիկ տուփին։", result.Response);
     }
 
     [Fact]
@@ -265,7 +270,11 @@ public class ChatServiceTailBlockTests
         // calls the AI again with ChoiceGenerationPrompt. The second call
         // returns genuinely different verbs — those must be what reaches
         // the child.
-        var weakPair = "Աղվեսը վազեց անտառով։\n---\nCHOICE_A:Բացենք փոքրիկ տուփը\nCHOICE_B:Բացենք մեծ դուռը";
+        // Body grounds the regenerated choice nouns (թռչունիկ + զանգակ)
+        // so the new runtime coherence gate stays quiet and this test
+        // continues to verify only the diversity-guard regeneration path.
+        var bodyText = "Աղվեսը վազեց անտառով։ Ճյուղին նստած էր թռչունիկը։ Մոտակայքում զանգում էր զանգակ։";
+        var weakPair = bodyText + "\n---\nCHOICE_A:Բացենք փոքրիկ տուփը\nCHOICE_B:Բացենք մեծ դուռը";
         // Regeneration prompt expects raw CHOICE_A/CHOICE_B lines; the
         // Step 10c code prepends "\n---\n" before parsing.
         var regeneratedChoices = "CHOICE_A:Կանչենք թռչունիկին\nCHOICE_B:Լսենք զանգակի ձայնը";
@@ -280,7 +289,7 @@ public class ChatServiceTailBlockTests
             Arg.Any<string>(), Arg.Any<List<(string, string)>>());
 
         // The story prose is preserved from the first call.
-        Assert.Equal("Աղվեսը վազեց անտառով։", result.Response);
+        Assert.Equal(bodyText, result.Response);
 
         // The weak pair must NOT reach the child; the regenerated pair does.
         Assert.Equal("Կանչենք թռչունիկին", result.ChoiceA);
@@ -292,7 +301,9 @@ public class ChatServiceTailBlockTests
     {
         // Control: genuinely different verbs must pass the guard and the
         // single AI call must be the only call made.
-        var goodPair = "Աղվեսը վազեց։\n---\nCHOICE_A:Կանչենք թռչունիկին\nCHOICE_B:Լսենք զանգակի ձայնը";
+        // Body grounds both choice nouns (թռչունիկ + զանգակ) so the new
+        // runtime coherence gate stays quiet too.
+        var goodPair = "Աղվեսը վազեց անտառով։ Ճյուղին նստած էր թռչունիկը։ Մոտակայքում զանգում էր զանգակ։\n---\nCHOICE_A:Կանչենք թռչունիկին\nCHOICE_B:Լսենք զանգակի ձայնը";
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns(goodPair);
 
