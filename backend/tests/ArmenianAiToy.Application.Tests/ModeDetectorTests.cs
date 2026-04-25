@@ -50,6 +50,20 @@ public class ModeDetectorTests
         Assert.Equal(DetectedMode.Story, ModeDetector.Detect(message, EmptyHistory));
     }
 
+    // Whisper STT on short Armenian clips collapses Armenian's three-way
+    // stop voicing, producing e.g. "Բատմիր հեկերդ" for "Պատմիր հեքիաթ".
+    // Pins that these phonetic near-neighbors still fire Story mode so the
+    // C1 voice path reliably opens an interactive Story turn on the
+    // canonical "tell me a story" utterance.
+    [Theory]
+    [InlineData("բատմիր հեկերդ։")] // Բատմիր հեկերդ։ — observed Whisper output
+    [InlineData("բատմիր")]                                            // Բատմիր alone
+    [InlineData("հեկիաթ ասա")]                         // հեկիաթ ասա (ք→կ shift)
+    public void Story_WhisperMisheardArmenian_DetectsStory(string message)
+    {
+        Assert.Equal(DetectedMode.Story, ModeDetector.Detect(message, EmptyHistory));
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // Game mode
     // ─────────────────────────────────────────────────────────────────────

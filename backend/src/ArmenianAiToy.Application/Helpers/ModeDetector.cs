@@ -47,6 +47,13 @@ public static class ModeDetector
         "\u057a\u0561\u057f\u0574\u0578\u0582\u0569\u0575\u0578\u0582\u0576", // patmutyun
         "\u0570\u0565\u0584\u056b\u0561\u0569",                   // heqiat
         "\u056b\u0576\u0579 \u056f\u056c\u056b\u0576\u056b",      // inch klini
+        // Whisper STT confusables for the two Armenian triggers above. Armenian
+        // has a three-way voicing distinction on stops (voiceless / aspirated /
+        // voiced) that Whisper routinely collapses, producing \u054a\u2192\u0532 and \u0584\u2192\u056f
+        // shifts on short utterances. Neither variant is a real Armenian word,
+        // so false-positive risk on normal child speech is negligible.
+        "\u0562\u0561\u057f\u0574\u056b\u0580",                   // batmir (\u054a\u2192\u0532 misheard of patmir)
+        "\u0570\u0565\u056f\u056b\u0561\u0569",                   // hekiat (\u0584\u2192\u056f misheard of heqiat)
         "patmir",
         "patmutyun",
         "heqiat",
