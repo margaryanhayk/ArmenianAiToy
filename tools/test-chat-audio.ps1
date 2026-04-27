@@ -15,16 +15,38 @@
 #     -OutputAudio ".\artifacts\areg-response.mp3"
 #
 # Parameters:
-#   -BaseUrl      Backend base URL, e.g. http://<host>:<port> (no trailing /api).
-#   -DeviceId     Device GUID from POST /api/devices/register.
-#   -ApiKey       Device API key (dtk_...) from POST /api/devices/register.
-#   -InputWav     Local WAV file to send. 16 kHz mono PCM matches C1 firmware.
-#   -OutputAudio  Where to save the assistant MP3 response.
-#   -ContentType  Optional. Defaults to audio/wav.
-#   -TimeoutSec   Optional. Defaults to 60 s (STT + chat + TTS end-to-end).
+#   -BaseUrl           Backend base URL, e.g. http://<host>:<port> (no trailing /api).
+#   -DeviceId          Device GUID from POST /api/devices/register.
+#   -ApiKey            Device API key (dtk_...) from POST /api/devices/register.
+#   -InputWav          Local WAV file to send. 16 kHz mono PCM matches C1 firmware.
+#   -OutputAudio       Where to save the assistant MP3 response.
+#   -ContentType       Optional. Defaults to audio/wav.
+#   -TimeoutSec        Optional. Defaults to 60 s (STT + chat + TTS end-to-end).
+#   -TelegramBotToken  Optional. If set together with -TelegramChatId, the
+#                      saved assistant MP3 is also sent to the given chat
+#                      via Telegram Bot API (requires PowerShell 7+).
+#   -TelegramChatId    Optional. Telegram chat id (numeric or @channel) to
+#                      receive the MP3. Required iff -TelegramBotToken is set.
+#   -TelegramCaption   Optional. Caption text attached to the Telegram audio.
+#
+# Optional Telegram delivery (requires PowerShell 7+):
+#   pwsh -File tools\test-chat-audio.ps1 `
+#     -BaseUrl "http://<backend-host>:<port>" `
+#     -DeviceId "<device-guid>" `
+#     -ApiKey "dtk_<api-key>" `
+#     -InputWav ".\samples\hello.wav" `
+#     -OutputAudio ".\artifacts\areg-response.mp3" `
+#     -TelegramBotToken "<bot-token>" `
+#     -TelegramChatId  "<chat-id>" `
+#     -TelegramCaption "C1 voice QA test"
 #
 # Never commit real DeviceId / ApiKey / Wi-Fi URLs via this script's
 # defaults. All sensitive values come in on the command line.
+#
+# MANUAL QA ONLY for the Telegram path. Never use with real child
+# audio without explicit approval. Never commit a Telegram bot
+# token or chat id. Tokens come on the command line; this script
+# does not persist them anywhere.
 
 param(
     [string] $BaseUrl,
@@ -33,7 +55,10 @@ param(
     [string] $InputWav,
     [string] $OutputAudio,
     [string] $ContentType = 'audio/wav',
-    [int]    $TimeoutSec  = 60
+    [int]    $TimeoutSec  = 60,
+    [string] $TelegramBotToken,
+    [string] $TelegramChatId,
+    [string] $TelegramCaption
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,11 +68,35 @@ function Fail([int]$code, [string]$msg) {
     exit $code
 }
 
+# Returns "<prefix>:<first3>...<last3>" for a Telegram bot token of
+# the form 123456:ABCDEF...xyz, or '<masked>' on too-short / malformed
+# input. Used in every log line that mentions the token so the raw
+# secret never appears on stdout.
+function Format-MaskedToken([string]$t) {
+    if (-not $t -or $t.Length -lt 12) { return '<masked>' }
+    $colon = $t.IndexOf(':')
+    if ($colon -lt 1 -or $colon -ge ($t.Length - 6)) { return '<masked>' }
+    $prefix = $t.Substring(0, $colon)
+    $secret = $t.Substring($colon + 1)
+    return "{0}:{1}...{2}" -f $prefix, $secret.Substring(0, 3),
+                               $secret.Substring($secret.Length - 3)
+}
+
 if (-not $BaseUrl)     { Fail 2 "ERROR: -BaseUrl is required." }
 if (-not $DeviceId)    { Fail 2 "ERROR: -DeviceId is required." }
 if (-not $ApiKey)      { Fail 2 "ERROR: -ApiKey is required." }
 if (-not $InputWav)    { Fail 2 "ERROR: -InputWav is required." }
 if (-not $OutputAudio) { Fail 2 "ERROR: -OutputAudio is required." }
+
+# Telegram delivery is opt-in. Both -TelegramBotToken AND -TelegramChatId
+# must be supplied together (or both omitted). Caption is independent.
+$telegramRequested = ($TelegramBotToken -or $TelegramChatId)
+if ($telegramRequested -and (-not $TelegramBotToken -or -not $TelegramChatId)) {
+    Fail 2 "ERROR: -TelegramBotToken and -TelegramChatId must be supplied together (or both omitted)."
+}
+if ($telegramRequested -and $PSVersionTable.PSVersion.Major -lt 7) {
+    Fail 2 "ERROR: -TelegramBotToken / -TelegramChatId require PowerShell 7+ (current: $($PSVersionTable.PSVersion))."
+}
 
 if (-not (Test-Path -LiteralPath $InputWav -PathType Leaf)) {
     Fail 2 "ERROR: input WAV not found: $InputWav"
@@ -153,3 +202,86 @@ if (-not $isAudio) {
 }
 
 Write-Host "OK -- play the output file to verify Areg's Armenian reply."
+
+# Optional Telegram delivery. Only runs after /api/chat/audio succeeded
+# and the response was audio/*. The saved MP3 is NEVER deleted on
+# Telegram failure -- the local artifact is the primary QA outcome;
+# Telegram is a side-channel.
+if ($telegramRequested) {
+    $maskedToken = Format-MaskedToken $TelegramBotToken
+    Write-Host ''
+    Write-Host "Telegram:      sending audio to chat $TelegramChatId via bot $maskedToken ..."
+
+    $tgUrl  = "https://api.telegram.org/bot$TelegramBotToken/sendAudio"
+    $tgForm = @{
+        chat_id = $TelegramChatId
+        audio   = Get-Item -LiteralPath $OutputAudio
+    }
+    if ($TelegramCaption) {
+        $tgForm['caption'] = $TelegramCaption
+    }
+
+    $tgResp = $null
+    try {
+        $tgResp = Invoke-WebRequest `
+            -Method POST `
+            -Uri $tgUrl `
+            -Form $tgForm `
+            -TimeoutSec $TimeoutSec
+    }
+    catch {
+        $tgErr = $_
+        $tgWeb = $null
+        try { $tgWeb = $tgErr.Exception.Response } catch {}
+
+        Write-Host ''
+        Write-Host "Telegram delivery FAILED (bot $maskedToken)." -ForegroundColor Red
+
+        if ($tgWeb) {
+            $tgStatus = 0
+            try { $tgStatus = [int] $tgWeb.StatusCode } catch {}
+            Write-Host "HTTP status:   $tgStatus" -ForegroundColor Red
+            $tgBody = ''
+            try {
+                $s = $tgWeb.GetResponseStream()
+                $reader = New-Object System.IO.StreamReader($s)
+                $tgBody = $reader.ReadToEnd()
+            } catch {}
+            if ($tgBody) { Write-Host "Error body:    $tgBody" }
+        }
+        else {
+            Write-Host "Transport error: $($tgErr.Exception.Message)" -ForegroundColor Red
+        }
+
+        Write-Host "Hint: verify -TelegramBotToken (the bot must be added to the chat) and -TelegramChatId."
+        Write-Host "Local MP3 preserved at $outResolved"
+        exit 4
+    }
+
+    $tgOk = $false
+    $tgDescription = ''
+    $tgMessageId = $null
+    try {
+        $tgJson = $tgResp.Content | ConvertFrom-Json
+        if ($tgJson.PSObject.Properties.Name -contains 'ok') { $tgOk = [bool] $tgJson.ok }
+        if ($tgJson.PSObject.Properties.Name -contains 'description') { $tgDescription = [string] $tgJson.description }
+        if ($tgJson.PSObject.Properties.Name -contains 'result' -and $tgJson.result.PSObject.Properties.Name -contains 'message_id') {
+            $tgMessageId = $tgJson.result.message_id
+        }
+    } catch {}
+
+    if (-not $tgOk) {
+        Write-Host ''
+        Write-Host "Telegram API rejected the upload (bot $maskedToken)." -ForegroundColor Red
+        if ($tgDescription) { Write-Host "Description:   $tgDescription" }
+        Write-Host "Hint: verify -TelegramBotToken (the bot must be added to the chat) and -TelegramChatId."
+        Write-Host "Local MP3 preserved at $outResolved"
+        exit 4
+    }
+
+    if ($tgMessageId) {
+        Write-Host "OK -- sent to Telegram chat $TelegramChatId (message_id=$tgMessageId)."
+    } else {
+        Write-Host "OK -- sent to Telegram chat $TelegramChatId."
+    }
+}
