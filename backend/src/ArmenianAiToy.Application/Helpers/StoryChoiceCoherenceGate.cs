@@ -146,6 +146,7 @@ public sealed class StoryChoiceCoherenceGate : IStoryChoiceCoherenceGate
     // overlap survives ordinary case/conjugation differences.
     private static readonly string[] Suffixes =
     [
+        "ությամբ",
         "ություն",
         "ներով",
         "ներից",
@@ -159,6 +160,7 @@ public sealed class StoryChoiceCoherenceGate : IStoryChoiceCoherenceGate
         "երի",
         "երը",
         "ներ",
+        "ամբ",
         "ին",
         "ից",
         "ով",
@@ -469,6 +471,7 @@ public sealed class StoryChoiceCoherenceGate : IStoryChoiceCoherenceGate
                 var raw = m.Value.Trim().TrimEnd(TrailingPunct);
                 if (raw.Length < MinTokenLen) continue;
                 if (StopWords.Contains(raw)) continue;
+                if (IsLikelyPastTenseVerbForm(raw)) continue;
                 var stem = StripSuffix(raw);
                 if (stem.Length < MinTokenLen) continue;
                 if (StopWords.Contains(stem)) continue;
@@ -479,5 +482,17 @@ public sealed class StoryChoiceCoherenceGate : IStoryChoiceCoherenceGate
             }
         }
         return anchors;
+    }
+
+    // Conservative verb-form detector: the most common Armenian past-tense
+    // 3rd-person ending («-ավ»). Used by ExtractAnchorStems so verbs like
+    // «մոտեցավ», «տեսավ», «զարմացավ» are not selected as repair anchors —
+    // feeding them through the Dative «-ին» transform would otherwise emit
+    // gibberish like «մոտեցավին». Length ≥ 4 keeps the rule from eating
+    // short nouns that incidentally end in «ավ» (none common enough to
+    // matter as a last-resort fallback anchor).
+    private static bool IsLikelyPastTenseVerbForm(string raw)
+    {
+        return raw.Length >= 4 && raw.EndsWith("ավ", StringComparison.Ordinal);
     }
 }

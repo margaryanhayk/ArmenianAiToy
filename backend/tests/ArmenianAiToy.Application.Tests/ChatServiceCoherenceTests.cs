@@ -189,6 +189,65 @@ public class ChatServiceCoherenceTests
     }
 
     [Fact]
+    public async Task LiveQA_BadButterflyPair_DoesNotReachUser_EvenWhenRetryRepeats()
+    {
+        // 2026-04-27 voice-MVP regression. The LLM produced a Story body
+        // that's fine on its own but a choice pair that combines a
+        // verb-derived pseudo-noun («հպենք») with a fabricated compound
+        // («շատրվանաքար»). Even when the retry returns the same coined
+        // pair, the deterministic final-coh repair must replace the
+        // labels with body-anchored alternatives before the response
+        // reaches the child.
+        var body =
+              "Հին ժամանակներում, մի փոքրիկ թիթեռ ապրում էր ծաղկավոր պարտեզում։ "
+            + "Թիթեռը շատ էր սիրում պարել ծաղիկների տերևների վրա։ "
+            + "Մի անգամ, երբ նա պտտվում էր, տեսավ մի առեղծվածային լուսավոր քար, "
+            + "որը փայլում էր մեղմ լույսով և ծաղիկներին հատուկ հոտով։ "
+            + "Թիթեռը մոտեցավ քարին և զարմացավ նրա գեղեցկությամբ։";
+        var bad = body
+            + "\n---\nCHOICE_A:Մոտենանք հպենքին\nCHOICE_B:Նայենք շատրվանաքարին";
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(bad, bad);
+
+        var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "tell me a story");
+
+        // The exact bad strings must NOT reach the user.
+        Assert.NotEqual("Մոտենանք հպենքին", result.ChoiceA);
+        Assert.NotEqual("Նայենք շատրվանաքարին", result.ChoiceB);
+        Assert.NotNull(result.ChoiceA);
+        Assert.NotNull(result.ChoiceB);
+
+        // Coined / fabricated tokens must not survive in either label.
+        Assert.DoesNotContain("հպենք", result.ChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("հպենք", result.ChoiceB!, StringComparison.Ordinal);
+        Assert.DoesNotContain("շատրվան", result.ChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("շատրվան", result.ChoiceB!, StringComparison.Ordinal);
+
+        // Body verbs must not be selected as repair anchors.
+        Assert.DoesNotContain("մոտեցավ", result.ChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("մոտեցավ", result.ChoiceB!, StringComparison.Ordinal);
+        Assert.DoesNotContain("զարմացավ", result.ChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("զարմացավ", result.ChoiceB!, StringComparison.Ordinal);
+
+        // The two delivered labels must differ.
+        Assert.NotEqual(result.ChoiceA, result.ChoiceB);
+
+        // At least one delivered label must reference a real body noun.
+        var refsBody =
+               result.ChoiceA!.Contains("թիթեռ", StringComparison.Ordinal)
+            || result.ChoiceA!.Contains("քար", StringComparison.Ordinal)
+            || result.ChoiceA!.Contains("ծաղիկ", StringComparison.Ordinal)
+            || result.ChoiceA!.Contains("պարտեզ", StringComparison.Ordinal)
+            || result.ChoiceB!.Contains("թիթեռ", StringComparison.Ordinal)
+            || result.ChoiceB!.Contains("քար", StringComparison.Ordinal)
+            || result.ChoiceB!.Contains("ծաղիկ", StringComparison.Ordinal)
+            || result.ChoiceB!.Contains("պարտեզ", StringComparison.Ordinal);
+        Assert.True(refsBody,
+            $"Delivered labels must reference a body noun. Got A=\"{result.ChoiceA}\" B=\"{result.ChoiceB}\"");
+    }
+
+    [Fact]
     public async Task GroundedInitialPair_DoesNotTriggerExtraRetry()
     {
         // Sanity / no-regression: a grounded pair on the first call must

@@ -194,4 +194,114 @@ public class StoryChoiceCoherenceGateTests
         Assert.NotNull(result.RepairedChoiceA);
         Assert.NotNull(result.RepairedChoiceB);
     }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Live QA regression — 2026-04-27 voice-MVP butterfly story
+    // ─────────────────────────────────────────────────────────────────
+
+    // Body returned by the live `/api/chat` text-input QA. Reused across
+    // a few tests below so the exact prose is pinned in one place.
+    private const string LiveButterflyBody =
+          "Հին ժամանակներում, մի փոքրիկ թիթեռ ապրում էր ծաղկավոր պարտեզում։ "
+        + "Թիթեռը շատ էր սիրում պարել ծաղիկների տերևների վրա։ "
+        + "Մի անգամ, երբ նա պտտվում էր, տեսավ մի առեղծվածային լուսավոր քար, "
+        + "որը փայլում էր մեղմ լույսով և ծաղիկներին հատուկ հոտով։ "
+        + "Թիթեռը մոտեցավ քարին և զարմացավ նրա գեղեցկությամբ։";
+
+    [Fact]
+    public void LiveQA_BadPair_IsRejected_AndRepairIsBodyAnchoredAndWellFormed()
+    {
+        // The 2026-04-27 voice-MVP failure mode. Choice A coined a verb-
+        // derived pseudo-noun («հպենք», 1pl optative «let's touch» turned
+        // into a dative); Choice B fabricated a compound noun
+        // («շատրվանաքար», "fountain-stone") whose «շատրվան» prefix is
+        // absent from the body — body only has «քար».
+        var result = _gate.Evaluate(
+            LiveButterflyBody,
+            "Մոտենանք հպենքին",
+            "Նայենք շատրվանաքարին");
+
+        Assert.False(result.IsCoherent);
+        Assert.True(result.ShouldRetry);
+        Assert.NotNull(result.RepairedChoiceA);
+        Assert.NotNull(result.RepairedChoiceB);
+
+        // Repair must NOT carry any of the rejected coined tokens.
+        Assert.DoesNotContain("հպենք", result.RepairedChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("հպենք", result.RepairedChoiceB!, StringComparison.Ordinal);
+        Assert.DoesNotContain("շատրվան", result.RepairedChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("շատրվան", result.RepairedChoiceB!, StringComparison.Ordinal);
+
+        // Repair must NOT pick body verbs as anchors. «մոտեցավ» / «տեսավ»
+        // / «զարմացավ» under the Dative «-ին» produce gibberish like
+        // «մոտեցավին» — the original failure mode of this fix.
+        Assert.DoesNotContain("մոտեցավ", result.RepairedChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("մոտեցավ", result.RepairedChoiceB!, StringComparison.Ordinal);
+        Assert.DoesNotContain("տեսավ", result.RepairedChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("տեսավ", result.RepairedChoiceB!, StringComparison.Ordinal);
+        Assert.DoesNotContain("զարմացավ", result.RepairedChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("զարմացավ", result.RepairedChoiceB!, StringComparison.Ordinal);
+
+        // The repaired pair must differ.
+        Assert.NotEqual(result.RepairedChoiceA, result.RepairedChoiceB);
+
+        // At least one repaired label must reference an actual body noun
+        // («թիթեռ», «քար», «ծաղիկ», «պարտեզ»).
+        var refsBody =
+               result.RepairedChoiceA!.Contains("թիթեռ", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("քար", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("ծաղիկ", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("պարտեզ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("թիթեռ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("քար", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("ծաղիկ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("պարտեզ", StringComparison.Ordinal);
+        Assert.True(refsBody,
+            $"Repair must reference a body noun. Got A=\"{result.RepairedChoiceA}\" B=\"{result.RepairedChoiceB}\"");
+    }
+
+    [Fact]
+    public void Choice_FabricatedCompoundEndingInBodyStem_IsRejected()
+    {
+        // Body has only «քար» (stone). Choice extends it into a coined
+        // compound «շատրվանաքար» whose «շատրվան» (fountain) prefix is
+        // absent from the body. The gate must NOT treat this as a
+        // morphological match — that's a fabrication, not inflection.
+        var body = "Թիթեռը մոտեցավ քարին և զարմացավ նրա գեղեցկությամբ։";
+        var result = _gate.Evaluate(body, "Մոտենանք քարին", "Նայենք շատրվանաքարին");
+        Assert.False(result.IsCoherent);
+        Assert.True(result.ShouldRetry);
+    }
+
+    [Fact]
+    public void Choice_VerbDerivedDative_IsRejected()
+    {
+        // Choice token «հպենք» is a 1pl-optative verb form coerced into
+        // a noun via the Dative «-ին». The body never mentions «հպվել»
+        // / touching, so the choice introduces a new (and unnatural)
+        // concept — must be rejected.
+        var body = "Թիթեռը նայեց ծաղիկին և թռավ։";
+        var result = _gate.Evaluate(body, "Մոտենանք ծաղիկին", "Մոտենանք հպենքին");
+        Assert.False(result.IsCoherent);
+    }
+
+    [Fact]
+    public void Repair_DoesNotEmitPastTenseVerbForms_AsAnchors()
+    {
+        // Body whose latest sentence is verb-heavy («մոտեցավ»,
+        // «զարմացավ»). Without the verb-form filter, the deterministic
+        // repair would pick «մոտեցավ» and emit «մոտեցավին» under the
+        // Dative transform — gibberish to a 4–7 yo. The filter must skip
+        // raw past-tense forms ending in «-ավ» and pick body nouns
+        // («թիթեռ», «քար») instead.
+        var body = "Թիթեռը մոտեցավ քարին և զարմացավ նրա գեղեցկությամբ։";
+        var result = _gate.Evaluate(body, "Մտնենք քարանձավը", "Կանչենք վիշապին");
+        Assert.False(result.IsCoherent);
+        Assert.NotNull(result.RepairedChoiceA);
+        Assert.NotNull(result.RepairedChoiceB);
+        Assert.DoesNotContain("մոտեցավ", result.RepairedChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("մոտեցավ", result.RepairedChoiceB!, StringComparison.Ordinal);
+        Assert.DoesNotContain("զարմացավ", result.RepairedChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("զարմացավ", result.RepairedChoiceB!, StringComparison.Ordinal);
+    }
 }
