@@ -295,6 +295,56 @@ public class ChatServiceCoherenceTests
     }
 
     [Fact]
+    public async Task LiveQA_HetwBadPair_DoesNotReachUser_EvenWhenRetryRepeats()
+    {
+        // 2026-04-28 voice-MVP follow-up regression. Body contains the
+        // postposition «հետ» ("with") and the LLM produced choiceA
+        // «Մոտենանք հետևին» — coincidentally prefix-matching «հետ» but
+        // semantically unrelated. Both initial and retry returned the
+        // same coined pair. The pipeline must NOT deliver
+        // «Մոտենանք հետևին» to the child — final-coh repair has to
+        // replace it with body-anchored deterministic labels.
+        var body =
+              "Փոքրիկ նապաստակը ցատկեց քարի վրայից։ "
+            + "Փափուկ խոտի վրա քամիի մեղմ ծեսը լսվում էր։ "
+            + "Նապաստակը իր բույսերի ընկերների հետ խաղում էր, երբ տեսավ, "
+            + "որ հողի վրա փայլում է մի փոքրիկ թանկարժեք քար։ "
+            + "Նա զարմացած մոտեցավ, որպեսզի ավելի լավ տեսնի։ "
+            + "Բայց այդ ժամանակ քարից դուրս թռավ մի արտասովոր փոքրիկ թիթեռ, "
+            + "որ փայլում էր գունագեղ լույսերով։";
+        var bad = body
+            + "\n---\nCHOICE_A:Մոտենանք հետևին\nCHOICE_B:Նայենք թիթեռին";
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(bad, bad);
+
+        var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "tell me a story");
+
+        // The exact bad string must NOT reach the user.
+        Assert.NotEqual("Մոտենանք հետևին", result.ChoiceA);
+        Assert.NotNull(result.ChoiceA);
+        Assert.NotNull(result.ChoiceB);
+
+        // «հետև» / «հետևին» must not survive in either label.
+        Assert.DoesNotContain("հետև", result.ChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("հետև", result.ChoiceB!, StringComparison.Ordinal);
+
+        // Defense in depth — none of the prior bad-anchor classes either.
+        foreach (var bad2 in new[]
+        {
+            "հպենք", "շատրվանաքար", "մոտեցավ", "տեսավ", "զարմացավ",
+            "կարող", "լին",
+        })
+        {
+            Assert.DoesNotContain(bad2, result.ChoiceA!, StringComparison.Ordinal);
+            Assert.DoesNotContain(bad2, result.ChoiceB!, StringComparison.Ordinal);
+        }
+
+        // The two delivered labels must differ.
+        Assert.NotEqual(result.ChoiceA, result.ChoiceB);
+    }
+
+    [Fact]
     public async Task GroundedInitialPair_DoesNotTriggerExtraRetry()
     {
         // Sanity / no-regression: a grounded pair on the first call must

@@ -407,4 +407,106 @@ public class StoryChoiceCoherenceGateTests
             "Նայենք լինին");
         Assert.False(result.IsCoherent);
     }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Live QA regression — 2026-04-28 rabbit-with-stone / «հետ» false-ground
+    // ─────────────────────────────────────────────────────────────────
+
+    private const string LiveRabbitStoneBody =
+          "Փոքրիկ նապաստակը ցատկեց քարի վրայից։ "
+        + "Փափուկ խոտի վրա քամիի մեղմ ծեսը լսվում էր։ "
+        + "Նապաստակը իր բույսերի ընկերների հետ խաղում էր, երբ տեսավ, "
+        + "որ հողի վրա փայլում է մի փոքրիկ թանկարժեք քար։ "
+        + "Նա զարմացած մոտեցավ, որպեսզի ավելի լավ տեսնի։ "
+        + "Բայց այդ ժամանակ քարից դուրս թռավ մի արտասովոր փոքրիկ թիթեռ, "
+        + "որ փայլում էր գունագեղ լույսերով։";
+
+    [Fact]
+    public void LiveQA_HetBadPair_IsRejected_AndRepairAvoidsHetw()
+    {
+        // 2026-04-28 voice-MVP follow-up regression. Body contains the
+        // postposition «հետ» ("with", from «ընկերների հետ»). The gate's
+        // prefix-match used to ground choiceA's «հետև» («-ին» dative of
+        // "back/behind") against body's «հետ» — but those are
+        // semantically unrelated lexemes. Two complementary fixes:
+        // adding «հետ» to StopWords, and tightening prefix-match to
+        // require body stem length ≥ 4. Either alone closes this case;
+        // both make the gate robust to similar function-word collisions.
+        var result = _gate.Evaluate(
+            LiveRabbitStoneBody,
+            "Մոտենանք հետևին",
+            "Նայենք թիթեռին");
+
+        Assert.False(result.IsCoherent);
+        Assert.True(result.ShouldRetry);
+        Assert.NotNull(result.RepairedChoiceA);
+        Assert.NotNull(result.RepairedChoiceB);
+
+        // Repair must NOT carry the rejected «հետև» / «հետևին».
+        Assert.DoesNotContain("հետև", result.RepairedChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("հետև", result.RepairedChoiceB!, StringComparison.Ordinal);
+
+        // Repair must NOT regress to any of the prior bad-anchor classes.
+        foreach (var bad in new[]
+        {
+            "հպենք", "շատրվանաքար", "մոտեցավ", "տեսավ", "զարմացավ",
+            "կարող", "լին",
+        })
+        {
+            Assert.DoesNotContain(bad, result.RepairedChoiceA!, StringComparison.Ordinal);
+            Assert.DoesNotContain(bad, result.RepairedChoiceB!, StringComparison.Ordinal);
+        }
+
+        // The two repaired labels must differ.
+        Assert.NotEqual(result.RepairedChoiceA, result.RepairedChoiceB);
+
+        // At least one repaired label should reference a concrete body
+        // noun («նապաստակ», «քար», «թիթեռ», «խոտ»).
+        var refsBody =
+               result.RepairedChoiceA!.Contains("նապաստակ", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("քար", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("թիթեռ", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("խոտ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("նապաստակ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("քար", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("թիթեռ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("խոտ", StringComparison.Ordinal);
+        Assert.True(refsBody,
+            $"Repair must reference a body noun. Got A=\"{result.RepairedChoiceA}\" B=\"{result.RepairedChoiceB}\"");
+    }
+
+    [Fact]
+    public void Choice_LongerStem_DoesNotPrefixMatch_ShortBodyFunctionWord()
+    {
+        // Smaller, isolated regression for the prefix-match tightening.
+        // Body has «հետ» as a postposition; the choice token «հետև»
+        // («back/behind») coincidentally starts with «հետ» but is a
+        // different lexeme. The gate must NOT count this as overlap.
+        var body = "Նապաստակը խաղում էր ընկերների հետ։ Տեսավ մի թիթեռ։";
+        var result = _gate.Evaluate(
+            body,
+            "Մոտենանք թիթեռին",
+            "Նայենք հետևին");
+        Assert.False(result.IsCoherent);
+    }
+
+    [Fact]
+    public void Choice_ShortBodyContentNounPrefixMatch_StillWorks_ViaExactMatch()
+    {
+        // Sanity / no-regression: a short concrete content noun
+        // («քար», 3 chars) in the body still grounds a choice that
+        // contains the same stem — via exact-match (Contains), not
+        // prefix-match. The tightened prefix-match rule should not
+        // break legitimate 3-char body-noun groundings.
+        var body = "Թիթեռը մոտեցավ քարին և զարմացավ։";
+        var result = _gate.Evaluate(
+            body,
+            "Մոտենանք քարին",
+            "Նայենք քարի վրա");
+        // ChoiceDiversity may fire here (both about the stone) — the
+        // test only pins that grounding works, not that the pair
+        // passes overall. Specifically: the gate should NOT report
+        // "both_choices_ungrounded".
+        Assert.NotEqual("both_choices_ungrounded", result.Reason);
+    }
 }

@@ -140,6 +140,7 @@ public sealed class StoryChoiceCoherenceGate : IStoryChoiceCoherenceGate
         "այստեղ",
         "այնտեղ",
         "այդտեղ",
+        "հետ",
     };
 
     // Armenian auxiliary / verb stems that surface in children's stories
@@ -349,9 +350,15 @@ public sealed class StoryChoiceCoherenceGate : IStoryChoiceCoherenceGate
             }
             // Stem-prefix match: a longer body stem that starts with this
             // choice stem, or vice versa. Catches mild morphology gaps the
-            // suffix-strip table missed.
-            if (bodyStems.Any(b => b.StartsWith(stem, StringComparison.Ordinal)
-                                || stem.StartsWith(b, StringComparison.Ordinal)))
+            // suffix-strip table missed. Requires the BODY stem to be ≥ 4
+            // chars so 3-char function-like stems (e.g. «հետ» = "with")
+            // cannot ground unrelated longer choice stems («հետև» = "back/
+            // behind") via a coincidental prefix overlap. Exact-match
+            // grounding still works at any length via the Contains check
+            // above.
+            if (bodyStems.Any(b => b.Length >= 4
+                                && (b.StartsWith(stem, StringComparison.Ordinal)
+                                 || stem.StartsWith(b, StringComparison.Ordinal))))
             {
                 overlap++;
                 continue;
