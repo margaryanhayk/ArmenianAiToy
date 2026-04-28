@@ -490,6 +490,121 @@ public class StoryChoiceCoherenceGateTests
         Assert.False(result.IsCoherent);
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // Live QA regression — 2026-04-28 squirrel-on-branch / verb+adjective
+    // stem datives & concrete-anchor preference
+    // ─────────────────────────────────────────────────────────────────
+
+    private const string LiveSquirrelOnBranchBody =
+          "Փոքրիկ սկյուռիկը վազում էր ճյուղի վրայով։ "
+        + "Վար քամու մեղմ հովը փչում էր նրա քիչ մազերը։ "
+        + "Նա ուրախ էր ու չէր շտապում ոչ մի տեղ։ "
+        + "Փոթորկոտ խոտերի մեջ նա գտավ մի փայլուն փոքրիկ քար։ "
+        + "Որոշեց իմանալ, թե ինչքան զարմանալի գաղտնիք ունի այդ քարը։";
+
+    [Fact]
+    public void LiveQA_VerbAdjectiveStemDatives_AreRejected_AndRepairPrefersConcreteNouns()
+    {
+        // 2026-04-28 fourth follow-up. The LLM borrowed «վերցն» (verb stem
+        // of «վերցնել», "to take") and «փայլու» (adjective stem of
+        // «փայլուն», "shining") from the squirrel-on-branch body and
+        // inflected them as Dative pseudo-nouns. Both classes need to be
+        // rejected at gate-classification time AND prevented from leaking
+        // into deterministic repair anchors. The body has plenty of
+        // concrete child-friendly nouns («սկյուռիկ», «ճյուղ», «քամի»,
+        // «խոտ», «քար») — repair must prefer those.
+        var result = _gate.Evaluate(
+            LiveSquirrelOnBranchBody,
+            "Մոտենանք վերցնին",
+            "Նայենք փայլուին");
+
+        Assert.False(result.IsCoherent);
+        Assert.True(result.ShouldRetry);
+        Assert.NotNull(result.RepairedChoiceA);
+        Assert.NotNull(result.RepairedChoiceB);
+
+        // Repair must NOT carry any of the rejected verb/adjective stems
+        // or their Dative pseudo-noun forms.
+        foreach (var bad in new[]
+        {
+            "վերցն", "որոշ", "իման", "շտապ", "փայլու",
+            "վերցնին", "որոշին", "իմանին", "շտապին", "փայլուին",
+        })
+        {
+            Assert.DoesNotContain(bad, result.RepairedChoiceA!, StringComparison.Ordinal);
+            Assert.DoesNotContain(bad, result.RepairedChoiceB!, StringComparison.Ordinal);
+        }
+
+        // Repair must reference at least one concrete body noun.
+        var concreteHit =
+               result.RepairedChoiceA!.Contains("սկյուռ", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("ճյուղ", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("քամ", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("խոտ", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("քար", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("սկյուռ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("ճյուղ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("քամ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("խոտ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("քար", StringComparison.Ordinal);
+        Assert.True(concreteHit,
+            $"Repair must reference a concrete body noun. Got A=\"{result.RepairedChoiceA}\" B=\"{result.RepairedChoiceB}\"");
+
+        Assert.NotEqual(result.RepairedChoiceA, result.RepairedChoiceB);
+    }
+
+    [Fact]
+    public void Repair_PrefersConcreteAnchors_OverVerbStemNeighbors()
+    {
+        // Last sentence is verb-heavy («որոշեց», «իմանալ») while an
+        // earlier sentence has a concrete noun («խոտ»). The two-pass
+        // anchor extraction must find the concrete noun in the earlier
+        // sentence rather than collapsing onto the verb stems just
+        // because they are nearer to the end.
+        var result = _gate.Evaluate(
+            LiveSquirrelOnBranchBody,
+            "Մտնենք քարանձավը",
+            "Կանչենք վիշապին");
+        Assert.False(result.IsCoherent);
+        Assert.NotNull(result.RepairedChoiceA);
+        Assert.NotNull(result.RepairedChoiceB);
+        // No verb-derived pseudo-noun anchors.
+        Assert.DoesNotContain("որոշ", result.RepairedChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("որոշ", result.RepairedChoiceB!, StringComparison.Ordinal);
+        Assert.DoesNotContain("իման", result.RepairedChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("իման", result.RepairedChoiceB!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Choice_VerbStemDative_IsRejectedAtClassification()
+    {
+        // Body has concrete subject «սկյուռիկ»; one choice is grounded
+        // by it, the other coerces a verb stem («վերցն» from «վերցնել»)
+        // into a Dative pseudo-noun. The blocked-stem rule keeps «վերցն»
+        // out of bodyStems, so the gate cannot ground it.
+        var body = "Փոքրիկ սկյուռիկը վազում էր ճյուղի վրայով։ Որոշեց վերցնել մի քար։";
+        var result = _gate.Evaluate(
+            body,
+            "Մոտենանք սկյուռիկին",
+            "Նայենք վերցնին");
+        Assert.False(result.IsCoherent);
+    }
+
+    [Fact]
+    public void Choice_AdjectiveStemDative_IsRejectedAtClassification()
+    {
+        // Body has «փայլուն» as an adjective («shining stone»). Choice
+        // coerces the post-«-ն»-strip stem «փայլու» into a Dative
+        // pseudo-noun. Adjective-stem datives are not real Armenian
+        // nouns; the blocked-stem rule rejects them.
+        var body = "Թիթեռը տեսավ մի փայլուն քար։ Քարը գեղեցիկ էր։";
+        var result = _gate.Evaluate(
+            body,
+            "Մոտենանք քարին",
+            "Նայենք փայլուին");
+        Assert.False(result.IsCoherent);
+    }
+
     [Fact]
     public void Choice_ShortBodyContentNounPrefixMatch_StillWorks_ViaExactMatch()
     {

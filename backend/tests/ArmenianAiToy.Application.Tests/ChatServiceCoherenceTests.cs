@@ -345,6 +345,69 @@ public class ChatServiceCoherenceTests
     }
 
     [Fact]
+    public async Task LiveQA_VerbAdjectiveStemBadPair_DoesNotReachUser_EvenWhenRetryRepeats()
+    {
+        // 2026-04-28 fourth follow-up regression. The LLM produced
+        // «Մոտենանք վերցնին» (verb stem of «վերցնել», to take) and
+        // «Նայենք փայլուին» (adjective stem of «փայլուն», shining)
+        // — both Dative pseudo-nouns coerced from non-noun parts of
+        // speech. Both initial and retry returned the same coined
+        // pair. The pipeline must replace them with body-anchored
+        // concrete-noun labels before the response reaches the child.
+        var body =
+              "Փոքրիկ սկյուռիկը վազում էր ճյուղի վրայով։ "
+            + "Վար քամու մեղմ հովը փչում էր նրա քիչ մազերը։ "
+            + "Նա ուրախ էր ու չէր շտապում ոչ մի տեղ։ "
+            + "Փոթորկոտ խոտերի մեջ նա գտավ մի փայլուն փոքրիկ քար։ "
+            + "Որոշեց իմանալ, թե ինչքան զարմանալի գաղտնիք ունի այդ քարը։";
+        var bad = body
+            + "\n---\nCHOICE_A:Մոտենանք վերցնին\nCHOICE_B:Նայենք փայլուին";
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(bad, bad);
+
+        var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "tell me a story");
+
+        // The exact bad strings must NOT reach the user.
+        Assert.NotEqual("Մոտենանք վերցնին", result.ChoiceA);
+        Assert.NotEqual("Նայենք փայլուին", result.ChoiceB);
+        Assert.NotNull(result.ChoiceA);
+        Assert.NotNull(result.ChoiceB);
+
+        // None of the verb / adjective / auxiliary stems may survive in
+        // either delivered label.
+        foreach (var bad2 in new[]
+        {
+            "վերցն", "որոշ", "իման", "շտապ", "փայլու",
+            "հպենք", "շատրվանաքար", "մոտեցավ", "տեսավ", "զարմացավ",
+            "կարող", "լին", "հետև",
+        })
+        {
+            Assert.DoesNotContain(bad2, result.ChoiceA!, StringComparison.Ordinal);
+            Assert.DoesNotContain(bad2, result.ChoiceB!, StringComparison.Ordinal);
+        }
+
+        // The two delivered labels must differ.
+        Assert.NotEqual(result.ChoiceA, result.ChoiceB);
+
+        // At least one delivered label must reference a concrete body
+        // noun («սկյուռ», «ճյուղ», «քամ», «խոտ», «քար»).
+        var refsBody =
+               result.ChoiceA!.Contains("սկյուռ", StringComparison.Ordinal)
+            || result.ChoiceA!.Contains("ճյուղ", StringComparison.Ordinal)
+            || result.ChoiceA!.Contains("քամ", StringComparison.Ordinal)
+            || result.ChoiceA!.Contains("խոտ", StringComparison.Ordinal)
+            || result.ChoiceA!.Contains("քար", StringComparison.Ordinal)
+            || result.ChoiceB!.Contains("սկյուռ", StringComparison.Ordinal)
+            || result.ChoiceB!.Contains("ճյուղ", StringComparison.Ordinal)
+            || result.ChoiceB!.Contains("քամ", StringComparison.Ordinal)
+            || result.ChoiceB!.Contains("խոտ", StringComparison.Ordinal)
+            || result.ChoiceB!.Contains("քար", StringComparison.Ordinal);
+        Assert.True(refsBody,
+            $"Delivered labels must reference a concrete body noun. Got A=\"{result.ChoiceA}\" B=\"{result.ChoiceB}\"");
+    }
+
+    [Fact]
     public async Task GroundedInitialPair_DoesNotTriggerExtraRetry()
     {
         // Sanity / no-regression: a grounded pair on the first call must

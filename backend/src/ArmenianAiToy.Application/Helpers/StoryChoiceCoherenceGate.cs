@@ -157,9 +157,57 @@ public sealed class StoryChoiceCoherenceGate : IStoryChoiceCoherenceGate
     // we have observed in live QA, not a broad verb dictionary.
     private static readonly HashSet<string> BlockedContentStems = new(StringComparer.Ordinal)
     {
-        "կարող",
-        "լին",
+        "կարող",     // auxiliary "can/be able"
+        "լին",       // stem of «լինել» (to be)
         "լինել",
+        "վերցն",     // stem of «վերցնել» (to take)
+        "որոշ",      // stem of «որոշել» (to decide)
+        "իման",      // stem of «իմանալ» (to know)
+        "շտապ",      // stem of «շտապել» (to hurry); also adjective "urgent"
+        "փայլու",    // adjective stem of «փայլուն» (shining), post «-ն» strip
+        "հետև",      // "back/behind" — too abstract for a child action target
+    };
+
+    // Concrete child-friendly noun stems that the deterministic repair
+    // anchor selector PREFERS when they appear in the body. This is a
+    // positive allow / preference list, not a broad dictionary — it keeps
+    // repair pointing at things a 4–7 yo can actually picture and act on
+    // («squirrel», «butterfly», «stone», «branch», «river»). Matches body
+    // stems by prefix so morphological extensions like «թռչունիկ» (small
+    // bird, diminutive of «թռչուն») or «սկյուռիկ» (squirrel, diminutive of
+    // «սկյուռ») are caught without separately listing each variant.
+    // First-pass extraction takes only stems that match this list. Second
+    // pass falls back to the broader filter (stop / blocked / generic / past-
+    // tense filtered), so a body with no concrete match still gets a
+    // body-anchored repair, just not a curated one.
+    private static readonly HashSet<string> ConcreteAnchorAllowList = new(StringComparer.Ordinal)
+    {
+        "սկյուռ",   // squirrel (covers «սկյուռիկ»)
+        "նապաստակ", // rabbit
+        "թիթեռ",    // butterfly
+        "թռչուն",   // bird (covers «թռչունիկ»)
+        "խխունջ",   // snail
+        "ձուկ",     // fish
+        "քար",      // stone
+        "ծառ",      // tree
+        "ճյուղ",    // branch
+        "տերև",     // leaf
+        "խոտ",      // grass
+        "ծաղիկ",    // flower
+        "քամի",     // wind
+        "պարտեզ",   // garden
+        "դուռ",     // door
+        "տուն",     // house
+        "գետ",      // river
+        "կամուրջ",  // bridge
+        "ձայն",     // sound/voice
+        "լույս",    // light
+        "տուփ",     // box
+        "զանգակ",   // bell
+        "երկինք",   // sky
+        "արև",      // sun
+        "լուսին",   // moon
+        "ընկեր",    // friend
     };
 
     // Suffixes stripped (longest first, single pass). Folds inflectional
@@ -489,10 +537,33 @@ public sealed class StoryChoiceCoherenceGate : IStoryChoiceCoherenceGate
         var anchors = new List<string>();
         if (string.IsNullOrWhiteSpace(body)) return anchors;
 
-        // Slice into sentences and walk back-to-front so the most recent
-        // beat anchors choice A. Take from the last 4 sentences max.
         var sentences = body.Split(SentenceDelims, StringSplitOptions.RemoveEmptyEntries);
         var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        // Pass 1: PREFER concrete child-friendly noun stems. Walks the
+        // last 4 sentences back-to-front and only accepts stems that
+        // prefix-match ConcreteAnchorAllowList. This avoids emitting
+        // verb / adjective / abstract stems as repair anchors when the
+        // body already names a concrete object the child can act on
+        // («squirrel», «branch», «stone»).
+        if (TryCollectAnchors(sentences, seen, anchors, requireConcrete: true))
+            return anchors;
+
+        // Pass 2: fall back to the broader filter when the body has no
+        // concrete match. Blocked-stem, generic-action, and past-tense
+        // verb filters still apply, so the most common gibberish anchors
+        // (verb past-tense forms, auxiliary stems, fabricated compounds)
+        // remain excluded here as well.
+        TryCollectAnchors(sentences, seen, anchors, requireConcrete: false);
+        return anchors;
+    }
+
+    private static bool TryCollectAnchors(
+        string[] sentences,
+        HashSet<string> seen,
+        List<string> anchors,
+        bool requireConcrete)
+    {
         int considered = 0;
         for (int i = sentences.Length - 1; i >= 0 && considered < 4; i--, considered++)
         {
@@ -507,12 +578,25 @@ public sealed class StoryChoiceCoherenceGate : IStoryChoiceCoherenceGate
                 if (StopWords.Contains(stem)) continue;
                 if (GenericActionStems.Contains(stem)) continue;
                 if (BlockedContentStems.Contains(stem)) continue;
+                if (requireConcrete && !IsConcreteAnchor(stem)) continue;
                 if (!seen.Add(stem)) continue;
                 anchors.Add(stem);
-                if (anchors.Count >= 2) return anchors;
+                if (anchors.Count >= 2) return true;
             }
         }
-        return anchors;
+        return false;
+    }
+
+    // Body stem prefix-matches a known concrete anchor entry. Prefix
+    // (not exact) so morphological extensions like «թռչունիկ» / «սկյուռիկ»
+    // (diminutives) match their canonical lemma.
+    private static bool IsConcreteAnchor(string stem)
+    {
+        foreach (var allowed in ConcreteAnchorAllowList)
+        {
+            if (stem.StartsWith(allowed, StringComparison.Ordinal)) return true;
+        }
+        return false;
     }
 
     // Conservative verb-form detector: the most common Armenian past-tense
