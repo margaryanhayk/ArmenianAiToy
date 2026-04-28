@@ -248,6 +248,53 @@ public class ChatServiceCoherenceTests
     }
 
     [Fact]
+    public async Task LiveQA_AuxiliaryStemBadPair_DoesNotReachUser_EvenWhenRetryRepeats()
+    {
+        // 2026-04-28 voice-MVP follow-up regression. The LLM picked the
+        // body's auxiliary «կարող» and verb-«to be» «լին» stems and
+        // inflected them as Dative pseudo-nouns (Մոտենանք կարողին /
+        // Նայենք լինին). Both initial and retry returned the same bad
+        // pair. The pipeline must NOT deliver them to the child —
+        // deterministic final-coh repair has to replace the labels with
+        // body-anchored alternatives.
+        var body =
+              "Փոքրիկ սկյուռիկը վազեց ծառերի միջով։ "
+            + "Ամեն կողմից լսվում էր քամու մեղմ շնչառությունը։ "
+            + "Հանկարծ նա տեսավ մի փայլուն իր ճյուղերի մեջ։ "
+            + "Սրտում ուրախություն զգալով, նա մոտեցավ։ "
+            + "Ի՞նչ կարող է լինել այդտեղ։";
+        var bad = body
+            + "\n---\nCHOICE_A:Մոտենանք կարողին\nCHOICE_B:Նայենք լինին";
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(bad, bad);
+
+        var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "tell me a story");
+
+        // The exact bad strings must NOT reach the user.
+        Assert.NotEqual("Մոտենանք կարողին", result.ChoiceA);
+        Assert.NotEqual("Նայենք լինին", result.ChoiceB);
+        Assert.NotNull(result.ChoiceA);
+        Assert.NotNull(result.ChoiceB);
+
+        // Auxiliary / verb stems must not survive in either label.
+        Assert.DoesNotContain("կարող", result.ChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("կարող", result.ChoiceB!, StringComparison.Ordinal);
+        Assert.DoesNotContain("լին", result.ChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("լին", result.ChoiceB!, StringComparison.Ordinal);
+
+        // Past-tense verb forms must also not appear (defense in depth
+        // for the prior 6dae9a0 invariant).
+        Assert.DoesNotContain("մոտեցավ", result.ChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("մոտեցավ", result.ChoiceB!, StringComparison.Ordinal);
+        Assert.DoesNotContain("տեսավ", result.ChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("տեսավ", result.ChoiceB!, StringComparison.Ordinal);
+
+        // The two delivered labels must differ.
+        Assert.NotEqual(result.ChoiceA, result.ChoiceB);
+    }
+
+    [Fact]
     public async Task GroundedInitialPair_DoesNotTriggerExtraRetry()
     {
         // Sanity / no-regression: a grounded pair on the first call must

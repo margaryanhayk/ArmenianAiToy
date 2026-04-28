@@ -139,6 +139,26 @@ public sealed class StoryChoiceCoherenceGate : IStoryChoiceCoherenceGate
         "ինչպես",
         "այստեղ",
         "այնտեղ",
+        "այդտեղ",
+    };
+
+    // Armenian auxiliary / verb stems that surface in children's stories
+    // only as light grammatical scaffolding — never as concrete things a
+    // child can act on. Without this list the LLM can borrow «կարող» (an
+    // auxiliary "can") or «լին» (the stem of «լինել», "to be") from a
+    // body sentence like «Ի՞նչ կարող է լինել այդտեղ» and inflect it as
+    // a Dative-«-ին» pseudo-noun («կարողին» / «լինին»). Stem-overlap
+    // grounding would otherwise accept those, but they are not real
+    // Armenian nouns. Stop-listed at the stem level — applied during
+    // both bodyStems extraction (so they cannot ground a choice) and
+    // anchor selection (so they cannot become a deterministic-repair
+    // anchor). Conservative on purpose: only the recurring offenders
+    // we have observed in live QA, not a broad verb dictionary.
+    private static readonly HashSet<string> BlockedContentStems = new(StringComparer.Ordinal)
+    {
+        "կարող",
+        "լին",
+        "լինել",
     };
 
     // Suffixes stripped (longest first, single pass). Folds inflectional
@@ -368,9 +388,12 @@ public sealed class StoryChoiceCoherenceGate : IStoryChoiceCoherenceGate
             var raw = m.Value.Trim().TrimEnd(TrailingPunct);
             if (raw.Length < MinTokenLen) continue;
             if (StopWords.Contains(raw)) continue;
+            if (GenericActionRawForms.Contains(raw)) continue;
             var stem = StripSuffix(raw);
             if (stem.Length < MinTokenLen) continue;
             if (StopWords.Contains(stem)) continue;
+            if (BlockedContentStems.Contains(stem)) continue;
+            if (GenericActionStems.Contains(stem)) continue;
             set.Add(stem);
         }
         return set;
@@ -476,6 +499,7 @@ public sealed class StoryChoiceCoherenceGate : IStoryChoiceCoherenceGate
                 if (stem.Length < MinTokenLen) continue;
                 if (StopWords.Contains(stem)) continue;
                 if (GenericActionStems.Contains(stem)) continue;
+                if (BlockedContentStems.Contains(stem)) continue;
                 if (!seen.Add(stem)) continue;
                 anchors.Add(stem);
                 if (anchors.Count >= 2) return anchors;

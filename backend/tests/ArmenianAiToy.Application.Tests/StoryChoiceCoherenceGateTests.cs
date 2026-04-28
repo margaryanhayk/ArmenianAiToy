@@ -304,4 +304,107 @@ public class StoryChoiceCoherenceGateTests
         Assert.DoesNotContain("զարմացավ", result.RepairedChoiceA!, StringComparison.Ordinal);
         Assert.DoesNotContain("զարմացավ", result.RepairedChoiceB!, StringComparison.Ordinal);
     }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Live QA regression — 2026-04-28 squirrel story / auxiliary stems
+    // ─────────────────────────────────────────────────────────────────
+
+    // Body returned by the live `/api/chat` text-input QA after the
+    // 6dae9a0 push. Reused across the auxiliary-stem regression tests
+    // below so the exact prose is pinned in one place.
+    private const string LiveSquirrelBody =
+          "Փոքրիկ սկյուռիկը վազեց ծառերի միջով։ "
+        + "Ամեն կողմից լսվում էր քամու մեղմ շնչառությունը։ "
+        + "Հանկարծ նա տեսավ մի փայլուն իր ճյուղերի մեջ։ "
+        + "Սրտում ուրախություն զգալով, նա մոտեցավ։ "
+        + "Ի՞նչ կարող է լինել այդտեղ։";
+
+    [Fact]
+    public void LiveQA_AuxiliaryStemDatives_AreRejected_AndRepairAvoidsBlockedStems()
+    {
+        // 2026-04-28 voice-MVP follow-up regression. The LLM borrowed an
+        // auxiliary stem («կարող» from "Ի՞նչ կարող է լինել") and the
+        // verb-«to be» stem («լին» from «լինել») and inflected them as
+        // Dative pseudo-nouns («կարողին» / «լինին»). Stem-overlap
+        // grounding accepted them because the body literally contains
+        // those stems — but neither result is a real Armenian noun.
+        // The blocked-content-stem stop-list keeps both out of bodyStems
+        // and out of repair anchors.
+        var result = _gate.Evaluate(
+            LiveSquirrelBody,
+            "Մոտենանք կարողին",
+            "Նայենք լինին");
+
+        Assert.False(result.IsCoherent);
+        Assert.True(result.ShouldRetry);
+        Assert.NotNull(result.RepairedChoiceA);
+        Assert.NotNull(result.RepairedChoiceB);
+
+        // Repair must NOT carry the rejected pseudo-noun forms.
+        Assert.DoesNotContain("կարողին", result.RepairedChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("կարողին", result.RepairedChoiceB!, StringComparison.Ordinal);
+        Assert.DoesNotContain("լինին", result.RepairedChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("լինին", result.RepairedChoiceB!, StringComparison.Ordinal);
+
+        // Repair must NOT pick the blocked stems themselves as anchors.
+        Assert.DoesNotContain("կարող", result.RepairedChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("կարող", result.RepairedChoiceB!, StringComparison.Ordinal);
+        Assert.DoesNotContain("լին", result.RepairedChoiceA!, StringComparison.Ordinal);
+        Assert.DoesNotContain("լին", result.RepairedChoiceB!, StringComparison.Ordinal);
+
+        // Sanity: deterministic repair must not collapse to the
+        // last-resort generic pair when the body has usable content
+        // anchors («սրտ» / «ուրախ» / «սկյուռիկ» / «ճյուղ» / etc.).
+        Assert.NotEqual("Շարունակենք պատմությունը", result.RepairedChoiceA);
+
+        // The two repaired labels must differ.
+        Assert.NotEqual(result.RepairedChoiceA, result.RepairedChoiceB);
+
+        // At least one repaired label should reference a real body word
+        // («սկյուռիկ» / «ծառ» / «քամ» / «ճյուղ» / «սրտ» / «ուրախ»).
+        var refsBody =
+               result.RepairedChoiceA!.Contains("սկյուռիկ", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("ծառ", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("քամ", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("ճյուղ", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("սրտ", StringComparison.Ordinal)
+            || result.RepairedChoiceA!.Contains("ուրախ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("սկյուռիկ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("ծառ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("քամ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("ճյուղ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("սրտ", StringComparison.Ordinal)
+            || result.RepairedChoiceB!.Contains("ուրախ", StringComparison.Ordinal);
+        Assert.True(refsBody,
+            $"Repair must reference a body noun. Got A=\"{result.RepairedChoiceA}\" B=\"{result.RepairedChoiceB}\"");
+    }
+
+    [Fact]
+    public void Choice_AuxiliaryStem_IsNotGroundedByBodyOccurrence()
+    {
+        // Body literally contains «կարող» but only as the auxiliary
+        // "can". The choice token reuses that stem as a Dative-coerced
+        // noun. The blocked-stem rule must remove «կարող» from
+        // bodyStems so the grounding heuristic cannot accept this pair.
+        var body = "Թիթեռը նայեց ծաղիկին։ Ի՞նչ կարող է լինել այդտեղ։";
+        var result = _gate.Evaluate(
+            body,
+            "Մոտենանք ծաղիկին",
+            "Նայենք կարողին");
+        Assert.False(result.IsCoherent);
+    }
+
+    [Fact]
+    public void Choice_VerbToBeStem_IsNotGroundedByBodyOccurrence()
+    {
+        // Body uses «լինել» (to be) as a copula. Choice reuses its
+        // «լին» stem as a Dative-coerced noun. The blocked-stem rule
+        // must keep «լին» out of bodyStems so this never grounds.
+        var body = "Թիթեռը նայեց ծաղիկին։ Կարող է այնտեղ ինչ-որ բան լինել։";
+        var result = _gate.Evaluate(
+            body,
+            "Մոտենանք ծաղիկին",
+            "Նայենք լինին");
+        Assert.False(result.IsCoherent);
+    }
 }
