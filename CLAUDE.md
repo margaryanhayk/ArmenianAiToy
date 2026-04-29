@@ -1627,6 +1627,76 @@ driven C2.2a behavior is unchanged.
    `ParentDormancyAnonymized` row carries
    `audio_conversations_attempted = 0`.
 
+## Voice chat (C2.3 — orphan audio sweeper, deferred)
+
+C2.1 + C2.2a + C2.2b together cover every code path that destroys
+a `Conversation` row: parent-driven deletes (conversation, child,
+unlink-orphan, account-orphan) and lifecycle deletes (retention
+expiry, dormant-parent anonymize, dormant-device delete). Each
+calls `IAudioBlobStore.DeleteConversationAudioAsync` after its DB
+commit, with counts surfaced in audit metadata. The C2 voice-data
+hygiene story is functionally closed for everything that goes
+through the application.
+
+A standalone filesystem orphan sweeper (C2.3) is **intentionally
+deferred**. It is not needed in the current dev/QA phase and adds
+non-trivial design surface (path-traversal hardening, grace-window
+selection, race with concurrent writes from `AudioChatController`,
+batch caps, audit framing) that benefits from being landed against
+real production constraints rather than speculative ones.
+
+**Residual orphan scenarios that C2.3 would address:**
+- **Legacy / pre-C2 blobs.** Dev and QA hosts that ran C1 voice
+  flows before C2.2a/b shipped have `audio-blobs/` directories
+  whose backing conversations may have been deleted by code paths
+  that didn't yet clean blobs. Mitigation today is operator
+  discipline: `rm -rf audio-blobs/` between bench sessions.
+- **`Failed=true` cleanup residue.** Per-file IO failures during
+  cascade cleanup (locked file, antivirus, permissions) leave
+  individual files behind. The audit row's `audio_delete_failures`
+  count makes this observable; the file itself becomes unreachable
+  through normal code paths after the conversation row is gone.
+- **Manual DB edits / direct SQL.** A `DELETE FROM Conversations`
+  outside the application strands the corresponding blob
+  directory. Production must never permit this; dev/QA might.
+- **Future writers we haven't built.** Today exactly one writer
+  exists (`AudioChatController`). Any future code path that
+  writes a blob without committing the matching `Conversation`
+  row would create permanent orphans. Not a concern today; would
+  be the moment to land C2.3.
+- **Crash between `WriteAsync` and the metadata
+  `SaveChangesAsync` in `AudioChatController.PersistAudioPathsAsync`.**
+  Not a true orphan: the `Conversation` row is already committed
+  by the prior `ChatService` call, so the conversation's directory
+  still gets cleaned by the next destructive event. Worth naming
+  here only because it looks like an orphan source on a casual
+  read of the code.
+
+**Trigger conditions** (any one flips C2.3 from deferred to
+"implement now"):
+- Production or closed-beta deployment of the toy with real
+  child voice landing on real hosts.
+- A privacy / compliance requirement that promises a hard
+  deletion timeline for child audio.
+- Sustained nonzero `audio_delete_failures` in the audit feed for
+  more than a week — steady residue is accumulating.
+- A second blob writer lands beyond `AudioChatController` (e.g.
+  background TTS pre-render, server-side mixing, alternate codec
+  pipeline).
+- `audio-blobs/` exceeds ~5 GB on any deployed host —
+  operational threshold where ad-hoc cleanup stops being
+  practical.
+
+**Forward-looking design** (for the slice when it lands; not
+implemented today): a fourth pass on `RetentionPurgeService`,
+disabled by default, that scans only top-level directories under
+`Audio:BlobStoreRoot` whose names match `^[0-9a-fA-F]{32}$`,
+projects them against `Conversations.Id`, and removes those with
+no DB match older than a configurable grace window (default
+24 h). Per-tick directory cap, path-traversal hardening, system-
+actor audit row on tick-with-deletions only, counts-only
+metadata. No content inspection, no parent-/user-facing endpoint.
+
 ## Engineering Guardrails
 
 - **No architecture redesign.** Work within existing structure.
