@@ -248,7 +248,14 @@ public class AuditEvent
         int conversationsDeleted,
         int messagesDeleted,
         DateTime cutoffUtc,
-        int batchSizeLimit) => new()
+        int batchSizeLimit,
+        // C2.2b — audio cleanup roll-up across the conversations
+        // this tick deleted. Defaults preserve compatibility with
+        // any future caller that omits the cleanup signal; the
+        // retention worker always populates them with real counts.
+        int audioConversationsAttempted = 0,
+        int audioFilesDeleted = 0,
+        int audioDeleteFailures = 0) => new()
     {
         Id = Guid.NewGuid(),
         Timestamp = DateTime.UtcNow,
@@ -261,7 +268,10 @@ public class AuditEvent
             conversations_deleted = conversationsDeleted,
             messages_deleted = messagesDeleted,
             cutoff_utc = cutoffUtc,
-            batch_size_limit = batchSizeLimit
+            batch_size_limit = batchSizeLimit,
+            audio_conversations_attempted = audioConversationsAttempted,
+            audio_files_deleted = audioFilesDeleted,
+            audio_delete_failures = audioDeleteFailures
         })
     };
 
@@ -419,7 +429,16 @@ public class AuditEvent
         int anonymizeAfterDays,
         int warnRefireIntervalDays,
         int linkedDevicesUnlinked,
-        int orphanDevicesCascaded) => new()
+        int orphanDevicesCascaded,
+        // C2.2b — audio cleanup roll-up across the orphan-cascaded
+        // devices. Always 0 when the parent only had shared devices
+        // (no orphan cascade fired), even if a notional cleanup was
+        // attempted with an empty id list. Defaults preserve
+        // compatibility with any future caller that omits the
+        // cleanup signal.
+        int audioConversationsAttempted = 0,
+        int audioFilesDeleted = 0,
+        int audioDeleteFailures = 0) => new()
     {
         Id = Guid.NewGuid(),
         Timestamp = DateTime.UtcNow,
@@ -433,7 +452,10 @@ public class AuditEvent
             anonymize_after_days = anonymizeAfterDays,
             warn_refire_interval_days = warnRefireIntervalDays,
             linked_devices_unlinked = linkedDevicesUnlinked,
-            orphan_devices_cascaded = orphanDevicesCascaded
+            orphan_devices_cascaded = orphanDevicesCascaded,
+            audio_conversations_attempted = audioConversationsAttempted,
+            audio_files_deleted = audioFilesDeleted,
+            audio_delete_failures = audioDeleteFailures
         })
     };
 
@@ -539,7 +561,14 @@ public class AuditEvent
         int linkedParentsAtDelete,
         int childrenDeleted,
         int conversationsDeleted,
-        int messagesDeleted) => new()
+        int messagesDeleted,
+        // C2.2b — audio cleanup roll-up for the device's
+        // conversations. Defaults preserve compatibility with any
+        // future caller that omits the cleanup signal; the
+        // retention worker always populates them with real counts.
+        int audioConversationsAttempted = 0,
+        int audioFilesDeleted = 0,
+        int audioDeleteFailures = 0) => new()
     {
         Id = Guid.NewGuid(),
         Timestamp = DateTime.UtcNow,
@@ -555,7 +584,10 @@ public class AuditEvent
             linked_parents_at_delete = linkedParentsAtDelete,
             children_deleted = childrenDeleted,
             conversations_deleted = conversationsDeleted,
-            messages_deleted = messagesDeleted
+            messages_deleted = messagesDeleted,
+            audio_conversations_attempted = audioConversationsAttempted,
+            audio_files_deleted = audioFilesDeleted,
+            audio_delete_failures = audioDeleteFailures
         })
     };
 

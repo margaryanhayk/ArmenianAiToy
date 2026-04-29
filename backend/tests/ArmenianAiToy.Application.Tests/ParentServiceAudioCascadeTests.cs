@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.Services;
+using ArmenianAiToy.Application.Tests.Helpers;
 using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Domain.Enums;
 using ArmenianAiToy.Infrastructure.Data;
@@ -38,74 +39,10 @@ namespace ArmenianAiToy.Application.Tests;
 public class ParentServiceAudioCascadeTests
 {
     // --- Helpers -----------------------------------------------------
-
-    /// <summary>
-    /// Records-keyed in-memory blob store. Mirrors the on-disk layout
-    /// (<c>{convId:N}/{msgId:N}.{ext}</c>) so prefix-based delete
-    /// matches the <see cref="LocalDiskAudioBlobStore"/> semantic.
-    /// Tracks every <see cref="DeleteConversationAudioAsync"/> call so
-    /// tests can pin "how many conversations were attempted."
-    /// </summary>
-    private sealed class RecordingBlobStore : IAudioBlobStore
-    {
-        public readonly Dictionary<string, byte[]> Files = new();
-        public readonly List<Guid> DeleteCalls = new();
-
-        public Task<string> WriteAsync(Guid conversationId, Guid messageId,
-            byte[] content, string mimeType, CancellationToken cancellationToken = default)
-        {
-            var ext = mimeType.StartsWith("audio/wav") ? ".wav"
-                     : mimeType.StartsWith("audio/mpeg") ? ".mp3"
-                     : ".bin";
-            var path = $"{conversationId:N}/{messageId:N}{ext}";
-            Files[path] = content;
-            return Task.FromResult(path);
-        }
-
-        public Task<(Stream Content, string MimeType)?> ReadAsync(
-            Guid conversationId, Guid messageId, CancellationToken cancellationToken = default)
-            => Task.FromResult<(Stream, string)?>(null);
-
-        public Task<AudioBlobDeleteResult> DeleteConversationAudioAsync(
-            Guid conversationId, CancellationToken cancellationToken = default)
-        {
-            DeleteCalls.Add(conversationId);
-            var prefix = conversationId.ToString("N") + "/";
-            var matched = Files.Keys.Where(k => k.StartsWith(prefix)).ToList();
-            if (matched.Count == 0)
-            {
-                return Task.FromResult(new AudioBlobDeleteResult(
-                    FilesDeleted: 0, DirectoryMissing: true, Failed: false, ErrorMessage: null));
-            }
-            foreach (var k in matched) Files.Remove(k);
-            return Task.FromResult(new AudioBlobDeleteResult(
-                FilesDeleted: matched.Count, DirectoryMissing: false, Failed: false, ErrorMessage: null));
-        }
-    }
-
-    /// <summary>
-    /// Always-failing blob store used to pin the "IO failure does not
-    /// fail the parent action" contract. Returns Failed=true on every
-    /// call.
-    /// </summary>
-    private sealed class FailingBlobStore : IAudioBlobStore
-    {
-        public int Calls;
-        public Task<string> WriteAsync(Guid conversationId, Guid messageId,
-            byte[] content, string mimeType, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-        public Task<(Stream Content, string MimeType)?> ReadAsync(
-            Guid conversationId, Guid messageId, CancellationToken cancellationToken = default)
-            => Task.FromResult<(Stream, string)?>(null);
-        public Task<AudioBlobDeleteResult> DeleteConversationAudioAsync(
-            Guid conversationId, CancellationToken cancellationToken = default)
-        {
-            Calls++;
-            return Task.FromResult(new AudioBlobDeleteResult(
-                FilesDeleted: 0, DirectoryMissing: false, Failed: true,
-                ErrorMessage: "synthetic IO failure"));
-        }
-    }
+    // RecordingBlobStore + FailingBlobStore live in
+    // Helpers/RecordingBlobStore.cs; lifted there during the C2.2b
+    // slice so RetentionPurgeServiceTests can register the same shape
+    // on its harness's ServiceCollection without duplicating the type.
 
     private static async Task<(ParentService Service, AppDbContext Db, SqliteConnection Conn, RecordingBlobStore Blob)>
         CreateAsync()

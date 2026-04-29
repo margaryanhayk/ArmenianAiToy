@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.Services;
+using ArmenianAiToy.Application.Tests.Helpers;
 using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Domain.Enums;
 using ArmenianAiToy.Infrastructure.Background;
@@ -31,7 +33,13 @@ public class RetentionPurgeServiceTests
         RetentionPurgeService Service,
         AppDbContext Db,
         SqliteConnection Conn,
-        ServiceProvider RootProvider) : IAsyncDisposable
+        ServiceProvider RootProvider,
+        // C2.2b — exposes the in-memory blob double so tests can
+        // assert which conversation ids the worker called the audio
+        // cleanup for and what blob payloads survived the tick.
+        // Null when the caller passed in their own IAudioBlobStore
+        // (e.g. the always-failing variant).
+        RecordingBlobStore? Blob) : IAsyncDisposable
     {
         public async ValueTask DisposeAsync()
         {
@@ -48,7 +56,11 @@ public class RetentionPurgeServiceTests
         int? dormancyWarnAfterDays = null,
         int? dormancyWarnRefireIntervalDays = null,
         int? dormancyAnonymizeAfterDays = null,
-        ArmenianAiToy.Application.Notifications.INotifier? notifier = null)
+        ArmenianAiToy.Application.Notifications.INotifier? notifier = null,
+        // C2.2b — caller can override with FailingBlobStore (etc.)
+        // to pin the IO-failure-non-fatal contract. Default is the
+        // recording in-memory double exposed on Harness.Blob.
+        IAudioBlobStore? blobStore = null)
     {
         var conn = new SqliteConnection("Data Source=:memory:");
         await conn.OpenAsync();
@@ -63,6 +75,14 @@ public class RetentionPurgeServiceTests
         // token passes keep working without touching INotifier.
         services.AddScoped<ArmenianAiToy.Application.Notifications.INotifier>(
             _ => notifier ?? new NoOpNotifier());
+
+        // C2.2b — IAudioBlobStore registered for the per-tick scope
+        // so the destructive passes resolve a real instance. Default
+        // is a RecordingBlobStore exposed via Harness.Blob; tests
+        // that need "everything fails" inject FailingBlobStore.
+        var defaultBlob = blobStore is null ? new RecordingBlobStore() : null;
+        services.AddSingleton<IAudioBlobStore>(
+            _ => blobStore ?? defaultBlob!);
 
         var configDict = new Dictionary<string, string?>();
         if (maxAgeDays is not null)
@@ -104,7 +124,7 @@ public class RetentionPurgeServiceTests
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
         var service = new RetentionPurgeService(scopeFactory, config, logger);
 
-        return new Harness(service, db, conn, provider);
+        return new Harness(service, db, conn, provider, defaultBlob);
     }
 
     private static Guid SeedDevice(AppDbContext db)
@@ -1527,7 +1547,8 @@ public class RetentionPurgeServiceTests
         int? devicesRefireIntervalDays = null,
         int? devicesDeleteAfterDays = null,
         int? maxAgeDays = null,
-        ArmenianAiToy.Application.Notifications.INotifier? notifier = null)
+        ArmenianAiToy.Application.Notifications.INotifier? notifier = null,
+        IAudioBlobStore? blobStore = null)
     {
         var conn = new SqliteConnection("Data Source=:memory:");
         await conn.OpenAsync();
@@ -1535,6 +1556,9 @@ public class RetentionPurgeServiceTests
         services.AddDbContext<AppDbContext>(options => options.UseSqlite(conn));
         services.AddScoped<ArmenianAiToy.Application.Notifications.INotifier>(
             _ => notifier ?? new NoOpNotifier());
+        // C2.2b — same audio-store registration shape as CreateHarnessAsync.
+        var defaultBlob = blobStore is null ? new RecordingBlobStore() : null;
+        services.AddSingleton<IAudioBlobStore>(_ => blobStore ?? defaultBlob!);
         var configDict = new Dictionary<string, string?>();
         if (devicesWarnAfterDays is not null)
             configDict["Dormancy:Devices:WarnAfterDays"] = devicesWarnAfterDays.Value.ToString();
@@ -1566,7 +1590,7 @@ public class RetentionPurgeServiceTests
         var logger = Substitute.For<ILogger<RetentionPurgeService>>();
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
         var service = new RetentionPurgeService(scopeFactory, config, logger);
-        return new Harness(service, db, conn, provider);
+        return new Harness(service, db, conn, provider, defaultBlob);
     }
 
     private static Guid SeedDeviceWithLastSeen(

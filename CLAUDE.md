@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1242 tests)
+dotnet test                                     # Run all tests (1250 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -1514,6 +1514,118 @@ they land in a follow-up C2.2b slice.
 5. Negative case: unlink a device that is still linked to
    another parent → audio survives; audit row still written
    with `audio_*` counts all zero.
+
+## Voice chat (C2.2b — retention/dormancy blob delete cascade)
+
+Extends the C2.2a parent-driven cleanup to the
+`RetentionPurgeService` lifecycle paths so audio blobs no longer
+outlive their database records when destruction comes from the
+background worker rather than the parent dashboard. Parent-
+driven C2.2a behavior is unchanged.
+
+- **Hooked passes** (all three system-actor destructive sites):
+  - `PurgeExpiredConversationsAsync` — every conversation past the
+    retention cutoff. Conversation ids are already collected in
+    the existing eligibility projection; cleanup reuses that list
+    verbatim.
+  - `AnonymizeDormantParentsAsync` — every conversation under any
+    *orphaned* device the dormant parent unlinked. Per-orphaned-
+    device conversation-id projection runs inside the existing
+    orphan loop, BEFORE the device's `Remove`, so the FK cascade
+    does not erase the information needed for cleanup. **Shared
+    devices skip the projection by construction**, contribute zero
+    ids, and their audio is preserved.
+  - `DeleteDormantDevicesAsync` — every conversation on the device.
+    Per-device conversation-id projection runs just before the
+    `Device.Remove`. Eligibility-set already gates "this device is
+    about to be deleted"; no risk of touching another device's
+    blobs.
+
+- **DB-first, two-SaveChanges shape**, identical to C2.2a:
+  1. Snapshot conversation ids.
+  2. Mutate the DbSet, run `SaveChangesAsync` (FK cascade handles
+     Messages / Children / ParentDevices). Audit row is held back.
+  3. Run `IAudioBlobStore.DeleteConversationAudioAsync` per id and
+     aggregate counts via a private `RunAudioCleanupAsync` helper
+     on the worker.
+  4. Add the existing system-actor audit row with the post-cleanup
+     counts in metadata, then `SaveChangesAsync` again.
+
+- **Audit metadata extension**, same three keys C2.2a uses, added
+  as additive optional parameters with defaults of zero on the
+  three system-actor factories: `ConversationsPurgedByRetention`,
+  `ParentDormancyAnonymized`, `DeviceDormancyDeleted`. **Always
+  populated**, even on no-cleanup branches (shared device, empty
+  device) — zero is the honest signal for "no audio to clean
+  here," and never omitting the keys means downstream readers can
+  sum across audit events without special-casing event types.
+  No new `AuditEventType` values; no PII; mirrors the existing
+  counts-only discipline (`conversations_deleted`, etc.).
+
+- **`IAudioBlobStore` resolution**. Resolved from the per-tick
+  scope via `scope.ServiceProvider.GetRequiredService<IAudioBlobStore>()`,
+  same convention as `AppDbContext` and `INotifier`. The
+  `RetentionPurgeService` constructor signature is unchanged —
+  test harnesses register `IAudioBlobStore` on the same
+  `ServiceCollection` and pick it up transparently.
+
+- **Helper duplication, not extraction**. C2.2a's
+  `RunAudioCleanupAsync` lives privately on `ParentService`;
+  C2.2b adds an equivalent private helper on
+  `RetentionPurgeService`. Same shape (`(int Attempted, int
+  FilesDeleted, int Failures)`), same swallow-and-count contract,
+  ~25 lines duplicated. A shared utility would be a third caller
+  away from being justified — C2.3 (orphan sweeper) is the
+  natural moment to lift one if it ever appears.
+
+- **Test infrastructure**. `RecordingBlobStore` and
+  `FailingBlobStore` were lifted from
+  `ParentServiceAudioCascadeTests` into
+  `tests/Helpers/RecordingBlobStore.cs` so both C2.2a and C2.2b
+  share the same in-memory test double. Existing
+  `RetentionPurgeServiceTests` harnesses register a default
+  `RecordingBlobStore` on the `ServiceCollection`; new C2.2b
+  tests live in `RetentionPurgeServiceAudioCascadeTests.cs` with
+  a focused harness.
+
+**Invariants pinned by tests** (do not regress):
+- `RetentionPurgeServiceAudioCascadeTests` — happy path for each
+  of the three hooked sites; non-eligible conversation audio
+  preserved; failing blob store does not break the tick; shared-
+  device audio preserved on dormant-parent anonymize; device with
+  zero conversations reports zeros; audit metadata carries the
+  three new keys with the correct counts.
+- All existing `RetentionPurgeServiceTests` — re-run; should be
+  green (the new IAudioBlobStore registration is additive on the
+  harness, no existing test logic changed).
+- All C2.2a `ParentServiceAudioCascadeTests` — re-run; should be
+  green (helper lift is a structural change only).
+
+**Out of scope for C2.2b** (deliberate):
+- Orphan sweeper that scans `audio-blobs/` for directories without
+  a backing `Conversation` row → still C2.3.
+- Promotion of the audio cleanup loop to a shared utility class →
+  wait for a third caller.
+- Constructor-signature change on `RetentionPurgeService` → none
+  needed; per-tick scope resolution covers it.
+- Token-cleanup or warn-only passes → non-destructive, no audio.
+
+**Manual QA (C2.2b)**:
+1. With `Retention:Messages:RunIntervalMinutes` overridden to a
+   short value via env var (do not commit), wait one tick after
+   seeding an expired conversation with audio. Inspect
+   `audio-blobs/{conv:N}/` → directory removed; the matching
+   `ConversationsPurgedByRetention` row's `Metadata` carries
+   `audio_conversations_attempted`, `audio_files_deleted`,
+   `audio_delete_failures`.
+2. Repeat for `DeleteDormantDevicesAsync` by stamping
+   `Device.LastSeenAt` and `Device.DormancyWarnedAt` far enough
+   in the past, then waiting a tick. The audit row of type
+   `DeviceDormancyDeleted` should carry the same three keys.
+3. Negative path: a multi-parent shared device under an
+   anonymizing dormant parent → device + audio survive; the
+   `ParentDormancyAnonymized` row carries
+   `audio_conversations_attempted = 0`.
 
 ## Engineering Guardrails
 

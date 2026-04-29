@@ -1,3 +1,4 @@
+using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.Notifications;
 using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Domain.Entities;
@@ -256,8 +257,15 @@ public sealed class RetentionPurgeService : BackgroundService
 
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // C2.2b — resolve from the per-tick scope, same convention as
+        // db and INotifier. Keeps the constructor signature stable
+        // (the existing harness builds RetentionPurgeService with
+        // three positional args) and lets test harnesses register a
+        // double on the same ServiceCollection without touching ctor
+        // wiring.
+        var blobStore = scope.ServiceProvider.GetRequiredService<IAudioBlobStore>();
 
-        await PurgeExpiredConversationsAsync(db, maxAgeDays, stoppingToken);
+        await PurgeExpiredConversationsAsync(db, blobStore, maxAgeDays, stoppingToken);
         await PurgeStalePasswordResetTokensAsync(db, stoppingToken);
         await PurgeStaleEmailVerificationTokensAsync(db, stoppingToken);
         // Anonymize before warn is deliberate. If warn ran first it
@@ -270,7 +278,7 @@ public sealed class RetentionPurgeService : BackgroundService
         // then naturally skips them via its AnonymizedAt == null
         // filter. Non-anonymize-eligible parents get their normal
         // refire on the same tick, so no warn is lost.
-        await AnonymizeDormantParentsAsync(db, stoppingToken);
+        await AnonymizeDormantParentsAsync(db, blobStore, stoppingToken);
         await WarnDormantParentsAsync(scope.ServiceProvider, db, stoppingToken);
         // Device-warn runs before device-delete so a freshly-warned
         // device's DormancyWarnedAt stamp is at most "this tick's now"
@@ -283,11 +291,11 @@ public sealed class RetentionPurgeService : BackgroundService
         // uses Device columns only (LastSeenAt + DormancyWarnedAt +
         // DeleteAfterDays). Disabled gate (DeleteAfterDays <= 0)
         // short-circuits.
-        await DeleteDormantDevicesAsync(db, stoppingToken);
+        await DeleteDormantDevicesAsync(db, blobStore, stoppingToken);
     }
 
     private async Task PurgeExpiredConversationsAsync(
-        AppDbContext db, int maxAgeDays, CancellationToken stoppingToken)
+        AppDbContext db, IAudioBlobStore blobStore, int maxAgeDays, CancellationToken stoppingToken)
     {
         var batchSize = ReadBatchSize();
         var cutoffUtc = DateTime.UtcNow - TimeSpan.FromDays(maxAgeDays);
@@ -332,6 +340,15 @@ public sealed class RetentionPurgeService : BackgroundService
 
         db.Set<Conversation>().RemoveRange(toDelete);
 
+        // C2.2b — DB-first ordering. Commit the conversation deletes
+        // (and FK-cascaded messages) before touching the filesystem.
+        // The audit row is held back from this transaction; it lands
+        // in the second SaveChanges below with the post-cleanup
+        // counts so the durable record matches what hit disk.
+        await db.SaveChangesAsync(stoppingToken);
+
+        var audioCleanup = await RunAudioCleanupAsync(blobStore, idsToDelete, stoppingToken);
+
         // Inline the TrackAndAddAudit pattern from ParentService — this
         // slice deliberately does not promote that private helper to a
         // shared type. One audit row per tick-with-deletions; noop
@@ -346,7 +363,10 @@ public sealed class RetentionPurgeService : BackgroundService
             conversationsDeleted: toDelete.Count,
             messagesDeleted: messagesDeleted,
             cutoffUtc: cutoffUtc,
-            batchSizeLimit: batchSize);
+            batchSizeLimit: batchSize,
+            audioConversationsAttempted: audioCleanup.Attempted,
+            audioFilesDeleted: audioCleanup.FilesDeleted,
+            audioDeleteFailures: audioCleanup.Failures);
         db.Set<AuditEvent>().Add(audit);
         AppMeter.AuditEventsWritten.Add(1,
             new KeyValuePair<string, object?>("event_type", audit.EventType.ToString()));
@@ -354,8 +374,9 @@ public sealed class RetentionPurgeService : BackgroundService
         await db.SaveChangesAsync(stoppingToken);
 
         _logger.LogInformation(
-            "RetentionPurgeService tick: purged {Conversations} conversations and {Messages} messages (cutoff={CutoffUtc:O}, batch={BatchSize}).",
-            toDelete.Count, messagesDeleted, cutoffUtc, batchSize);
+            "RetentionPurgeService tick: purged {Conversations} conversations and {Messages} messages (cutoff={CutoffUtc:O}, batch={BatchSize}, audio_files_deleted={AudioFilesDeleted}, audio_delete_failures={AudioDeleteFailures}).",
+            toDelete.Count, messagesDeleted, cutoffUtc, batchSize,
+            audioCleanup.FilesDeleted, audioCleanup.Failures);
     }
 
     /// <summary>
@@ -554,7 +575,7 @@ public sealed class RetentionPurgeService : BackgroundService
     /// </para>
     /// </summary>
     private async Task AnonymizeDormantParentsAsync(
-        AppDbContext db, CancellationToken stoppingToken)
+        AppDbContext db, IAudioBlobStore blobStore, CancellationToken stoppingToken)
     {
         var anonymizeAfterDays = ReadDormancyAnonymizeAfterDays();
         if (anonymizeAfterDays <= 0)
@@ -620,7 +641,14 @@ public sealed class RetentionPurgeService : BackgroundService
             // per-parent SaveChangesAsync below fires. Any remaining
             // link to the device from a different parent keeps the
             // device alive.
+            // C2.2b — also snapshot every orphaned-device's
+            // conversation ids BEFORE the Device removal so the FK
+            // cascade does not erase the information we need for
+            // blob cleanup. Shared devices are skipped via
+            // `if (stillLinked) continue;` — they contribute zero
+            // ids and their audio is preserved by construction.
             int orphansDeleted = 0;
+            var orphanConversationIds = new List<Guid>();
             foreach (var deviceId in linkedDeviceIds)
             {
                 var stillLinked = await db.Set<ParentDevice>()
@@ -628,6 +656,12 @@ public sealed class RetentionPurgeService : BackgroundService
                               stoppingToken);
                 if (stillLinked)
                     continue;
+
+                var deviceConversationIds = await db.Set<Conversation>()
+                    .Where(c => c.DeviceId == deviceId)
+                    .Select(c => c.Id)
+                    .ToListAsync(stoppingToken);
+                orphanConversationIds.AddRange(deviceConversationIds);
 
                 var device = await db.Set<Device>()
                     .FindAsync(new object?[] { deviceId }, stoppingToken);
@@ -656,6 +690,14 @@ public sealed class RetentionPurgeService : BackgroundService
             parent.DormancyWarnedAt = null;
             parent.AnonymizedAt = nowUtc;
 
+            // C2.2b — DB-first ordering. Commit the link removals,
+            // orphan device deletes, and parent scrub BEFORE running
+            // audio cleanup; audit row lands in the second
+            // SaveChanges below with the post-cleanup counts.
+            await db.SaveChangesAsync(stoppingToken);
+
+            var audioCleanup = await RunAudioCleanupAsync(blobStore, orphanConversationIds, stoppingToken);
+
             // System-actor audit row — counts-only metadata, no email,
             // no parent id, no PII. The ActorParentId=null contract
             // keeps this row invisible to every parent-facing read
@@ -665,15 +707,18 @@ public sealed class RetentionPurgeService : BackgroundService
                 anonymizeAfterDays: anonymizeAfterDays,
                 warnRefireIntervalDays: warnRefireIntervalDays,
                 linkedDevicesUnlinked: linkedDeviceIds.Count,
-                orphanDevicesCascaded: orphansDeleted);
+                orphanDevicesCascaded: orphansDeleted,
+                audioConversationsAttempted: audioCleanup.Attempted,
+                audioFilesDeleted: audioCleanup.FilesDeleted,
+                audioDeleteFailures: audioCleanup.Failures);
             db.Set<AuditEvent>().Add(audit);
             AppMeter.AuditEventsWritten.Add(1,
                 new KeyValuePair<string, object?>("event_type", audit.EventType.ToString()));
 
-            // Per-parent atomicity: everything above (link removals,
-            // orphan device deletes, parent scrub, audit insert)
-            // flushes together. A crash between parents leaves prior
-            // anonymizes complete; next tick picks up the remainder.
+            // Second per-parent SaveChanges — audit row only.
+            // Two SaveChanges per parent by design: a blob-store IO
+            // failure cannot roll back the destructive scrub, and
+            // the durable record reflects what actually hit disk.
             await db.SaveChangesAsync(stoppingToken);
             anonymized++;
         }
@@ -902,7 +947,7 @@ public sealed class RetentionPurgeService : BackgroundService
     /// </para>
     /// </summary>
     private async Task DeleteDormantDevicesAsync(
-        AppDbContext db, CancellationToken stoppingToken)
+        AppDbContext db, IAudioBlobStore blobStore, CancellationToken stoppingToken)
     {
         var deleteAfterDays = ReadDormancyDevicesDeleteAfterDays();
         if (deleteAfterDays <= 0)
@@ -967,7 +1012,25 @@ public sealed class RetentionPurgeService : BackgroundService
             if (device is null)
                 continue; // raced with another deleter; skip cleanly
 
+            // C2.2b — snapshot every conversation id for this device
+            // BEFORE the FK cascade fires. Per-device projection runs
+            // inside the eligible loop so cost stays linear in the
+            // (already-batched) eligible set.
+            var deviceConversationIds = await db.Set<Conversation>()
+                .Where(c => c.DeviceId == row.Id)
+                .Select(c => c.Id)
+                .ToListAsync(stoppingToken);
+
             db.Set<Device>().Remove(device);
+
+            // DB-first ordering. Commit the device delete (and FK
+            // cascade through Children / Conversations / Messages /
+            // ParentDevices) before touching the filesystem. Audit
+            // row lands in the second SaveChanges with the post-
+            // cleanup counts.
+            await db.SaveChangesAsync(stoppingToken);
+
+            var audioCleanup = await RunAudioCleanupAsync(blobStore, deviceConversationIds, stoppingToken);
 
             var audit = AuditEvent.DeviceDormancyDeleted(
                 deviceId: row.Id,
@@ -977,13 +1040,15 @@ public sealed class RetentionPurgeService : BackgroundService
                 linkedParentsAtDelete: row.LinkedParentsAtDelete,
                 childrenDeleted: row.ChildrenCount,
                 conversationsDeleted: row.ConversationsCount,
-                messagesDeleted: row.MessagesCount);
+                messagesDeleted: row.MessagesCount,
+                audioConversationsAttempted: audioCleanup.Attempted,
+                audioFilesDeleted: audioCleanup.FilesDeleted,
+                audioDeleteFailures: audioCleanup.Failures);
             db.Set<AuditEvent>().Add(audit);
             AppMeter.AuditEventsWritten.Add(1,
                 new KeyValuePair<string, object?>("event_type", audit.EventType.ToString()));
 
-            // Per-device atomicity: device delete (with cascades) +
-            // audit insert flush together.
+            // Second per-device SaveChanges — audit row only.
             await db.SaveChangesAsync(stoppingToken);
             devicesDeleted++;
         }
@@ -1041,6 +1106,57 @@ public sealed class RetentionPurgeService : BackgroundService
                 "RetentionPurgeService tick: cleaned up {Deleted} stale email-verification token(s) (graceHours={GraceHours}).",
                 deleted, graceHours);
         }
+    }
+
+    // C2.2b — sum-aggregator for audio-blob delete-cascade across the
+    // retention worker's destructive passes. Mirrors the contract of
+    // ParentService.RunAudioCleanupAsync so the metadata keys
+    // (audio_conversations_attempted / audio_files_deleted /
+    // audio_delete_failures) are populated identically across
+    // parent-driven and lifecycle delete events. IO failures and
+    // missing directories are non-fatal — the destructive DB action
+    // is the source of truth, residue is a future C2.3 sweeper
+    // concern. OperationCanceledException is the one exception that
+    // propagates so cooperative cancellation stays visible during a
+    // host shutdown.
+    //
+    // Kept as a private helper rather than promoted to a shared
+    // utility — ParentService has its own equivalent helper today,
+    // and a third caller (orphan sweeper) does not yet exist. C2.3
+    // is the natural moment to lift this if the duplication becomes
+    // load-bearing.
+    private async Task<(int Attempted, int FilesDeleted, int Failures)>
+        RunAudioCleanupAsync(
+            IAudioBlobStore blobStore,
+            IReadOnlyCollection<Guid> conversationIds,
+            CancellationToken cancellationToken)
+    {
+        if (conversationIds.Count == 0)
+            return (0, 0, 0);
+
+        int attempted = 0;
+        int filesDeleted = 0;
+        int failures = 0;
+        foreach (var id in conversationIds)
+        {
+            attempted++;
+            try
+            {
+                var result = await blobStore.DeleteConversationAudioAsync(id, cancellationToken);
+                filesDeleted += result.FilesDeleted;
+                if (result.Failed)
+                    failures++;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Retention audio cleanup unexpectedly threw for conversation_id={ConversationId}; counting as failure",
+                    id);
+                failures++;
+            }
+        }
+        return (attempted, filesDeleted, failures);
     }
 
     // Config reads use the indexer + int.TryParse rather than the
