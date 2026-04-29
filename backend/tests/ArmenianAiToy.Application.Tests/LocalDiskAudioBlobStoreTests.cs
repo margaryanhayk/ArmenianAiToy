@@ -141,13 +141,25 @@ public class LocalDiskAudioBlobStoreTests : IDisposable
     [Fact]
     public async Task DeleteConversationAudioAsync_LockedFile_LeavesPartialResultAndDoesNotThrow()
     {
-        // Hold an exclusive handle on one of the seeded files so the
-        // store's File.Delete call hits an IOException for that file.
-        // Contract: log + count + continue, returning Failed=true with
-        // a partial FilesDeleted count. Never throws.
-        //
-        // Windows-specific lock semantic — the test deliberately runs
-        // on the same OS the dev/CI hosts use.
+        // Windows-only scenario. POSIX (Linux/macOS) <c>unlink</c>
+        // succeeds against an open file: the directory entry is
+        // removed immediately and the inode persists until the last
+        // handle closes. So <c>FileShare.None</c> + <c>File.Delete</c>
+        // does NOT produce the IOException this test asserts on
+        // non-Windows runners — both Linux CI (ubuntu-latest) and
+        // local macOS dev see the file silently disappear and the
+        // cleanup return Failed=false. The platform-independent
+        // "blob store reports Failed=true ⇒ parent action is still
+        // non-fatal" contract is covered by
+        // <c>ParentServiceAudioCascadeTests.DeleteConversation_BlobStoreFails_…</c>
+        // via a synthetic FailingBlobStore double, which is the
+        // signal that actually matters at the contract layer. Skip
+        // the disk-level lock test on non-Windows; keep it on
+        // Windows where the IOException path is the real production
+        // failure mode.
+        if (!OperatingSystem.IsWindows())
+            return;
+
         var (convId, userMsgId, asstMsgId) = await SeedConversationAsync();
         var dir = Path.Combine(_root, convId.ToString("N"));
         var lockedPath = Path.Combine(dir, userMsgId.ToString("N") + ".wav");
