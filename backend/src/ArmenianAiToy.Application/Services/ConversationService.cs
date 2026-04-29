@@ -104,7 +104,8 @@ public class ConversationService : IConversationService
                 m.Role.ToString().ToLower(),
                 m.Content,
                 m.Timestamp,
-                m.SafetyFlag
+                m.SafetyFlag,
+                AudioAvailable: m.Role == MessageRole.Assistant && m.AudioBlobPath != null
             )).ToList()
         )).ToList();
     }
@@ -212,7 +213,8 @@ public class ConversationService : IConversationService
                 m.Role.ToString().ToLower(),
                 m.Content,
                 m.Timestamp,
-                m.SafetyFlag
+                m.SafetyFlag,
+                AudioAvailable: m.Role == MessageRole.Assistant && m.AudioBlobPath != null
             )).ToList()
         );
     }

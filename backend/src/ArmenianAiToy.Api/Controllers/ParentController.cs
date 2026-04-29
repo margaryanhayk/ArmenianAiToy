@@ -1,4 +1,5 @@
 using ArmenianAiToy.Api.RateLimiting;
+using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
@@ -620,5 +621,64 @@ public class ParentController : ControllerBase
         var filename = "areg-export-" + export.GeneratedAt.ToString("yyyyMMddTHHmmssZ") + ".json";
         Response.Headers.ContentDisposition = $"attachment; filename=\"{filename}\"";
         return Ok(export);
+    }
+
+    /// <summary>
+    /// C2.1 — stream Areg's synthesized audio for a single assistant
+    /// message back to the authenticated parent. Drives the
+    /// dashboard's ▶ Listen affordance.
+    /// <para>
+    /// <b>Assistant-only.</b> Child/user audio uploads are never
+    /// replayable here even if their <c>AudioBlobPath</c> is
+    /// populated — child voice playback is out of scope for C2.1.
+    /// The role gate lives in
+    /// <see cref="IParentService.GetAssistantAudioMessageAsync"/>.
+    /// </para>
+    /// <para>
+    /// <b>Uniform 404.</b> Every miss reason — unknown message id,
+    /// message owned by a different family, child/user role,
+    /// <c>AudioBlobPath</c> null, blob file missing on disk —
+    /// collapses to the same response body so a parent cannot probe
+    /// existence, ownership, or attachment state across families.
+    /// </para>
+    /// <para>
+    /// The blob store is resolved via <c>[FromServices]</c> rather
+    /// than a constructor parameter so existing controller-construction
+    /// tests do not have to thread a fourth dependency through.
+    /// </para>
+    /// </summary>
+    [HttpGet("messages/{messageId}/audio")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetMessageAudio(
+        Guid messageId,
+        [FromServices] IAudioBlobStore blobStore,
+        CancellationToken cancellationToken)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var hit = await _parentService.GetAssistantAudioMessageAsync(parentId, messageId);
+        if (hit is null)
+            return NotFound(new { error = "Audio not available." });
+
+        var blob = await blobStore.ReadAsync(
+            hit.Value.ConversationId, hit.Value.MessageId, cancellationToken);
+        if (blob is null)
+            return NotFound(new { error = "Audio not available." });
+
+        // Defense-in-depth: this endpoint's contract is "assistant MP3
+        // replay only." Today the only writer (AudioChatController) only
+        // ever persists assistant audio as MP3, so this branch is dead
+        // in practice. Pin the contract at the HTTP boundary anyway —
+        // a future codec change, a manual file placement, or a misbehaving
+        // blob-store implementation must not be able to serve a non-MP3
+        // payload through this endpoint. Same uniform-404 body so an
+        // unexpected MIME is indistinguishable from "no blob" on the wire.
+        if (!string.Equals(blob.Value.MimeType, "audio/mpeg", StringComparison.OrdinalIgnoreCase))
+            return NotFound(new { error = "Audio not available." });
+
+        return File(blob.Value.Content, "audio/mpeg");
     }
 }

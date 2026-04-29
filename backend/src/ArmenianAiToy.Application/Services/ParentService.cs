@@ -1224,7 +1224,8 @@ public class ParentService : IParentService
                         m.Role.ToString().ToLower(),
                         m.Content,
                         m.Timestamp,
-                        m.SafetyFlag
+                        m.SafetyFlag,
+                        AudioAvailable: m.Role == MessageRole.Assistant && m.AudioBlobPath != null
                     )).ToList()
                 )).ToList()
                 : new List<ConversationDto>()
@@ -1308,6 +1309,39 @@ public class ParentService : IParentService
             // blob is always valid JSON (or null).
             a.Metadata is null ? null : JsonNode.Parse(a.Metadata)
         )).ToList();
+    }
+
+    /// <summary>
+    /// C2.1 — resolve a message id for parent-dashboard audio replay.
+    /// Single join query — Message → Conversation → ParentDevice — that
+    /// also gates on role and AudioBlobPath. Every miss reason
+    /// (unknown message id, conversation owned by another parent,
+    /// child/user role, or null AudioBlobPath) collapses to the same
+    /// <c>null</c> return so the controller surfaces an identical 404
+    /// in every case. No existence leak across families; child WAV
+    /// uploads are never replayable here even if their AudioBlobPath
+    /// is populated. No DB write, no audit row.
+    /// </summary>
+    public async Task<(Guid ConversationId, Guid MessageId)?> GetAssistantAudioMessageAsync(
+        Guid parentId, Guid messageId)
+    {
+        var hit = await _db.Set<Message>()
+            .Where(m => m.Id == messageId
+                     && m.Role == MessageRole.Assistant
+                     && m.AudioBlobPath != null)
+            .Join(
+                _db.Set<Conversation>(),
+                m => m.ConversationId,
+                c => c.Id,
+                (m, c) => new { ConversationId = c.Id, MessageId = m.Id, c.DeviceId })
+            .Where(x => _db.Set<ParentDevice>().Any(
+                pd => pd.ParentId == parentId && pd.DeviceId == x.DeviceId))
+            .Select(x => new { x.ConversationId, x.MessageId })
+            .FirstOrDefaultAsync();
+
+        if (hit is null)
+            return null;
+        return (hit.ConversationId, hit.MessageId);
     }
 
     // Central write path for audit rows: Adds the entity to the DbSet

@@ -127,4 +127,26 @@ public interface IParentService
         bool? story, bool? game, bool? riddle, bool? curiosity);
     Task<List<AuditEventDto>> GetAuditEventsForParentAsync(Guid parentId, int limit, int offset);
     Task<ParentExport?> BuildExportAsync(Guid parentId);
+
+    /// <summary>
+    /// C2.1 — resolve a message id for parent-dashboard audio replay.
+    /// Returns the (conversationId, messageId) pair iff <b>all</b> of:
+    /// <list type="bullet">
+    ///   <item>the message exists,</item>
+    ///   <item>the authenticated parent owns the device that the
+    ///   message's conversation belongs to (Message → Conversation →
+    ///   Device → ParentDevice),</item>
+    ///   <item>the message role is <see cref="Domain.Enums.MessageRole.Assistant"/>
+    ///   (child WAV uploads are never replayable in C2.1 even if their
+    ///   AudioBlobPath is populated),</item>
+    ///   <item><see cref="Domain.Entities.Message.AudioBlobPath"/> is non-null.</item>
+    /// </list>
+    /// Returns <c>null</c> on every other case. Failure reasons are
+    /// deliberately not distinguished — the controller maps null to a
+    /// uniform 404 so a parent cannot probe message existence,
+    /// ownership across families, or whether a given message has an
+    /// audio attachment.
+    /// </summary>
+    Task<(Guid ConversationId, Guid MessageId)?> GetAssistantAudioMessageAsync(
+        Guid parentId, Guid messageId);
 }

@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1151 tests)
+dotnet test                                     # Run all tests (1228 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -1326,6 +1326,93 @@ working endpoint.
 8. Pause the device via the parent dashboard, retry the curl
    — the response body is the cached canned paused MP3; no
    STT, no LLM, no new `Message` rows.
+
+## Voice chat (C2.1 — assistant replay)
+
+Closes the parent half of the C1 voice loop — parents can play
+back what *Areg* said, but not what the child said. Strict
+assistant-only contract.
+
+- **Endpoint**: `GET /api/parents/messages/{messageId}/audio`,
+  parent-JWT authenticated. Streams the assistant MP3 with
+  `Content-Type: audio/mpeg`. **Uniform 404** with body
+  `{ "error": "Audio not available." }` for every miss reason —
+  unknown id, message owned by a different family, user/child
+  role, null `AudioBlobPath`, blob file missing on disk, **or
+  blob MIME other than `audio/mpeg`**. A parent cannot probe
+  message existence, ownership across families, or attachment
+  state.
+- **MIME contract enforced at the HTTP boundary.** The controller
+  whitelists `audio/mpeg` after the blob store read and serves
+  the byte stream with a *constant* `audio/mpeg` content-type
+  rather than echoing whatever the store reported. Defense-in-
+  depth: today the only writer (`AudioChatController`) only
+  persists assistant audio as MP3, so the whitelist is dead code
+  in practice — but a future codec change, manual file
+  placement, or misbehaving store implementation must not be
+  able to leak a non-MP3 payload through this endpoint.
+- **Ownership chain**: Message → Conversation → Device →
+  ParentDevice, joined in a single query in
+  `ParentService.GetAssistantAudioMessageAsync`. Role + audio-path
+  gates are pushed into the same query so an unauthorized
+  message never causes a blob-store probe.
+- **`MessageDto.AudioAvailable`**: new field on the existing wire
+  shape. Set to `true` ONLY when `Role == Assistant` AND
+  `AudioBlobPath != null`. Drives the dashboard's `▶ Listen`
+  affordance. **Child WAV uploads MUST NOT expose `true`** even
+  if their `AudioBlobPath` is populated — the role gate is
+  applied at every projection site (`ConversationService`,
+  `ParentService.BuildExportAsync`) so the wire shape is the
+  single source of truth.
+- **Dashboard surface**: `parent.html` adds a `▶ Listen` button
+  and inline status line on assistant messages with
+  `audioAvailable === true`. The audio is fetched with the
+  `Authorization` header, decoded into a `Blob`, and exposed via
+  `URL.createObjectURL` so the bytes never appear in the URL bar
+  / history. The Object URL is revoked on `ended` to avoid
+  per-page memory growth across long detail sessions. The
+  button is replaced by an `<audio controls autoplay>` element
+  on first success so re-listens use the native player.
+- **Pinned by `ParentMessageAudioTests`**: success, parent JWT
+  required (`[Authorize]` attribute), not owned, unknown id,
+  user-WAV role gate (KEYSTONE), null `AudioBlobPath`, missing
+  blob, and a multi-branch "all miss reasons return null"
+  no-existence-leak assertion.
+
+**Not in C2.1** (deliberate — moved to C2.2):
+- Child WAV playback.
+- Audio export ZIP / binary inclusion in
+  `GET /api/parents/export`.
+- Retention cascade on conversation-delete /
+  device-delete / parent-anonymize for audio blobs.
+- Orphan blob sweeper.
+- New audit event for the read endpoint (the durable record of
+  *what was said* already lives on the conversation; logging
+  every replay click would be PII-adjacent and out of scope).
+
+The dangling-reference disclaimer in the Retention section
+still applies — `Message.AudioBlobPath` is owned externally;
+no code in this repo deletes blobs today. C2.2 owns that
+cleanup hook.
+
+**Manual QA (C2.1)**:
+1. `dotnet run --project src/ArmenianAiToy.Api` and complete the
+   C1 voice flow once so an assistant MP3 lands on disk.
+2. Open `http://localhost:5000/parent.html`, log in, drill into
+   the conversation that includes the voice turn.
+3. The assistant message shows a `▶ Listen` button; the child
+   message does NOT, even though both have `AudioBlobPath`
+   populated.
+4. Click `▶ Listen` → an `<audio>` element appears and plays
+   the MP3 inline. URL bar is unchanged.
+5. `curl -i http://localhost:5000/api/parents/messages/<msgId>/audio`
+   without an `Authorization` header → 401.
+6. With a parent JWT, request a known **user** message id →
+   uniform 404 `{ "error": "Audio not available." }`.
+7. Same JWT, request a fabricated GUID → identical 404 body.
+8. `rm -rf audio-blobs` and re-click `▶ Listen` for an
+   assistant message → uniform 404 (blob missing on disk
+   collapses into the same response).
 
 ## Engineering Guardrails
 

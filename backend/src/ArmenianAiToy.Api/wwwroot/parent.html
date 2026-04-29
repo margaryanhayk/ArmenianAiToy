@@ -2153,7 +2153,99 @@
 
       div.appendChild(meta);
       div.appendChild(body);
+
+      // C2.1 — assistant audio replay. The wire shape guarantees
+      // audioAvailable is true ONLY for assistant messages with a
+      // non-null AudioBlobPath; child WAV uploads never expose true
+      // here even if their AudioBlobPath is populated. The role check
+      // is belt-and-suspenders so a future projection bug cannot
+      // silently render a play button next to a child utterance.
+      if (m.audioAvailable === true && m.role === 'assistant' && m.id) {
+        div.appendChild(buildListenAffordance(m.id));
+      }
       return div;
+    }
+
+    // C2.1 — render the ▶ Listen affordance + an inline status line
+    // and (on success) a vanilla <audio> element backed by a Blob URL.
+    // The audio is fetched with the parent JWT, decoded into a Blob,
+    // and exposed via URL.createObjectURL so the bytes never appear
+    // in the browser URL bar / history. The Blob URL is revoked when
+    // playback ends so we don't leak per-page memory after a long
+    // detail-view session.
+    function buildListenAffordance(messageId) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '▶ Listen';
+      btn.style.cssText =
+        'background:#ece4f8;color:#5b3e8a;border:none;border-radius:6px;' +
+        'padding:4px 10px;font-size:12px;cursor:pointer;';
+
+      var status = document.createElement('span');
+      status.style.cssText = 'font-size:12px;color:#888;';
+
+      btn.onclick = function () {
+        btn.disabled = true;
+        status.textContent = 'Loading…';
+        status.style.color = '#888';
+
+        var token = getToken();
+        if (!token) {
+          status.textContent = 'Session expired.';
+          status.style.color = '#c62828';
+          btn.disabled = false;
+          return;
+        }
+        fetch('/api/parents/messages/' + encodeURIComponent(messageId) + '/audio', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function (res) {
+          if (res.status === 401) {
+            clearToken();
+            show('loginView');
+            setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+            return null;
+          }
+          if (res.status === 404) {
+            status.textContent = 'Audio not available.';
+            status.style.color = '#c62828';
+            btn.disabled = false;
+            return null;
+          }
+          if (!res.ok) {
+            status.textContent = 'Error: HTTP ' + res.status;
+            status.style.color = '#c62828';
+            btn.disabled = false;
+            return null;
+          }
+          return res.blob();
+        }).then(function (blob) {
+          if (!blob) return;
+          var url = URL.createObjectURL(blob);
+          var audio = document.createElement('audio');
+          audio.controls = true;
+          audio.autoplay = true;
+          audio.src = url;
+          audio.style.cssText = 'max-width:100%;vertical-align:middle;';
+          audio.addEventListener('ended', function () {
+            URL.revokeObjectURL(url);
+          });
+          // Replace the button + status with the player so the row
+          // doesn't pile up controls if the parent listens twice.
+          wrap.innerHTML = '';
+          wrap.appendChild(audio);
+        }).catch(function () {
+          status.textContent = 'Network error.';
+          status.style.color = '#c62828';
+          btn.disabled = false;
+        });
+      };
+
+      wrap.appendChild(btn);
+      wrap.appendChild(status);
+      return wrap;
     }
 
     // ---------- audit view ----------
