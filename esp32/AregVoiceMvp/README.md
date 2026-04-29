@@ -26,16 +26,34 @@ PSRAM required for the 480 KB capture + 512 KB response
 buffers). Other S3 boards work; adjust pin numbers in
 `config.h`.
 
-| Component      | Part       | Pin (config.h)       |
-|----------------|------------|----------------------|
-| Mic (I2S RX)   | INMP441    | BCK=4 / WS=5 / SD=6  |
-| Amp (I2S TX)   | MAX98357A  | BCK=15 / LRC=16 / DIN=7 |
-| Button to GND  | tactile    | 0 (BOOT)             |
-| LED (WS2812)   | onboard    | 48                   |
+| Component      | Part        | Pin (config.h)          |
+|----------------|-------------|-------------------------|
+| Mic (I2S RX)   | INMP441     | BCK=4 / WS=5 / SD=6     |
+| Mic L/R select | INMP441 L/R | **tie to GND**          |
+| Amp (I2S TX)   | MAX98357A   | BCK=15 / LRC=16 / DIN=7 |
+| Button to GND  | tactile     | 0 (BOOT)                |
+| LED (WS2812)   | onboard     | 48                      |
+
+The firmware reads only the left I2S slot
+(`I2S_CHANNEL_FMT_ONLY_LEFT` in `audio_io.cpp`), so the
+INMP441's L/R pin must be tied to GND. Floating L/R produces
+silence or noise that looks like a working capture.
 
 Wire all three ground returns (board, mic, amp) to the same
 ground rail — shared ground is the most common wiring mistake
 on this kind of bench.
+
+**Wi-Fi must be 2.4 GHz.** ESP32-S3 has no 5 GHz radio. If your
+router exposes one merged SSID across both bands and prefers
+5 GHz for new clients, the board can sit in
+`[wifi] connecting...` indefinitely on otherwise-correct
+credentials. Move the bench AP to a 2.4 GHz-only SSID for
+bring-up.
+
+**BOOT button is the press-to-talk button.** GPIO 0 is wired to
+the BOOT button on DevKitC-1, so don't hold it while resetting
+(you'll land in flash-mode); use the EN/RESET button for a clean
+restart instead.
 
 ## Arduino IDE setup
 
@@ -44,11 +62,17 @@ on this kind of bench.
   board variant — required either way)
 - **Partition Scheme**: default "Default 4MB with spiffs" is
   fine
+- **Flash Size**: set to match your chip — "8MB (64Mb)" for
+  N8R8, "16MB (128Mb)" for N16R8. The Arduino IDE does not
+  detect this automatically.
 - **USB CDC On Boot**: Enabled (so Serial Monitor works over
   the native USB port)
 - **Libraries (via Library Manager)**:
   - `Adafruit NeoPixel` by Adafruit
-  - `ESP8266Audio` by Earle Philhower
+  - `ESP8266Audio` by Earle Philhower — version not pinned yet;
+    record the exact installed version in this README after the
+    first successful C3.1 bench compile so future bench machines
+    can reproduce the build.
 
 No other libraries. `WiFi`, `HTTPClient`, `driver/i2s.h`, and
 `esp_heap_caps.h` all ship with the ESP32 Arduino core.
@@ -71,10 +95,32 @@ No other libraries. `WiFi`, `HTTPClient`, `driver/i2s.h`, and
    ```
 4. Copy the four values into `config.h`:
    - `AREG_WIFI_SSID` / `AREG_WIFI_PASSWORD`
-   - `AREG_BACKEND_URL` (e.g. `http://192.168.1.100:5000/api/chat/audio`)
+   - `AREG_BACKEND_URL` (e.g. `http://192.168.1.100:5000/api/chat/audio`
+     — pick a free port; pass `--urls http://0.0.0.0:5050` to
+     `dotnet run` if `:5000` is already in use, and match the
+     port in the URL above)
    - `AREG_DEVICE_ID` / `AREG_DEVICE_API_KEY`
 
-## Render the failure clip (one-time per voice change)
+   > **Do not commit `config.h` after pasting real credentials.**
+   > The file is tracked (so pin/timing constants ship with the
+   > repo) and `.gitignore` does not exclude it. Run
+   > `git diff --staged -- esp32/AregVoiceMvp/config.h` before
+   > every commit and confirm it prints nothing. Optionally,
+   > mark the file skip-worktree for the duration of bench work:
+   >
+   > ```
+   > git update-index --skip-worktree esp32/AregVoiceMvp/config.h
+   > # revert later with --no-skip-worktree
+   > ```
+
+## Render the failure clip (optional, one-time per voice change)
+
+This step is **optional**. It calls OpenAI's TTS API and **costs
+OpenAI credits** every time you run it. Skip it if you already
+have a non-stub `canned_clip.h`, or if you accept silent error
+paths during bench bring-up — the firmware logs
+`[fail] canned clip stub is empty; skipping playback` and
+returns to idle cleanly.
 
 The committed `canned_clip.h` is a 1-byte stub — the firmware
 plays silence on error paths until you regenerate it.
@@ -94,9 +140,13 @@ as a PROGMEM byte array. Rebuild + reflash after running it.
 Open `AregVoiceMvp.ino` in the Arduino IDE. Hit Upload. Open
 Serial Monitor at 115200 baud.
 
-You should see:
+You should see (matches `setup()` output in `AregVoiceMvp.ino`):
 ```
 [boot] AregVoiceMvp starting
+[boot] backend=http://<your-host>:<port>/api/chat/audio
+[boot] pins button=0 led=48
+[boot] mic_i2s bck=4 ws=5 sd=6
+[boot] amp_i2s bck=15 lrc=16 din=7
 [wifi] connecting to <your SSID> ...
 [wifi] ip=192.168.1.X
 [boot] ready — press button to speak
