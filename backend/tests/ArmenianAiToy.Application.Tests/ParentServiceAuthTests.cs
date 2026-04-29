@@ -31,6 +31,17 @@ public class ParentServiceAuthTests
             modelBuilder.Entity<AuditEvent>().HasKey(a => a.Id);
             modelBuilder.Entity<ParentEmailVerificationToken>().HasKey(t => t.Id);
             modelBuilder.Entity<ParentEmailVerificationToken>().Ignore(t => t.Parent);
+
+            // C2.2a — UnlinkDeviceAsync's orphan branch now projects
+            // conversation ids before the FK cascade fires so blob
+            // cleanup can run for each. Register Conversation here so
+            // the legacy auth-only test context can resolve the query.
+            // No Messages entity is needed — UnlinkDevice does not
+            // touch them directly.
+            modelBuilder.Entity<Conversation>().HasKey(c => c.Id);
+            modelBuilder.Entity<Conversation>().Ignore(c => c.Device);
+            modelBuilder.Entity<Conversation>().Ignore(c => c.Child);
+            modelBuilder.Entity<Conversation>().Ignore(c => c.Messages);
         }
     }
 

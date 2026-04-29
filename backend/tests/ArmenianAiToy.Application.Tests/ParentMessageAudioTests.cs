@@ -268,6 +268,16 @@ public class ParentMessageAudioTests
             return Task.FromResult<(Stream, string)?>(
                 (new MemoryStream(Bytes), Mime));
         }
+
+        // C2.2a — interface compatibility shim. The C2.1 read-side
+        // tests in this file exercise GetMessageAudio only; they
+        // never invoke conversation-level audio cleanup. Returning
+        // the missing-directory idempotent-success shape keeps the
+        // stub honest if it ever does get called.
+        public Task<AudioBlobDeleteResult> DeleteConversationAudioAsync(
+            Guid conversationId, CancellationToken cancellationToken = default)
+            => Task.FromResult(new AudioBlobDeleteResult(
+                FilesDeleted: 0, DirectoryMissing: true, Failed: false, ErrorMessage: null));
     }
 
     private static (ParentController Controller, IParentService Service, Guid ParentId)

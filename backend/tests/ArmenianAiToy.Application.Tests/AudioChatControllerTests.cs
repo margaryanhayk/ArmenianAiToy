@@ -55,6 +55,28 @@ public class AudioChatControllerTests
         public Task<(Stream Content, string MimeType)?> ReadAsync(
             Guid conversationId, Guid messageId, CancellationToken cancellationToken = default)
             => Task.FromResult<(Stream, string)?>(null);
+
+        // C2.2a — conversation-level cleanup. Removes every dictionary
+        // entry whose path begins with the {conversationId:N}/ prefix,
+        // mirroring the on-disk LocalDiskAudioBlobStore semantic. The
+        // C1 audio chat tests don't exercise delete, but the C2.2a
+        // ParentService delete tests construct ParentService over this
+        // double via a separate test seam; keeping the implementation
+        // honest here avoids surprises if anything ever does call it.
+        public Task<AudioBlobDeleteResult> DeleteConversationAudioAsync(
+            Guid conversationId, CancellationToken cancellationToken = default)
+        {
+            var prefix = conversationId.ToString("N") + "/";
+            var matched = Written.Keys.Where(k => k.StartsWith(prefix)).ToList();
+            if (matched.Count == 0)
+            {
+                return Task.FromResult(new AudioBlobDeleteResult(
+                    FilesDeleted: 0, DirectoryMissing: true, Failed: false, ErrorMessage: null));
+            }
+            foreach (var k in matched) Written.Remove(k);
+            return Task.FromResult(new AudioBlobDeleteResult(
+                FilesDeleted: matched.Count, DirectoryMissing: false, Failed: false, ErrorMessage: null));
+        }
     }
 
     private sealed record Harness(

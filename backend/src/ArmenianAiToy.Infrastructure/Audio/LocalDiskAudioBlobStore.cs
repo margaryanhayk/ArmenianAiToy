@@ -79,6 +79,114 @@ public sealed class LocalDiskAudioBlobStore : IAudioBlobStore
         return Task.FromResult<(Stream, string)?>(null);
     }
 
+    public Task<AudioBlobDeleteResult> DeleteConversationAudioAsync(
+        Guid conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        // Local layout: every blob for one conversation lives under
+        // {root}/{conversationId:N}/. Cascade cleanup = one recursive
+        // directory delete. We enumerate file-by-file rather than
+        // calling Directory.Delete(path, recursive: true) so a
+        // per-file IO failure (a still-open FileStream from a slow
+        // ReadAsync, an antivirus lock, an ACL hiccup) leaves the
+        // remaining files visible for a retry / orphan-sweep instead
+        // of throwing in the middle of a recursive delete.
+        var directory = Path.Combine(_root, conversationId.ToString("N"));
+
+        if (!Directory.Exists(directory))
+        {
+            // Idempotent miss: no audio was ever written, or a prior
+            // cleanup pass already removed it. Not a failure.
+            return Task.FromResult(new AudioBlobDeleteResult(
+                FilesDeleted: 0,
+                DirectoryMissing: true,
+                Failed: false,
+                ErrorMessage: null));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        int filesDeleted = 0;
+        var failures = new List<string>();
+        string[] files;
+        try
+        {
+            files = Directory.GetFiles(directory);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            // Listing the directory itself failed — extremely unusual,
+            // but classify the whole call as failed and bail.
+            _logger.LogWarning(ex,
+                "Audio blob cleanup: failed to enumerate directory for conversation_id={ConversationId}",
+                conversationId);
+            return Task.FromResult(new AudioBlobDeleteResult(
+                FilesDeleted: 0,
+                DirectoryMissing: false,
+                Failed: true,
+                ErrorMessage: ex.GetType().Name + ": " + ex.Message));
+        }
+
+        foreach (var file in files)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                File.Delete(file);
+                filesDeleted++;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                // Per-file IO failure is the load-bearing case. Log
+                // and continue — a half-cleaned directory is better
+                // than an exception thrown back through a destructive
+                // parent action that has already committed to the DB.
+                _logger.LogWarning(ex,
+                    "Audio blob cleanup: per-file delete failure for conversation_id={ConversationId} file={FileName}",
+                    conversationId, Path.GetFileName(file));
+                failures.Add(Path.GetFileName(file) + ": " + ex.GetType().Name);
+            }
+        }
+
+        // Best-effort directory removal after the file loop. Empty
+        // directory removes cleanly; a directory that still has files
+        // (from per-file failures above) cannot be removed and that
+        // is fine — the orphan sweeper will pick it up later.
+        bool directoryFailed = false;
+        if (failures.Count == 0)
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: false);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Audio blob cleanup: directory removal failure for conversation_id={ConversationId}",
+                    conversationId);
+                directoryFailed = true;
+                failures.Add("<dir>: " + ex.GetType().Name);
+            }
+        }
+
+        bool failed = failures.Count > 0 || directoryFailed;
+        if (!failed)
+        {
+            _logger.LogInformation(
+                "Audio blob cleanup: conversation_id={ConversationId} files_deleted={FilesDeleted}",
+                conversationId, filesDeleted);
+        }
+
+        return Task.FromResult(new AudioBlobDeleteResult(
+            FilesDeleted: filesDeleted,
+            DirectoryMissing: false,
+            Failed: failed,
+            ErrorMessage: failed ? string.Join("; ", failures) : null));
+    }
+
     private static string BuildRelativePath(Guid conversationId, Guid messageId, string mimeType)
     {
         var ext = ExtensionFor(mimeType);

@@ -29,7 +29,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1228 tests)
+dotnet test                                     # Run all tests (1242 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -1413,6 +1413,107 @@ cleanup hook.
 8. `rm -rf audio-blobs` and re-click `▶ Listen` for an
    assistant message → uniform 404 (blob missing on disk
    collapses into the same response).
+
+## Voice chat (C2.2a — parent-driven blob delete cascade)
+
+Hooks audio-blob cleanup into the four destructive
+`ParentService` paths so blobs no longer outlive their database
+records. Retention-worker and dormancy paths are out of scope —
+they land in a follow-up C2.2b slice.
+
+- **New blob-store API**:
+  `IAudioBlobStore.DeleteConversationAudioAsync(Guid, CancellationToken)`
+  returning a compact `AudioBlobDeleteResult` record
+  (`FilesDeleted`, `DirectoryMissing`, `Failed`, `ErrorMessage`).
+  The local layout groups every blob for a conversation under
+  `{conversationId:N}/`, so cleanup is a single recursive directory
+  delete in practice. Idempotent on a missing directory; never
+  throws on per-file IO failure (cooperative cancellation does
+  propagate).
+
+- **Hooked sites**:
+  - `ParentService.DeleteConversationAsync` — single conversation.
+  - `ParentService.DeleteChildAsync` — every conversation the child
+    owned.
+  - `ParentService.UnlinkDeviceAsync` — orphan-cascade branch only;
+    the still-linked branch performs no cleanup (audit metadata
+    counts are zero on that branch).
+  - `ParentService.DeleteAccountAsync` — every conversation under
+    each *orphaned* device. Devices still linked to another parent
+    keep their data and audio.
+
+- **DB-first ordering**. Each site:
+  1. Snapshots affected conversation ids,
+  2. Mutates the DbSet and runs `SaveChangesAsync` (FK cascade
+     handles Messages/Children/etc.),
+  3. Calls `DeleteConversationAudioAsync` per id and aggregates
+     counts,
+  4. Writes the existing destructive audit row with the post-
+     cleanup counts in metadata, then `SaveChangesAsync` again.
+  Two SaveChanges per parent action by design: a blob-store IO
+  failure cannot roll back a parent-initiated delete, and the
+  durable audit row reflects what actually hit disk.
+
+- **Audit metadata extension**. Three new keys appear in the
+  `ParentConversationDeleted`, `ParentChildDeleted`,
+  `ParentDeviceUnlinked`, and `ParentAccountDeleted` factories:
+  - `audio_conversations_attempted: int`
+  - `audio_files_deleted: int`
+  - `audio_delete_failures: int`
+  Counts only — no paths, no PII, mirrors the existing
+  `messages_deleted` discipline. Defaults to zero on the
+  still-linked unlink branch and on any factory call that omits
+  the new parameters (additive-only signature change keeps every
+  existing caller compiling).
+
+- **Constructor seam**. `ParentService` gains an optional
+  `IAudioBlobStore? blobStore` parameter that defaults to a
+  private `NullAudioBlobStore` (returns `DirectoryMissing=true,
+  FilesDeleted=0, Failed=false`). Real DI registers
+  `LocalDiskAudioBlobStore`; the null fallback exists so the many
+  pre-existing `ParentService`-constructing tests for
+  non-destructive flows (pause, bedtime, mode flags, etc.)
+  continue to compile and run unchanged.
+
+- **No retention/dormancy hook in this slice**. Retention purge,
+  dormant-parent anonymize, and dormant-device delete still
+  accumulate orphaned blobs until a follow-up slice (C2.2b)
+  attaches the same cleanup pattern there. The "audio blob
+  retention is owned externally" disclaimer in
+  § Retention remains true for those paths.
+
+- **Orphan sweeper still deferred** to C2.3. C2.2a only catches
+  blobs at known delete sites; orphans produced by IO failures
+  here, or by retention paths that don't yet hook the API, are
+  the orphan sweeper's job.
+
+**Invariants pinned by tests** (do not regress):
+- `LocalDiskAudioBlobStoreTests` — directory removal, missing-dir
+  idempotent success, sibling-conversation isolation, empty-dir
+  cleanup, cancellation propagation, locked-file partial delete.
+- `ParentServiceAudioCascadeTests` — each of the four hooked
+  sites cleans the right scope (and only that scope), audit
+  metadata carries the three new keys with the correct counts,
+  unrelated audio is preserved, and a failing blob store does
+  NOT break the parent action.
+
+**Manual QA (C2.2a)**:
+1. Run the C2.1 manual QA flow once so an assistant MP3 lands at
+   `audio-blobs/{conv:N}/{msg:N}.mp3`.
+2. As the owning parent, click `Delete conversation` on the
+   dashboard. Refresh → conversation is gone; check
+   `audio-blobs/{conv:N}/` → directory removed.
+3. Repeat with `Delete child`, `Unlink device` (when the device
+   has only this parent linked), and `Delete account`. In each
+   case the audio directory(ies) under the affected conversation
+   id(s) should disappear.
+4. Inspect `aat_audit_events_written_total` on `/metrics` and
+   the `AuditEvents` table — the matching row's `Metadata`
+   should contain `audio_conversations_attempted`,
+   `audio_files_deleted`, `audio_delete_failures`.
+5. Negative case: unlink a device that is still linked to
+   another parent → audio survives; audit row still written
+   with `audio_*` counts all zero.
 
 ## Engineering Guardrails
 

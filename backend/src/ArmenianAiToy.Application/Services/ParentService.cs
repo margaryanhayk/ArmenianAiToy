@@ -1,3 +1,4 @@
+using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.Auth;
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Interfaces;
@@ -33,11 +34,12 @@ public class ParentService : IParentService
     private readonly Func<string, string> _hashPassword;
     private readonly INotifier _notifier;
     private readonly IGoogleIdTokenValidator? _googleValidator;
+    private readonly IAudioBlobStore _blobStore;
 
     /// <summary>
-    /// Standard constructor used by the DI container. Two test-facing
-    /// optional parameters, both defaulted, so no existing
-    /// ParentService-constructing test needs updating:
+    /// Standard constructor used by the DI container. Optional
+    /// parameters exist purely so the existing ParentService-construct-
+    /// ing tests don't have to thread substitutes through:
     /// <list type="bullet">
     ///   <item><description><paramref name="hashPassword"/> — defaults
     ///   to <c>BCrypt.Net.BCrypt.HashPassword</c>. Exists so the
@@ -50,6 +52,15 @@ public class ParentService : IParentService
     ///   unit tests for unrelated flows (pause, bedtime, mode flags,
     ///   etc.) can construct a bare ParentService without threading a
     ///   notifier substitute everywhere.</description></item>
+    ///   <item><description><paramref name="blobStore"/> — C2.2a audio
+    ///   cleanup seam. Defaults to a private no-op
+    ///   <see cref="NullAudioBlobStore"/> so existing tests for
+    ///   non-destructive parent flows (pause, bedtime, mode flags,
+    ///   etc.) construct ParentService unchanged. The four destructive
+    ///   parent paths (DeleteConversation / DeleteChild / UnlinkDevice
+    ///   orphan / DeleteAccount orphan) call into this store post-DB-
+    ///   commit; tests that exercise those paths inject a real or
+    ///   counting double.</description></item>
     /// </list>
     /// Forgot-password-specific tests pass an explicit
     /// <see cref="INotifier"/> substitute.
@@ -60,7 +71,8 @@ public class ParentService : IParentService
         ILogger<ParentService> logger,
         Func<string, string>? hashPassword = null,
         INotifier? notifier = null,
-        IGoogleIdTokenValidator? googleValidator = null)
+        IGoogleIdTokenValidator? googleValidator = null,
+        IAudioBlobStore? blobStore = null)
     {
         _db = db;
         _config = config;
@@ -68,6 +80,7 @@ public class ParentService : IParentService
         _hashPassword = hashPassword ?? BCrypt.Net.BCrypt.HashPassword;
         _notifier = notifier ?? NullNotifier.Instance;
         _googleValidator = googleValidator;
+        _blobStore = blobStore ?? NullAudioBlobStore.Instance;
     }
 
     // Private no-op notifier. Used as the safe default when no
@@ -89,6 +102,27 @@ public class ParentService : IParentService
             string parentEmail, string deviceName, DateTime lastSeenAtUtc,
             DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
             => Task.FromResult(true);
+    }
+
+    // Private no-op blob store — safe default for tests that construct
+    // ParentService directly and don't exercise C2.2a audio cleanup.
+    // Returns the "directory missing" idempotent-success shape so the
+    // aggregate audit metadata stays at zeros, just as if no audio had
+    // ever been written. Real DI injects LocalDiskAudioBlobStore.
+    private sealed class NullAudioBlobStore : IAudioBlobStore
+    {
+        public static readonly NullAudioBlobStore Instance = new();
+        public Task<string> WriteAsync(Guid conversationId, Guid messageId,
+            byte[] content, string mimeType, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException(
+                "NullAudioBlobStore is read/delete-only; ParentService never writes blobs.");
+        public Task<(Stream Content, string MimeType)?> ReadAsync(
+            Guid conversationId, Guid messageId, CancellationToken cancellationToken = default)
+            => Task.FromResult<(Stream, string)?>(null);
+        public Task<AudioBlobDeleteResult> DeleteConversationAudioAsync(
+            Guid conversationId, CancellationToken cancellationToken = default)
+            => Task.FromResult(new AudioBlobDeleteResult(
+                FilesDeleted: 0, DirectoryMissing: true, Failed: false, ErrorMessage: null));
     }
 
     /// <summary>
@@ -265,6 +299,9 @@ public class ParentService : IParentService
             .AnyAsync(pd => pd.DeviceId == deviceId);
         if (stillLinked)
         {
+            // No cascade fired → no audio cleanup runs. Audit metadata
+            // carries zeros for the audio counts, same as the still-linked
+            // contract states.
             TrackAndAddAudit(AuditEvent.ParentDeviceUnlinked(
                 parentId, deviceId, orphanCascaded: false));
             await _db.SaveChangesAsync();
@@ -274,20 +311,41 @@ public class ParentService : IParentService
             return true;
         }
 
+        // C2.2a — orphan-cascade branch. Snapshot the conversation ids
+        // BEFORE the Device delete so the FK cascade doesn't erase the
+        // information we need to clean up audio. Counts only — no
+        // entity materialization beyond the bare id projection.
+        var conversationIds = await _db.Set<Conversation>()
+            .Where(c => c.DeviceId == deviceId)
+            .Select(c => c.Id)
+            .ToListAsync();
+
         var device = await _db.Set<Device>().FindAsync(deviceId);
         if (device != null)
         {
             _db.Set<Device>().Remove(device);
         }
+        // DB-first: commit the device delete (and FK cascade through
+        // Children / Conversations / Messages / ParentDevices) before
+        // touching the filesystem.
+        await _db.SaveChangesAsync();
+
+        var audio = await RunAudioCleanupAsync(conversationIds);
+
         // orphanCascaded captures whether the device row was actually removed.
         // In the rare "device already gone" race it stays false even though
         // this was the last ParentDevice link.
         TrackAndAddAudit(AuditEvent.ParentDeviceUnlinked(
-            parentId, deviceId, orphanCascaded: device != null));
+            parentId, deviceId,
+            orphanCascaded: device != null,
+            audioConversationsAttempted: audio.Attempted,
+            audioFilesDeleted: audio.FilesDeleted,
+            audioDeleteFailures: audio.Failures));
         await _db.SaveChangesAsync();
+
         _logger.LogInformation(
-            "Parent {ParentId} unlinked last link to device {DeviceId}; device and subtree deleted",
-            parentId, deviceId);
+            "Parent {ParentId} unlinked last link to device {DeviceId}; device and subtree deleted ({AudioFilesDeleted} audio files cleaned, {AudioDeleteFailures} failures)",
+            parentId, deviceId, audio.FilesDeleted, audio.Failures);
         return true;
     }
 
@@ -760,12 +818,22 @@ public class ParentService : IParentService
         // rule per device; this loop is the bulk equivalent when the
         // whole account goes away at once.
         int orphanedDevicesDeleted = 0;
+        // C2.2a — collect every conversation id under any orphaned
+        // device BEFORE its Device row is removed, so the FK cascade
+        // doesn't erase the information we need for blob cleanup.
+        var orphanConversationIds = new List<Guid>();
         foreach (var deviceId in linkedDeviceIds)
         {
             var stillLinked = await _db.Set<ParentDevice>()
                 .AnyAsync(pd => pd.DeviceId == deviceId);
             if (stillLinked)
                 continue;
+
+            var conversationIds = await _db.Set<Conversation>()
+                .Where(c => c.DeviceId == deviceId)
+                .Select(c => c.Id)
+                .ToListAsync();
+            orphanConversationIds.AddRange(conversationIds);
 
             var device = await _db.Set<Device>().FindAsync(deviceId);
             if (device != null)
@@ -774,15 +842,27 @@ public class ParentService : IParentService
                 orphanedDevicesDeleted++;
             }
         }
+        // DB-first commit. The Device removals fire the FK cascade
+        // through Conversations / Messages / Children / ParentDevices
+        // in this transaction. Audio cleanup runs against the
+        // pre-collected conversation id list afterward.
+        await _db.SaveChangesAsync();
+
+        var audio = await RunAudioCleanupAsync(orphanConversationIds);
+
         // Audit must be written even when no orphan cleanup was needed, so
         // this SaveChangesAsync runs unconditionally now.
         TrackAndAddAudit(AuditEvent.ParentAccountDeleted(
-            parentId, linkedDeviceIds.Count, orphanedDevicesDeleted));
+            parentId, linkedDeviceIds.Count, orphanedDevicesDeleted,
+            audioConversationsAttempted: audio.Attempted,
+            audioFilesDeleted: audio.FilesDeleted,
+            audioDeleteFailures: audio.Failures));
         await _db.SaveChangesAsync();
 
         _logger.LogInformation(
-            "Parent {ParentId} deleted account ({LinkedDevices} linked devices, {OrphanedDevices} orphaned devices cascaded)",
-            parentId, linkedDeviceIds.Count, orphanedDevicesDeleted);
+            "Parent {ParentId} deleted account ({LinkedDevices} linked devices, {OrphanedDevices} orphaned devices cascaded, {AudioFilesDeleted} audio files cleaned, {AudioDeleteFailures} failures)",
+            parentId, linkedDeviceIds.Count, orphanedDevicesDeleted,
+            audio.FilesDeleted, audio.Failures);
         return true;
     }
 
@@ -812,16 +892,33 @@ public class ParentService : IParentService
         var conversations = await _db.Set<Conversation>()
             .Where(c => c.ChildId == childId)
             .ToListAsync();
+        // Snapshot the ids BEFORE we Remove the entities — the change
+        // tracker keeps Id readable while the row is queued for delete,
+        // but capturing now keeps the audio cleanup loop cleanly
+        // decoupled from the EF entity state.
+        var conversationIds = conversations.Select(c => c.Id).ToList();
         if (conversations.Count > 0)
             _db.Set<Conversation>().RemoveRange(conversations);
 
+        // C2.2a — DB-first. Remove Child + Conversations and commit;
+        // Messages cascade at the FK level. Then run audio cleanup
+        // for every conversation the child owned.
         _db.Set<Child>().Remove(child);
-        TrackAndAddAudit(AuditEvent.ParentChildDeleted(parentId, childId, conversations.Count));
+        await _db.SaveChangesAsync();
+
+        var audio = await RunAudioCleanupAsync(conversationIds);
+
+        TrackAndAddAudit(AuditEvent.ParentChildDeleted(
+            parentId, childId, conversations.Count,
+            audioConversationsAttempted: audio.Attempted,
+            audioFilesDeleted: audio.FilesDeleted,
+            audioDeleteFailures: audio.Failures));
         await _db.SaveChangesAsync();
 
         _logger.LogInformation(
-            "Parent {ParentId} deleted child {ChildId} on device {DeviceId} ({ConversationCount} conversations cascaded)",
-            parentId, childId, child.DeviceId, conversations.Count);
+            "Parent {ParentId} deleted child {ChildId} on device {DeviceId} ({ConversationCount} conversations cascaded, {AudioFilesDeleted} audio files cleaned, {AudioDeleteFailures} failures)",
+            parentId, childId, child.DeviceId, conversations.Count,
+            audio.FilesDeleted, audio.Failures);
         return true;
     }
 
@@ -861,14 +958,30 @@ public class ParentService : IParentService
         var messageCount = await _db.Set<Message>()
             .CountAsync(m => m.ConversationId == conversationId);
 
+        // C2.2a — DB-first ordering. Remove the Conversation row and
+        // commit; messages cascade at the DB FK level. Audio blob
+        // cleanup runs AFTER this commit so a filesystem failure
+        // cannot roll back a parent-initiated delete.
+        var deviceId = conversation.DeviceId;
         _db.Set<Conversation>().Remove(conversation);
+        await _db.SaveChangesAsync();
+
+        var audio = await RunAudioCleanupAsync(new[] { conversationId });
+
+        // Audit row carries the post-cleanup counts so the durable
+        // record matches what hit disk. Two SaveChanges per parent
+        // action by design — see CLAUDE.md § Voice chat (C2.2a).
         TrackAndAddAudit(AuditEvent.ParentConversationDeleted(
-            parentId, conversation.DeviceId, conversationId, messageCount));
+            parentId, deviceId, conversationId, messageCount,
+            audioConversationsAttempted: audio.Attempted,
+            audioFilesDeleted: audio.FilesDeleted,
+            audioDeleteFailures: audio.Failures));
         await _db.SaveChangesAsync();
 
         _logger.LogInformation(
-            "Parent {ParentId} deleted conversation {ConversationId} on device {DeviceId} ({MessageCount} messages cascaded)",
-            parentId, conversationId, conversation.DeviceId, messageCount);
+            "Parent {ParentId} deleted conversation {ConversationId} on device {DeviceId} ({MessageCount} messages cascaded, {AudioFilesDeleted} audio files cleaned, {AudioDeleteFailures} failures)",
+            parentId, conversationId, deviceId, messageCount,
+            audio.FilesDeleted, audio.Failures);
         return true;
     }
 
@@ -1342,6 +1455,51 @@ public class ParentService : IParentService
         if (hit is null)
             return null;
         return (hit.ConversationId, hit.MessageId);
+    }
+
+    // C2.2a — sum-aggregator for the audio-blob delete-cascade hook.
+    // Runs per-conversation cleanup AFTER the destructive DB
+    // SaveChanges has already committed, then returns the three
+    // count-shaped fields the existing parent-driven audit factories
+    // now carry (audio_conversations_attempted / audio_files_deleted /
+    // audio_delete_failures). IO failures and missing directories are
+    // both non-fatal here — the destructive parent action is the
+    // source of truth, residue is a future C2.3 sweeper concern.
+    // OperationCanceledException is the one exception that is allowed
+    // to propagate so cooperative cancellation stays visible.
+    private async Task<(int Attempted, int FilesDeleted, int Failures)>
+        RunAudioCleanupAsync(IReadOnlyCollection<Guid> conversationIds)
+    {
+        if (conversationIds.Count == 0)
+            return (0, 0, 0);
+
+        int attempted = 0;
+        int filesDeleted = 0;
+        int failures = 0;
+        foreach (var id in conversationIds)
+        {
+            attempted++;
+            try
+            {
+                var result = await _blobStore.DeleteConversationAudioAsync(id);
+                filesDeleted += result.FilesDeleted;
+                if (result.Failed)
+                    failures++;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                // Defensive — implementations are documented to swallow
+                // per-file IO failures, but if a future implementation
+                // throws (or the in-memory test double does), do not
+                // unwind the parent action. DB delete already committed.
+                _logger.LogWarning(ex,
+                    "Audio cleanup unexpectedly threw for conversation_id={ConversationId}; counting as failure",
+                    id);
+                failures++;
+            }
+        }
+        return (attempted, filesDeleted, failures);
     }
 
     // Central write path for audit rows: Adds the entity to the DbSet

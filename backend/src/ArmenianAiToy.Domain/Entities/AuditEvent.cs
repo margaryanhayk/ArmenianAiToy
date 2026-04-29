@@ -43,7 +43,16 @@ public class AuditEvent
     public string? Metadata { get; set; }
 
     public static AuditEvent ParentAccountDeleted(
-        Guid parentId, int linkedDevices, int orphanedDevicesDeleted) => new()
+        Guid parentId,
+        int linkedDevices,
+        int orphanedDevicesDeleted,
+        // C2.2a — audio cleanup roll-up across the orphaned-device
+        // cascade. Defaults are 0 so call sites that predate the
+        // cascade hook (none today, but keeps the signature
+        // additive-only) compile unchanged.
+        int audioConversationsAttempted = 0,
+        int audioFilesDeleted = 0,
+        int audioDeleteFailures = 0) => new()
     {
         Id = Guid.NewGuid(),
         Timestamp = DateTime.UtcNow,
@@ -52,12 +61,23 @@ public class AuditEvent
         Metadata = JsonSerializer.Serialize(new
         {
             linked_devices = linkedDevices,
-            orphaned_devices_deleted = orphanedDevicesDeleted
+            orphaned_devices_deleted = orphanedDevicesDeleted,
+            audio_conversations_attempted = audioConversationsAttempted,
+            audio_files_deleted = audioFilesDeleted,
+            audio_delete_failures = audioDeleteFailures
         })
     };
 
     public static AuditEvent ParentChildDeleted(
-        Guid parentId, Guid childId, int conversationsRemoved) => new()
+        Guid parentId,
+        Guid childId,
+        int conversationsRemoved,
+        // C2.2a — audio cleanup roll-up across every conversation the
+        // child owned. Defaults preserve compatibility with any
+        // future call site that wants to skip the cleanup signal.
+        int audioConversationsAttempted = 0,
+        int audioFilesDeleted = 0,
+        int audioDeleteFailures = 0) => new()
     {
         Id = Guid.NewGuid(),
         Timestamp = DateTime.UtcNow,
@@ -66,12 +86,24 @@ public class AuditEvent
         TargetChildId = childId,
         Metadata = JsonSerializer.Serialize(new
         {
-            conversations_removed = conversationsRemoved
+            conversations_removed = conversationsRemoved,
+            audio_conversations_attempted = audioConversationsAttempted,
+            audio_files_deleted = audioFilesDeleted,
+            audio_delete_failures = audioDeleteFailures
         })
     };
 
     public static AuditEvent ParentDeviceUnlinked(
-        Guid parentId, Guid deviceId, bool orphanCascaded) => new()
+        Guid parentId,
+        Guid deviceId,
+        bool orphanCascaded,
+        // C2.2a — audio cleanup roll-up across the orphan-cascaded
+        // device's conversations. Always 0 on the still-linked
+        // branch (no cascade fired). Defaults keep the signature
+        // additive-only.
+        int audioConversationsAttempted = 0,
+        int audioFilesDeleted = 0,
+        int audioDeleteFailures = 0) => new()
     {
         Id = Guid.NewGuid(),
         Timestamp = DateTime.UtcNow,
@@ -80,7 +112,10 @@ public class AuditEvent
         TargetDeviceId = deviceId,
         Metadata = JsonSerializer.Serialize(new
         {
-            orphan_cascaded = orphanCascaded
+            orphan_cascaded = orphanCascaded,
+            audio_conversations_attempted = audioConversationsAttempted,
+            audio_files_deleted = audioFilesDeleted,
+            audio_delete_failures = audioDeleteFailures
         })
     };
 
@@ -251,7 +286,15 @@ public class AuditEvent
         Guid parentId,
         Guid deviceId,
         Guid conversationId,
-        int messageCountDeleted) => new()
+        int messageCountDeleted,
+        // C2.2a — audio cleanup signal for this single-conversation
+        // delete. Single-conversation scope means audio_conversations_
+        // attempted is always 1 here in practice; kept consistent with
+        // the multi-conversation factories so downstream readers can
+        // sum across audit events without special-casing event types.
+        int audioConversationsAttempted = 0,
+        int audioFilesDeleted = 0,
+        int audioDeleteFailures = 0) => new()
     {
         Id = Guid.NewGuid(),
         Timestamp = DateTime.UtcNow,
@@ -263,7 +306,10 @@ public class AuditEvent
         {
             conversation_id = conversationId,
             message_count_deleted = messageCountDeleted,
-            deleted_at_utc = DateTime.UtcNow
+            deleted_at_utc = DateTime.UtcNow,
+            audio_conversations_attempted = audioConversationsAttempted,
+            audio_files_deleted = audioFilesDeleted,
+            audio_delete_failures = audioDeleteFailures
         })
     };
 
