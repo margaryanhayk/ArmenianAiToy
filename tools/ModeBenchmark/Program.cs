@@ -2,20 +2,25 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-// D2.1 — End-to-end mode-routing scaffold.
+// D2.2 — End-to-end mode-routing scaffold + device-only gate scenarios.
 //
-// CLI: first positional arg is baseUrl. No --write-baseline support in
-// this slice — the committed baseline ships with Placeholder=true and
-// the first real capture is a separate D2.1.bench follow-up slice.
+// CLI: first positional arg is baseUrl. No --write-baseline support yet —
+// the committed baseline ships with Placeholder=true and the first real
+// capture is a separate D2.x.bench follow-up slice.
 //
 // Per-scenario contract:
 //   1. Register a fresh device via POST /api/devices/register.
-//   2. POST /api/chat with { "message": <scenario.message> }.
-//   3. For "hard" scenarios (expectedMode != null):
-//        pass iff HTTP 200 AND resp.Mode == expectedMode.
-//   4. For "soft" scenarios (expectedMode == null):
-//        pass iff HTTP 200; observed mode is recorded but not asserted.
-//        Soft scenarios do NOT count against ModeMatches.
+//   2. For "gate" scenarios: link the device to a per-run parent,
+//      apply the gate-specific setup (pause / bedtime window /
+//      mode-flags), then send the chat request from the device.
+//   3. For "hard" / "soft" scenarios: send POST /api/chat as before.
+//   4. Pass conditions:
+//        hard: HTTP 200 AND resp.Mode == expectedMode.
+//        soft: HTTP 200 only; observed mode recorded but not asserted.
+//        gate: HTTP 200 AND resp.Mode == null AND resp.Response ==
+//              expectedResponseExact AND resp.ConversationId ==
+//              Guid.Empty AND resp.SafetyFlag == 0 (Clean) AND
+//              resp.ChoiceA == null AND resp.ChoiceB == null.
 //
 // D1-F2 contract is mirrored: SHA-256 of scenarios.json is included in
 // summary.json; baseline-side hash mismatch flips the verdict to
@@ -48,8 +53,11 @@ var scenarios = JsonSerializer.Deserialize<List<Scenario>>(
 // --- Inline self-check (runs BEFORE any HttpClient construction) ---
 // Every scenario must have a non-empty id and message; ids must be
 // unique; expectedMode (when non-null) must be in the allowed set.
+// Gate scenarios additionally require kind="gate", a recognized gate
+// value, expectedMode==null, and a non-empty expectedResponseExact.
 {
     string[] allowedModes = { "story", "game", "riddle", "curiosity", "calm" };
+    string[] allowedGates = { "paused", "bedtime", "mode_disabled" };
     var ids = new HashSet<string>(StringComparer.Ordinal);
     foreach (var s in scenarios)
     {
@@ -75,29 +83,106 @@ var scenarios = JsonSerializer.Deserialize<List<Scenario>>(
                 $"[selfcheck] FAILED: scenario {s.Id} expectedMode '{s.ExpectedMode}' not in allowed set");
             return 2;
         }
+
+        // Gate scenarios:
+        bool isGate = string.Equals(s.Kind, "gate", StringComparison.Ordinal);
+        bool hasGateField = !string.IsNullOrEmpty(s.Gate);
+        if (isGate || hasGateField)
+        {
+            if (!isGate)
+            {
+                Console.WriteLine(
+                    $"[selfcheck] FAILED: scenario {s.Id} has gate field but kind != 'gate'");
+                return 2;
+            }
+            if (!hasGateField)
+            {
+                Console.WriteLine(
+                    $"[selfcheck] FAILED: scenario {s.Id} kind='gate' but gate field is empty");
+                return 2;
+            }
+            if (Array.IndexOf(allowedGates, s.Gate) < 0)
+            {
+                Console.WriteLine(
+                    $"[selfcheck] FAILED: scenario {s.Id} gate '{s.Gate}' not in allowed set");
+                return 2;
+            }
+            if (s.ExpectedMode is not null)
+            {
+                Console.WriteLine(
+                    $"[selfcheck] FAILED: scenario {s.Id} is a gate but expectedMode is set");
+                return 2;
+            }
+            if (string.IsNullOrEmpty(s.ExpectedResponseExact))
+            {
+                Console.WriteLine(
+                    $"[selfcheck] FAILED: scenario {s.Id} gate has empty expectedResponseExact");
+                return 2;
+            }
+        }
     }
 }
 
 Console.WriteLine($"ModeBenchmark target: {baseUrl}");
 Console.WriteLine($"Loaded {scenarios.Count} scenarios\n");
 
-int hardCount = scenarios.Count(s => s.ExpectedMode is not null);
-int softCount = scenarios.Count(s => s.ExpectedMode is null);
+int hardCount = scenarios.Count(s => s.ExpectedMode is not null && !string.Equals(s.Kind, "gate", StringComparison.Ordinal));
+int softCount = scenarios.Count(s => s.ExpectedMode is null && !string.Equals(s.Kind, "gate", StringComparison.Ordinal));
+int gateCount = scenarios.Count(s => string.Equals(s.Kind, "gate", StringComparison.Ordinal));
+int gateTripsExpected = gateCount;
+int gateTripsObserved = 0;
 int scenariosOk = 0;
 int modeMatches = 0;
 var failures = new List<string>();
 var results = new List<ScenarioResult>();
+
+// --- Per-run parent for gate-scenario setup ---
+// Registered + logged in ONCE before the scenario loop. The same parent
+// then links every gate scenario's fresh device. Skipped entirely when
+// no gate scenarios are present (one parent registration costs an extra
+// auth-rate-limit slot we don't need to spend).
+HttpClient? parentHttp = null;
+if (gateCount > 0)
+{
+    parentHttp = new HttpClient
+    {
+        BaseAddress = new Uri(baseUrl),
+        Timeout = TimeSpan.FromSeconds(30),
+    };
+    var parentEmail = $"mbench-{DateTime.UtcNow:yyyyMMddHHmmssfff}@example.invalid";
+    var parentPassword = $"MBenchPass-{Guid.NewGuid():N}";
+    try
+    {
+        await RegisterParentAsync(parentHttp, parentEmail, parentPassword);
+        var jwt = await LoginParentAsync(parentHttp, parentEmail, parentPassword, jsonOpts);
+        parentHttp.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", jwt);
+        Console.WriteLine($"Registered + logged in parent: {parentEmail}\n");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[fatal] Parent setup failed — gate scenarios cannot run: {ex.Message}");
+        return 1;
+    }
+}
 
 Console.WriteLine("ID    | Kind | Expected   | Observed   | Status");
 Console.WriteLine("------|------|------------|------------|-------");
 
 foreach (var scenario in scenarios)
 {
+    bool isGate = string.Equals(scenario.Kind, "gate", StringComparison.Ordinal);
+    bool isHard = !isGate && scenario.ExpectedMode is not null;
+    bool isSoft = !isGate && !isHard;
+
     var sResult = new ScenarioResult
     {
         Id = scenario.Id,
         Message = scenario.Message,
         ExpectedMode = scenario.ExpectedMode,
+        Kind = isGate ? "gate" : (isHard ? "hard" : "soft"),
+        Gate = scenario.Gate,
+        ExpectedResponseExact = scenario.ExpectedResponseExact,
     };
 
     // Fresh HttpClient + device per scenario so any per-conversation
@@ -122,11 +207,50 @@ foreach (var scenario in scenarios)
         sResult.Error = $"device registration failed: {ex.Message}";
         failures.Add($"{scenario.Id}: device registration failed — {ex.Message}");
         results.Add(sResult);
-        Console.WriteLine($" {scenario.Id} | {(scenario.ExpectedMode is null ? "soft" : "hard")} | reg-fail");
+        Console.WriteLine($" {scenario.Id} | {sResult.Kind,-4} | reg-fail");
         continue;
     }
     http.DefaultRequestHeaders.Add("X-Device-Id", device.DeviceId.ToString());
     http.DefaultRequestHeaders.Add("X-Api-Key", device.ApiKey);
+
+    // Gate-specific setup BEFORE the chat call.
+    if (isGate)
+    {
+        try
+        {
+            await LinkDeviceAsync(parentHttp!, device.DeviceId, device.ApiKey);
+            switch (scenario.Gate)
+            {
+                case "paused":
+                    await PauseDeviceAsync(parentHttp!, device.DeviceId);
+                    break;
+                case "bedtime":
+                    var (start, end) = ComputeBedtimeWindowAroundNow();
+                    await SetBedtimeWindowAsync(parentHttp!, device.DeviceId, start, end);
+                    break;
+                case "mode_disabled":
+                    // Disable Story specifically — the trigger message is a
+                    // Story trigger, so this gate fires.
+                    await SetDeviceModeFlagsAsync(parentHttp!, device.DeviceId,
+                        story: false, game: true, riddle: true, curiosity: true);
+                    break;
+                default:
+                    sResult.Error = $"unknown gate '{scenario.Gate}'";
+                    failures.Add($"{scenario.Id}: unknown gate '{scenario.Gate}'");
+                    results.Add(sResult);
+                    Console.WriteLine($" {scenario.Id} | gate | unknown-gate");
+                    continue;
+            }
+        }
+        catch (Exception ex)
+        {
+            sResult.Error = $"gate setup failed: {ex.Message}";
+            failures.Add($"{scenario.Id}: gate setup failed — {ex.Message}");
+            results.Add(sResult);
+            Console.WriteLine($" {scenario.Id} | gate | setup-fail");
+            continue;
+        }
+    }
 
     ChatResponseShape? resp = null;
     int httpStatus = 0;
@@ -141,7 +265,7 @@ foreach (var scenario in scenarios)
             sResult.Error = $"HTTP {httpStatus}";
             failures.Add($"{scenario.Id}: HTTP {httpStatus}");
             results.Add(sResult);
-            Console.WriteLine($" {scenario.Id} | {(scenario.ExpectedMode is null ? "soft" : "hard")} | HTTP {httpStatus}");
+            Console.WriteLine($" {scenario.Id} | {sResult.Kind,-4} | HTTP {httpStatus}");
             continue;
         }
         resp = await httpResp.Content.ReadFromJsonAsync<ChatResponseShape>(jsonOpts);
@@ -152,7 +276,7 @@ foreach (var scenario in scenarios)
         sResult.Error = ex.Message;
         failures.Add($"{scenario.Id}: chat request failed — {ex.Message}");
         results.Add(sResult);
-        Console.WriteLine($" {scenario.Id} | {(scenario.ExpectedMode is null ? "soft" : "hard")} | error");
+        Console.WriteLine($" {scenario.Id} | {sResult.Kind,-4} | error");
         continue;
     }
 
@@ -163,9 +287,33 @@ foreach (var scenario in scenarios)
         ? responseText.Substring(0, 120) + "…"
         : responseText;
 
-    bool isHard = scenario.ExpectedMode is not null;
     bool ok;
-    if (isHard)
+    if (isGate)
+    {
+        // Five-invariant gate-trip assertion. ALL must hold.
+        bool modeNull           = resp?.Mode is null;
+        bool textMatches        = string.Equals(
+            resp?.Response, scenario.ExpectedResponseExact, StringComparison.Ordinal);
+        bool conversationEmpty  = resp?.ConversationId == Guid.Empty;
+        bool safetyClean        = (resp?.SafetyFlag ?? -1) == 0;
+        bool noChoiceA          = string.IsNullOrEmpty(resp?.ChoiceA);
+        bool noChoiceB          = string.IsNullOrEmpty(resp?.ChoiceB);
+        ok = httpStatus == 200 && modeNull && textMatches
+             && conversationEmpty && safetyClean && noChoiceA && noChoiceB;
+        if (ok)
+        {
+            gateTripsObserved++;
+        }
+        else
+        {
+            failures.Add(
+                $"{scenario.Id}: gate={scenario.Gate} expected canned response, " +
+                $"got mode={resp?.Mode ?? "(null)"}, " +
+                $"text='{(responseText.Length > 60 ? responseText.Substring(0, 60) + "…" : responseText)}', " +
+                $"conv={resp?.ConversationId}, safety={resp?.SafetyFlag}");
+        }
+    }
+    else if (isHard)
     {
         ok = httpStatus == 200
              && string.Equals(resp?.Mode, scenario.ExpectedMode, StringComparison.Ordinal);
@@ -194,21 +342,26 @@ foreach (var scenario in scenarios)
     if (ok) scenariosOk++;
     results.Add(sResult);
 
-    var kindLabel = isHard ? "hard" : "soft";
-    var expectedLabel = scenario.ExpectedMode ?? "(any)";
+    var expectedLabel = isGate
+        ? scenario.Gate ?? "(gate)"
+        : (scenario.ExpectedMode ?? "(any)");
     var observedLabel = resp?.Mode ?? "(null)";
     var statusLabel = ok ? "PASS" : "FAIL";
     Console.WriteLine(
-        $" {scenario.Id} | {kindLabel} | {expectedLabel,-10} | {observedLabel,-10} | {statusLabel}");
+        $" {scenario.Id} | {sResult.Kind,-4} | {expectedLabel,-10} | {observedLabel,-10} | {statusLabel}");
 }
+
+// Always dispose the parent client after all scenarios run.
+parentHttp?.Dispose();
 
 Console.WriteLine();
 Console.WriteLine("═══════════════════════════════════════");
 Console.WriteLine("  MODE BENCHMARK SUMMARY");
 Console.WriteLine("═══════════════════════════════════════");
-Console.WriteLine($"  Total scenarios:   {scenarios.Count}  (hard {hardCount} / soft {softCount})");
-Console.WriteLine($"  Scenarios passed:  {scenariosOk}/{scenarios.Count}");
-Console.WriteLine($"  Mode matches:      {modeMatches}/{hardCount}");
+Console.WriteLine($"  Total scenarios:    {scenarios.Count}  (hard {hardCount} / soft {softCount} / gate {gateCount})");
+Console.WriteLine($"  Scenarios passed:   {scenariosOk}/{scenarios.Count}");
+Console.WriteLine($"  Mode matches:       {modeMatches}/{hardCount}");
+Console.WriteLine($"  Gate trips:         {gateTripsObserved}/{gateTripsExpected}");
 
 // --- Save per-scenario results + markdown ---
 var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
@@ -222,14 +375,16 @@ md.AppendLine("# ModeBenchmark Results");
 md.AppendLine();
 md.AppendLine($"**Date:** {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
 md.AppendLine($"**Target:** {baseUrl}");
-md.AppendLine($"**Scenarios:** {scenarios.Count}  (hard {hardCount} / soft {softCount})");
+md.AppendLine($"**Scenarios:** {scenarios.Count}  (hard {hardCount} / soft {softCount} / gate {gateCount})");
 md.AppendLine();
 md.AppendLine("| ID | Kind | Message | Expected | Observed | Status |");
 md.AppendLine("|----|------|---------|----------|----------|--------|");
 foreach (var r in results)
 {
-    var kind = r.ExpectedMode is null ? "soft" : "hard";
-    var expected = r.ExpectedMode ?? "(any)";
+    var kind = r.Kind ?? "soft";
+    var expected = string.Equals(kind, "gate", StringComparison.Ordinal)
+        ? (r.Gate ?? "(gate)")
+        : (r.ExpectedMode ?? "(any)");
     var observed = r.ObservedMode ?? "(null)";
     var status = r.Ok ? "PASS" : "FAIL";
     md.AppendLine($"| {r.Id} | {kind} | {r.Message} | {expected} | {observed} | {status} |");
@@ -328,6 +483,9 @@ await File.WriteAllTextAsync(summaryPath, JsonSerializer.Serialize(new
     scenariosOk,
     modeMatches,
     softScenarios = softCount,
+    gateScenarios = gateCount,
+    gateTripsExpected,
+    gateTripsObserved,
 }, jsonOpts));
 
 if (failures.Count > 0)
@@ -341,6 +499,80 @@ Console.WriteLine("════════════════════�
 
 return runSucceeded ? 0 : 1;
 
+// --- Helpers (parent-side endpoints used by gate scenarios) ---
+
+static async Task RegisterParentAsync(HttpClient http, string email, string password)
+{
+    var body = new { email, password, acceptedTerms = true };
+    var resp = await http.PostAsJsonAsync("/api/parents/register", body);
+    resp.EnsureSuccessStatusCode();
+}
+
+static async Task<string> LoginParentAsync(
+    HttpClient http, string email, string password, JsonSerializerOptions jsonOpts)
+{
+    var body = new { email, password };
+    var resp = await http.PostAsJsonAsync("/api/parents/login", body);
+    resp.EnsureSuccessStatusCode();
+    var login = await resp.Content.ReadFromJsonAsync<ParentLoginShape>(jsonOpts)
+        ?? throw new Exception("parent login returned null");
+    if (string.IsNullOrWhiteSpace(login.Token))
+        throw new Exception("parent login response had no token");
+    return login.Token;
+}
+
+static async Task LinkDeviceAsync(HttpClient parentHttp, Guid deviceId, string apiKey)
+{
+    var body = new { deviceId, apiKey };
+    var resp = await parentHttp.PostAsJsonAsync("/api/parents/devices/link", body);
+    resp.EnsureSuccessStatusCode();
+}
+
+static async Task PauseDeviceAsync(HttpClient parentHttp, Guid deviceId)
+{
+    var resp = await parentHttp.PostAsync(
+        $"/api/parents/devices/{deviceId}/pause", content: null);
+    resp.EnsureSuccessStatusCode();
+}
+
+static async Task SetBedtimeWindowAsync(
+    HttpClient parentHttp, Guid deviceId, TimeOnly start, TimeOnly end)
+{
+    var body = new
+    {
+        start = start.ToString("HH:mm:ss"),
+        end   = end.ToString("HH:mm:ss"),
+    };
+    var resp = await parentHttp.PutAsJsonAsync(
+        $"/api/parents/devices/{deviceId}/bedtime-window", body);
+    resp.EnsureSuccessStatusCode();
+}
+
+static async Task SetDeviceModeFlagsAsync(
+    HttpClient parentHttp, Guid deviceId,
+    bool story, bool game, bool riddle, bool curiosity)
+{
+    var body = new { story, game, riddle, curiosity };
+    var resp = await parentHttp.PutAsJsonAsync(
+        $"/api/parents/devices/{deviceId}/mode-flags", body);
+    resp.EnsureSuccessStatusCode();
+}
+
+// Compute a 6-minute bedtime window centered on wall-clock now, expressed
+// in the device's default IANA timezone. Mirrors the server-side fallback:
+// if "Asia/Yerevan" doesn't resolve on this host, fall back to UTC — the
+// server does the same (BedtimeWindowEvaluator.cs:46–49).
+static (TimeOnly start, TimeOnly end) ComputeBedtimeWindowAroundNow()
+{
+    TimeZoneInfo tz;
+    try { tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Yerevan"); }
+    catch { tz = TimeZoneInfo.Utc; }
+    var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
+    var start = TimeOnly.FromDateTime(nowLocal.AddMinutes(-1));
+    var end = TimeOnly.FromDateTime(nowLocal.AddMinutes(+5));
+    return (start, end);
+}
+
 // --- DTOs ---
 
 record Scenario
@@ -348,6 +580,11 @@ record Scenario
     public string Id { get; init; } = "";
     public string Message { get; init; } = "";
     public string? ExpectedMode { get; init; }
+
+    // D2.2 additions — gate scenarios only.
+    public string? Kind { get; init; }                 // "gate" for gate scenarios; null for hard/soft
+    public string? Gate { get; init; }                 // "paused" / "bedtime" / "mode_disabled"
+    public string? ExpectedResponseExact { get; init; } // canned text the wire MUST match
 }
 
 record ChatResponseShape
@@ -368,14 +605,25 @@ record DeviceReg
     public string ApiKey { get; init; } = "";
 }
 
+record ParentLoginShape
+{
+    public string Token { get; init; } = "";
+}
+
 record ModeMetrics
 {
     public int TotalScenarios { get; init; }
     public int HardScenarios { get; init; }
     public int SoftScenarios { get; init; }
+
+    // D2.2 additions on the metrics record.
+    public int GateScenarios { get; init; }
+    public int GateTripsExpected { get; init; }
+    public int GateTripsObserved { get; init; }
+
     public int ScenariosOk { get; init; }
     public int ModeMatches { get; init; }
-    public int GateTrips { get; init; }
+    public int GateTrips { get; init; }   // legacy placeholder kept alongside GateTripsObserved
     public int WeakCases { get; init; }
     public bool Placeholder { get; init; }
     public int PromptsCount { get; init; }
@@ -387,6 +635,12 @@ record ScenarioResult
     public string Id { get; init; } = "";
     public string Message { get; init; } = "";
     public string? ExpectedMode { get; init; }
+
+    // D2.2 additions on the per-scenario result.
+    public string? Kind { get; init; }                  // "hard" / "soft" / "gate"
+    public string? Gate { get; init; }                  // gate value when applicable
+    public string? ExpectedResponseExact { get; init; } // canned text expected (gate scenarios)
+
     public string? ObservedMode { get; set; }
     public string? ResponseSnippet { get; set; }
     public int HttpStatus { get; set; }

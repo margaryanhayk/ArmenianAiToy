@@ -6,5 +6,29 @@
   { "id": "MB05", "message": "I'm tired",                         "expectedMode": "calm" },
   { "id": "MB06", "message": "Պատմիր",                            "expectedMode": "story" },
   { "id": "MB07", "message": "ինչու են աստղերը փայլում",          "expectedMode": "curiosity" },
-  { "id": "MB08", "message": "բարև",                              "expectedMode": null }
+  { "id": "MB08", "message": "բարև",                              "expectedMode": null },
+  {
+    "id": "MG01",
+    "kind": "gate",
+    "gate": "paused",
+    "message": "tell me a story about a bunny",
+    "expectedMode": null,
+    "expectedResponseExact": "Հիմա հանգստանում եմ։ Ծնողիդ կարող է նորից միացնել։"
+  },
+  {
+    "id": "MG02",
+    "kind": "gate",
+    "gate": "bedtime",
+    "message": "tell me a story about a bunny",
+    "expectedMode": null,
+    "expectedResponseExact": "Հիմա հանգստանում եմ։ Ծնողիդ կարող է նորից միացնել։"
+  },
+  {
+    "id": "MG03",
+    "kind": "gate",
+    "gate": "mode_disabled",
+    "message": "tell me a story about a bunny",
+    "expectedMode": null,
+    "expectedResponseExact": "Եկ մի ուրիշ բան փորձենք։"
+  }
 ]

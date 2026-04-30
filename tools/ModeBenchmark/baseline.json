@@ -1,12 +1,15 @@
 {
-  "TotalScenarios": 8,
+  "TotalScenarios": 11,
   "HardScenarios": 7,
   "SoftScenarios": 1,
-  "ScenariosOk": 8,
-  "ModeMatches": 7,
+  "GateScenarios": 3,
+  "GateTripsExpected": 3,
+  "GateTripsObserved": 0,
+  "ScenariosOk": 0,
+  "ModeMatches": 0,
   "GateTrips": 0,
   "WeakCases": 0,
-  "Placeholder": false,
-  "PromptsCount": 8,
-  "PromptsSha256": "78c041983cdbc90c167c8c8a2c8af54ab2842a3e5d03a3f7ff41a4175841e0ec"
+  "Placeholder": true,
+  "PromptsCount": 11,
+  "PromptsSha256": "ca48881b5a7f17bd31af5328a4f096a966c6afe5c90b552989391ea1316010d1"
 }
