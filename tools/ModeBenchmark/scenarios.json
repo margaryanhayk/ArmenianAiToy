@@ -1,0 +1,10 @@
+[
+  { "id": "MB01", "message": "tell me a story about a bunny",     "expectedMode": "story" },
+  { "id": "MB02", "message": "let's play a game",                 "expectedMode": "game" },
+  { "id": "MB03", "message": "give me a riddle",                  "expectedMode": "riddle" },
+  { "id": "MB04", "message": "why is the sky blue",               "expectedMode": "curiosity" },
+  { "id": "MB05", "message": "I'm tired",                         "expectedMode": "calm" },
+  { "id": "MB06", "message": "Պատմիր",                            "expectedMode": "story" },
+  { "id": "MB07", "message": "ինչու են աստղերը փայլում",          "expectedMode": "curiosity" },
+  { "id": "MB08", "message": "բարև",                              "expectedMode": null }
+]
