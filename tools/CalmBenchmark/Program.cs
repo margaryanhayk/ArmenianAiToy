@@ -23,6 +23,14 @@ var baselinePath = Path.Combine(AppContext.BaseDirectory, "baseline.json");
 var resultsDir = Path.Combine(AppContext.BaseDirectory, "results");
 Directory.CreateDirectory(resultsDir);
 
+// D1-F2: pin prompt-set identity so prompt edits cannot silently invalidate
+// the regression verdict. The hash is the SHA-256 of prompts.json on disk;
+// the count comes from the deserialized list later. Both land in
+// summary.json and in any --write-baseline output.
+var promptsBytes = await File.ReadAllBytesAsync(promptsPath);
+var promptsSha256 = Convert.ToHexString(
+    System.Security.Cryptography.SHA256.HashData(promptsBytes)).ToLowerInvariant();
+
 // --- Thresholds ---
 // Mirrors ModeBenchmark's CalmMaxLen — the Calm surface accepts
 // somewhat longer turns on the opener but the WIND-DOWN ARC directive
@@ -378,7 +386,11 @@ var current = new CalmMetrics
     EchoedFearWord = echoedFearWord,
     ArcNotWindingDown = arcNotWindingDown,
     Placeholder = false,
+    PromptsCount = scenarios.Count,
+    PromptsSha256 = promptsSha256,
 };
+
+bool promptsChanged = false;
 
 if (File.Exists(baselinePath))
 {
@@ -388,6 +400,19 @@ if (File.Exists(baselinePath))
             await File.ReadAllTextAsync(baselinePath), jsonOpts);
         if (baseline is not null && !baseline.Placeholder)
         {
+            // D1-F2: detect prompt-set drift before printing deltas. A
+            // null/empty PromptsSha256 on the baseline is treated as a
+            // mismatch — once a baseline is recaptured under the new
+            // tooling it always carries a hash; absence means the baseline
+            // pre-dates this check and the verdict cannot be trusted.
+            if (string.IsNullOrEmpty(baseline.PromptsSha256)
+                || !string.Equals(baseline.PromptsSha256, promptsSha256, StringComparison.Ordinal))
+            {
+                promptsChanged = true;
+                Console.WriteLine();
+                Console.WriteLine("  WARNING: Prompts hash differs from baseline — regression verdict unavailable for this run");
+            }
+
             Console.WriteLine();
             Console.WriteLine("  Delta vs baseline (negative = improvement for weak counts)");
             Console.WriteLine($"    scenarios_ok:             {Delta(baseline.ScenariosOk, current.ScenariosOk)}");
@@ -454,7 +479,10 @@ Console.WriteLine("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\
 // a partial run's weak-case total is not comparable to the baseline.
 bool runSucceeded = (scenariosOk == scenarios.Count);
 int? baselineWeakCasesForSummary = null;
-if (runSucceeded && File.Exists(baselinePath))
+// D1-F2: when the prompt set has changed, the baseline weak-case count is
+// not comparable to the current run; force the BenchmarkAll-side verdict
+// to "unavailable" by leaving baselineWeakCasesForSummary null.
+if (runSucceeded && !promptsChanged && File.Exists(baselinePath))
 {
     try
     {
@@ -465,7 +493,8 @@ if (runSucceeded && File.Exists(baselinePath))
     }
     catch { /* leave null → verdict stays "unavailable" */ }
 }
-string regressionVerdict = baselineWeakCasesForSummary is null ? "unavailable"
+string regressionVerdict = promptsChanged ? "unavailable"
+    : baselineWeakCasesForSummary is null ? "unavailable"
     : current.WeakCases < baselineWeakCasesForSummary.Value ? "improved"
     : current.WeakCases > baselineWeakCasesForSummary.Value ? "regressed"
     : "unchanged";
@@ -478,6 +507,9 @@ await File.WriteAllTextAsync(summaryPath, JsonSerializer.Serialize(new
     baselineWeakCases = baselineWeakCasesForSummary,
     currentWeakCases = current.WeakCases,
     regressionVerdict,
+    promptsCount = scenarios.Count,
+    promptsSha256,
+    promptsChanged,
 }, jsonOpts));
 
 return scenariosOk == scenarios.Count ? 0 : 1;
@@ -538,6 +570,11 @@ record CalmMetrics
     public int EchoedFearWord { get; init; }
     public int ArcNotWindingDown { get; init; }
     public bool Placeholder { get; init; }
+    // D1-F2: prompt-set identity. PromptsSha256 is null on legacy baselines
+    // that pre-date the field; a null/empty value triggers the same
+    // "prompts changed" path as a hash mismatch.
+    public int PromptsCount { get; init; }
+    public string? PromptsSha256 { get; init; }
 }
 
 record ScenarioResult

@@ -10,5 +10,7 @@
   "CelebrationRepeat": 0,
   "AskingPermission": 0,
   "MixingTypes": 0,
-  "Placeholder": false
+  "Placeholder": false,
+  "PromptsCount": 6,
+  "PromptsSha256": "74e6e5a63628c73e4947954afc01c76e613c9fbd7106c1477c39c7daebf7ce8a"
 }

@@ -10,5 +10,7 @@
   "EncyclopediaOpener": 0,
   "ChainedCause": 0,
   "LengthGrowing": 1,
-  "Placeholder": false
+  "Placeholder": false,
+  "PromptsCount": 6,
+  "PromptsSha256": "93540a785a61b5b3a67edf39bf0725e30a687e7c59f13da98634a257263bbc46"
 }

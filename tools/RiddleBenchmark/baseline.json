@@ -10,5 +10,7 @@
   "MissingRevealMarker": 0,
   "MissingOfferNext": 0,
   "TooLong": 0,
-  "Placeholder": false
+  "Placeholder": false,
+  "PromptsCount": 6,
+  "PromptsSha256": "009bf79bd6cc17ee3fc5b7300bf23a834155e911691d4c2847ec29af4f6a8aa5"
 }

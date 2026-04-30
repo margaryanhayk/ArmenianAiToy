@@ -11,5 +11,7 @@
   "CompanionLanguageLeak": 0,
   "EchoedFearWord": 0,
   "ArcNotWindingDown": 0,
-  "Placeholder": false
+  "Placeholder": false,
+  "PromptsCount": 5,
+  "PromptsSha256": "d674d0c1184ece49d523eda130929736d1f6cea5a6aeb7ec255e4dad0401ec89"
 }
