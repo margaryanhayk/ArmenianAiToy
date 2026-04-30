@@ -250,6 +250,59 @@ tabs.
    reach the Today panel — the device is not visible at all under
    the existing ownership filter; no new auth surface is added.
 
+### E1.2.ui addendum (panel rewired to server-aggregated endpoint)
+
+As of E1.2.ui, the Today panel consumes
+`GET /api/conversations/today-summary?deviceId=...` instead of the
+client-side aggregation over `/api/conversations/summary?limit=100`.
+
+- **Counts are EXACT per-message** (no longer over-counts when a
+  conversation spans midnight UTC).
+- **The 100-row cap is gone.** Server pre-aggregates the full day; the
+  panel renders the DTO as-is.
+- **New "🔊 N replayable" badge** when `assistantMessagesWithAudio > 0`.
+  The badge is **count-only** — actual audio playback stays in the
+  conversation detail view via the existing C2.1 ▶ Listen affordance.
+  The panel does not surface any path or id, only a daily count.
+- **"[N today]" tail** on each newest / flagged conversation link
+  shows `messageCountToday` per the E1.2 DTO. For a conversation that
+  started yesterday but had a turn today, this tail reflects ONLY the
+  today messages, not the lifetime count.
+- **Footnote** is now `Today (UTC) — server-aggregated.` (the
+  limit-100 caveat from E1.1 is dropped).
+- **Privacy unchanged.** The DTO does NOT expose `childId` or
+  `audioBlobPath`; the panel cannot. The C2.1 contract that audio
+  replay happens in the detail view (with the assistant-only role
+  gate) is preserved.
+
+**Manual QA additions (E1.2.ui)**:
+
+9.  Network tab (browser DevTools): exactly ONE Today-panel request
+    fires per device-tab entry, to `/api/conversations/today-summary`.
+    The legacy `/api/conversations/summary?limit=100&offset=0` Today-
+    panel call is gone. The paginated list below the panel still
+    calls `/api/conversations/summary` with `limit=20`.
+10. Counts agree with the DTO. With a known-state device (e.g. 3
+    conversations today, two started yesterday), the rendered
+    counts equal `dto.conversationsCount` / `dto.messagesCount` /
+    `dto.flaggedMessagesCount` byte-for-byte.
+11. Audio badge appears only when `dto.assistantMessagesWithAudio > 0`.
+    Reproduce by completing one C1 voice turn (or running the audio
+    chat path manually) and refreshing the panel.
+12. Audio badge does NOT appear when the count is 0.
+13. Newest list reflects server-side ordering (`StartedAt` desc, top 3).
+14. Flagged list reflects server-side ordering (latest flagged-today
+    timestamp desc, top 3) — verify with a synthetic case where the
+    OLDEST conversation has the LATEST flagged turn.
+15. `[N today]` tail on each link shows `messageCountToday`. For a
+    spanning conversation, it shows ONLY today's count.
+16. Failure mode: stop the backend mid-page-load → the panel renders
+    `Today summary unavailable.` while the existing Conversations /
+    Flagged tabs continue to use the cached / paged `/summary` results.
+17. Privacy: a different parent who does NOT own the device cannot
+    reach the panel — same property as T8; the device is not
+    visible at all under the existing ownership filter.
+
 ## Today summary endpoint (E1.2)
 
 Server-side daily aggregation that supersedes the E1.1 frontend-only
@@ -306,12 +359,15 @@ linked-device ownership gate.
 - `AssistantMessagesWithAudio` is role-gated. Pinned by
   `GetTodaySummary_AssistantAudio_OnlyAssistantWithAudioBlobPath`.
 
-**`parent.html` consumption — DEFERRED to E1.2.ui.** The frontend
-Today panel still uses `/api/conversations/summary` and computes
-client-side approximations. A follow-up slice will rewire it to call
-this endpoint, dropping the limit-100 cap and the whole-conversation
-over-counting, and rendering the new
-`AssistantMessagesWithAudio` badge.
+**`parent.html` consumption — LIVE as of E1.2.ui.** The Today panel
+calls this endpoint and renders the DTO directly. The legacy E1.1
+client-side aggregation over `/api/conversations/summary?limit=100`
+is gone; the limit-100 cap and whole-conversation over-counting are
+no longer in the panel. The `assistantMessagesWithAudio` field is
+displayed as a small `🔊 N replayable` badge (count only — playback
+stays in the detail view per C2.1). See the "Today summary panel
+(E1.1)" → "E1.2.ui addendum" subsection above for the full UI
+contract and manual QA additions.
 
 **Modes-used-today — DEFERRED to E1.3.** `DetectedMode` is not
 persisted in the schema today (it lives only in

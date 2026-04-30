@@ -2017,15 +2017,16 @@
       loadSummaries();
     }
 
-    // ---------- today summary panel (E1.1) ----------
+    // ---------- today summary panel (E1.1 + E1.2.ui) ----------
     // Read-only daily snapshot at the top of the Conversations view.
-    // Reuses /api/conversations/summary with the existing parent-JWT
-    // auth and ownership filter. "Today" is computed in UTC: rows whose
-    // startedAt >= midnight UTC of the current day are counted. Up to
-    // 100 newest summary rows are pulled; a device with > 100 same-day
-    // conversations would surface the top 100 (footnote documents this).
-    // Modes-used / audio-availability counts are deferred to E1.2 — they
-    // need per-message data not present in /summary.
+    // E1.2.ui: now consumes the dedicated server-aggregated endpoint
+    // /api/conversations/today-summary (E1.2). Counts are EXACT per-
+    // message (not whole-conversation), the limit-100 cap is gone,
+    // and assistantMessagesWithAudio is rendered as a small count-only
+    // "🔊 N replayable" badge. Audio playback itself stays in the
+    // detail view per the C2.1 contract — the panel never plays audio
+    // and never exposes AudioBlobPath. The endpoint also does not
+    // expose childId.
     function loadTodayPanel(deviceId) {
       var panel = document.getElementById('todayPanel');
       if (!panel || !deviceId) return;
@@ -2039,16 +2040,14 @@
       clearChildren(flagged);
       if (footnote) footnote.textContent = '';
 
-      var url = '/api/conversations/summary'
-        + '?deviceId=' + encodeURIComponent(deviceId)
-        + '&limit=100&offset=0';
+      var url = '/api/conversations/today-summary'
+        + '?deviceId=' + encodeURIComponent(deviceId);
       authedFetch(url).then(function (data) {
         // The deviceId may have changed by the time this resolves
         // (parent navigated away). Render only if we're still on the
         // same device.
         if (state.currentDeviceId !== deviceId) return;
-        var rows = (data && data.conversations) || [];
-        renderTodayPanel(rows);
+        renderTodayPanel(data || {});
       }).catch(function (err) {
         if (err && err.status === 401) return;
         if (state.currentDeviceId !== deviceId) return;
@@ -2059,7 +2058,7 @@
       });
     }
 
-    function renderTodayPanel(rows) {
+    function renderTodayPanel(dto) {
       var counts   = document.getElementById('todayCounts');
       var newest   = document.getElementById('todayNewest');
       var flagged  = document.getElementById('todayFlagged');
@@ -2068,40 +2067,27 @@
       clearChildren(newest);
       clearChildren(flagged);
 
-      // UTC today boundary — matches the StartedAt UTC storage.
-      var now = new Date();
-      var todayStartUtc = Date.UTC(
-        now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0);
+      var conversationsToday = (typeof dto.conversationsCount === 'number')
+        ? dto.conversationsCount : 0;
+      var messagesToday = (typeof dto.messagesCount === 'number')
+        ? dto.messagesCount : 0;
+      var flaggedToday = (typeof dto.flaggedMessagesCount === 'number')
+        ? dto.flaggedMessagesCount : 0;
+      var audioToday = (typeof dto.assistantMessagesWithAudio === 'number')
+        ? dto.assistantMessagesWithAudio : 0;
+      var newestRows = Array.isArray(dto.newest) ? dto.newest : [];
+      var flaggedRows = Array.isArray(dto.flagged) ? dto.flagged : [];
 
-      var todayRows = rows.filter(function (r) {
-        if (!r || !r.startedAt) return false;
-        var t = Date.parse(r.startedAt);
-        return !isNaN(t) && t >= todayStartUtc;
-      });
-
-      if (todayRows.length === 0) {
+      if (conversationsToday === 0) {
         var empty = document.createElement('div');
         empty.className = 'today-empty';
         empty.textContent = 'No conversations today on this device.';
         counts.appendChild(empty);
         if (footnote) {
-          footnote.textContent =
-            'Showing up to 100 newest conversations for today (UTC).';
+          footnote.textContent = 'Today (UTC) — server-aggregated.';
         }
         return;
       }
-
-      var conversationsToday = todayRows.length;
-      var messagesToday = todayRows.reduce(function (sum, r) {
-        return sum + (typeof r.messageCount === 'number' ? r.messageCount : 0);
-      }, 0);
-      // Sum exact flaggedMessageCount when available; fall back to a
-      // binary "+1 if hasFlaggedContent" for older payloads.
-      var flaggedToday = todayRows.reduce(function (sum, r) {
-        return sum + (typeof r.flaggedMessageCount === 'number'
-          ? r.flaggedMessageCount
-          : (r.hasFlaggedContent ? 1 : 0));
-      }, 0);
 
       var countsLine = document.createElement('div');
       countsLine.textContent =
@@ -2110,36 +2096,37 @@
       counts.appendChild(countsLine);
 
       if (flaggedToday > 0) {
-        var badge = document.createElement('span');
-        badge.className = 'badge';
-        badge.textContent = '⚠ ' + flaggedToday + ' flagged message'
+        var flagBadge = document.createElement('span');
+        flagBadge.className = 'badge';
+        flagBadge.textContent = '⚠ ' + flaggedToday + ' flagged message'
           + (flaggedToday === 1 ? '' : 's');
         countsLine.appendChild(document.createTextNode(' '));
-        countsLine.appendChild(badge);
+        countsLine.appendChild(flagBadge);
       }
 
-      // Newest 3 (today only).
-      var sortedNewest = todayRows.slice().sort(function (a, b) {
-        return Date.parse(b.startedAt) - Date.parse(a.startedAt);
-      }).slice(0, 3);
+      // E1.2.ui: count-only badge — playback stays in the detail view
+      // per the C2.1 ▶ Listen contract. The badge does not surface any
+      // path / id; it is a deterministic per-day aggregate.
+      if (audioToday > 0) {
+        var audioBadge = document.createElement('span');
+        audioBadge.className = 'badge';
+        audioBadge.title = 'Assistant messages with replayable audio today.';
+        audioBadge.textContent = '🔊 ' + audioToday + ' replayable';
+        countsLine.appendChild(document.createTextNode(' '));
+        countsLine.appendChild(audioBadge);
+      }
+
+      // Newest — server pre-orders by startedAt desc and caps at 3.
       var newestLabel = document.createElement('div');
       newestLabel.className = 'today-section-label';
       newestLabel.textContent = 'Newest:';
       newest.appendChild(newestLabel);
-      sortedNewest.forEach(function (r) {
+      newestRows.forEach(function (r) {
         newest.appendChild(buildTodayLink(r, false));
       });
 
-      // Flagged today (top 3 by startedAt).
-      var flaggedRows = todayRows.filter(function (r) {
-        var c = (typeof r.flaggedMessageCount === 'number')
-          ? r.flaggedMessageCount
-          : (r.hasFlaggedContent ? 1 : 0);
-        return c > 0;
-      }).sort(function (a, b) {
-        return Date.parse(b.startedAt) - Date.parse(a.startedAt);
-      }).slice(0, 3);
-
+      // Flagged — server pre-orders by latest-flagged-today timestamp
+      // desc, caps at 3, and excludes today-clean conversations.
       if (flaggedRows.length > 0) {
         var flaggedLabel = document.createElement('div');
         flaggedLabel.className = 'today-section-label';
@@ -2156,29 +2143,32 @@
       }
 
       if (footnote) {
-        footnote.textContent =
-          'Showing up to 100 newest conversations for today (UTC).';
+        footnote.textContent = 'Today (UTC) — server-aggregated.';
       }
     }
 
     // Build a single → Open button row inside the Today panel. Reuses
     // the shared openConversation() detail-view loader; no duplicate
-    // navigation logic.
+    // navigation logic. Today-only counts (messageCountToday /
+    // flaggedMessageCountToday) come from the E1.2 DTO and reflect
+    // ONLY today's activity for a possibly-spanning conversation.
     function buildTodayLink(row, showFlag) {
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'today-link';
       btn.title = row.id;
       var t = fmtTime(row.startedAt);
-      var snippet = row.firstUserSnippet || row.lastAssistantSnippet || '(no snippet)';
+      var snippet = row.firstUserSnippet || '(no snippet)';
       if (snippet.length > 60) snippet = snippet.substring(0, 60) + '…';
+      var todayCount = (typeof row.messageCountToday === 'number')
+        ? row.messageCountToday : 0;
+      var todayTail = '  [' + todayCount + ' today]';
       if (showFlag) {
-        var c = (typeof row.flaggedMessageCount === 'number')
-          ? row.flaggedMessageCount
-          : (row.hasFlaggedContent ? 1 : 0);
-        btn.textContent = t + '  ⚠ ' + c + '  ' + snippet;
+        var c = (typeof row.flaggedMessageCountToday === 'number')
+          ? row.flaggedMessageCountToday : 0;
+        btn.textContent = t + '  ⚠ ' + c + '  ' + snippet + todayTail;
       } else {
-        btn.textContent = t + '  ' + snippet;
+        btn.textContent = t + '  ' + snippet + todayTail;
       }
       btn.addEventListener('click', function () {
         openConversation(row.id);
