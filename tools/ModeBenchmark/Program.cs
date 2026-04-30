@@ -1,8 +1,10 @@
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-// D2.2 — End-to-end mode-routing scaffold + device-only gate scenarios.
+// D2.3 — End-to-end mode-routing scaffold + device-gate + child-override
+// scenarios.
 //
 // CLI: first positional arg is baseUrl. No --write-baseline support yet —
 // the committed baseline ships with Placeholder=true and the first real
@@ -13,14 +15,23 @@ using System.Text.Json.Serialization;
 //   2. For "gate" scenarios: link the device to a per-run parent,
 //      apply the gate-specific setup (pause / bedtime window /
 //      mode-flags), then send the chat request from the device.
-//   3. For "hard" / "soft" scenarios: send POST /api/chat as before.
-//   4. Pass conditions:
+//   3. For "child_override" scenarios: link the device to the per-run
+//      parent, apply the requested device-level mode flags, create a
+//      child, set the child's three-valued mode override, then send
+//      a chat request that includes childId in the body. Assertion
+//      shape is hard (resp.Mode == expectedMode) when
+//      expectedResponseExact is null, otherwise gate-shape (5-invariant
+//      canned-response match).
+//   4. For "hard" / "soft" scenarios: send POST /api/chat as before.
+//   5. Pass conditions:
 //        hard: HTTP 200 AND resp.Mode == expectedMode.
 //        soft: HTTP 200 only; observed mode recorded but not asserted.
 //        gate: HTTP 200 AND resp.Mode == null AND resp.Response ==
 //              expectedResponseExact AND resp.ConversationId ==
 //              Guid.Empty AND resp.SafetyFlag == 0 (Clean) AND
 //              resp.ChoiceA == null AND resp.ChoiceB == null.
+//        child_override: hard-shape OR gate-shape, picked per-scenario
+//              from the presence of expectedResponseExact.
 //
 // D1-F2 contract is mirrored: SHA-256 of scenarios.json is included in
 // summary.json; baseline-side hash mismatch flips the verdict to
@@ -45,6 +56,17 @@ var jsonOpts = new JsonSerializerOptions
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
 };
 
+// D2.3: a separate options instance for the child-override PUT body — the
+// server's ChildModeOverridesRequest expects all four nullable fields
+// to be PRESENT in the body, with `null` denoting Inherit. The default
+// `WhenWritingNull` policy on `jsonOpts` would elide null fields.
+var jsonOptsKeepNulls = new JsonSerializerOptions
+{
+    PropertyNameCaseInsensitive = true,
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+};
+
 // Load scenarios early so the self-check runs before any network call.
 var scenarios = JsonSerializer.Deserialize<List<Scenario>>(
     await File.ReadAllTextAsync(scenariosPath), jsonOpts)
@@ -55,6 +77,9 @@ var scenarios = JsonSerializer.Deserialize<List<Scenario>>(
 // unique; expectedMode (when non-null) must be in the allowed set.
 // Gate scenarios additionally require kind="gate", a recognized gate
 // value, expectedMode==null, and a non-empty expectedResponseExact.
+// Child-override scenarios additionally require kind="child_override",
+// non-null deviceFlags + childOverride, and exactly one of
+// expectedMode / expectedResponseExact non-null.
 {
     string[] allowedModes = { "story", "game", "riddle", "curiosity", "calm" };
     string[] allowedGates = { "paused", "bedtime", "mode_disabled" };
@@ -84,9 +109,11 @@ var scenarios = JsonSerializer.Deserialize<List<Scenario>>(
             return 2;
         }
 
-        // Gate scenarios:
         bool isGate = string.Equals(s.Kind, "gate", StringComparison.Ordinal);
+        bool isChildOverride = string.Equals(s.Kind, "child_override", StringComparison.Ordinal);
         bool hasGateField = !string.IsNullOrEmpty(s.Gate);
+
+        // Gate scenarios:
         if (isGate || hasGateField)
         {
             if (!isGate)
@@ -120,29 +147,64 @@ var scenarios = JsonSerializer.Deserialize<List<Scenario>>(
                 return 2;
             }
         }
+
+        // Child-override scenarios:
+        if (isChildOverride)
+        {
+            if (s.DeviceFlags is null)
+            {
+                Console.WriteLine(
+                    $"[selfcheck] FAILED: scenario {s.Id} child_override has null deviceFlags");
+                return 2;
+            }
+            if (s.ChildOverride is null)
+            {
+                Console.WriteLine(
+                    $"[selfcheck] FAILED: scenario {s.Id} child_override has null childOverride");
+                return 2;
+            }
+            bool hasMode = !string.IsNullOrEmpty(s.ExpectedMode);
+            bool hasText = !string.IsNullOrEmpty(s.ExpectedResponseExact);
+            if (hasMode == hasText)
+            {
+                Console.WriteLine(
+                    $"[selfcheck] FAILED: scenario {s.Id} child_override must set exactly one of expectedMode / expectedResponseExact");
+                return 2;
+            }
+        }
     }
 }
 
 Console.WriteLine($"ModeBenchmark target: {baseUrl}");
 Console.WriteLine($"Loaded {scenarios.Count} scenarios\n");
 
-int hardCount = scenarios.Count(s => s.ExpectedMode is not null && !string.Equals(s.Kind, "gate", StringComparison.Ordinal));
-int softCount = scenarios.Count(s => s.ExpectedMode is null && !string.Equals(s.Kind, "gate", StringComparison.Ordinal));
+int hardCount = scenarios.Count(s =>
+    s.ExpectedMode is not null
+    && !string.Equals(s.Kind, "gate", StringComparison.Ordinal)
+    && !string.Equals(s.Kind, "child_override", StringComparison.Ordinal));
+int softCount = scenarios.Count(s =>
+    s.ExpectedMode is null
+    && !string.Equals(s.Kind, "gate", StringComparison.Ordinal)
+    && !string.Equals(s.Kind, "child_override", StringComparison.Ordinal));
 int gateCount = scenarios.Count(s => string.Equals(s.Kind, "gate", StringComparison.Ordinal));
+int childOverrideCount = scenarios.Count(s =>
+    string.Equals(s.Kind, "child_override", StringComparison.Ordinal));
 int gateTripsExpected = gateCount;
 int gateTripsObserved = 0;
+int childOverrideMatches = 0;
 int scenariosOk = 0;
 int modeMatches = 0;
 var failures = new List<string>();
 var results = new List<ScenarioResult>();
 
-// --- Per-run parent for gate-scenario setup ---
-// Registered + logged in ONCE before the scenario loop. The same parent
-// then links every gate scenario's fresh device. Skipped entirely when
-// no gate scenarios are present (one parent registration costs an extra
-// auth-rate-limit slot we don't need to spend).
+// --- Per-run parent for gate / child-override scenario setup ---
+// Registered + logged in ONCE before the scenario loop. Reused across
+// all scenarios that need parent endpoints (link, pause, bedtime,
+// mode-flags, child create, child override). Skipped entirely when
+// no such scenarios are present.
 HttpClient? parentHttp = null;
-if (gateCount > 0)
+bool needsParent = gateCount > 0 || childOverrideCount > 0;
+if (needsParent)
 {
     parentHttp = new HttpClient
     {
@@ -161,28 +223,36 @@ if (gateCount > 0)
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[fatal] Parent setup failed — gate scenarios cannot run: {ex.Message}");
+        Console.WriteLine($"[fatal] Parent setup failed — gate/child-override scenarios cannot run: {ex.Message}");
         return 1;
     }
 }
 
-Console.WriteLine("ID    | Kind | Expected   | Observed   | Status");
-Console.WriteLine("------|------|------------|------------|-------");
+Console.WriteLine("ID    | Kind  | Expected      | Observed   | Status");
+Console.WriteLine("------|-------|---------------|------------|-------");
 
 foreach (var scenario in scenarios)
 {
     bool isGate = string.Equals(scenario.Kind, "gate", StringComparison.Ordinal);
-    bool isHard = !isGate && scenario.ExpectedMode is not null;
-    bool isSoft = !isGate && !isHard;
+    bool isChildOverride = string.Equals(scenario.Kind, "child_override", StringComparison.Ordinal);
+    bool isHard = !isGate && !isChildOverride && scenario.ExpectedMode is not null;
+    bool isSoft = !isGate && !isChildOverride && !isHard;
+
+    string runtimeKind = isGate ? "gate"
+        : isChildOverride ? "child"
+        : isHard ? "hard"
+        : "soft";
 
     var sResult = new ScenarioResult
     {
         Id = scenario.Id,
         Message = scenario.Message,
         ExpectedMode = scenario.ExpectedMode,
-        Kind = isGate ? "gate" : (isHard ? "hard" : "soft"),
+        Kind = runtimeKind,
         Gate = scenario.Gate,
         ExpectedResponseExact = scenario.ExpectedResponseExact,
+        DeviceFlags = scenario.DeviceFlags,
+        ChildOverride = scenario.ChildOverride,
     };
 
     // Fresh HttpClient + device per scenario so any per-conversation
@@ -207,7 +277,7 @@ foreach (var scenario in scenarios)
         sResult.Error = $"device registration failed: {ex.Message}";
         failures.Add($"{scenario.Id}: device registration failed — {ex.Message}");
         results.Add(sResult);
-        Console.WriteLine($" {scenario.Id} | {sResult.Kind,-4} | reg-fail");
+        Console.WriteLine($" {scenario.Id} | {runtimeKind,-5} | reg-fail");
         continue;
     }
     http.DefaultRequestHeaders.Add("X-Device-Id", device.DeviceId.ToString());
@@ -238,7 +308,7 @@ foreach (var scenario in scenarios)
                     sResult.Error = $"unknown gate '{scenario.Gate}'";
                     failures.Add($"{scenario.Id}: unknown gate '{scenario.Gate}'");
                     results.Add(sResult);
-                    Console.WriteLine($" {scenario.Id} | gate | unknown-gate");
+                    Console.WriteLine($" {scenario.Id} | gate  | unknown-gate");
                     continue;
             }
         }
@@ -247,7 +317,43 @@ foreach (var scenario in scenarios)
             sResult.Error = $"gate setup failed: {ex.Message}";
             failures.Add($"{scenario.Id}: gate setup failed — {ex.Message}");
             results.Add(sResult);
-            Console.WriteLine($" {scenario.Id} | gate | setup-fail");
+            Console.WriteLine($" {scenario.Id} | gate  | setup-fail");
+            continue;
+        }
+    }
+
+    // Child-override-specific setup BEFORE the chat call.
+    Guid? createdChildId = null;
+    if (isChildOverride)
+    {
+        try
+        {
+            await LinkDeviceAsync(parentHttp!, device.DeviceId, device.ApiKey);
+            // Apply device-level flags from the scenario.
+            await SetDeviceModeFlagsAsync(parentHttp!, device.DeviceId,
+                scenario.DeviceFlags!.Story,
+                scenario.DeviceFlags.Game,
+                scenario.DeviceFlags.Riddle,
+                scenario.DeviceFlags.Curiosity);
+            // Create a child belonging to this device.
+            createdChildId = await CreateChildAsync(
+                parentHttp!, device.DeviceId, "BenchKid", jsonOpts);
+            // Set the per-child override (three-valued; null = Inherit).
+            await SetChildModeOverridesAsync(
+                parentHttp!, createdChildId.Value,
+                scenario.ChildOverride!.Story,
+                scenario.ChildOverride.Game,
+                scenario.ChildOverride.Riddle,
+                scenario.ChildOverride.Curiosity,
+                jsonOptsKeepNulls);
+            sResult.CreatedChildId = createdChildId;
+        }
+        catch (Exception ex)
+        {
+            sResult.Error = $"child-override setup failed: {ex.Message}";
+            failures.Add($"{scenario.Id}: child-override setup failed — {ex.Message}");
+            results.Add(sResult);
+            Console.WriteLine($" {scenario.Id} | child | setup-fail");
             continue;
         }
     }
@@ -256,8 +362,18 @@ foreach (var scenario in scenarios)
     int httpStatus = 0;
     try
     {
-        var body = new { message = scenario.Message };
-        var httpResp = await http.PostAsJsonAsync("/api/chat", body);
+        // Conditional chat body — child-override scenarios pass childId.
+        HttpResponseMessage httpResp;
+        if (isChildOverride && createdChildId is not null)
+        {
+            var body = new { message = scenario.Message, childId = createdChildId.Value };
+            httpResp = await http.PostAsJsonAsync("/api/chat", body);
+        }
+        else
+        {
+            var body = new { message = scenario.Message };
+            httpResp = await http.PostAsJsonAsync("/api/chat", body);
+        }
         httpStatus = (int)httpResp.StatusCode;
         if (!httpResp.IsSuccessStatusCode)
         {
@@ -265,7 +381,7 @@ foreach (var scenario in scenarios)
             sResult.Error = $"HTTP {httpStatus}";
             failures.Add($"{scenario.Id}: HTTP {httpStatus}");
             results.Add(sResult);
-            Console.WriteLine($" {scenario.Id} | {sResult.Kind,-4} | HTTP {httpStatus}");
+            Console.WriteLine($" {scenario.Id} | {runtimeKind,-5} | HTTP {httpStatus}");
             continue;
         }
         resp = await httpResp.Content.ReadFromJsonAsync<ChatResponseShape>(jsonOpts);
@@ -276,7 +392,7 @@ foreach (var scenario in scenarios)
         sResult.Error = ex.Message;
         failures.Add($"{scenario.Id}: chat request failed — {ex.Message}");
         results.Add(sResult);
-        Console.WriteLine($" {scenario.Id} | {sResult.Kind,-4} | error");
+        Console.WriteLine($" {scenario.Id} | {runtimeKind,-5} | error");
         continue;
     }
 
@@ -313,6 +429,43 @@ foreach (var scenario in scenarios)
                 $"conv={resp?.ConversationId}, safety={resp?.SafetyFlag}");
         }
     }
+    else if (isChildOverride)
+    {
+        // Sub-shape selector: gate-shape when expectedResponseExact is set,
+        // hard-shape otherwise. Either way, success increments
+        // childOverrideMatches and scenariosOk — but NOT modeMatches and
+        // NOT gateTripsObserved (those are scoped to their own kinds).
+        if (!string.IsNullOrEmpty(scenario.ExpectedResponseExact))
+        {
+            bool modeNull           = resp?.Mode is null;
+            bool textMatches        = string.Equals(
+                resp?.Response, scenario.ExpectedResponseExact, StringComparison.Ordinal);
+            bool conversationEmpty  = resp?.ConversationId == Guid.Empty;
+            bool safetyClean        = (resp?.SafetyFlag ?? -1) == 0;
+            bool noChoiceA          = string.IsNullOrEmpty(resp?.ChoiceA);
+            bool noChoiceB          = string.IsNullOrEmpty(resp?.ChoiceB);
+            ok = httpStatus == 200 && modeNull && textMatches
+                 && conversationEmpty && safetyClean && noChoiceA && noChoiceB;
+            if (!ok)
+            {
+                failures.Add(
+                    $"{scenario.Id}: child_override expected canned response, " +
+                    $"got mode={resp?.Mode ?? "(null)"}, " +
+                    $"text='{(responseText.Length > 60 ? responseText.Substring(0, 60) + "…" : responseText)}'");
+            }
+        }
+        else
+        {
+            ok = httpStatus == 200
+                 && string.Equals(resp?.Mode, scenario.ExpectedMode, StringComparison.Ordinal);
+            if (!ok)
+            {
+                failures.Add(
+                    $"{scenario.Id}: child_override expected mode='{scenario.ExpectedMode}' got '{resp?.Mode ?? "(null)"}'");
+            }
+        }
+        if (ok) childOverrideMatches++;
+    }
     else if (isHard)
     {
         ok = httpStatus == 200
@@ -344,11 +497,13 @@ foreach (var scenario in scenarios)
 
     var expectedLabel = isGate
         ? scenario.Gate ?? "(gate)"
-        : (scenario.ExpectedMode ?? "(any)");
+        : isChildOverride
+            ? (scenario.ExpectedMode ?? "(canned)")
+            : (scenario.ExpectedMode ?? "(any)");
     var observedLabel = resp?.Mode ?? "(null)";
     var statusLabel = ok ? "PASS" : "FAIL";
     Console.WriteLine(
-        $" {scenario.Id} | {sResult.Kind,-4} | {expectedLabel,-10} | {observedLabel,-10} | {statusLabel}");
+        $" {scenario.Id} | {runtimeKind,-5} | {expectedLabel,-13} | {observedLabel,-10} | {statusLabel}");
 }
 
 // Always dispose the parent client after all scenarios run.
@@ -358,10 +513,11 @@ Console.WriteLine();
 Console.WriteLine("═══════════════════════════════════════");
 Console.WriteLine("  MODE BENCHMARK SUMMARY");
 Console.WriteLine("═══════════════════════════════════════");
-Console.WriteLine($"  Total scenarios:    {scenarios.Count}  (hard {hardCount} / soft {softCount} / gate {gateCount})");
-Console.WriteLine($"  Scenarios passed:   {scenariosOk}/{scenarios.Count}");
-Console.WriteLine($"  Mode matches:       {modeMatches}/{hardCount}");
-Console.WriteLine($"  Gate trips:         {gateTripsObserved}/{gateTripsExpected}");
+Console.WriteLine($"  Total scenarios:        {scenarios.Count}  (hard {hardCount} / soft {softCount} / gate {gateCount} / child {childOverrideCount})");
+Console.WriteLine($"  Scenarios passed:       {scenariosOk}/{scenarios.Count}");
+Console.WriteLine($"  Mode matches:           {modeMatches}/{hardCount}");
+Console.WriteLine($"  Gate trips:             {gateTripsObserved}/{gateTripsExpected}");
+Console.WriteLine($"  Child override matches: {childOverrideMatches}/{childOverrideCount}");
 
 // --- Save per-scenario results + markdown ---
 var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
@@ -375,7 +531,7 @@ md.AppendLine("# ModeBenchmark Results");
 md.AppendLine();
 md.AppendLine($"**Date:** {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
 md.AppendLine($"**Target:** {baseUrl}");
-md.AppendLine($"**Scenarios:** {scenarios.Count}  (hard {hardCount} / soft {softCount} / gate {gateCount})");
+md.AppendLine($"**Scenarios:** {scenarios.Count}  (hard {hardCount} / soft {softCount} / gate {gateCount} / child {childOverrideCount})");
 md.AppendLine();
 md.AppendLine("| ID | Kind | Message | Expected | Observed | Status |");
 md.AppendLine("|----|------|---------|----------|----------|--------|");
@@ -384,7 +540,9 @@ foreach (var r in results)
     var kind = r.Kind ?? "soft";
     var expected = string.Equals(kind, "gate", StringComparison.Ordinal)
         ? (r.Gate ?? "(gate)")
-        : (r.ExpectedMode ?? "(any)");
+        : string.Equals(kind, "child", StringComparison.Ordinal)
+            ? (r.ExpectedMode ?? "(canned)")
+            : (r.ExpectedMode ?? "(any)");
     var observed = r.ObservedMode ?? "(null)";
     var status = r.Ok ? "PASS" : "FAIL";
     md.AppendLine($"| {r.Id} | {kind} | {r.Message} | {expected} | {observed} | {status} |");
@@ -486,6 +644,8 @@ await File.WriteAllTextAsync(summaryPath, JsonSerializer.Serialize(new
     gateScenarios = gateCount,
     gateTripsExpected,
     gateTripsObserved,
+    childOverrideScenarios = childOverrideCount,
+    childOverrideMatches,
 }, jsonOpts));
 
 if (failures.Count > 0)
@@ -499,7 +659,7 @@ Console.WriteLine("════════════════════�
 
 return runSucceeded ? 0 : 1;
 
-// --- Helpers (parent-side endpoints used by gate scenarios) ---
+// --- Helpers (parent-side endpoints used by gate / child-override scenarios) ---
 
 static async Task RegisterParentAsync(HttpClient http, string email, string password)
 {
@@ -558,6 +718,42 @@ static async Task SetDeviceModeFlagsAsync(
     resp.EnsureSuccessStatusCode();
 }
 
+// D2.3: create a child belonging to <deviceId>. Gender is sent as the
+// integer literal 0 (Boy in the Domain enum) — System.Text.Json
+// serializes enums as ints by default, and the bench uses an int
+// literal directly to avoid taking a runtime dependency on the
+// Domain assembly.
+static async Task<Guid> CreateChildAsync(
+    HttpClient parentHttp, Guid deviceId, string name, JsonSerializerOptions jsonOpts)
+{
+    var body = new { deviceId, name, gender = 0 };
+    var resp = await parentHttp.PostAsJsonAsync("/api/children", body);
+    resp.EnsureSuccessStatusCode();
+    var created = await resp.Content.ReadFromJsonAsync<CreateChildResponseShape>(jsonOpts)
+        ?? throw new Exception("create child returned null");
+    if (created.ChildId == Guid.Empty)
+        throw new Exception("create child returned empty childId");
+    return created.ChildId;
+}
+
+// D2.3: set the per-child override (three-valued; null = Inherit). The
+// server's ChildModeOverridesRequest expects all four nullable fields
+// PRESENT in the body. Use a dedicated keep-nulls JsonSerializerOptions
+// so the WhenWritingNull policy on the default options does not elide
+// Inherit fields.
+static async Task SetChildModeOverridesAsync(
+    HttpClient parentHttp, Guid childId,
+    bool? story, bool? game, bool? riddle, bool? curiosity,
+    JsonSerializerOptions jsonOptsKeepNulls)
+{
+    var body = new { story, game, riddle, curiosity };
+    var json = JsonSerializer.Serialize(body, jsonOptsKeepNulls);
+    var content = new StringContent(json, Encoding.UTF8, "application/json");
+    var resp = await parentHttp.PutAsync(
+        $"/api/parents/children/{childId}/mode-flags", content);
+    resp.EnsureSuccessStatusCode();
+}
+
 // Compute a 6-minute bedtime window centered on wall-clock now, expressed
 // in the device's default IANA timezone. Mirrors the server-side fallback:
 // if "Asia/Yerevan" doesn't resolve on this host, fall back to UTC — the
@@ -581,11 +777,19 @@ record Scenario
     public string Message { get; init; } = "";
     public string? ExpectedMode { get; init; }
 
-    // D2.2 additions — gate scenarios only.
-    public string? Kind { get; init; }                 // "gate" for gate scenarios; null for hard/soft
+    // D2.2 additions — gate scenarios.
+    public string? Kind { get; init; }                 // "gate" / "child_override" / null
     public string? Gate { get; init; }                 // "paused" / "bedtime" / "mode_disabled"
     public string? ExpectedResponseExact { get; init; } // canned text the wire MUST match
+
+    // D2.3 additions — child-override scenarios.
+    public DeviceFlagsBlock? DeviceFlags { get; init; }
+    public ChildOverrideBlock? ChildOverride { get; init; }
 }
+
+record DeviceFlagsBlock(bool Story, bool Game, bool Riddle, bool Curiosity);
+
+record ChildOverrideBlock(bool? Story, bool? Game, bool? Riddle, bool? Curiosity);
 
 record ChatResponseShape
 {
@@ -610,16 +814,24 @@ record ParentLoginShape
     public string Token { get; init; } = "";
 }
 
+record CreateChildResponseShape
+{
+    public Guid ChildId { get; init; }
+}
+
 record ModeMetrics
 {
     public int TotalScenarios { get; init; }
     public int HardScenarios { get; init; }
     public int SoftScenarios { get; init; }
 
-    // D2.2 additions on the metrics record.
     public int GateScenarios { get; init; }
     public int GateTripsExpected { get; init; }
     public int GateTripsObserved { get; init; }
+
+    // D2.3 additions.
+    public int ChildOverrideScenarios { get; init; }
+    public int ChildOverrideMatches { get; init; }
 
     public int ScenariosOk { get; init; }
     public int ModeMatches { get; init; }
@@ -636,10 +848,14 @@ record ScenarioResult
     public string Message { get; init; } = "";
     public string? ExpectedMode { get; init; }
 
-    // D2.2 additions on the per-scenario result.
-    public string? Kind { get; init; }                  // "hard" / "soft" / "gate"
+    public string? Kind { get; init; }                  // "hard" / "soft" / "gate" / "child"
     public string? Gate { get; init; }                  // gate value when applicable
-    public string? ExpectedResponseExact { get; init; } // canned text expected (gate scenarios)
+    public string? ExpectedResponseExact { get; init; } // canned text expected (gate / child-override gate-shape)
+
+    // D2.3 additions on the per-scenario result.
+    public DeviceFlagsBlock? DeviceFlags { get; init; }
+    public ChildOverrideBlock? ChildOverride { get; init; }
+    public Guid? CreatedChildId { get; set; }
 
     public string? ObservedMode { get; set; }
     public string? ResponseSnippet { get; set; }

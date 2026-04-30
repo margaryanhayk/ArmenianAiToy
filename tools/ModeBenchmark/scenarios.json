@@ -30,5 +30,32 @@
     "message": "tell me a story about a bunny",
     "expectedMode": null,
     "expectedResponseExact": "Եկ մի ուրիշ բան փորձենք։"
+  },
+  {
+    "id": "MG04",
+    "kind": "child_override",
+    "message": "tell me a story about a bunny",
+    "deviceFlags":   { "story": false, "game": true,  "riddle": true,  "curiosity": true },
+    "childOverride": { "story": true,  "game": null,  "riddle": null,  "curiosity": null },
+    "expectedMode": "story",
+    "expectedResponseExact": null
+  },
+  {
+    "id": "MG05",
+    "kind": "child_override",
+    "message": "tell me a story about a bunny",
+    "deviceFlags":   { "story": true,  "game": true,  "riddle": true,  "curiosity": true },
+    "childOverride": { "story": false, "game": null,  "riddle": null,  "curiosity": null },
+    "expectedMode": null,
+    "expectedResponseExact": "Եկ մի ուրիշ բան փորձենք։"
+  },
+  {
+    "id": "MG06",
+    "kind": "child_override",
+    "message": "tell me a story about a bunny",
+    "deviceFlags":   { "story": true,  "game": true,  "riddle": true,  "curiosity": true },
+    "childOverride": { "story": null,  "game": null,  "riddle": null,  "curiosity": null },
+    "expectedMode": "story",
+    "expectedResponseExact": null
   }
 ]
