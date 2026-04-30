@@ -4,12 +4,12 @@
   "SoftScenarios": 1,
   "GateScenarios": 3,
   "GateTripsExpected": 3,
-  "GateTripsObserved": 0,
-  "ScenariosOk": 0,
-  "ModeMatches": 0,
-  "GateTrips": 0,
+  "GateTripsObserved": 3,
+  "ScenariosOk": 11,
+  "ModeMatches": 7,
+  "GateTrips": 3,
   "WeakCases": 0,
-  "Placeholder": true,
+  "Placeholder": false,
   "PromptsCount": 11,
   "PromptsSha256": "ca48881b5a7f17bd31af5328a4f096a966c6afe5c90b552989391ea1316010d1"
 }
