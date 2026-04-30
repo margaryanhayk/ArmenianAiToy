@@ -22,6 +22,35 @@ var promptsBytes = await File.ReadAllBytesAsync(promptsPath);
 var promptsSha256 = Convert.ToHexString(
     System.Security.Cryptography.SHA256.HashData(promptsBytes)).ToLowerInvariant();
 
+// D1-F11: stem-aware continuation-label matching. Run a closed fixture
+// set through ArmenianStem before any network call so a regression in
+// the ending list / consonant-drop rule fails fast at startup, not in
+// the middle of a ~174-call benchmark run.
+{
+    (string a, string b, bool expectedMatch)[] selfcheckFixtures =
+    {
+        // positive — must collapse to the same stem
+        ("մոտենանք",  "մոտեցավ",      true),    // verb root ն/ց alternation
+        ("մոտենանք",  "մոտենալով",    true),    // gerund vs jussive
+        ("ընկերին",   "ընկերոջ",      true),    // noun dative vs genitive
+        ("թիթեռիկին", "թիթեռիկներին", true),    // sg dat vs pl dat
+        // negative — must stay distinct
+        ("մոտենանք",  "տերև",         false),   // unrelated roots
+        ("ընկերին",   "ընկուզ",       false),   // shared 3-char prefix is not enough
+    };
+    foreach (var (a, b, expected) in selfcheckFixtures)
+    {
+        var actual = string.Equals(
+            ArmenianStem(a), ArmenianStem(b), StringComparison.Ordinal);
+        if (actual != expected)
+        {
+            Console.WriteLine(
+                $"[selfcheck] FAILED: {a} vs {b} expected {expected} got {actual}");
+            return 2;
+        }
+    }
+}
+
 // --- Thresholds for weak-case detection ---
 const int MinResponseLen = 100;   // 3 Armenian sentences ~100+ chars
 const int MaxResponseLen = 800;   // 5 sentences should be well under 800
@@ -263,29 +292,40 @@ foreach (var prompt in prompts)
                 // Approximates E1's POST-CHOICE CONTINUATION rule: the
                 // continuation should visibly act on the chosen label.
                 // Conservative — we only flag when ChoiceA has at least one
-                // ≥4-char Armenian token we can look for AND none appear
-                // anywhere in the continuation text. Short labels (no
-                // ≥4-char tokens) are skipped, not flagged.
+                // ≥4-char Armenian stem we can look for AND none of those
+                // stems is hit by any ≥4-char Armenian stem in the
+                // continuation. Short labels (no ≥4-char tokens) are
+                // skipped, not flagged.
                 // Skip when the continuation came back without its own new
                 // choices — that's the signature of the backend's safety
                 // fallback (latin_run / leaked_tag paths in ChatService),
                 // which replaces the LLM reply with a canned string and
                 // clears both choices. That's not the prompt failing the
                 // post-choice rule; the prompt never got its output through.
+                // D1-F11: matching is a conservative Armenian light-stem
+                // equality (ArmenianStem). Surface-form String.Contains
+                // missed routine inflection (Մոտենանք → Մոտեցավ /
+                // Մոտենալով, ընկերին → ընկերոջ, թիթեռիկին → թիթեռիկներին)
+                // and tripped the metric on continuations that did enact
+                // CHOICE_A. The stemmer strips a closed list of common
+                // verb / noun-case endings and handles the «ն»/«ց»
+                // verb-root alternation; see ArmenianStem at the bottom
+                // of this file.
                 if (contHasResponse && contHasChoices
                     && !string.IsNullOrWhiteSpace(startResp.ChoiceA))
                 {
-                    var labelTokens = ExtractArmenianTokens(
+                    var labelStems = ExtractArmenianStems(
                         startResp.ChoiceA, MinTokenLen, trailingPunct, armenianOnlyRegex);
-                    if (labelTokens.Count > 0)
+                    if (labelStems.Count > 0)
                     {
-                        var contLower = cont.Response.ToLowerInvariant();
-                        bool anyReferenced = labelTokens.Any(t => contLower.Contains(t));
+                        var contStems = ExtractArmenianStems(
+                            cont.Response, MinTokenLen, trailingPunct, armenianOnlyRegex);
+                        bool anyReferenced = labelStems.Overlaps(contStems);
                         if (!anyReferenced)
                         {
                             result.WeakFlags.Add("continuation_no_label_reference");
                             weakCases.Add(
-                                $"{prompt.Id}: continuation does not reference any ≥4-char token from CHOICE_A");
+                                $"{prompt.Id}: continuation does not reference any ≥4-char stem from CHOICE_A");
                             hasWeak = true;
                         }
                     }
@@ -647,6 +687,69 @@ static HashSet<string> ExtractArmenianTokens(string? s, int minLen, char[] trail
         set.Add(clean.ToLowerInvariant());
     }
     return set;
+}
+
+// D1-F11: light-stem normalizer for the continuation_no_label_reference
+// signal. Conservative by design — strips a closed list of common verb
+// and noun-case endings, then handles the verb-root «ն»/«ց» alternation
+// (մոտեն-/մոտեց-). Returns the lowercase original when no rule applies
+// or stripping would leave fewer than 4 Armenian chars.
+//
+// Used ONLY by the label-reference signal via ExtractArmenianStems. The
+// other Story signals (same_first_verb, start_continuation_recap_overlap)
+// continue to compare surface tokens via ExtractArmenianTokens.
+static string ArmenianStem(string? token)
+{
+    if (string.IsNullOrEmpty(token)) return token ?? "";
+    var lower = token.ToLowerInvariant();
+    if (lower.Length < 4) return lower;
+    foreach (var c in lower)
+    {
+        if (c < '԰' || c > '֏') return lower;
+    }
+
+    // Verb endings — longest-first. NO «ին» here (collides with the
+    // noun dative singular; «ին» lives in the noun list).
+    string[] verbEndings = { "ալով", "ենք", "անք", "ում", "ավ", "եց", "ալ", "ել", "իր" };
+    // Noun / case / number endings — longest-first.
+    string[] nounEndings = { "ներին", "ներով", "ներից", "ները", "ներ",
+                             "ին", "ից", "ով", "ում", "ոջ", "ի" };
+
+    string stem = lower;
+    foreach (var endings in new[] { verbEndings, nounEndings })
+    {
+        bool stripped = false;
+        foreach (var e in endings)
+        {
+            if (stem.EndsWith(e, StringComparison.Ordinal)
+                && stem.Length - e.Length >= 4)
+            {
+                stem = stem.Substring(0, stem.Length - e.Length);
+                stripped = true;
+                break;
+            }
+        }
+        if (stripped) break;
+    }
+
+    // Verb-root alternation: drop a trailing «ն» or «ց» when the stem is
+    // still ≥ 5 chars (so we keep ≥ 4 after the drop).
+    if (stem.Length >= 5)
+    {
+        var last = stem[stem.Length - 1];
+        if (last == 'ն' || last == 'ց')   // ն / ց
+            stem = stem.Substring(0, stem.Length - 1);
+    }
+    return stem;
+}
+
+// Wraps ExtractArmenianTokens and maps each token through ArmenianStem.
+static HashSet<string> ExtractArmenianStems(string? s, int minLen, char[] trailing, Regex armenianOnly)
+{
+    var tokens = ExtractArmenianTokens(s, minLen, trailing, armenianOnly);
+    var stems = new HashSet<string>();
+    foreach (var t in tokens) stems.Add(ArmenianStem(t));
+    return stems;
 }
 
 // Jaccard overlap on two sets. 0 when either is empty.
