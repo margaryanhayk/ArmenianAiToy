@@ -174,6 +174,82 @@ no editing, no deletion, no child-facing features.
 7. Log out → returns to login view, token cleared from sessionStorage.
 8. **Your activity**: in the linked-devices view, click "View your activity →". Empty-state copy appears for a freshly-registered parent. After triggering a parental action (pause/resume, bedtime window, mode flags toggle, child delete, etc.), refresh: a row appears with the friendly label (e.g. *Device paused/resumed*), timestamp, resolved device/child name where applicable, and one-line metadata summary. Pagination (← Newer / Older →) disables correctly on first page / short final page. ← Devices returns to the linked-devices view. **Every shipped parent-actor event type maps to a friendly label** — no raw CamelCase enum names should appear. Spot-check by exercising: data export (*Data export downloaded*), forgot-password request + completion (*Password reset requested* / *Password reset completed*), email verification (*Email verified*), and Google sign-in (*Signed in with Google*).
 
+## Today summary panel (E1.1)
+
+A small read-only "Today" panel at the top of the per-device
+Conversations view summarizes the day's activity at a glance. It
+sits below the device-context line and above the paginated
+Conversations / Flagged list, and is independent of the existing
+tabs.
+
+- **Frontend-only.** No new backend endpoint. The panel reuses
+  `GET /api/conversations/summary?deviceId=&limit=100&offset=0` (the
+  same endpoint that drives the Conversations tab's paginated list)
+  with the existing parent-JWT auth and ownership filter. No new
+  privacy surface; a parent can never reach the panel for a device
+  they don't own.
+- **UTC boundary.** "Today" is computed in UTC: rows whose
+  `startedAt >= Date.UTC(year, month, day, 0, 0, 0)` are counted.
+  The panel header is labeled `Today (UTC)` so a far-Western-
+  timezone parent isn't surprised.
+- **Limit cap.** The panel pulls up to **100 newest summary rows**
+  via the existing endpoint and filters them client-side. A device
+  with > 100 conversations on a single UTC day reports the top 100
+  (footnote on the panel: *"Showing up to 100 newest conversations
+  for today (UTC)."*).
+- **Counts shown:** conversations today, messages today (sum of
+  `messageCount` across today's rows — the existing summary returns
+  the WHOLE conversation's message count, so a conversation that
+  spans midnight UTC contributes its full count to today's total;
+  documented limitation), flagged messages today (sum of
+  `flaggedMessageCount` with the older `hasFlaggedContent` fallback),
+  the newest 3 conversations of the day, and up to 3 flagged
+  conversations of the day.
+- **Failure mode.** If the Today fetch fails (e.g. transient backend
+  error), the panel renders a quiet *"Today summary unavailable."*
+  line and the existing Conversations / Flagged tabs continue to
+  work normally. The Today fetch and the paginated list fetch are
+  independent.
+
+**Deferred to a future E1.2 slice (NOT in E1.1):**
+- Modes used today (requires per-message `Mode` field aggregation;
+  currently absent from the `/summary` shape).
+- Assistant-audio availability count (requires per-message
+  `audioAvailable`; absent from `/summary`).
+- Accurate per-message daily aggregation (the current sums count
+  whole conversations spanning midnight UTC).
+- Server-side aggregation endpoint
+  (`GET /api/conversations/today-summary?deviceId=`) to remove the
+  100-row cap and add the modes / audio counts.
+- Multi-device "all my devices today" view.
+- Browser-local timezone handling.
+
+**Manual QA**:
+1. Log in as a parent who has at least one linked device. Click a
+   device in the linked-devices list → the Today panel renders at
+   the top of the Conversations view.
+2. Pick a device with TODAY activity → the counts line shows non-zero
+   conversations / messages, and the *Newest:* sub-list lists today's
+   most-recent up to 3 conversations.
+3. Pick a device with NO today activity (or a freshly-registered one)
+   → the panel shows *"No conversations today on this device."*
+4. Trigger flagged content (a moderation block on a known trigger
+   word) → the badge *"⚠ N flagged messages"* appears in the counts
+   line, and the *Flagged today:* sub-list shows the offending
+   conversation(s) with a working → Open link.
+5. Click any → Open link inside the panel → the existing detail view
+   opens with the right conversation messages and the ▶ Listen
+   affordance on assistant audio messages (per C2.1).
+6. The existing Conversations pagination (← Newer / Older →) still
+   works; the Today panel is independent and is not paginated.
+7. Force a Today fetch failure (e.g. `taskkill` the backend after
+   the page loaded but before the panel fetch completes) → the panel
+   shows *"Today summary unavailable."* and the rest of the view
+   continues to function.
+8. Privacy: a different parent who does NOT own the device cannot
+   reach the Today panel — the device is not visible at all under
+   the existing ownership filter; no new auth surface is added.
+
 ## Audit events
 
 An append-only `AuditEvents` table records sensitive parent actions.

@@ -98,6 +98,62 @@
     .legend-box p:last-child { margin-bottom: 0; }
     .legend-box .badge { margin-right: 4px; }
 
+    /* E1.1 Today summary panel — at-a-glance read-only digest at the
+       top of the per-device summaries view. Reuses the existing
+       /api/conversations/summary endpoint and parent-JWT auth; no new
+       privacy surface. */
+    .today-panel {
+      font-size: 13px;
+      color: #5b3e8a;
+      background: #f5f0ff;
+      border: 1px solid #e4d9f7;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin: 0 0 10px;
+    }
+    .today-panel h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #5b3e8a;
+      margin: 0 0 6px;
+    }
+    .today-counts { font-size: 13px; margin-bottom: 6px; }
+    .today-counts .badge { margin-left: 6px; }
+    .today-section-label {
+      font-weight: 600;
+      font-size: 12px;
+      margin: 6px 0 4px;
+    }
+    .today-link {
+      display: block;
+      background: white;
+      border: 1px solid #e4d9f7;
+      border-radius: 4px;
+      padding: 5px 8px;
+      margin-bottom: 4px;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      font-size: 12px;
+      color: #5b3e8a;
+      font-family: inherit;
+    }
+    .today-link:hover { background: #ece4f8; }
+    .today-empty {
+      font-style: italic;
+      color: #9a8ab5;
+      font-size: 12px;
+    }
+    .today-footnote {
+      font-size: 11px;
+      color: #9a8ab5;
+      margin-top: 6px;
+    }
+    .today-error {
+      font-size: 12px;
+      color: #c62828;
+    }
+
     .pager-info {
       font-size: 12px;
       color: #9a8ab5;
@@ -439,6 +495,16 @@
         </span>
       </h2>
       <div id="summariesDeviceContext" class="device-context"></div>
+      <!-- E1.1 Today summary panel — frontend-only digest above the
+           paginated conversation list. Hidden until loadTodayPanel
+           populates it. -->
+      <section id="todayPanel" class="today-panel" hidden aria-live="polite">
+        <h3>Today (UTC)</h3>
+        <div id="todayCounts" class="today-counts"></div>
+        <div id="todayNewest"></div>
+        <div id="todayFlagged"></div>
+        <div id="todayFootnote" class="today-footnote"></div>
+      </section>
       <div id="summariesList"></div>
       <div id="summariesStatus" class="status muted" aria-live="polite"></div>
       <div class="pager">
@@ -1845,6 +1911,11 @@
       var listEl = document.getElementById('summariesList');
       clearChildren(listEl);
 
+      // E1.1: kick off the Today panel fetch in parallel with the paged
+      // conversation list. The two are independent — a Today fetch
+      // failure does NOT block or affect the paginated list below.
+      loadTodayPanel(state.currentDeviceId);
+
       var url = '/api/conversations/summary'
         + '?deviceId=' + encodeURIComponent(state.currentDeviceId)
         + '&limit=' + PAGE_SIZE
@@ -1944,6 +2015,175 @@
     function pageNewer() {
       state.offset = Math.max(0, state.offset - PAGE_SIZE);
       loadSummaries();
+    }
+
+    // ---------- today summary panel (E1.1) ----------
+    // Read-only daily snapshot at the top of the Conversations view.
+    // Reuses /api/conversations/summary with the existing parent-JWT
+    // auth and ownership filter. "Today" is computed in UTC: rows whose
+    // startedAt >= midnight UTC of the current day are counted. Up to
+    // 100 newest summary rows are pulled; a device with > 100 same-day
+    // conversations would surface the top 100 (footnote documents this).
+    // Modes-used / audio-availability counts are deferred to E1.2 — they
+    // need per-message data not present in /summary.
+    function loadTodayPanel(deviceId) {
+      var panel = document.getElementById('todayPanel');
+      if (!panel || !deviceId) return;
+      panel.hidden = false;
+      var counts   = document.getElementById('todayCounts');
+      var newest   = document.getElementById('todayNewest');
+      var flagged  = document.getElementById('todayFlagged');
+      var footnote = document.getElementById('todayFootnote');
+      clearChildren(counts);
+      clearChildren(newest);
+      clearChildren(flagged);
+      if (footnote) footnote.textContent = '';
+
+      var url = '/api/conversations/summary'
+        + '?deviceId=' + encodeURIComponent(deviceId)
+        + '&limit=100&offset=0';
+      authedFetch(url).then(function (data) {
+        // The deviceId may have changed by the time this resolves
+        // (parent navigated away). Render only if we're still on the
+        // same device.
+        if (state.currentDeviceId !== deviceId) return;
+        var rows = (data && data.conversations) || [];
+        renderTodayPanel(rows);
+      }).catch(function (err) {
+        if (err && err.status === 401) return;
+        if (state.currentDeviceId !== deviceId) return;
+        var msg = document.createElement('div');
+        msg.className = 'today-error';
+        msg.textContent = 'Today summary unavailable.';
+        counts.appendChild(msg);
+      });
+    }
+
+    function renderTodayPanel(rows) {
+      var counts   = document.getElementById('todayCounts');
+      var newest   = document.getElementById('todayNewest');
+      var flagged  = document.getElementById('todayFlagged');
+      var footnote = document.getElementById('todayFootnote');
+      clearChildren(counts);
+      clearChildren(newest);
+      clearChildren(flagged);
+
+      // UTC today boundary — matches the StartedAt UTC storage.
+      var now = new Date();
+      var todayStartUtc = Date.UTC(
+        now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0);
+
+      var todayRows = rows.filter(function (r) {
+        if (!r || !r.startedAt) return false;
+        var t = Date.parse(r.startedAt);
+        return !isNaN(t) && t >= todayStartUtc;
+      });
+
+      if (todayRows.length === 0) {
+        var empty = document.createElement('div');
+        empty.className = 'today-empty';
+        empty.textContent = 'No conversations today on this device.';
+        counts.appendChild(empty);
+        if (footnote) {
+          footnote.textContent =
+            'Showing up to 100 newest conversations for today (UTC).';
+        }
+        return;
+      }
+
+      var conversationsToday = todayRows.length;
+      var messagesToday = todayRows.reduce(function (sum, r) {
+        return sum + (typeof r.messageCount === 'number' ? r.messageCount : 0);
+      }, 0);
+      // Sum exact flaggedMessageCount when available; fall back to a
+      // binary "+1 if hasFlaggedContent" for older payloads.
+      var flaggedToday = todayRows.reduce(function (sum, r) {
+        return sum + (typeof r.flaggedMessageCount === 'number'
+          ? r.flaggedMessageCount
+          : (r.hasFlaggedContent ? 1 : 0));
+      }, 0);
+
+      var countsLine = document.createElement('div');
+      countsLine.textContent =
+        conversationsToday + ' conversation' + (conversationsToday === 1 ? '' : 's')
+        + ' · ' + messagesToday + ' message' + (messagesToday === 1 ? '' : 's');
+      counts.appendChild(countsLine);
+
+      if (flaggedToday > 0) {
+        var badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = '⚠ ' + flaggedToday + ' flagged message'
+          + (flaggedToday === 1 ? '' : 's');
+        countsLine.appendChild(document.createTextNode(' '));
+        countsLine.appendChild(badge);
+      }
+
+      // Newest 3 (today only).
+      var sortedNewest = todayRows.slice().sort(function (a, b) {
+        return Date.parse(b.startedAt) - Date.parse(a.startedAt);
+      }).slice(0, 3);
+      var newestLabel = document.createElement('div');
+      newestLabel.className = 'today-section-label';
+      newestLabel.textContent = 'Newest:';
+      newest.appendChild(newestLabel);
+      sortedNewest.forEach(function (r) {
+        newest.appendChild(buildTodayLink(r, false));
+      });
+
+      // Flagged today (top 3 by startedAt).
+      var flaggedRows = todayRows.filter(function (r) {
+        var c = (typeof r.flaggedMessageCount === 'number')
+          ? r.flaggedMessageCount
+          : (r.hasFlaggedContent ? 1 : 0);
+        return c > 0;
+      }).sort(function (a, b) {
+        return Date.parse(b.startedAt) - Date.parse(a.startedAt);
+      }).slice(0, 3);
+
+      if (flaggedRows.length > 0) {
+        var flaggedLabel = document.createElement('div');
+        flaggedLabel.className = 'today-section-label';
+        flaggedLabel.textContent = 'Flagged today:';
+        flagged.appendChild(flaggedLabel);
+        flaggedRows.forEach(function (r) {
+          flagged.appendChild(buildTodayLink(r, true));
+        });
+      } else {
+        var none = document.createElement('div');
+        none.className = 'today-empty';
+        none.textContent = 'No flagged conversations today.';
+        flagged.appendChild(none);
+      }
+
+      if (footnote) {
+        footnote.textContent =
+          'Showing up to 100 newest conversations for today (UTC).';
+      }
+    }
+
+    // Build a single → Open button row inside the Today panel. Reuses
+    // the shared openConversation() detail-view loader; no duplicate
+    // navigation logic.
+    function buildTodayLink(row, showFlag) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'today-link';
+      btn.title = row.id;
+      var t = fmtTime(row.startedAt);
+      var snippet = row.firstUserSnippet || row.lastAssistantSnippet || '(no snippet)';
+      if (snippet.length > 60) snippet = snippet.substring(0, 60) + '…';
+      if (showFlag) {
+        var c = (typeof row.flaggedMessageCount === 'number')
+          ? row.flaggedMessageCount
+          : (row.hasFlaggedContent ? 1 : 0);
+        btn.textContent = t + '  ⚠ ' + c + '  ' + snippet;
+      } else {
+        btn.textContent = t + '  ' + snippet;
+      }
+      btn.addEventListener('click', function () {
+        openConversation(row.id);
+      });
+      return btn;
     }
 
     // ---------- flagged ----------
