@@ -2,11 +2,11 @@
   "TotalScenarios": 8,
   "HardScenarios": 7,
   "SoftScenarios": 1,
-  "ScenariosOk": 0,
-  "ModeMatches": 0,
+  "ScenariosOk": 8,
+  "ModeMatches": 7,
   "GateTrips": 0,
   "WeakCases": 0,
-  "Placeholder": true,
+  "Placeholder": false,
   "PromptsCount": 8,
   "PromptsSha256": "78c041983cdbc90c167c8c8a2c8af54ab2842a3e5d03a3f7ff41a4175841e0ec"
 }
