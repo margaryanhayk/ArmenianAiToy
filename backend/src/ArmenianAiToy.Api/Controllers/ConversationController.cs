@@ -105,6 +105,50 @@ public class ConversationController : ControllerBase
     }
 
     /// <summary>
+    /// E1.2 — server-aggregated daily snapshot for the parent dashboard's
+    /// Today panel. Returns conversation, message, flagged-message, and
+    /// assistant-audio counts for an owned device on today (UTC), plus the
+    /// top 3 newest and top 3 flagged conversations of the day. Read-only;
+    /// no schema or behavioral side effects.
+    /// <para>
+    /// Ownership is enforced through the same <see cref="IParentService.GetLinkedDeviceIdsAsync"/>
+    /// gate used by /summary, /flagged, and /history; an unowned deviceId
+    /// returns 403 Forbid (matching the deviceId-keyed convention; the
+    /// silent-404 pattern is reserved for /{conversationId}).
+    /// </para>
+    /// <para>
+    /// <c>asOfUtc</c> is an optional ISO8601 instant. When absent the
+    /// server uses <c>DateTime.UtcNow</c>. ASP.NET Core's
+    /// <see cref="DateTimeOffset"/> binder accepts any valid ISO8601
+    /// (with or without an offset) and the server normalizes to UTC via
+    /// <see cref="DateTimeOffset.UtcDateTime"/>; an unparseable value
+    /// surfaces as a 400 from the model-binding pipeline before this
+    /// action runs.
+    /// </para>
+    /// </summary>
+    [HttpGet("today-summary")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    public async Task<IActionResult> GetTodaySummary(
+        [FromQuery] Guid deviceId,
+        [FromQuery] DateTimeOffset? asOfUtc = null)
+    {
+        var asOf = asOfUtc?.UtcDateTime ?? DateTime.UtcNow;
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var linkedDevices = await _parentService.GetLinkedDeviceIdsAsync(parentId);
+
+        if (!linkedDevices.Contains(deviceId))
+            return Forbid();
+
+        var summary = await _conversationService.GetTodaySummaryAsync(deviceId, asOf);
+        return Ok(summary);
+    }
+
+    /// <summary>
     /// Get a single conversation with full message list.
     /// </summary>
     [HttpGet("{conversationId}")]

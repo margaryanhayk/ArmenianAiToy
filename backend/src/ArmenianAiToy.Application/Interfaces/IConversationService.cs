@@ -13,4 +13,13 @@ public interface IConversationService
     Task<ConversationDto?> GetConversationByIdAsync(Guid conversationId);
     Task<List<ConversationSummaryDto>> GetConversationSummariesAsync(Guid deviceId, int limit = 20, int offset = 0);
     Task<List<FlaggedMessageDto>> GetFlaggedMessagesAsync(Guid deviceId, int limit = 20, int offset = 0);
+
+    /// <summary>
+    /// E1.2 server-side aggregation for the parent dashboard's Today panel.
+    /// Returns counts and per-conversation links scoped to today (UTC) on
+    /// the given device. Caller is expected to enforce ownership BEFORE
+    /// calling this method (the controller does so via the existing
+    /// GetLinkedDeviceIdsAsync gate).
+    /// </summary>
+    Task<TodaySummaryDto> GetTodaySummaryAsync(Guid deviceId, DateTime asOfUtc);
 }

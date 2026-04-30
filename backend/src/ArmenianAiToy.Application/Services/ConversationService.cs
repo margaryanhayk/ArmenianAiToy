@@ -218,4 +218,127 @@ public class ConversationService : IConversationService
             )).ToList()
         );
     }
+
+    public async Task<TodaySummaryDto> GetTodaySummaryAsync(Guid deviceId, DateTime asOfUtc)
+    {
+        // Normalize to UTC. Inputs from the controller arrive UTC-typed
+        // already (via DateTimeOffset.UtcDateTime); be tolerant of
+        // Unspecified-Kind inputs from tests that pass plain DateTime.
+        var normalizedAsOf = asOfUtc.Kind == DateTimeKind.Utc
+            ? asOfUtc
+            : DateTime.SpecifyKind(asOfUtc, DateTimeKind.Utc);
+        var dayStartUtc = new DateTime(
+            normalizedAsOf.Year, normalizedAsOf.Month, normalizedAsOf.Day,
+            0, 0, 0, DateTimeKind.Utc);
+
+        // Distinct conversation count: any conversation on this device
+        // that has at least one message timestamped on or after today.
+        var conversationsCount = await _db.Set<Conversation>()
+            .CountAsync(c => c.DeviceId == deviceId
+                          && c.Messages.Any(m => m.Timestamp >= dayStartUtc));
+
+        // Per-message aggregate counts. The Join scopes Messages by the
+        // owning device without depending on Message.Conversation
+        // navigation (which is Ignore()'d in the InMemory test contexts).
+        var todayMessages = _db.Set<Message>()
+            .Join(
+                _db.Set<Conversation>().Where(c => c.DeviceId == deviceId),
+                m => m.ConversationId,
+                c => c.Id,
+                (m, c) => m)
+            .Where(m => m.Timestamp >= dayStartUtc);
+
+        var messagesCount = await todayMessages.CountAsync();
+        var flaggedCount = await todayMessages
+            .CountAsync(m => m.SafetyFlag != SafetyFlag.Clean);
+        var assistantAudioCount = await todayMessages
+            .CountAsync(m => m.Role == MessageRole.Assistant
+                           && m.AudioBlobPath != null);
+
+        // Newest 3 conversations with today activity, by StartedAt desc.
+        // Per-conversation rollups (MessageCountToday, FlaggedMessageCountToday)
+        // count ONLY today's messages — so a conversation that started
+        // yesterday but had a turn today contributes only its today
+        // messages to the rollup.
+        var newestRows = await _db.Set<Conversation>()
+            .Where(c => c.DeviceId == deviceId
+                     && c.Messages.Any(m => m.Timestamp >= dayStartUtc))
+            .OrderByDescending(c => c.StartedAt)
+            .Take(3)
+            .Select(c => new
+            {
+                c.Id,
+                c.StartedAt,
+                FirstUserContent = c.Messages
+                    .Where(m => m.Role == MessageRole.User)
+                    .OrderBy(m => m.Timestamp)
+                    .Select(m => m.Content)
+                    .FirstOrDefault(),
+                MessageCountToday = c.Messages.Count(m => m.Timestamp >= dayStartUtc),
+                FlaggedMessageCountToday = c.Messages.Count(m =>
+                    m.Timestamp >= dayStartUtc && m.SafetyFlag != SafetyFlag.Clean),
+            })
+            .ToListAsync();
+
+        var newest = newestRows
+            .Select(r => new TodaySummaryConversationLink(
+                r.Id,
+                r.StartedAt,
+                MakeSnippet(r.FirstUserContent),
+                r.MessageCountToday,
+                r.FlaggedMessageCountToday))
+            .ToList();
+
+        // Flagged top 3: conversations with any flagged-today message,
+        // ordered by latest flagged-today timestamp desc. We use
+        // OrderByDescending+FirstOrDefault rather than Max so an empty
+        // sub-collection (impossible by the Where clause but defensive)
+        // does not throw.
+        var flaggedRows = await _db.Set<Conversation>()
+            .Where(c => c.DeviceId == deviceId
+                     && c.Messages.Any(m => m.Timestamp >= dayStartUtc
+                                          && m.SafetyFlag != SafetyFlag.Clean))
+            .Select(c => new
+            {
+                c.Id,
+                c.StartedAt,
+                FirstUserContent = c.Messages
+                    .Where(m => m.Role == MessageRole.User)
+                    .OrderBy(m => m.Timestamp)
+                    .Select(m => m.Content)
+                    .FirstOrDefault(),
+                MessageCountToday = c.Messages.Count(m => m.Timestamp >= dayStartUtc),
+                FlaggedMessageCountToday = c.Messages.Count(m =>
+                    m.Timestamp >= dayStartUtc && m.SafetyFlag != SafetyFlag.Clean),
+                LatestFlaggedToday = c.Messages
+                    .Where(m => m.Timestamp >= dayStartUtc
+                             && m.SafetyFlag != SafetyFlag.Clean)
+                    .OrderByDescending(m => m.Timestamp)
+                    .Select(m => m.Timestamp)
+                    .FirstOrDefault(),
+            })
+            .OrderByDescending(c => c.LatestFlaggedToday)
+            .Take(3)
+            .ToListAsync();
+
+        var flagged = flaggedRows
+            .Select(r => new TodaySummaryConversationLink(
+                r.Id,
+                r.StartedAt,
+                MakeSnippet(r.FirstUserContent),
+                r.MessageCountToday,
+                r.FlaggedMessageCountToday))
+            .ToList();
+
+        return new TodaySummaryDto(
+            DeviceId: deviceId,
+            AsOfUtc: normalizedAsOf,
+            DayStartUtc: dayStartUtc,
+            ConversationsCount: conversationsCount,
+            MessagesCount: messagesCount,
+            FlaggedMessagesCount: flaggedCount,
+            AssistantMessagesWithAudio: assistantAudioCount,
+            Newest: newest,
+            Flagged: flagged);
+    }
 }

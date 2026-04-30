@@ -250,6 +250,79 @@ tabs.
    reach the Today panel — the device is not visible at all under
    the existing ownership filter; no new auth surface is added.
 
+## Today summary endpoint (E1.2)
+
+Server-side daily aggregation that supersedes the E1.1 frontend-only
+panel's approximate sums. Lives under the existing
+`ConversationController` family and reuses the same parent-JWT +
+linked-device ownership gate.
+
+**Endpoint**:
+`GET /api/conversations/today-summary?deviceId={Guid}[&asOfUtc={ISO8601}]`
+
+- **Authorization**: parent JWT in `Authorization` header
+  (`[Authorize]` on the action). The auth pipeline rejects anonymous
+  callers before the action runs.
+- **Ownership**: 403 `Forbid` when the queried `deviceId` is not in
+  the caller's `GetLinkedDeviceIdsAsync` set — same convention as
+  `/summary`, `/flagged`, and `/history`. (Silent 404 is reserved for
+  the conversation-by-id family, where existence-leak across families
+  matters.)
+- **`asOfUtc`**: optional. Bound as `DateTimeOffset?` so any valid
+  ISO8601 is accepted (with or without offset). Normalized to UTC via
+  `DateTimeOffset.UtcDateTime` before reaching the service. The
+  ASP.NET Core model binder returns 400 for unparseable values.
+- **Day boundary**: UTC. `DayStartUtc = asOfUtc.Date` with
+  `DateTimeKind.Utc`. Matches E1.1 panel semantics.
+- **Counts are EXACT per-message** (vs E1.1's whole-conversation
+  over-counting):
+  - `MessagesCount` — count of `Message` rows where
+    `Timestamp >= DayStartUtc` on this device.
+  - `FlaggedMessagesCount` — same scope, with
+    `SafetyFlag != Clean`.
+  - `AssistantMessagesWithAudio` — same scope, with
+    `Role == Assistant AND AudioBlobPath != null`. **Role gate is
+    structural** — child WAV uploads with `AudioBlobPath` set CANNOT
+    contribute to the count.
+- **Conversation links**:
+  - `Newest`: top 3 conversations on this device with any today
+    activity, ordered by `StartedAt` desc.
+  - `Flagged`: top 3 conversations with at least one flagged
+    today-message, ordered by latest flagged-today timestamp desc.
+    Today-clean conversations are excluded.
+- Each `TodaySummaryConversationLink` carries
+  `MessageCountToday` / `FlaggedMessageCountToday` (today-only sums)
+  alongside the conversation's `StartedAt` and a snippet trimmed by
+  the same `MakeSnippet()` helper used by `/summary`.
+
+**Wire-shape invariants** (do not regress):
+
+- `TodaySummaryDto` and `TodaySummaryConversationLink` deliberately
+  do NOT carry `ChildId` — per-child filtering is a separate concern
+  that would need an explicit per-child authorization step. Pinned by
+  `TodaySummaryDto_DoesNotExposeChildIdOrAudioBlobPath`.
+- Neither DTO carries `AudioBlobPath`. Audio paths are server-internal;
+  only the COUNT is exposed. Pinned by the same test.
+- `AssistantMessagesWithAudio` is role-gated. Pinned by
+  `GetTodaySummary_AssistantAudio_OnlyAssistantWithAudioBlobPath`.
+
+**`parent.html` consumption — DEFERRED to E1.2.ui.** The frontend
+Today panel still uses `/api/conversations/summary` and computes
+client-side approximations. A follow-up slice will rewire it to call
+this endpoint, dropping the limit-100 cap and the whole-conversation
+over-counting, and rendering the new
+`AssistantMessagesWithAudio` badge.
+
+**Modes-used-today — DEFERRED to E1.3.** `DetectedMode` is not
+persisted in the schema today (it lives only in
+`ChatService.ActiveModes`, an in-memory `ConcurrentDictionary` that
+clears on backend restart). Re-running `ModeDetector` against
+historical messages would diverge from runtime resolution because the
+pure-function detector has no access to the runtime active-story
+session or history-priority state. A future E1.3 slice would add a
+persistent `Message.Mode` (or equivalent) column and migration
+before exposing this aggregate.
+
 ## Audit events
 
 An append-only `AuditEvents` table records sensitive parent actions.
