@@ -30,7 +30,33 @@ point before any full-set live run.
 | `bakeoff-prompts.json` | The 12 Armenian story scenarios (multi-turn where relevant). |
 | `system-prompt.txt` | Frozen copy of the production `SystemPrompt` (from `backend/src/ArmenianAiToy.Api/appsettings.json`) with a `# Source:` header. The loader strips that header before hashing. |
 | `StoryModelBakeoff.csproj` | net10.0 console exe, no PackageReferences, no ProjectReferences. |
+| `story-seed-bank.v1.json` | Hand-edited Armenian-flavored seed bank for future Story Director experiments (Phase 1 per `STORY_DIRECTOR_ARCHITECTURE.md`). NOT loaded by ChatService. |
+| `validate-seed-bank.js` | Node.js validator for `story-seed-bank.v1.json`. Pure-stdlib; checks shape, counts, duplicates, deprecated keys, and known-bad values. |
 | `results/` | Per-run Markdown + JSON output (created on first live run). **Gitignored** (`.gitignore` excludes `tools/StoryModelBakeoff/results/`). |
+
+## Seed bank validation
+
+Run the validator before opening a PR that touches
+`story-seed-bank.v1.json`:
+
+```
+node tools/StoryModelBakeoff/validate-seed-bank.js
+```
+
+The validator is pure Node.js (no dependencies), reads the seed
+bank next to itself, and checks:
+
+- top-level shape (`version`, `language`, `purpose`, `palettes`);
+- required palette arrays and their minimum counts;
+- optional `traditionalFormulas` object shape if present;
+- every value is a non-empty string;
+- no duplicates inside any array;
+- the deprecated `palettes.avoidAnimals` key is gone (split into
+  `rareOrRequestedOnlyAnimals` + `hardAvoidCreatures`);
+- a small list of known-bad strings does not appear anywhere.
+
+Exit 0 on PASS, non-zero on FAIL with all errors listed before
+exit. The script never modifies the seed bank.
 
 ## Running
 
