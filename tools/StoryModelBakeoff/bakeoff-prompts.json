@@ -1,0 +1,88 @@
+[
+  {
+    "id": "S01",
+    "category": "bare-armenian",
+    "turns": [
+      { "role": "user", "content": "Պատմիր հեքիաթ" }
+    ]
+  },
+  {
+    "id": "S02",
+    "category": "transliterated-armenian",
+    "turns": [
+      { "role": "user", "content": "patmir heqiat" }
+    ]
+  },
+  {
+    "id": "S03",
+    "category": "english-request",
+    "turns": [
+      { "role": "user", "content": "Tell me an Armenian fairy tale for a 5 year old" }
+    ]
+  },
+  {
+    "id": "S04",
+    "category": "animal-story",
+    "turns": [
+      { "role": "user", "content": "Պատմիր նապաստակի մասին" }
+    ]
+  },
+  {
+    "id": "S05",
+    "category": "folklore-flavor",
+    "turns": [
+      { "role": "user", "content": "Պատմիր հեքիաթ քաջ տղայի և կախարդական աղբյուրի մասին" }
+    ]
+  },
+  {
+    "id": "S06",
+    "category": "calm-bedtime",
+    "turns": [
+      { "role": "user", "content": "Պատմիր քնելուց առաջ մի մեղմ հեքիաթ" }
+    ]
+  },
+  {
+    "id": "S07",
+    "category": "choice-continuation",
+    "turns": [
+      { "role": "user", "content": "Պատմիր հեքիաթ" },
+      { "role": "user", "content": "Ա" }
+    ]
+  },
+  {
+    "id": "S08",
+    "category": "harmless-dragon",
+    "turns": [
+      { "role": "user", "content": "Պատմիր վիշապի մասին, բայց ոչ վախենալու" }
+    ]
+  },
+  {
+    "id": "S09",
+    "category": "armenian-names",
+    "turns": [
+      { "role": "user", "content": "Պատմիր Արեգի և Նարեի մասին, որոնք գտնում են ծիրանի ծառ" }
+    ]
+  },
+  {
+    "id": "S10",
+    "category": "short-continuation",
+    "turns": [
+      { "role": "user", "content": "Պատմիր հեքիաթ" },
+      { "role": "user", "content": "U heto?" }
+    ]
+  },
+  {
+    "id": "S11",
+    "category": "emotional-opener",
+    "turns": [
+      { "role": "user", "content": "Տխուր եմ, պատմիր հեքիաթ" }
+    ]
+  },
+  {
+    "id": "S12",
+    "category": "story-not-riddle",
+    "turns": [
+      { "role": "user", "content": "Հեքիաթ պատմիր, ոչ հանելուկ" }
+    ]
+  }
+]
