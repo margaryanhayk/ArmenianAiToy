@@ -32,6 +32,7 @@ point before any full-set live run.
 | `StoryModelBakeoff.csproj` | net10.0 console exe, no PackageReferences, no ProjectReferences. |
 | `story-seed-bank.v1.json` | Hand-edited Armenian-flavored seed bank for future Story Director experiments (Phase 1 per `STORY_DIRECTOR_ARCHITECTURE.md`). NOT loaded by ChatService. |
 | `validate-seed-bank.js` | Node.js validator for `story-seed-bank.v1.json`. Pure-stdlib; checks shape, counts, duplicates, deprecated keys, and known-bad values. |
+| `generate-story-plan.js` | Node.js Story Plan generator (Phase 2 of `STORY_DIRECTOR_ARCHITECTURE.md`). Pure-stdlib; reads the seed bank and prints pretty JSON plans to stdout. Supports `--count N` and `--seed N`. |
 | `results/` | Per-run Markdown + JSON output (created on first live run). **Gitignored** (`.gitignore` excludes `tools/StoryModelBakeoff/results/`). |
 
 ## Seed bank validation
@@ -57,6 +58,62 @@ bank next to itself, and checks:
 
 Exit 0 on PASS, non-zero on FAIL with all errors listed before
 exit. The script never modifies the seed bank.
+
+## Story plan generator
+
+Quick experiment to feel out whether the seed bank can produce
+usable Areg-style story material *before* any model call. Reads
+the seed bank and prints pretty JSON plans to stdout:
+
+```
+node tools/StoryModelBakeoff/generate-story-plan.js
+node tools/StoryModelBakeoff/generate-story-plan.js --count 3
+node tools/StoryModelBakeoff/generate-story-plan.js --count 5 --seed 123
+```
+
+Defaults: one plan, non-deterministic (`Math.random`). With
+`--seed N`, the script uses a small LCG so the same seed reproduces
+the same plan(s) — useful for reviewing a specific output later.
+
+Generation rules:
+
+- `hero` and `friendOrGuide` are drawn from `palettes.animals`,
+  always different from each other, and explicitly excluded from
+  `rareOrRequestedOnlyAnimals` and `hardAvoidCreatures` even if
+  they sneak into `animals` by hand-edit.
+- `place` / `magicalObject` / `smallProblem` from their matching
+  palettes.
+- `sensoryDetails` is two distinct entries from `sensoryDetails`.
+- `choiceA` / `choiceB` are concrete grounded actions: one
+  references the plan's `place`, the other references the plan's
+  `magicalObject`. Order between them is randomised per plan.
+
+  **Place templates** all use `դեպի` (toward) so the place phrase
+  stays in the nominative — no irregular-stem hazard:
+  - *"գնալ դեպի <place>"*, *"քայլել դեպի <place>"* — universal.
+  - *"իջնել դեպի <place>"* — only when the place reads as a
+    water / lower spot (`լճակ`, `աղբյուր`, `առվակ`, `ափ`, ...).
+  - *"բարձրանալ դեպի <place>"* — only when the place reads as a
+    high spot (`բլուր`, `սար`, `ժայռ`, `կատար`, `ծառ`, `ընկուզենի`,
+    `աշտարակ`, `ճյուղ`, ...).
+
+  **Object templates** use the Armenian definite suffix
+  («ը»/«ն») where the action requires accusative-shape:
+  - *"վերցնել <obj>"*, *"տանել <obj>ը ընկերոջ մոտ"*,
+    *"պահել <obj>ը ափի մեջ"*, *"մոտեցնել <obj>ը լույսին"* —
+    universal, work on any small magical object.
+  - *"բացել <obj>ը"* — only when the object is openable
+    (`տուփ`, `սրվակ`, `կուժ`, `տոպրակ`, `սփռոց`).
+  - *"հետևել <obj>ի փայլին"* — only when the object reads as
+    shiny (`ոսկ-`, `արծաթ-`, `լուսավոր`, `փայլող`, `մարգարիտ`,
+    `աստղ`, `լույս`, `շող`) AND its phrase ends in a consonant
+    (so the genitive `-ի` doesn't double).
+  - *"լսել՝ արդյոք <obj>ը ձայն ունի"* — only when the object
+    reads as sound-capable (`զանգակ`, `սանր`, `սրինգ`, `սուլիչ`,
+    `խեցի`, `փետուր`, `կաթիլ`, or carries `երգող`/`խոսող`/`հնչող`).
+
+This is research tooling. **No model is called.** No production
+runtime is touched.
 
 ## Running
 
