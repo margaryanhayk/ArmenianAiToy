@@ -43,6 +43,14 @@ public class ConversationServiceTodaySummaryTests
                 .HasMany(c => c.Messages)
                 .WithOne()
                 .HasForeignKey(m => m.ConversationId);
+
+            // E2.1 — Device is read by GetTodaySummaryAsync to resolve the
+            // effective timezone when the caller didn't pass tz explicitly.
+            // Nav properties stay ignored; tests don't need ParentDevices /
+            // Conversations off the Device entity.
+            modelBuilder.Entity<Device>().HasKey(d => d.Id);
+            modelBuilder.Entity<Device>().Ignore(d => d.Conversations);
+            modelBuilder.Entity<Device>().Ignore(d => d.ParentDevices);
         }
     }
 
@@ -409,5 +417,135 @@ public class ConversationServiceTodaySummaryTests
         Assert.Equal(0, result.AssistantMessagesWithAudio);
         Assert.Single(result.Newest);
         Assert.Equal(ours.Id, result.Newest[0].Id);
+    }
+
+    // ---------- E2.1 — timezone-aware day boundary ----------
+
+    private static Device NewDevice(Guid id, string timeZone) => new()
+    {
+        Id = id,
+        MacAddress = "mac-" + id.ToString("N").Substring(0, 8),
+        Name = "TestDevice",
+        ApiKey = "dtk_test",
+        RegisteredAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        LastSeenAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        TimeZone = timeZone,
+    };
+
+    [Fact]
+    public async Task TimeZone_AsiaYerevan_ShiftsDayBoundaryByFourHours()
+    {
+        // Asia/Yerevan = UTC+4, no DST.
+        // asOfUtc = Apr 21 09:00 UTC = Apr 21 13:00 local Yerevan.
+        // DayStartLocal = Apr 21 00:00 Yerevan = Apr 20 20:00 UTC.
+        // T1 = Apr 20 22:30 UTC = Apr 21 02:30 Yerevan → counted (today).
+        // T2 = Apr 20 19:30 UTC = Apr 20 23:30 Yerevan → NOT counted.
+        var (service, db) = CreateService();
+        var deviceId = Guid.NewGuid();
+        db.Set<Device>().Add(NewDevice(deviceId, "Asia/Yerevan"));
+        var conv = NewConversation(deviceId,
+            new DateTime(2026, 4, 20, 19, 0, 0, DateTimeKind.Utc));
+        db.Set<Conversation>().Add(conv);
+
+        var t1 = new DateTime(2026, 4, 20, 22, 30, 0, DateTimeKind.Utc);
+        var t2 = new DateTime(2026, 4, 20, 19, 30, 0, DateTimeKind.Utc);
+        db.Set<Message>().AddRange(
+            NewMessage(conv.Id, MessageRole.User, "yerevan-today", t1),
+            NewMessage(conv.Id, MessageRole.User, "yerevan-yesterday", t2));
+        await db.SaveChangesAsync();
+
+        var asOf = new DateTime(2026, 4, 21, 9, 0, 0, DateTimeKind.Utc);
+        var result = await service.GetTodaySummaryAsync(deviceId, asOf);
+
+        Assert.Equal("Asia/Yerevan", result.TimeZoneId);
+        Assert.True(result.TimeZoneResolved);
+        Assert.Equal(
+            new DateTime(2026, 4, 21, 0, 0, 0, DateTimeKind.Unspecified),
+            result.DayStartLocal);
+        Assert.Equal(
+            new DateTime(2026, 4, 20, 20, 0, 0, DateTimeKind.Utc),
+            result.DayStartUtc);
+        Assert.Equal(1, result.MessagesCount);
+        Assert.Equal(1, result.ConversationsCount);
+    }
+
+    [Fact]
+    public async Task TimeZone_NullArg_DefaultsToDeviceTimeZone()
+    {
+        // Same setup as the Yerevan boundary test, but the caller passes
+        // tz=null — the service must read Device.TimeZone and use Yerevan.
+        var (service, db) = CreateService();
+        var deviceId = Guid.NewGuid();
+        db.Set<Device>().Add(NewDevice(deviceId, "Asia/Yerevan"));
+        await db.SaveChangesAsync();
+
+        var asOf = new DateTime(2026, 4, 21, 9, 0, 0, DateTimeKind.Utc);
+        var result = await service.GetTodaySummaryAsync(deviceId, asOf, tz: null);
+
+        Assert.Equal("Asia/Yerevan", result.TimeZoneId);
+        Assert.True(result.TimeZoneResolved);
+        Assert.Equal(
+            new DateTime(2026, 4, 20, 20, 0, 0, DateTimeKind.Utc),
+            result.DayStartUtc);
+    }
+
+    [Fact]
+    public async Task TimeZone_ExplicitArg_OverridesDevice()
+    {
+        // Device row says Asia/Yerevan, but caller passes tz=UTC explicitly:
+        // service must use UTC, not the device default.
+        var (service, db) = CreateService();
+        var deviceId = Guid.NewGuid();
+        db.Set<Device>().Add(NewDevice(deviceId, "Asia/Yerevan"));
+        await db.SaveChangesAsync();
+
+        var asOf = new DateTime(2026, 4, 21, 9, 0, 0, DateTimeKind.Utc);
+        var result = await service.GetTodaySummaryAsync(deviceId, asOf, tz: "UTC");
+
+        Assert.Equal("UTC", result.TimeZoneId);
+        Assert.True(result.TimeZoneResolved);
+        Assert.Equal(
+            new DateTime(2026, 4, 21, 0, 0, 0, DateTimeKind.Utc),
+            result.DayStartUtc);
+    }
+
+    [Fact]
+    public async Task TimeZone_Unresolvable_FallsBackToUtc()
+    {
+        // Bogus IANA id: fail soft to UTC, echo the requested id, mark
+        // TimeZoneResolved=false. Day boundary is straight UTC midnight.
+        var (service, db) = CreateService();
+        var deviceId = Guid.NewGuid();
+        db.Set<Device>().Add(NewDevice(deviceId, "Asia/Yerevan"));
+        await db.SaveChangesAsync();
+
+        var asOf = new DateTime(2026, 4, 21, 9, 0, 0, DateTimeKind.Utc);
+        var result = await service.GetTodaySummaryAsync(
+            deviceId, asOf, tz: "Not/Real_Zone");
+
+        Assert.False(result.TimeZoneResolved);
+        Assert.Equal("Not/Real_Zone", result.TimeZoneId);
+        Assert.Equal(
+            new DateTime(2026, 4, 21, 0, 0, 0, DateTimeKind.Utc),
+            result.DayStartUtc);
+    }
+
+    [Fact]
+    public async Task TimeZone_DeviceRowMissing_UsesUtc()
+    {
+        // No Device row seeded and no tz arg: service falls back to UTC,
+        // echoes "UTC" as the literal id, marks TimeZoneResolved=false
+        // (the dashboard label will read "UTC fallback").
+        var (service, _) = CreateService();
+        var deviceId = Guid.NewGuid();
+
+        var asOf = new DateTime(2026, 4, 21, 9, 0, 0, DateTimeKind.Utc);
+        var result = await service.GetTodaySummaryAsync(deviceId, asOf, tz: null);
+
+        Assert.False(result.TimeZoneResolved);
+        Assert.Equal("UTC", result.TimeZoneId);
+        Assert.Equal(
+            new DateTime(2026, 4, 21, 0, 0, 0, DateTimeKind.Utc),
+            result.DayStartUtc);
     }
 }

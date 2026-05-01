@@ -219,7 +219,8 @@ public class ConversationService : IConversationService
         );
     }
 
-    public async Task<TodaySummaryDto> GetTodaySummaryAsync(Guid deviceId, DateTime asOfUtc)
+    public async Task<TodaySummaryDto> GetTodaySummaryAsync(
+        Guid deviceId, DateTime asOfUtc, string? tz = null)
     {
         // Normalize to UTC. Inputs from the controller arrive UTC-typed
         // already (via DateTimeOffset.UtcDateTime); be tolerant of
@@ -227,9 +228,20 @@ public class ConversationService : IConversationService
         var normalizedAsOf = asOfUtc.Kind == DateTimeKind.Utc
             ? asOfUtc
             : DateTime.SpecifyKind(asOfUtc, DateTimeKind.Utc);
-        var dayStartUtc = new DateTime(
-            normalizedAsOf.Year, normalizedAsOf.Month, normalizedAsOf.Day,
-            0, 0, 0, DateTimeKind.Utc);
+
+        // E2.1 — resolve effective timezone: explicit arg > Device.TimeZone > UTC.
+        // Unresolvable ids fail soft to UTC and stamp TimeZoneResolved=false,
+        // mirroring the BedtimeWindowEvaluator contract.
+        var (resolvedTz, timeZoneId, timeZoneResolved) =
+            await ResolveTodayTimezoneAsync(deviceId, tz);
+
+        // Day boundary: midnight LOCAL in the resolved timezone, then back
+        // to a UTC instant for the EF Timestamp filters below.
+        var localAsOf = TimeZoneInfo.ConvertTimeFromUtc(normalizedAsOf, resolvedTz);
+        var dayStartLocal = new DateTime(
+            localAsOf.Year, localAsOf.Month, localAsOf.Day,
+            0, 0, 0, DateTimeKind.Unspecified);
+        var dayStartUtc = TimeZoneInfo.ConvertTimeToUtc(dayStartLocal, resolvedTz);
 
         // Distinct conversation count: any conversation on this device
         // that has at least one message timestamped on or after today.
@@ -334,11 +346,59 @@ public class ConversationService : IConversationService
             DeviceId: deviceId,
             AsOfUtc: normalizedAsOf,
             DayStartUtc: dayStartUtc,
+            DayStartLocal: dayStartLocal,
+            TimeZoneId: timeZoneId,
+            TimeZoneResolved: timeZoneResolved,
             ConversationsCount: conversationsCount,
             MessagesCount: messagesCount,
             FlaggedMessagesCount: flaggedCount,
             AssistantMessagesWithAudio: assistantAudioCount,
             Newest: newest,
             Flagged: flagged);
+    }
+
+    // E2.1 — resolution chain for the Today panel's effective timezone.
+    // Returns (TimeZoneInfo, echoed id, resolved). On any failure path the
+    // resolved TimeZoneInfo is UTC, and the echoed id is the requested or
+    // device-stored id (so the dashboard can label "UTC fallback" with the
+    // attempted name). When neither an explicit arg nor a Device row is
+    // available, the echoed id is the literal "UTC" and Resolved=false —
+    // the panel still renders, the day boundary is just UTC midnight.
+    private async Task<(TimeZoneInfo Tz, string TimeZoneId, bool Resolved)>
+        ResolveTodayTimezoneAsync(Guid deviceId, string? requestedTz)
+    {
+        var candidate = !string.IsNullOrWhiteSpace(requestedTz)
+            ? requestedTz!.Trim()
+            : await ReadDeviceTimeZoneAsync(deviceId);
+
+        if (string.IsNullOrWhiteSpace(candidate))
+            return (TimeZoneInfo.Utc, "UTC", false);
+
+        try
+        {
+            return (TimeZoneInfo.FindSystemTimeZoneById(candidate), candidate, true);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            _logger.LogWarning(
+                "Today summary: time zone id '{TimeZoneId}' not found on this host; using UTC.",
+                candidate);
+            return (TimeZoneInfo.Utc, candidate, false);
+        }
+        catch (InvalidTimeZoneException)
+        {
+            _logger.LogWarning(
+                "Today summary: time zone id '{TimeZoneId}' is invalid; using UTC.",
+                candidate);
+            return (TimeZoneInfo.Utc, candidate, false);
+        }
+    }
+
+    private async Task<string?> ReadDeviceTimeZoneAsync(Guid deviceId)
+    {
+        return await _db.Set<Device>()
+            .Where(d => d.Id == deviceId)
+            .Select(d => (string?)d.TimeZone)
+            .FirstOrDefaultAsync();
     }
 }

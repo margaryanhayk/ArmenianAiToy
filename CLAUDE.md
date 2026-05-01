@@ -379,6 +379,51 @@ session or history-priority state. A future E1.3 slice would add a
 persistent `Message.Mode` (or equivalent) column and migration
 before exposing this aggregate.
 
+### E2.1 addendum — timezone-aware day boundary
+
+By default the Today endpoint now computes its day boundary in the
+**device's local time zone** (`Device.TimeZone`, IANA, default
+`Asia/Yerevan`) instead of UTC. The wire shape gains three additive
+fields and stays backwards-compatible.
+
+- **Resolution chain** (`ConversationService.ResolveTodayTimezoneAsync`):
+  explicit `?tz=<IANA>` query param → `Device.TimeZone` → `"UTC"`.
+  Only the first non-empty entry is consulted — the `tz` query
+  param is the override seam, not the default.
+- **Fail-soft to UTC.** Unresolvable ids (`TimeZoneNotFoundException`,
+  `InvalidTimeZoneException`) collapse to `TimeZoneInfo.Utc`,
+  log one warning, and stamp `TimeZoneResolved=false` on the DTO.
+  `TimeZoneId` echoes the *attempted* id so the dashboard can
+  honestly label "UTC fallback". Same contract as
+  `BedtimeWindowEvaluator`. Hard 400 was rejected — it would break
+  parents on hosts whose IANA db lacks the requested zone.
+- **DTO additive fields**:
+  - `DayStartLocal: DateTime` (Kind=Unspecified) — midnight local in
+    the resolved zone.
+  - `TimeZoneId: string` — echoed id (or literal `"UTC"` when no id
+    was attempted).
+  - `TimeZoneResolved: bool` — false when fell back to UTC.
+- **`DayStartUtc`** stays the EF filter anchor and is now derived
+  via `TimeZoneInfo.ConvertTimeToUtc(DayStartLocal, resolvedTz)`.
+  EF queries are unchanged: still `Timestamp >= DayStartUtc`.
+- **Privacy invariants unchanged.** Still no `ChildId`, still no
+  `AudioBlobPath` on `TodaySummaryDto` or
+  `TodaySummaryConversationLink`. Pinned by the existing wire-shape
+  test, extended to also require the three new fields are present.
+- **Frontend.** `parent.html` does NOT pass `?tz=` — the backend
+  infers from the device row. The Today-panel footnote now reads:
+  - `Today (Asia/Yerevan) — server-aggregated.` (resolved=true)
+  - `Today (UTC fallback) — server-aggregated.` (resolved=false)
+  - `Today — server-aggregated.` (defensive fallback when the field
+    is missing, e.g. an older backend).
+- **Out of scope (deferred).** No `TimeZone` field on
+  `LinkedDeviceDto`; no parent-profile timezone setting; no UI
+  picker; no DST-edge fixtures across `America/*` transitions; no
+  schema change (`Device.TimeZone` already exists). Other
+  parent-facing list views (Conversations, Flagged, audit feed)
+  remain UTC-anchored and format timestamps client-side. Modes-
+  used-today still deferred per the note above.
+
 ## Audit events
 
 An append-only `AuditEvents` table records sensitive parent actions.

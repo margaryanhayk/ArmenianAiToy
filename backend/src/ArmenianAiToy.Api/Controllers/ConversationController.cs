@@ -125,6 +125,13 @@ public class ConversationController : ControllerBase
     /// surfaces as a 400 from the model-binding pipeline before this
     /// action runs.
     /// </para>
+    /// <para>
+    /// E2.1 — <c>tz</c> is an optional IANA time-zone id that overrides
+    /// the device's stored <see cref="ArmenianAiToy.Domain.Entities.Device.TimeZone"/>.
+    /// When absent (the dashboard's default) the service infers the zone
+    /// from the device row. Unresolvable ids fail soft to UTC; the DTO
+    /// surfaces this via <c>TimeZoneResolved=false</c>.
+    /// </para>
     /// </summary>
     [HttpGet("today-summary")]
     [Authorize]
@@ -134,7 +141,8 @@ public class ConversationController : ControllerBase
     [ProducesResponseType(403)]
     public async Task<IActionResult> GetTodaySummary(
         [FromQuery] Guid deviceId,
-        [FromQuery] DateTimeOffset? asOfUtc = null)
+        [FromQuery] DateTimeOffset? asOfUtc = null,
+        [FromQuery] string? tz = null)
     {
         var asOf = asOfUtc?.UtcDateTime ?? DateTime.UtcNow;
 
@@ -144,7 +152,7 @@ public class ConversationController : ControllerBase
         if (!linkedDevices.Contains(deviceId))
             return Forbid();
 
-        var summary = await _conversationService.GetTodaySummaryAsync(deviceId, asOf);
+        var summary = await _conversationService.GetTodaySummaryAsync(deviceId, asOf, tz);
         return Ok(summary);
     }
 

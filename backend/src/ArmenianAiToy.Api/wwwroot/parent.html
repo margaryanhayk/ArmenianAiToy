@@ -2084,7 +2084,7 @@
         empty.textContent = 'No conversations today on this device.';
         counts.appendChild(empty);
         if (footnote) {
-          footnote.textContent = 'Today (UTC) — server-aggregated.';
+          footnote.textContent = todayFooterLabel(dto);
         }
         return;
       }
@@ -2143,8 +2143,27 @@
       }
 
       if (footnote) {
-        footnote.textContent = 'Today (UTC) — server-aggregated.';
+        footnote.textContent = todayFooterLabel(dto);
       }
+    }
+
+    // E2.1 — footer label for the Today panel. Honest about whether the
+    // server resolved the device's IANA tz id; falls back to "UTC fallback"
+    // (echoing the attempted id is intentional and lives on the DTO, but
+    // the dashboard prefers the explicit "fallback" wording so a parent
+    // cannot mistake a fallback for a successful resolve). Defensive
+    // "Today — server-aggregated." renders when the field is missing
+    // (e.g. an older backend).
+    function todayFooterLabel(dto) {
+      if (dto && dto.timeZoneResolved === true
+          && typeof dto.timeZoneId === 'string'
+          && dto.timeZoneId.length > 0) {
+        return 'Today (' + dto.timeZoneId + ') — server-aggregated.';
+      }
+      if (dto && dto.timeZoneResolved === false) {
+        return 'Today (UTC fallback) — server-aggregated.';
+      }
+      return 'Today — server-aggregated.';
     }
 
     // Build a single → Open button row inside the Today panel. Reuses

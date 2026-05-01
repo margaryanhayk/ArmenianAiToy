@@ -62,6 +62,9 @@ public class ConversationControllerTodaySummaryTests
             DeviceId: deviceId,
             AsOfUtc: new DateTime(2026, 4, 30, 12, 0, 0, DateTimeKind.Utc),
             DayStartUtc: new DateTime(2026, 4, 30, 0, 0, 0, DateTimeKind.Utc),
+            DayStartLocal: new DateTime(2026, 4, 30, 0, 0, 0, DateTimeKind.Unspecified),
+            TimeZoneId: "UTC",
+            TimeZoneResolved: false,
             ConversationsCount: 0,
             MessagesCount: 0,
             FlaggedMessagesCount: 0,
@@ -92,7 +95,7 @@ public class ConversationControllerTodaySummaryTests
         var result = await controller.GetTodaySummary(unlinkedDeviceId, asOfUtc: null);
 
         Assert.IsType<ForbidResult>(result);
-        await convos.DidNotReceiveWithAnyArgs().GetTodaySummaryAsync(default, default);
+        await convos.DidNotReceiveWithAnyArgs().GetTodaySummaryAsync(default, default, default);
     }
 
     [Fact]
@@ -100,7 +103,8 @@ public class ConversationControllerTodaySummaryTests
     {
         var (controller, convos, _, ownedDeviceId, _) = CreateController();
         var dto = MakeDto(ownedDeviceId);
-        convos.GetTodaySummaryAsync(ownedDeviceId, Arg.Any<DateTime>()).Returns(dto);
+        convos.GetTodaySummaryAsync(ownedDeviceId, Arg.Any<DateTime>(), Arg.Any<string?>())
+              .Returns(dto);
 
         var result = await controller.GetTodaySummary(ownedDeviceId, asOfUtc: null);
 
@@ -112,21 +116,22 @@ public class ConversationControllerTodaySummaryTests
     public async Task GetTodaySummary_DefaultAsOfUtc_ServiceReceivesUtcKind()
     {
         var (controller, convos, _, ownedDeviceId, _) = CreateController();
-        convos.GetTodaySummaryAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
+        convos.GetTodaySummaryAsync(Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<string?>())
               .Returns(MakeDto(ownedDeviceId));
 
         await controller.GetTodaySummary(ownedDeviceId, asOfUtc: null);
 
         await convos.Received(1).GetTodaySummaryAsync(
             ownedDeviceId,
-            Arg.Is<DateTime>(d => d.Kind == DateTimeKind.Utc));
+            Arg.Is<DateTime>(d => d.Kind == DateTimeKind.Utc),
+            Arg.Any<string?>());
     }
 
     [Fact]
     public async Task GetTodaySummary_OffsetAsOfUtc_NormalizedToUtc()
     {
         var (controller, convos, _, ownedDeviceId, _) = CreateController();
-        convos.GetTodaySummaryAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
+        convos.GetTodaySummaryAsync(Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<string?>())
               .Returns(MakeDto(ownedDeviceId));
 
         // 2026-04-30 14:00 +02:00 == 2026-04-30 12:00 UTC.
@@ -138,7 +143,39 @@ public class ConversationControllerTodaySummaryTests
 
         await convos.Received(1).GetTodaySummaryAsync(
             ownedDeviceId,
-            Arg.Is<DateTime>(d => d == expectedUtc && d.Kind == DateTimeKind.Utc));
+            Arg.Is<DateTime>(d => d == expectedUtc && d.Kind == DateTimeKind.Utc),
+            Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task GetTodaySummary_TzQueryParam_PassesThroughToService()
+    {
+        var (controller, convos, _, ownedDeviceId, _) = CreateController();
+        convos.GetTodaySummaryAsync(Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<string?>())
+              .Returns(MakeDto(ownedDeviceId));
+
+        await controller.GetTodaySummary(
+            ownedDeviceId, asOfUtc: null, tz: "America/Los_Angeles");
+
+        await convos.Received(1).GetTodaySummaryAsync(
+            ownedDeviceId,
+            Arg.Any<DateTime>(),
+            "America/Los_Angeles");
+    }
+
+    [Fact]
+    public async Task GetTodaySummary_NullTzQueryParam_PassesNullToService()
+    {
+        var (controller, convos, _, ownedDeviceId, _) = CreateController();
+        convos.GetTodaySummaryAsync(Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<string?>())
+              .Returns(MakeDto(ownedDeviceId));
+
+        await controller.GetTodaySummary(ownedDeviceId, asOfUtc: null, tz: null);
+
+        await convos.Received(1).GetTodaySummaryAsync(
+            ownedDeviceId,
+            Arg.Any<DateTime>(),
+            (string?)null);
     }
 
     [Fact]
@@ -147,10 +184,16 @@ public class ConversationControllerTodaySummaryTests
         // Wire-shape pin: the DTO must NOT carry per-child or per-blob
         // identifiers. AssistantMessagesWithAudio is a count only; the
         // path itself never leaves the service layer.
+        // E2.1: timezone-awareness fields ARE present (TimeZoneId,
+        // TimeZoneResolved, DayStartLocal); the privacy invariants for
+        // ChildId / AudioBlobPath are unchanged.
         var dtoProps = typeof(TodaySummaryDto)
             .GetProperties().Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
         Assert.DoesNotContain("ChildId", dtoProps);
         Assert.DoesNotContain("AudioBlobPath", dtoProps);
+        Assert.Contains("TimeZoneId", dtoProps);
+        Assert.Contains("TimeZoneResolved", dtoProps);
+        Assert.Contains("DayStartLocal", dtoProps);
 
         var linkProps = typeof(TodaySummaryConversationLink)
             .GetProperties().Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
