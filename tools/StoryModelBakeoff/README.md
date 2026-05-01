@@ -30,7 +30,7 @@ point before any full-set live run.
 | `bakeoff-prompts.json` | The 12 Armenian story scenarios (multi-turn where relevant). |
 | `system-prompt.txt` | Frozen copy of the production `SystemPrompt` (from `backend/src/ArmenianAiToy.Api/appsettings.json`) with a `# Source:` header. The loader strips that header before hashing. |
 | `StoryModelBakeoff.csproj` | net10.0 console exe, no PackageReferences, no ProjectReferences. |
-| `story-seed-bank.v1.json` | Hand-edited Armenian-flavored seed bank for future Story Director experiments (Phase 1 per `STORY_DIRECTOR_ARCHITECTURE.md`). NOT loaded by ChatService. |
+| `story-seed-bank.v1.json` | Hand-edited Armenian-flavored seed bank for future Story Director experiments (Phase 1 per `STORY_DIRECTOR_ARCHITECTURE.md`). NOT loaded by ChatService. Now carries: **content palettes** (animals, places, magicalObjects, smallProblems, sensoryDetails, gentleActions, choiceVerbs, traditionalFormulas), **story-control attributes** (characterTraits, characterGoals, storyMoods, relationshipTypes, conflictTypes, resolutionStyles, choiceTypes), **age tone profiles** (object array: ageToneProfiles), and **guardrail arrays** (rareOrRequestedOnlyAnimals, hardAvoidCreatures, avoidPatterns, forbiddenTonePatterns). |
 | `validate-seed-bank.js` | Node.js validator for `story-seed-bank.v1.json`. Pure-stdlib; checks shape, counts, duplicates, deprecated keys, and known-bad values. |
 | `generate-story-plan.js` | Node.js Story Plan generator (Phase 2 of `STORY_DIRECTOR_ARCHITECTURE.md`). Pure-stdlib; reads the seed bank and prints pretty JSON plans to stdout. Supports `--count N` and `--seed N`. |
 | `results/` | Per-run Markdown + JSON output (created on first live run). **Gitignored** (`.gitignore` excludes `tools/StoryModelBakeoff/results/`). |
@@ -74,6 +74,17 @@ node tools/StoryModelBakeoff/generate-story-plan.js --count 5 --seed 123
 Defaults: one plan, non-deterministic (`Math.random`). With
 `--seed N`, the script uses a small LCG so the same seed reproduces
 the same plan(s) — useful for reviewing a specific output later.
+
+> **Plan generator v1 scope.** The current generator consumes only
+> the original *content palettes* of `story-seed-bank.v1.json`
+> (animals, places, magicalObjects, smallProblems, sensoryDetails,
+> rareOrRequestedOnlyAnimals, hardAvoidCreatures). The newer
+> *story-control attributes* (`characterTraits`, `characterGoals`,
+> `storyMoods`, `relationshipTypes`, `conflictTypes`,
+> `resolutionStyles`, `choiceTypes`, `ageToneProfiles`,
+> `forbiddenTonePatterns`) are present in the seed bank for the
+> validator to enforce, but the plan generator does not yet read
+> them. Later slices will teach it to consume those attributes.
 
 Generation rules:
 

@@ -71,6 +71,7 @@ if (!palettes || typeof palettes !== 'object' || Array.isArray(palettes)) {
 
 // ---- required palette arrays + minimum counts ----
 const REQUIRED = {
+  // Content palettes.
   animals: 30,
   places: 30,
   magicalObjects: 30,
@@ -78,9 +79,20 @@ const REQUIRED = {
   sensoryDetails: 30,
   gentleActions: 30,
   choiceVerbs: 20,
+  // Guardrail arrays.
   rareOrRequestedOnlyAnimals: 5,
   hardAvoidCreatures: 3,
   avoidPatterns: 10,
+  // Story-control attribute arrays (string arrays — ageToneProfiles
+  // is checked separately below because it carries object entries).
+  characterTraits: 20,
+  characterGoals: 20,
+  storyMoods: 12,
+  relationshipTypes: 12,
+  conflictTypes: 12,
+  resolutionStyles: 12,
+  choiceTypes: 12,
+  forbiddenTonePatterns: 12,
 };
 
 console.log();
@@ -165,6 +177,57 @@ if ('traditionalFormulas' in palettes) {
   }
 } else {
   console.log('Optional traditionalFormulas: not present (allowed)');
+}
+
+// ---- required ageToneProfiles object array ----
+// Object entries (label / ageRange / sentenceStyle / wordChoice /
+// targetWords) — checked separately from REQUIRED because that loop
+// only handles flat string arrays. Labels must be unique.
+const ATP_REQUIRED_FIELDS = [
+  'label', 'ageRange', 'sentenceStyle', 'wordChoice', 'targetWords',
+];
+const ATP_MIN = 4;
+
+if (!('ageToneProfiles' in palettes)) {
+  err('palettes.ageToneProfiles is missing');
+  console.log('Required ageToneProfiles: MISSING');
+} else if (!Array.isArray(palettes.ageToneProfiles)) {
+  err('palettes.ageToneProfiles is not an array');
+  console.log('Required ageToneProfiles: not an array');
+} else {
+  const arr = palettes.ageToneProfiles;
+  const status =
+    arr.length >= ATP_MIN ? `(≥${ATP_MIN} OK)` : `(MIN ${ATP_MIN} REQUIRED — short)`;
+  console.log('Required ageToneProfiles: ' + arr.length + ' ' + status);
+  if (arr.length < ATP_MIN) {
+    err(`palettes.ageToneProfiles has ${arr.length} entries; minimum is ${ATP_MIN}`);
+  }
+  const labelSeen = new Map();
+  for (let i = 0; i < arr.length; i++) {
+    const item = arr[i];
+    if (item == null || typeof item !== 'object' || Array.isArray(item)) {
+      err(`palettes.ageToneProfiles[${i}] is not an object`);
+      continue;
+    }
+    for (const f of ATP_REQUIRED_FIELDS) {
+      const v = item[f];
+      if (typeof v !== 'string') {
+        err(`palettes.ageToneProfiles[${i}].${f} is missing or not a string`);
+      } else if (v.trim().length === 0) {
+        err(`palettes.ageToneProfiles[${i}].${f} is empty after trim`);
+      }
+    }
+    if (typeof item.label === 'string') {
+      if (labelSeen.has(item.label)) {
+        err(
+          `duplicate label in palettes.ageToneProfiles: "${item.label}"` +
+          ` (first at index ${labelSeen.get(item.label)}, again at index ${i})`
+        );
+      } else {
+        labelSeen.set(item.label, i);
+      }
+    }
+  }
 }
 
 // ---- deprecated key check ----
