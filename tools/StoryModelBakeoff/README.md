@@ -33,6 +33,7 @@ point before any full-set live run.
 | `story-seed-bank.v1.json` | Hand-edited Armenian-flavored seed bank for future Story Director experiments (Phase 1 per `STORY_DIRECTOR_ARCHITECTURE.md`). NOT loaded by ChatService. Now carries: **content palettes** (animals, places, magicalObjects, smallProblems, sensoryDetails, gentleActions, choiceVerbs, traditionalFormulas), **story-control attributes** (characterTraits, characterGoals, storyMoods, relationshipTypes, conflictTypes, resolutionStyles, choiceTypes), **age tone profiles** (object array: ageToneProfiles), and **guardrail arrays** (rareOrRequestedOnlyAnimals, hardAvoidCreatures, avoidPatterns, forbiddenTonePatterns). |
 | `validate-seed-bank.js` | Node.js validator for `story-seed-bank.v1.json`. Pure-stdlib; checks shape, counts, duplicates, deprecated keys, and known-bad values. |
 | `generate-story-plan.js` | Node.js Story Plan generator (Phase 2 of `STORY_DIRECTOR_ARCHITECTURE.md`). Pure-stdlib; reads the seed bank and prints pretty JSON plans to stdout. Supports `--count N` and `--seed N`. |
+| `validate-story-plan.js` | Node.js Plan Gate validator (Phase 3 first half). Pure-stdlib; reads plan JSON from stdin or a file path, checks the 17-field shape, seed-bank membership of every value, hardAvoidCreatures / forbiddenTonePatterns leaks, banned choice phrases, and choice grounding + type consistency. Reports per-plan PASS/FAIL with errors and lightweight warnings. Exit 0 on PASS, 1 on FAIL. |
 | `results/` | Per-run Markdown + JSON output (created on first live run). **Gitignored** (`.gitignore` excludes `tools/StoryModelBakeoff/results/`). |
 
 ## Seed bank validation
@@ -58,6 +59,68 @@ bank next to itself, and checks:
 
 Exit 0 on PASS, non-zero on FAIL with all errors listed before
 exit. The script never modifies the seed bank.
+
+## Story plan validation
+
+Validate generated plan JSON against the seed bank's vocabulary
+and the Plan Gate's structural rules. Pure Node.js, no
+dependencies; reads from stdin or a file path:
+
+```
+# Validate freshly generated plans through stdin
+node tools/StoryModelBakeoff/generate-story-plan.js --count 10 --seed 123 \
+  | node tools/StoryModelBakeoff/validate-story-plan.js
+
+# Validate a saved plans file
+node tools/StoryModelBakeoff/validate-story-plan.js \
+  tools/StoryModelBakeoff/evaluations/story-plan-generator-review-20260501.plans.json
+```
+
+What it checks:
+
+- **Required fields** — all 17 plan fields must exist; the
+  string fields must be non-empty; `sensoryDetails` is exactly
+  two distinct entries; `ageToneProfile` is a full object with
+  the five required string fields.
+- **Seed-bank membership** — every value must appear in its
+  source palette: `hero` / `friendOrGuide` ∈ `palettes.animals`,
+  `heroTrait` ∈ `palettes.characterTraits`, `mood` ∈
+  `palettes.storyMoods`, `choiceAType` / `choiceBType` ∈
+  `palettes.choiceTypes`, `ageToneProfile.label` ∈
+  `palettes.ageToneProfiles[].label`, etc.
+- **Hero / friend rules** — must be different; neither may be
+  in `rareOrRequestedOnlyAnimals` or `hardAvoidCreatures`.
+- **Guardrail leaks** — no value in `palettes.hardAvoidCreatures`
+  or `palettes.forbiddenTonePatterns` may appear as a substring
+  anywhere in the plan; the historical known-bad cleanup strings
+  also stay out.
+- **Choice grounding** — each choice must reference either the
+  plan's `place` or its `magicalObject` as a substring.
+- **Choice type consistency** — a place-grounded choice must
+  carry `choiceType = "գնալ դեպի վայր"`; an object-grounded
+  choice must NOT carry that type.
+- **Banned choice phrases** — exact rejects (`շարունակել`,
+  `գնալ առաջ`, `չգիտեմ`, `այո`, `ոչ`) and substring rejects
+  (`բացել ճյուղ`, `դիտել `, `թակել լճակ`, `շոյել քարայր`).
+
+Lightweight warnings (do not affect PASS/FAIL):
+
+- `ageToneProfile.label === "age-7-richer"` — story may run long
+  for younger ages; verify against the intended target.
+- `մոտեցնել X-ը լույսին` template fired on an object that
+  doesn't match the inspection-natural keyword set
+  (`isShiny` / `isOpenable` / `isSoundCapable`).
+
+Exit 0 on no errors, 1 on any error. The script never modifies
+the input.
+
+> **Backward-compat note.** Plans generated before the 17-field
+> shape (e.g. the committed
+> `evaluations/story-plan-generator-review-20260501.plans.json`)
+> will FAIL validation against the new schema because they lack
+> the post-Phase-2 attributes. That's expected; do not force
+> backward compatibility — re-generate with the current
+> `generate-story-plan.js` if you need a validating sample.
 
 ## Story plan generator
 
