@@ -925,41 +925,143 @@ Continuation after B:
 |---|---|
 | Provider | claude |
 | Source | app (claude.ai) |
-| Model label | `<TODO>` |
-| Captured (UTC) | `<TODO>` |
-| Reviewer | `<TODO>` |
-| Decoding | `(unobservable — app default)` |
+| Model label | Claude (consumer app default at capture time) |
+| Captured (UTC) | 2026-05-02 (local capture) |
+| Reviewer | Hayk |
+| Decoding | (unobservable — app default) |
 
 **Raw output**
 
+Verbatim. The continuation's opening sentence-pair is duplicated
+in place — the same Claude.app render artefact observed in Plan A
+(see Weakness 2 below).
+
 ```
-<TODO>
+Մի անգամ, հին քարե կամրջի տակ, ապրում էր մի անշտապ ծղրիդ։ Նա շատ էր սիրում նստել խոտի վրա ու լսել առվակի մեղմ ձայնը, որը կարծես երգեր էր փսփսում քարերին։
+Մի առավոտ ծղրիդը նկատեց, որ կամրջի մոտի ծառը տխուր է կանգնած՝ առանց տերևների։ Տերևները քամին տարել էր հեռու։ Հենց այդ պահին թռավ նրա ընկերը՝ փոքրիկ ճպուռը, թափահարելով իր թափանցիկ թևերը։
+— Ծղրի՛դ ջան, — շշնջաց ճպուռը դողդոջուն ձայնով, — գորտուկը մոռացել է իր ցատկելու երգը, ու հիմա ամեն ինչ լռել է։ Ես վախենում եմ։
+Ծղրիդը մեղմ ժպտաց ու դիպավ ճպուռի թևին։
+— Մի՛ վախեցիր։ Միասին կգտնենք լուծումը։
+Հեռվից եկավ նոր թխված գաթայի անուշ բույրը։ Ծղրիդը հանեց իր գաղտնի վարդագույն մարգարիտը, որը փայլում էր ինչպես արշալույսի կաթիլ։ Մարգարիտը շշնջում էր, թե տերևները կարող են վերադառնալ ծառին, եթե ընկերները միասին փորձեն։
+Ճպուռի աչքերը փայլեցին հույսով։ Հիմա պետք էր որոշել՝ ինչպես սկսել։
+Ի՞նչ կանի ծղրիդը։
+🌿 Քայլել դեպի հին կամուրջ
+🌸 Մոտեցնել վարդագույն մարգարիտը լույսին
+
+Continuation after "Քայլել դեպի հին կամուրջ":
+Ծղրիդն ու ճպուռը կամաց-կամաց քայլեցին դեպի հին քարե կամուրջը։ Առվակը նրանց ոտքերի տակ երգում էր մեղմ ու հանգիստ, իսկ քամին շոյում էր խոտերը։Ծղրիդն ու ճպուռը կամաց-կամաց քայլեցին դեպի հին քարե կամուրջը։ Առվակը նրանց ոտքերի տակ երգում էր մեղմ ու հանգիստ, իսկ քամին շոյում էր խոտերը։
+Կամրջի վրա նրանք գտան փոքրիկ գորտուկին։ Նա նստած էր մի քարի վրա ու տխուր նայում էր ջրին։
+— Ես մոռացել եմ իմ երգը, — շշնջաց գորտուկը։ — Առանց երգի՝ տերևները չեն կարող գտնել իրենց ծառը։
+Ծղրիդը նստեց գորտուկի կողքին ու հանեց վարդագույն մարգարիտը։ Մարգարիտը փայլեց արևի տակ ու սկսեց մեղմ զնգալ։
+— Փորձենք միասին, — ասաց ծղրիդը։
+Ճպուռը թափահարեց թևերը՝ որպես թմբուկ։ Ծղրիդը տվեց իր փոքրիկ ծղրիդային ձայնը։ Եվ հանկարծ՝ գորտուկը հիշեց։ Նրա երգը դուրս թռավ ինչպես թիթեռ։
+Քամին վերցրեց երգը ու տարավ տերևներին։ Մեկ առ մեկ տերևները վերադարձան իրենց ծառին՝ պարելով օդում։
+Ծառը կրկին կանաչ էր։ Հեռվից եկավ գաթայի անուշ բույրը, իսկ երեք ընկերները ժպտում էին միասին՝ կամրջի վրա։
 ```
 
 **Normalized Areg output**
 
+What Areg would actually speak — the duplicated opening
+sentence-pair at the start of the continuation (the same app
+rendering artefact observed in Plan A) is collapsed to a single
+instance. No other edits.
+
 ```
-<TODO>
+Մի անգամ, հին քարե կամրջի տակ, ապրում էր մի անշտապ ծղրիդ։ Նա շատ էր սիրում նստել խոտի վրա ու լսել առվակի մեղմ ձայնը, որը կարծես երգեր էր փսփսում քարերին։
+Մի առավոտ ծղրիդը նկատեց, որ կամրջի մոտի ծառը տխուր է կանգնած՝ առանց տերևների։ Տերևները քամին տարել էր հեռու։ Հենց այդ պահին թռավ նրա ընկերը՝ փոքրիկ ճպուռը, թափահարելով իր թափանցիկ թևերը։
+— Ծղրի՛դ ջան, — շշնջաց ճպուռը դողդոջուն ձայնով, — գորտուկը մոռացել է իր ցատկելու երգը, ու հիմա ամեն ինչ լռել է։ Ես վախենում եմ։
+Ծղրիդը մեղմ ժպտաց ու դիպավ ճպուռի թևին։
+— Մի՛ վախեցիր։ Միասին կգտնենք լուծումը։
+Հեռվից եկավ նոր թխված գաթայի անուշ բույրը։ Ծղրիդը հանեց իր գաղտնի վարդագույն մարգարիտը, որը փայլում էր ինչպես արշալույսի կաթիլ։ Մարգարիտը շշնջում էր, թե տերևները կարող են վերադառնալ ծառին, եթե ընկերները միասին փորձեն։
+Ճպուռի աչքերը փայլեցին հույսով։ Հիմա պետք էր որոշել՝ ինչպես սկսել։
+Ի՞նչ կանի ծղրիդը։
+🌿 Քայլել դեպի հին կամուրջ
+🌸 Մոտեցնել վարդագույն մարգարիտը լույսին
+
+Continuation after "Քայլել դեպի հին կամուրջ":
+Ծղրիդն ու ճպուռը կամաց-կամաց քայլեցին դեպի հին քարե կամուրջը։ Առվակը նրանց ոտքերի տակ երգում էր մեղմ ու հանգիստ, իսկ քամին շոյում էր խոտերը։
+Կամրջի վրա նրանք գտան փոքրիկ գորտուկին։ Նա նստած էր մի քարի վրա ու տխուր նայում էր ջրին։
+— Ես մոռացել եմ իմ երգը, — շշնջաց գորտուկը։ — Առանց երգի՝ տերևները չեն կարող գտնել իրենց ծառը։
+Ծղրիդը նստեց գորտուկի կողքին ու հանեց վարդագույն մարգարիտը։ Մարգարիտը փայլեց արևի տակ ու սկսեց մեղմ զնգալ։
+— Փորձենք միասին, — ասաց ծղրիդը։
+Ճպուռը թափահարեց թևերը՝ որպես թմբուկ։ Ծղրիդը տվեց իր փոքրիկ ծղրիդային ձայնը։ Եվ հանկարծ՝ գորտուկը հիշեց։ Նրա երգը դուրս թռավ ինչպես թիթեռ։
+Քամին վերցրեց երգը ու տարավ տերևներին։ Մեկ առ մեկ տերևները վերադարձան իրենց ծառին՝ պարելով օդում։
+Ծառը կրկին կանաչ էր։ Հեռվից եկավ գաթայի անուշ բույրը, իսկ երեք ընկերները ժպտում էին միասին՝ կամրջի վրա։
 ```
 
 **Notes**
 
-- `<TODO: did the writer keep the age-5-balanced sentence style? word count in 120–160 range?>`
+- **Overall quality.** Good — usable with small edits. Strong
+  age-5 fit: balanced, slightly richer than the age-4 sample
+  (longer sentences, small metaphors), but still child-friendly.
+  The hero (anshtap ծղրիդ), the friend (փոքրիկ ճպուռ), the place
+  (հին քարե կամուրջ), the magicalObject (վարդագույն մարգարիտ),
+  and the smallProblem (գորտուկը մոռացել է իր ցատկելու երգը)
+  are all present and visibly drive the prose.
+- **Plan adherence.** Mostly good. The relationship
+  ("հերոսը մխիթարում է վախեցած կերպարին") visibly shapes Ծղրիդ's
+  "Մի՛ վախեցիր" line to Ճպուռ; the resolutionStyle
+  ("լուծումը գալիս է ընկերոջ հետ միասին փորձելուց") drives the
+  "Փորձենք միասին" beat and the three-friends-together drumming
+  scene. The goal ("վերադարձնել տերևները իրենց ծառին") is
+  explicitly resolved in the continuation.
+- **Strong line.** *"Նրա երգը դուրս թռավ ինչպես թիթեռ։"* — a
+  natural Armenian fairy-tale image; the kind of phrasing the
+  age-5-balanced profile is targeting (small metaphors, simple
+  warm imagery).
+- **Weakness 1 — common opener.** Story again starts with
+  *"Մի անգամ, ..."* — the same template-shaped opener as the
+  Plan A Claude render. Predictable; production-time the
+  writer-prompt could nudge against this exact opener.
+- **Weakness 2 — duplicated opening sentence-pair on the
+  continuation.** The continuation begins with the same first
+  sentence-pair printed twice in a row, no spacing — same
+  Claude.app rendering artefact observed in the Plan A capture.
+  Almost certainly an app-side stream-vs-final collision rather
+  than a model defect; an API run with the same prompt should
+  not exhibit it. Normalised output above collapses the
+  duplicate.
+- **Weakness 3 — mildly unnatural phrase.** *"Ծղրիդը տվեց իր
+  փոքրիկ ծղրիդային ձայնը"* reads as a derived adjective stack
+  ("a tiny cricket-shaped voice") rather than natural Armenian.
+  A more idiomatic version would be *"Ծղրիդը իր մեղմ ձայնը
+  միացրեց երգին"*. Spot-edit at story-render time, not a
+  structural issue.
+- **Weakness 4 — choice format.** Writer used emoji bullets
+  («🌿 / 🌸») instead of the prompt's `Ա: ` / `Բ: ` format. The
+  user-visible choice text is correct and grounded; only the
+  format marker is off. Same low-impact deviation as Plan A's
+  `Ա) / Բ)`.
+- **Verdict.** Supports the Story Director hypothesis. The
+  second consecutive plan-conditioned Claude.app render is
+  clearly stronger than the existing Areg / OpenAI free-form
+  baseline (see
+  `samples/openai-api-current-areg-baseline-story-20260501.md`):
+  native Armenian fauna, atmospheric place + magicalObject,
+  warm Armenian-fairy-tale register, and the small metaphors
+  expected at the age-5-balanced tone.
+
+> **Reminder.** App output, not API output. Per
+> `../API_VS_APP_BAKEOFF_PLAN.md` § 6 no runtime decision
+> follows from a single sample. Two consistent strong app
+> samples (Plan A + Plan B) is *suggestive* but still ceiling
+> evidence; the API-path comparison via F1.2 is the load-
+> bearing one when `ANTHROPIC_API_KEY` is available.
 
 **Rubric**
 
 | Dimension | Score |
 |---|---|
-| Armenian naturalness | _ / 5 |
-| Eastern Armenian correctness | _ / 5 |
-| Fairy-tale feeling | _ / 5 |
-| Warmth for age 5–6 | _ / 5 |
-| Age-profile fit (age-5-balanced) | _ / 5 |
-| Length / pacing | _ / 5 |
-| Choice quality | _ / 5 |
-| Plan adherence | _ / 5 |
-| Safety / age appropriateness | pass / fail |
-| "Would I let Areg say this aloud?" | yes / no / yes-with-edits |
+| Armenian naturalness | **4 / 5** |
+| Eastern Armenian correctness | **4 / 5** |
+| Fairy-tale feeling | **4.5 / 5** |
+| Warmth for age 5–6 | **4.5 / 5** |
+| Age-profile fit (age-5-balanced) | **4.5 / 5** |
+| Length / pacing | **4 / 5** |
+| Choice quality | **4 / 5** |
+| Plan adherence | **4.5 / 5** |
+| Safety / age appropriateness | **pass** |
+| "Would I let Areg say this aloud?" | **yes, with small edits** |
 
 ### 4B. Plan B (age-5-balanced) — Gemini consumer app
 
