@@ -34,6 +34,8 @@ point before any full-set live run.
 | `validate-seed-bank.js` | Node.js validator for `story-seed-bank.v1.json`. Pure-stdlib; checks shape, counts, duplicates, deprecated keys, and known-bad values. |
 | `generate-story-plan.js` | Node.js Story Plan generator (Phase 2 of `STORY_DIRECTOR_ARCHITECTURE.md`). Pure-stdlib; reads the seed bank and prints pretty JSON plans to stdout. Supports `--count N` and `--seed N`. |
 | `validate-story-plan.js` | Node.js Plan Gate validator (Phase 3 first half). Pure-stdlib; reads plan JSON from stdin or a file path, checks the 17-field shape, seed-bank membership of every value, hardAvoidCreatures / forbiddenTonePatterns leaks, banned choice phrases, and choice grounding + type consistency. Reports per-plan PASS/FAIL with errors and lightweight warnings. Exit 0 on PASS, 1 on FAIL. |
+| `story-character-names.v1.json` | Hand-edited Armenian character name bank — 3-6 warm, speakable candidate names per animal in `palettes.animals`, plus an optional `sharedNames` array for names usable across many small animals. Tool-only research data; **not loaded by ChatService**, and the generator does NOT consume it yet — a future slice will wire it in. |
+| `validate-character-names.js` | Node.js validator for `story-character-names.v1.json`. Pure-stdlib; checks JSON shape, that every animal in seed-bank `palettes.animals` has an entry with at least 3 non-empty names, that no exact duplicate appears inside the same animal list, and that `sharedNames` (if present) is an array of non-empty strings. Exit 0 on PASS, 1 on FAIL. |
 | `results/` | Per-run Markdown + JSON output (created on first live run). **Gitignored** (`.gitignore` excludes `tools/StoryModelBakeoff/results/`). |
 
 ## Seed bank validation
@@ -59,6 +61,43 @@ bank next to itself, and checks:
 
 Exit 0 on PASS, non-zero on FAIL with all errors listed before
 exit. The script never modifies the seed bank.
+
+## Character names
+
+Hand-edited bank of warm, speakable Armenian character names —
+3-6 candidates per animal in seed-bank `palettes.animals`, plus
+an optional `sharedNames` array for names broadly applicable to
+many small animals (e.g. `Շողիկ`, `Փափուկ`, `Մեղմիկ`,
+`Լուսիկ`, `Բարիք`, `Թևիկ`).
+
+> **Generator does NOT consume `story-character-names.v1.json`
+> yet.** This file is research-only today; a future slice will
+> wire it into the Story Plan generator (and possibly the writer
+> prompt) so heroes and friends can be named deterministically
+> from the bank instead of being invented by the model.
+
+Run the validator before opening a PR that touches
+`story-character-names.v1.json`:
+
+```
+node tools/StoryModelBakeoff/validate-character-names.js
+```
+
+What it checks:
+
+- Top-level shape (`version`, `language`, `purpose`,
+  `animalNames`).
+- Coverage — every animal in seed-bank `palettes.animals` has
+  an entry in `animalNames`. Extra keys not in the seed bank
+  surface as warnings (not failures), so an animal that gets
+  removed from the seed bank later doesn't bricked the whole
+  bank.
+- Each entry has **at least 3** non-empty string names.
+- No exact duplicate names inside the same animal's list.
+- Optional `sharedNames`, if present, is an array of non-empty
+  strings with no duplicates.
+
+Exit 0 on PASS, non-zero on FAIL.
 
 ## Story plan validation
 
