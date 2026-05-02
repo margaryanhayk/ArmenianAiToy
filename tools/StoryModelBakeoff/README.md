@@ -69,22 +69,34 @@ the seed bank and prints pretty JSON plans to stdout:
 node tools/StoryModelBakeoff/generate-story-plan.js
 node tools/StoryModelBakeoff/generate-story-plan.js --count 3
 node tools/StoryModelBakeoff/generate-story-plan.js --count 5 --seed 123
+node tools/StoryModelBakeoff/generate-story-plan.js \
+  --count 3 --seed 123 --age-profile age-5-balanced
 ```
 
 Defaults: one plan, non-deterministic (`Math.random`). With
 `--seed N`, the script uses a small LCG so the same seed reproduces
 the same plan(s) — useful for reviewing a specific output later.
 
-> **Plan generator v1 scope.** The current generator consumes only
-> the original *content palettes* of `story-seed-bank.v1.json`
-> (animals, places, magicalObjects, smallProblems, sensoryDetails,
-> rareOrRequestedOnlyAnimals, hardAvoidCreatures). The newer
-> *story-control attributes* (`characterTraits`, `characterGoals`,
-> `storyMoods`, `relationshipTypes`, `conflictTypes`,
-> `resolutionStyles`, `choiceTypes`, `ageToneProfiles`,
-> `forbiddenTonePatterns`) are present in the seed bank for the
-> validator to enforce, but the plan generator does not yet read
-> them. Later slices will teach it to consume those attributes.
+`--age-profile <label>` pins the `ageToneProfile` field on every
+generated plan to a specific entry from
+`palettes.ageToneProfiles` (`age-4-simple`, `age-5-balanced`,
+`age-6-story-rich`, `age-7-richer`). Without the flag, each plan
+draws an `ageToneProfile` independently. An unknown label exits
+non-zero with the available labels listed.
+
+> **Generator now consumes story-control attributes.** Each
+> emitted plan carries the original content fields plus
+> `heroTrait`, `relationship`, `mood`, `conflictType`, `goal`,
+> `resolutionStyle`, `ageToneProfile` (the full object), and
+> `choiceAType` / `choiceBType` tags drawn from
+> `palettes.choiceTypes`. The `forbiddenTonePatterns` array is
+> guardrail data for the writer prompt and is intentionally NOT
+> consumed by the generator.
+>
+> The new fields are *generated*, not yet *enforced*. The Plan
+> Gate (Phase 3) is the slice that will start rejecting plans
+> whose attribute combinations don't fit the seed bank
+> constraints.
 
 Generation rules:
 
@@ -95,6 +107,18 @@ Generation rules:
 - `place` / `magicalObject` / `smallProblem` from their matching
   palettes.
 - `sensoryDetails` is two distinct entries from `sensoryDetails`.
+- Story-control attributes — one independent draw per plan, one
+  field per palette: `heroTrait` ← `characterTraits`,
+  `relationship` ← `relationshipTypes`, `mood` ← `storyMoods`,
+  `conflictType` ← `conflictTypes`, `goal` ← `characterGoals`,
+  `resolutionStyle` ← `resolutionStyles`, `ageToneProfile` ←
+  `ageToneProfiles` (or pinned by `--age-profile`).
+- `choiceAType` / `choiceBType` are tags from `palettes.choiceTypes`
+  attached to the chosen choice templates (e.g. place templates
+  carry `"գնալ դեպի վայր"`; the `բացել` object template carries
+  `"բացել փոքրիկ առարկան"`; the `լսել` object template carries
+  `"լսել ձայնը"`; etc.). Tags map to existing seed-bank entries
+  exactly — no synthesised choiceType strings.
 - `choiceA` / `choiceB` are concrete grounded actions: one
   references the plan's `place`, the other references the plan's
   `magicalObject`. Order between them is randomised per plan.

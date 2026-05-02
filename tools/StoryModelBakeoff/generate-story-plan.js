@@ -11,13 +11,42 @@
 //   node tools/StoryModelBakeoff/generate-story-plan.js
 //   node tools/StoryModelBakeoff/generate-story-plan.js --count 3
 //   node tools/StoryModelBakeoff/generate-story-plan.js --count 5 --seed 123
+//   node tools/StoryModelBakeoff/generate-story-plan.js \
+//     --count 3 --seed 123 --age-profile age-5-balanced
 //
-// Choice generation uses category-aware templates rather than naive
-// "verb + noun" templates, so the outputs read like grounded story
-// actions instead of mechanical phrases. See `objectActions()` and
-// `placeActions()` below for the conditional rules. Choices are
-// always one place-grounded + one object-grounded, randomised per
-// plan so the order does not predict the family.
+// Plan shape (now consumes the seed bank's story-control attributes
+// in addition to the original content palettes; see
+// `palettes.characterTraits`, `palettes.relationshipTypes`,
+// `palettes.storyMoods`, `palettes.conflictTypes`,
+// `palettes.characterGoals`, `palettes.resolutionStyles`,
+// `palettes.choiceTypes`, `palettes.ageToneProfiles`):
+//
+//   {
+//     "hero": "...",                       (palettes.animals, safe pool)
+//     "heroTrait": "...",                  (palettes.characterTraits)
+//     "friendOrGuide": "...",              (palettes.animals, safe pool, ≠ hero)
+//     "relationship": "...",               (palettes.relationshipTypes)
+//     "place": "...",                      (palettes.places)
+//     "mood": "...",                       (palettes.storyMoods)
+//     "magicalObject": "...",              (palettes.magicalObjects)
+//     "smallProblem": "...",               (palettes.smallProblems)
+//     "conflictType": "...",               (palettes.conflictTypes)
+//     "goal": "...",                       (palettes.characterGoals)
+//     "resolutionStyle": "...",            (palettes.resolutionStyles)
+//     "sensoryDetails": ["...", "..."],    (palettes.sensoryDetails, 2 distinct)
+//     "ageToneProfile": { ... },           (palettes.ageToneProfiles object,
+//                                           pinned by --age-profile if set)
+//     "choiceAType": "...",                (palettes.choiceTypes — derived
+//     "choiceBType": "...",                 from the selected templates)
+//     "choiceA": "...",                    (concrete grounded action)
+//     "choiceB": "..."                     (concrete grounded action)
+//   }
+//
+// Choices are still one place-grounded + one object-grounded per plan;
+// each template carries its `choiceType` tag (drawn from the seed
+// bank's `choiceTypes`) so the plan records WHICH choice family was
+// drawn, not just the rendered phrase. Order between A and B is
+// randomised per plan.
 
 'use strict';
 
@@ -36,6 +65,7 @@ function flag(name) {
 }
 const countArg = flag('--count');
 const seedArg = flag('--seed');
+const ageProfileArg = flag('--age-profile');
 
 const count = countArg === null
   ? 1
@@ -60,9 +90,6 @@ const seed = seedArg === null
     })();
 
 // ---- RNG ----
-// Linear congruential generator. Deterministic when --seed is passed;
-// falls back to Math.random when no seed is given so two invocations
-// don't collide visually.
 function makeRng(s) {
   if (s === null) return Math.random;
   let state = (s >>> 0) || 1;
@@ -105,11 +132,22 @@ try {
   process.exit(1);
 }
 const palettes = data && data.palettes;
-const REQUIRED = [
+
+// Required string-array palettes for plan generation. forbidden-
+// TonePatterns is intentionally NOT in this list — it is a
+// guardrail for the writer prompt layer, not a generation source.
+const REQUIRED_ARRAYS = [
+  // content palettes
   'animals', 'places', 'magicalObjects', 'smallProblems',
-  'sensoryDetails', 'rareOrRequestedOnlyAnimals', 'hardAvoidCreatures',
+  'sensoryDetails',
+  // guardrails (we filter against, not draw from)
+  'rareOrRequestedOnlyAnimals', 'hardAvoidCreatures',
+  // story-control attributes
+  'characterTraits', 'characterGoals', 'storyMoods',
+  'relationshipTypes', 'conflictTypes', 'resolutionStyles',
+  'choiceTypes',
 ];
-for (const k of REQUIRED) {
+for (const k of REQUIRED_ARRAYS) {
   const arr = palettes && palettes[k];
   if (!Array.isArray(arr) || arr.length === 0) {
     console.error('Seed bank missing or empty palettes.' + k);
@@ -117,12 +155,14 @@ for (const k of REQUIRED) {
     process.exit(1);
   }
 }
+// ageToneProfiles is an object array — separate shape check.
+if (!Array.isArray(palettes.ageToneProfiles) || palettes.ageToneProfiles.length === 0) {
+  console.error('Seed bank missing or empty palettes.ageToneProfiles');
+  console.error('Run: node tools/StoryModelBakeoff/validate-seed-bank.js');
+  process.exit(1);
+}
 
 // ---- defensive animal pool ----
-// `palettes.animals` is supposed to exclude rareOrRequestedOnlyAnimals
-// and hardAvoidCreatures by file convention; we double-check at
-// runtime so a future hand-edit cannot silently leak an off-tone
-// hero into the default generator.
 const block = new Set([
   ...palettes.rareOrRequestedOnlyAnimals,
   ...palettes.hardAvoidCreatures,
@@ -133,23 +173,31 @@ if (safeAnimals.length < 2) {
   process.exit(1);
 }
 
-// ---- Armenian morphology helpers ----
-// Conservative inflection support. The seed bank carries un-inflected
-// noun phrases; the generator adds `-ը` / `-ն` (definite) where
-// templates need an accusative-like object, and `-ի` (genitive) only
-// when the phrase ends in a consonant (irregular -ի-ending stems
-// are skipped by returning null so the calling template is filtered
-// out instead of producing awkward double-vowel forms).
+// ---- --age-profile resolution ----
+// Pinned per-run profile when the operator requests one; otherwise
+// each plan draws independently from palettes.ageToneProfiles.
+let agePinnedProfile = null;
+if (ageProfileArg !== null) {
+  agePinnedProfile = palettes.ageToneProfiles.find(
+    (p) => p && p.label === ageProfileArg
+  );
+  if (!agePinnedProfile) {
+    const labels = palettes.ageToneProfiles
+      .map((p) => p && p.label)
+      .filter(Boolean)
+      .join(', ');
+    console.error('Unknown --age-profile: ' + ageProfileArg);
+    console.error('Available labels: ' + labels);
+    process.exit(1);
+  }
+}
 
+// ---- Armenian morphology helpers ----
 const VOWELS = new Set(['ա', 'ե', 'է', 'ի', 'ո', 'օ', 'ը', 'ու']);
 
 function endsInVowel(phrase) {
   const s = String(phrase).trim();
   if (s.length === 0) return false;
-  // Treat `ու` as a digraph vowel; otherwise check the single last
-  // char. The Armenian ligature `և` is treated as consonant-final
-  // (its phonetic tail is `-v`), which keeps `տերև` -> `տերևը` as
-  // expected.
   const last2 = s.slice(-2);
   if (VOWELS.has(last2)) return true;
   return VOWELS.has(s.slice(-1));
@@ -160,25 +208,16 @@ function appendDefiniteSuffix(phrase) {
   return s + (endsInVowel(s) ? 'ն' : 'ը');
 }
 
-// Returns `phrase + 'ի'` for a genitive-style form, but ONLY when
-// the phrase ends in a consonant. Returns null for vowel-final
-// phrases so the caller drops the template (avoids forms like
-// `հայելի-ի` / `ընկուզենի-ի`).
 function appendGenitiveSafe(phrase) {
   if (endsInVowel(phrase)) return null;
   return String(phrase).trim() + 'ի';
 }
 
-// ---- shape classifiers (keyword heuristics) ----
-// Cheap regex-based detection. Drives which conditional templates
-// are eligible for a given object / place. If no class matches,
-// only universal templates are used — never a malformed action.
-
+// ---- shape classifiers ----
 function isOpenable(obj) {
   return /(տուփ|սրվակ|կուժ|տոպրակ|սփռոց)/.test(obj);
 }
 function isShiny(obj) {
-  // Includes glow, gold, silver, light, pearl, star, ray.
   return /(ոսկ|արծաթ|լուսավոր|փայլող|մարգարիտ|աստղ|լույս|շող)/.test(obj);
 }
 function isSoundCapable(obj) {
@@ -186,66 +225,68 @@ function isSoundCapable(obj) {
 }
 
 function isWaterOrLow(place) {
-  // Lake / spring / brook / shore / valley / lower / marsh.
   return /(լճակ|աղբյուր|առվակ|ափ|ձոր|ներքև|ճահ)/.test(place);
 }
 function isHighOrUp(place) {
-  // Hill / mountain / rock / peak / oak / tree / walnut / tower /
-  // branch / "high".
   return /(բլուր|սար|ժայռ|կատար|լեռ|կաղնի|ծառ|ընկուզենի|աշտարակ|ճյուղ|բարձ)/.test(place);
 }
 
-// ---- object-grounded action templates ----
+// ---- choice templates (now type-tagged) ----
 //
-// Universal templates (always present):
-//   "վերցնել {obj}"                   — pick up. Bare nominative
-//                                       reads as accusative-shape
-//                                       in Armenian fairy-tale style.
-//   "տանել {obj}ը ընկերոջ մոտ"        — take it to the friend.
-//   "պահել {obj}ը ափի մեջ"            — keep it in palm.
-//   "մոտեցնել {obj}ը լույսին"         — bring close to the light.
+// Each template returns { phrase, choiceType }. The `choiceType`
+// strings are exact members of `palettes.choiceTypes` so the
+// generated plan's choiceAType / choiceBType slot into the seed-
+// bank vocabulary without translation.
 //
-// Conditional templates:
-//   "բացել {obj}ը"                    — only if isOpenable.
-//   "հետևել {obj}ի փայլին"            — only if isShiny AND
-//                                       genitive form is safe
-//                                       (consonant-ending).
-//   "լսել՝ արդյոք {obj}ը ձայն ունի"   — only if isSoundCapable.
+// Place templates → choiceType "գնալ դեպի վայր" (uniform — all
+// place templates use `դեպի` + nominative).
+// Object templates carry per-template choiceTypes that match the
+// action family in the seed bank.
+
+const CT_PLACE        = 'գնալ դեպի վայր';
+const CT_USE          = 'օգտագործել կախարդական առարկան';
+const CT_HELP         = 'օգնել կերպարին';
+const CT_KEEP_NEAR    = 'պահել առարկան իր մոտ';
+const CT_GENTLE_TRY   = 'փորձել մեղմ գործողություն';
+const CT_OPEN         = 'բացել փոքրիկ առարկան';
+const CT_FOLLOW_TRACE = 'հետևել հետքին';
+const CT_LISTEN       = 'լսել ձայնը';
+
 function objectActions(obj) {
   const def = appendDefiniteSuffix(obj);
   const out = [
-    'վերցնել ' + obj,
-    'տանել ' + def + ' ընկերոջ մոտ',
-    'պահել ' + def + ' ափի մեջ',
-    'մոտեցնել ' + def + ' լույսին',
+    { phrase: 'վերցնել ' + obj,                       choiceType: CT_USE },
+    { phrase: 'տանել ' + def + ' ընկերոջ մոտ',        choiceType: CT_HELP },
+    { phrase: 'պահել ' + def + ' ափի մեջ',            choiceType: CT_KEEP_NEAR },
+    { phrase: 'մոտեցնել ' + def + ' լույսին',         choiceType: CT_GENTLE_TRY },
   ];
-  if (isOpenable(obj)) out.push('բացել ' + def);
+  if (isOpenable(obj)) {
+    out.push({ phrase: 'բացել ' + def, choiceType: CT_OPEN });
+  }
   const gen = appendGenitiveSafe(obj);
-  if (isShiny(obj) && gen) out.push('հետևել ' + gen + ' փայլին');
-  if (isSoundCapable(obj)) out.push('լսել՝ արդյոք ' + def + ' ձայն ունի');
+  if (isShiny(obj) && gen) {
+    out.push({ phrase: 'հետևել ' + gen + ' փայլին', choiceType: CT_FOLLOW_TRACE });
+  }
+  if (isSoundCapable(obj)) {
+    out.push({
+      phrase: 'լսել՝ արդյոք ' + def + ' ձայն ունի',
+      choiceType: CT_LISTEN,
+    });
+  }
   return out;
 }
 
-// ---- place-grounded action templates ----
-//
-// All four templates use the preposition `դեպի` (toward), which
-// takes the nominative — so we never need to inflect the place
-// phrase. That dodges the irregular-stem hazard for words like
-// `ընկուզենի` (genitive `ընկուզենու`) entirely.
-//
-// Universal:
-//   "գնալ դեպի {place}"
-//   "քայլել դեպի {place}"
-// Conditional:
-//   "իջնել դեպի {place}"     — only if isWaterOrLow.
-//   "բարձրանալ դեպի {place}" — only if isHighOrUp.
 function placeActions(place) {
   const out = [
-    'գնալ դեպի ' + place,
-    'քայլել դեպի ' + place,
+    { phrase: 'գնալ դեպի '   + place, choiceType: CT_PLACE },
+    { phrase: 'քայլել դեպի ' + place, choiceType: CT_PLACE },
   ];
-  if (isWaterOrLow(place)) out.push('իջնել դեպի ' + place);
-  if (isHighOrUp(place)) out.push('բարձրանալ դեպի ' + place);
+  if (isWaterOrLow(place)) {
+    out.push({ phrase: 'իջնել դեպի ' + place, choiceType: CT_PLACE });
+  }
+  if (isHighOrUp(place)) {
+    out.push({ phrase: 'բարձրանալ դեպի ' + place, choiceType: CT_PLACE });
+  }
   return out;
 }
 
@@ -255,32 +296,46 @@ function buildPlan() {
   let friend = pick(safeAnimals);
   while (friend === hero) friend = pick(safeAnimals);
 
-  const place = pick(palettes.places);
-  const magicalObject = pick(palettes.magicalObjects);
-  const smallProblem = pick(palettes.smallProblems);
+  const heroTrait      = pick(palettes.characterTraits);
+  const relationship   = pick(palettes.relationshipTypes);
+  const place          = pick(palettes.places);
+  const mood           = pick(palettes.storyMoods);
+  const magicalObject  = pick(palettes.magicalObjects);
+  const smallProblem   = pick(palettes.smallProblems);
+  const conflictType   = pick(palettes.conflictTypes);
+  const goal           = pick(palettes.characterGoals);
+  const resolutionStyle = pick(palettes.resolutionStyles);
   const sensoryDetails = pickDistinct(palettes.sensoryDetails, 2);
+  const ageToneProfile = agePinnedProfile || pick(palettes.ageToneProfiles);
 
   const objCandidates = objectActions(magicalObject);
   const plcCandidates = placeActions(place);
-
-  // One place-grounded + one object-grounded action per plan.
-  // Order randomised so the user can't predict which family is A
-  // vs B from output position alone.
   const objChoice = pick(objCandidates);
   const plcChoice = pick(plcCandidates);
   const aIsPlace = rng() < 0.5;
-  const choiceA = aIsPlace ? plcChoice : objChoice;
-  const choiceB = aIsPlace ? objChoice : plcChoice;
+  const choiceAObj = aIsPlace ? plcChoice : objChoice;
+  const choiceBObj = aIsPlace ? objChoice : plcChoice;
 
+  // Field order is contractual — this is the shape consumers / the
+  // experiment markdown reference. Do not reorder without a slice.
   return {
     hero,
-    place,
-    magicalObject,
+    heroTrait,
     friendOrGuide: friend,
+    relationship,
+    place,
+    mood,
+    magicalObject,
     smallProblem,
+    conflictType,
+    goal,
+    resolutionStyle,
     sensoryDetails,
-    choiceA,
-    choiceB,
+    ageToneProfile,
+    choiceAType: choiceAObj.choiceType,
+    choiceBType: choiceBObj.choiceType,
+    choiceA: choiceAObj.phrase,
+    choiceB: choiceBObj.phrase,
   };
 }
 
