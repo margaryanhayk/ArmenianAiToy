@@ -1198,41 +1198,161 @@ Continuation after "Քայլել դեպի հին կամուրջ":
 |---|---|
 | Provider | claude |
 | Source | app (claude.ai) |
-| Model label | `<TODO>` |
-| Captured (UTC) | `<TODO>` |
-| Reviewer | `<TODO>` |
-| Decoding | `(unobservable — app default)` |
+| Model label | Claude (consumer app default at capture time) |
+| Captured (UTC) | 2026-05-02 (local capture) |
+| Reviewer | Hayk |
+| Decoding | (unobservable — app default) |
 
 **Raw output**
 
+Verbatim. The continuation's opening sentence-pair is duplicated
+in place — same Claude.app render artefact observed in Plans A
+and B (see Weakness 1 below). Only the choiceA branch ("Գնալ
+դեպի խնձորենու այգին") was followed; the choiceB branch was not
+captured.
+
 ```
-<TODO>
+Ձմեռային մեղմ առավոտ էր։ Խնձորենու այգում ձյունը փափուկ ծածկոց էր փռել ճյուղերին, իսկ հեռվից լսվում էր մեղվի մեղմ բզզոցը՝ կարծես երազից եկած։ Մի փոքրիկ ծիտիկ՝ համարձակ սրտով, նստել էր ամենաբարձր ճյուղին և նայում էր շուրջը։
+Այսօր ինչ-որ բան այլ էր։ Աղբյուրը, որ միշտ մեղմ խոսում էր քարերի հետ, լռել էր։ Իսկ լույսը՝ այն ոսկեգույն լույսը, որ առավոտները սահում էր ճյուղերի արանքով, թաքնվել էր ինչ-որ տեղ։
+Ծիտիկը ցած թռավ և տեսավ իր փոքրիկ ընկերոջը՝ մրջյունին, որ դողում էր ձյան վրա։ Ծիտիկը հանեց իր պահած հացի փշուրը՝ դեռ տաք, թոնիրի հոտով, և կիսեց մրջյունի հետ։
+— Իմ քույրիկը մոլորվել է,— շշնջաց մրջյունը։— Չեմ կարողանում գտնել նրան առանց լույսի։
+Ծիտիկը մտածեց։ Հանկարծ նկատեց, որ կտուցում պահել էր մի արծաթե բարակ ճյուղ, որ առավոտյան գտել էր ձյան տակ։ Ճյուղը մեղմ փայլում էր՝ կարծես ինքն էլ սպասում էր մի բանի։
+Ծիտիկը հասկացավ՝ պետք է ընտրի։ Կարող էր թռչել դեպի այգու խորքը՝ փնտրելու մրջյունի քույրիկին, կամ կարող էր մեղմ ձայնով խոսել արծաթե ճյուղի հետ ու մոտեցնել այն թաքնված լույսին։
+Ա․ Գնալ դեպի խնձորենու այգին։
+Բ․ Մոտեցնել արծաթե բարակ ճյուղը լույսին։
+
+Continuation after "Գնալ դեպի խնձորենու այգին":
+Ծիտիկը թափահարեց իր փոքրիկ թևերը և բարձրացավ օդ։ Մրջյունը նստեց նրա փափուկ փետուրների արանքում՝ ամուր բռնելով։Ծիտիկը թափահարեց իր փոքրիկ թևերը և բարձրացավ օդ։ Մրջյունը նստեց նրա փափուկ փետուրների արանքում՝ ամուր բռնելով։
+— Բռնիր ամուր,— ասաց ծիտիկը մեղմ ձայնով։— Միասին կգտնենք քո քույրիկին։
+Նրանք թռան այգու խորքը։ Խնձորենիների ճյուղերը ձյունով ծածկված՝ կարծես արծաթե ժանյակներ էին։ Ամեն կողմից լսվում էր մեղվի մեղմ բզզոցը, իսկ հեռվից բերվում էր թոնիրի տաք հացի անուշ հոտը՝ կարծես ինչ-որ մեկը նրանց համար էր հաց թխում։
+Ծիտիկը նստեց ամենահին խնձորենու ճյուղին և ուշադիր նայեց ներքև։ Ձյան վրա երևում էին փոքրիկ, մանր հետքեր՝ մրջյունի քույրիկի հետքերը։
+— Ահա՛,— ուրախ շշնջաց մրջյունը։
+Հետքերը տանում էին դեպի մի փոքրիկ քար, որի տակ դողդողում էր փոքրիկ մրջյունը՝ սառած ու վախեցած։ Ծիտիկը մեղմ իջավ նրա մոտ և իր կտուցով արծաթե բարակ ճյուղը դրեց քարի կողքին։
+Ճյուղը սկսեց փայլել։ Հանկարծ աղբյուրը նորից սկսեց խոսել՝ ջինջ ու քաղցր ձայնով։ Լույսը դուրս եկավ թաքստոցից և լցվեց այգին։
+Մրջյունի քույրիկը ժպտաց։ Երկու մրջյունները բարձրացան ծիտիկի թևերին, իսկ ծիտիկը՝ հանգիստ ու ուրախ սրտով, թռավ դեպի տուն՝ դեպի տաք հացի հոտը։
 ```
 
 **Normalized Areg output**
 
+What Areg would actually speak — the duplicated opening
+sentence-pair at the start of the continuation (the same app
+rendering artefact observed in Plans A and B) is collapsed to
+a single instance. No other edits.
+
 ```
-<TODO>
+Ձմեռային մեղմ առավոտ էր։ Խնձորենու այգում ձյունը փափուկ ծածկոց էր փռել ճյուղերին, իսկ հեռվից լսվում էր մեղվի մեղմ բզզոցը՝ կարծես երազից եկած։ Մի փոքրիկ ծիտիկ՝ համարձակ սրտով, նստել էր ամենաբարձր ճյուղին և նայում էր շուրջը։
+Այսօր ինչ-որ բան այլ էր։ Աղբյուրը, որ միշտ մեղմ խոսում էր քարերի հետ, լռել էր։ Իսկ լույսը՝ այն ոսկեգույն լույսը, որ առավոտները սահում էր ճյուղերի արանքով, թաքնվել էր ինչ-որ տեղ։
+Ծիտիկը ցած թռավ և տեսավ իր փոքրիկ ընկերոջը՝ մրջյունին, որ դողում էր ձյան վրա։ Ծիտիկը հանեց իր պահած հացի փշուրը՝ դեռ տաք, թոնիրի հոտով, և կիսեց մրջյունի հետ։
+— Իմ քույրիկը մոլորվել է,— շշնջաց մրջյունը։— Չեմ կարողանում գտնել նրան առանց լույսի։
+Ծիտիկը մտածեց։ Հանկարծ նկատեց, որ կտուցում պահել էր մի արծաթե բարակ ճյուղ, որ առավոտյան գտել էր ձյան տակ։ Ճյուղը մեղմ փայլում էր՝ կարծես ինքն էլ սպասում էր մի բանի։
+Ծիտիկը հասկացավ՝ պետք է ընտրի։ Կարող էր թռչել դեպի այգու խորքը՝ փնտրելու մրջյունի քույրիկին, կամ կարող էր մեղմ ձայնով խոսել արծաթե ճյուղի հետ ու մոտեցնել այն թաքնված լույսին։
+Ա․ Գնալ դեպի խնձորենու այգին։
+Բ․ Մոտեցնել արծաթե բարակ ճյուղը լույսին։
+
+Continuation after "Գնալ դեպի խնձորենու այգին":
+Ծիտիկը թափահարեց իր փոքրիկ թևերը և բարձրացավ օդ։ Մրջյունը նստեց նրա փափուկ փետուրների արանքում՝ ամուր բռնելով։
+— Բռնիր ամուր,— ասաց ծիտիկը մեղմ ձայնով։— Միասին կգտնենք քո քույրիկին։
+Նրանք թռան այգու խորքը։ Խնձորենիների ճյուղերը ձյունով ծածկված՝ կարծես արծաթե ժանյակներ էին։ Ամեն կողմից լսվում էր մեղվի մեղմ բզզոցը, իսկ հեռվից բերվում էր թոնիրի տաք հացի անուշ հոտը՝ կարծես ինչ-որ մեկը նրանց համար էր հաց թխում։
+Ծիտիկը նստեց ամենահին խնձորենու ճյուղին և ուշադիր նայեց ներքև։ Ձյան վրա երևում էին փոքրիկ, մանր հետքեր՝ մրջյունի քույրիկի հետքերը։
+— Ահա՛,— ուրախ շշնջաց մրջյունը։
+Հետքերը տանում էին դեպի մի փոքրիկ քար, որի տակ դողդողում էր փոքրիկ մրջյունը՝ սառած ու վախեցած։ Ծիտիկը մեղմ իջավ նրա մոտ և իր կտուցով արծաթե բարակ ճյուղը դրեց քարի կողքին։
+Ճյուղը սկսեց փայլել։ Հանկարծ աղբյուրը նորից սկսեց խոսել՝ ջինջ ու քաղցր ձայնով։ Լույսը դուրս եկավ թաքստոցից և լցվեց այգին։
+Մրջյունի քույրիկը ժպտաց։ Երկու մրջյունները բարձրացան ծիտիկի թևերին, իսկ ծիտիկը՝ հանգիստ ու ուրախ սրտով, թռավ դեպի տուն՝ դեպի տաք հացի հոտը։
 ```
 
 **Notes**
 
-- `<TODO: did the writer keep the age-6-story-rich rhythm? word count in 150–200 range?>`
+- **Overall quality.** Good — usable with small edits. Strong
+  age-6 fit: richer than the Plan A and Plan B samples, more
+  narrative rhythm, longer sentences with light story-telling
+  cadence, but still child-friendly. The hero (համարձակ ծիտիկ),
+  the friend (մրջյուն), the place (խնձորենու այգի), the
+  magicalObject (արծաթե բարակ ճյուղ), and the smallProblem
+  (աղբյուրը դադարել է խոսել) all appear and shape the prose.
+- **Plan adherence.** Mostly good. The relationship
+  ("հերոսը կիսում է ուտելիքը մի փոքրիկի հետ") is rendered
+  literally — Ծիտիկ shares the warm bread crumb with the ant
+  in the opening turn. The resolutionStyle ("լուծումը գալիս է
+  մեղմ ձայնով խոսելուց") is present in the writer's framing
+  ("մեղմ ձայնով խոսել արծաթե ճյուղի հետ") and in the gentle-
+  voice tone the bird uses to comfort the ant. The
+  conflictType ("լույսը թաքնվել է") drives the central beat —
+  light hides, then returns when the silver branch is placed
+  by the stone.
+- **Strong images flagged.**
+  - *"ձյունը փափուկ ծածկոց էր փռել ճյուղերին"* — soft, age-6-
+    register opener.
+  - *"արծաթե ժանյակներ"* (silver lacework) — apt metaphor for
+    snow-covered branches; lands the story-rich tone cleanly.
+  - *"աղբյուրը նորից սկսեց խոսել՝ ջինջ ու քաղցր ձայնով"* —
+    direct payoff to the smallProblem ("the spring stopped
+    speaking"), tied tight to the resolution beat.
+- **Weakness 1 — duplicated opening sentence-pair.** Same
+  Claude.app render artefact observed across Plans A, B, and
+  C now: the continuation begins with its first sentence-pair
+  printed twice in a row, no spacing. Three consecutive
+  captures showing the identical pattern is enough confirmation
+  that this is a Claude.app UI behaviour (stream-vs-final
+  collision), not a model output shape. Normalised output above
+  collapses the duplicate.
+- **Weakness 2 — sensoryDetail / mood mild clash.** Plan C's
+  mood is `ձմեռային մեղմ` (winter-soft) but one of the
+  sensoryDetails is `մեղվի մեղմ բզզոց` (gentle bee buzz). Bees
+  and winter don't naturally co-occur. Claude softened the
+  clash with *"կարծես երազից եկած"* (as if come from a dream),
+  which works as a fairy-tale frame but is a small repair the
+  writer had to do. **Generator-side improvement candidate**:
+  weight `sensoryDetails` against the plan's `mood` so winter-
+  mood plans don't draw bee-buzz sensoryDetails. (Would belong
+  in a future Plan Gate refinement, not in this slice.)
+- **Weakness 3 — choiceB branch not captured.** Only the
+  choiceA branch ("Գնալ դեպի խնձորենու այգին") was followed
+  through the consumer-app session. The choiceB branch
+  ("Մոտեցնել արծաթե բարակ ճյուղը լույսին") remains untested.
+  When the API path is exercised on this plan, both branches
+  should be captured to confirm choiceB is grounded with the
+  same plan-adherence quality.
+- **Weakness 4 — richer imagery, acceptable for age 6–7.** The
+  silver-lacework metaphor and the "as if come from a dream"
+  framing are more elaborate than the Plan A/B captures. For
+  age-6-story-rich this is on-target; for age 4–5 it would be
+  too much. The age-profile control is doing what it's meant
+  to.
+- **Choice format.** Used `Ա․ / Բ․` (Armenian abbreviation
+  full-stop) instead of the prompt's `Ա: / Բ: ` (colon).
+  Different from Plan A's `Ա) / Բ)` and Plan B's `🌿 / 🌸`,
+  but the text content is correct. Pattern across three Claude
+  captures: choice text is grounded; only the marker style
+  varies.
+- **Verdict.** Third consecutive plan-conditioned Claude
+  render supports the Story Director hypothesis. The age-
+  profile control appears to work across the age-4 / age-5 /
+  age-6 samples — each batch carries the expected sentence
+  rhythm and metaphor density without spilling over its target.
+
+> **Reminder.** App output, not API output. Per
+> `../API_VS_APP_BAKEOFF_PLAN.md` § 6 no runtime decision
+> follows from this single sample, and three consistent
+> strong app samples is suggestive but still ceiling
+> evidence. The API-path comparison via F1.2 is the load-
+> bearing one when `ANTHROPIC_API_KEY` is available. Plan D
+> (age-7-richer) capture remains to complete the four-
+> profile coverage on the consumer-app side.
 
 **Rubric**
 
 | Dimension | Score |
 |---|---|
-| Armenian naturalness | _ / 5 |
-| Eastern Armenian correctness | _ / 5 |
-| Fairy-tale feeling | _ / 5 |
-| Warmth for age 6–7 | _ / 5 |
-| Age-profile fit (age-6-story-rich) | _ / 5 |
-| Length / pacing | _ / 5 |
-| Choice quality | _ / 5 |
-| Plan adherence | _ / 5 |
-| Safety / age appropriateness | pass / fail |
-| "Would I let Areg say this aloud?" | yes / no / yes-with-edits |
+| Armenian naturalness | **4 / 5** |
+| Eastern Armenian correctness | **4 / 5** |
+| Fairy-tale feeling | **4.5 / 5** |
+| Warmth for age 6–7 | **4.5 / 5** |
+| Age-profile fit (age-6-story-rich) | **4.5 / 5** |
+| Length / pacing | **4 / 5** |
+| Choice quality | **4 / 5** |
+| Plan adherence | **4.5 / 5** |
+| Safety / age appropriateness | **pass** |
+| "Would I let Areg say this aloud?" | **yes, with small edits** |
 
 ### 4C. Plan C (age-6-story-rich) — Gemini consumer app
 
