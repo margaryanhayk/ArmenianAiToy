@@ -581,41 +581,214 @@ target word count?) and **plan adherence** (carried over from
 |---|---|
 | Provider | claude |
 | Source | app (claude.ai) |
-| Model label | `<TODO>` |
-| Captured (UTC) | `<TODO>` |
-| Reviewer | `<TODO>` |
-| Decoding | `(unobservable — app default)` |
+| Model label | Claude (consumer app default at capture time) |
+| Captured (UTC) | 2026-05-01 (local capture timestamp ≈ 22:22) |
+| Reviewer | Hayk |
+| Decoding | (unobservable — app default) |
 
 **Raw output**
 
+Verbatim, including the duplicated opening sentence-pair at the
+start of each continuation (a Claude.app render artefact, noted
+under Weakness 2 below):
+
 ```
-<TODO>
+Մի անգամ, շատ վաղուց, խնձորենու այգում ապրում էր մի փոքրիկ շնիկ։ Նրա անունը Բարիկ էր։ Բարիկը շատ հնարամիտ էր։
+Մի տաք օր տատիկ շունը նստել էր ծառի տակ։ Արևի շողը մեղմ տաքացնում էր նրա մորթին։ Կողքին հասած դեղձ կար՝ թավշյա մաշկով։
+— Արի, պատմեմ քեզ հին պատմություն,— ասաց տատիկը։— Մի օր երկնքից մի փոքրիկ աստղ ընկավ։ Ոչ ոք չգիտեր՝ ուր։
+Հենց այդ պահին երկնքից իջավ մի արագիլ։ Նա հոգնած էր ու տխուր։
+— Ես չեմ գտնում հանգստանալու տեղը,— ասաց արագիլը։— Չգիտեմ՝ ինչպես տուն գնամ։
+Բարիկը մտածեց։ Նա տեսավ մի փոքրիկ տերև։ Տերևի վրա փայլում էին ցողի կաթիլները՝ ճիշտ ինչպես աստղիկներ։
+— Կարող եմ քեզ մի փոքրիկ նվեր տալ,— ասաց Բարիկը։— Թերևս սա ճանապարհ ցույց տա։
+Արագիլը ժպտաց։ Բարիկը մտածում է, թե ինչ անի հիմա։
+Ա) Մոտեցնել ցողի կաթիլներով տերևը լույսին
+Բ) Գնալ դեպի խնձորենու այգի
+
+Continuation after A:
+Բարիկը մեղմ վերցրեց տերևը։ Նա բարձրացրեց այն դեպի արևի շողը։Բարիկը մեղմ վերցրեց տերևը։ Նա բարձրացրեց այն դեպի արևի շողը։
+Հանկարծ ցողի կաթիլները սկսեցին փայլել։ Ամեն կաթիլի մեջ մի փոքրիկ լույս երևաց։ Կաթիլները փայլում էին ճիշտ ինչպես աստղեր։
+— Օհ,— շշնջաց արագիլը։— Սրանք նման են իմ տան աստղերին։
+Տերևի լույսերը ցույց տվեցին մի ճանապարհ՝ դեպի երկինք։ Արագիլը ուրախացավ։ Նրա սիրտը տաքացավ։
+— Շնորհակալ եմ, փոքրիկ Բարիկ,— ասաց արագիլը։— Քո նվերը ինձ տուն կտանի։
+Արագիլը մեղմ թափահարեց թևերը։ Նա բարձրացավ երկինք՝ լույսի ճանապարհով։
+Տատիկ շունը ժպտաց։ Արևի շողը դեռ տաքացնում էր այգին։ Հասած դեղձը բուրում էր քաղցր։
+Բարիկը նստեց տատիկի կողքին։ Նրա սիրտը լի էր ուրախությամբ։
+Ա) Հարցնել տատիկին պատմության մասին
+Բ) Գնալ նայել խնձորենու ծառերին
+
+Continuation after B:
+Բարիկը կամացուկ վեր կացավ։ Նա գնաց դեպի խնձորենու ծառերը։Բարիկը կամացուկ վեր կացավ։ Նա գնաց դեպի խնձորենու ծառերը։
+Ծառերը բարձր էին ու կանաչ։ Ճյուղերին կախված էին կարմիր խնձորներ։ Արևի շողը խաղում էր տերևների արանքում։
+Բարիկը նայեց վերև։ Մի փոքրիկ խնձոր ընկավ նրա առաջ։ Խնձորը կարմիր էր ու փայլուն։
+Հանկարծ Բարիկը մի բան նկատեց։ Խնձորի վրա փայլում էր մի ցողի կաթիլ։ Կաթիլի մեջ երևում էր մի փոքրիկ լույս՝ ճիշտ ինչպես աստղ։
+Բարիկը ժպտաց։ Միգուցե ընկած աստղը հենց այստեղ էր՝ խնձորենու այգում։
+Նա վերցրեց խնձորը։ Տարավ տատիկի մոտ։
+— Տատիկ, նայիր,— ասաց Բարիկը։— Ես գտա մի փոքրիկ աստղ։
+Տատիկը ժպտաց ու համբուրեց Բարիկի գլուխը։ Այգին լի էր տաք լույսով ու քաղցր բույրով։
+Ա) Կիսել խնձորը տատիկի հետ
+Բ) Գնալ ետ՝ նոր ցողի կաթիլներ փնտրելու
+
+Continuation after A:
+Բարիկը կամացուկ կիսեց խնձորը։ Մի կեսը տվեց տատիկին, մյուսը պահեց իրեն։Բարիկը կամացուկ կիսեց խնձորը։ Մի կեսը տվեց տատիկին, մյուսը պահեց իրեն։
+Խնձորը քաղցր էր ու հյութալի։ Տատիկը ուրախ ծամում էր։ Բարիկը նայում էր նրա բարի աչքերին։
+— Գիտե՞ս, փոքրիկս,— ասաց տատիկը։— Ամենահամեղ խնձորը նա է, որ կիսում ես սիրելիի հետ։
+Բարիկը ժպտաց։ Նրա սիրտը շատ տաք էր։
+Արևը մեղմ իջնում էր։ Երկինքը դառնում էր վարդագույն։ Հեռվում երևաց արագիլը՝ թռչում էր դեպի տուն։ Նա թափահարեց թևերը՝ ասես բարև ասեր։
+Բարիկը գլուխը դրեց տատիկի թաթերին։ Տատիկը մեղմ շոյում էր նրան։ Այգին լուռ էր ու տաք։
+— Տատիկ, պատմիր ևս մի պատմություն,— շշնջաց Բարիկը։
+Տատիկը ժպտաց ու սկսեց նոր հին հեքիաթ։
+Ա) Լսել տատիկի նոր պատմությունը
+Բ) Քնել տատիկի թաթերին՝ աստղերի երազով
+
+Continuation after B:
+Բարիկի աչքերը կամացուկ փակվեցին։ Տատիկի թաթերը փափուկ էին ու տաք։Բարիկի աչքերը կամացուկ փակվեցին։ Տատիկի թաթերը փափուկ էին ու տաք։
+Երկինքը դարձավ մուգ կապույտ։ Աստղերը սկսեցին փայլել մեկը մյուսի հետևից։ Ամեն աստղ նման էր ցողի փոքրիկ կաթիլի։
+Բարիկը երազում տեսավ արագիլին։ Արագիլը թռչում էր աստղերի արանքով։ Նա ժպտում էր ու թափահարում թևերը։
+— Շնորհակալ եմ, փոքրիկ Բարիկ,— շշնջում էր արագիլը երազում։— Քո բարի սիրտը ինձ տուն բերեց։
+Բարիկը երազում տեսավ նաև խնձորենու այգին։ Ծառերի վրա փայլում էին փոքրիկ աստղեր՝ կարմիր խնձորների հետ միասին։
+Տատիկը մեղմ երգում էր հին օրորոց։ Նրա ձայնը նման էր քամու շշուկին։
+Այգին լուռ էր։ Արագիլը հասավ իր տուն։ Աստղերը հսկում էին Բարիկին։
+Բարիկը քնեց խաղաղ ու երջանիկ՝ տատիկի տաք թաթերին։
+Վերջ։ 🌙
 ```
 
 **Normalized Areg output**
 
+What Areg would actually speak — the duplicated opening sentence-
+pair at the start of each continuation (an app-side rendering
+artefact) is collapsed to a single instance. No other edits.
+
 ```
-<TODO>
+Մի անգամ, շատ վաղուց, խնձորենու այգում ապրում էր մի փոքրիկ շնիկ։ Նրա անունը Բարիկ էր։ Բարիկը շատ հնարամիտ էր։
+Մի տաք օր տատիկ շունը նստել էր ծառի տակ։ Արևի շողը մեղմ տաքացնում էր նրա մորթին։ Կողքին հասած դեղձ կար՝ թավշյա մաշկով։
+— Արի, պատմեմ քեզ հին պատմություն,— ասաց տատիկը։— Մի օր երկնքից մի փոքրիկ աստղ ընկավ։ Ոչ ոք չգիտեր՝ ուր։
+Հենց այդ պահին երկնքից իջավ մի արագիլ։ Նա հոգնած էր ու տխուր։
+— Ես չեմ գտնում հանգստանալու տեղը,— ասաց արագիլը։— Չգիտեմ՝ ինչպես տուն գնամ։
+Բարիկը մտածեց։ Նա տեսավ մի փոքրիկ տերև։ Տերևի վրա փայլում էին ցողի կաթիլները՝ ճիշտ ինչպես աստղիկներ։
+— Կարող եմ քեզ մի փոքրիկ նվեր տալ,— ասաց Բարիկը։— Թերևս սա ճանապարհ ցույց տա։
+Արագիլը ժպտաց։ Բարիկը մտածում է, թե ինչ անի հիմա։
+Ա) Մոտեցնել ցողի կաթիլներով տերևը լույսին
+Բ) Գնալ դեպի խնձորենու այգի
+
+Continuation after A:
+Բարիկը մեղմ վերցրեց տերևը։ Նա բարձրացրեց այն դեպի արևի շողը։
+Հանկարծ ցողի կաթիլները սկսեցին փայլել։ Ամեն կաթիլի մեջ մի փոքրիկ լույս երևաց։ Կաթիլները փայլում էին ճիշտ ինչպես աստղեր։
+— Օհ,— շշնջաց արագիլը։— Սրանք նման են իմ տան աստղերին։
+Տերևի լույսերը ցույց տվեցին մի ճանապարհ՝ դեպի երկինք։ Արագիլը ուրախացավ։ Նրա սիրտը տաքացավ։
+— Շնորհակալ եմ, փոքրիկ Բարիկ,— ասաց արագիլը։— Քո նվերը ինձ տուն կտանի։
+Արագիլը մեղմ թափահարեց թևերը։ Նա բարձրացավ երկինք՝ լույսի ճանապարհով։
+Տատիկ շունը ժպտաց։ Արևի շողը դեռ տաքացնում էր այգին։ Հասած դեղձը բուրում էր քաղցր։
+Բարիկը նստեց տատիկի կողքին։ Նրա սիրտը լի էր ուրախությամբ։
+Ա) Հարցնել տատիկին պատմության մասին
+Բ) Գնալ նայել խնձորենու ծառերին
+
+Continuation after B:
+Բարիկը կամացուկ վեր կացավ։ Նա գնաց դեպի խնձորենու ծառերը։
+Ծառերը բարձր էին ու կանաչ։ Ճյուղերին կախված էին կարմիր խնձորներ։ Արևի շողը խաղում էր տերևների արանքում։
+Բարիկը նայեց վերև։ Մի փոքրիկ խնձոր ընկավ նրա առաջ։ Խնձորը կարմիր էր ու փայլուն։
+Հանկարծ Բարիկը մի բան նկատեց։ Խնձորի վրա փայլում էր մի ցողի կաթիլ։ Կաթիլի մեջ երևում էր մի փոքրիկ լույս՝ ճիշտ ինչպես աստղ։
+Բարիկը ժպտաց։ Միգուցե ընկած աստղը հենց այստեղ էր՝ խնձորենու այգում։
+Նա վերցրեց խնձորը։ Տարավ տատիկի մոտ։
+— Տատիկ, նայիր,— ասաց Բարիկը։— Ես գտա մի փոքրիկ աստղ։
+Տատիկը ժպտաց ու համբուրեց Բարիկի գլուխը։ Այգին լի էր տաք լույսով ու քաղցր բույրով։
+Ա) Կիսել խնձորը տատիկի հետ
+Բ) Գնալ ետ՝ նոր ցողի կաթիլներ փնտրելու
+
+Continuation after A:
+Բարիկը կամացուկ կիսեց խնձորը։ Մի կեսը տվեց տատիկին, մյուսը պահեց իրեն։
+Խնձորը քաղցր էր ու հյութալի։ Տատիկը ուրախ ծամում էր։ Բարիկը նայում էր նրա բարի աչքերին։
+— Գիտե՞ս, փոքրիկս,— ասաց տատիկը։— Ամենահամեղ խնձորը նա է, որ կիսում ես սիրելիի հետ։
+Բարիկը ժպտաց։ Նրա սիրտը շատ տաք էր։
+Արևը մեղմ իջնում էր։ Երկինքը դառնում էր վարդագույն։ Հեռվում երևաց արագիլը՝ թռչում էր դեպի տուն։ Նա թափահարեց թևերը՝ ասես բարև ասեր։
+Բարիկը գլուխը դրեց տատիկի թաթերին։ Տատիկը մեղմ շոյում էր նրան։ Այգին լուռ էր ու տաք։
+— Տատիկ, պատմիր ևս մի պատմություն,— շշնջաց Բարիկը։
+Տատիկը ժպտաց ու սկսեց նոր հին հեքիաթ։
+Ա) Լսել տատիկի նոր պատմությունը
+Բ) Քնել տատիկի թաթերին՝ աստղերի երազով
+
+Continuation after B:
+Բարիկի աչքերը կամացուկ փակվեցին։ Տատիկի թաթերը փափուկ էին ու տաք։
+Երկինքը դարձավ մուգ կապույտ։ Աստղերը սկսեցին փայլել մեկը մյուսի հետևից։ Ամեն աստղ նման էր ցողի փոքրիկ կաթիլի։
+Բարիկը երազում տեսավ արագիլին։ Արագիլը թռչում էր աստղերի արանքով։ Նա ժպտում էր ու թափահարում թևերը։
+— Շնորհակալ եմ, փոքրիկ Բարիկ,— շշնջում էր արագիլը երազում։— Քո բարի սիրտը ինձ տուն բերեց։
+Բարիկը երազում տեսավ նաև խնձորենու այգին։ Ծառերի վրա փայլում էին փոքրիկ աստղեր՝ կարմիր խնձորների հետ միասին։
+Տատիկը մեղմ երգում էր հին օրորոց։ Նրա ձայնը նման էր քամու շշուկին։
+Այգին լուռ էր։ Արագիլը հասավ իր տուն։ Աստղերը հսկում էին Բարիկին։
+Բարիկը քնեց խաղաղ ու երջանիկ՝ տատիկի տաք թաթերին։
+Վերջ։ 🌙
 ```
 
 **Notes**
 
-- `<TODO: did the writer keep the age-4-simple sentence style? word count in 90–130 range?>`
+- **Overall quality.** Good — usable with small edits. Strong age-4
+  fit: simple words, short sentences, warm tone throughout. The
+  hero (շնիկ Բարիկ), the friend (տատիկ շուն), the place
+  (խնձորենու այգի), the magicalObject (ցողի կաթիլներով տերև),
+  and the smallProblem (արագիլը չի գտնում հանգստանալու տեղը) all
+  appear and are honoured by the writer.
+- **Plan adherence.** Mostly good. The hero / friend / place /
+  magicalObject / smallProblem are all preserved, the
+  resolutionStyle ("լուծումը գալիս է փոքրիկ նվեր մատուցելուց")
+  visibly shapes the prose (Բարիկ gives the dewdrop leaf as a
+  gift to the stork), and both initial choices map cleanly to
+  the plan's choiceA / choiceB.
+- **Weakness 1 — common opener.** Story starts with the
+  template-shaped «Մի անգամ, շատ վաղուց...». Not wrong, but
+  predictable; production-time we'd nudge the prompt away from
+  this exact opener.
+- **Weakness 2 — duplicated opening sentence-pair on every
+  continuation.** Each turn after the first repeats its first
+  sentence-pair verbatim immediately. Almost certainly a Claude.app
+  rendering artefact (likely a stream/preview vs final-response
+  collision), not a model defect — an API run with the same
+  prompt should not exhibit this. Normalised output above
+  collapses the duplicate to a single instance.
+- **Weakness 3 — mild moralising.** The grandmother's line in
+  the third continuation, «Ամենահամեղ խնձորը նա է, որ կիսում ես
+  սիրելիի հետ։», states the moral explicitly. The writer prompt
+  bans moral lectures; this is on the edge — the line is
+  embedded in dialogue, but it is a direct value statement.
+  Worth tightening the writer-prompt SAFETY-AND-TONE section
+  in a future slice.
+- **Weakness 4 — conflictType drift (not harmful).** The plan's
+  `conflictType` is "աստղն ընկել է մի անհայտ տեղ"; the prose
+  weaves it in as the grandmother's framing tale and then as a
+  metaphor for the dewdrop / apple resolution, but it never
+  becomes the central conflict. Acceptable softening rather
+  than a plan-adherence break.
+- **Choice format minor deviation.** Writer used `Ա)` / `Բ)`
+  (parenthesis) instead of `Ա: ` / `Բ: ` (colon) requested by
+  the prompt. Trivial.
+- **Verdict.** Supports the Story Director hypothesis. The
+  plan-conditioned Claude.app render is clearly stronger than
+  the current Areg / OpenAI free-form baseline (see
+  `samples/openai-api-current-areg-baseline-story-20260501.md`):
+  native Armenian fauna throughout, no rhinoceros / chicken
+  pairing, atmospheric place + magicalObject, and the warm
+  grandparent register the production prompt asks for.
+
+> **Reminder.** This is **app output**, not API output — it
+> shows Claude's ceiling under the consumer-app default
+> environment, not what our integration would deliver. Per
+> `../API_VS_APP_BAKEOFF_PLAN.md` § 6, no runtime decision
+> follows from this single sample. The next step is to capture
+> the same plan + writer prompt through the F1.2 Claude API
+> path when `ANTHROPIC_API_KEY` is available.
 
 **Rubric**
 
 | Dimension | Score |
 |---|---|
-| Armenian naturalness | _ / 5 |
-| Eastern Armenian correctness | _ / 5 |
-| Fairy-tale feeling | _ / 5 |
-| Warmth for age 4–5 | _ / 5 |
-| Age-profile fit (age-4-simple) | _ / 5 |
-| Length / pacing | _ / 5 |
-| Choice quality | _ / 5 |
-| Plan adherence | _ / 5 |
-| Safety / age appropriateness | pass / fail |
-| "Would I let Areg say this aloud?" | yes / no / yes-with-edits |
+| Armenian naturalness | **4 / 5** |
+| Eastern Armenian correctness | **4 / 5** |
+| Fairy-tale feeling | **4 / 5** |
+| Warmth for age 4–5 | **5 / 5** |
+| Age-profile fit (age-4-simple) | **4.5 / 5** |
+| Length / pacing | **4 / 5** |
+| Choice quality | **4 / 5** |
+| Plan adherence | **4.5 / 5** |
+| Safety / age appropriateness | **pass** |
+| "Would I let Areg say this aloud?" | **yes, with small edits** |
 
 ### 4A. Plan A (age-4-simple) — Gemini consumer app
 
