@@ -589,8 +589,8 @@ edits).
 |---|---|
 | Provider | claude |
 | Source | app (claude.ai) |
-| Model label | <TODO> |
-| Captured (UTC) | <TODO> |
+| Model label | Claude (consumer app default at capture time) |
+| Captured (UTC) | 2026-05-04 (local capture) |
 | Reviewer | Hayk |
 | Decoding | (unobservable — app default) |
 | TURN_INDEX | 1 |
@@ -600,30 +600,51 @@ edits).
 **Raw output**
 
 ```text
-<TODO>
+Խնձորենու այգում արևի տաք շողը նստել էր հասած դեղձի թավշյա մաշկին։ Շնիկը նստած էր տատիկ-շան կողքին և լսում էր հին պատմությունը։
+— Վաղուց մի աստղ ընկել է այս այգում,— փսփսաց տատիկը։— Արագիլը թռչում էր երկնքով ու չէր գտնում հանգստանալու տեղը, որովհետև իր աստղը կորել էր։
+Շնիկը նայեց վերև։ Տերևների արանքից կախված էր մի փոքրիկ տերև՝ ցողի կաթիլներով լի։ Կաթիլները փայլում էին այնպես, ինչպես փոքրիկ աստղեր։
+Հենց այդ պահին վերևից լսվեց արագիլի մեղմ ձայնը։ Նա պտտվում էր այգու վրա՝ հոգնած ու մոլորված։
+Շնիկը մտածեց՝ գուցե այս փայլուն տերևը կարող է օգնել արագիլին գտնել տան ճանապարհը։ Բայց ինչպե՞ս մոտենալ նրան։
+Տատիկը մեղմ ժպտաց ու սպասեց, թե շնիկն ինչ կանի։
+Ա: մոտեցնել ցողի կաթիլներով տերևը լույսին
+Բ: գնալ դեպի խնձորենու այգի
 ```
 
 **Normalized Areg output**
 
+(Identical to raw — Turn 1 carries no Claude.app duplicated-sentence-pair artefact and no meta-output line.)
+
 ```text
-<TODO>
+Խնձորենու այգում արևի տաք շողը նստել էր հասած դեղձի թավշյա մաշկին։ Շնիկը նստած էր տատիկ-շան կողքին և լսում էր հին պատմությունը։
+— Վաղուց մի աստղ ընկել է այս այգում,— փսփսաց տատիկը։— Արագիլը թռչում էր երկնքով ու չէր գտնում հանգստանալու տեղը, որովհետև իր աստղը կորել էր։
+Շնիկը նայեց վերև։ Տերևների արանքից կախված էր մի փոքրիկ տերև՝ ցողի կաթիլներով լի։ Կաթիլները փայլում էին այնպես, ինչպես փոքրիկ աստղեր։
+Հենց այդ պահին վերևից լսվեց արագիլի մեղմ ձայնը։ Նա պտտվում էր այգու վրա՝ հոգնած ու մոլորված։
+Շնիկը մտածեց՝ գուցե այս փայլուն տերևը կարող է օգնել արագիլին գտնել տան ճանապարհը։ Բայց ինչպե՞ս մոտենալ նրան։
+Տատիկը մեղմ ժպտաց ու սպասեց, թե շնիկն ինչ կանի։
+Ա: մոտեցնել ցողի կաթիլներով տերևը լույսին
+Բ: գնալ դեպի խնձորենու այգի
 ```
 
 **Notes**
 
-- <TODO>
+- Opens with `Խնձորենու այգում` — `plan.place` anchored cleanly in the first three words. **No `Մի անգամ`** opener; rule A held.
+- Both choices appear verbatim as `plan.choiceA` / `plan.choiceB`, with exact `Ա: ` / `Բ: ` prefixes (Armenian Ա/Բ + ASCII colon + ASCII space). Rule B held.
+- Tatik narrator-frame is preserved without any moralizing aphorism (vs v1 where the same setup produced `Ամենահամեղ խնձորը նա է, որ կիսում ես սիրելիի հետ`). Rule C held.
+- ~110 Armenian words; within the 90–130 budget for the initial turn.
+- No Claude.app duplicated-sentence-pair artefact — the artefact only appears on continuations (turns ≥ 2), consistent with v1 / v2 captures.
+- See § 8a *Failures* #1: Hayk's overall summary flags Turn 1 place-drift as a v3 weakness from a separate attempt (`opened in կանաչ բացատ`); the captured run below does not show that drift, but the variance itself is what v3.1 needs to harden.
 
 **v3 pass / fail (Turn 1)** — see § 8 for the full checklist.
 
 | # | Check | Pass / fail |
 |---|---|---|
-| C1 | No forbidden opener | _ |
-| C2 | No moralizing dialogue | _ |
-| C3 | No duplicate sentence in turn | _ |
-| C4 | Age-4 simple language | _ |
-| C5 | Plan adherence (atoms visible) | _ |
-| C6 | Exact `Ա: ` / `Բ: ` choices verbatim from plan | _ |
-| C7 | Length 90–130 words | _ |
+| C1 | No forbidden opener | **PASS** |
+| C2 | No moralizing dialogue | **PASS** |
+| C3 | No duplicate sentence in turn | **PASS** |
+| C4 | Age-4 simple language | **PASS** |
+| C5 | Plan adherence (atoms visible) | **PASS** (this run; place-anchor variance noted in § 8a) |
+| C6 | Exact `Ա: ` / `Բ: ` choices verbatim from plan | **PASS** |
+| C7 | Length 90–130 words | **PASS** (~110 words) |
 
 ### 7B. Turn 2 — Claude consumer app
 
@@ -631,8 +652,8 @@ edits).
 |---|---|
 | Provider | claude |
 | Source | app (claude.ai) |
-| Model label | <TODO> |
-| Captured (UTC) | <TODO> |
+| Model label | Claude (consumer app default at capture time) |
+| Captured (UTC) | 2026-05-04 (local capture) |
 | Reviewer | Hayk |
 | Decoding | (unobservable — app default) |
 | TURN_INDEX | 2 |
@@ -642,30 +663,49 @@ edits).
 **Raw output**
 
 ```text
-<TODO>
+Շնիկը կամաց բարձրացրեց տերևը դեպի արևը։ Ցողի կաթիլները բռնեցին լույսը և սկսեցին փայլատակել։ Խոտի վրա հայտնվեցին փոքրիկ ծիածաններ՝ կարմիր, դեղին, կապույտ։Շարունակեց հեքիաթը՝ ստեղծելով կախարդական պահ և նոր ընտրանքներ։Շարունակեց հեքիաթը՝ ստեղծելով կախարդական պահ և նոր ընտրանքներ։Շնիկը կամաց բարձրացրեց տերևը դեպի արևը։ Ցողի կաթիլները բռնեցին լույսը և սկսեցին փայլատակել։ Խոտի վրա հայտնվեցին փոքրիկ ծիածաններ՝ կարմիր, դեղին, կապույտ։
+Արագիլը երկնքից նկատեց այդ լույսը։ Նա ավելի ցածր իջավ ու սկսեց պտտվել շնիկի գլխի վերևում։
+Շնիկը նայեց տերևին ավելի ուշադիր։ Մի կաթիլ ավելի մեծ էր մյուսներից։ Կաթիլի ներսում, ինչպես փոքրիկ հայելու մեջ, երևաց մի պատկեր՝ փափուկ բույն խնձորենու ճյուղերի արանքում, արևի տաք շողի տակ։
+Շնիկը հասկացավ։ Տերևը ցույց էր տալիս, թե որտեղ կարող է հանգստանալ արագիլը։ Բայց խնձորենու այգին մեծ էր։ Որ կողմից մոտենալ։
+Հեռվում մի դեղին թիթեռ թռչում էր այգու ուղղությամբ։ Իսկ մոտակայքում մի փոքրիկ արահետ էր ոլորվում խոտի միջով։
+Ա: հետևել դեղին թիթեռին
+Բ: քայլել փոքրիկ արահետով
 ```
 
 **Normalized Areg output**
 
+Two normalizations applied: (1) collapsed the duplicated opening sentence-trio (Claude.app UI artefact, same shape v1 / v2 showed); (2) **stripped both copies of the meta-output line** `Շարունակեց հեքիաթը՝ ստեղծելով կախարդական պահ և նոր ընտրանքներ։` (model leaked an internal narrator-commentary string — must never reach Areg's TTS / a child).
+
 ```text
-<TODO>
+Շնիկը կամաց բարձրացրեց տերևը դեպի արևը։ Ցողի կաթիլները բռնեցին լույսը և սկսեցին փայլատակել։ Խոտի վրա հայտնվեցին փոքրիկ ծիածաններ՝ կարմիր, դեղին, կապույտ։
+Արագիլը երկնքից նկատեց այդ լույսը։ Նա ավելի ցածր իջավ ու սկսեց պտտվել շնիկի գլխի վերևում։
+Շնիկը նայեց տերևին ավելի ուշադիր։ Մի կաթիլ ավելի մեծ էր մյուսներից։ Կաթիլի ներսում, ինչպես փոքրիկ հայելու մեջ, երևաց մի պատկեր՝ փափուկ բույն խնձորենու ճյուղերի արանքում, արևի տաք շողի տակ։
+Շնիկը հասկացավ։ Տերևը ցույց էր տալիս, թե որտեղ կարող է հանգստանալ արագիլը։ Բայց խնձորենու այգին մեծ էր։ Որ կողմից մոտենալ։
+Հեռվում մի դեղին թիթեռ թռչում էր այգու ուղղությամբ։ Իսկ մոտակայքում մի փոքրիկ արահետ էր ոլորվում խոտի միջով։
+Ա: հետևել դեղին թիթեռին
+Բ: քայլել փոքրիկ արահետով
 ```
 
 **Notes**
 
-- <TODO>
+- First sentence (`Շնիկը կամաց բարձրացրեց տերևը դեպի արևը։`) directly performs the chosen `Ա: մոտեցնել ցողի կաթիլներով տերևը լույսին`. Rule F held — no recap of Turn 1.
+- **BREAK-GLASS Turn 2 choice block ignored.** Prompt instructed the model to emit `Ա: ուղեկցել արագիլին մինչև երկնքի եզրը` / `Բ: մնալ այգում և նայել, թե ինչպես է արագիլը թռչում տուն`. Model emitted unrelated `Ա: հետևել դեղին թիթեռին` / `Բ: քայլել փոքրիկ արահետով`. C8b **FAIL** — break-glass instruction wording was not strong enough to override the model's narrative momentum.
+- **Meta-output leak (NEW v3 issue):** the literal string `Շարունակեց հեքիաթը՝ ստեղծելով կախարդական պահ և նոր ընտրանքներ։` appeared **twice**, interleaved with the duplicated sentence-trio. This is internal narrator-commentary the model leaked — **must never appear in Areg output.** The v3 prompt has no rule against meta-text; v3.1 needs an explicit anti-meta rule with positive output examples.
+- Claude.app duplicated-sentence-trio artefact still present at the very start of the turn — same UI-side bug v1 / v2 showed; v3 changed nothing relevant. Pending API run.
+- Plan adherence holds: hero (շնիկ), magicalObject (ցողի կաթիլներով տերև), goal (the leaf shows the way home via the dewdrop image), mood (հիշատակային ու տաք) all visible. Plan.place (խնձորենու այգի) referenced explicitly in the dewdrop reflection.
+- ~115 Armenian words after normalization; slightly over the 70–110 continuation budget — flag in length, not blocking.
 
 **v3 pass / fail (Turn 2)** — see § 8.
 
 | # | Check | Pass / fail |
 |---|---|---|
-| C2 | No moralizing dialogue | _ |
-| C3 | No duplicate sentence in turn | _ |
-| C4 | Age-4 simple language | _ |
-| C5 | Plan adherence | _ |
-| C8a | First sentence performs SELECTED_CHOICE Ա | _ |
-| C8b | Two choices in exact `Ա: ` / `Բ: ` format with the right semantic directions | _ |
-| C8c | Length 70–110 words | _ |
+| C2 | No moralizing dialogue | **PASS** |
+| C3 | No duplicate sentence in turn | **FAIL** (Claude.app artefact + meta-line leak) |
+| C4 | Age-4 simple language | **PASS** |
+| C5 | Plan adherence | **PASS** |
+| C8a | First sentence performs SELECTED_CHOICE Ա | **PASS** |
+| C8b | Two choices in exact `Ա: ` / `Բ: ` format with the right semantic directions | **FAIL** (BREAK-GLASS block ignored — see Notes) |
+| C8c | Length 70–110 words | **PASS-ish** (~115 words after normalization) |
 
 ### 7C. Turn 3 — Claude consumer app
 
@@ -673,43 +713,61 @@ edits).
 |---|---|
 | Provider | claude |
 | Source | app (claude.ai) |
-| Model label | <TODO> |
-| Captured (UTC) | <TODO> |
+| Model label | Claude (consumer app default at capture time) |
+| Captured (UTC) | 2026-05-04 (local capture) |
 | Reviewer | Hayk |
 | Decoding | (unobservable — app default) |
 | TURN_INDEX | 3 |
-| SELECTED_CHOICE | Բ: մնալ այգում և նայել, թե ինչպես է արագիլը թռչում տուն |
+| SELECTED_CHOICE | **Ա: հետևել դեղին թիթեռին** (operator override — Turn 2 emitted invented choices instead of the BREAK-GLASS pair, so the package's planned `Բ: մնալ այգում...` did not exist; the operator chose Ա from Turn 2's actual options) |
 | MAX_TURNS | 3 |
 
 **Raw output**
 
 ```text
-<TODO>
+Շնիկը տերևը զգուշորեն բռնեց ատամներով ու վազեց թիթեռի հետևից։ Թիթեռը թռչում էր ցածր, հետո բարձր, հետո նորից ցածր։ Արագիլը երկնքից հետևում էր նրանց։Շնիկը տերևը զգուշորեն բռնեց ատամներով ու վազեց թիթեռի հետևից։ Թիթեռը թռչում էր ցածր, հետո բարձր, հետո նորից ցածր։ Արագիլը երկնքից հետևում էր նրանց։
+Թիթեռը հասավ խնձորենու այգի։ Ծառերի ճյուղերը ծանր էին հասած խնձորներից։ Օդում քաղցր բույր էր։ Թիթեռը նստեց մի ճյուղի վրա ու սպասեց։
+Շնիկը նայեց վերև։ Հենց այնտեղ, որտեղ նստել էր թիթեռը, ճյուղերը միահյուսվել էին և ստեղծել փոքրիկ բույնի նման տեղ՝ ճիշտ այնպիսին, ինչպիսին երևացել էր ցողի կաթիլում։
+Շնիկը դրեց տերևը խոտի վրա ու հաչեց մեկ անգամ՝ կամաց։ Արագիլը կամաց իջավ ու նստեց ճյուղերի արանքում։ Նրա թևերը հանգստացան։ Աչքերը կիսախուփ եղան։
+Արագիլը նայեց ներքև՝ շնիկին։ Կտուցով դիպավ մի հասած խնձորի, և խնձորը գլորվեց ուղիղ շնիկի թաթերի մոտ։
+Թիթեռը նորից թռավ։ Արևը տաքացնում էր այգին։ Շնիկը նստեց խնձորենու տակ ու կրծեց քաղցր խնձորը, իսկ վերևում արագիլը հանգիստ շնչում էր իր նոր տեղում։
 ```
 
 **Normalized Areg output**
 
+One normalization applied: collapsed the duplicated opening sentence-trio (Claude.app UI artefact). No meta-output line on this turn.
+
 ```text
-<TODO>
+Շնիկը տերևը զգուշորեն բռնեց ատամներով ու վազեց թիթեռի հետևից։ Թիթեռը թռչում էր ցածր, հետո բարձր, հետո նորից ցածր։ Արագիլը երկնքից հետևում էր նրանց։
+Թիթեռը հասավ խնձորենու այգի։ Ծառերի ճյուղերը ծանր էին հասած խնձորներից։ Օդում քաղցր բույր էր։ Թիթեռը նստեց մի ճյուղի վրա ու սպասեց։
+Շնիկը նայեց վերև։ Հենց այնտեղ, որտեղ նստել էր թիթեռը, ճյուղերը միահյուսվել էին և ստեղծել փոքրիկ բույնի նման տեղ՝ ճիշտ այնպիսին, ինչպիսին երևացել էր ցողի կաթիլում։
+Շնիկը դրեց տերևը խոտի վրա ու հաչեց մեկ անգամ՝ կամաց։ Արագիլը կամաց իջավ ու նստեց ճյուղերի արանքում։ Նրա թևերը հանգստացան։ Աչքերը կիսախուփ եղան։
+Արագիլը նայեց ներքև՝ շնիկին։ Կտուցով դիպավ մի հասած խնձորի, և խնձորը գլորվեց ուղիղ շնիկի թաթերի մոտ։
+Թիթեռը նորից թռավ։ Արևը տաքացնում էր այգին։ Շնիկը նստեց խնձորենու տակ ու կրծեց քաղցր խնձորը, իսկ վերևում արագիլը հանգիստ շնչում էր իր նոր տեղում։
 ```
 
 **Notes**
 
-- <TODO>
+- **C9 PASS — load-bearing.** Turn 3 contains NO `Ա: ` / `Բ: ` lines anywhere in the turn. No prompt-shaped child-directed question. **The bounded-arc rule held — this is the v3 success.**
+- First sentence (`Շնիկը տերևը զգուշորեն բռնեց ատամներով ու վազեց թիթեռի հետևից։`) directly performs the actual SELECTED_CHOICE `Ա: հետևել դեղին թիթեռին` (the operator-overridden Turn 2 invented choice). Rule F held against the actual selection; the package's planned `Բ: մնալ այգում...` was bypassed because Turn 2 didn't emit that choice in the first place.
+- `smallProblem` (`արագիլը չի գտնում հանգստանալու տեղը`) resolved within the turn — the stork lands and rests in the woven-branches nest. Resolution flavour matches `plan.resolutionStyle` (`լուծումը գալիս է փոքրիկ նվեր մատուցելուց`) via the apple-gift sequence (the stork drops an apple to the dog).
+- Closure ends in a natural narrative sentence (`...իսկ վերևում արագիլը հանգիստ շնչում էր իր նոր տեղում։`) — no `Վերջ։` line, no cliffhanger, no Areg-asks-the-child question. Rule § 5 held.
+- Claude.app duplicated-sentence-trio artefact at the start of the turn (same shape as Turn 2). Pending API confirmation.
+- ~155 Armenian words after normalization; **exceeds the 70–110 closure budget by ~50%.** C13 FAIL — closure ran long. v3.1 should tighten this.
+- Plan adherence: hero (շնիկ), magicalObject (ցողի կաթիլներով տերև — placed on the grass before the stork lands), place (խնձորենու այգի), smallProblem (resolved), goal, mood. friendOrGuide (շուն) is referenced obliquely as `տատիկ-շան` from Turn 1's frame; the cat is not in this plan.
 
 **v3 pass / fail (Turn 3 — load-bearing)** — see § 8.
 
 | # | Check | Pass / fail |
 |---|---|---|
-| C2 | No moralizing dialogue | _ |
-| C3 | No duplicate sentence in turn | _ |
-| C4 | Age-4 simple language | _ |
-| C5 | Plan adherence (incl. resolutionStyle) | _ |
-| C9 | **Turn 3 contains NO choice block (no `Ա: ` / `Բ: ` lines)** | _ |
-| C10 | First sentence performs SELECTED_CHOICE Բ | _ |
-| C11 | smallProblem resolved within turn | _ |
-| C12 | Ends in natural last sentence or `Վերջ։` | _ |
-| C13 | Length 70–110 words | _ |
+| C2 | No moralizing dialogue | **PASS** |
+| C3 | No duplicate sentence in turn | **FAIL** (Claude.app artefact at opening) |
+| C4 | Age-4 simple language | **PASS** |
+| C5 | Plan adherence (incl. resolutionStyle) | **PASS** |
+| C9 | **Turn 3 contains NO choice block (no `Ա: ` / `Բ: ` lines)** | **PASS — load-bearing v3 success** |
+| C10 | First sentence performs SELECTED_CHOICE | **PASS** (against actual selected `Ա: հետևել դեղին թիթեռին`) |
+| C11 | smallProblem resolved within turn | **PASS** |
+| C12 | Ends in natural last sentence or `Վերջ։` | **PASS** (natural last sentence) |
+| C13 | Length 70–110 words | **FAIL** (~155 words; ~50% over budget) |
 
 ---
 
@@ -741,6 +799,135 @@ sufficient.
 **Decision rule:** A v3 capture passes iff **every** check in
 the table marks pass. C9 is the strictest — its failure is
 what § 9 routes around.
+
+---
+
+## 8a. Overall verdict — v3 Plan A capture (2026-05-04)
+
+Hayk's manual capture of writer prompt v3 against Plan A /
+age-4-simple #17 in Claude.app, three turns. Outcome:
+**partial success — the bounded-arc rule landed (C9 PASS) but
+several weaknesses block API / runtime use until v3.1.**
+
+### Improvements (vs v2)
+
+1. **Turn 1 did NOT start with `Մի անգամ`.** Rule A held —
+   opens with `Խնձորենու այգում արևի տաք շողը...`, place-
+   anchored.
+2. **Turn 1 used exact `Ա: ` / `Բ: ` choice format**, with
+   both choices matching `plan.choiceA` / `plan.choiceB`
+   byte-for-byte. Rule B held on Turn 1.
+3. **Tone and Armenian quality good for age-4** across all
+   three turns — natural spoken register, simple sentences,
+   warm tatik-narrator framing on Turn 1.
+4. **No moral lecture in any turn.** Rule C held even with
+   the tatik elder character on Turn 1 (vs v1 where the same
+   plan produced `Ամենահամեղ խնձորը նա է, որ կիսում ես
+   սիրելիի հետ`).
+5. **Turn 3 ended with closure and NO new choice block.**
+   The bounded-arc rule worked. **C9 PASS — this is the
+   load-bearing v3 result.**
+
+### Failures / weaknesses
+
+1. **Turn 1 place anchor is unreliable.** Hayk noted that an
+   earlier v3 attempt drifted from `plan.place` ("opened in
+   `կանաչ բացատ` instead of directly in `խնձորենու այգի`").
+   The captured run in § 7A opens cleanly in `Խնձորենու
+   այգում`, but the variance itself is the v3.1 issue: the
+   place-anchor rule wording is loose enough that the model
+   sometimes drifts.
+2. **Turn 2 ignored the BREAK-GLASS choice block.** Prompt
+   forced the semantic directions `Ա: ուղեկցել արագիլին
+   մինչև երկնքի եզրը` / `Բ: մնալ այգում և նայել, թե
+   ինչպես է արագիլը թռչում տուն`. Model emitted unrelated
+   `Ա: հետևել դեղին թիթեռին` / `Բ: քայլել փոքրիկ արահետով`.
+   The break-glass instruction wording was not strong enough.
+3. **Claude.app duplicated-sentence-trio artefact still
+   present** on Turn 2 and Turn 3 (same shape v1 / v2
+   showed). Treated as UI-side rendering artefact pending
+   API confirmation; v3 changed nothing relevant.
+4. **Meta-output line leaked** in Turn 2 raw:
+   `Շարունակեց հեքիաթը՝ ստեղծելով կախարդական պահ և նոր
+   ընտրանքներ։`. This appeared **twice**, interleaved with
+   the duplicated sentence-trio. **This must NEVER appear in
+   Areg's user-facing output** — it is internal-narrator
+   commentary the model leaked through. v3 has no rule
+   against it; v3.1 needs an explicit anti-meta rule.
+
+### Rubric — overall v3 Plan A
+
+| Dimension | Score |
+|---|---|
+| Armenian naturalness | 4 / 5 |
+| Eastern Armenian correctness | 4 / 5 |
+| Fairy-tale feeling | 4 / 5 |
+| Warmth for age target | 4.5 / 5 |
+| Age-profile fit | 4.5 / 5 |
+| Length / pacing | 4 / 5 |
+| Choice quality | 3 / 5 |
+| Plan adherence | 3.5 / 5 |
+| Bounded arc / stop condition | **pass** |
+| Safety / age appropriateness | pass |
+| Would I let Areg say this aloud? | **yes — but only after normalization (strip the duplicate-sentence-trio + meta line) and v3.1 fixes** |
+
+### v3 pass / fail (consolidated)
+
+Maps the per-turn checks in § 8 plus a new
+**C14 — no meta-output** which v3 was missing.
+
+| # | Check | Pass / fail |
+|---|---|---|
+| C1 | No forbidden opener | **PASS** |
+| — | Exact choice format Turn 1 | **PASS** (verbatim plan.choiceA / plan.choiceB) |
+| — | Exact choice format Turn 2 | **FAIL** (BREAK-GLASS ignored — see § 7B) |
+| C2 | No moralizing | **PASS** |
+| C7 / C8c / C13 | Length within budget | **PASS-ish** (Turn 3 overshoots: ~155 words vs 70–110 target) |
+| C3 | No duplicate sentence within turn | **FAIL** (Claude.app artefact on Turn 2 + Turn 3) |
+| C8a / C10 | Selected choice followed | **PASS** (Turn 2 + Turn 3 first sentences perform the chosen action) |
+| C9 | Final turn has no choice block | **PASS — load-bearing v3 success** |
+| C14 | No meta-output line | **FAIL** (Turn 2 leaked `Շարունակեց հեքիաթը՝...`) |
+
+### Verdict
+
+**v3 proves the bounded-arc rule works.** C9 PASS is the
+load-bearing claim and it held. v3 is therefore a real
+improvement over v2 on the most serious issue. **But v3.1 is
+needed before any API or runtime testing**, with three
+specific fixes:
+
+1. **Harden Turn 2's exact-choice contract.** Either make the
+   BREAK-GLASS block use a positive output-example pattern
+   (show the model exactly what those two lines must look
+   like, byte-for-byte), or accept that Turn 2 choices are
+   model-generated and drop the BREAK-GLASS attempt for
+   that turn. Hayk's preference is the former — keep
+   determinism, harden the wording.
+2. **Forbid meta-continuation text** with an explicit rule
+   listing the exact strings to avoid (`Շարունակեց հեքիաթը...`,
+   `As an AI...`, `Note:`, `Continued:`, etc.) and a
+   positive output-example showing the prose ending without
+   any narrator-commentary suffix. This is the new C14
+   check.
+3. **Strengthen Turn 1's place anchor.** Tighten the rule
+   wording so the opening sentence MUST reference plan.place
+   (or a plan.place-derived phrase) within the first ~10
+   words. Reduces the "started in `կանաչ բացատ`" variance
+   Hayk observed across attempts.
+
+The duplicated-sentence-trio artefact stays unresolved on
+the Claude.app surface; the API run remains the load-bearing
+follow-up for that question, but it is **not blocked by
+v3.1** — a v3.1 capture will still show the artefact on
+Claude.app, and the API run is what tells us whether it is
+UI-side or model-side.
+
+The decision in § 9 below maps the actual outcome to
+**branch 2** — *C9 passed, other checks failed, next
+iteration is v3.1 prompt tweaks*. No production / runtime
+change is gated on this slice. ChatService and
+`system-prompt.txt` stay unaffected. Provider selection in
+production stays on OpenAI.
 
 ---
 
