@@ -173,6 +173,8 @@ node tools/StoryModelBakeoff/generate-story-plan.js --count 3
 node tools/StoryModelBakeoff/generate-story-plan.js --count 5 --seed 123
 node tools/StoryModelBakeoff/generate-story-plan.js \
   --count 3 --seed 123 --age-profile age-5-balanced
+node tools/StoryModelBakeoff/generate-story-plan.js \
+  --count 3 --seed 123 --with-names
 ```
 
 Defaults: one plan, non-deterministic (`Math.random`). With
@@ -185,6 +187,41 @@ generated plan to a specific entry from
 `age-6-story-rich`, `age-7-richer`). Without the flag, each plan
 draws an `ageToneProfile` independently. An unknown label exits
 non-zero with the available labels listed.
+
+`--with-names` (boolean, opt-in) wires
+[`story-character-names.v1.json`](./story-character-names.v1.json)
+into plan generation. Each emitted plan carries two extra string
+fields, positioned right after the animal they name:
+
+- `heroName` — drawn from `animalNames[hero]` when that list is
+  non-empty, else from `sharedNames` as a fallback.
+- `friendOrGuideName` — drawn from `animalNames[friendOrGuide]`
+  with the same `sharedNames` fallback. If the first draw equals
+  `heroName` it is redrawn once from the friend's pool; if still
+  equal, the friend's name comes from `sharedNames` minus
+  `heroName`. If even that pool is empty the generator exits
+  non-zero with a clear `name-collision: ...` error.
+
+**Default stays nameless.** Without the flag the generator emits
+the same 17-field plan it always has. The validator
+(`validate-story-plan.js`) treats `heroName` and `friendOrGuideName`
+as **optional** — older plan files without names continue to
+PASS.
+
+**Determinism caveat.** Names are drawn LAST inside each
+`buildPlan()`, so plan 1's non-name fields are byte-identical
+between `--seed N` and `--seed N --with-names`. Across plans 2…N
+the per-plan name draws shift the RNG state, so non-name fields
+do diverge. This is documented in
+[`evaluations/character-name-wiring-plan-20260503.md`](./evaluations/character-name-wiring-plan-20260503.md) § 3.3.
+
+> **Bank cleanup pre-condition.** The current
+> `story-character-names.v1.json` still carries names that need
+> Hayk's native-ear review (see
+> [`evaluations/character-name-native-review-20260503.md`](./evaluations/character-name-native-review-20260503.md)).
+> `--with-names` works against today's bank, but plans whose
+> evidence value depends on the bank reading natively to a
+> 5-year-old should wait until that review lands.
 
 > **Generator now consumes story-control attributes.** Each
 > emitted plan carries the original content fields plus

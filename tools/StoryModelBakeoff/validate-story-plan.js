@@ -12,6 +12,13 @@
 // consistency rules. Reports per-plan PASS/FAIL with errors and
 // lightweight warnings; exits 0 if no errors, 1 otherwise.
 //
+// Optional fields (per evaluations/character-name-wiring-plan-20260503.md):
+// `heroName` and `friendOrGuideName`. Half-state allowed. When
+// present, each must be a non-empty string in
+// animalNames[<corresponding-animal-field>] ∪ sharedNames, and
+// the two names must differ. Older 17-field plans that omit these
+// fields continue to PASS.
+//
 // Usage:
 //   node tools/StoryModelBakeoff/generate-story-plan.js --count 10 --seed 123 \
 //     | node tools/StoryModelBakeoff/validate-story-plan.js
@@ -23,6 +30,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SEED_BANK_PATH = path.resolve(__dirname, 'story-seed-bank.v1.json');
+const NAMES_BANK_PATH = path.resolve(__dirname, 'story-character-names.v1.json');
 
 // Load the seed bank for membership + guardrail checks.
 let seedBank;
@@ -36,6 +44,28 @@ const palettes = seedBank && seedBank.palettes;
 if (!palettes || typeof palettes !== 'object') {
   console.error('FAIL: seed bank has no palettes object.');
   process.exit(1);
+}
+
+// Load the character name bank if it exists. Optional — only fails
+// per-plan when a plan actually carries heroName / friendOrGuideName
+// AND the bank is missing or malformed.
+// See evaluations/character-name-wiring-plan-20260503.md § 5.3.
+let namesBank = null;
+let namesBankError = null;
+if (fs.existsSync(NAMES_BANK_PATH)) {
+  try {
+    namesBank = JSON.parse(fs.readFileSync(NAMES_BANK_PATH, 'utf8'));
+  } catch (e) {
+    namesBankError = 'parse error: ' + e.message;
+  }
+  if (namesBank
+      && (typeof namesBank.animalNames !== 'object'
+          || Array.isArray(namesBank.animalNames))) {
+    namesBankError = 'animalNames missing or not an object';
+    namesBank = null;
+  }
+} else {
+  namesBankError = 'file not found at ' + NAMES_BANK_PATH;
 }
 
 // ---- constants ----
@@ -366,6 +396,46 @@ function validatePlan(plan, idx) {
   if (isNonEmptyString(plan.choiceA) && isNonEmptyString(plan.choiceB)
       && plan.choiceA === plan.choiceB) {
     errors.push('choiceA and choiceB are identical');
+  }
+
+  // Optional character-name fields per
+  // evaluations/character-name-wiring-plan-20260503.md § 5.
+  // Both fields are optional at the wire shape; half-state allowed.
+  function checkOptionalName(field, animalField) {
+    if (!(field in plan)) return; // optional — absence is fine
+    const v = plan[field];
+    if (typeof v !== 'string' || v.trim().length === 0) {
+      errors.push(`${field} is present but not a non-empty string`);
+      return;
+    }
+    // Membership check requires the name bank.
+    if (!namesBank) {
+      errors.push(
+        `${field} present but character name bank is unavailable ` +
+        `(${namesBankError}); cannot validate membership`
+      );
+      return;
+    }
+    const animal = plan[animalField];
+    if (!isNonEmptyString(animal)) return; // animal-field check fires elsewhere
+    const perAnimal = Array.isArray(namesBank.animalNames[animal])
+      ? namesBank.animalNames[animal] : [];
+    const shared = Array.isArray(namesBank.sharedNames)
+      ? namesBank.sharedNames : [];
+    const allowed = new Set([...perAnimal, ...shared]);
+    if (!allowed.has(v)) {
+      errors.push(
+        `${field} "${v}" not in animalNames["${animal}"] ∪ sharedNames`
+      );
+    }
+  }
+  checkOptionalName('heroName', 'hero');
+  checkOptionalName('friendOrGuideName', 'friendOrGuide');
+  if ('heroName' in plan && 'friendOrGuideName' in plan
+      && isNonEmptyString(plan.heroName)
+      && isNonEmptyString(plan.friendOrGuideName)
+      && plan.heroName === plan.friendOrGuideName) {
+    errors.push('heroName and friendOrGuideName are identical');
   }
 
   return { idx, errors, warnings, pass: errors.length === 0 };

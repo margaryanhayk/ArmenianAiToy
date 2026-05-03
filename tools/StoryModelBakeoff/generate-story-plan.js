@@ -13,6 +13,9 @@
 //   node tools/StoryModelBakeoff/generate-story-plan.js --count 5 --seed 123
 //   node tools/StoryModelBakeoff/generate-story-plan.js \
 //     --count 3 --seed 123 --age-profile age-5-balanced
+//   node tools/StoryModelBakeoff/generate-story-plan.js --with-names
+//   node tools/StoryModelBakeoff/generate-story-plan.js \
+//     --count 3 --seed 123 --with-names
 //
 // Plan shape (now consumes the seed bank's story-control attributes
 // in addition to the original content palettes; see
@@ -54,6 +57,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SEED_BANK_PATH = path.resolve(__dirname, 'story-seed-bank.v1.json');
+const NAMES_BANK_PATH = path.resolve(__dirname, 'story-character-names.v1.json');
 
 // ---- args ----
 const args = process.argv.slice(2);
@@ -66,6 +70,7 @@ function flag(name) {
 const countArg = flag('--count');
 const seedArg = flag('--seed');
 const ageProfileArg = flag('--age-profile');
+const withNames = args.includes('--with-names');
 
 const count = countArg === null
   ? 1
@@ -160,6 +165,29 @@ if (!Array.isArray(palettes.ageToneProfiles) || palettes.ageToneProfiles.length 
   console.error('Seed bank missing or empty palettes.ageToneProfiles');
   console.error('Run: node tools/StoryModelBakeoff/validate-seed-bank.js');
   process.exit(1);
+}
+
+// ---- optional character name bank (loaded only when --with-names set) ----
+let namesBank = null;
+if (withNames) {
+  if (!fs.existsSync(NAMES_BANK_PATH)) {
+    console.error('Character name bank not found: ' + NAMES_BANK_PATH);
+    console.error('Run: node tools/StoryModelBakeoff/validate-character-names.js');
+    process.exit(1);
+  }
+  try {
+    namesBank = JSON.parse(fs.readFileSync(NAMES_BANK_PATH, 'utf8'));
+  } catch (e) {
+    console.error('Character name bank parse error: ' + e.message);
+    process.exit(1);
+  }
+  if (!namesBank
+      || typeof namesBank.animalNames !== 'object'
+      || Array.isArray(namesBank.animalNames)) {
+    console.error('Character name bank missing or malformed animalNames');
+    console.error('Run: node tools/StoryModelBakeoff/validate-character-names.js');
+    process.exit(1);
+  }
 }
 
 // ---- defensive animal pool ----
@@ -290,6 +318,72 @@ function placeActions(place) {
   return out;
 }
 
+// ---- character-name draw helpers (only used when --with-names) ----
+//
+// Source / fallback rules per
+// `evaluations/character-name-wiring-plan-20260503.md` § 3.1:
+//   primary  = animalNames[animal] (when non-empty)
+//   fallback = sharedNames (only when primary is missing or empty)
+//
+// Collision rules per § 3.2:
+//   redraw friend once from friend's primary pool;
+//   if still equal, draw friend from sharedNames excluding heroName;
+//   if exhausted, throw a clear error (no numeric suffixes).
+function namePoolFor(animal) {
+  const arr = namesBank.animalNames[animal];
+  if (Array.isArray(arr)) {
+    const filtered = arr.filter(
+      (v) => typeof v === 'string' && v.trim().length > 0
+    );
+    if (filtered.length > 0) return filtered;
+  }
+  if (Array.isArray(namesBank.sharedNames)) {
+    const shared = namesBank.sharedNames.filter(
+      (v) => typeof v === 'string' && v.trim().length > 0
+    );
+    if (shared.length > 0) return shared;
+  }
+  return [];
+}
+
+function pickNamesPair(hero, friend) {
+  const heroPool = namePoolFor(hero);
+  if (heroPool.length === 0) {
+    throw new Error(
+      'No names available for hero "' + hero +
+      '" (per-animal list empty and sharedNames empty)'
+    );
+  }
+  const heroName = pick(heroPool);
+
+  const friendPool = namePoolFor(friend);
+  if (friendPool.length === 0) {
+    throw new Error(
+      'No names available for friend "' + friend +
+      '" (per-animal list empty and sharedNames empty)'
+    );
+  }
+  let friendName = pick(friendPool);
+  if (friendName === heroName) {
+    friendName = pick(friendPool); // redraw once
+  }
+  if (friendName === heroName) {
+    const sharedMinusHero = (
+      Array.isArray(namesBank.sharedNames) ? namesBank.sharedNames : []
+    ).filter(
+      (v) => typeof v === 'string' && v.trim().length > 0 && v !== heroName
+    );
+    if (sharedMinusHero.length === 0) {
+      throw new Error(
+        'name-collision: heroName "' + heroName +
+        '" + friendOrGuideName pool exhausted'
+      );
+    }
+    friendName = pick(sharedMinusHero);
+  }
+  return { heroName, friendName };
+}
+
 // ---- plan builder ----
 function buildPlan() {
   const hero = pick(safeAnimals);
@@ -316,12 +410,28 @@ function buildPlan() {
   const choiceAObj = aIsPlace ? plcChoice : objChoice;
   const choiceBObj = aIsPlace ? objChoice : plcChoice;
 
+  // Names are drawn LAST per character-name-wiring-plan-20260503.md
+  // § 3.3 so the first plan in a run has identical non-name fields
+  // whether or not --with-names is set; the per-plan name draws
+  // shift downstream RNG state across plans 2…N (documented).
+  let heroName = null;
+  let friendName = null;
+  if (withNames) {
+    const pair = pickNamesPair(hero, friend);
+    heroName = pair.heroName;
+    friendName = pair.friendName;
+  }
+
   // Field order is contractual — this is the shape consumers / the
   // experiment markdown reference. Do not reorder without a slice.
+  // Optional name fields, when present, are positioned right after
+  // the animal field they name (per design § 2).
   return {
     hero,
+    ...(withNames ? { heroName } : {}),
     heroTrait,
     friendOrGuide: friend,
+    ...(withNames ? { friendOrGuideName: friendName } : {}),
     relationship,
     place,
     mood,
