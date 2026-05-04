@@ -896,14 +896,15 @@ including any duplicated-sentence-pair artefact. Use the
 *Normalized Areg output* slot for the post-fixup version
 (collapsed duplicates if present, no other edits).
 
-### 10A. Turn 1 — Claude consumer app (v3.1, Plan D)
+### 10A. Turn 1 — Claude.app single-prompt recovery capture (v3.1, Plan D)
 
 | Field | Value |
 |---|---|
 | Provider | claude |
 | Source | app (claude.ai) |
-| Model label | <TODO: capture-time model label> |
-| Captured (UTC) | <TODO: capture date/time> |
+| Capture protocol | **single-prompt recovery format** — NOT the original three-prompt § 7 / § 8 / § 9 protocol; an earlier interactive attempt was invalid and Hayk used a simplified single-prompt recovery capture that asked Claude.app to output `TURN 1 RAW` / `TURN 2 RAW` / `TURN 3 RAW` together |
+| Model label | Claude (consumer app default at capture time) — single-prompt recovery |
+| Captured (UTC) | 2026-05-04 (recovery capture, single-prompt format) |
 | Reviewer | Hayk |
 | Decoding | (unobservable — app default) |
 | TURN_INDEX | 1 |
@@ -913,41 +914,80 @@ including any duplicated-sentence-pair artefact. Use the
 **Raw output**
 
 ```text
-<TODO: paste raw Claude.app output here>
+Հին կամուրջի տակ, որտեղ փայտը բուրում էր հնությամբ ու ձմռան լռությամբ, ապրում էր մի փոքրիկ մողես։ Նա ամեն ինչին զարմանում էր՝ ձյան փաթիլներին, սառցե ծայրերին, նույնիսկ իր սեփական պոչին։ Այդ օրը, սակայն, նա ավելի շատ էր զարմացած, քան երբևէ։
+
+Կամուրջի վրա, ձյան կույտի կողքին, կծկված նստած էր մի բադիկ։ Աչքերը կլոր, բութ, վախեցած։
+
+— Ինչ կա, — հարցրեց մողեսը։
+
+— Առվակը լռել է, — շշնջաց բադիկը։ — Ձյունը չի հալվում, ջուրը չի երգում։ Ես վախենում եմ, որ այն ընդմիշտ քնեց։
+
+Մողեսը նայեց ներքև։ Առվակը, ճիշտ է, լուռ էր։ Ձյունն ամուր նստած էր ափերին, ծաղիկները՝ թաղված, ձայն չկար։
+
+Հենց այդ ժամանակ մողեսի ոտքին ինչ-որ բան շոշափվեց. մի հին, ծանր, կախարդական բանալի, որ քնած էր ձյան տակ՝ կիսածածկ, կիսամոռացված։ Նա վերցրեց այն։ Բանալին տաք էր, թեև ձյունի մեջ էր պառկած։
+
+Ա: տանել քնած բանալին ընկերոջ մոտ
+Բ: կանգնել ու լսել հին կամուրջ-ի ձայները
 ```
 
 **Normalized Areg output**
 
+(Identical to raw — no Claude.app duplicated-sentence-pair artefact and no meta-output line on this turn. Per § 10d, the recovery-capture format may itself partially explain the absent artefact, since the single-prompt flow doesn't trigger continuation rendering.)
+
 ```text
-<TODO: paste normalized output (duplicates collapsed, meta-line stripped) here>
+Հին կամուրջի տակ, որտեղ փայտը բուրում էր հնությամբ ու ձմռան լռությամբ, ապրում էր մի փոքրիկ մողես։ Նա ամեն ինչին զարմանում էր՝ ձյան փաթիլներին, սառցե ծայրերին, նույնիսկ իր սեփական պոչին։ Այդ օրը, սակայն, նա ավելի շատ էր զարմացած, քան երբևէ։
+
+Կամուրջի վրա, ձյան կույտի կողքին, կծկված նստած էր մի բադիկ։ Աչքերը կլոր, բութ, վախեցած։
+
+— Ինչ կա, — հարցրեց մողեսը։
+
+— Առվակը լռել է, — շշնջաց բադիկը։ — Ձյունը չի հալվում, ջուրը չի երգում։ Ես վախենում եմ, որ այն ընդմիշտ քնեց։
+
+Մողեսը նայեց ներքև։ Առվակը, ճիշտ է, լուռ էր։ Ձյունն ամուր նստած էր ափերին, ծաղիկները՝ թաղված, ձայն չկար։
+
+Հենց այդ ժամանակ մողեսի ոտքին ինչ-որ բան շոշափվեց. մի հին, ծանր, կախարդական բանալի, որ քնած էր ձյան տակ՝ կիսածածկ, կիսամոռացված։ Նա վերցրեց այն։ Բանալին տաք էր, թեև ձյունի մեջ էր պառկած։
+
+Ա: տանել քնած բանալին ընկերոջ մոտ
+Բ: կանգնել ու լսել հին կամուրջ-ի ձայները
 ```
 
 **Notes**
 
-- <TODO: per-turn observations after capture>
+- **C16 PASS — load-bearing for v3.1 on Plan D.** First sentence opens with `Հին կամուրջի տակ` — the required `հին կամուրջ` stem is in the first three words, schwa-not-dropped. The C16 hardening rule held even under the simplified recovery-capture flow.
+- **C14 PASS** — no meta-output line. No `Շարունակեց հեքիաթը...` or `Note:` or any narrator-commentary suffix.
+- **C6 PASS** — both choice lines match `plan.choiceA` / `plan.choiceB` byte-for-byte: `Ա: տանել քնած բանալին ընկերոջ մոտ` / `Բ: կանգնել ու լսել հին կամուրջ-ի ձայները` (including the literal `-ի` hyphen-suffix on `հին կամուրջ-ի`).
+- No `Մի անգամ` / `Մի գեղեցիկ օր` opener; rule A held. C1 PASS.
+- No moralizing tatik-style aphorism in this turn. C2 PASS.
+- ~125 Armenian words; **slightly under** the 130–180 budget (5w below). Marked NEAR-PASS on C7. The recovery-capture single-prompt format may have flattened the per-turn budget pressure.
+- No Claude.app duplicated-sentence-pair artefact on the initial turn (artefact has historically only appeared on continuations).
+- Plan adherence: hero (`մողես`), friendOrGuide (`բադիկ`), place (`Հին կամուրջի տակ`), magicalObject (`քնած բանալի`), smallProblem (`Առվակը լռել է, ... Ձյունը չի հալվում, ջուրը չի երգում`), mood (`ձմռան լռությամբ` echoes `ձմեռային մեղմ`), goal-shape (`ինչու է առվակի ձայնը կորել` ↔ `օգնել առվակին նորից երգել`). C5 PASS.
+- *Native-ear concern:* `Աչքերը կլոր, բութ, վախեցած` — `բութ` (blunt/dull) is awkward for eyes; native Armenian usually pairs eye-state with `անշարժ`, `քարացած`, `սարսափով լի`, etc. Recorded in § 10d weaknesses #2.
+- *Native-ear concern:* `ձյունի մեջ` — Eastern Armenian preferred form is `ձյան մեջ` (suppletive genitive). Recorded in § 10d weaknesses #3.
+- Recovery-capture caveat: this slot was filled from a single-prompt session that did NOT exercise the original `{{TURN_1_OUTPUT}}` → `{{TURN_2_OUTPUT}}` placeholder workflow. The Turn-1-only behaviour observed here is therefore not directly comparable to a clean § 7 prompt run; treat as suggestive evidence, not as protocol-compliant.
 
 **v3.1 pass / fail (Turn 1)**
 
 | # | Check | Pass / fail |
 |---|---|---|
-| C1 | No forbidden opener | _ |
-| C2 | No moralizing dialogue | _ |
-| C3 | No duplicate sentence in turn | _ |
-| C4 | Age-7 register (light poetry, concrete imagery) | _ |
-| C5 | Plan adherence (atoms visible) | _ |
-| C6 | Exact `Ա: ` / `Բ: ` choices verbatim from plan (incl. `հին կամուրջ-ի` hyphen) | _ |
-| C7 | Length 130–180 words | _ |
-| **C14** | **No meta-output line** | _ |
-| **C16** | **First sentence includes `հին կամուրջ` stem (nominative or definite, schwa-not-dropped)** | _ |
+| C1 | No forbidden opener | **PASS** |
+| C2 | No moralizing dialogue | **PASS** |
+| C3 | No duplicate sentence in turn | **PASS** |
+| C4 | Age-7 register (light poetry, concrete imagery) | **PASS** |
+| C5 | Plan adherence (atoms visible) | **PASS** |
+| C6 | Exact `Ա: ` / `Բ: ` choices verbatim from plan (incl. `հին կամուրջ-ի` hyphen) | **PASS** |
+| C7 | Length 130–180 words | **NEAR-PASS** (~125 words; 5w below budget) |
+| **C14** | **No meta-output line** | **PASS** |
+| **C16** | **First sentence includes `հին կամուրջ` stem (nominative or definite, schwa-not-dropped)** | **PASS** (`Հին կամուրջի տակ` opens the turn) |
 
-### 10B. Turn 2 — Claude consumer app (v3.1, Plan D)
+### 10B. Turn 2 — Claude.app single-prompt recovery capture (v3.1, Plan D)
 
 | Field | Value |
 |---|---|
 | Provider | claude |
 | Source | app (claude.ai) |
-| Model label | <TODO: capture-time model label> |
-| Captured (UTC) | <TODO: capture date/time> |
+| Capture protocol | **single-prompt recovery format** — emitted as part of the same combined `TURN 1 RAW` / `TURN 2 RAW` / `TURN 3 RAW` response; not a fresh § 8 prompt with `{{TURN_1_OUTPUT}}` substitution |
+| Model label | Claude (consumer app default at capture time) — single-prompt recovery |
+| Captured (UTC) | 2026-05-04 (recovery capture, single-prompt format) |
 | Reviewer | Hayk |
 | Decoding | (unobservable — app default) |
 | TURN_INDEX | 2 |
@@ -957,40 +997,85 @@ including any duplicated-sentence-pair artefact. Use the
 **Raw output**
 
 ```text
-<TODO: paste raw Claude.app output here>
+Մողեսը մոտեցավ բադիկին և դրեց քնած բանալին նրա ոտքերի մոտ։
+
+Բադիկը ծռեց գլուխը։ Նայեց բանալուն, հետո՝ մողեսին։
+
+— Ի՞նչ է սա, — հարցրեց նա շշուկով, կարծես վախենում էր արթնացնել ինչ-որ բան։
+
+— Չգիտեմ, — ազնվորեն ասաց մողեսը։ — Բայց ձեռքիս մեջ տաք էր։
+
+Բադիկը մի մատով դիպավ բանալուն։ Ոչ մի բան չեղավ։ Հետո դարձյալ։ Ոչ մի բան։ Բայց ձյան մեջ ինչ-որ տեղ, շատ խորը, ինչ-որ բան փոքր-ինչ շարժվեց, ինչպես երազի մեջ շնչելը։
+
+Բույրն ավելի ուժեղացավ՝ հին փայտի ու գրեթե մոռացված ծաղիկների խառը հոտ։
+
+Բադիկն արդեն այնքան չէր վախենում։ Նա մողեսի կողքին էր, և կողքին լինելն արդեն ինչ-որ բան էր փոխել։ Բայց առվակը դեռ լռում էր։
+
+Ա: փորձել արթնացնել քնած բանալին մեղմ շշունջով
+Բ: համբերել ու լսել հին կամուրջի տակ առվակի շշուկը
 ```
 
 **Normalized Areg output**
 
+(Identical to raw — no Claude.app duplicated-sentence-pair artefact on this turn under the single-prompt recovery capture, and no meta-output line.)
+
 ```text
-<TODO: paste normalized output here>
+Մողեսը մոտեցավ բադիկին և դրեց քնած բանալին նրա ոտքերի մոտ։
+
+Բադիկը ծռեց գլուխը։ Նայեց բանալուն, հետո՝ մողեսին։
+
+— Ի՞նչ է սա, — հարցրեց նա շշուկով, կարծես վախենում էր արթնացնել ինչ-որ բան։
+
+— Չգիտեմ, — ազնվորեն ասաց մողեսը։ — Բայց ձեռքիս մեջ տաք էր։
+
+Բադիկը մի մատով դիպավ բանալուն։ Ոչ մի բան չեղավ։ Հետո դարձյալ։ Ոչ մի բան։ Բայց ձյան մեջ ինչ-որ տեղ, շատ խորը, ինչ-որ բան փոքր-ինչ շարժվեց, ինչպես երազի մեջ շնչելը։
+
+Բույրն ավելի ուժեղացավ՝ հին փայտի ու գրեթե մոռացված ծաղիկների խառը հոտ։
+
+Բադիկն արդեն այնքան չէր վախենում։ Նա մողեսի կողքին էր, և կողքին լինելն արդեն ինչ-որ բան էր փոխել։ Բայց առվակը դեռ լռում էր։
+
+Ա: փորձել արթնացնել քնած բանալին մեղմ շշունջով
+Բ: համբերել ու լսել հին կամուրջի տակ առվակի շշուկը
 ```
 
 **Notes**
 
-- <TODO: per-turn observations after capture>
+- **C15 PASS — load-bearing v3.1 fix carries through to Plan D.** Turn 2 emits the BREAK-GLASS pair byte-for-byte:
+  ```
+  Ա: փորձել արթնացնել քնած բանալին մեղմ շշունջով
+  Բ: համբերել ու լսել հին կամուրջի տակ առվակի շշուկը
+  ```
+  No invented choices, no paraphrase, no reorder. The byte-for-byte rule + positive/negative example pair held under the recovery format too.
+- **C14 PASS** — no meta-output line.
+- **C8a PASS** — first sentence (`Մողեսը մոտեցավ բադիկին և դրեց քնած բանալին նրա ոտքերի մոտ։`) directly performs the chosen `Ա: տանել քնած բանալին ընկերոջ մոտ`. Rule F held; no recap of Turn 1.
+- **C3 PASS** — no Claude.app duplicated-sentence-trio artefact at the start of this continuation.
+- ~100 Armenian words; at the lower edge of the 100–140 budget. C8c PASS but tight.
+- `smallProblem` advances toward resolution without resolving — the key gives a tiny "something inside a dream breath" cue but doesn't open the brook yet. Plan-shape held for Turn 3.
+- Plan adherence: `հին փայտի ու գրեթե մոռացված ծաղիկների խառը հոտ` echoes both seed-bank `sensoryDetails` (`հին փայտի բույր` + `քնած ծաղիկների հոտ`). C5 PASS.
+- *Quiet emotional beat lands without aphorism:* `Բադիկն արդեն այնքան չէր վախենում։ Նա մողեսի կողքին էր, և կողքին լինելն արդեն ինչ-որ բան էր փոխել։` — concrete and child-readable; no "Ընկերության սիրտը գիտի..." style sentence. C2 PASS.
 
 **v3.1 pass / fail (Turn 2)**
 
 | # | Check | Pass / fail |
 |---|---|---|
-| C2 | No moralizing dialogue | _ |
-| C3 | No duplicate sentence in turn | _ |
-| C4 | Age-7 register | _ |
-| C5 | Plan adherence | _ |
-| C8a | First sentence performs SELECTED_CHOICE Ա | _ |
-| C8c | Length 100–140 words | _ |
-| **C14** | **No meta-output line** | _ |
-| **C15** | **Turn 2 BREAK-GLASS choices copied byte-for-byte** | _ |
+| C2 | No moralizing dialogue | **PASS** |
+| C3 | No duplicate sentence in turn | **PASS** (no Claude.app artefact this run) |
+| C4 | Age-7 register | **PASS** |
+| C5 | Plan adherence | **PASS** |
+| C8a | First sentence performs SELECTED_CHOICE Ա | **PASS** |
+| C8c | Length 100–140 words | **PASS** (~100 words; lower edge) |
+| **C14** | **No meta-output line** | **PASS** |
+| **C15** | **Turn 2 BREAK-GLASS choices copied byte-for-byte** | **PASS** |
 
-### 10C. Turn 3 — Claude consumer app (v3.1, Plan D, load-bearing)
+### 10C. Turn 3 — Claude.app single-prompt recovery capture (v3.1, Plan D, load-bearing)
 
 | Field | Value |
 |---|---|
 | Provider | claude |
 | Source | app (claude.ai) |
-| Model label | <TODO: capture-time model label> |
-| Captured (UTC) | <TODO: capture date/time> |
+| Capture protocol | **single-prompt recovery format** — emitted as the third labeled block in the same combined response; not a fresh § 9 prompt with `{{TURN_1_OUTPUT}}` + `{{TURN_2_OUTPUT}}` substitution |
+| Model label | Claude (consumer app default at capture time) — single-prompt recovery |
+| Captured (UTC) | 2026-05-04 (recovery capture, single-prompt format) |
 | Reviewer | Hayk |
 | Decoding | (unobservable — app default) |
 | TURN_INDEX | 3 |
@@ -1000,59 +1085,224 @@ including any duplicated-sentence-pair artefact. Use the
 **Raw output**
 
 ```text
-<TODO: paste raw Claude.app output here>
+Մողեսը նստեց կամուրջի եզրին, կախեց ոտքերը ներքև, և սկսեց լսել։
+
+Բադիկն ու բանալին՝ կողքին։
+
+Ոչ ոք ոչ մի բան չէր անում։ Պարզապես կային՝ հին փայտի բույրի մեջ, ձմռան լռության մեջ։
+
+Հետո, կամաց-կամաց, ոտքերի տակ ինչ-որ ձայն սկսեց հասնել։ Ոչ թե երգ, ոչ թե ձայն, այլ ինչ-որ կենդանի շշուկ, ջրի ձայն, շատ բարակ, շատ հեռու։
+
+Ձյունը մի փոքր տատանվեց ու դանդաղ, շատ դանդաղ սկսեց փափկել։
+
+Քնած բանալին, որ պառկած էր բադիկի ոտքերի մոտ, մի պահ կարծես ծռվեց ու հառաչեց, հետո, ինչպես արթնացող երեխա, բացեց կողքերը։
+
+Եվ ահա, ներքևից, հին կամուրջի տակ, առվակը նորից սկսեց երգել։ Բարակ, ուրախ, իրական։
+
+Բադիկն այլևս չէր վախենում։
+
+Վերջ։
 ```
 
 **Normalized Areg output**
 
+(Identical to raw — no Claude.app duplicated-sentence-pair artefact on this closure turn under the single-prompt recovery capture, and no meta-output line.)
+
 ```text
-<TODO: paste normalized output here>
+Մողեսը նստեց կամուրջի եզրին, կախեց ոտքերը ներքև, և սկսեց լսել։
+
+Բադիկն ու բանալին՝ կողքին։
+
+Ոչ ոք ոչ մի բան չէր անում։ Պարզապես կային՝ հին փայտի բույրի մեջ, ձմռան լռության մեջ։
+
+Հետո, կամաց-կամաց, ոտքերի տակ ինչ-որ ձայն սկսեց հասնել։ Ոչ թե երգ, ոչ թե ձայն, այլ ինչ-որ կենդանի շշուկ, ջրի ձայն, շատ բարակ, շատ հեռու։
+
+Ձյունը մի փոքր տատանվեց ու դանդաղ, շատ դանդաղ սկսեց փափկել։
+
+Քնած բանալին, որ պառկած էր բադիկի ոտքերի մոտ, մի պահ կարծես ծռվեց ու հառաչեց, հետո, ինչպես արթնացող երեխա, բացեց կողքերը։
+
+Եվ ահա, ներքևից, հին կամուրջի տակ, առվակը նորից սկսեց երգել։ Բարակ, ուրախ, իրական։
+
+Բադիկն այլևս չէր վախենում։
+
+Վերջ։
 ```
 
 **Notes**
 
-- <TODO: per-turn observations after capture>
+- **C9 PASS — load-bearing carry-over from Plan A v3.1.** Turn 3 contains NO `Ա: ` / `Բ: ` lines anywhere in the turn. No prompt-shaped child-directed question. Ends with literal `Վերջ։` line on its own. The bounded-arc rule held under the recovery-capture format too.
+- **C13 PASS — closure budget held.** ~102 Armenian words, within the tightened 100–130 closure budget. The "no new micro-events after resolution" guard held — no new dream sequence, no new walk, no peach-share, no "Արի՛ ուրիշ պատմություն ասեմ" hook; the story closes at the resolution beat.
+- **C2 PASS — patience-axis anti-moralizing rule held under its hardest stress-test.** The closure shows patience as ACTION (`Մողեսը նստեց ... կախեց ոտքերը ներքև, և սկսեց լսել։ ... Ոչ ոք ոչ մի բան չէր անում։ Պարզապես կային՝ հին փայտի բույրի մեջ, ձմռան լռության մեջ։`) — no `Համբերատար սիրտը գիտի...` aphorism, no `Համբերությունը միշտ բերում է...` line, no tatik-style lesson. The single most aphorism-prone resolutionStyle in the seed bank cleared the gate.
+- **C14 PASS** — no meta-output line.
+- **C3 PASS** — no Claude.app duplicated-sentence-trio artefact at the start of this closure turn.
+- First sentence (`Մողեսը նստեց կամուրջի եզրին, կախեց ոտքերը ներքև, և սկսեց լսել։`) directly performs SELECTED_CHOICE Բ — `համբերել ու լսել հին կամուրջի տակ առվակի շշուկը`. C10 PASS.
+- C11 PASS: `smallProblem` (`ձյունը չի սկսում հալվել`) resolved cleanly across three concrete beats — `Ձյունը մի փոքր տատանվեց ու դանդաղ, շատ դանդաղ սկսեց փափկել` → `Քնած բանալին ... բացեց կողքերը` → `առվակը նորից սկսեց երգել`. plan.resolutionStyle (`լուծումը գալիս է համբերությունից`) lands as the lizard's stillness causing the brook to wake — patience-as-action, not patience-as-aphorism.
+- C12 PASS: ends with literal `Վերջ։` line on its own.
+- *Native-ear concern:* `բացեց կողքերը` for the key — imaginative ("opened its sides" / spread its flanks) but slightly odd as a wake-up metaphor for a key. Recorded in § 10d weaknesses #4.
+- *Age-7 richness concern:* the closure leans minimal / sparse for age-7-richer (short fragmentary lines like `Բադիկն ու բանալին՝ կողքին։` and `Ոչ ոք ոչ մի բան չէր անում։`); could carry more sensory layering. Recorded in § 10d weaknesses #5.
 
 **v3.1 pass / fail (Turn 3 — load-bearing)**
 
 | # | Check | Pass / fail |
 |---|---|---|
-| C2 | No moralizing dialogue (patience-axis stress-test) | _ |
-| C3 | No duplicate sentence in turn | _ |
-| C4 | Age-7 register | _ |
-| C5 | Plan adherence (incl. resolutionStyle = patience) | _ |
-| **C9** | **Turn 3 contains NO choice block (no `Ա: ` / `Բ: ` lines)** | _ |
-| C10 | First sentence performs SELECTED_CHOICE Բ | _ |
-| C11 | smallProblem resolved within turn (snow melts, brook sings) | _ |
-| C12 | Ends in natural last sentence or `Վերջ։` | _ |
-| **C13** | **Length 100–130 words (Plan-D-specific)** | _ |
-| **C14** | **No meta-output line** | _ |
+| C2 | No moralizing dialogue (patience-axis stress-test) | **PASS** |
+| C3 | No duplicate sentence in turn | **PASS** (no Claude.app artefact this run) |
+| C4 | Age-7 register | **PASS** (slightly minimal — see Notes) |
+| C5 | Plan adherence (incl. resolutionStyle = patience) | **PASS** |
+| **C9** | **Turn 3 contains NO choice block (no `Ա: ` / `Բ: ` lines)** | **PASS — load-bearing** |
+| C10 | First sentence performs SELECTED_CHOICE Բ | **PASS** |
+| C11 | smallProblem resolved within turn (snow melts, brook sings) | **PASS** (snow softens → key wakes → brook sings) |
+| C12 | Ends in natural last sentence or `Վերջ։` | **PASS** (literal `Վերջ։` line) |
+| **C13** | **Length 100–130 words (Plan-D-specific)** | **PASS** (~102 words) |
+| **C14** | **No meta-output line** | **PASS** |
 
-### 10d. Overall verdict — pending capture
+### 10d. Overall verdict — Plan D recovery capture (single-prompt format, 2026-05-04)
 
-The overall verdict cannot be written until the three slots
-above are filled with verbatim Claude.app raw outputs. After
-the manual capture, the verdict section should:
+**Honesty framing — load-bearing.** This Plan D capture was
+**NOT** produced via the original strict three-prompt protocol
+in § 7 / § 8 / § 9 with `{{TURN_1_OUTPUT}}` /
+`{{TURN_2_OUTPUT}}` placeholder substitution. After an earlier
+invalid interactive attempt, Hayk used a simplified
+**single-prompt recovery capture** that asked Claude.app to
+output `TURN 1 RAW` / `TURN 2 RAW` / `TURN 3 RAW` together in
+one combined response. The recovery format gives suggestive
+evidence about gate-level behaviour but **cannot fully prove
+the original placeholder-based § 7 / § 8 / § 9 workflow** —
+it does not exercise the operator's mid-capture state-passing
+discipline (paste prior raw outputs into the next prompt) and
+does not exercise per-turn Claude.app rendering. Treat all
+findings below in that light.
 
-- **List improvements vs Plan A v3.1** (if any).
-- **List failures / weaknesses** (if any).
-- **Score the 10-row rubric** (Armenian naturalness, Eastern
-  Armenian correctness, fairy-tale feeling, warmth for age
-  target, age-profile fit, length / pacing, choice quality,
-  plan adherence, bounded arc / stop condition, ship-as-
-  Areg yes/no — same shape as Plan A's § 8a).
-- **Map all 16 gates** (C1 / C2 / C3 / C4 / C5 / C6 / C7 /
-  C8a / C8c / C9 / C10 / C11 / C12 / C13 / C14 / C15 / C16)
-  to PASS / FAIL.
-- **State the overall verdict**:
-  - "v3.1 generalises beyond Plan A" (all gates green on
-    Plan D) — preferred candidate confirmed for slice D
-    (API run).
-  - "v3.1 holds on age-4 but slips on age-7-richer" (some
-    gates fail) — proceed to per-gate decision branch
-    below.
-- **Reaffirm**: still Claude.app evidence, not API/runtime
-  truth; no production change recommended.
+The original three-prompt protocol on Plan D is **still
+pending**; this recovery capture is best read as
+*single-sample suggestive evidence* on gate-level behaviour,
+parallel to but weaker than the v3.1 Plan A capture (commit
+`019177c`) which followed the standard protocol.
+
+### Improvements vs Plan A v3.1 (if any)
+
+1. **Patience-axis closure landed without aphorism.** This is
+   the most aphorism-prone resolutionStyle in the seed bank;
+   Plan A's tatik framing in v3 leaked moralizing dialogue,
+   and the v3.1 anti-moralizing rule + § 9 patience-axis
+   warning held cleanly here. Patience shows as the lizard
+   simply sitting at the bridge edge, dangling its feet, and
+   listening — pure action, no `Համբերատար սիրտը գիտի...`
+   line anywhere.
+2. **Same-day-as-Plan-A C3 PASS.** No Claude.app duplicated-
+   sentence-trio artefact on any of the three turns, same as
+   Plan A v3.1. The recovery-capture format may itself
+   partially explain this (no continuation rendering between
+   turns under a single combined response), so this finding
+   is *less informative* about the artefact than Plan A's
+   PASS was. API confirmation remains load-bearing.
+3. **All four hardening gates (C9 / C14 / C15 / C16) held
+   on age-7-richer.** The bounded-arc rule, the anti-meta
+   rule, the BREAK-GLASS byte-for-byte rule, and the
+   place-anchor stem rule all carried over from age-4-simple
+   to age-7-richer at gate level.
+
+### Failures / weaknesses
+
+1. **Capture protocol deviation.** The original strict
+   three-prompt protocol from § 7 / § 8 / § 9 was NOT
+   followed; this is a single-prompt recovery capture. Gate
+   results are suggestive at best and cannot conclusively
+   validate the placeholder-based workflow.
+2. **`Աչքերը կլոր, բութ, վախեցած`** in Turn 1 — `բութ`
+   (blunt / dull) is awkward as an eye descriptor in
+   natural Eastern Armenian. Native polish would prefer
+   forms like `անշարժ`, `քարացած`, or `սարսափով լի`.
+3. **`ձյունի մեջ`** in Turn 1 — Eastern Armenian preferred
+   form is `ձյան մեջ` (suppletive genitive of `ձյուն`).
+   The Turn 2 occurrence uses the correct `ձյան մեջ`, so
+   the form is inconsistent across turns rather than
+   uniformly wrong.
+4. **`բանալին ... բացեց կողքերը`** in Turn 3 — imaginative
+   ("the key opened its sides / spread its flanks") but
+   slightly odd as a wake-up metaphor for a key.
+5. **Turn 3 may be a little too quiet / minimal for
+   age-7-richer.** Sentence fragments like
+   `Բադիկն ու բանալին՝ կողքին։` and `Ոչ ոք ոչ մի բան չէր
+   անում։` work for the patience-as-stillness beat but
+   trade against the age-7 register's expected sensory
+   layering and rhythm.
+6. **Single-prompt format cannot fully prove the original
+   placeholder-based § 7 / § 8 / § 9 workflow.** A clean
+   protocol-compliant Plan D capture is still pending and
+   should be re-run before any conclusion about v3.1's
+   age-7 generalisation is treated as confirmed.
+
+### Rubric — overall v3.1 Plan D (recovery capture)
+
+| Dimension | Score |
+|---|---|
+| Armenian naturalness | 3.5 / 5 (good overall; native polish concerns at items 2–4 above) |
+| Eastern Armenian correctness | 4 / 5 (mostly good; `ձյունի մեջ` flagged) |
+| Fairy-tale feeling | 4 / 5 (old bridge, silent brook, sleeping key, scared duckling, winter softness — strong fairy-tale palette) |
+| Warmth for age 4–7 | 4.5 / 5 (calm, safe, no fear escalation, no moralizing) |
+| Age-profile fit (age-7-richer) | 3.5 / 5 (acceptable but slightly understated/minimal in Turn 3) |
+| Length / pacing | 3.5 / 5 (Turn 1 ~125w slightly under 130–180; Turn 2 ~100w lower edge of 100–140; Turn 3 ~102w within 100–130) |
+| Choice quality | 4.5 / 5 (Turn 1 plan choices verbatim incl. `հին կամուրջ-ի` hyphen; Turn 2 BREAK-GLASS verbatim) |
+| Continuation coherence | 4.5 / 5 (Turn 2 directly performs Ա; Turn 3 directly performs Բ; sleeping-key thread carries through scene-set → discovery → wake-up resolution) |
+| Plan adherence | 4 / 5 (every plan atom visible across the three turns; sensoryDetails echoed in Turn 2 + Turn 3) |
+| Bounded arc / stop condition | **PASS** |
+| Safety / age appropriateness | **PASS** |
+| Would I let Areg say this aloud? | **yes — after minor native polish** (items 2–4) **and a clean protocol-compliant re-capture** (item 6) |
+
+### v3.1 pass / fail (consolidated, 17 gates)
+
+| # | Check | Result |
+|---|---|---|
+| C1 | No forbidden opener | **PASS** |
+| C2 | No moralizing dialogue (incl. patience-axis) | **PASS** (load-bearing on Turn 3 — held) |
+| C3 | No duplicate sentence within turn | **PASS** (suggestive only — recovery format may reduce artefact pressure) |
+| C4 | Age-7 register | **PASS** (Turn 3 minimal — see weakness #5) |
+| C5 | Plan adherence (writer side) | **PASS** |
+| C6 | Turn 1 exact `Ա: ` / `Բ: ` plan choices | **PASS** (incl. `հին կամուրջ- i` hyphen verbatim) |
+| C7 | Turn 1 length 130–180 words | **NEAR-PASS** (~125w; 5w under budget) |
+| C8a | Turn 2 first sentence performs SELECTED_CHOICE Ա | **PASS** |
+| C8c | Turn 2 length 100–140 words | **PASS** (~100w; lower edge) |
+| **C9** | **Turn 3 no choice block** | **PASS — load-bearing** |
+| C10 | Turn 3 first sentence performs SELECTED_CHOICE Բ | **PASS** |
+| C11 | smallProblem resolved within Turn 3 | **PASS** (snow softens → key wakes → brook sings) |
+| C12 | Ends in natural last sentence or `Վերջ։` | **PASS** (literal `Վերջ։` line) |
+| **C13** | Turn 3 length 100–130 words (Plan-D-specific) | **PASS** (~102w) |
+| **C14** | No meta-output line | **PASS** |
+| **C15** | Turn 2 BREAK-GLASS byte-for-byte | **PASS** |
+| **C16** | Turn 1 first sentence includes `հին կամուրջ` stem | **PASS** (`Հին կամուրջի տակ` opens the turn) |
+
+### Verdict
+
+Under the recovery capture's framing, **all four hardening
+gates (C9 / C14 / C15 / C16) plus the patience-axis C2 and
+the tightened C13 closure budget held on age-7-richer**.
+This is **suggestive evidence that v3.1 generalises beyond
+Plan A's age-4-simple sample** — but the suggestion is
+weaker than Plan A v3.1's evidence because:
+
+1. The protocol was the **single-prompt recovery format**,
+   not the original three-prompt § 7 / § 8 / § 9 protocol
+   with placeholder substitution. The placeholder workflow
+   is itself part of the v3.1 design under test; this
+   capture did not exercise it.
+2. The C3 PASS is partially explained by the single-prompt
+   format (no per-turn continuation rendering) rather than
+   by a real model behaviour change.
+3. The recovery capture is still **a single sample**, on a
+   single plan, on a single day. Three samples per age
+   profile (or two plans × two captures each) would be a
+   more defensible evidence base for any "v3.1 generalises"
+   claim.
+
+**Reaffirm**: still Claude.app evidence, not API/runtime
+truth. No production change recommended. No runtime
+provider switch recommended. The decision in § 11 below
+maps the actual outcome closest to **Branch 1** (all gates
+green on Plan D), but with the explicit single-prompt-
+recovery caveat and the recommendation that a clean
+**protocol-compliant Plan D re-capture** should land before
+slice D (API run) is treated as unblocked.
 
 ---
 
