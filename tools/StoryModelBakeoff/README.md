@@ -262,14 +262,41 @@ Generation rules:
   references the plan's `place`, the other references the plan's
   `magicalObject`. Order between them is randomised per plan.
 
-  **Place templates** all use `դեպի` (toward) so the place phrase
-  stays in the nominative — no irregular-stem hazard:
-  - *"գնալ դեպի <place>"*, *"քայլել դեպի <place>"* — universal.
-  - *"իջնել դեպի <place>"* — only when the place reads as a
-    water / lower spot (`լճակ`, `աղբյուր`, `առվակ`, `ափ`, ...).
-  - *"բարձրանալ դեպի <place>"* — only when the place reads as a
-    high spot (`բլուր`, `սար`, `ժայռ`, `կատար`, `ծառ`, `ընկուզենի`,
-    `աշտարակ`, `ճյուղ`, ...).
+  **Place templates** are sub-location / scene-exploration
+  patterns. The story always opens IN `plan.place`, so the
+  earlier *"գնալ դեպի <place>"* / *"քայլել դեպի <place>"*
+  templates were spatially vacuous on Turn 1 (see
+  [`evaluations/story-brain-finalization-20260504.md`](./evaluations/story-brain-finalization-20260504.md) § 4).
+  The current templates point to sub-regions of `<place>` or
+  to actions performed *within* the scene; each still contains
+  `<place>` verbatim as a substring so the Plan Gate's
+  choice-grounding check passes:
+  - *"գնալ <place>-ի հեռավոր եզրը"* — universal.
+  - *"քայլել <place>-ի միջով"* — universal.
+  - *"կանգնել ու լսել <place>-ի ձայները"* — universal.
+  - *"փնտրել մի փոքրիկ նշան <place>-ի մոտ"* — universal.
+  - *"իջնել <place>-ի խորքը"* — only when the place reads as
+    a water / lower spot (`լճակ`, `աղբյուր`, `առվակ`, `ափ`, ...).
+  - *"բարձրանալ <place>-ի գագաթը"* — only when the place reads
+    as a high spot (`բլուր`, `սար`, `ժայռ`, `կատար`, `ծառ`,
+    `ընկուզենի`, `աշտարակ`, `ճյուղ`, ...).
+
+  Armenian morphology note: the templates emit `<place>-ի` /
+  `<place>-ը` etc. with a literal hyphen rather than per-place
+  declension. The writer prompt is responsible for polishing
+  morphology at render time — e.g. *"խնձորենու այգի-ի"*
+  (research-tool emission) → *"խնձորենու այգու"* (proper
+  genitive) in the rendered Armenian prose.
+
+  The Plan Gate validator
+  ([`validate-story-plan.js`](./validate-story-plan.js)) raises
+  a **warning** if it ever sees the legacy bare *"գնալ դեպի
+  <plan.place>"* / *"քայլել դեպի <plan.place>"* / *"իջնել
+  դեպի <plan.place>"* / *"բարձրանալ դեպի <plan.place>"*
+  patterns — a regression guard for the generator change.
+  Older plan files generated before the 2026-05-04 fix may
+  still match these patterns and surface the warning; that is
+  expected and does not fail validation.
 
   **Object templates** use the Armenian definite suffix
   («ը»/«ն») where the action requires accusative-shape:

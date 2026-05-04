@@ -358,6 +358,36 @@ function validatePlan(plan, idx) {
         errors.push(`${label} contains banned pattern "${sub}": "${choice}"`);
       }
     }
+    // Spatially-vacuous regression check: a bare
+    // "գնալ դեպի <plan.place>" / "քայլել դեպի <plan.place>"
+    // (and the իջնել / բարձրանալ variants) reads as "go to the
+    // place we're already in", because plan.place IS the scene's
+    // setting. The 2026-05-04 generator fix replaces these
+    // templates with sub-location patterns; this check is a
+    // regression guard. See
+    // `evaluations/story-brain-finalization-20260504.md` § 4.
+    //
+    // WARNING (not a hard error) so older plan files generated
+    // before the 2026-05-04 generator fix continue to validate
+    // for back-compat. Plans emitted by the current generator
+    // will not match these patterns.
+    if (place != null && place.length > 0) {
+      const trimmed = choice.trim();
+      const vacuousPrefixes = [
+        'գնալ դեպի ', 'քայլել դեպի ',
+        'իջնել դեպի ', 'բարձրանալ դեպի ',
+      ];
+      for (const prefix of vacuousPrefixes) {
+        if (trimmed === prefix + place) {
+          warnings.push(
+            `${label} is spatially vacuous: "${choice}" — story opens in ` +
+            `plan.place ("${place}"), so this choice points to the current scene; ` +
+            `use a sub-location or scene-element template (see story-brain-finalization-20260504.md § 4)`
+          );
+          break;
+        }
+      }
+    }
     if (place == null || obj == null) return; // can't check grounding
     // Grounding: choice must reference place OR magicalObject.
     const refsPlace = choice.includes(place);

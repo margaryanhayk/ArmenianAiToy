@@ -304,16 +304,41 @@ function objectActions(obj) {
   return out;
 }
 
+// Sub-location / scene-exploration templates.
+//
+// The story always opens IN `plan.place`, so the earlier
+// "գնալ դեպի <place>" / "քայլել դեպի <place>" templates were
+// spatially vacuous on Turn 1 — "go to the place we're already
+// in" is not a child choice. See
+// `evaluations/story-brain-finalization-20260504.md` § 4 for
+// the discovery context.
+//
+// The new templates point to sub-regions of `<place>` or to
+// actions performed *within* the scene. Each template still
+// contains `<place>` verbatim as a substring so the Plan Gate's
+// choice-grounding check (`choice.includes(place)`) keeps
+// passing without further changes.
+//
+// Armenian morphology note: the templates emit `<place>-ի` /
+// `<place>-ը` etc. with a literal hyphen rather than trying to
+// inflect each `<place>` correctly (which would require per-
+// place declension data the seed bank does not carry). The
+// writer prompt is responsible for polishing the morphology
+// at render time — e.g. "խնձորենու այգի-ի" (research-tool
+// emission) → "խնձորենու այգու" (proper genitive) in the
+// rendered Armenian prose.
 function placeActions(place) {
   const out = [
-    { phrase: 'գնալ դեպի '   + place, choiceType: CT_PLACE },
-    { phrase: 'քայլել դեպի ' + place, choiceType: CT_PLACE },
+    { phrase: 'գնալ ' + place + '-ի հեռավոր եզրը',           choiceType: CT_PLACE },
+    { phrase: 'քայլել ' + place + '-ի միջով',                 choiceType: CT_PLACE },
+    { phrase: 'կանգնել ու լսել ' + place + '-ի ձայները',     choiceType: CT_PLACE },
+    { phrase: 'փնտրել մի փոքրիկ նշան ' + place + '-ի մոտ',   choiceType: CT_PLACE },
   ];
   if (isWaterOrLow(place)) {
-    out.push({ phrase: 'իջնել դեպի ' + place, choiceType: CT_PLACE });
+    out.push({ phrase: 'իջնել ' + place + '-ի խորքը', choiceType: CT_PLACE });
   }
   if (isHighOrUp(place)) {
-    out.push({ phrase: 'բարձրանալ դեպի ' + place, choiceType: CT_PLACE });
+    out.push({ phrase: 'բարձրանալ ' + place + '-ի գագաթը', choiceType: CT_PLACE });
   }
   return out;
 }
