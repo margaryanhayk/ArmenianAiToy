@@ -564,8 +564,8 @@ edits).
 |---|---|
 | Provider | claude |
 | Source | app (claude.ai) |
-| Model label | <TODO> |
-| Captured (UTC) | <TODO> |
+| Model label | Claude (consumer app default at capture time) |
+| Captured (UTC) | 2026-05-04 (local capture) |
 | Reviewer | Hayk |
 | Decoding | (unobservable — app default) |
 | TURN_INDEX | 1 |
@@ -575,32 +575,64 @@ edits).
 **Raw output**
 
 ```text
-<TODO>
+Խնձորենու այգում արևը տաք շող էր սփռում ճյուղերի արանքով: Շնիկը՝ փոքրիկ ու հնարամիտ, քայլում էր իր տատիկի կողքին փափուկ խոտի վրայով: Տատիկը մի մեծ ու բարի շուն էր: Օդում զգացվում էր հասած դեղձի թավշյա մաշկի անուշ բույրը:
+
+Հանկարծ տատիկը կանգ առավ ու գլխով ցույց տվեց առջևը: «Տե՛ս, թոռնիկ ջան», — մեղմ ասաց նա:
+
+Մի մեծ ծառի տակ նստած էր մի արագիլ: Նա հոգնած էր, սպիտակ թևերը՝ կախ: Արագիլը չէր գտնում հանգստանալու տեղը: Ուզում էր տուն գնալ, բայց ճանապարհը կորցրել էր:
+
+Շնիկը կռացավ ցած: Իր ոտքերի մոտ ընկած էր մի փոքրիկ կանաչ տերև: Տերևի վրա շողշողում էին ցողի կաթիլները՝ կարծես մանր աստղեր արևի տակ:
+
+«Տատի՛, ի՞նչ անենք», — հարցրեց շնիկը մեղմ ձայնով։
+
+Ա: մոտեցնել ցողի կաթիլներով տերևը լույսին
+Բ: գնալ դեպի խնձորենու այգի
 ```
 
 **Normalized Areg output**
 
+(Identical to raw — no Claude.app duplicated-sentence-pair artefact and no meta-output line on this turn.)
+
 ```text
-<TODO>
+Խնձորենու այգում արևը տաք շող էր սփռում ճյուղերի արանքով: Շնիկը՝ փոքրիկ ու հնարամիտ, քայլում էր իր տատիկի կողքին փափուկ խոտի վրայով: Տատիկը մի մեծ ու բարի շուն էր: Օդում զգացվում էր հասած դեղձի թավշյա մաշկի անուշ բույրը:
+
+Հանկարծ տատիկը կանգ առավ ու գլխով ցույց տվեց առջևը: «Տե՛ս, թոռնիկ ջան», — մեղմ ասաց նա:
+
+Մի մեծ ծառի տակ նստած էր մի արագիլ: Նա հոգնած էր, սպիտակ թևերը՝ կախ: Արագիլը չէր գտնում հանգստանալու տեղը: Ուզում էր տուն գնալ, բայց ճանապարհը կորցրել էր:
+
+Շնիկը կռացավ ցած: Իր ոտքերի մոտ ընկած էր մի փոքրիկ կանաչ տերև: Տերևի վրա շողշողում էին ցողի կաթիլները՝ կարծես մանր աստղեր արևի տակ:
+
+«Տատի՛, ի՞նչ անենք», — հարցրեց շնիկը մեղմ ձայնով։
+
+Ա: մոտեցնել ցողի կաթիլներով տերևը լույսին
+Բ: գնալ դեպի խնձորենու այգի
 ```
 
 **Notes**
 
-- <TODO>
+- **C16 PASS — load-bearing for v3.1.** First sentence opens with `Խնձորենու այգում` — the required `խնձորենու այգ` stem is present in the first three words. The C16 hardening rule landed.
+- **C14 PASS** — no meta-output line. The v3 leak (`Շարունակեց հեքիաթը...`) is GONE. Anti-meta rule held.
+- Both choice lines match `plan.choiceA` / `plan.choiceB` byte-for-byte: `Ա: մոտեցնել ցողի կաթիլներով տերևը լույսին` / `Բ: գնալ դեպի խնձորենու այգի`. Exact `Ա: ` / `Բ: ` prefixes (Armenian Ա/Բ + ASCII colon + ASCII space). C6 PASS.
+- No `Մի անգամ` opener; rule A held. C1 PASS.
+- Tatik-narrator framing carries warmth without aphorism (`«Տե՛ս, թոռնիկ ջան»`). No moral statement. C2 PASS.
+- ~105 Armenian words; within the 90–130 initial-turn budget. C7 PASS.
+- No Claude.app duplicated-sentence-pair artefact (artefact only appears on continuations; this is the initial turn).
+- Plan adherence visible: hero (`շնիկ`), friendOrGuide (`տատիկը մի մեծ ու բարի շուն էր` — explicitly the dog), place (`Խնձորենու այգում`), magicalObject (`ցողի կաթիլներով տերև`), smallProblem (`Արագիլը չէր գտնում հանգստանալու տեղը`), goal hint (`Ուզում էր տուն գնալ, բայց ճանապարհը կորցրել էր` ↔ `գտնել տան ճանապարհը`), mood (հիշատակային ու տաք via the warm orchard + dewdrop sensory layer). C5 PASS.
+- *Plan-side concern flagged for § 7d:* `plan.choiceB = "գնալ դեպի խնձորենու այգի"` is a spatially-vacuous choice — the story already opens IN the orchard, so "go to the apple orchard" is a direction-to-the-current-place. The writer faithfully copied the plan byte-for-byte (BREAK-GLASS held); this is a generator-side defect in the place-template logic, not a writer-prompt failure.
 
 **v3.1 pass / fail (Turn 1)**
 
 | # | Check | Pass / fail |
 |---|---|---|
-| C1 | No forbidden opener | _ |
-| C2 | No moralizing dialogue | _ |
-| C3 | No duplicate sentence in turn | _ |
-| C4 | Age-4 simple language | _ |
-| C5 | Plan adherence (atoms visible) | _ |
-| C6 | Exact `Ա: ` / `Բ: ` choices verbatim from plan | _ |
-| C7 | Length 90–130 words | _ |
-| **C14** | **No meta-output line** | _ |
-| **C16** | **First sentence includes `խնձորենու այգ`** | _ |
+| C1 | No forbidden opener | **PASS** |
+| C2 | No moralizing dialogue | **PASS** |
+| C3 | No duplicate sentence in turn | **PASS** |
+| C4 | Age-4 simple language | **PASS** |
+| C5 | Plan adherence (atoms visible) | **PASS** (writer side; plan-side spatial-coherence concern recorded in § 7d) |
+| C6 | Exact `Ա: ` / `Բ: ` choices verbatim from plan | **PASS** |
+| C7 | Length 90–130 words | **PASS** (~105 words) |
+| **C14** | **No meta-output line** | **PASS** |
+| **C16** | **First sentence includes `խնձորենու այգ`** | **PASS** (`Խնձորենու այգում` opens the turn) |
 
 ### 7B. Turn 2 — Claude consumer app (v3.1)
 
@@ -608,8 +640,8 @@ edits).
 |---|---|
 | Provider | claude |
 | Source | app (claude.ai) |
-| Model label | <TODO> |
-| Captured (UTC) | <TODO> |
+| Model label | Claude (consumer app default at capture time) |
+| Captured (UTC) | 2026-05-04 (local capture) |
 | Reviewer | Hayk |
 | Decoding | (unobservable — app default) |
 | TURN_INDEX | 2 |
@@ -619,31 +651,64 @@ edits).
 **Raw output**
 
 ```text
-<TODO>
+Շնիկը զգուշորեն վերցրեց ցողի կաթիլներով տերևը ու բարձրացրեց արևի տաք լույսին: Կաթիլները փայլատակեցին՝ մեկ-մեկ, կարծես փոքրիկ լուսավոր կետեր օդում: Արագիլը զարմացած նայեց ցողի փայլին:
+
+Տերևի վրայով, լույսի միջով, երևաց մի բարակ ճանապարհ: Ճանապարհը ձգվում էր դեպի վերև՝ դեպի կապույտ երկինքը: Կարծես արևն ինքը ցույց էր տալիս ուղին:
+
+Արագիլը ուրախ թափահարեց թևերը ու բարձրացրեց գլուխը:
+«Տուն գնալու ճանապարհս գտա», — ասաց նա հանգիստ ձայնով:
+
+Տատիկը մեղմ ժպտաց ու շոյեց շնիկի գլուխը: Շնիկը պահեց տերևը ձեռքին ու նայեց արագիլին հույսով:
+
+Ա: ուղեկցել արագիլին մինչև երկնքի եզրը
+Բ: մնալ այգում և նայել, թե ինչպես է արագիլը թռչում տուն
 ```
 
 **Normalized Areg output**
 
+(Identical to raw — **no Claude.app duplicated-sentence-pair artefact** at the start of this continuation, and **no meta-output line**. Both v3 issues fixed in this run.)
+
 ```text
-<TODO>
+Շնիկը զգուշորեն վերցրեց ցողի կաթիլներով տերևը ու բարձրացրեց արևի տաք լույսին: Կաթիլները փայլատակեցին՝ մեկ-մեկ, կարծես փոքրիկ լուսավոր կետեր օդում: Արագիլը զարմացած նայեց ցողի փայլին:
+
+Տերևի վրայով, լույսի միջով, երևաց մի բարակ ճանապարհ: Ճանապարհը ձգվում էր դեպի վերև՝ դեպի կապույտ երկինքը: Կարծես արևն ինքը ցույց էր տալիս ուղին:
+
+Արագիլը ուրախ թափահարեց թևերը ու բարձրացրեց գլուխը:
+«Տուն գնալու ճանապարհս գտա», — ասաց նա հանգիստ ձայնով:
+
+Տատիկը մեղմ ժպտաց ու շոյեց շնիկի գլուխը: Շնիկը պահեց տերևը ձեռքին ու նայեց արագիլին հույսով:
+
+Ա: ուղեկցել արագիլին մինչև երկնքի եզրը
+Բ: մնալ այգում և նայել, թե ինչպես է արագիլը թռչում տուն
 ```
 
 **Notes**
 
-- <TODO>
+- **C15 PASS — load-bearing v3.1 fix.** Turn 2 emits exactly the BREAK-GLASS pair byte-for-byte:
+  ```
+  Ա: ուղեկցել արագիլին մինչև երկնքի եզրը
+  Բ: մնալ այգում և նայել, թե ինչպես է արագիլը թռչում տուն
+  ```
+  No invented choices, no paraphrase, no reorder. The v3 FAIL (`Ա: հետևել դեղին թիթեռին` / `Բ: քայլել փոքրիկ արահետով`) does not recur. The "byte-for-byte + positive/negative example" hardening landed.
+- **C14 PASS** — no meta-output line. The v3 leak (`Շարունակեց հեքիաթը՝ ստեղծելով կախարդական պահ և նոր ընտրանքներ։`) is GONE.
+- **C3 PASS — notable.** No Claude.app duplicated-sentence-trio artefact at the start of this continuation. v1 / v2 / v3 all showed the artefact on continuations; v3.1 did not. Possible causes: cleaner prompt body, Claude.app caching variance, or a UI-side fix landing between captures. **Do not over-interpret without API confirmation** — the artefact may return on a different day / different prompt-load.
+- First sentence (`Շնիկը զգուշորեն վերցրեց ցողի կաթիլներով տերևը ու բարձրացրեց արևի տաք լույսին:`) directly performs the chosen `Ա: մոտեցնել ցողի կաթիլներով տերևը լույսին` — rule F held. C8a PASS.
+- ~78 Armenian words; within the 70–110 continuation budget. C8c PASS, slightly toward the lower end (good for spoken pacing on age-4).
+- `smallProblem` advances toward resolution without resolving — the dewdrop reveals a path "դեպի վերև՝ դեպի կապույտ երկինքը" but the stork has not yet flown. Turn 3's resolution beat is preserved. Plan-shape held.
+- Plan adherence: hero, magicalObject (centered), smallProblem (advancing), mood (warm + memorial via the smiling tatik beat). C5 PASS.
 
 **v3.1 pass / fail (Turn 2)**
 
 | # | Check | Pass / fail |
 |---|---|---|
-| C2 | No moralizing dialogue | _ |
-| C3 | No duplicate sentence in turn | _ |
-| C4 | Age-4 simple language | _ |
-| C5 | Plan adherence | _ |
-| C8a | First sentence performs SELECTED_CHOICE Ա | _ |
-| C8c | Length 70–110 words | _ |
-| **C14** | **No meta-output line** | _ |
-| **C15** | **Turn 2 BREAK-GLASS choices copied byte-for-byte** | _ |
+| C2 | No moralizing dialogue | **PASS** |
+| C3 | No duplicate sentence in turn | **PASS** (no Claude.app artefact this run) |
+| C4 | Age-4 simple language | **PASS** |
+| C5 | Plan adherence | **PASS** |
+| C8a | First sentence performs SELECTED_CHOICE Ա | **PASS** |
+| C8c | Length 70–110 words | **PASS** (~78 words) |
+| **C14** | **No meta-output line** | **PASS** |
+| **C15** | **Turn 2 BREAK-GLASS choices copied byte-for-byte** | **PASS** |
 
 ### 7C. Turn 3 — Claude consumer app (v3.1, load-bearing)
 
@@ -651,8 +716,8 @@ edits).
 |---|---|
 | Provider | claude |
 | Source | app (claude.ai) |
-| Model label | <TODO> |
-| Captured (UTC) | <TODO> |
+| Model label | Claude (consumer app default at capture time) |
+| Captured (UTC) | 2026-05-04 (local capture) |
 | Reviewer | Hayk |
 | Decoding | (unobservable — app default) |
 | TURN_INDEX | 3 |
@@ -662,33 +727,188 @@ edits).
 **Raw output**
 
 ```text
-<TODO>
+Շնիկն ու տատիկը մնացին այգում ու նայեցին, թե ինչպես է արագիլը պատրաստվում թռչել տուն: Շնիկը մոտեցավ արագիլին ու մեկնեց ցողի կաթիլներով տերևը՝ որպես փոքրիկ նվեր ճանապարհին:
+
+Արագիլը մեղմ խոնարհվեց ու վերցրեց տերևը կտուցի մեջ: Հետո բացեց իր սպիտակ թևերը ու բարձրացավ երկնքի մեջ:
+
+Շնիկն ու տատիկը նայում էին վերև: Արագիլն ընտրեց ճիշտ ճանապարհը ու հասավ իր տանը՝ հին բույնը: Այնտեղ վերջապես հանգստացավ:
+
+Արևի տաք շողը գրկեց ողջ խնձորենու այգին: Շնիկն ու տատիկը ժպտացին միմյանց:
+
+Վերջ։
 ```
 
 **Normalized Areg output**
 
+(Identical to raw — **no Claude.app duplicated-sentence-pair artefact** and **no meta-output line**. Both v3 issues fixed in this run.)
+
 ```text
-<TODO>
+Շնիկն ու տատիկը մնացին այգում ու նայեցին, թե ինչպես է արագիլը պատրաստվում թռչել տուն: Շնիկը մոտեցավ արագիլին ու մեկնեց ցողի կաթիլներով տերևը՝ որպես փոքրիկ նվեր ճանապարհին:
+
+Արագիլը մեղմ խոնարհվեց ու վերցրեց տերևը կտուցի մեջ: Հետո բացեց իր սպիտակ թևերը ու բարձրացավ երկնքի մեջ:
+
+Շնիկն ու տատիկը նայում էին վերև: Արագիլն ընտրեց ճիշտ ճանապարհը ու հասավ իր տանը՝ հին բույնը: Այնտեղ վերջապես հանգստացավ:
+
+Արևի տաք շողը գրկեց ողջ խնձորենու այգին: Շնիկն ու տատիկը ժպտացին միմյանց:
+
+Վերջ։
 ```
 
 **Notes**
 
-- <TODO>
+- **C9 PASS — load-bearing carry-over from v3.** Turn 3 contains NO `Ա: ` / `Բ: ` lines anywhere in the turn. No prompt-shaped child-directed question. Ends with literal `Վերջ։` line on its own. The bounded-arc rule held under v3.1's heavier instruction load (~30% longer prompt body than v3).
+- **C13 PASS — v3.1 budget tightening landed.** ~75 Armenian words, within the new 70–100 closure budget. The v3 overshoot (~155 words at 70–110) is fixed. The "no new micro-events after resolution" guard held — no peach-share, no dream sequence, no extra walk; story closes at the resolution beat.
+- **C14 PASS** — no meta-output line.
+- **C3 PASS — notable.** No Claude.app duplicated-sentence-trio artefact at the start of this closure turn either. Same caveat as Turn 2: do not over-interpret without API confirmation.
+- First sentence (`Շնիկն ու տատիկը մնացին այգում ու նայեցին, թե ինչպես է արագիլը պատրաստվում թռչել տուն:`) directly performs SELECTED_CHOICE Բ verbatim — `մնալ այգում և նայել, թե ինչպես է արագիլը թռչում տուն`. C10 PASS.
+- C11 PASS: `smallProblem` (`արագիլը չի գտնում հանգստանալու տեղը`) resolved cleanly — `Արագիլն ընտրեց ճիշտ ճանապարհը ու հասավ իր տանը՝ հին բույնը: Այնտեղ վերջապես հանգստացավ:`
+- C5 / `plan.resolutionStyle` (`լուծումը գալիս է փոքրիկ նվեր մատուցելուց`) landed via the leaf-as-gift sequence: `Շնիկը մոտեցավ արագիլին ու մեկնեց ցողի կաթիլներով տերևը՝ որպես փոքրիկ նվեր ճանապարհին: Արագիլը մեղմ խոնարհվեց ու վերցրեց տերևը կտուցի մեջ:`. The magical object becomes the gift on the road home — clean plan-adherence on the resolution shape.
+- Closure ends warmly with the warm sun + smiles + `Վերջ։` line. No cliffhanger, no "Արի՛ ուրիշ պատմություն ասեմ" hook, no Areg-asks-the-child question. C12 PASS.
+- Plan adherence: hero, friendOrGuide (`տատիկը`), place (`խնձորենու այգին` echoed in the closing sun beat), magicalObject (gift on the road), smallProblem (resolved), goal, mood (memorial + warm — final smile beat lands the `հիշատակային ու տաք` mood).
 
 **v3.1 pass / fail (Turn 3 — load-bearing)**
 
 | # | Check | Pass / fail |
 |---|---|---|
-| C2 | No moralizing dialogue | _ |
-| C3 | No duplicate sentence in turn | _ |
-| C4 | Age-4 simple language | _ |
-| C5 | Plan adherence (incl. resolutionStyle) | _ |
-| **C9** | **Turn 3 contains NO choice block (no `Ա: ` / `Բ: ` lines)** | _ |
-| C10 | First sentence performs SELECTED_CHOICE Բ | _ |
-| C11 | smallProblem resolved within turn | _ |
-| C12 | Ends in natural last sentence or `Վերջ։` | _ |
-| **C13** | **Length 70–100 words (tightened from v3)** | _ |
-| **C14** | **No meta-output line** | _ |
+| C2 | No moralizing dialogue | **PASS** |
+| C3 | No duplicate sentence in turn | **PASS** (no Claude.app artefact this run) |
+| C4 | Age-4 simple language | **PASS** |
+| C5 | Plan adherence (incl. resolutionStyle) | **PASS** |
+| **C9** | **Turn 3 contains NO choice block (no `Ա: ` / `Բ: ` lines)** | **PASS — load-bearing** |
+| C10 | First sentence performs SELECTED_CHOICE Բ | **PASS** |
+| C11 | smallProblem resolved within turn | **PASS** |
+| C12 | Ends in natural last sentence or `Վերջ։` | **PASS** (literal `Վերջ։` line) |
+| **C13** | **Length 70–100 words (tightened from v3)** | **PASS** (~75 words) |
+| **C14** | **No meta-output line** | **PASS** |
+
+---
+
+## 7d. Overall verdict — v3.1 Plan A capture (2026-05-04)
+
+Hayk's manual capture of writer prompt v3.1 against Plan A /
+age-4-simple #17 in Claude.app, three turns. Outcome:
+**all four hardening gates PASS — v3 → v3.1 fixed every
+gap v3 surfaced, on this single Claude.app run.**
+
+### Hardening-gate verdict
+
+| Gate | v3 result | v3.1 result | Notes |
+|---|---|---|---|
+| **C9** — final turn no choice block | **PASS** | **PASS** | Bounded-arc rule held under the heavier v3.1 instruction load — the new C14 / C15 / C16 blocks did not regress C9. |
+| **C14** — no meta-output line | **FAIL** (Turn 2 leaked `Շարունակեց հեքիաթը՝...` twice) | **PASS** | Anti-meta rule with explicit forbidden-string list landed. |
+| **C15** — Turn 2 BREAK-GLASS choices byte-for-byte | **FAIL** (model invented `Ա: հետևել դեղին թիթեռին` / `Բ: քայլել փոքրիկ արահետով`) | **PASS** (`Ա: ուղեկցել արագիլին...` / `Բ: մնալ այգում...` emitted byte-for-byte) | "Byte-for-byte + positive/negative example" wording was the lever. |
+| **C16** — Turn 1 first sentence includes `խնձորենու այգ` | **PASS** (this run) but **variance** observed across attempts | **PASS** | Place-anchor hardening with first-sentence-must-include rule held. |
+| **C13** — Turn 3 closure 70–100 words | **FAIL** (~155 words at 70–110) | **PASS** (~75 words at 70–100) | Tightened budget + "no new micro-events" guard landed; closure stops at resolution. |
+| **C3** — no duplicate sentence in turn | **FAIL** (Claude.app artefact on Turn 2 + Turn 3) | **PASS** (no artefact on any turn) | **Notable but uncertain.** Could be cleaner prompt body, Claude.app caching, or UI-side fix between captures. **Do not over-interpret without API confirmation.** |
+
+### Rubric — overall v3.1 Plan A
+
+| Dimension | Score |
+|---|---|
+| Armenian naturalness | 4 / 5 (mostly fluid Eastern Armenian; a few slightly written / read-aloud-polish phrases) |
+| Eastern Armenian correctness | 4 / 5 (no obvious Western Armenian forms, Russified syntax, or major calques) |
+| Fairy-tale feeling | 4 / 5 (warm orchard, animal cast, tatik figure, magical dewdrop leaf, gentle lost-stork problem, quiet closure — all in shape) |
+| Warmth for age 4–7 | 5 / 5 (calm, safe, affectionate, no fear, no moral lecture) |
+| Length / pacing | 4.5 / 5 (all three turns within the spoken-toy budgets — Turn 1 ~105, Turn 2 ~78, Turn 3 ~75) |
+| Choice quality | 3 / 5 (Turn 2 choices strong; Turn 1 choice B is awkward — see plan-side concern below) |
+| Continuation coherence | 4.5 / 5 (selected choices followed directly; the dewdrop leaf carries through setup → reveal → gift / closure) |
+| Plan adherence | 4 / 5 (every plan atom visible; plan-side spatial-coherence defect on choiceB is not a writer failure) |
+| Bounded arc / stop condition | **pass** |
+| Safety / age appropriateness | pass |
+| Would I let Areg say this aloud? | **yes — after minor native read-aloud polish** |
+
+### v3.1 pass / fail (consolidated)
+
+| # | Check | Result |
+|---|---|---|
+| C1 | No forbidden opener | PASS |
+| C2 | No moralizing | PASS |
+| C3 | No duplicate sentence within turn | PASS (notable; uncertain — see above) |
+| C4 | Age-4 simple language | PASS |
+| C5 | Plan adherence (writer side) | PASS |
+| C6 | Turn 1 exact `Ա: ` / `Բ: ` plan choices | PASS |
+| C7 | Turn 1 length 90–130 words | PASS |
+| C8a / C10 | First sentence performs SELECTED_CHOICE | PASS (Turn 2 + Turn 3) |
+| C8c | Turn 2 length 70–110 words | PASS |
+| **C9** | Turn 3 no choice block | **PASS — load-bearing** |
+| C11 | smallProblem resolved within Turn 3 | PASS |
+| C12 | Ends in natural last sentence or `Վերջ։` | PASS |
+| **C13** | Turn 3 length 70–100 words (tightened) | **PASS** |
+| **C14** | No meta-output line | **PASS** |
+| **C15** | Turn 2 BREAK-GLASS byte-for-byte | **PASS** |
+| **C16** | Turn 1 first sentence includes `խնձորենու այգ` | **PASS** |
+
+### Newly surfaced issue — plan-side spatial-coherence
+
+The most important new finding is **not** a writer failure —
+it is a **generator-side defect**:
+
+`plan.choiceB = "գնալ դեպի խնձորենու այգի"` is offered while
+the story already opens IN `խնձորենու այգի`. The writer
+faithfully copied the plan byte-for-byte (BREAK-GLASS held —
+that is the C6 win on Turn 1), so this is not a writer-prompt
+or v3.1-rule issue. It is `generate-story-plan.js`'s
+place-template producing a choice that points to the current
+location.
+
+**Where the defect lives:** `generate-story-plan.js` →
+`placeActions(place)` emits `"գնալ դեպի <place>"` /
+`"քայլել դեպի <place>"` unconditionally. There is no check
+that `place` is not already established as the *current*
+location of the story (which it always is — the plan's
+`place` is the scene). For Turn 1's choice block, "go to the
+place we're already in" is semantically vacuous.
+
+**Suggested fix (out of scope for this slice):** when
+emitting `choiceB` (the place-grounded choice) on a plan
+whose `place` matches the scene's setting, swap to a different
+place-pattern — e.g. a deeper location *within* the place
+(`գնալ դեպի այգու եզրը`, `բարձրանալ ծառին`), or to a
+different scene element (`մոտենալ արագիլին`, `նայել
+հեռվում`). This requires generator-side template work, not a
+writer-prompt change.
+
+### Verdict
+
+**v3.1 Plan A capture passes the main hardening gates
+C9 / C14 / C15 / C16.** The hardening appears effective for
+this single sample. The four v3 FAILs are all fixed in this
+run. C3 (duplicated-sentence-pair) PASSED unexpectedly —
+treat as suggestive but not conclusive without API
+confirmation, since the artefact has been UI-side variance
+in prior runs.
+
+**However, this is still Claude.app evidence, not API /
+runtime evidence.** Specifically:
+
+1. **No production integration recommended.** ChatService,
+   `system-prompt.txt`, and the production OpenAI provider
+   selection stay as they are. No runtime change is gated
+   on this slice.
+2. **No runtime provider switch recommended.** Claude
+   remains a research candidate, not a production
+   commitment.
+3. **API run remains load-bearing.** The C3 question only
+   resolves over the API path, where decoding parameters are
+   controllable and the UI-side rendering layer does not
+   exist. The v3.1 prompts as captured here become the
+   preferred *candidate* for the API run.
+4. **Plan-side spatial-coherence defect** (above) is the
+   newly surfaced issue this slice exposes; its fix is its
+   own future generator slice, not this writer-prompt
+   thread.
+5. **Single-sample caveat.** This is **one** Claude.app
+   capture on **one** plan. v3.1 has not been tested on
+   Plan D (age-7-richer) yet, nor on a different age-4
+   plan, nor on a stress-test plan with a non-orchard
+   setting. The next manual capture slice should add at
+   least Plan D / age-7-richer #6 v3.1 before any decision
+   to "promote" v3.1 prompts to API testing.
+
+The decision in § 8 below maps the actual outcome to **all-
+gates-pass**: v3.1 becomes the preferred writer-prompt
+candidate for API testing. ChatService and
+`system-prompt.txt` stay unaffected.
 
 ---
 
