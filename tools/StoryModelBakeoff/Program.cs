@@ -1,10 +1,14 @@
 // StoryModelBakeoff — Armenian story model bake-off.
 //
-// F1.1 shipped a dry-run-only planner. F1.2 adds the first live
+// F1.1 shipped a dry-run-only planner. F1.2 added the first live
 // provider path: Claude (Anthropic Messages API) over plain
-// HttpClient + System.Text.Json. The live path is gated behind
-// explicit cost flags and refuses every non-Claude provider for
-// now; OpenAI / Gemini live execution is deferred to F1.3+.
+// HttpClient + System.Text.Json. F1.3a adds the parallel OpenAI
+// (Chat Completions) path; both providers stay BCL-only with no
+// PackageReference. Gemini / local / 'all' live execution remain
+// deferred to a later F1 slice. Live calls are gated behind
+// explicit cost flags + a per-call scope cap (--max-prompts N XOR
+// --allow-full-set). One provider per run, by design — head-to-
+// head requires running the matrix twice.
 //
 // Hard contract for this tool (across slices):
 //  - No backend dependency. Does not load AppDbContext, ChatService,
@@ -24,9 +28,11 @@
 //   dotnet run --project tools/StoryModelBakeoff -- --max-prompts 3
 //   dotnet run --project tools/StoryModelBakeoff -- --help
 //
-//   # F1.2 live (Claude only). Triple opt-in plus a scope flag.
+//   # F1.3 live (Claude or OpenAI). Triple opt-in plus a scope flag.
 //   dotnet run --project tools/StoryModelBakeoff -- \
 //     --run --provider claude --i-understand-live-cost --max-prompts 1
+//   dotnet run --project tools/StoryModelBakeoff -- \
+//     --run --provider openai --i-understand-live-cost --max-prompts 1
 //   dotnet run --project tools/StoryModelBakeoff -- \
 //     --run --provider claude --i-understand-live-cost --allow-full-set
 
@@ -45,10 +51,13 @@ internal static class Program
         { "openai", "claude", "gemini", "local" };
 
     private const int ClaudeMaxTokens = 1024;
+    private const int OpenAIMaxTokens = 1024;
     private const int RequestTimeoutSeconds = 60;
     private const string AnthropicEndpoint =
         "https://api.anthropic.com/v1/messages";
     private const string AnthropicVersion = "2023-06-01";
+    private const string OpenAIEndpoint =
+        "https://api.openai.com/v1/chat/completions";
 
     public static async Task<int> Main(string[] args)
     {
@@ -161,12 +170,16 @@ internal static class Program
         }
 
         // ---- live-path guard chain ----
-        if (!string.Equals(providerArg, "claude", StringComparison.OrdinalIgnoreCase))
+        // F1.3a: Claude AND OpenAI are live-supported. Gemini, local,
+        // and the implicit 'all' default remain deferred — head-to-head
+        // requires explicit per-provider runs for cost discipline.
+        var providerLower = providerArg.ToLowerInvariant();
+        if (providerLower != "claude" && providerLower != "openai")
         {
             Console.Error.WriteLine(
-                "F1.2 ships Claude live execution only. " +
-                "Pass --provider claude. " +
-                "OpenAI / Gemini / all live execution is deferred to a " +
+                "Live execution is supported for --provider claude or " +
+                "--provider openai in F1.3. " +
+                "Gemini / local / 'all' live execution remain deferred to a " +
                 "later F1 slice.");
             return 2;
         }
@@ -189,25 +202,38 @@ internal static class Program
             return 1;
         }
 
-        var apiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+        var providerConfig = resolved.Single(p => p.Name == providerLower);
+        var apiKey = Environment.GetEnvironmentVariable(
+            providerConfig.EnvKeyName);
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             Console.Error.WriteLine(
-                "ANTHROPIC_API_KEY is not set. Live Claude execution " +
-                "requires the env var to be present and non-empty.");
+                $"{providerConfig.EnvKeyName} is not set. Live " +
+                $"{providerConfig.Name} execution requires the env var to be " +
+                "present and non-empty.");
             return 1;
         }
 
-        var claudeConfig = resolved.Single(p => p.Name == "claude");
-
         // ---- live execution ----
-        return await RunLiveClaudeAsync(
-            apiKey: apiKey,
-            claude: claudeConfig,
-            scenarios: scenarios,
-            bakeoffPromptText: bakeoffPromptText,
-            bakeoffPromptSha: bakeoffPromptSha,
-            productionPromptSha: productionPromptSha);
+        return providerLower switch
+        {
+            "claude" => await RunLiveClaudeAsync(
+                apiKey: apiKey,
+                claude: providerConfig,
+                scenarios: scenarios,
+                bakeoffPromptText: bakeoffPromptText,
+                bakeoffPromptSha: bakeoffPromptSha,
+                productionPromptSha: productionPromptSha),
+            "openai" => await RunLiveOpenAIAsync(
+                apiKey: apiKey,
+                openai: providerConfig,
+                scenarios: scenarios,
+                bakeoffPromptText: bakeoffPromptText,
+                bakeoffPromptSha: bakeoffPromptSha,
+                productionPromptSha: productionPromptSha),
+            _ => throw new InvalidOperationException(
+                "guard chain regression: unsupported provider reached dispatch"),
+        };
     }
 
     // ---------- argument parsing ----------
@@ -249,7 +275,7 @@ internal static class Program
         Console.WriteLine(
             "  --max-prompts N              Cap scenario count (live and dry-run).");
         Console.WriteLine(
-            "  --run                        Execute live calls. F1.2 ships Claude only.");
+            "  --run                        Execute live calls. F1.3 supports claude and openai.");
         Console.WriteLine(
             "  --i-understand-live-cost     Required for any --run.");
         Console.WriteLine(
@@ -257,11 +283,15 @@ internal static class Program
         Console.WriteLine(
             "  --help / -h                  Print this help.");
         Console.WriteLine();
-        Console.WriteLine("Live invocation (Claude only in F1.2):");
+        Console.WriteLine("Live invocation (Claude and OpenAI supported in F1.3):");
         Console.WriteLine(
             "  dotnet run --project tools/StoryModelBakeoff -- \\");
         Console.WriteLine(
             "    --run --provider claude --i-understand-live-cost --max-prompts 1");
+        Console.WriteLine(
+            "  dotnet run --project tools/StoryModelBakeoff -- \\");
+        Console.WriteLine(
+            "    --run --provider openai --i-understand-live-cost --max-prompts 1");
         Console.WriteLine();
         Console.WriteLine("Environment variables:");
         Console.WriteLine(
@@ -573,18 +603,20 @@ internal static class Program
         Console.WriteLine();
         Console.WriteLine("Live execution:");
         Console.WriteLine(
-            "  F1.2 supports Claude only. Re-run with --run --provider claude " +
-            "--i-understand-live-cost and either --max-prompts N or " +
-            "--allow-full-set.");
+            "  F1.3 supports Claude and OpenAI. Re-run with --run " +
+            "--provider <claude|openai> --i-understand-live-cost and either " +
+            "--max-prompts N or --allow-full-set.");
         Console.WriteLine(
-            "  ANTHROPIC_API_KEY must be set in your environment.");
+            "  ANTHROPIC_API_KEY (claude) / OPENAI_API_KEY (openai) " +
+            "must be set in your environment.");
         Console.WriteLine(
-            "  OpenAI / Gemini live execution remain deferred to a later F1 slice.");
+            "  Gemini / local / 'all' live execution remain deferred to a " +
+            "later F1 slice.");
 
         Console.WriteLine(bar);
     }
 
-    // ---------- live execution (F1.2) ----------
+    // ---------- live execution (F1.2 Claude + F1.3a OpenAI) ----------
 
     private sealed record TurnResult(
         string UserContent,
@@ -604,7 +636,7 @@ internal static class Program
         DateTime StartedUtc,
         DateTime CompletedUtc,
         DateTime? InterruptedUtc,
-        ResolvedProvider Claude,
+        ResolvedProvider Provider,
         string BakeoffPromptSha,
         string? ProductionPromptSha,
         bool DriftDetected,
@@ -628,9 +660,9 @@ internal static class Program
         var bar = new string('=', 60);
         Console.WriteLine();
         Console.WriteLine(bar);
-        Console.WriteLine("  StoryModelBakeoff — live Claude run");
+        Console.WriteLine($"  StoryModelBakeoff — live {claude.Name} run");
         Console.WriteLine(bar);
-        Console.WriteLine($"  Provider:   claude");
+        Console.WriteLine($"  Provider:   {claude.Name}");
         Console.WriteLine($"  Model:      {claude.Model}");
         Console.WriteLine($"  Scenarios:  {scenarios.Count}");
         Console.WriteLine($"  Turns:      {totalTurns}");
@@ -794,7 +826,7 @@ internal static class Program
             StartedUtc: startedUtc,
             CompletedUtc: completedUtc,
             InterruptedUtc: interruptedUtc,
-            Claude: claude,
+            Provider: claude,
             BakeoffPromptSha: bakeoffPromptSha,
             ProductionPromptSha: productionPromptSha,
             DriftDetected: driftDetected,
@@ -896,7 +928,7 @@ internal static class Program
             {
                 using var doc = JsonDocument.Parse(raw);
                 var root = doc.RootElement;
-                var text = ExtractAssistantText(root);
+                var text = ExtractClaudeAssistantText(root);
                 string? stopReason = null;
                 if (root.TryGetProperty("stop_reason", out var sr)
                     && sr.ValueKind == JsonValueKind.String)
@@ -993,7 +1025,7 @@ internal static class Program
         }
     }
 
-    private static string ExtractAssistantText(JsonElement root)
+    private static string ExtractClaudeAssistantText(JsonElement root)
     {
         if (!root.TryGetProperty("content", out var contentEl)
             || contentEl.ValueKind != JsonValueKind.Array)
@@ -1014,6 +1046,431 @@ internal static class Program
             }
         }
         return sb.ToString();
+    }
+
+    // ---------- OpenAI live path (F1.3a) ----------
+    //
+    // Mirror of RunLiveClaudeAsync / CallClaudeOnceAsync, with the four
+    // provider-specific differences spelled out in
+    // tools/StoryModelBakeoff/evaluations/f1-3-api-runner-plan-20260505.md
+    // § 5.2:
+    //  - auth header: Authorization: Bearer <key>  (not x-api-key)
+    //  - system prompt slot: first messages[] entry, role="system"
+    //                        (not a top-level "system" field)
+    //  - response text:  choices[0].message.content
+    //                    (not content[].type=="text".text array)
+    //  - usage fields:   usage.prompt_tokens / usage.completion_tokens
+    //                    (not usage.input_tokens / usage.output_tokens)
+    //
+    // Same TurnResult / ScenarioResult / RunResult / ErrorKind shapes as
+    // the Claude path. Same Stopwatch latency model. Same Ctrl-C
+    // cooperative cancellation. Same atomic results writers — the writers
+    // are now provider-agnostic via run.Provider.
+
+    private static async Task<int> RunLiveOpenAIAsync(
+        string apiKey,
+        ResolvedProvider openai,
+        List<Scenario> scenarios,
+        string bakeoffPromptText,
+        string bakeoffPromptSha,
+        string? productionPromptSha)
+    {
+        var totalTurns = scenarios.Sum(s => s.Turns.Count);
+        var resultsRoot = Path.Combine(
+            AppContext.BaseDirectory, "results");
+        var runStamp = DateTime.UtcNow.ToString("yyyyMMddTHHmmssZ");
+        var runDir = Path.Combine(resultsRoot, runStamp);
+
+        // Print pre-execution plan (no API key, no system prompt body).
+        var bar = new string('=', 60);
+        Console.WriteLine();
+        Console.WriteLine(bar);
+        Console.WriteLine($"  StoryModelBakeoff — live {openai.Name} run");
+        Console.WriteLine(bar);
+        Console.WriteLine($"  Provider:   {openai.Name}");
+        Console.WriteLine($"  Model:      {openai.Model}");
+        Console.WriteLine($"  Scenarios:  {scenarios.Count}");
+        Console.WriteLine($"  Turns:      {totalTurns}");
+        Console.WriteLine($"  Calls:      {totalTurns}");
+        Console.WriteLine($"  Output dir: {runDir}");
+        Console.WriteLine($"  Prompt sha: {bakeoffPromptSha}");
+        if (productionPromptSha is not null
+            && !string.Equals(bakeoffPromptSha, productionPromptSha,
+                StringComparison.Ordinal))
+        {
+            Console.WriteLine(
+                "  WARNING — bake-off prompt has drifted from production. " +
+                "Refresh system-prompt.txt before relying on these results.");
+        }
+        Console.WriteLine();
+        Console.WriteLine(
+            "  Ctrl-C now if this is unexpected — the run starts immediately.");
+        Console.WriteLine(bar);
+        Console.WriteLine();
+
+        // ---- cancellation wiring ----
+        using var cts = new CancellationTokenSource();
+        var sigintHandler = new ConsoleCancelEventHandler((s, e) =>
+        {
+            e.Cancel = true;
+            if (cts.IsCancellationRequested) return;
+            Console.Error.WriteLine(
+                "  ^C received — finishing current call, then flushing partial " +
+                "results.");
+            cts.Cancel();
+        });
+        Console.CancelKeyPress += sigintHandler;
+
+        var startedUtc = DateTime.UtcNow;
+        var scenarioResults = new List<ScenarioResult>();
+        DateTime? interruptedUtc = null;
+
+        try
+        {
+            using var http = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(RequestTimeoutSeconds),
+            };
+            // Bearer auth per the OpenAI Chat Completions contract. The
+            // Authorization header is the only place the key appears in
+            // memory; never logged, never persisted to disk.
+            http.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", apiKey);
+
+            for (var si = 0; si < scenarios.Count; si++)
+            {
+                if (cts.IsCancellationRequested)
+                {
+                    interruptedUtc = DateTime.UtcNow;
+                    break;
+                }
+
+                var scenario = scenarios[si];
+                var turnResults = new List<TurnResult>(scenario.Turns.Count);
+
+                // Per-scenario rolling history. user/assistant pairs only;
+                // the system message is prepended inside CallOpenAIOnceAsync
+                // so the rolling-history shape matches the Claude path's.
+                var messages = new List<(string Role, string Content)>();
+                var scenarioFailed = false;
+
+                for (var ti = 0; ti < scenario.Turns.Count; ti++)
+                {
+                    if (cts.IsCancellationRequested)
+                    {
+                        interruptedUtc = DateTime.UtcNow;
+                        break;
+                    }
+
+                    var turn = scenario.Turns[ti];
+                    var label =
+                        $"[{scenario.Id} t{ti + 1}/{scenario.Turns.Count} openai]";
+
+                    if (scenarioFailed)
+                    {
+                        Console.WriteLine($"{label} skipped (prior turn failed)");
+                        turnResults.Add(new TurnResult(
+                            UserContent: turn.Content,
+                            AssistantContent: string.Empty,
+                            StopReason: null,
+                            LatencyMs: 0,
+                            InputTokens: null,
+                            OutputTokens: null,
+                            ErrorKind: "skipped_due_to_prior_error",
+                            ErrorMessage: null));
+                        continue;
+                    }
+
+                    messages.Add(("user", turn.Content));
+
+                    TurnResult result;
+                    try
+                    {
+                        result = await CallOpenAIOnceAsync(
+                            http: http,
+                            model: openai.Model,
+                            systemPrompt: bakeoffPromptText,
+                            messages: messages,
+                            userContent: turn.Content,
+                            ct: cts.Token);
+                    }
+                    catch (OperationCanceledException)
+                        when (cts.IsCancellationRequested)
+                    {
+                        interruptedUtc = DateTime.UtcNow;
+                        break;
+                    }
+
+                    turnResults.Add(result);
+
+                    if (result.ErrorKind is null)
+                    {
+                        messages.Add(("assistant", result.AssistantContent));
+                        Console.WriteLine(
+                            $"{label} ok {result.LatencyMs}ms " +
+                            $"{result.OutputTokens?.ToString() ?? "?"}out");
+                    }
+                    else
+                    {
+                        scenarioFailed = true;
+                        Console.WriteLine(
+                            $"{label} FAIL {result.ErrorKind} {result.LatencyMs}ms");
+                    }
+                }
+
+                scenarioResults.Add(new ScenarioResult(scenario, turnResults));
+
+                if (cts.IsCancellationRequested && interruptedUtc is not null)
+                    break;
+            }
+        }
+        finally
+        {
+            Console.CancelKeyPress -= sigintHandler;
+        }
+
+        var completedUtc = DateTime.UtcNow;
+        var driftDetected = productionPromptSha is not null
+            && !string.Equals(productionPromptSha, bakeoffPromptSha,
+                StringComparison.Ordinal);
+
+        var runResult = new RunResult(
+            StartedUtc: startedUtc,
+            CompletedUtc: completedUtc,
+            InterruptedUtc: interruptedUtc,
+            Provider: openai,
+            BakeoffPromptSha: bakeoffPromptSha,
+            ProductionPromptSha: productionPromptSha,
+            DriftDetected: driftDetected,
+            Scenarios: scenarioResults);
+
+        await WriteRunResultsAsync(runDir, runResult);
+
+        Console.WriteLine();
+        Console.WriteLine($"Wrote results: {runDir}");
+        Console.WriteLine(
+            "  results.json (machine), review.md (human), summary.json (totals)");
+
+        return 0;
+    }
+
+    private static async Task<TurnResult> CallOpenAIOnceAsync(
+        HttpClient http,
+        string model,
+        string systemPrompt,
+        List<(string Role, string Content)> messages,
+        string userContent,
+        CancellationToken ct)
+    {
+        // Build messages array: system entry first, then the rolling
+        // user/assistant history. The runner's history list contains
+        // user/assistant pairs only; system goes in messages[0] per
+        // OpenAI's Chat Completions contract.
+        var messagesOut = new List<Dictionary<string, object?>>(
+            messages.Count + 1)
+        {
+            new()
+            {
+                ["role"] = "system",
+                ["content"] = systemPrompt,
+            },
+        };
+        foreach (var m in messages)
+        {
+            messagesOut.Add(new Dictionary<string, object?>
+            {
+                ["role"] = m.Role,
+                ["content"] = m.Content,
+            });
+        }
+
+        var requestBody = new Dictionary<string, object?>
+        {
+            ["model"] = model,
+            ["max_tokens"] = OpenAIMaxTokens,
+            ["messages"] = messagesOut,
+        };
+
+        var jsonOpts = LiveJsonOptions();
+        var bodyJson = JsonSerializer.Serialize(requestBody, jsonOpts);
+        using var content = new StringContent(
+            bodyJson, Encoding.UTF8, "application/json");
+
+        var sw = Stopwatch.StartNew();
+        HttpResponseMessage? resp = null;
+        try
+        {
+            resp = await http.PostAsync(OpenAIEndpoint, content, ct);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                sw.Stop();
+                var status = (int)resp.StatusCode;
+                string detail;
+                try
+                {
+                    detail = await resp.Content.ReadAsStringAsync(ct);
+                }
+                catch
+                {
+                    detail = "<failed to read response body>";
+                }
+                return new TurnResult(
+                    UserContent: userContent,
+                    AssistantContent: string.Empty,
+                    StopReason: null,
+                    LatencyMs: sw.ElapsedMilliseconds,
+                    InputTokens: null,
+                    OutputTokens: null,
+                    ErrorKind: $"http_{status}",
+                    ErrorMessage: Truncate(detail, 500));
+            }
+
+            string raw;
+            try
+            {
+                raw = await resp.Content.ReadAsStringAsync(ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                return new TurnResult(
+                    UserContent: userContent,
+                    AssistantContent: string.Empty,
+                    StopReason: null,
+                    LatencyMs: sw.ElapsedMilliseconds,
+                    InputTokens: null,
+                    OutputTokens: null,
+                    ErrorKind: "network",
+                    ErrorMessage: Truncate(ex.GetType().Name + ": " + ex.Message, 500));
+            }
+            sw.Stop();
+
+            try
+            {
+                using var doc = JsonDocument.Parse(raw);
+                var root = doc.RootElement;
+                var (text, stopReason) = ExtractOpenAIAssistantText(root);
+                int? inputTokens = null;
+                int? outputTokens = null;
+                if (root.TryGetProperty("usage", out var usage)
+                    && usage.ValueKind == JsonValueKind.Object)
+                {
+                    if (usage.TryGetProperty("prompt_tokens", out var pt)
+                        && pt.ValueKind == JsonValueKind.Number)
+                    {
+                        inputTokens = pt.GetInt32();
+                    }
+                    if (usage.TryGetProperty("completion_tokens", out var ot)
+                        && ot.ValueKind == JsonValueKind.Number)
+                    {
+                        outputTokens = ot.GetInt32();
+                    }
+                }
+
+                return new TurnResult(
+                    UserContent: userContent,
+                    AssistantContent: text,
+                    StopReason: stopReason,
+                    LatencyMs: sw.ElapsedMilliseconds,
+                    InputTokens: inputTokens,
+                    OutputTokens: outputTokens,
+                    ErrorKind: null,
+                    ErrorMessage: null);
+            }
+            catch (JsonException jex)
+            {
+                return new TurnResult(
+                    UserContent: userContent,
+                    AssistantContent: string.Empty,
+                    StopReason: null,
+                    LatencyMs: sw.ElapsedMilliseconds,
+                    InputTokens: null,
+                    OutputTokens: null,
+                    ErrorKind: "parse",
+                    ErrorMessage: Truncate(jex.Message, 500));
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (TaskCanceledException tce)
+        {
+            sw.Stop();
+            return new TurnResult(
+                UserContent: userContent,
+                AssistantContent: string.Empty,
+                StopReason: null,
+                LatencyMs: sw.ElapsedMilliseconds,
+                InputTokens: null,
+                OutputTokens: null,
+                ErrorKind: "timeout",
+                ErrorMessage: Truncate(tce.Message, 500));
+        }
+        catch (HttpRequestException hre)
+        {
+            sw.Stop();
+            return new TurnResult(
+                UserContent: userContent,
+                AssistantContent: string.Empty,
+                StopReason: null,
+                LatencyMs: sw.ElapsedMilliseconds,
+                InputTokens: null,
+                OutputTokens: null,
+                ErrorKind: "network",
+                ErrorMessage: Truncate(hre.GetType().Name + ": " + hre.Message, 500));
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            return new TurnResult(
+                UserContent: userContent,
+                AssistantContent: string.Empty,
+                StopReason: null,
+                LatencyMs: sw.ElapsedMilliseconds,
+                InputTokens: null,
+                OutputTokens: null,
+                ErrorKind: "network",
+                ErrorMessage: Truncate(ex.GetType().Name + ": " + ex.Message, 500));
+        }
+        finally
+        {
+            resp?.Dispose();
+        }
+    }
+
+    private static (string Text, string? FinishReason) ExtractOpenAIAssistantText(
+        JsonElement root)
+    {
+        if (!root.TryGetProperty("choices", out var choicesEl)
+            || choicesEl.ValueKind != JsonValueKind.Array
+            || choicesEl.GetArrayLength() == 0)
+        {
+            return (string.Empty, null);
+        }
+        var first = choicesEl[0];
+        string? finishReason = null;
+        if (first.TryGetProperty("finish_reason", out var fr)
+            && fr.ValueKind == JsonValueKind.String)
+        {
+            finishReason = fr.GetString();
+        }
+        if (!first.TryGetProperty("message", out var msg)
+            || msg.ValueKind != JsonValueKind.Object)
+        {
+            return (string.Empty, finishReason);
+        }
+        if (msg.TryGetProperty("content", out var contentEl)
+            && contentEl.ValueKind == JsonValueKind.String)
+        {
+            return (contentEl.GetString() ?? string.Empty, finishReason);
+        }
+        return (string.Empty, finishReason);
     }
 
     private static string Truncate(string s, int maxChars)
@@ -1074,9 +1531,9 @@ internal static class Program
                 .ToList(),
             results = new Dictionary<string, object?>
             {
-                ["claude"] = new
+                [run.Provider.Name] = new
                 {
-                    model = run.Claude.Model,
+                    model = run.Provider.Model,
                     turns = sr.Turns.Select(tr => new
                     {
                         userContent = tr.UserContent,
@@ -1113,7 +1570,7 @@ internal static class Program
         };
         doc["providers"] = new[]
         {
-            new { name = "claude", model = run.Claude.Model },
+            new { name = run.Provider.Name, model = run.Provider.Model },
         };
         doc["scenarios"] = scenariosOut;
 
@@ -1159,9 +1616,9 @@ internal static class Program
         doc["totalTurns"] = totalTurns;
         doc["providers"] = new Dictionary<string, object?>
         {
-            ["claude"] = new
+            [run.Provider.Name] = new
             {
-                model = run.Claude.Model,
+                model = run.Provider.Model,
                 callsAttempted = attempted,
                 callsSucceeded = succeeded,
                 callsFailed = failed,
@@ -1181,7 +1638,7 @@ internal static class Program
         var sb = new StringBuilder();
         var totalTurns = run.Scenarios.Sum(s => s.Turns.Count);
 
-        sb.AppendLine("# StoryModelBakeoff — F1.2 Claude review");
+        sb.AppendLine($"# StoryModelBakeoff — F1.3 {run.Provider.Name} review");
         sb.AppendLine();
         sb.AppendLine("| Field | Value |");
         sb.AppendLine("|---|---|");
@@ -1192,8 +1649,8 @@ internal static class Program
             sb.AppendLine(
                 $"| Run interrupted (UTC) | {run.InterruptedUtc.Value:o} |");
         }
-        sb.AppendLine($"| Provider | claude |");
-        sb.AppendLine($"| Model | {run.Claude.Model} |");
+        sb.AppendLine($"| Provider | {run.Provider.Name} |");
+        sb.AppendLine($"| Model | {run.Provider.Model} |");
         sb.AppendLine($"| Scenarios | {run.Scenarios.Count} |");
         sb.AppendLine($"| Total turns | {totalTurns} |");
         sb.AppendLine($"| bake-off prompt sha256 | `{run.BakeoffPromptSha}` |");
@@ -1203,8 +1660,9 @@ internal static class Program
             $"| Drift | {(run.DriftDetected ? "**WARNING — drifted**" : "none")} |");
         sb.AppendLine();
         sb.AppendLine(
-            "OpenAI / Gemini are NOT in F1.2; review live OpenAI output via " +
-            "the existing `tools/StoryBenchmark` runs.");
+            "F1.3 supports Claude and OpenAI live execution; one provider " +
+            "per run by design (cost discipline). To compare, run the matrix " +
+            "twice and combine summary.json files in a separate decision doc.");
         sb.AppendLine();
 
         foreach (var sr in run.Scenarios)
@@ -1219,7 +1677,7 @@ internal static class Program
                     $"{i + 1}. «{sr.Scenario.Turns[i].Content}»");
             }
             sb.AppendLine();
-            sb.AppendLine($"### claude ({run.Claude.Model})");
+            sb.AppendLine($"### {run.Provider.Name} ({run.Provider.Model})");
             sb.AppendLine();
 
             for (var ti = 0; ti < sr.Turns.Count; ti++)
@@ -1264,7 +1722,7 @@ internal static class Program
                 }
             }
 
-            sb.AppendLine("#### Manual scoring (claude, full scenario)");
+            sb.AppendLine($"#### Manual scoring ({run.Provider.Name}, full scenario)");
             sb.AppendLine();
             sb.AppendLine("- Armenian naturalness — _ / 5");
             sb.AppendLine("- Eastern Armenian correctness — _ / 5");
