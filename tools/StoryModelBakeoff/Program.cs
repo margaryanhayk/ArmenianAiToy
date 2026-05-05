@@ -73,6 +73,8 @@ internal static class Program
         var maxPromptsArg = ParseIntArg(args, "--max-prompts");
         var costFlag = args.Contains("--i-understand-live-cost");
         var allowFullSet = args.Contains("--allow-full-set");
+        var scenariosOverride = ParseStringArg(args, "--scenarios");
+        var systemPromptOverride = ParseStringArg(args, "--system-prompt");
 
         if (!IsValidProviderArg(providerArg))
         {
@@ -97,22 +99,49 @@ internal static class Program
             return 1;
         }
 
-        // ---- locate scaffold files (next to the binary) ----
-        var systemPromptPath = Path.Combine(
-            AppContext.BaseDirectory, "system-prompt.txt");
-        var promptsPath = Path.Combine(
-            AppContext.BaseDirectory, "bakeoff-prompts.json");
+        // ---- locate scaffold files (override-aware) ----
+        // F1.3b: --scenarios <path> and --system-prompt <path> let an
+        // alternate pair (e.g. v3.1 + Plan A/D) drive the run without
+        // replacing the shipped bare-Armenian smoke set. Defaults preserve
+        // F1.2 behavior byte-for-byte. Override paths resolve against cwd
+        // (user-supplied paths typically live in source); defaults stay
+        // next to the binary (CopyToOutputDirectory pair).
+        string systemPromptPath;
+        var alternateSystemPromptInUse = false;
+        if (!string.IsNullOrWhiteSpace(systemPromptOverride))
+        {
+            systemPromptPath = Path.GetFullPath(systemPromptOverride);
+            alternateSystemPromptInUse = true;
+        }
+        else
+        {
+            systemPromptPath = Path.Combine(
+                AppContext.BaseDirectory, "system-prompt.txt");
+        }
+
+        string promptsPath;
+        var alternateScenariosInUse = false;
+        if (!string.IsNullOrWhiteSpace(scenariosOverride))
+        {
+            promptsPath = Path.GetFullPath(scenariosOverride);
+            alternateScenariosInUse = true;
+        }
+        else
+        {
+            promptsPath = Path.Combine(
+                AppContext.BaseDirectory, "bakeoff-prompts.json");
+        }
 
         if (!File.Exists(systemPromptPath))
         {
             Console.Error.WriteLine(
-                $"system-prompt.txt not found next to binary: {systemPromptPath}");
+                $"system-prompt file not found: {systemPromptPath}");
             return 1;
         }
         if (!File.Exists(promptsPath))
         {
             Console.Error.WriteLine(
-                $"bakeoff-prompts.json not found next to binary: {promptsPath}");
+                $"scenarios file not found: {promptsPath}");
             return 1;
         }
 
@@ -129,6 +158,12 @@ internal static class Program
         var (productionPromptSha, productionPath) =
             TryReadProductionPromptSha();
 
+        // ---- compute scenarios SHA-256 (raw file, line-end normalized) ----
+        // F1.3b: pinned in promptIdentity so a future audit can reproduce
+        // the exact prompt set even if the file is later edited or moved.
+        var scenariosSha = Sha256Hex(
+            NormalizeNewlines(File.ReadAllText(promptsPath)));
+
         // ---- load + validate prompts ----
         List<Scenario> scenarios;
         try
@@ -139,7 +174,7 @@ internal static class Program
         catch (Exception ex)
         {
             Console.Error.WriteLine(
-                $"bakeoff-prompts.json invalid: {ex.Message}");
+                $"scenarios file invalid: {ex.Message}");
             return 1;
         }
 
@@ -156,7 +191,7 @@ internal static class Program
         // ---- resolve providers ----
         var resolved = ResolveProviders(providerArg);
 
-        // ---- dry-run path (unchanged from F1.1) ----
+        // ---- dry-run path (unchanged from F1.1; F1.3b adds override info) ----
         if (!live)
         {
             PrintPlan(
@@ -164,6 +199,10 @@ internal static class Program
                 scenarios,
                 bakeoffPromptPath: systemPromptPath,
                 bakeoffPromptSha: bakeoffPromptSha,
+                scenariosPath: promptsPath,
+                scenariosSha: scenariosSha,
+                alternateSystemPromptInUse: alternateSystemPromptInUse,
+                alternateScenariosInUse: alternateScenariosInUse,
                 productionPath: productionPath,
                 productionPromptSha: productionPromptSha);
             return 0;
@@ -223,14 +262,24 @@ internal static class Program
                 scenarios: scenarios,
                 bakeoffPromptText: bakeoffPromptText,
                 bakeoffPromptSha: bakeoffPromptSha,
-                productionPromptSha: productionPromptSha),
+                productionPromptSha: productionPromptSha,
+                scenariosPath: promptsPath,
+                scenariosSha: scenariosSha,
+                systemPromptPath: systemPromptPath,
+                alternateScenariosInUse: alternateScenariosInUse,
+                alternateSystemPromptInUse: alternateSystemPromptInUse),
             "openai" => await RunLiveOpenAIAsync(
                 apiKey: apiKey,
                 openai: providerConfig,
                 scenarios: scenarios,
                 bakeoffPromptText: bakeoffPromptText,
                 bakeoffPromptSha: bakeoffPromptSha,
-                productionPromptSha: productionPromptSha),
+                productionPromptSha: productionPromptSha,
+                scenariosPath: promptsPath,
+                scenariosSha: scenariosSha,
+                systemPromptPath: systemPromptPath,
+                alternateScenariosInUse: alternateScenariosInUse,
+                alternateSystemPromptInUse: alternateSystemPromptInUse),
             _ => throw new InvalidOperationException(
                 "guard chain regression: unsupported provider reached dispatch"),
         };
@@ -280,6 +329,10 @@ internal static class Program
             "  --i-understand-live-cost     Required for any --run.");
         Console.WriteLine(
             "  --allow-full-set             Run all scenarios; XOR with --max-prompts.");
+        Console.WriteLine(
+            "  --scenarios <path>           Override scenarios JSON (default: bakeoff-prompts.json next to binary).");
+        Console.WriteLine(
+            "  --system-prompt <path>       Override system prompt (default: system-prompt.txt next to binary).");
         Console.WriteLine(
             "  --help / -h                  Print this help.");
         Console.WriteLine();
@@ -509,6 +562,10 @@ internal static class Program
         List<Scenario> scenarios,
         string bakeoffPromptPath,
         string bakeoffPromptSha,
+        string scenariosPath,
+        string scenariosSha,
+        bool alternateSystemPromptInUse,
+        bool alternateScenariosInUse,
         string? productionPath,
         string? productionPromptSha)
     {
@@ -571,6 +628,12 @@ internal static class Program
         Console.WriteLine("Prompt identity:");
         Console.WriteLine($"  bake-off  sha256 = {bakeoffPromptSha}");
         Console.WriteLine($"            path   = {bakeoffPromptPath}");
+        Console.WriteLine($"  scenarios sha256 = {scenariosSha}");
+        Console.WriteLine($"            path   = {scenariosPath}");
+        Console.WriteLine(
+            $"  alternate system-prompt = {(alternateSystemPromptInUse ? "yes" : "no")}");
+        Console.WriteLine(
+            $"  alternate scenarios     = {(alternateScenariosInUse ? "yes" : "no")}");
         if (productionPromptSha is null)
         {
             Console.WriteLine("  production sha256 = (not located)");
@@ -589,6 +652,15 @@ internal static class Program
                 StringComparison.Ordinal))
             {
                 Console.WriteLine("  drift   = none (hashes match)");
+            }
+            else if (alternateSystemPromptInUse)
+            {
+                // F1.3b: drift is expected when the operator opts into a
+                // non-default system prompt (e.g. v3.1). Frame it as
+                // intentional rather than warn.
+                Console.WriteLine(
+                    "  drift   = drifted (intentional — alternate system prompt " +
+                    "in use via --system-prompt)");
             }
             else
             {
@@ -640,6 +712,11 @@ internal static class Program
         string BakeoffPromptSha,
         string? ProductionPromptSha,
         bool DriftDetected,
+        string ScenariosPath,
+        string ScenariosSha,
+        string SystemPromptPath,
+        bool AlternateScenariosInUse,
+        bool AlternateSystemPromptInUse,
         List<ScenarioResult> Scenarios);
 
     private static async Task<int> RunLiveClaudeAsync(
@@ -648,7 +725,12 @@ internal static class Program
         List<Scenario> scenarios,
         string bakeoffPromptText,
         string bakeoffPromptSha,
-        string? productionPromptSha)
+        string? productionPromptSha,
+        string scenariosPath,
+        string scenariosSha,
+        string systemPromptPath,
+        bool alternateScenariosInUse,
+        bool alternateSystemPromptInUse)
     {
         var totalTurns = scenarios.Sum(s => s.Turns.Count);
         var resultsRoot = Path.Combine(
@@ -830,6 +912,11 @@ internal static class Program
             BakeoffPromptSha: bakeoffPromptSha,
             ProductionPromptSha: productionPromptSha,
             DriftDetected: driftDetected,
+            ScenariosPath: scenariosPath,
+            ScenariosSha: scenariosSha,
+            SystemPromptPath: systemPromptPath,
+            AlternateScenariosInUse: alternateScenariosInUse,
+            AlternateSystemPromptInUse: alternateSystemPromptInUse,
             Scenarios: scenarioResults);
 
         await WriteRunResultsAsync(runDir, runResult);
@@ -1073,7 +1160,12 @@ internal static class Program
         List<Scenario> scenarios,
         string bakeoffPromptText,
         string bakeoffPromptSha,
-        string? productionPromptSha)
+        string? productionPromptSha,
+        string scenariosPath,
+        string scenariosSha,
+        string systemPromptPath,
+        bool alternateScenariosInUse,
+        bool alternateSystemPromptInUse)
     {
         var totalTurns = scenarios.Sum(s => s.Turns.Count);
         var resultsRoot = Path.Combine(
@@ -1242,6 +1334,11 @@ internal static class Program
             BakeoffPromptSha: bakeoffPromptSha,
             ProductionPromptSha: productionPromptSha,
             DriftDetected: driftDetected,
+            ScenariosPath: scenariosPath,
+            ScenariosSha: scenariosSha,
+            SystemPromptPath: systemPromptPath,
+            AlternateScenariosInUse: alternateScenariosInUse,
+            AlternateSystemPromptInUse: alternateSystemPromptInUse,
             Scenarios: scenarioResults);
 
         await WriteRunResultsAsync(runDir, runResult);
@@ -1554,7 +1651,7 @@ internal static class Program
 
         var doc = new Dictionary<string, object?>
         {
-            ["schemaVersion"] = 1,
+            ["schemaVersion"] = 2,
             ["runStartedUtc"] = run.StartedUtc.ToString("o"),
             ["runCompletedUtc"] = run.CompletedUtc.ToString("o"),
         };
@@ -1567,6 +1664,11 @@ internal static class Program
             bakeoffPromptSha256 = run.BakeoffPromptSha,
             productionPromptSha256 = run.ProductionPromptSha,
             driftDetected = run.DriftDetected,
+            alternateSystemPromptInUse = run.AlternateSystemPromptInUse,
+            alternateScenariosInUse = run.AlternateScenariosInUse,
+            scenariosPath = run.ScenariosPath,
+            scenariosSha256 = run.ScenariosSha,
+            systemPromptPath = run.SystemPromptPath,
         };
         doc["providers"] = new[]
         {
@@ -1604,7 +1706,7 @@ internal static class Program
 
         var doc = new Dictionary<string, object?>
         {
-            ["schemaVersion"] = 1,
+            ["schemaVersion"] = 2,
             ["runStartedUtc"] = run.StartedUtc.ToString("o"),
             ["runCompletedUtc"] = run.CompletedUtc.ToString("o"),
         };
@@ -1654,10 +1756,21 @@ internal static class Program
         sb.AppendLine($"| Scenarios | {run.Scenarios.Count} |");
         sb.AppendLine($"| Total turns | {totalTurns} |");
         sb.AppendLine($"| bake-off prompt sha256 | `{run.BakeoffPromptSha}` |");
+        sb.AppendLine($"| system-prompt path | `{run.SystemPromptPath}` |");
+        sb.AppendLine($"| scenarios sha256 | `{run.ScenariosSha}` |");
+        sb.AppendLine($"| scenarios path | `{run.ScenariosPath}` |");
+        sb.AppendLine(
+            $"| alternate system-prompt | {(run.AlternateSystemPromptInUse ? "yes" : "no")} |");
+        sb.AppendLine(
+            $"| alternate scenarios | {(run.AlternateScenariosInUse ? "yes" : "no")} |");
         sb.AppendLine(
             $"| production prompt sha256 | `{run.ProductionPromptSha ?? "(not located)"}` |");
-        sb.AppendLine(
-            $"| Drift | {(run.DriftDetected ? "**WARNING — drifted**" : "none")} |");
+        var driftLabel = run.DriftDetected
+            ? (run.AlternateSystemPromptInUse
+                ? "drifted (intentional — alternate system prompt)"
+                : "**WARNING — drifted**")
+            : "none";
+        sb.AppendLine($"| Drift | {driftLabel} |");
         sb.AppendLine();
         sb.AppendLine(
             "F1.3 supports Claude and OpenAI live execution; one provider " +
