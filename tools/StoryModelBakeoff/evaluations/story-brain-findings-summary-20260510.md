@@ -3,7 +3,7 @@
 **Status:** evidence summary only. No code change, no paid API
 call, no backend run, no Claude API use, no production change,
 no ChatService touch, no provider switch implied or authorized
-by this document. Pulls the per-axis pattern out of four data
+by this document. Pulls the per-axis pattern out of five data
 points landed across recent capture sessions and restates the
 conservative decision thresholds from the comparison plan.
 
@@ -16,6 +16,8 @@ conservative decision thresholds from the comparison plan.
   `tools/StoryModelBakeoff/evaluations/claude-app-plan-a-controlled-capture-result-20260510.md`
 - Claude.app Plan D controlled capture result (commit `471bbf6`):
   `tools/StoryModelBakeoff/evaluations/claude-app-plan-d-controlled-capture-result-20260510.md`
+- Claude.app Home/Play controlled capture result (commit `8c944e5`):
+  `tools/StoryModelBakeoff/evaluations/claude-app-home-play-controlled-capture-result-20260510.md`
 - Controlled comparison plan (commit `bbe50fa`):
   `tools/StoryModelBakeoff/evaluations/controlled-claude-openai-comparison-plan-20260510.md`
 
@@ -39,6 +41,16 @@ with the rest of this evidence batch.
   lesson-style closing). Plan D had higher atmosphere but
   native-ear semantic / animal-anatomy issues (duckling ears,
   lizard wing, off-register `կռկռում` for water).
+- **Claude Home/Play is the cleanest practical say-aloud
+  controlled sample so far.** The PE scenario (Նարե / her room /
+  doll Մոմո / missing little pillow) scored strongly on natural
+  everyday Armenian, short pacing, format stability, fake-
+  Armenian safety, and semantic / body-part sanity. Less
+  magical / premium than the hedgehog sample, but more
+  production-realistic for everyday toy use. Supports the
+  finding that Claude performs better when the prompt constrains
+  register to simple everyday Armenian and familiar settings.
+  Does NOT justify a provider switch by itself.
 - **No provider switch yet.** Neither side has cleared the
   comparison-plan thresholds. ChatService still routes to
   OpenAI in production.
@@ -56,6 +68,7 @@ with the rest of this evidence batch.
 | **OAI-v3.2.3-mp1-PA** | `openai-v3-2-3-smoke-mp1-20260510.md` | OpenAI API via `StoryModelBakeoff` runner, gpt-4o, max-prompts-1 | PA: puppy / orchard / dew-drop golden leaf / stork | Best-yet structural envelope across v3.2-era runs: hard-tally 9/10, T3 mid-band ~90w, all turns in target word-band for first time, no English/meta leakage, safety PASS | Four borderline / coined Armenian tokens across 3 turns (`բոցերում`, `փայլացնում`, `ցուցանի`, `անթել`); recurring mid-paragraph `Մի օր,` opener slip in T1 sentence 6 | NO, borderline | OpenAI structurally strong, Armenian-risky. Same shape every round; named-exemplar tightening has hit a ceiling. |
 | **CLA-app-PA-controlled** | `claude-app-plan-a-controlled-capture-result-20260510.md` | Manual Claude.app, controlled prompt (Areg persona, PD scenario family, A → B path, 9-label format) | PA (same scenario family as the OpenAI PA bake-off run) | Format compliance perfect; correct A → B path; no English / meta; no obvious fake Armenian morphology; gentle / safe | Generic `Մի անգամ` opener; `կաչկաչ` (a bird-style verb) used for a dog; mildly lesson-style closing line | YES, but not ideal | Claude clearly safer than OpenAI on fake-Armenian risk on the matched scenario, but not premium enough to justify a switch by itself. |
 | **CLA-app-PD-controlled** | `claude-app-plan-d-controlled-capture-result-20260510.md` | Manual Claude.app, controlled prompt (Areg persona, PD scenario family, A → B path, schwa-not-drop + no-aphorism PD care, 9-label format) | PD: lizard / frightened duckling / old bridge / sleeping key / snow / patience resolution | Strong winter fairy-tale mood; cleanly avoids the patience-aphorism trap; schwa-not-drop on `հին կամուրջ` PASS (exactly the care note OpenAI v3.2.1 mp2 failed); format compliance perfect; A → B path correct; no obvious fake Armenian | Native-ear semantic / anatomy issues: duckling with `ականջները ճկված`, lizard offered `թև` in T1 CHOICE_B; `կռկռում է` for an awakening stream; ungrammatical middle clause `Բանալին, ոչ ոք չէ նայել, պտտվեց…`; T3 leans too literary for age 4–7 | NO, but close | Closes the "Claude has flawless Armenian" hypothesis. Promising-not-proven status confirmed. |
+| **CLA-app-Home-Play-controlled** | `claude-app-home-play-controlled-capture-result-20260510.md` | Claude.app manual, controlled prompt (Areg persona, PE child-natural home/play scenario, A → B path, 9-label format, anti-magical + anti-poetic register rules) | PE: Նարե (≈ 5 y.o.) / her bedroom / doll Մոմո / missing little pillow | Clean practical say-aloud everyday Armenian; format compliance perfect; A → B path correct; no fake Armenian; no animal-anatomy mismatch (no animal hero by design); concrete physical choices; safe + warm for ages 4–7 | Slightly plain; less memorable than the magical hedgehog sample; one minor wording/coherence issue around `Մոմոյին դրեց բարձի կողքին` in T2 (pillow not yet found at that point) | YES | Strengthens Claude as candidate for everyday Areg speech; still no runtime switch by itself. |
 
 ---
 
@@ -93,13 +106,28 @@ with the rest of this evidence batch.
   `բոցերում`/`փայլացնում`/`ցուցանի`/`անթել`. Each new exemplar
   list catches the previous family and the next family appears.
   The named-exemplar approach has hit a ceiling.
-- **The best result so far is the manual Claude hedgehog
-  sample.** But it is **not fully controlled enough for runtime
-  decision** — captured under the consumer-app's own system
-  prompt and decoding, not the Areg system prompt; the choice
-  block format is non-parser-compatible (emoji + `Հիմա ի՞նչ
-  անի…`); single scenario; single capture. Useful ceiling
-  signal, not decision evidence.
+- **The best controlled evidence is now scenario-dependent.**
+  For *magical / fairy-tale* register, the manual Claude
+  hedgehog sample remains the strongest — but it is **not fully
+  controlled enough for runtime decision** (captured under the
+  consumer-app's own system prompt and decoding, not the Areg
+  system prompt; the choice block format is non-parser-
+  compatible (emoji + `Հիմա ի՞նչ անի…`); single scenario;
+  single capture). For *practical everyday say-aloud* register,
+  the **Claude.app Home/Play controlled capture is now the
+  strongest** controlled sample — clean format, clean
+  morphology, clean semantics, age-appropriate everyday
+  vocabulary, no animal-anatomy surface (no animal hero by
+  design), no aphorism closing. Useful, but one PE sample under
+  controlled conditions still does not clear the comparison-plan
+  thresholds.
+- **Claude performs noticeably better when the prompt constrains
+  register to simple everyday Armenian.** The contrast between
+  PD (literary winter register, native-ear semantic slips) and
+  Home/Play (everyday register, clean) suggests Claude's failure
+  mode is correlated with poetic / metaphor-dense affordances.
+  A production prompt that pins the register tight should be
+  the default if Claude ever ships.
 
 ---
 
@@ -138,13 +166,12 @@ with the rest of this evidence batch.
   first") and probably a *positive whitelist* of safe stems.
   Worth designing on paper *before* burning another paid mp1 on
   another exemplar pass.
-- **Continue controlled evidence collection.** The matrix has
-  PA + PD covered across both providers (Claude via app,
-  OpenAI via API). The next decision-relevant data point is a
-  child-natural home / family / play scenario (PE per the
-  comparison plan § 4) — forest / enchanted-bridge scenarios
-  play to fairy-tale strengths and may hide practical-
-  conversational-Armenian weaknesses.
+- **Continue controlled evidence collection.** The matrix now
+  has PA + PD + PE Claude.app controlled captures, plus
+  OpenAI v3.2.3 PA via API. Still missing: a Calm-mode
+  controlled capture for both providers, a native Armenian
+  review pass of the full set, and at least one matched PE on
+  the OpenAI side if a decision needs forcing.
 - **Add a stricter semantic / naturalness checklist** to future
   capture prompts and evaluation files. Today the rubric covers
   "fake Armenian / morphology" but not "animal anatomy",
@@ -152,12 +179,16 @@ with the rest of this evidence batch.
   register" — all three were load-bearing in the Plan D capture
   review. A native Armenian reviewer's eye also needs to be
   part of every "say it aloud" cell, not optional.
-- **Next comparison should include one child-natural
-  home / play scenario.** This is the load-bearing test for the
-  hypothesis that Claude's atmospheric-prose strength extends
-  to ordinary kitchen-table Armenian. If it doesn't, the
-  apparent Claude advantage collapses outside the magical /
-  forest tropes.
+- **Child-natural Home/Play scenario is now captured.** The
+  Claude.app Home/Play controlled result (commit `8c944e5`) is
+  the load-bearing test for the hypothesis that Claude's
+  atmospheric-prose strength extends to ordinary kitchen-table
+  Armenian. It **does** extend — the practical-Armenian sample
+  is clean and say-aloud-positive. This **strengthens Claude as
+  a candidate** for an eventual provider decision but **does not
+  by itself clear the comparison-plan thresholds**. One PE
+  capture is not the matrix; a Calm-mode capture and a native
+  Armenian review pass are still required.
 
 ---
 
@@ -209,43 +240,43 @@ recommendations only, not edits to any production prompt.
 Strict order — do not parallelize without explicit GO at each
 step.
 
-1. **Create a child-natural home / play controlled scenario
-   prompt.** Following the same shape as the PA / PD capture
-   prep docs but with a different scenario family — small
-   everyday situation a 4–7-year-old recognizes (lost toy,
-   helping a sibling, learning to share, kitchen / garden /
-   bedroom). No magical object, no enchanted forest. Suggested
-   filename: `claude-app-plan-e-controlled-capture-prompt-<date>.md`
-   under `tools/StoryModelBakeoff/evaluations/`. PE per the
-   comparison plan § 4.
-2. **Capture Claude.app result for that scenario.** Same
-   capture protocol (fresh chat, non-interactive single-shot,
-   fixed A → B path, 9-label format, no coaching). Save raw
-   output as `claude-app-plan-e-controlled-capture-result-<date>.md`.
-   Evaluator review focuses on whether atmospheric prose
-   strength transfers to ordinary kitchen-table Armenian.
-3. **Compare against OpenAI only if needed and only with
-   `--max-prompts 1`.** If the PE Claude capture is decisive
-   (clearly say-aloud YES or clearly NO), one paid OpenAI mp1
-   PE run could close the matrix row. If PE Claude is the same
-   mixed shape as PA / PD, the OpenAI paid run is not yet
-   warranted — design first, spend later.
-4. **Create a native Armenian review checklist.** Lifted from
-   the per-file weakness lists (animal anatomy, verb-noun
-   semantic fit, register, schwa drops, named-coinage scan,
-   opener pattern, choice-as-physical-action). A short
-   reusable file under `tools/StoryModelBakeoff/evaluations/`
-   that future capture-result evaluator notes import by
-   reference. Lets the next reviewer skip rediscovering the
-   checklist from scratch.
-5. **Only after enough evidence, design a production
-   integration plan.** Earliest possible scope: a Claude-API-
-   based adapter behind a feature flag, with parser-adaptation
-   for the Claude tail-block format, with all four scenarios
+1. **(DONE)** PE controlled-scenario capture prompt created and
+   committed (`70df2dd`):
+   `claude-app-home-play-controlled-capture-prompt-20260510.md`.
+   Child-natural home / family / play scenario, A → B fixed
+   path, 9-label format, anti-magical + anti-poetic register
+   rules. PE per the comparison plan § 4.
+2. **(DONE)** PE Claude.app capture recorded and committed
+   (`8c944e5`):
+   `claude-app-home-play-controlled-capture-result-20260510.md`.
+   First-pass operator rubric YES on say-aloud; **native
+   Armenian review still pending.**
+3. **Create a native Armenian review checklist.** Now the
+   highest-priority next step. Lifted from the per-file
+   weakness lists across the four controlled captures so far
+   (animal anatomy, verb-noun semantic fit, register, schwa
+   drops, named-coinage scan, opener pattern, choice-as-
+   physical-action, plus the new Home/Play story-logic and
+   everyday-vocabulary checks). A short reusable file under
+   `tools/StoryModelBakeoff/evaluations/` that future capture-
+   result evaluator notes import by reference. Lets the next
+   reviewer (native speaker) skip rediscovering the checklist
+   from scratch.
+4. **Compare against OpenAI on PE only if needed and only with
+   `--max-prompts 1`.** Now deprioritized vs the native review.
+   If the native review of the PE Claude capture is decisively
+   YES or decisively NO, one paid OpenAI mp1 PE run could close
+   the matrix row. If the review is mixed, the paid run is not
+   yet warranted — design first, spend later.
+5. **Only after enough evidence, design a small production
+   integration plan — document only, no code.** Earliest
+   possible scope of the document: a Claude-API-based adapter
+   behind a feature flag, with parser-adaptation for the Claude
+   tail-block format, with all scenarios in the matrix
    (PA + PD + PE + a Calm-mode capture) reviewed by a native
-   speaker. No code change before this design exists; no
-   code change after this design exists without a second
-   explicit GO.
+   speaker. The integration design is a *document*; no code
+   change before this design exists; no code change after this
+   design exists without a second explicit GO.
 
 ---
 
