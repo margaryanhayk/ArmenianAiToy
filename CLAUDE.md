@@ -164,16 +164,6 @@ no editing, no deletion, no child-facing features.
 
 **Pagination guard**: list endpoints reject `offset < 0` and `limit < 1` with 400, and clamp `limit > 100` to 100. Lives as a private static helper inside `ConversationController`.
 
-**Manual QA checklist**
-1. `dotnet run --project src/ArmenianAiToy.Api` → open `http://localhost:5000/` → click "Open the Parent Dashboard →".
-2. Log in → devices list loads (or "No devices linked to this account yet." if none).
-3. Click a device → Conversations tab active, summaries load. Click Flagged tab → flagged list loads (or "No safety-flagged messages on this device. ✓").
-4. Click a row → detail view opens with messages; Blocked (red) and Flagged (amber) borders distinct. ← Back returns to the originating tab.
-5. Pagination: ← Newer disabled on page 1, Older → disabled on last page, "Page N" label visible.
-6. Bad inputs: `?offset=-1` → 400; `?limit=0` → 400; `?limit=500` → 200 with at most 100 rows.
-7. Log out → returns to login view, token cleared from sessionStorage.
-8. **Your activity**: in the linked-devices view, click "View your activity →". Empty-state copy appears for a freshly-registered parent. After triggering a parental action (pause/resume, bedtime window, mode flags toggle, child delete, etc.), refresh: a row appears with the friendly label (e.g. *Device paused/resumed*), timestamp, resolved device/child name where applicable, and one-line metadata summary. Pagination (← Newer / Older →) disables correctly on first page / short final page. ← Devices returns to the linked-devices view. **Every shipped parent-actor event type maps to a friendly label** — no raw CamelCase enum names should appear. Spot-check by exercising: data export (*Data export downloaded*), forgot-password request + completion (*Password reset requested* / *Password reset completed*), email verification (*Email verified*), and Google sign-in (*Signed in with Google*).
-
 ## Today summary panel (E1.1)
 
 A small read-only "Today" panel at the top of the per-device
@@ -224,32 +214,6 @@ tabs.
 - Multi-device "all my devices today" view.
 - Browser-local timezone handling.
 
-**Manual QA**:
-1. Log in as a parent who has at least one linked device. Click a
-   device in the linked-devices list → the Today panel renders at
-   the top of the Conversations view.
-2. Pick a device with TODAY activity → the counts line shows non-zero
-   conversations / messages, and the *Newest:* sub-list lists today's
-   most-recent up to 3 conversations.
-3. Pick a device with NO today activity (or a freshly-registered one)
-   → the panel shows *"No conversations today on this device."*
-4. Trigger flagged content (a moderation block on a known trigger
-   word) → the badge *"⚠ N flagged messages"* appears in the counts
-   line, and the *Flagged today:* sub-list shows the offending
-   conversation(s) with a working → Open link.
-5. Click any → Open link inside the panel → the existing detail view
-   opens with the right conversation messages and the ▶ Listen
-   affordance on assistant audio messages (per C2.1).
-6. The existing Conversations pagination (← Newer / Older →) still
-   works; the Today panel is independent and is not paginated.
-7. Force a Today fetch failure (e.g. `taskkill` the backend after
-   the page loaded but before the panel fetch completes) → the panel
-   shows *"Today summary unavailable."* and the rest of the view
-   continues to function.
-8. Privacy: a different parent who does NOT own the device cannot
-   reach the Today panel — the device is not visible at all under
-   the existing ownership filter; no new auth surface is added.
-
 ### E1.2.ui addendum (panel rewired to server-aggregated endpoint)
 
 As of E1.2.ui, the Today panel consumes
@@ -274,34 +238,6 @@ client-side aggregation over `/api/conversations/summary?limit=100`.
   `audioBlobPath`; the panel cannot. The C2.1 contract that audio
   replay happens in the detail view (with the assistant-only role
   gate) is preserved.
-
-**Manual QA additions (E1.2.ui)**:
-
-9.  Network tab (browser DevTools): exactly ONE Today-panel request
-    fires per device-tab entry, to `/api/conversations/today-summary`.
-    The legacy `/api/conversations/summary?limit=100&offset=0` Today-
-    panel call is gone. The paginated list below the panel still
-    calls `/api/conversations/summary` with `limit=20`.
-10. Counts agree with the DTO. With a known-state device (e.g. 3
-    conversations today, two started yesterday), the rendered
-    counts equal `dto.conversationsCount` / `dto.messagesCount` /
-    `dto.flaggedMessagesCount` byte-for-byte.
-11. Audio badge appears only when `dto.assistantMessagesWithAudio > 0`.
-    Reproduce by completing one C1 voice turn (or running the audio
-    chat path manually) and refreshing the panel.
-12. Audio badge does NOT appear when the count is 0.
-13. Newest list reflects server-side ordering (`StartedAt` desc, top 3).
-14. Flagged list reflects server-side ordering (latest flagged-today
-    timestamp desc, top 3) — verify with a synthetic case where the
-    OLDEST conversation has the LATEST flagged turn.
-15. `[N today]` tail on each link shows `messageCountToday`. For a
-    spanning conversation, it shows ONLY today's count.
-16. Failure mode: stop the backend mid-page-load → the panel renders
-    `Today summary unavailable.` while the existing Conversations /
-    Flagged tabs continue to use the cached / paged `/summary` results.
-17. Privacy: a different parent who does NOT own the device cannot
-    reach the panel — same property as T8; the device is not
-    visible at all under the existing ownership filter.
 
 ## Today summary endpoint (E1.2)
 
@@ -588,16 +524,6 @@ params, no async prepared exports, no zip format, no email
 delivery, no signed URLs, no dashboard button. The endpoint is
 callable today with any parent JWT.
 
-**Manual QA**:
-1. `dotnet run --project src/ArmenianAiToy.Api`
-2. `POST /api/parents/login` to get a JWT.
-3. `curl -H "Authorization: Bearer <jwt>" -OJ http://localhost:5000/api/parents/export`
-   → writes a `areg-export-<utcts>.json` file. Open it and confirm
-   top-level `schemaVersion`, `generatedAt`, `parent`, `devices`,
-   `auditEvents`, `excludedFields`.
-4. Re-run the curl immediately → 429 with `Retry-After` header.
-5. Wait past the cooldown → success again.
-
 ## Retention
 
 First scheduled-delete layer in the repo. Lives in
@@ -710,19 +636,6 @@ reference. When the audio workstream lands, it owns the
 conversation-delete → blob-delete hook; the retention purge here
 will need to be extended at that point so deletions do not leave
 orphaned audio.
-
-**Manual QA**:
-1. `dotnet run --project src/ArmenianAiToy.Api`
-2. Structured logs should show a single "RetentionPurgeService tick:
-   nothing eligible" (or "purged N conversations…") line within the
-   configured interval. With the shipped 60-minute default the first
-   tick is slow to observe; override `Retention:Messages:RunIntervalMinutes`
-   via an environment variable (e.g. `RETENTION__MESSAGES__RUNINTERVALMINUTES=15`)
-   for a smoke run — do not commit that override, and do not override
-   `MaxAgeDays`.
-3. `curl http://localhost:5000/metrics | grep aat_audit_events_written_total`
-   → on a tick-with-deletions, the counter increments with tag
-   `event_type="ConversationsPurgedByRetention"`.
 
 ## Bedtime window (B4)
 
@@ -936,41 +849,6 @@ error message (`"Reset link is invalid or expired."`) verbatim,
 preserving the "all failure reasons look identical on the wire"
 contract at the UI layer too.
 
-**Manual QA for the full browser flow:**
-1. `dotnet run --project src/ArmenianAiToy.Api` → open
-   `http://localhost:5000/parent.html`.
-2. On the login view, confirm the **Forgot password?** link is visible
-   next to the Log in button.
-3. Click **Forgot password?** → reset-request form appears with an
-   Email input and **Send reset link** button.
-4. Submit a KNOWN email → see *"If an account exists for that email,
-   a reset link has been sent…"* Status: success-muted green.
-5. Submit an UNKNOWN email → see the **identical** message (no "email
-   not found" leak, no timing oracle — also pinned by the backend
-   anti-enumeration tests).
-6. Check the stdout log → one structured line per call; for a
-   log-transport run the delivery is simulated and the token is NOT
-   in any log template hole.
-7. With `Notifications:Transport=smtp` and a real relay configured,
-   open the email, click the link (which goes to
-   `Notifications:PasswordResetLinkBase?token=...`).
-8. The dashboard opens on the reset-password view; confirm the URL
-   bar no longer contains `?token=...` (stripped by
-   `history.replaceState`).
-9. Enter a password < 8 chars → client-side validation rejects
-   before a network call is made.
-10. Enter mismatched new-password / confirm → client-side validation
-    rejects.
-11. Enter a valid new password → success routes back to login with a
-    "Your password has been reset. Please log in." status message.
-    Log in with the new password → works.
-12. Re-click the same emailed link (now single-use-consumed) → see
-    the uniform *"Reset link is invalid or expired."* error
-    (identical for consumed / expired / unknown tokens).
-13. Open an obviously-invalid URL like
-    `http://localhost:5000/parent.html?token=garbage` → same uniform
-    error; no crash.
-
 ## Email verification
 
 Tracking-only (T1) email-verification flow. `Parent.EmailVerifiedAt`
@@ -1028,25 +906,6 @@ linked-devices summary block additionally surfaces an
 unobtrusive `Email not verified yet.` line with a `Send
 verification email` action when the authenticated parent is
 unverified — verified parents see no extra UI.
-
-**Manual QA for the dashboard verification-visibility surface**:
-1. Log in as an UNVERIFIED parent (a freshly-registered one whose
-   verification email was logged but never clicked).
-2. On the linked-devices summary block, confirm an additional line
-   `Email not verified yet.` with a small `Send verification email`
-   action button is visible.
-3. Click `Send verification email`. The line text flips to
-   `Verification email sent — check your inbox.`. The button hides.
-4. Hit the auth-rate-limiter (rapid clicks across the same IP) →
-   line shows `Too many requests. Please try again shortly.` and
-   the button re-enables for retry.
-5. Open the emailed link → verify the email per the existing flow
-   (steps 7–11 of § Password reset are equivalent shape).
-6. Reload the dashboard. The `Email not verified yet.` line should
-   be gone (verified parents see no extra UI).
-7. Cross-check: the login-view `Didn't get a verification email?`
-   link still opens the standalone verify-request form — both
-   surfaces remain available.
 
 ## Register anti-enumeration
 
@@ -1164,41 +1023,6 @@ refresh-token or disconnect-google flow in this slice.
   fetch, `kid` rotation, `iss`/`aud`/`exp` checks all handled by
   the library. Tests swap a fake double; no test hits real Google
   endpoints.
-
-**Manual QA**:
-1. `dotnet run --project src/ArmenianAiToy.Api` → open
-   `http://localhost:5000/parent.html`. With `GoogleAuth:ClientId`
-   **empty** (shipped default): the "Continue with Google" button
-   is hidden and `curl -i http://localhost:5000/api/parents/google-login`
-   with any body returns **404**.
-2. Set `GoogleAuth:ClientId` to a real Google OAuth Web Client Id
-   via user-secrets / env var (e.g.
-   `dotnet user-secrets set "GoogleAuth:ClientId" "...apps.googleusercontent.com"`).
-   Reload the dashboard: the "Continue with Google" button is
-   visible on the login view.
-3. **Existing password account links correctly.** Pre-register a
-   parent via the password flow
-   (`POST /api/parents/register` with the same email you'll use on
-   Google). Sign in with Google using that email → success; reload
-   devices tab and confirm the same linked devices appear as
-   before (one Parent row, not two). Second Google sign-in with
-   the same identity signs in via the sub-lookup branch
-   (`first_time=false` in the audit feed).
-4. **Unknown email + accepted terms signs up correctly.** In an
-   incognito window, sign in with Google using an email that is
-   NOT in the Parents table. Check the terms checkbox first; the
-   backend creates a new Parent row with empty `PasswordHash`,
-   stamped `EmailVerifiedAt`, and stamped terms. The devices tab
-   opens empty (no links yet) and a "Signed in with Google" audit
-   row appears in **Your activity**.
-5. Repeat step 4 with terms un-checked → UI surfaces "You must
-   accept the terms to continue." (400); no Parent row created.
-6. **Feature-off hides the button and 404s the endpoint.** Re-clear
-   `GoogleAuth:ClientId` (`dotnet user-secrets remove "GoogleAuth:ClientId"`)
-   and restart the API. Reload the dashboard → button gone; `curl
-   -i -X POST http://localhost:5000/api/parents/google-login -H
-   'Content-Type: application/json' -d '{"idToken":"x","acceptedTerms":true}'`
-   → **404**. Existing password login continues to work unchanged.
 
 ## JWT key rotation
 
@@ -1390,21 +1214,6 @@ currently `1.15.3-beta.1`; the OpenTelemetry SIG keeps the
 Prometheus-side exporter in `-beta` deliberately even though it is
 mature in practice).
 
-**Manual QA**:
-1. `dotnet run --project src/ArmenianAiToy.Api` (or set
-   `Metrics:ScrapeToken` via user-secrets / env-var first).
-2. `curl http://localhost:5000/api/health` → expect `{"status":"ok",…}`.
-3. `curl -I http://localhost:5000/metrics` with no `Authorization`
-   header → expect **404** (fail-closed default).
-4. `curl -H "Authorization: Bearer <your-token>" http://localhost:5000/metrics`
-   → expect Prometheus-format output including at minimum
-   `aat_health_probe_total{result="ok"} 1`.
-5. (Optional) For a no-token local run, export
-   `METRICS__ALLOWUNAUTHENTICATEDSCRAPE=true` and re-verify step 3
-   now returns 200.
-6. (Optional) Development only — stdout shows a span emitted by the
-   console trace exporter for the same request.
-
 ### Latency histograms
 
 Two `Histogram<double>` instruments on the `ArmenianAiToy` meter,
@@ -1429,14 +1238,6 @@ would duplicate signal already present on the existing counters
 from AppMeter applies: do NOT add `device_id`, `parent_id`,
 `child_id`, `mac_address`, `model_name`, or free-form strings as tags
 on these histograms.
-
-**Manual QA**:
-1. `dotnet run --project src/ArmenianAiToy.Api`
-2. Trigger at least one chat request (hits both the moderation path
-   and the gated OpenAI call).
-3. `curl http://localhost:5000/metrics | grep -E 'aat_(chat_openai|moderation_classify)_duration_seconds_(bucket|sum|count)'`
-   → expect `_bucket`, `_sum`, `_count` lines for both histogram
-   families.
 
 ### OpenAI reliability
 
@@ -1554,29 +1355,6 @@ working endpoint.
   instrumentation split / second mode over voice / firmware
   code.
 
-**Manual QA (backend-only, C1)**:
-1. `dotnet user-secrets set "OpenAI:ApiKey" "sk-..." --project src/ArmenianAiToy.Api`
-2. `dotnet run --project src/ArmenianAiToy.Api`
-3. Register a device via the existing `POST /api/devices/register`
-   path and note the returned `DeviceId` + `ApiKey`.
-4. Record a short Armenian WAV (16 kHz mono) — e.g. a phone
-   memo saying *"Պատմիր հեքիաթ"*. `curl -X POST
-   http://localhost:5000/api/chat/audio \
-     -H "X-Device-Id: <guid>" -H "X-Api-Key: dtk_..." \
-     -H "Content-Type: audio/wav" --data-binary @story.wav \
-     -o reply.mp3`
-5. Play `reply.mp3` — it should be a warm Armenian narrator
-   opening a short story with two spoken choices.
-6. Record *"Ա"*, repeat the curl — the story should continue.
-7. Inspect `./audio-blobs/` — two files per turn (one `.wav`
-   for the child's utterance, one `.mp3` for Areg's reply).
-   Inspect the DB: both `Message` rows for each turn have
-   `AudioBlobPath` populated; `Message.Content` holds the
-   canonical transcript / assistant text.
-8. Pause the device via the parent dashboard, retry the curl
-   — the response body is the cached canned paused MP3; no
-   STT, no LLM, no new `Message` rows.
-
 ## Voice chat (C2.1 — assistant replay)
 
 Closes the parent half of the C1 voice loop — parents can play
@@ -1644,25 +1422,6 @@ The dangling-reference disclaimer in the Retention section
 still applies — `Message.AudioBlobPath` is owned externally;
 no code in this repo deletes blobs today. C2.2 owns that
 cleanup hook.
-
-**Manual QA (C2.1)**:
-1. `dotnet run --project src/ArmenianAiToy.Api` and complete the
-   C1 voice flow once so an assistant MP3 lands on disk.
-2. Open `http://localhost:5000/parent.html`, log in, drill into
-   the conversation that includes the voice turn.
-3. The assistant message shows a `▶ Listen` button; the child
-   message does NOT, even though both have `AudioBlobPath`
-   populated.
-4. Click `▶ Listen` → an `<audio>` element appears and plays
-   the MP3 inline. URL bar is unchanged.
-5. `curl -i http://localhost:5000/api/parents/messages/<msgId>/audio`
-   without an `Authorization` header → 401.
-6. With a parent JWT, request a known **user** message id →
-   uniform 404 `{ "error": "Audio not available." }`.
-7. Same JWT, request a fabricated GUID → identical 404 body.
-8. `rm -rf audio-blobs` and re-click `▶ Listen` for an
-   assistant message → uniform 404 (blob missing on disk
-   collapses into the same response).
 
 ## Voice chat (C2.2a — parent-driven blob delete cascade)
 
@@ -1746,24 +1505,6 @@ they land in a follow-up C2.2b slice.
   metadata carries the three new keys with the correct counts,
   unrelated audio is preserved, and a failing blob store does
   NOT break the parent action.
-
-**Manual QA (C2.2a)**:
-1. Run the C2.1 manual QA flow once so an assistant MP3 lands at
-   `audio-blobs/{conv:N}/{msg:N}.mp3`.
-2. As the owning parent, click `Delete conversation` on the
-   dashboard. Refresh → conversation is gone; check
-   `audio-blobs/{conv:N}/` → directory removed.
-3. Repeat with `Delete child`, `Unlink device` (when the device
-   has only this parent linked), and `Delete account`. In each
-   case the audio directory(ies) under the affected conversation
-   id(s) should disappear.
-4. Inspect `aat_audit_events_written_total` on `/metrics` and
-   the `AuditEvents` table — the matching row's `Metadata`
-   should contain `audio_conversations_attempted`,
-   `audio_files_deleted`, `audio_delete_failures`.
-5. Negative case: unlink a device that is still linked to
-   another parent → audio survives; audit row still written
-   with `audio_*` counts all zero.
 
 ## Voice chat (C2.2b — retention/dormancy blob delete cascade)
 
@@ -1859,23 +1600,6 @@ driven C2.2a behavior is unchanged.
 - Constructor-signature change on `RetentionPurgeService` → none
   needed; per-tick scope resolution covers it.
 - Token-cleanup or warn-only passes → non-destructive, no audio.
-
-**Manual QA (C2.2b)**:
-1. With `Retention:Messages:RunIntervalMinutes` overridden to a
-   short value via env var (do not commit), wait one tick after
-   seeding an expired conversation with audio. Inspect
-   `audio-blobs/{conv:N}/` → directory removed; the matching
-   `ConversationsPurgedByRetention` row's `Metadata` carries
-   `audio_conversations_attempted`, `audio_files_deleted`,
-   `audio_delete_failures`.
-2. Repeat for `DeleteDormantDevicesAsync` by stamping
-   `Device.LastSeenAt` and `Device.DormancyWarnedAt` far enough
-   in the past, then waiting a tick. The audit row of type
-   `DeviceDormancyDeleted` should carry the same three keys.
-3. Negative path: a multi-parent shared device under an
-   anonymizing dormant parent → device + audio survive; the
-   `ParentDormancyAnonymized` row carries
-   `audio_conversations_attempted = 0`.
 
 ## Voice chat (C2.3 — orphan audio sweeper, deferred)
 
