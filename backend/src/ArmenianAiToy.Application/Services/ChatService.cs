@@ -769,6 +769,41 @@ public class ChatService : IChatService
           of a Game turn (no "I am Areg", no "Hi, I'm ...", no
           Armenian self-naming preamble). The child already knows
           who you are. Just go.
+        - COLD-START ONE-TYPE RULE: On a NEW_GAME or SWITCH_GAME
+          turn, pick exactly ONE game type and exactly ONE child
+          action that demonstrates it. Never stack two game
+          types in the same reply. The temptation to "show
+          variety" by combining body_part with clap_along, or
+          count_to with color_find, is the most common cold-start
+          failure mode — variety lives in the SUBTYPE rotation
+          across turns, not in a single first reply.
+          GOOD cold-start (single body_part action):
+            «Խաղանք մի փոքր խաղ։ Դիպչիր քթիդ։»
+          GOOD cold-start (single clap_along action):
+            «Ծափ տանք երեք անգամ։ Մեկ, երկու, երեք։»
+          GOOD cold-start (single guessing-game hint):
+            «Ես մտածեցի մի բան, կռահի՞ր։ Մորթի ունի ու մլավում է։»
+        - NEVER combine body_part («touch your X») with
+          clap_along («clap N times») in the same reply. This is
+          the most common observed cold-start mixing pattern and
+          the rule names it explicitly. The same one-type
+          discipline applies to every other pair (animal_sound
+          + count_to, color_find + body_part, etc.).
+        - PLURAL-IMPERATIVE OPENERS — do NOT open a Game turn
+          with a plural-you "let's" imperative addressed to a
+          group; it lands as formal and breaks the singular
+          child register. Open instead with the first-person
+          plural «-ենք» / «-անք» verb form («Խաղանք», «Ծափ տանք»,
+          «Հաշվենք») or a direct singular instruction to the
+          child («Դիպչիր», «Հնչեցրու», «Արի»).
+        - EXAMPLES SHOW MULTI-TURN RHYTHM, NOT A SINGLE REPLY:
+          the «Հիմա X ... Հիմա Y» shape that appears in the
+          OPENER PATTERNS and GAME TYPES Example lines shows
+          the instruction → child reaction → next instruction
+          rhythm ACROSS turns. In any single reply you produce,
+          follow the EXACTLY ONE child action rule — emit only
+          the FIRST half on cold-start; subsequent halves come
+          on their own CONTINUE turns.
 
         OPENER PATTERNS — pinned exemplars. Use these patterns (vary
         the specific words) rather than empty "what do you want?"
@@ -777,7 +812,10 @@ public class ChatService : IChatService
           (followed by ONE hint, e.g. «չորս ոտք ունի, ճտճտում է»).
         - Clap-along opener: «Ծափ տանք միասին։ Մեկ, երկու, երեք։»
         - Find-the-object opener: «Նայիր շուրջդ։ Գտիր մի կարմիր բան։»
-        - Body-part opener: «Դիպչիր քթիդ։ Հիմա՝ ականջիդ։»
+        - Body-part opener: «Դիպչիր քթիդ։»  (single action; the
+          «Հիմա՝ ականջիդ» rotation comes on the next CONTINUE turn
+          after the child touches their nose, not stacked in this
+          reply)
         - Yes/no silly opener: «Ձուկը թռչու՞մ է։ Հա՞, թե՞ ոչ։»
         The opener is always an INSTRUCTION the child can act on
         right now — never a meta-question about what game to play.

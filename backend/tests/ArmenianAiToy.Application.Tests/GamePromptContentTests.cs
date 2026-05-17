@@ -276,4 +276,81 @@ public class GamePromptContentTests
         // the model has a positive target to swap to.
         Assert.Contains("«դու»", Prompt);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Game Mode v5 — cold-start mixing-types regression fix (GB05)
+    //
+    // Anchored on the 2026-05-17 live BenchmarkAll regression:
+    //   GameBenchmark GB05 turn 1 (user "play a game") produced
+    //   «Եկեք խաղանք մի փոքրիկ խաղ. դիպչիր քթիդ։ Հիմա՝ ծափ տանք երեք անգամ։»
+    // which stacked body_part + clap_along in one cold-start reply and
+    // opened with the formal-plural «Եկեք». Evidence:
+    //   tools/quality-evidence/areg-live-quality-validation-20260517.md
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Prompt_DeclaresColdStartOneTypeRule()
+    {
+        Assert.Contains("COLD-START ONE-TYPE RULE", Prompt);
+        Assert.Contains("exactly ONE game type", Prompt);
+        Assert.Contains("exactly ONE child", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_PinsGoodColdStartBodyPartExemplar()
+    {
+        // The exact GOOD cold-start single-body_part shape the slice
+        // prompt asked for, pinned verbatim.
+        Assert.Contains("«Խաղանք մի փոքր խաղ։ Դիպչիր քթիդ։»", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_BansBodyPartPlusClapAlongCombo()
+    {
+        // The most-common cold-start mixing pair, named explicitly.
+        Assert.Contains("NEVER combine body_part", Prompt);
+        Assert.Contains("clap_along («clap N times»)", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_BansPluralImperativeOpeners()
+    {
+        Assert.Contains("PLURAL-IMPERATIVE OPENERS", Prompt);
+        // Positive replacements — the model needs concrete first-person
+        // plural and direct-singular verb forms to swap to.
+        Assert.Contains("«Խաղանք»", Prompt);
+        Assert.Contains("«Հաշվենք»", Prompt);
+        Assert.Contains("«Հնչեցրու»", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_DoesNotContainPluralImperativeLiteralEkek()
+    {
+        // The plural-you imperative «Եկեք» is the literal form that
+        // tripped GB05. The ban is worded abstractly so this literal
+        // never appears in the prompt body and the model is not even
+        // shown the banned shape.
+        Assert.DoesNotContain("Եկեք", Prompt);  // Եկեք
+    }
+
+    [Fact]
+    public void Prompt_DeclaresExamplesShowMultiTurnRhythm()
+    {
+        // Reconciles the OPENER PATTERNS / GAME TYPES Example two-action
+        // shapes with the "EXACTLY ONE child action per turn" rule from
+        // the prior v4 slice. Without this disclaimer the model could
+        // (and did, in GB05) copy the «Հիմա X ... Հիմա Y» template
+        // literally into a single reply.
+        Assert.Contains("EXAMPLES SHOW MULTI-TURN RHYTHM", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_BodyPartOpenerIsNowSingleAction()
+    {
+        // The OPENER PATTERNS body-part opener was a two-action stack
+        // («Դիպչիր քթիդ։ Հիմա՝ ականջիդ։»). Now single-action with an
+        // explicit "rotation comes on the next CONTINUE turn" hint.
+        Assert.Contains("Body-part opener: «Դիպչիր քթիդ։»", Prompt);
+        Assert.Contains("(single action;", Prompt);
+    }
 }
