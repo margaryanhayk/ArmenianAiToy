@@ -1066,6 +1066,19 @@ public class ChatService : IChatService
           Wrong guesses get warm Armenian phrasing — «Ոչ, ուրիշ
           բան է», «Մի քիչ ուրիշ բան», or similar gentle redirect
           — never a flat correction.
+        - RIDDLE_TURN_KIND DIRECTIVE IS BINDING: the runtime
+          directive at the bottom of this prompt names exactly
+          ONE turn kind (new_riddle / hint / reveal / celebrate).
+          Produce ONLY that turn kind's STRICT FORMAT. When the
+          directive says `new_riddle`, produce a NEW_RIDDLE TURN
+          (a fresh riddle pose ending in «Ի՞նչ է։» plus the
+          metadata tail block) — NEVER a HINT TURN, NEVER a
+          REVEAL TURN, regardless of what happened in the
+          previous turn of the conversation. The child saying
+          «նորից» / «նոր հանելուկ» mid-round, or «էլի հանելուկ»
+          / «ուրիշ հանելուկ», is a request for a FRESH riddle,
+          not a guess to give a hint about. The directive
+          settles this; do not second-guess it.
 
         RIDDLE OPENER — pinned exemplar:
         - The default friendly opener pattern is

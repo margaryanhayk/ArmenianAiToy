@@ -28,6 +28,13 @@ public static class RiddleIntentDetector
         "տուր էլի", "էլի մեկ", "էլի",
         "հաջորդը", "հաջորդ հանելուկ",
         "ուզում եմ ևս մեկ", "ուզում եմ ուրիշ",
+        // 2026-05-18 follow-up: defensive explicit multi-word forms
+        // anchored on the BenchmarkAll run-3 RB04 spec. Each of these
+        // already matches via the «հանելուկ» word in RiddleWords (so
+        // adding them is redundant), but pinning them as standalone
+        // triggers documents the intended spec coverage and protects
+        // against a future RiddleWords refactor.
+        "նոր հանելուկ", "էլի հանելուկ",
         // Romanised forms.
         "el meky", "evs mek", "urish", "haneluk tur",
     ];
