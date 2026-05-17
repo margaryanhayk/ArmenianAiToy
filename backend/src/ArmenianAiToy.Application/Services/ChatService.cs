@@ -614,6 +614,24 @@ public class ChatService : IChatService
           single short clause. Never both. Never more than one.
         - Total length: 1 to 3 short sentences, never more.
 
+        FOLLOW-UP CONCISION — STRICT:
+        A follow-up Curiosity answer (the second or later answer
+        in a conversation that has already been in Curiosity mode)
+        MUST NOT be longer than the previous answer. Default
+        direction across consecutive Curiosity turns is shorter,
+        not longer. Repeating context the child already heard is
+        verbosity drift, not warmth.
+        - Exception: only stretch a follow-up if the child
+          explicitly asks for more ("ավելի պատմիր", "more",
+          "tell me more", "ինչու" as a fresh sub-question).
+        - One concrete example MAX per follow-up; never list two.
+        - No second paragraph or stacked clauses in a follow-up
+          answer.
+        - If the natural answer needs more length than the prior
+          turn, trim it: pick the single most important sentence
+          and drop the rest. LAYER 2 (analogy / fun fact) is the
+          first thing to drop on a follow-up turn.
+
         RULES:
         - 1 to 3 short sentences. Be honest and simple.
         - Do NOT ask any questions back.

@@ -188,4 +188,48 @@ public class CuriosityPromptContentTests
         Assert.DoesNotContain("Ձեզ", Prompt);                                            // Ձեզ
         Assert.DoesNotContain("Ձեր", Prompt);                                            // Ձեր
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Curiosity v3 — follow-up concision (anti length_growing drift)
+    //
+    // Anchored on the 2026-05-17 BenchmarkAll persistent baseline weak
+    // case: CuB01 ("why does the sun rise") turn 2 grew to 87 chars vs
+    // turn 1's 61. The new FOLLOW-UP CONCISION rule pins "follow-up MUST
+    // NOT be longer than the previous answer" with one explicit exception
+    // for child-driven "tell me more" requests. Evidence:
+    //   tools/quality-evidence/areg-live-quality-validation-20260517.md
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Prompt_DeclaresFollowUpConcisionRule()
+    {
+        Assert.Contains("FOLLOW-UP CONCISION — STRICT", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_RequiresFollowUpNoLongerThanPrior()
+    {
+        // The load-bearing length rule: follow-up answer must be the
+        // same length or shorter than the prior. Default direction is
+        // shorter, not longer.
+        Assert.Contains("MUST NOT be longer than the previous", Prompt);
+        Assert.Contains("verbosity drift", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_BansListsAndStackedClausesInFollowUp()
+    {
+        // One concrete example max — never list two.
+        Assert.Contains("One concrete example MAX per follow-up", Prompt);
+        // No second paragraph / stacked clauses on a follow-up turn.
+        Assert.Contains("No second paragraph or stacked clauses", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_NamesExplicitChildAskForMoreExceptionOnly()
+    {
+        // The single exception: child explicitly asks for more.
+        Assert.Contains("only stretch a follow-up if the child", Prompt);
+        Assert.Contains("ավելի պատմիր", Prompt);
+    }
 }
