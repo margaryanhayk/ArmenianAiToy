@@ -150,6 +150,40 @@ public class ChatService : IChatService
           CHOICE_A: «Մոտենանք երգող ձայնին»
           CHOICE_B: «Թաքնված մնանք ու լսենք»
 
+        STRICT NON-NEGOTIABLES FOR CHOICES — these override
+        everything else:
+        - NEVER use generic motion-only pairs as the two choices
+          (forward/back, go/return, continue/stop, walk/run,
+          enter/leave). These are not real choices — they tell the
+          child nothing about what changes next. Replace them with
+          two specific actions naming specific entities the body
+          already introduced.
+        - NEVER produce meta-chat choices that ask the child a
+          follow-up question or a continuation preference
+          (any "do you want to keep going / what do you think /
+          tell me more / shall we continue" shape, in Armenian or
+          English). The two CHOICE lines ARE the continuation
+          signal; do not bounce the question back to the child.
+        - NEVER emit placeholder / template / null choice labels.
+          Every CHOICE line must carry a real Armenian action
+          phrase. Forbidden patterns: a bracketed marker like
+          [option], the literal English words "null" / "empty" /
+          "choice" / "option" / "TBD" / "Option A" / "Option B",
+          a bare single letter "A" or "B", an ellipsis "...", a
+          trailing colon with nothing after it. If the label
+          cannot be filled with a real action, the whole story
+          turn is invalid — rewrite the body so a real action
+          fits.
+        - KEEP each CHOICE line at or under ~60 Armenian
+          characters so it fits the small ESP32 / phone screen.
+          The 3-7-word rule still binds; this is an upper bound
+          on visual length, not a substitute for the word count.
+        - DO NOT use the formal-plural Armenian address forms
+          (the plural-you pronouns and their case forms) inside a
+          choice. The «մենք»-style first-person plural ("let's X")
+          and the singular «դու» second person are the natural
+          child registers — never the formal-plural pronouns.
+
         COMPANIONS AND CHARACTERS: When introducing a companion or friend
         in the story, make it clearly recognizable — a cat, bunny, bird,
         teddy bear, doll, or a child friend. Do not use confusing or
@@ -384,6 +418,9 @@ public class ChatService : IChatService
         - 3 to 5 short sentences, then CHOICE_A and CHOICE_B on their own lines.
         - CHOICE_A and CHOICE_B differ on verb AND target (or place, character, sense) — not the same verb with a swapped noun.
         - Every choice acts on a character, object, or place that was named in your own 3–5 sentences. No new entities introduced only in the choices.
+        - Neither choice is a generic motion-only pair (forward/back, continue/stop). Each choice names a specific action on a specific entity.
+        - Neither choice is meta-chat ("do you want to keep going", "what do you think"). The choices ARE the continuation signal.
+        - Each choice carries a real Armenian action phrase — no placeholder markers, no bare A/B, no "Option A", no ellipsis.
         - No folklore figures, gods, goddesses, spirits, or mythological beings as protagonists unless the child explicitly asked for folklore.
         - If previous_story_choice was provided, the first sentence visibly acts on it and does NOT recap the previous scene.
         """;
