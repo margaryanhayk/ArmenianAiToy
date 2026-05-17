@@ -320,4 +320,114 @@ public class StoryPromptContentTests
     {
         Assert.DoesNotContain(badNoun, Prompt);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Story choices v2 — STRICT NON-NEGOTIABLES FOR CHOICES
+    // (full-day slice 1: generic-motion / meta-chat / placeholder /
+    //  UI-length / formal-plural bans + reiteration in FINAL STORY CHECK)
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void StrictChoiceNonNegotiables_SectionPresent()
+    {
+        Assert.Contains("STRICT NON-NEGOTIABLES FOR CHOICES", Prompt);
+    }
+
+    [Fact]
+    public void StrictChoiceNonNegotiables_BansGenericMotionOnlyPairs()
+    {
+        Assert.Contains("generic motion-only pairs", Prompt);
+        // The pinned example list keeps the rule concrete — a future edit
+        // that drops the parenthesized examples fails distinctly here.
+        Assert.Contains("forward/back", Prompt);
+        Assert.Contains("continue/stop", Prompt);
+    }
+
+    [Fact]
+    public void StrictChoiceNonNegotiables_BansMetaChatChoices()
+    {
+        Assert.Contains("meta-chat choices that ask the child a", Prompt);
+        Assert.Contains("ARE the continuation signal", Prompt);
+    }
+
+    [Fact]
+    public void StrictChoiceNonNegotiables_BansPlaceholderLabels()
+    {
+        Assert.Contains("placeholder / template / null choice labels", Prompt);
+        Assert.Contains("real Armenian action", Prompt);
+    }
+
+    [Fact]
+    public void StrictChoiceNonNegotiables_RequiresShortUiFriendlyLabels()
+    {
+        // The 3-7-word rule already exists; this is the visual upper
+        // bound for the ESP32 / phone display.
+        Assert.Contains("60 Armenian", Prompt);
+        Assert.Contains("ESP32 / phone screen", Prompt);
+    }
+
+    [Fact]
+    public void StrictChoiceNonNegotiables_BansFormalPluralInChoices()
+    {
+        Assert.Contains("formal-plural Armenian address forms", Prompt);
+        // Positive replacement target — the existing «մենք»-form choices
+        // (e.g. «Բացենք փոքրիկ տուփը») are the correct register.
+        Assert.Contains("«մենք»", Prompt);
+    }
+
+    [Fact]
+    public void FinalStoryCheck_ReiteratesNoGenericMotionChoices()
+    {
+        var idx = Prompt.IndexOf("FINAL STORY CHECK");
+        Assert.True(idx >= 0);
+        var tail = Prompt.Substring(idx);
+        Assert.Contains("generic motion-only pair", tail);
+    }
+
+    [Fact]
+    public void FinalStoryCheck_ReiteratesNoMetaChatChoices()
+    {
+        var idx = Prompt.IndexOf("FINAL STORY CHECK");
+        Assert.True(idx >= 0);
+        var tail = Prompt.Substring(idx);
+        Assert.Contains("meta-chat", tail);
+    }
+
+    [Fact]
+    public void FinalStoryCheck_ReiteratesNoPlaceholderLabels()
+    {
+        var idx = Prompt.IndexOf("FINAL STORY CHECK");
+        Assert.True(idx >= 0);
+        var tail = Prompt.Substring(idx);
+        Assert.Contains("real Armenian action phrase", tail);
+    }
+
+    [Fact]
+    public void StoryChoiceInstruction_DoesNotContainBannedGenericMotionLiteral()
+    {
+        // The slice-spec literal banned phrase. The ban above is worded
+        // abstractly ("generic motion-only pairs") so this Armenian
+        // literal never appears in the prompt body.
+        Assert.DoesNotContain("գնալ առաջ", Prompt);  // գնալ առաջ
+    }
+
+    [Fact]
+    public void StoryChoiceInstruction_DoesNotContainBannedMetaChatLiteral()
+    {
+        // The slice-spec literal banned phrase. The ban above is worded
+        // abstractly so this Armenian "do you want to continue" form
+        // never appears in the prompt body.
+        Assert.DoesNotContain("ուզու՞մ ես շարունակել", Prompt);  // ուզու՞մ ես շարունակել
+    }
+
+    [Fact]
+    public void StoryChoiceInstruction_DoesNotContainFormalPluralAddress()
+    {
+        // The formal-plural Armenian pronouns must not appear anywhere
+        // in the Story prompt. Worded abstractly so these literals stay
+        // out and the model is not even shown the banned form.
+        Assert.DoesNotContain("դուք", Prompt, StringComparison.OrdinalIgnoreCase);  // դուք / Դուք
+        Assert.DoesNotContain("Ձեզ", Prompt);                                            // Ձեզ
+        Assert.DoesNotContain("Ձեր", Prompt);                                            // Ձեր
+    }
 }

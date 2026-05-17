@@ -162,4 +162,30 @@ public class CuriosityPromptContentTests
     {
         Assert.Contains("encyclopedia opener", Prompt);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Armenian register — full-day slice 2: ban formal-plural + self-intro
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Prompt_ContainsArmenianRegisterRule()
+    {
+        Assert.Contains("ARMENIAN REGISTER — STRICT", Prompt);
+        Assert.Contains("formal-plural Armenian address forms", Prompt);
+        Assert.Contains("«դու»", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_BansSelfIntroAtCuriosityTurnStart()
+    {
+        Assert.Contains("Do NOT introduce yourself or greet at the top of a Curiosity", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_DoesNotContainFormalPluralAddress()
+    {
+        Assert.DoesNotContain("դուք", Prompt, StringComparison.OrdinalIgnoreCase);  // դուք / Դուք
+        Assert.DoesNotContain("Ձեզ", Prompt);                                            // Ձեզ
+        Assert.DoesNotContain("Ձեր", Prompt);                                            // Ձեր
+    }
 }

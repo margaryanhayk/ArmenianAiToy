@@ -128,4 +128,100 @@ public class RiddlePromptContentTests
         // Hint / reveal / celebrate must explicitly forbid the tail block.
         Assert.Contains("DO NOT include any tail block", Prompt);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Riddle Mode v3 — STRICT NON-NEGOTIABLES + pinned opener
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Prompt_DeclaresStrictNonNegotiablesSection()
+    {
+        Assert.Contains("STRICT NON-NEGOTIABLES", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_BansAnswerRevealBeforeCorrectGuessOrGiveUp()
+    {
+        // The reveal must be earned. Only the reveal turn kind reveals,
+        // and only on a clear give-up cue. Pinned so a silent removal
+        // of the gate fails distinctly.
+        Assert.Contains("NEVER reveal the answer before the child either guesses", Prompt);
+        Assert.Contains("Only the reveal turn kind reveals", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_RequiresNewClueOnRepeatedWrongGuess()
+    {
+        // Second consecutive wrong guess gets a hint that is distinct
+        // from both the riddle and the first hint. Recycled wording
+        // breaks the back-and-forth.
+        Assert.Contains("On a SECOND consecutive wrong guess", Prompt);
+        Assert.Contains("NEW physical clue, distinct from both the original", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_BansFormalPluralAddressInRiddle()
+    {
+        // The ban is worded abstractly so the literal Armenian
+        // plural-you pronouns never appear in the prompt body —
+        // and the DoesNotContain assertions below stay green.
+        Assert.Contains("Do NOT use the formal-plural Armenian address forms", Prompt);
+        // Positive replacement target — singular forms must be present
+        // so the model has a concrete pronoun to swap to.
+        Assert.Contains("«դու»", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_BansSelfIntroAtRiddleTurnStart()
+    {
+        Assert.Contains("Do NOT introduce yourself or greet at the top of a", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_BansColdRejectionPhrasingForWrongGuesses()
+    {
+        Assert.Contains("Do NOT use cold-rejection phrasing for wrong guesses", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_ContainsPinnedRiddleOpener()
+    {
+        // Required natural-Armenian opener pattern — pinned so a future
+        // refactor cannot silently drop the invitation exemplar.
+        Assert.Contains("RIDDLE OPENER", Prompt);
+        Assert.Contains("Կռահի՞ր, թե ինչ եմ մտածել", Prompt); // Կռահի՞ր, թե ինչ եմ մտածել
+    }
+
+    [Fact]
+    public void Prompt_ReaffirmsNoStoryChoicesInRiddleMode()
+    {
+        // Existing line we pin again here because the slice spec
+        // requires riddle mode to never emit story choices. The
+        // CHOICE_A / CHOICE_B ban is already in the per-turn-kind
+        // rules; this test is the slice-level pinning of that
+        // contract so a future structural rewrite cannot quietly
+        // drop it.
+        Assert.Contains("Do NOT include a CHOICE_A / CHOICE_B block", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_DoesNotContainFormalPluralAddress()
+    {
+        // None of the formal-plural Armenian pronouns may appear
+        // anywhere in the prompt — the ban above is worded
+        // abstractly so these literals stay out and the model is
+        // not even shown the banned form.
+        Assert.DoesNotContain("դուք", Prompt, StringComparison.OrdinalIgnoreCase);  // դուք / Դուք
+        Assert.DoesNotContain("Ձեզ", Prompt);                                            // Ձեզ
+        Assert.DoesNotContain("Ձեր", Prompt);                                            // Ձեր
+    }
+
+    [Fact]
+    public void Prompt_DoesNotContainColdRejectionLiteral()
+    {
+        // The curt Armenian "that's not correct" form. The ban
+        // above is worded abstractly ("cold-rejection phrasing")
+        // so this literal stays absent from the prompt body.
+        Assert.DoesNotContain("ճիշտ չէ", Prompt);  // ճիշտ չէ
+    }
 }
