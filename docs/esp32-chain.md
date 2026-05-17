@@ -7,6 +7,33 @@ authoritative bench instructions for the voice prototype live at
 [`esp32/AregVoiceMvp/README.md`](../esp32/AregVoiceMvp/README.md);
 this doc only describes the *chain* and its known quirks.
 
+## Repo-tracked vs local-scratch prototype
+
+There are **two parallel firmware tracks** for this project, and
+this distinction matters for any reproducibility / safety story:
+
+- **Repo-tracked firmware** — `esp32/AregVoiceMvp/`,
+  `esp32/ArmenianAiToy/`. These are committed sketches that any
+  collaborator can build. The voice MVP is current; the legacy
+  text sketch is stale (see below). Neither sketch carries
+  credentials in tree (the `config.h` files are tracked for pins
+  / timing constants, with credential lines left blank or as
+  placeholders that the operator fills in locally).
+- **Local-scratch prototype** — typically lives under the operator's
+  `~/Documents/Arduino/` (or `%USERPROFILE%\Documents\Arduino\`)
+  outside this repo. This is where iterative bench work happens
+  (loading UX tweaks, alternate UI experiments, one-off Wi-Fi
+  configurations). **Anything in the local-scratch tree is not
+  shipped, not reviewed, and is the operator's own state.** It
+  may carry real Wi-Fi passwords, real device API keys, and
+  real backend IPs — those must never be copy-pasted into a
+  committed config.
+
+When this doc says "the proven chain", it refers to the
+**repo-tracked** sketches plus the backend on this branch. If a
+behavior only works in the local-scratch sketch, it is not
+reproducible from a fresh clone — say so explicitly.
+
 ## What's in the repo
 
 Two firmware sketches and a backend with three browser pages:
@@ -188,3 +215,41 @@ and lives outside the repo entirely.
 If step 3 ever fails with 401, the most likely cause is a stale
 `deviceId`/`apiKey` in `localStorage` left over from an older
 backend DB. Clear site data for the host and reload.
+
+## Next hardware steps
+
+Status of the physical-toy build, broken down so the next operator
+can pick the smallest useful next slice. Items marked **local-only**
+exist in the operator's local-scratch prototype today; they would
+need a clean re-implementation against the repo-tracked sketches
+to be a shipped invariant.
+
+| Item | Status | Notes |
+|---|---|---|
+| Browser dev UI (`/`, `/story.html`, `/parent.html`) | **Repo-tracked, working** | The proven text path. Phone-on-LAN reproducible from a fresh clone. |
+| Device-auth register + chat | **Repo-tracked, working** | `POST /api/devices/register` → `X-Device-Id` / `X-Api-Key` on every `/api/chat`. Enforced by `DeviceAuthMiddleware`. |
+| Voice MVP (button → mic → backend → speaker) | **Repo-tracked, bench-only** | `esp32/AregVoiceMvp/`. Buffered playback, no streaming, no retry, no barge-in. C1 scope per CLAUDE.md. |
+| Loading UX while AI thinks | **Local-only** | Iterated in the operator's local-scratch sketch. The repo-tracked text sketch only shows static "Thinking..." text; the browser pages show their own per-page spinners. A shipped invariant would mean lifting the local prototype's UX into either the browser pages or a future v2 sketch. |
+| TTS / speaker on a non-voice device | **Next recommended** | The voice MVP already does TTS via the backend (`IAudioSynthesisService` → MP3 → I²S → MAX98357A). A "TTS-only, no mic" variant — push a question via the browser, hear the answer on a speaker-attached ESP32 — is the smallest next slice that doesn't require a microphone. |
+| On-device microphone for ad-hoc capture | **After TTS** | Once TTS is shipped on a non-voice device, the next slice is wiring an INMP441 (or equivalent) for ad-hoc capture without the voice MVP's full state machine. |
+| Physical button as press-to-talk | **After mic** | A tactile push-to-talk button gated by `LOW`-debounced GPIO is the simplest interaction shell; the voice MVP already has the debounce pattern in `AregVoiceMvp.ino` and can be lifted into the new sketch. |
+| Enclosure, battery, OTA, wake word, barge-in, retry, TLS | **Out of scope for current iteration** | Each is its own slice. None are in the proven chain today. |
+
+The deliberate order — **TTS → mic → physical button** — is so the
+operator always has a working speaker side before introducing
+input complexity. A failed mic capture in a TTS-only build still
+plays a clear Armenian fallback line; a failed mic capture in a
+button-first build only blinks an LED.
+
+## What this doc is NOT
+
+- It is not the authoritative pinout / bench-bring-up guide — that
+  lives at `esp32/AregVoiceMvp/README.md`. This doc only covers
+  the chain shape.
+- It is not a security review. The chain runs HTTP-only on the
+  bench LAN; TLS / hardened device-key rotation / parent-side
+  device unlink hardening are separate concerns covered (or
+  deferred) in CLAUDE.md.
+- It is not a promise that any specific firmware behavior is
+  shipped. Anything tagged "local-only" above only works on the
+  operator's bench, not from a fresh clone.
