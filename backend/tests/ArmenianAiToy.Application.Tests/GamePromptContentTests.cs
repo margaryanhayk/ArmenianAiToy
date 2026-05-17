@@ -205,4 +205,75 @@ public class GamePromptContentTests
     {
         Assert.Contains("mechanical praise repeat", Prompt);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Game Mode v4 — STRICT NON-NEGOTIABLES + pinned opener patterns
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Prompt_DeclaresStrictNonNegotiablesSection()
+    {
+        Assert.Contains("STRICT NON-NEGOTIABLES", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_RequiresExactlyOneChildActionPerTurn()
+    {
+        // The weaker "One clear, simple instruction at a time" line was
+        // already present; v4 adds a stronger "EXACTLY ONE" rule that
+        // also forbids stacking "instruction + question" in one reply.
+        Assert.Contains("EXACTLY ONE child action per turn", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_BansMultipleQuestionsPerTurn()
+    {
+        Assert.Contains("Do NOT ask two questions in the same turn", Prompt);
+        Assert.Contains("Max one question mark per reply", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_BansEndingTheGameAfterOneExchange()
+    {
+        Assert.Contains("NEVER end the game after a single exchange", Prompt);
+        Assert.Contains("The stop_game turn kind is the ONLY way a game ends", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_ContainsPinnedGuessingGameOpener()
+    {
+        // Required natural-Armenian opener pattern — pinned so a future
+        // refactor cannot silently drop the guessing-game exemplar.
+        Assert.Contains("OPENER PATTERNS", Prompt);
+        Assert.Contains("Ես մտածեցի մի բան, կռահի՞ր", Prompt); // Ես մտածեցի մի բան, կռահի՞ր
+    }
+
+    [Fact]
+    public void Prompt_DoesNotContainBannedEmptyOpener()
+    {
+        // The empty-filler opener «Ինչ ես ուզում անել» must not appear
+        // anywhere in the prompt — neither as an example nor inside the
+        // ban itself (the ban is worded abstractly so the literal phrase
+        // stays absent and this DoesNotContain holds).
+        Assert.DoesNotContain(
+            "ինչ ես ուզում անել", // ինչ ես ուզում անել
+            Prompt,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Prompt_DoesNotContainFormalPluralAddress()
+    {
+        // The formal-plural Armenian pronouns must not appear anywhere
+        // in the prompt — the ban is worded abstractly ("formal-plural
+        // address forms") so these literals stay out and the model is
+        // not even shown the banned form.
+        Assert.DoesNotContain("դուք", Prompt, StringComparison.OrdinalIgnoreCase);  // դուք / Դուք
+        Assert.DoesNotContain("Ձեզ", Prompt);                                            // Ձեզ
+        Assert.DoesNotContain("Ձեր", Prompt);                                            // Ձեր
+
+        // The replacement guidance — singular «դու» — must be present so
+        // the model has a positive target to swap to.
+        Assert.Contains("«դու»", Prompt);
+    }
 }
