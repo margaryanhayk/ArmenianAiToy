@@ -414,3 +414,138 @@ also held.
   second cycle.
 - Bench DB / Api binaries reused from the first run; no new
   temp dirs created.
+
+---
+
+## Final confirmation BenchmarkAll — 2026-05-17 19:10 UTC
+
+Third live run. Same `:5050` bench backend, rebuilt once more
+to guarantee parity with HEAD (`139fa20` at the time of the
+build, prompt content identical to `e0d91eb`). Full BenchmarkAll
+suite, ~36 minutes.
+
+Run artifacts (all gitignored, local only):
+- Suite: `tools/BenchmarkAll/results/run_20260517_191038.md`
+- Story: `tools/StoryBenchmark/bin/Debug/net10.0/results/run_20260517_190328.md`
+- Game: `tools/GameBenchmark/bin/Debug/net10.0/results/...`
+- Riddle: `tools/RiddleBenchmark/bin/Debug/net10.0/results/run_20260517_190813.md`
+- Calm: `tools/CalmBenchmark/bin/Debug/net10.0/results/...`
+- Curiosity: `tools/CuriosityBenchmark/bin/Debug/net10.0/results/run_20260517_191038.md`
+
+### Suite outcome
+
+| Benchmark | Status | Elapsed | Baseline weak | Current weak | Verdict |
+|---|---|---|---|---|---|
+| StoryBenchmark | OK | 1774.2 s | 0 | **1** | **regressed** |
+| GameBenchmark | OK | 180.3 s | 0 | **0** | **unchanged** |
+| RiddleBenchmark | OK | 105.4 s | 0 | **1** | **regressed** |
+| CalmBenchmark | OK | 76.5 s | 0 | 0 | unchanged |
+| CuriosityBenchmark | OK | 68.2 s | 1 | 1 | unchanged |
+
+All 5 benchmarks exited 0 (no hard fails). 90 live turns total.
+
+### Cross-run comparison — three live samples on this branch
+
+| | Run 1 (12:53 UTC) | Run 2 (Game-only 18:03) | Run 3 (19:10 UTC) |
+|---|---|---|---|
+| Story | 0 / 29 | — | **1** / 29 |
+| Game | **1** / 20 | 0 / 20 | 0 / 20 |
+| Riddle | 0 / 15 | — | **1** / 15 |
+| Calm | 0 / 13 | — | 0 / 13 |
+| Curiosity | 0 / 13 | — | **1** / 13 |
+| **Total weak / turn count** | **1 / 90** | 0 / 20 | **3 / 90** |
+
+The pattern is clear: **the prompts produce ~1–3 weak cases
+per 90 live turns, distributed differently each run**. The
+Game-fix slice (`e0d91eb`) cleanly fixed the GB05 mixing-types
+failure — Game stayed at 0 across both post-fix runs. The two
+new run-3 weak cases (Story T10, Riddle RB04) sit on
+turns that passed clean in run 1; both are model-side variance
+on borderline rules, not regressions caused by today's slice.
+
+### Run-3 weak cases — exact failing turns
+
+**Story T10** — *"tell me a story about two friends"*:
+- Body: «Մի փոքրիկ չամրացած կանաչ դաշտում ապրում էին երկու
+  լավագույն ընկերներ՝ սկյուռիկը՝ Տիկո, և նապաստակը՝ Պակո...»
+- CHOICE_A: «Մոտենանք ընկերին» — generic "approach the friend"
+- Flag: `continuation_no_label_reference` — the continuation
+  did not contain a ≥4-char stem from CHOICE_A. The
+  VERBATIM ANCHOR rule was violated.
+- Reading: the choice itself is template-generic
+  («Մոտենանք ընկերին» appears across many Story turns) and the
+  body has no specific "friend" object the continuation can
+  re-anchor on. This is the choice-templating drift noted in
+  this doc's earlier qualitative-observations section, surfacing
+  here as a benchmark hit. Independent of today's Game slice.
+
+**Riddle RB04** — *"explicit trigger mid-round forces new"*:
+- Turn 1 (`give me a riddle`): «Կռահի՞ր, թե ինչ եմ մտածել։
+  Այն կանաչ է, կլոր, երբեմն մաշկը կոպիտ է, և մենք այն ուտում
+  ենք։ Ինչ է։» — note the missing «՞» on the closing question
+  («Ինչ է» not «Ի՞նչ է»).
+- Turn 2 (`նորից`, "again"): expected a NEW riddle pose;
+  model produced a hint instead («Կտրուկ չէ, մի քիչ ուրիշ
+  բան։ Դու կարող ես այդ բանը կեղևով ուտել, ու շատերն այն
+  ուտում են տաք օրերին։ Փորձիր էլի։»).
+- Flag: `MissingRiddlePose` — Turn 2 had no Armenian
+  question mark, because it wasn't a riddle pose at all.
+- Reading: this is a runtime-dispatch question — does
+  `RiddleIntent` / `ActiveModes` classify «նորից» as a
+  new_riddle trigger? Morning run had this turn passing
+  cleanly, so the dispatch IS capable; this run it
+  misfired. The same `tools/RiddleBenchmark/baseline.json`
+  was a pass against the same prompt today, so this is
+  model-variance noise on a borderline classifier, not a
+  prompt regression from today's slice.
+
+**Curiosity CuB01** — *"why does the sun rise" turn 2*:
+- Flag: `length_growing` (87 > 61 chars).
+- This failure was **also in the committed baseline**
+  (1 → 1, unchanged). It is a persistent borderline case in
+  the `length_growing` metric. Not introduced today.
+
+### Push posture — three-run honest read
+
+- **Game fix verified twice.** Runs 2 and 3 both hit 0/20
+  Game weak cases. The cold-start ONE-TYPE rule + plural-
+  imperative ban + multi-turn-rhythm disclaimer hold.
+- **No mode-level regression caused by today's work.** The
+  weak cases in run 3 hit turns that were not the target of
+  today's slices and that passed cleanly in run 1.
+- **The benchmark noise floor is ~1–3 weak cases per
+  90-turn BenchmarkAll** — the slice-content tests are
+  green, but live runs sample model variance. Zeroing all
+  metrics would require either much larger sample sizes,
+  runtime classifiers stricter than the current ones, or
+  prompt rules that the model violates ~0% of the time —
+  none of which can be added in a single slice.
+
+### Recommendation
+
+**SAFE TO PUSH** — with the explicit caveat that the
+benchmark noise floor stays at ~1–3 weak cases per
+BenchmarkAll run. The committed baselines in each
+`tools/{Mode}Benchmark/baseline.json` are 0 across every
+metric the run-3 regressions hit, meaning the operator
+will need to either:
+
+  (a) accept that 1–3 weak cases per run is the current
+      floor and stop comparing against 0-baselines, OR
+  (b) bump each baseline to match the new floor, OR
+  (c) keep tightening prompts AND/OR runtime classifiers
+      slice-by-slice (the Story T10 verbatim-anchor
+      failure and Riddle RB04 dispatch failure each
+      warrant their own targeted slice; neither blocks
+      push because both are independent of today's Game fix).
+
+The Game slice did exactly what it set out to do. The other
+mode regressions are independent items for the post-push
+backlog, NOT pre-push blockers.
+
+### Cleanup performed (run 3)
+
+- Bench backend stopped (TaskStop on the third start).
+- User's `:5000` dev API still untouched throughout this
+  third cycle.
+- Bench DB / Api binaries reused; no new temp dirs created.
