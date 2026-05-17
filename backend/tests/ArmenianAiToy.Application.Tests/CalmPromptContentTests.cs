@@ -213,6 +213,27 @@ public class CalmPromptContentTests
         Assert.Contains("no \"I\", room-based", Prompt);
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Armenian register — full-day slice 2: ban formal-plural address
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Prompt_ContainsArmenianRegisterRule()
+    {
+        Assert.Contains("ARMENIAN REGISTER — STRICT", Prompt);
+        Assert.Contains("formal-plural Armenian address forms", Prompt);
+        // Positive target so the model has a concrete pronoun to swap to.
+        Assert.Contains("«դու»", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_DoesNotContainFormalPluralAddress()
+    {
+        Assert.DoesNotContain("դուք", Prompt, StringComparison.OrdinalIgnoreCase);  // դուք / Դուք
+        Assert.DoesNotContain("Ձեզ", Prompt);                                            // Ձեզ
+        Assert.DoesNotContain("Ձեր", Prompt);                                            // Ձեր
+    }
+
     [Fact]
     public void CalmFallback_ContainsClosingPhraseAndAnchor()
     {
