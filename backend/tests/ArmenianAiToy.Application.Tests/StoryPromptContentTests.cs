@@ -430,4 +430,66 @@ public class StoryPromptContentTests
         Assert.DoesNotContain("Ձեզ", Prompt);                                            // Ձեզ
         Assert.DoesNotContain("Ձեր", Prompt);                                            // Ձեր
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Story choices v3 — anchor on a NAMED entity, not a generic role word
+    //
+    // Anchored on the 2026-05-17 BenchmarkAll run-3 regression:
+    //   Story T10 ("tell me a story about two friends") produced
+    //   CHOICE_A «Մոտենանք ընկերին» when the body named the actual
+    //   characters (Տիկո, Պակո). The continuation could not verbatim-
+    //   anchor on a ≥4-char stem from «ընկեր» (the word never appeared
+    //   in the body), tripping continuation_no_label_reference.
+    //   Evidence: tools/quality-evidence/areg-live-quality-validation-20260517.md
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void ChoiceAnchor_RequiresNamedOrConcreteEntity()
+    {
+        Assert.Contains("ANCHOR ON A NAMED ENTITY", Prompt);
+    }
+
+    [Fact]
+    public void ChoiceAnchor_BansGenericRolePlaceholders()
+    {
+        Assert.Contains("BANNED ROLE PLACEHOLDERS IN CHOICE LABELS", Prompt);
+    }
+
+    [Fact]
+    public void ChoiceAnchor_PinsGoodNamedCharacterExemplar()
+    {
+        // «Մոտենանք Տիկոյին» — anchors on a named character whose stem
+        // («Տիկո») the body already used.
+        Assert.Contains("«Մոտենանք Տիկոյին»", Prompt);
+    }
+
+    [Fact]
+    public void ChoiceAnchor_PinsGoodSpeciesNounExemplar()
+    {
+        // «Մոտենանք սկյուռիկին» — anchors on a concrete species noun
+        // («սկյուռիկ») the body already used.
+        Assert.Contains("«Մոտենանք սկյուռիկին»", Prompt);
+    }
+
+    [Fact]
+    public void ChoiceAnchor_DoesNotContainBannedGenericChoiceLiterals()
+    {
+        // The specific generic-template choice phrasings the slice spec
+        // calls out. The ban is worded abstractly so none of these
+        // literal Armenian phrasings appear in the prompt body.
+        Assert.DoesNotContain("Մոտենանք ընկերին", Prompt);    // Մոտենանք ընկերին
+        Assert.DoesNotContain("Շարունակենք ճանապարհը", Prompt); // Շարունակենք ճանապարհը
+        Assert.DoesNotContain("Գնանք նրա մոտ", Prompt);        // Գնանք նրա մոտ
+        Assert.DoesNotContain("Խոսենք նրա հետ", Prompt);       // Խոսենք նրա հետ
+    }
+
+    [Fact]
+    public void FinalStoryCheck_ReiteratesAnchorRule()
+    {
+        var idx = Prompt.IndexOf("FINAL STORY CHECK");
+        Assert.True(idx >= 0);
+        var tail = Prompt.Substring(idx);
+        Assert.Contains("primary noun is a NAMED", tail);
+        Assert.Contains("generic role placeholder", tail);
+    }
 }

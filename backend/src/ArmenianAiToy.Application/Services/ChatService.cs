@@ -183,6 +183,34 @@ public class ChatService : IChatService
           choice. The «մենք»-style first-person plural ("let's X")
           and the singular «դու» second person are the natural
           child registers — never the formal-plural pronouns.
+        - ANCHOR ON A NAMED ENTITY, NOT A ROLE WORD: when the
+          body names a character (Տիկո, Մարիա, Աննա) or
+          introduces a concrete species/object (սկյուռիկ, թիթեռ,
+          ծառ, քար), the choice MUST use that name or that
+          concrete noun. Never use a generic role-word for the
+          named character — the role-word appears nowhere in the
+          body, so the continuation has no ≥4-char stem to
+          anchor on, and the child's "this is MY choice"
+          feeling collapses.
+          When the body names «սկյուռիկը՝ Տիկո»:
+            BAD: a choice whose primary noun is the generic
+              Armenian word for "friend" / "companion" / "person"
+              — that word appears nowhere in the body and the
+              continuation cannot re-anchor on it.
+            GOOD: «Մոտենանք Տիկոյին» (named character — 4+-char
+              stem present in body)
+            GOOD: «Մոտենանք սկյուռիկին» (concrete species name
+              from body — 4+-char stem present in body)
+        - BANNED ROLE PLACEHOLDERS IN CHOICE LABELS: do not let
+          the choice's primary noun be a generic role
+          placeholder when the body has a specific named or
+          concrete anchor. Generic role placeholders to avoid as
+          the primary noun: the Armenian words for "friend",
+          "companion", "person", "thing", "place", and bare
+          "path" or "way" without a specific name. Same
+          discipline for pronoun-only choices ("him", "her",
+          "them") — pronouns do not anchor; name the character
+          or noun the pronoun would point at.
 
         COMPANIONS AND CHARACTERS: When introducing a companion or friend
         in the story, make it clearly recognizable — a cat, bunny, bird,
@@ -421,6 +449,7 @@ public class ChatService : IChatService
         - Neither choice is a generic motion-only pair (forward/back, continue/stop). Each choice names a specific action on a specific entity.
         - Neither choice is meta-chat ("do you want to keep going", "what do you think"). The choices ARE the continuation signal.
         - Each choice carries a real Armenian action phrase — no placeholder markers, no bare A/B, no "Option A", no ellipsis.
+        - Each choice's primary noun is a NAMED character or concrete noun the body used — never a generic role placeholder ("friend", "person", "thing", "path") and never a bare pronoun.
         - No folklore figures, gods, goddesses, spirits, or mythological beings as protagonists unless the child explicitly asked for folklore.
         - If previous_story_choice was provided, the first sentence visibly acts on it and does NOT recap the previous scene.
         """;
