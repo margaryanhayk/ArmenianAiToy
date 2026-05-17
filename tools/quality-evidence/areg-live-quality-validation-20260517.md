@@ -338,3 +338,79 @@ extra-run signal is not authoritative.
   **left in place**; safe to `rm`.
 - No firmware, sketch, config.h, or repo code touched. Only this
   evidence doc is added to the tree.
+
+---
+
+## Post-fix verification — 2026-05-17 18:03 UTC
+
+Commit `e0d91eb` (fix(chat): prevent mixed game actions in
+cold-start turns) landed the SLICE described in this doc's
+"Suggested next slice" section. Targeted live GameBenchmark
+re-run against a fresh `:5050` backend built from `e0d91eb`:
+
+```
+cd backend
+dotnet build src/ArmenianAiToy.Api/ArmenianAiToy.Api.csproj \
+  -c Debug --output "$LOCALAPPDATA/Temp/areg-bench-api" --nologo
+cd "$LOCALAPPDATA/Temp/areg-bench-api"
+ASPNETCORE_ENVIRONMENT=Development \
+  dotnet ArmenianAiToy.Api.dll \
+  --urls "http://localhost:5050" \
+  --Database:ConnectionString="Data Source=areg-bench.db"
+cd tools/GameBenchmark
+dotnet run --nologo -- http://localhost:5050
+```
+
+Result:
+
+| Metric | Pre-fix (12:49 UTC) | Post-fix (18:03 UTC) |
+|---|---|---|
+| Scenarios pass | 6/6 | 6/6 |
+| Turns pass | 20/20 | 20/20 |
+| **Weak cases** | **1** | **0** |
+| Mixing types | 1 | **0** |
+| Leaked tail | 0 | 0 |
+| Latin run | 0 | 0 |
+| Variety low | 0 | 0 |
+| Celebration repeat | 0 | 0 |
+| Asking permission | 0 | 0 |
+
+Verdict line from the benchmark:
+**`weak_cases: 0 -> 0 (0)` · ALL CHECKS PASSED — NO WEAK CASES**
+
+The GB05 turn 1 response on the post-fix run (verbatim):
+
+> **User:** `play a game`
+> **Response (post-fix):** «Դիպչիր քթիդ։»
+> *single body_part action, no «Եկեք», no «Հիմա X ... Հիմա Y»
+> stacking, no mixing — exactly the GOOD cold-start shape pinned
+> in the new STRICT NON-NEGOTIABLES.*
+
+For comparison, the pre-fix response was
+«Եկեք խաղանք մի փոքրիկ խաղ. դիպչիր քթիդ։ Հիմա՝ ծափ տանք երեք
+անգամ։» — three failures stacked. All three are now absent.
+
+GB05 turn 2 (`stop, let's switch game`) post-fix response:
+«Լավ, նոր խաղ՝ գտիր մի կապույտ բան։ Որտե՞ղ է այն։» — clean
+switch to `color_find` with a single action, no formal-plural,
+no mixing. The switch_game arm of the COLD-START ONE-TYPE rule
+also held.
+
+### Push posture after this verification
+
+- Single-run sample, so push if the live re-run shows clean
+  is **conditional**: one extra GameBenchmark run (or one
+  BenchmarkAll re-run for the broader signal) would be a more
+  honest baseline. Not run autonomously — see the original
+  "Single-run sample size" caveat above.
+- Recommendation: **safe to push after one more confirmation
+  run**, or push now with the understanding that one live run
+  is one sample.
+
+### Cleanup performed (post-fix run)
+
+- Bench backend stopped (TaskStop on the second start).
+- User's `:5000` dev API still untouched throughout this
+  second cycle.
+- Bench DB / Api binaries reused from the first run; no new
+  temp dirs created.
