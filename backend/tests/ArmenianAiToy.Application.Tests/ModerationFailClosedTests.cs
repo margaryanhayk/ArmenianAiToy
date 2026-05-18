@@ -16,6 +16,31 @@ namespace ArmenianAiToy.Application.Tests;
 /// other exception class. Retry-on-success must not widen what passes
 /// moderation — the retry only gives the endpoint one more chance to
 /// classify content, it cannot mark unsafe content safe.
+///
+/// MOCKING STRATEGY — these tests do NOT require network access.
+/// They subclass <see cref="OpenAIModerationAdapter"/> via the private
+/// <c>StubAdapter</c> below and override
+/// <c>protected virtual Task&lt;ModerationResult&gt; ClassifyOnceAsync(string)</c>
+/// — the only place the production code invokes the OpenAI SDK
+/// (<c>_client.ClassifyTextAsync(...)</c> at OpenAIModerationAdapter.cs:148).
+/// Each test scripts a sequence of responses (throws or success results)
+/// in <c>StubAdapter.Responses</c> and asserts the fail-closed sentinel
+/// contract (<c>IsSafe=false</c>, <c>FlaggedCategories=["moderation_unavailable"]</c>)
+/// fires on the exact failure shapes the production code is documented
+/// to handle.
+///
+/// The dummy <c>ModerationClient(model: "stub", apiKey: "stub")</c> the
+/// <c>StubAdapter</c> passes to the base constructor is constructed but
+/// never invoked — the OpenAI SDK builds the client config locally with
+/// no network I/O. If a future SDK version validates the API key at
+/// construction time and breaks this, add a parameterless protected
+/// constructor on <see cref="OpenAIModerationAdapter"/> that leaves
+/// <c>_client</c> null; subclasses that bypass <c>ClassifyOnceAsync</c>
+/// then have no SDK dependency at all.
+///
+/// Verify offline:
+///   dotnet test --filter "Moderation"
+/// passes 32/32 in ~1 second with no network.
 /// </summary>
 public class ModerationFailClosedTests
 {
