@@ -24,7 +24,17 @@ public class AppDbContext : DbContext
         {
             e.HasKey(d => d.Id);
             e.HasIndex(d => d.MacAddress).IsUnique();
-            e.HasIndex(d => d.ApiKey).IsUnique();
+            // Filtered unique index on ApiKey: nullable since the hash-at-rest
+            // slice, with hashed-only rows storing null in this column. The
+            // filter keeps the old uniqueness guarantee for legacy plaintext
+            // rows (during the lazy-upgrade window) without forbidding the
+            // common case of multiple null ApiKey values.
+            e.HasIndex(d => d.ApiKey)
+                .IsUnique()
+                .HasFilter("\"ApiKey\" IS NOT NULL");
+            // ApiKeyHash is intentionally NOT indexed. Auth lookups go by
+            // DeviceId (the primary key); the per-row salt makes any hash
+            // lookup pointless anyway.
             // B4: NOT NULL column with default backfills existing devices at
             // migration time, so the new non-nullable property never sees a
             // null in-memory and existing rows get the Armenia-first default.

@@ -1,6 +1,7 @@
 using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.Auth;
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Notifications;
 using ArmenianAiToy.Application.Telemetry;
@@ -254,10 +255,29 @@ public class ParentService : IParentService
 
     public async Task<bool> LinkDeviceAsync(Guid parentId, Guid deviceId, string apiKey)
     {
+        // Fetch by id alone — the credential check is done in-process so the
+        // same hashed / legacy-plaintext duality as DeviceService.ValidateDevice
+        // applies here. SQL plaintext equality (the pre-hash-at-rest shape)
+        // would never match a hashed row, locking parents out of every
+        // device registered after the slice landed.
         var device = await _db.Set<Device>()
-            .FirstOrDefaultAsync(d => d.Id == deviceId && d.ApiKey == apiKey);
+            .FirstOrDefaultAsync(d => d.Id == deviceId);
 
         if (device == null)
+            return false;
+
+        bool credentialValid;
+        if (DeviceApiKeyHasher.IsHash(device.ApiKeyHash))
+        {
+            credentialValid = DeviceApiKeyHasher.Verify(apiKey, device.ApiKeyHash);
+        }
+        else
+        {
+            credentialValid = !string.IsNullOrEmpty(device.ApiKey)
+                && DeviceApiKeyHasher.ConstantTimeEquals(apiKey, device.ApiKey);
+        }
+
+        if (!credentialValid)
             return false;
 
         var alreadyLinked = await _db.Set<ParentDevice>()
@@ -1393,7 +1413,8 @@ public class ParentService : IParentService
                 // any field added to Parent / Device that is credential-like
                 // or system-only belongs here.
                 "Parent.PasswordHash",
-                "Device.ApiKey"
+                "Device.ApiKey",
+                "Device.ApiKeyHash"
             });
     }
 
