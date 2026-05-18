@@ -11,6 +11,10 @@ Dockerfile, `.dockerignore`, and container deployment remain the
 canonical production posture; this doc covers a validated local
 non-Docker path.
 
+To run the published exe automatically as a background service
+after a Windows reboot (no PowerShell window open), continue with
+`docs/windows-service-deploy.md` once you finish this runbook.
+
 The procedure below was exercised end-to-end on Windows 11 against
 repo `main` at commit `9ef6344` ("Merge branch
 'feature/dockerfile-deploy-docs'"). Every command shown was actually
