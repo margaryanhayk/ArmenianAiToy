@@ -9,6 +9,11 @@ image.
 
 ESP32 firmware is out of scope for this image.
 
+For a validated Windows non-Docker deployment path (publish + run
+the exe directly), see `docs/windows-publish-deploy.md`. Docker
+remains the canonical production posture; the Windows-publish
+runbook is a sibling for hosts where Docker is unavailable.
+
 ## What's in the image
 
 - The `ArmenianAiToy.Api` publish output and its three project
