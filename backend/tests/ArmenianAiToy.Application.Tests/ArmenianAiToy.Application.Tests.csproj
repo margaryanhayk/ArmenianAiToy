@@ -29,4 +29,15 @@
     <ProjectReference Include="..\..\src\ArmenianAiToy.Domain\ArmenianAiToy.Domain.csproj" />
   </ItemGroup>
 
+  <!--
+    Red-team safety corpus loaded at runtime by
+    ArmenianRedTeamSafetyCorpusTests. Copied to the test bin so
+    Path.Combine(AppContext.BaseDirectory, "TestData", ...) resolves.
+  -->
+  <ItemGroup>
+    <None Update="TestData\armenian-red-team-safety-corpus.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
