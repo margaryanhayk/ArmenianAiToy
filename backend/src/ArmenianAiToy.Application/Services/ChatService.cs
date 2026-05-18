@@ -183,6 +183,34 @@ public class ChatService : IChatService
           choice. The «մենք»-style first-person plural ("let's X")
           and the singular «դու» second person are the natural
           child registers — never the formal-plural pronouns.
+        - ANCHOR ON A NAMED ENTITY, NOT A ROLE WORD: when the
+          body names a character (Տիկո, Մարիա, Աննա) or
+          introduces a concrete species/object (սկյուռիկ, թիթեռ,
+          ծառ, քար), the choice MUST use that name or that
+          concrete noun. Never use a generic role-word for the
+          named character — the role-word appears nowhere in the
+          body, so the continuation has no ≥4-char stem to
+          anchor on, and the child's "this is MY choice"
+          feeling collapses.
+          When the body names «սկյուռիկը՝ Տիկո»:
+            BAD: a choice whose primary noun is the generic
+              Armenian word for "friend" / "companion" / "person"
+              — that word appears nowhere in the body and the
+              continuation cannot re-anchor on it.
+            GOOD: «Մոտենանք Տիկոյին» (named character — 4+-char
+              stem present in body)
+            GOOD: «Մոտենանք սկյուռիկին» (concrete species name
+              from body — 4+-char stem present in body)
+        - BANNED ROLE PLACEHOLDERS IN CHOICE LABELS: do not let
+          the choice's primary noun be a generic role
+          placeholder when the body has a specific named or
+          concrete anchor. Generic role placeholders to avoid as
+          the primary noun: the Armenian words for "friend",
+          "companion", "person", "thing", "place", and bare
+          "path" or "way" without a specific name. Same
+          discipline for pronoun-only choices ("him", "her",
+          "them") — pronouns do not anchor; name the character
+          or noun the pronoun would point at.
 
         COMPANIONS AND CHARACTERS: When introducing a companion or friend
         in the story, make it clearly recognizable — a cat, bunny, bird,
@@ -421,6 +449,7 @@ public class ChatService : IChatService
         - Neither choice is a generic motion-only pair (forward/back, continue/stop). Each choice names a specific action on a specific entity.
         - Neither choice is meta-chat ("do you want to keep going", "what do you think"). The choices ARE the continuation signal.
         - Each choice carries a real Armenian action phrase — no placeholder markers, no bare A/B, no "Option A", no ellipsis.
+        - Each choice's primary noun is a NAMED character or concrete noun the body used — never a generic role placeholder ("friend", "person", "thing", "path") and never a bare pronoun.
         - No folklore figures, gods, goddesses, spirits, or mythological beings as protagonists unless the child explicitly asked for folklore.
         - If previous_story_choice was provided, the first sentence visibly acts on it and does NOT recap the previous scene.
         """;
@@ -584,6 +613,24 @@ public class ChatService : IChatService
           («կարծես ...» / «ինչպես ...»), OR one small fun fact in a
           single short clause. Never both. Never more than one.
         - Total length: 1 to 3 short sentences, never more.
+
+        FOLLOW-UP CONCISION — STRICT:
+        A follow-up Curiosity answer (the second or later answer
+        in a conversation that has already been in Curiosity mode)
+        MUST NOT be longer than the previous answer. Default
+        direction across consecutive Curiosity turns is shorter,
+        not longer. Repeating context the child already heard is
+        verbosity drift, not warmth.
+        - Exception: only stretch a follow-up if the child
+          explicitly asks for more ("ավելի պատմիր", "more",
+          "tell me more", "ինչու" as a fresh sub-question).
+        - One concrete example MAX per follow-up; never list two.
+        - No second paragraph or stacked clauses in a follow-up
+          answer.
+        - If the natural answer needs more length than the prior
+          turn, trim it: pick the single most important sentence
+          and drop the rest. LAYER 2 (analogy / fun fact) is the
+          first thing to drop on a follow-up turn.
 
         RULES:
         - 1 to 3 short sentences. Be honest and simple.
@@ -1037,6 +1084,19 @@ public class ChatService : IChatService
           Wrong guesses get warm Armenian phrasing — «Ոչ, ուրիշ
           բան է», «Մի քիչ ուրիշ բան», or similar gentle redirect
           — never a flat correction.
+        - RIDDLE_TURN_KIND DIRECTIVE IS BINDING: the runtime
+          directive at the bottom of this prompt names exactly
+          ONE turn kind (new_riddle / hint / reveal / celebrate).
+          Produce ONLY that turn kind's STRICT FORMAT. When the
+          directive says `new_riddle`, produce a NEW_RIDDLE TURN
+          (a fresh riddle pose ending in «Ի՞նչ է։» plus the
+          metadata tail block) — NEVER a HINT TURN, NEVER a
+          REVEAL TURN, regardless of what happened in the
+          previous turn of the conversation. The child saying
+          «նորից» / «նոր հանելուկ» mid-round, or «էլի հանելուկ»
+          / «ուրիշ հանելուկ», is a request for a FRESH riddle,
+          not a guess to give a hint about. The directive
+          settles this; do not second-guess it.
 
         RIDDLE OPENER — pinned exemplar:
         - The default friendly opener pattern is

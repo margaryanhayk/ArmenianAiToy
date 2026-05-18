@@ -224,4 +224,45 @@ public class RiddlePromptContentTests
         // so this literal stays absent from the prompt body.
         Assert.DoesNotContain("ճիշտ չէ", Prompt);  // ճիշտ չէ
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Riddle v4 — RIDDLE_TURN_KIND directive must override prior context
+    //
+    // Anchored on the 2026-05-17 BenchmarkAll run-3 regression:
+    //   RB04 ("explicit trigger mid-round forces new") turn 2 had user
+    //   «նորից» — the runtime correctly dispatched RIDDLE_TURN_KIND:
+    //   new_riddle, but the model produced a HINT TURN anyway. The
+    //   morning run hit the same code path and produced new_riddle
+    //   cleanly, so the dispatch IS capable; this slice pins the
+    //   prompt-side guarantee that the directive is binding.
+    //   Evidence: tools/quality-evidence/areg-live-quality-validation-20260517.md
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Prompt_DeclaresTurnKindDirectiveIsBinding()
+    {
+        Assert.Contains("RIDDLE_TURN_KIND DIRECTIVE IS BINDING", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_NamesAgainRequestsAsNewRiddleTriggers()
+    {
+        // The four Armenian forms the slice spec calls out — each must
+        // appear in the directive-binding rule so the model knows that
+        // any of these means "fresh riddle, not hint".
+        Assert.Contains("«նորից»", Prompt);
+        Assert.Contains("«նոր հանելուկ»", Prompt);
+        Assert.Contains("«ուրիշ հանելուկ»", Prompt);
+        Assert.Contains("«էլի հանելուկ»", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_ForbidsHintWhenDirectiveSaysNewRiddle()
+    {
+        // The explicit "NEVER a HINT TURN" wording when directive is
+        // new_riddle. Without this, the model can drift into a hint
+        // even when the runtime asked for a fresh riddle.
+        Assert.Contains("NEVER a HINT TURN", Prompt);
+        Assert.Contains("NEVER a", Prompt);
+    }
 }
