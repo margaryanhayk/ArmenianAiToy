@@ -493,7 +493,7 @@ public class ParentControllerExportTests
         // makes a future "let's put GoogleSubject back in exclusions"
         // edit fail loudly.
         Assert.Equal(
-            new[] { "Parent.PasswordHash", "Device.ApiKey" },
+            new[] { "Parent.PasswordHash", "Device.ApiKey", "Device.ApiKeyHash" },
             export.ExcludedFields);
     }
 

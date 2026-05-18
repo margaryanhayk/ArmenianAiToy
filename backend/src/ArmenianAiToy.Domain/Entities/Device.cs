@@ -5,7 +5,25 @@ public class Device
     public Guid Id { get; set; }
     public string MacAddress { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public string ApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Legacy plaintext device API key. Kept nullable for compatibility with
+    /// rows registered before the hash-at-rest slice landed. New
+    /// registrations MUST leave this null and store the hash in
+    /// <see cref="ApiKeyHash"/>. The auth path (<c>DeviceService.ValidateDeviceAsync</c>)
+    /// reads this only when <see cref="ApiKeyHash"/> is null and lazy-upgrades
+    /// the row on the first successful authentication.
+    /// </summary>
+    public string? ApiKey { get; set; }
+
+    /// <summary>
+    /// Hashed device API key. Format documented in
+    /// <c>DeviceApiKeyHasher</c> (v1:pbkdf2-sha256:&lt;iter&gt;:&lt;salt&gt;:&lt;hash&gt;).
+    /// Primary credential storage for all rows registered after the
+    /// hash-at-rest slice. Never returned to clients; never logged.
+    /// </summary>
+    public string? ApiKeyHash { get; set; }
+
     public string? FirmwareVersion { get; set; }
     public DateTime RegisteredAt { get; set; }
     public DateTime LastSeenAt { get; set; }

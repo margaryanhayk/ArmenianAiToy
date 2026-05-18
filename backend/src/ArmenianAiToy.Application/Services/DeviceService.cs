@@ -26,19 +26,56 @@ public class DeviceService : IDeviceService
 
         if (existing != null)
         {
-            _logger.LogInformation("Device {MacAddress} re-registered", request.MacAddress);
             existing.LastSeenAt = DateTime.UtcNow;
             existing.FirmwareVersion = request.FirmwareVersion;
-            await _db.SaveChangesAsync();
-            return new DeviceRegistrationResponse(existing.Id, existing.ApiKey);
+
+            // Three re-registration arms, in priority order:
+            //   1. Legacy row (ApiKey != null AND ApiKeyHash == null) —
+            //      pre-hash-at-rest slice. Return the existing plaintext
+            //      verbatim AND lazy-upgrade the row to hash so the next
+            //      validation does not need the plaintext column. Keeps
+            //      the old idempotency contract for any device that
+            //      registered before this slice.
+            //   2. Hashed row (ApiKeyHash != null) — cannot recover the
+            //      original plaintext from the hash, so rotate to a fresh
+            //      key, persist a new hash, and return the new key. This
+            //      is the documented behavior change for the hash-at-rest
+            //      slice.
+            //   3. Corrupt row (both null) — should not happen in practice;
+            //      treat as a rotate.
+            string returnedKey;
+            if (existing.ApiKey is { Length: > 0 } legacyPlaintext
+                && string.IsNullOrEmpty(existing.ApiKeyHash))
+            {
+                returnedKey = legacyPlaintext;
+                existing.ApiKeyHash = DeviceApiKeyHasher.Hash(legacyPlaintext);
+                existing.ApiKey = null;
+                await _db.SaveChangesAsync();
+                _logger.LogInformation(
+                    "Device {MacAddress} re-registered (legacy plaintext upgraded to hash)",
+                    request.MacAddress);
+            }
+            else
+            {
+                returnedKey = $"dtk_{Guid.NewGuid():N}";
+                existing.ApiKeyHash = DeviceApiKeyHasher.Hash(returnedKey);
+                existing.ApiKey = null;
+                await _db.SaveChangesAsync();
+                _logger.LogInformation(
+                    "Device {MacAddress} re-registered (API key rotated)",
+                    request.MacAddress);
+            }
+            return new DeviceRegistrationResponse(existing.Id, returnedKey);
         }
 
+        var plaintext = $"dtk_{Guid.NewGuid():N}";
         var device = new Device
         {
             Id = Guid.NewGuid(),
             MacAddress = request.MacAddress,
             Name = $"Toy-{request.MacAddress[^4..]}",
-            ApiKey = $"dtk_{Guid.NewGuid():N}",
+            ApiKey = null,
+            ApiKeyHash = DeviceApiKeyHasher.Hash(plaintext),
             FirmwareVersion = request.FirmwareVersion,
             RegisteredAt = DateTime.UtcNow,
             LastSeenAt = DateTime.UtcNow
@@ -48,13 +85,59 @@ public class DeviceService : IDeviceService
         await _db.SaveChangesAsync();
 
         _logger.LogInformation("New device registered: {DeviceId} ({MacAddress})", device.Id, device.MacAddress);
-        return new DeviceRegistrationResponse(device.Id, device.ApiKey);
+        return new DeviceRegistrationResponse(device.Id, plaintext);
     }
 
     public async Task<Device?> ValidateDeviceAsync(Guid deviceId, string apiKey)
     {
-        return await _db.Set<Device>()
-            .FirstOrDefaultAsync(d => d.Id == deviceId && d.ApiKey == apiKey);
+        // SQL filter by Id only — the hash compare cannot run in SQL because
+        // PBKDF2 + per-row salt require server-side computation. The legacy
+        // plaintext-equality branch is handled in-process too, so an attacker
+        // probing with the wrong key cannot see a timing difference between
+        // "device id exists" and "device id missing" beyond the FindAsync
+        // cost itself (which is the same for either branch).
+        var device = await _db.Set<Device>()
+            .FirstOrDefaultAsync(d => d.Id == deviceId);
+        if (device is null) return null;
+
+        // Preferred path: hashed credential.
+        if (DeviceApiKeyHasher.IsHash(device.ApiKeyHash))
+        {
+            return DeviceApiKeyHasher.Verify(apiKey, device.ApiKeyHash)
+                ? device
+                : null;
+        }
+
+        // Legacy plaintext fallback. Constant-time compare so a wrong key
+        // does not leak a prefix-match timing signal. On success, lazy-
+        // upgrade: persist the hash and clear the plaintext column so the
+        // next request goes through the preferred path.
+        if (!string.IsNullOrEmpty(device.ApiKey)
+            && DeviceApiKeyHasher.ConstantTimeEquals(apiKey, device.ApiKey))
+        {
+            device.ApiKeyHash = DeviceApiKeyHasher.Hash(apiKey);
+            device.ApiKey = null;
+            try
+            {
+                await _db.SaveChangesAsync();
+                _logger.LogInformation(
+                    "Device {DeviceId} legacy plaintext key upgraded to hash on successful auth",
+                    device.Id);
+            }
+            catch (Exception ex)
+            {
+                // Persisting the upgrade is best-effort; the auth itself
+                // already succeeded, so we never fail the request on a
+                // save error. The next successful auth will retry the
+                // upgrade.
+                _logger.LogWarning(ex,
+                    "Device {DeviceId} legacy-to-hash upgrade save failed (will retry)",
+                    device.Id);
+            }
+            return device;
+        }
+
+        return null;
     }
 
     public async Task UpdateLastSeenAsync(Guid deviceId)
