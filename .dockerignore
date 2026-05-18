@@ -1,0 +1,73 @@
+# .dockerignore — keeps the build context small and keeps secrets,
+# dev DBs, audio blobs, tooling, and ESP32 firmware OUT of the
+# image entirely. Mirrors .gitignore where it overlaps, and adds
+# the things git tracks but the runtime image should never carry
+# (test projects, tooling, docs, ESP32 firmware, dev settings).
+
+# --- Build artifacts (mirror .gitignore) --------------------------
+**/bin/
+**/obj/
+**/*.user
+**/*.suo
+**/.vs/
+**/.vscode/
+**/.idea/
+
+# --- Test + tooling trees (not part of the runtime app) -----------
+backend/tests/
+tests/
+tools/
+
+# --- Documentation + repo-level artifacts -------------------------
+docs/
+*.md
+ArmenianAiToy_Project_Status.pdf
+LICENSE
+.github/
+
+# --- ESP32 firmware (out of scope for the backend image) ----------
+esp32/
+
+# --- Dev SQLite (never bake a developer's DB into the image) ------
+**/*.db
+**/*.db-shm
+**/*.db-wal
+
+# --- Audio blob runtime artifacts ---------------------------------
+backend/src/ArmenianAiToy.Api/audio-blobs/
+audio-blobs/
+
+# --- Local secrets / config overlays ------------------------------
+**/secrets.json
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/launchSettings.json
+**/.env
+**/.env.*
+
+# --- Claude state / local agent memory ----------------------------
+.claude/
+backend/.claude/
+
+# --- VCS metadata -------------------------------------------------
+.git/
+.gitignore
+.gitattributes
+
+# --- StoryModelBakeoff results (already gitignored, but be explicit
+#     in case a stray result file lands in the build context) ------
+tools/StoryModelBakeoff/results/
+tools/BenchmarkAll/results/
+
+# --- Python caches (in case tests/ wasn't excluded above) ---------
+**/__pycache__/
+*.pyc
+*.pyo
+
+# --- OS junk ------------------------------------------------------
+**/.DS_Store
+**/Thumbs.db
+
+# --- Dockerfile itself isn't needed in the image ------------------
+Dockerfile
+.dockerignore
