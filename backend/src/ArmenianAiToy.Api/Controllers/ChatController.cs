@@ -6,6 +6,8 @@ using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace ArmenianAiToy.Api.Controllers;
 
@@ -19,12 +21,15 @@ public class ChatController : ControllerBase
 {
     private readonly IChatService _chatService;
     private readonly IDeviceService _deviceService;
+    private readonly OpenAICostMeter _costMeter;
+    private readonly IOptions<OpenAIDailyCostCapOptions> _costCapOptions;
+    private readonly ILogger<ChatController> _logger;
 
     // Child-facing canned reply when a parent has paused the device. Kept
     // short, age-appropriate, and tells the child to involve their parent.
     // Never passed through AI / moderation — it is a constant.
     internal const string PausedResponse =
-        "\u0540\u056b\u0574\u0561 \u0570\u0561\u0576\u0563\u057d\u057f\u0561\u0576\u0578\u0582\u0574 \u0565\u0574\u0589 \u053e\u0576\u0578\u0572\u056b\u0564 \u056f\u0561\u0580\u0578\u0572 \u0567 \u0576\u0578\u0580\u056b\u0581 \u0574\u056b\u0561\u0581\u0576\u0565\u056c\u0589";
+        "Հիմա հանգստանում եմ։ Ծնողիդ կարող է նորից միացնել։";
         // «Հիմա հանգստանում եմ։ Ծնողդ կարող է նորից միացնել։»
 
     // B5: canned reply when the parent has disabled the mode the child's
@@ -35,10 +40,26 @@ public class ChatController : ControllerBase
         "Եկ մի ուրիշ բան փորձենք։";
         // «Եկ մի ուրիշ բան փորձենք։» ("Let's try something else.")
 
-    public ChatController(IChatService chatService, IDeviceService deviceService)
+    // Cost-cap canned reply (P0 daily-spend gate). Child-safe, no cost
+    // detail, same envelope shape as PausedResponse. Deliberately distinct
+    // wording so the cap-trip path is operator-distinguishable in logs.
+    // SafetyFlag.Clean — a parent-cost-cap soft-off is not a safety event.
+    internal const string CostCapResponse =
+        "Հիմա մի փոքր դադար տանք։ Քիչ հետո նորից կշարունակենք։";
+        // «Հիմա մի փոքր դադար տանք։ Քիչ հետո նորից կշարունակենք։»
+
+    public ChatController(
+        IChatService chatService,
+        IDeviceService deviceService,
+        OpenAICostMeter costMeter,
+        IOptions<OpenAIDailyCostCapOptions> costCapOptions,
+        ILogger<ChatController> logger)
     {
         _chatService = chatService;
         _deviceService = deviceService;
+        _costMeter = costMeter;
+        _costCapOptions = costCapOptions;
+        _logger = logger;
     }
 
     /// <summary>
@@ -83,10 +104,56 @@ public class ChatController : ControllerBase
                     ModeDisabledResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
         }
 
+        // P0 daily cost cap. Fires AFTER the soft-off gates above so the
+        // existing pause/bedtime/mode-disabled telemetry shape is
+        // unchanged. SafetyFlag stays Clean — a cost-cap trip is a
+        // parent-cost soft-off, not a safety event. Disabled config
+        // skips the gate entirely.
+        var costCapOpts = _costCapOptions.Value;
+        if (costCapOpts.Enabled)
+        {
+            var nowUtc = DateTime.UtcNow;
+            var cap = costCapOpts.CapForDevice(deviceId);
+            if (_costMeter.IsOverCap(deviceId, cap, nowUtc))
+            {
+                AppMeter.OpenAICostCapTrip.Add(1,
+                    new KeyValuePair<string, object?>("kind", "chat"));
+                if (_costMeter.ShouldLogCapTrip(deviceId, nowUtc))
+                {
+                    _logger.LogWarning(
+                        "OpenAI daily cost cap reached. DeviceId={DeviceId} Kind={Kind} CurrentEstimatedUsd={Current:F4} CapUsd={Cap:F4} UtcDate={Date:yyyy-MM-dd}",
+                        deviceId, "chat",
+                        _costMeter.GetCurrentTotal(deviceId, nowUtc), cap, nowUtc.Date);
+                }
+                return Ok(new ChatResponse(
+                    CostCapResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
+            }
+        }
+
         try
         {
             var response = await _chatService.GetResponseAsync(deviceId, request.Message, request.ChildId,
                 request.StorySessionId, request.SelectedChoice);
+
+            // Cost-recording is best-effort and runs after a successful
+            // ChatService completion. Wrapped in its own try/catch so a
+            // bug in the estimator can never break the chat path.
+            if (costCapOpts.Enabled)
+            {
+                try
+                {
+                    var estimate = OpenAICostEstimator.EstimateChatCostUsd(
+                        request.Message, response.Response);
+                    _costMeter.Record(deviceId, estimate, DateTime.UtcNow);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "OpenAI cost-cap: chat cost-record failure (suppressed). DeviceId={DeviceId}",
+                        deviceId);
+                }
+            }
+
             return Ok(response);
         }
         catch (Exception)

@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -119,9 +120,17 @@ public class AudioChatControllerTests
         var canned = new CannedVoiceClips(synthesis);
         var logger = Substitute.For<ILogger<AudioChatController>>();
 
+        // Cost-cap gate added in feature/openai-daily-cost-cap. Disabled
+        // here so the AudioChat happy-path tests exercise the same code
+        // path as before. Dedicated cost-cap audio tests live in
+        // AudioChatControllerCostCapTests.cs.
+        var costMeter = new OpenAICostMeter();
+        var costCapOptions = Options.Create(
+            new OpenAIDailyCostCapOptions { Enabled = false });
+
         var controller = new AudioChatController(
             chatService, deviceService, transcription, synthesis,
-            blobStore, canned, db, logger);
+            blobStore, canned, db, costMeter, costCapOptions, logger);
 
         var httpContext = new DefaultHttpContext();
         var deviceId = Guid.NewGuid();

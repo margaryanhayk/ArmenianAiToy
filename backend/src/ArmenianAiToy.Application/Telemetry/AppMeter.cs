@@ -181,4 +181,25 @@ public static class AppMeter
             name: "aat_moderation_classify_duration_seconds",
             unit: "s",
             description: "End-to-end duration of the moderation classify call.");
+
+    /// <summary>
+    /// Count of per-device daily OpenAI cost-cap trips
+    /// (<c>OpenAICostMeter.IsOverCap</c> returned true ahead of a chat
+    /// or audio-chat request). Tag <c>kind</c> is one of <c>chat</c>
+    /// or <c>audio</c>. Bounded two-value enumeration — safe under
+    /// the no-high-cardinality invariant.
+    /// <para>
+    /// Trips fire once per request, so a buggy client that hits the
+    /// cap many times in one day produces many counter increments
+    /// (good — operators can alert on the rate) but exactly ONE
+    /// structured-warning log line (see
+    /// <c>OpenAICostMeter.ShouldLogCapTrip</c> for the flood-control
+    /// gate). Do NOT add a per-device tag here — that is what the
+    /// audit/log stream is for.
+    /// </para>
+    /// </summary>
+    public static readonly Counter<long> OpenAICostCapTrip =
+        Instance.CreateCounter<long>(
+            name: "aat_openai_cost_cap_trip_total",
+            description: "Count of per-device daily OpenAI cost-cap trips, by kind.");
 }

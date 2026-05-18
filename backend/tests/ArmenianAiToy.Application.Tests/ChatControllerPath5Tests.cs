@@ -6,6 +6,8 @@ using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Domain.Enums;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -28,7 +30,14 @@ public class ChatControllerPath5Tests
         // default for Task<bool>), so the pause gate added in the B3 commit is a
         // no-op here and these Path-5 tests exercise the same code path as before.
         var deviceService = Substitute.For<IDeviceService>();
-        var controller = new ChatController(chatService, deviceService);
+        // Cost-cap gate added in feature/openai-daily-cost-cap. Disabled here so
+        // these Path-5 tests exercise the same code path as before (cap gate
+        // never trips, no recording).
+        var costMeter = new OpenAICostMeter();
+        var costCapOptions = Options.Create(new OpenAIDailyCostCapOptions { Enabled = false });
+        var logger = Substitute.For<ILogger<ChatController>>();
+        var controller = new ChatController(
+            chatService, deviceService, costMeter, costCapOptions, logger);
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = Guid.NewGuid();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
@@ -99,7 +108,11 @@ public class ChatControllerPath5Tests
         deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
             .Returns(true);
 
-        var controller = new ChatController(chatService, deviceService);
+        var controller = new ChatController(
+            chatService, deviceService,
+            new OpenAICostMeter(),
+            Options.Create(new OpenAIDailyCostCapOptions { Enabled = false }),
+            Substitute.For<ILogger<ChatController>>());
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = Guid.NewGuid();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
@@ -132,7 +145,11 @@ public class ChatControllerPath5Tests
                 Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<DetectedMode>())
             .Returns(true);
 
-        var controller = new ChatController(chatService, deviceService);
+        var controller = new ChatController(
+            chatService, deviceService,
+            new OpenAICostMeter(),
+            Options.Create(new OpenAIDailyCostCapOptions { Enabled = false }),
+            Substitute.For<ILogger<ChatController>>());
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = Guid.NewGuid();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
@@ -170,7 +187,11 @@ public class ChatControllerPath5Tests
                 Arg.Any<Guid>(), Arg.Any<Guid?>(), DetectedMode.Story)
             .Returns(storyEnabled);
 
-        var controller = new ChatController(chatService, deviceService);
+        var controller = new ChatController(
+            chatService, deviceService,
+            new OpenAICostMeter(),
+            Options.Create(new OpenAIDailyCostCapOptions { Enabled = false }),
+            Substitute.For<ILogger<ChatController>>());
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = Guid.NewGuid();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
@@ -239,7 +260,11 @@ public class ChatControllerPath5Tests
                 Arg.Any<Guid>(), Arg.Any<Guid?>(), DetectedMode.Calm)
             .Returns(false);
 
-        var controller = new ChatController(chatService, deviceService);
+        var controller = new ChatController(
+            chatService, deviceService,
+            new OpenAICostMeter(),
+            Options.Create(new OpenAIDailyCostCapOptions { Enabled = false }),
+            Substitute.For<ILogger<ChatController>>());
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = Guid.NewGuid();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
@@ -270,7 +295,11 @@ public class ChatControllerPath5Tests
         deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
             .Returns(false);
 
-        var controller = new ChatController(chatService, deviceService);
+        var controller = new ChatController(
+            chatService, deviceService,
+            new OpenAICostMeter(),
+            Options.Create(new OpenAIDailyCostCapOptions { Enabled = false }),
+            Substitute.For<ILogger<ChatController>>());
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = Guid.NewGuid();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
