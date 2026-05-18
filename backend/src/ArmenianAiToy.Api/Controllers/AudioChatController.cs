@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace ArmenianAiToy.Api.Controllers;
 
@@ -47,6 +48,8 @@ public class AudioChatController : ControllerBase
     private readonly IAudioBlobStore _blobStore;
     private readonly CannedVoiceClips _canned;
     private readonly AppDbContext _db;
+    private readonly OpenAICostMeter _costMeter;
+    private readonly IOptions<OpenAIDailyCostCapOptions> _costCapOptions;
     private readonly ILogger<AudioChatController> _logger;
 
     public AudioChatController(
@@ -57,6 +60,8 @@ public class AudioChatController : ControllerBase
         IAudioBlobStore blobStore,
         CannedVoiceClips canned,
         AppDbContext db,
+        OpenAICostMeter costMeter,
+        IOptions<OpenAIDailyCostCapOptions> costCapOptions,
         ILogger<AudioChatController> logger)
     {
         _chatService = chatService;
@@ -66,6 +71,8 @@ public class AudioChatController : ControllerBase
         _blobStore = blobStore;
         _canned = canned;
         _db = db;
+        _costMeter = costMeter;
+        _costCapOptions = costCapOptions;
         _logger = logger;
     }
 
@@ -129,6 +136,34 @@ public class AudioChatController : ControllerBase
                 CannedVoiceClips.ModeDisabledKey, cancellationToken);
         }
 
+        // P0 daily cost cap. Fires BEFORE Whisper STT so a runaway
+        // client cannot rack up further transcription / chat / TTS
+        // cost in the same UTC day. Reuses the paused canned clip
+        // because the v1 child-facing message ("take a small break")
+        // is shape-compatible with the paused envelope; a future
+        // slice can add a distinct cost-cap voice clip if operators
+        // want to distinguish the two on the device side.
+        var costCapOpts = _costCapOptions.Value;
+        if (costCapOpts.Enabled)
+        {
+            var nowUtc = DateTime.UtcNow;
+            var cap = costCapOpts.CapForDevice(deviceId);
+            if (_costMeter.IsOverCap(deviceId, cap, nowUtc))
+            {
+                AppMeter.OpenAICostCapTrip.Add(1,
+                    new KeyValuePair<string, object?>("kind", "audio"));
+                if (_costMeter.ShouldLogCapTrip(deviceId, nowUtc))
+                {
+                    _logger.LogWarning(
+                        "OpenAI daily cost cap reached. DeviceId={DeviceId} Kind={Kind} CurrentEstimatedUsd={Current:F4} CapUsd={Cap:F4} UtcDate={Date:yyyy-MM-dd}",
+                        deviceId, "audio",
+                        _costMeter.GetCurrentTotal(deviceId, nowUtc), cap, nowUtc.Date);
+                }
+                return await CannedResultAsync(
+                    CannedVoiceClips.PausedKey, cancellationToken);
+            }
+        }
+
         // Voice → text. Whisper with Language=hy is the C1 impl.
         string transcript;
         try
@@ -188,6 +223,27 @@ public class AudioChatController : ControllerBase
             _logger.LogWarning(ex,
                 "Audio chat: TTS failure for Device {DeviceId}", deviceId);
             return StatusCode(502, new { error = "AI service unavailable. Please try again." });
+        }
+
+        // Cost-recording is best-effort and runs after STT + chat +
+        // TTS all succeeded. Wrapped in its own try/catch so a bug in
+        // the estimator can never break the audio path. Three samples:
+        // Whisper bytes-in, chat text-in/out, TTS chars-out.
+        if (costCapOpts.Enabled)
+        {
+            try
+            {
+                var sttCost = OpenAICostEstimator.EstimateWhisperCostUsd(audioBytes.LongLength);
+                var chatCost = OpenAICostEstimator.EstimateChatCostUsd(transcript, chatResult.Text);
+                var ttsCost = OpenAICostEstimator.EstimateTtsCostUsd(ttsText);
+                _costMeter.Record(deviceId, sttCost + chatCost + ttsCost, DateTime.UtcNow);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "OpenAI cost-cap: audio cost-record failure (suppressed). DeviceId={DeviceId}",
+                    deviceId);
+            }
         }
 
         // Persist both blobs. Non-fatal: if the disk write fails we

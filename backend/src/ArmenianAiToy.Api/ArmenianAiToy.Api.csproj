@@ -27,4 +27,14 @@
     <ProjectReference Include="..\ArmenianAiToy.Infrastructure\ArmenianAiToy.Infrastructure.csproj" />
   </ItemGroup>
 
+  <!--
+    Matches the InternalsVisibleTo declarations already present on
+    Application and Infrastructure. Lets the test project reference
+    internal constants on Api controllers (e.g. ChatController.CostCapResponse
+    pinned by ChatControllerCostCapTests).
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="ArmenianAiToy.Application.Tests" />
+  </ItemGroup>
+
 </Project>

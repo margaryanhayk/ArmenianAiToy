@@ -123,6 +123,45 @@ public static class DependencyInjection
         // only; see ExportCooldown for the rationale.
         services.AddSingleton<ExportCooldown>();
 
+        // Per-device daily OpenAI cost cap. Singleton in-memory meter
+        // shared by ChatController and AudioChatController. Options
+        // bind from "OpenAI:DailyCostCap"; missing keys collapse to the
+        // safety-default 0.50 USD/day cap (Enabled=true by default —
+        // see OpenAIDailyCostCapOptions). Process restart resets the
+        // counters; documented in docs/openai-daily-cost-cap.md.
+        //
+        // Manual binding (string indexer + GetSection / GetChildren)
+        // because Infrastructure deliberately does not pull
+        // Microsoft.Extensions.Configuration.Binder — keeps the
+        // dependency tree narrow and matches the existing
+        // config["Database:ConnectionString"] pattern earlier in this
+        // file. The Api project still ships an OptionsMonitor-aware
+        // story via Microsoft.Extensions.Options, which is what the
+        // controllers consume via IOptions<T>.
+        var capOpts = new OpenAIDailyCostCapOptions();
+        var capSection = config.GetSection("OpenAI:DailyCostCap");
+        if (bool.TryParse(capSection["Enabled"], out var capEnabled))
+            capOpts.Enabled = capEnabled;
+        if (decimal.TryParse(
+                capSection["Default"],
+                System.Globalization.NumberStyles.Number,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var capDefault))
+            capOpts.Default = capDefault;
+        foreach (var child in capSection.GetSection("PerDeviceOverride").GetChildren())
+        {
+            if (child.Value is null) continue;
+            if (decimal.TryParse(
+                    child.Value,
+                    System.Globalization.NumberStyles.Number,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var perDev))
+                capOpts.PerDeviceOverride[child.Key] = perDev;
+        }
+        services.AddSingleton(
+            Microsoft.Extensions.Options.Options.Create(capOpts));
+        services.AddSingleton<OpenAICostMeter>();
+
         // First scheduled-delete worker in the repo. Hard-deletes
         // conversations (and their cascaded messages) older than
         // Retention:Messages:MaxAgeDays (default 90). Missing config
