@@ -1,9 +1,14 @@
 // -------------------------------------------------------------
 // AregVoiceMvp / audio_io.cpp
 //
-// I2S capture + playback implementation. Uses the legacy
-// driver/i2s.h API because it is stable across ESP32 Arduino
-// cores 2.x and 3.x, well documented, and sufficient for C1.
+// I2S capture + playback implementation.
+//
+// Mic capture uses the ESP-IDF v5 i2s_std driver (channel-handle
+// API in <driver/i2s_std.h>). This is the supported API on
+// ESP32 Arduino core 3.x and is the same family of API that
+// ESP8266Audio's AudioOutputI2S targets, so capture and playback
+// can coexist in one firmware without the historical
+// legacy-vs-new I2S driver abort.
 //
 // Playback delegates MP3 decoding to ESP8266Audio; we do not
 // ship a decoder ourselves.
@@ -11,19 +16,19 @@
 #include "audio_io.h"
 #include "config.h"
 
-#include <driver/i2s.h>
-// AREG_DISABLE_MP3_PLAYBACK — bench guard.
+#include <driver/i2s_std.h>
+// AREG_DISABLE_MP3_PLAYBACK — bench rollback switch.
 //
-// ESP8266Audio's AudioOutputI2S pulls in the new ESP-IDF i2s_std
-// driver. Linking it alongside legacy <driver/i2s.h> (used by the
-// mic capture below) makes the IDF abort at component init with
-// "i2s(legacy): CONFLICT! The new i2s driver can't work along
-// with the legacy i2s driver" BEFORE setup() ever runs. Defining
-// AREG_DISABLE_MP3_PLAYBACK at compile time strips every
-// ESP8266Audio symbol from the binary so only the legacy driver
-// is linked. Capture/upload still work; playback becomes a logged
-// no-op. Remove the macro once the playback path is migrated to
-// new-I2S APIs (or capture is moved to new-I2S).
+// Capture has been migrated to the new i2s_std driver, so the
+// historical legacy-vs-new IDF conflict no longer applies and
+// ESP8266Audio's AudioOutputI2S can be linked alongside without
+// the boot-time abort. The macro is preserved as an instant
+// rollback to the speaker-disabled bench mode in case the new
+// playback path regresses on hardware — defining it strips
+// every ESP8266Audio symbol from the binary and makes
+// audio_play_mp3_buffer a logged no-op that the state machine
+// treats as success. Capture + HTTP upload are unaffected by
+// the macro either way.
 #ifndef AREG_DISABLE_MP3_PLAYBACK
 // ESP8266Audio exposes several AudioFileSource subclasses.
 // `AudioFileSourcePROGMEM` despite its AVR-era name works
@@ -41,56 +46,96 @@
 // in parallel. Simpler, avoids pin-driver conflicts on S3.
 #define AREG_I2S_PORT           I2S_NUM_0
 
-// Chunk size for each blocking i2s_read. Tuned for responsive
-// button-release handling without thrashing the driver.
+// Chunk size for each blocking i2s_channel_read. Tuned for
+// responsive button-release handling without thrashing the
+// driver.
 static constexpr size_t kCaptureChunkSamples = 256;
 
 // -------------------------------------------------------------
 // Mic
 // -------------------------------------------------------------
 
-bool audio_mic_begin() {
-    i2s_config_t cfg = {};
-    cfg.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX);
-    cfg.sample_rate = AREG_SAMPLE_RATE_HZ;
-    // INMP441 outputs 24-bit data in a 32-bit slot; we read 32-bit
-    // and right-shift to 16-bit below.
-    cfg.bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT;
-    cfg.channel_format = I2S_CHANNEL_FMT_ONLY_LEFT;
-    cfg.communication_format = I2S_COMM_FORMAT_STAND_I2S;
-    cfg.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1;
-    cfg.dma_buf_count = 4;
-    cfg.dma_buf_len = 1024;
-    cfg.use_apll = false;
-    cfg.tx_desc_auto_clear = false;
-    cfg.fixed_mclk = 0;
+// Channel handle owned by audio_mic_begin/end. Null when no
+// capture is active. The new i2s_std API replaces the legacy
+// "port + global state" model with explicit per-channel handles.
+static i2s_chan_handle_t s_mic_chan = nullptr;
 
-    if (i2s_driver_install(AREG_I2S_PORT, &cfg, 0, nullptr) != ESP_OK) {
-        Serial.println("[audio] mic driver_install failed");
+bool audio_mic_begin() {
+    if (s_mic_chan != nullptr) {
+        Serial.println("[audio] mic begin: channel already live");
         return false;
     }
-    i2s_pin_config_t pins = {};
-    pins.bck_io_num = AREG_PIN_MIC_BCK;
-    pins.ws_io_num = AREG_PIN_MIC_WS;
-    pins.data_out_num = I2S_PIN_NO_CHANGE;
-    pins.data_in_num = AREG_PIN_MIC_DATA;
-    if (i2s_set_pin(AREG_I2S_PORT, &pins) != ESP_OK) {
-        Serial.println("[audio] mic set_pin failed");
-        i2s_driver_uninstall(AREG_I2S_PORT);
+
+    i2s_chan_config_t chan_cfg =
+        I2S_CHANNEL_DEFAULT_CONFIG(AREG_I2S_PORT, I2S_ROLE_MASTER);
+    // Match the legacy capture's DMA shape: 4 descriptors of 1024
+    // 32-bit-mono frames each (legacy dma_buf_count=4,
+    // dma_buf_len=1024). One frame at 32-bit mono is 4 bytes, so
+    // total DMA residency is 4 × 4096 = 16 KB, same as before.
+    chan_cfg.dma_desc_num  = 4;
+    chan_cfg.dma_frame_num = 1024;
+
+    if (i2s_new_channel(&chan_cfg, nullptr, &s_mic_chan) != ESP_OK) {
+        Serial.println("[audio] mic new_channel failed");
+        s_mic_chan = nullptr;
         return false;
     }
-    i2s_zero_dma_buffer(AREG_I2S_PORT);
+
+    // INMP441 outputs 24-bit data in a 32-bit slot. We read the
+    // 32-bit slot and right-shift to 16-bit below. L/R is tied
+    // to GND on the bench board, which places the mic on the
+    // LEFT slot — make that explicit instead of relying on the
+    // mono-default's chip-specific behaviour.
+    i2s_std_config_t std_cfg = {
+        .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(AREG_SAMPLE_RATE_HZ),
+        .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(
+            I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_MONO),
+        .gpio_cfg = {
+            .mclk = I2S_GPIO_UNUSED,
+            .bclk = (gpio_num_t)AREG_PIN_MIC_BCK,
+            .ws   = (gpio_num_t)AREG_PIN_MIC_WS,
+            .dout = I2S_GPIO_UNUSED,
+            .din  = (gpio_num_t)AREG_PIN_MIC_DATA,
+            .invert_flags = {
+                .mclk_inv = false,
+                .bclk_inv = false,
+                .ws_inv   = false,
+            },
+        },
+    };
+    std_cfg.slot_cfg.slot_mask = I2S_STD_SLOT_LEFT;
+
+    if (i2s_channel_init_std_mode(s_mic_chan, &std_cfg) != ESP_OK) {
+        Serial.println("[audio] mic init_std_mode failed");
+        i2s_del_channel(s_mic_chan);
+        s_mic_chan = nullptr;
+        return false;
+    }
+    if (i2s_channel_enable(s_mic_chan) != ESP_OK) {
+        Serial.println("[audio] mic channel_enable failed");
+        i2s_del_channel(s_mic_chan);
+        s_mic_chan = nullptr;
+        return false;
+    }
     return true;
 }
 
 void audio_mic_end() {
-    i2s_driver_uninstall(AREG_I2S_PORT);
+    if (s_mic_chan == nullptr) {
+        return;
+    }
+    i2s_channel_disable(s_mic_chan);
+    i2s_del_channel(s_mic_chan);
+    s_mic_chan = nullptr;
 }
 
 size_t audio_mic_capture(int16_t *out_buffer,
                          size_t max_samples,
                          uint32_t max_duration_ms,
                          audio_should_stop_fn should_stop) {
+    if (s_mic_chan == nullptr) {
+        return 0;
+    }
     // Temporary 32-bit read buffer; INMP441 delivers 32-bit
     // slots that we narrow to 16-bit by right-shifting 14 bits
     // (INMP441 data lives in the upper 18 bits; 14 keeps it
@@ -108,9 +153,17 @@ size_t audio_mic_capture(int16_t *out_buffer,
         }
         size_t bytes_read = 0;
         // 10 ms per blocking call keeps the should_stop() poll
-        // responsive on button-release.
-        if (i2s_read(AREG_I2S_PORT, tmp, sizeof(tmp), &bytes_read,
-                     pdMS_TO_TICKS(10)) != ESP_OK) {
+        // responsive on button-release. Unlike the legacy i2s_read
+        // (which returned ESP_OK with bytes_read=0 on a window
+        // with no data), i2s_channel_read returns ESP_ERR_TIMEOUT.
+        // Treat that as "no data this tick, keep polling" so the
+        // loop's release/duration checks still run.
+        esp_err_t err = i2s_channel_read(s_mic_chan, tmp, sizeof(tmp),
+                                         &bytes_read, pdMS_TO_TICKS(10));
+        if (err == ESP_ERR_TIMEOUT) {
+            continue;
+        }
+        if (err != ESP_OK) {
             break;
         }
         size_t samples_read = bytes_read / sizeof(int32_t);
