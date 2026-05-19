@@ -12,6 +12,19 @@
 #include "config.h"
 
 #include <driver/i2s.h>
+// AREG_DISABLE_MP3_PLAYBACK — bench guard.
+//
+// ESP8266Audio's AudioOutputI2S pulls in the new ESP-IDF i2s_std
+// driver. Linking it alongside legacy <driver/i2s.h> (used by the
+// mic capture below) makes the IDF abort at component init with
+// "i2s(legacy): CONFLICT! The new i2s driver can't work along
+// with the legacy i2s driver" BEFORE setup() ever runs. Defining
+// AREG_DISABLE_MP3_PLAYBACK at compile time strips every
+// ESP8266Audio symbol from the binary so only the legacy driver
+// is linked. Capture/upload still work; playback becomes a logged
+// no-op. Remove the macro once the playback path is migrated to
+// new-I2S APIs (or capture is moved to new-I2S).
+#ifndef AREG_DISABLE_MP3_PLAYBACK
 // ESP8266Audio exposes several AudioFileSource subclasses.
 // `AudioFileSourcePROGMEM` despite its AVR-era name works
 // identically against RAM and PSRAM on ESP32 — it uses
@@ -21,6 +34,7 @@
 #include <AudioFileSourcePROGMEM.h>
 #include <AudioGeneratorMP3.h>
 #include <AudioOutputI2S.h>
+#endif
 
 // Use I2S port 0 for both capture and playback — we tear down
 // and reconfigure between phases rather than running two ports
@@ -136,6 +150,17 @@ bool audio_play_mp3_buffer(const uint8_t *data, size_t length) {
     if (data == nullptr || length == 0) {
         return false;
     }
+#ifdef AREG_DISABLE_MP3_PLAYBACK
+    (void)data;
+    (void)length;
+    // Return true so the state machine treats the no-op as a
+    // successful playback and routes back to IDLE instead of
+    // ERROR. We already validated upstream (HTTP 200 + MP3 body)
+    // by the time we got here; "didn't play through the speaker"
+    // is the expected bench behavior, not a decode failure.
+    Serial.println("[audio] speaker playback disabled for bench I2S conflict isolation; treating as success");
+    return true;
+#else
     AudioFileSourcePROGMEM source((const void *)data, (uint32_t)length);
     AudioOutputI2S out;
     out.SetPinout(AREG_PIN_AMP_BCK, AREG_PIN_AMP_LRC, AREG_PIN_AMP_DATA);
@@ -163,6 +188,7 @@ bool audio_play_mp3_buffer(const uint8_t *data, size_t length) {
     }
     out.stop();
     return true;
+#endif
 }
 
 // -------------------------------------------------------------
