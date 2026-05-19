@@ -71,7 +71,7 @@
 #define AREG_BUTTON_POLL_MS     10
 #define AREG_BUTTON_DEBOUNCE_MS 30
 #define AREG_HTTP_CONNECT_MS    5000
-#define AREG_HTTP_READ_MS       15000
+#define AREG_HTTP_READ_MS       30000
 
 // --- LED colors (GRB order for NeoPixel) ---------------------
 #define AREG_LED_IDLE_R         8
