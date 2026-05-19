@@ -14,6 +14,9 @@ non-Docker path.
 To run the published exe automatically as a background service
 after a Windows reboot (no PowerShell window open), continue with
 `docs/windows-service-deploy.md` once you finish this runbook.
+That sibling runbook has also been validated end-to-end with
+NSSM, including cold-reboot auto-start, on the same reference
+machine.
 
 The procedure below was exercised end-to-end on Windows 11 against
 repo `main` at commit `9ef6344` ("Merge branch

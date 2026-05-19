@@ -28,6 +28,49 @@ option.
 > trade-offs and the future option of adding `UseWindowsService()`
 > in a separate backend slice.
 
+## Validation status
+
+This Windows Service / NSSM path has been validated end-to-end on
+the real Windows machine. The runbook below is no longer
+speculative — every step was exercised against the published exe,
+the installed `AregBackend` service, and a cold reboot.
+
+Validated items:
+
+- `dotnet publish` from source into `C:\AregDeploy`.
+- NSSM install + configuration (`AppDirectory`, log paths,
+  rotation, restart policy, `AppEnvironmentExtra`).
+- Service start under SCM (`Start-Service AregBackend`).
+- Health endpoint reachable on `:5000`.
+- EF Core migrations applied against the fresh service DB
+  (`20260519120000_AddDeviceApiKeyHash`).
+- Device registration through the running service.
+- Device API-key hash-at-rest (`ApiKey IS NULL`,
+  `ApiKeyHash` carries the `v1:pbkdf2-sha256:` prefix).
+- Armenian `/api/chat` story smoke (`mode = story`,
+  both choices populated, `safetyFlag = 0`).
+- `Restart-Service AregBackend` (warm restart smoke).
+- **Cold-reboot auto-start** (the service comes back up on its
+  own after `Restart-Computer`, no operator intervention).
+
+Final post-reboot check, reproducible on any host installed per
+this runbook:
+
+```powershell
+Get-Service AregBackend
+# Status   Name          DisplayName
+# ------   ----          -----------
+# Running  AregBackend   Areg Backend
+
+curl.exe http://localhost:5000/api/health
+# {"status":"ok","service":"ArmenianAiToy API","database":"ok"}
+```
+
+Reboot validation has been completed successfully on the validated
+machine. For new machines installed via this runbook, still run
+the same two-command check after the first reboot to confirm
+`Start = SERVICE_AUTO_START` actually fired.
+
 ## 1. What this service setup does
 
 - Runs `C:\AregDeploy\ArmenianAiToy.Api.exe` in the background as
@@ -308,13 +351,13 @@ New-Item -ItemType Directory -Force $LogDir | Out-Null
 & $Nssm set $ServiceName DisplayName        $DisplayName
 & $Nssm set $ServiceName Description        $Description
 & $Nssm set $ServiceName Start              SERVICE_AUTO_START
-& $Nssm set $ServiceName AppStdout          (Join-Path $LogDir 'areg-stdout.log')
-& $Nssm set $ServiceName AppStderr          (Join-Path $LogDir 'areg-stderr.log')
+& $Nssm set $ServiceName AppStdout          (Join-Path $LogDir 'areg-backend.out.log')
+& $Nssm set $ServiceName AppStderr          (Join-Path $LogDir 'areg-backend.err.log')
 & $Nssm set $ServiceName AppRotateFiles     1
 & $Nssm set $ServiceName AppRotateOnline    1
 & $Nssm set $ServiceName AppRotateBytes     10485760   # 10 MiB per log file
 & $Nssm set $ServiceName AppExit            Default Restart
-& $Nssm set $ServiceName AppRestartDelay    5000       # 5 s between restarts
+& $Nssm set $ServiceName AppRestartDelay    60000      # 60 s between restarts (validated)
 ```
 
 NSSM defaults to LocalSystem; to use a dedicated user, add:
@@ -493,7 +536,7 @@ Expected response:
 ```
 
 On first start, the NSSM stdout log
-(`C:\AregDeployData\logs\areg-stdout.log`) should contain the
+(`C:\AregDeployData\logs\areg-backend.out.log`) should contain the
 migration line:
 
 ```
@@ -718,6 +761,23 @@ Important:
   destroy DB and audio evidence. If you do, do it as a separate,
   deliberate command — not as a side effect of uninstall.
 
+### Operational note — closing the terminal does not stop the service
+
+Once `AregBackend` is installed and `Running`, closing the Admin
+PowerShell window, exiting Claude CLI, or signing out of the
+machine does **not** stop the service. NSSM hosts the exe under
+the SCM as a child of the `services.exe` lifetime, not your
+interactive session. The service keeps running until one of:
+
+- `Stop-Service AregBackend` (graceful stop).
+- `nssm remove AregBackend confirm` (uninstall — service is
+  stopped first, then deregistered).
+- Machine shutdown / reboot. Auto-start brings it back on the
+  next boot because `Start = SERVICE_AUTO_START`.
+
+This is the whole point of running as a service — operator
+sessions and service lifetime are decoupled.
+
 ## 16. Upgrade flow
 
 The "publish a new build into a running service" sequence:
@@ -745,7 +805,7 @@ curl.exe http://localhost:5000/api/health
 ```
 
 If health fails, tail
-`C:\AregDeployData\logs\areg-stderr.log` for the actual reason —
+`C:\AregDeployData\logs\areg-backend.err.log` for the actual reason —
 the most common failure during an upgrade is an EF Core
 migration error on a DB that pre-dates the `Migrate()` cut-over
 (see `CLAUDE.md § Database migrations`).
@@ -778,6 +838,41 @@ migration error on a DB that pre-dates the `Migrate()` cut-over
 - The audit and structured-log records keep the durable history
   of what happened. Don't disable them to clean up logs.
 
+## Validated final report summary
+
+Snapshot of the configuration and outcomes recorded on the
+real-machine validation run. Use this as the reference shape
+when reproducing the path on a new host.
+
+| Item                            | Validated value                                              |
+| ------------------------------- | ------------------------------------------------------------ |
+| Service name                    | `AregBackend`                                                |
+| NSSM version                    | `NSSM 2.24-101-g897c7ad 64-bit 2017-04-26`                   |
+| `AppDirectory`                  | `C:\AregDeploy`                                              |
+| Content root observed           | `C:\AregDeploy`                                              |
+| DB path                         | `C:\AregDeployData\areg.db`                                  |
+| Stdout log                      | `C:\AregDeployData\logs\areg-backend.out.log`                |
+| Stderr log                      | `C:\AregDeployData\logs\areg-backend.err.log`                |
+| `AppRestartDelay`               | `60000` ms (60 s)                                            |
+| Start type                      | `SERVICE_AUTO_START` (Automatic)                             |
+| Listening URL                   | `http://0.0.0.0:5000`                                        |
+| Health                          | `{"status":"ok","service":"ArmenianAiToy API","database":"ok"}` |
+| `AddDeviceApiKeyHash` migration | applied                                                      |
+| Device registration             | verified                                                     |
+| ApiKey hash-at-rest             | verified (`ApiKey IS NULL`, `v1:pbkdf2-sha256:` prefix)      |
+| Armenian `/api/chat` smoke      | verified (`mode = story`, choices populated, `safetyFlag = 0`) |
+| `Restart-Service` warm restart  | verified                                                     |
+| Cold reboot auto-start          | verified                                                     |
+| Secrets printed during smoke    | none                                                         |
+| Repo files changed during smoke | none                                                         |
+
+The native `New-Service` / `sc.exe create` path is still NOT the
+current option — the backend exe does not call
+`builder.Host.UseWindowsService()` and does not reference
+`Microsoft.Extensions.Hosting.WindowsServices`. NSSM remains the
+recommended Windows background-run path until that backend slice
+lands (see § 4).
+
 ## 18. Final checklist
 
 - [ ] Published exe at `C:\AregDeploy\ArmenianAiToy.Api.exe`.
@@ -803,6 +898,9 @@ migration error on a DB that pre-dates the `Migrate()` cut-over
 - [ ] Optional real-chat smoke (§ 14) returned a Story-mode
       reply with both choices and `safetyFlag = 0`.
 - [ ] Service survives a `Restart-Computer` (manual reboot test).
+      Validated end-to-end on the reference machine — see
+      `## Validation status` and `## Validated final report summary`.
+      Re-run the two-command post-reboot check on every new host.
 - [ ] No secret values appear in git, docs, scripts, terminal
       history, or screen recordings.
 

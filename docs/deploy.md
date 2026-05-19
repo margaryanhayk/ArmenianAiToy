@@ -12,10 +12,12 @@ ESP32 firmware is out of scope for this image.
 For a validated Windows non-Docker deployment path (publish + run
 the exe directly), see `docs/windows-publish-deploy.md`. To run
 that published exe as an auto-starting background service on
-Windows, see `docs/windows-service-deploy.md`. Docker remains the
-canonical production posture; the Windows-publish and
-Windows-service runbooks are siblings for hosts where Docker is
-unavailable.
+Windows, see `docs/windows-service-deploy.md`. Both runbooks —
+the publish path and the NSSM service path including cold-reboot
+auto-start — are validated end-to-end for hosts where Docker is
+unavailable. Docker remains the canonical production posture; the
+Windows-publish and Windows-service runbooks are siblings, not
+replacements.
 
 ## What's in the image
 
