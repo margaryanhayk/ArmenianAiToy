@@ -87,6 +87,63 @@ public static class Evaluators
     public const double MinArmenianRatio = 0.80;
     public const double RecapOverlapThreshold = 0.60;
 
+    // ---- Noun-grounding ignore lists ----
+    //
+    // This is a deterministic *heuristic*, NOT a linguistic parser. The
+    // job is to filter out tokens whose presence in a choice does NOT
+    // signal real grounding in the story body: action verbs (շարունակել /
+    // մոտենանք / նայենք …), filler adjectives (փոքրիկ / բարի / կախարդական),
+    // and pronoun-like words (նրան / այնտեղ / …). What remains after
+    // filtering is treated as concrete-noun grounding evidence.
+    //
+    // Prefix-matching is used because Armenian agglutinative endings
+    // multiply surface forms (նայել / նայենք / նայեց / նայիր / նայել-ով …),
+    // and the existing ArmenianStem helper cannot strip endings shorter
+    // than the 4-char length guard — so several action surface forms keep
+    // their endings.
+    //
+    // Every prefix is ≥ 3 chars to keep it from accidentally matching
+    // unrelated kid-noun stems. Bare «գն» (2 chars) is deliberately NOT
+    // used — it would collide with «գնդակ» (ball) and other kid-story
+    // nouns.
+
+    private static readonly string[] IgnoreStemPrefixes =
+    {
+        // Movement / approach
+        "մոտեն", "մոտե",       // մոտենանք → մոտեն → մոտե
+        "գնան", "գնա", "գնալ",  // «գն» alone is unsafe (գնդակ)
+        "հետև",                 // հետևել / հետևենք
+        // Look / listen / see
+        "նայ",                  // նայ-, նայենք, նայել, նայեց, նայիր
+        "լսել", "լսենք", "լսեց", "լսիր",
+        "տես",                  // տես-, տեսնել, տեսնենք
+        // Speak / ask / say
+        "խոս",                  // խոս-, խոսել, խոսենք
+        "հարց",                 // հարց-, հարցնենք
+        "ասենք", "ասեց", "ասաց", "ասել",  // «աս» alone unsafe (աստղ)
+        // Help / search
+        "օգն",
+        "փնտր",
+        // Generic actions
+        "շարունակ",
+        "ընտր",                 // ընտր-, ընտրենք, ընտրեց
+        "բաց",                  // բացել, բացենք
+        "կանգ",                 // կանգնել, կանգնեց
+        "վազ",                  // վազել, վազենք
+        "խաղ",                  // խաղ-, խաղալ, խաղանք
+        "սպաս",                 // սպասել
+        "բեր",                  // բերել, բերեց
+        "վերց",                 // վերցն-
+        // Filler / pronoun / adjective
+        "նրան", "իրան",
+        "այնտ", "այստ",         // այնտեղ / այստեղ
+        "հետո", "հիմա",
+        "միաս",                 // միասին
+        "փոքր",                 // փոքրիկ — every Areg story uses it
+        "բարի",                 // every Areg story uses it
+        "կախարդա"               // կախարդական (adj) — NOT «կախարդ» (wizard noun)
+    };
+
     /// <summary>
     /// Fraction of letter-bearing characters that fall in the Armenian
     /// block. Returns 0 when the input has no letter-bearing chars.
@@ -184,6 +241,94 @@ public static class Evaluators
     }
 
     /// <summary>
+    /// Concrete-noun stem candidates from a choice. Starts with every
+    /// ≥4-char Armenian stem in the choice, then strips anything that
+    /// matches the verb / filler / pronoun ignore prefixes. The remaining
+    /// stems are treated as concrete grounding evidence — if NONE of
+    /// them appear in the body, the choice introduced a noun the body
+    /// never mentioned.
+    ///
+    /// Empty result means "this choice has no reliable noun signal" (e.g.
+    /// «Շարունակել», «Այո», «Մոտենալ»). In that case the caller should
+    /// NOT add a noun-grounding warning; the existing generic-choice
+    /// and verb-grounding warnings already cover those cases.
+    /// </summary>
+    public static HashSet<string> ChoiceNounStems(string? choice)
+    {
+        var nouns = new HashSet<string>(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(choice)) return nouns;
+        foreach (var stem in ExtractArmenianStems(choice, minLen: 4))
+        {
+            if (IsIgnoredStem(stem)) continue;
+            nouns.Add(stem);
+        }
+        return nouns;
+    }
+
+    /// <summary>
+    /// True when at least one of a choice's noun stems appears in the
+    /// body. A choice with no noun-stem candidates is considered grounded
+    /// (conservative: we don't flag what we can't reliably classify).
+    /// </summary>
+    public static bool ChoiceNounsAppearInBody(string? choice, string? body)
+    {
+        var nounStems = ChoiceNounStems(choice);
+        if (nounStems.Count == 0) return true;
+        if (string.IsNullOrWhiteSpace(body)) return false;
+        var bodyStems = ExtractArmenianStems(body, minLen: 4);
+        return nounStems.Overlaps(bodyStems);
+    }
+
+    private static bool IsIgnoredStem(string stem)
+    {
+        foreach (var p in IgnoreStemPrefixes)
+            if (stem.StartsWith(p, StringComparison.Ordinal)) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Per-turn warning lists for a single session. Empty list per turn
+    /// when no repetition is detected. The SECOND-and-later occurrence
+    /// of an exact normalized (ChoiceA, ChoiceB) pair gets the
+    /// `choices_repeated_from_earlier_turn` code; the first occurrence
+    /// is silent.
+    ///
+    /// Normalization: trim, collapse whitespace, strip trailing punctuation,
+    /// lowercase invariantly. A turn with either choice null/empty is
+    /// skipped — pairs are only compared when BOTH labels are present.
+    /// Order-sensitive: (A, B) and (B, A) are treated as different pairs
+    /// in this slice (per prompt: exact pair is enough).
+    /// </summary>
+    public static List<List<string>> DetectRepeatedChoicePairs(
+        IReadOnlyList<(string? A, string? B)> turnChoices)
+    {
+        var perTurn = new List<List<string>>(turnChoices.Count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (a, b) in turnChoices)
+        {
+            var warnings = new List<string>();
+            var na = NormalizeChoiceForRepeat(a);
+            var nb = NormalizeChoiceForRepeat(b);
+            if (!string.IsNullOrEmpty(na) && !string.IsNullOrEmpty(nb))
+            {
+                var key = na + "||" + nb;
+                if (!seen.Add(key))
+                    warnings.Add("choices_repeated_from_earlier_turn");
+            }
+            perTurn.Add(warnings);
+        }
+        return perTurn;
+    }
+
+    private static string NormalizeChoiceForRepeat(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        var trimmed = s.Trim().TrimEnd(ArmenianTrailingPunct).ToLowerInvariant();
+        // Collapse internal whitespace.
+        return System.Text.RegularExpressions.Regex.Replace(trimmed, @"\s+", " ");
+    }
+
+    /// <summary>
     /// Run all per-turn checks and return a list of warning codes for
     /// the given turn. Empty list = clean turn.
     /// </summary>
@@ -225,6 +370,16 @@ public static class Evaluators
             if (IsGenericChoice(b)) warnings.Add("choice_b_generic");
             if (HasLatinLeakage(a)) warnings.Add("latin_leakage_choice_a");
             if (HasLatinLeakage(b)) warnings.Add("latin_leakage_choice_b");
+
+            // Concrete-noun grounding. Stricter than the verb-stem
+            // grounding done by ChoiceGroundedInBody (which we keep for
+            // the continuation cross-turn check). A choice that contains
+            // a concrete noun stem absent from the body invented an
+            // object — the existing verb-only overlap is not enough.
+            if (!ChoiceNounsAppearInBody(a, body))
+                warnings.Add("choice_a_noun_not_in_body");
+            if (!ChoiceNounsAppearInBody(b, body))
+                warnings.Add("choice_b_noun_not_in_body");
         }
 
         // Continuation-specific checks: only when we have a previous
@@ -277,6 +432,8 @@ public static class Evaluators
                     case "choice_b_generic":
                     case "choice_a_too_long":
                     case "choice_b_too_long":
+                    case "choice_a_noun_not_in_body":
+                    case "choice_b_noun_not_in_body":
                         choiceHits++;
                         break;
                     case "continuation_ignores_selected_choice":
@@ -284,6 +441,7 @@ public static class Evaluators
                         logicHits++; // ignored-choice is also a logic break
                         break;
                     case "recap_overlap_high":
+                    case "choices_repeated_from_earlier_turn":
                         continuationHits++;
                         break;
                 }

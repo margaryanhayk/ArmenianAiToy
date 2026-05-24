@@ -1,0 +1,103 @@
+{
+  "runStamp": "20260524-151621",
+  "sessionIndex": 2,
+  "seedId": "S02",
+  "seedPrompt": "Պատմիր հեքիաթ ծիրանի ծառի տակ ապրող փոքրիկ նապաստակի մասին",
+  "startChoiceStrategy": "B",
+  "deviceId": "e903944a-a5af-4cd8-b4bb-feca66bf9cca",
+  "startedAtUtc": "2026-05-24T15:17:58.7493354Z",
+  "endedAtUtc": "2026-05-24T15:20:15.5394358Z",
+  "stopReason": "max_turns_reached",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ ծիրանի ծառի տակ ապրող փոքրիկ նապաստակի մասին",
+      "assistantBody": "Փոքրիկ նապաստակը անունով Կապիկ ապրում էր ծիրանի ծառի տակ։ Ամառվա արևի տակ, ծիրանները պայծառ էին փայլում, և Կապիկը սիրով էր նայում դրանք։ Մի օր, երբ նա ուզում էր նորից կարոտ զգալ ծիրանների հոտը, հանկարծ մի փոքրիկ երգացանկ լսեց ծառի մյուս կողմից։ Նապաստակը շատ զարմացավ և ցանկացավ իմանալ՝ ով է այդ քաղցր ձայնը։",
+      "choiceA": "Մոտենանք ծառին",
+      "choiceB": "Նայենք նապաստակին",
+      "conversationId": "56233d42-1a8a-4021-8072-a8ee71e5e200",
+      "storySessionIdOut": "56233d42-1a8a-4021-8072-a8ee71e5e200",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 308,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 29098,
+      "warnings": [
+        "choice_b_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 1,
+      "userInput": "Նայենք նապաստակին",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "Նայենք նապաստակին",
+      "storySessionIdIn": "56233d42-1a8a-4021-8072-a8ee71e5e200",
+      "assistantBody": "Նայելով Կապիկին, տեսավինք, թե ինչպես նա ուշադիր լսում էր երգող ձայնը։ Նապաստակը զգաց, թե ինչպես երգը նրան հանգստացնում էր, և մոտեցավ փոքրիկ թռչունիկին, որին գտավ ծառի ճյուղին նստած։ Թռչունիկը ժպտաց և քաղցր ձայնով սկսեց պատմել ծիրանի ծառի հին պատմությունները։",
+      "choiceA": "Խոսենք թռչունիկի հետ",
+      "choiceB": "Շարունակենք նայել թռչունիկին",
+      "conversationId": "56233d42-1a8a-4021-8072-a8ee71e5e200",
+      "storySessionIdOut": "56233d42-1a8a-4021-8072-a8ee71e5e200",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 258,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 46011,
+      "warnings": [
+        "continuation_ignores_selected_choice"
+      ]
+    },
+    {
+      "turnIndex": 2,
+      "userInput": "Խոսենք թռչունիկի հետ",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Խոսենք թռչունիկի հետ",
+      "storySessionIdIn": "56233d42-1a8a-4021-8072-a8ee71e5e200",
+      "assistantBody": "Կապիկը մոտեցավ թռչունիկին և սկսեց խոսել նրա հետ։ Թռչունիկը ուրախությամբ ասեց, որ նապաստակներին շատ է սիրում և ուզում է Կապիկին պատմել ծիրանի ծառի մասին։ Կապիկը հետաքրքրությամբ լսեց և սկսեց հարցնել մանրամասներ՝ ուզում էր իմանալ ամեն ինչ այդ հրաշալի ծառի մասին։",
+      "choiceA": "շարունակենք ընկերանալ թռչունիկի հետ",
+      "choiceB": "լսենք ծիրանի ծառի պատմությունը",
+      "conversationId": "56233d42-1a8a-4021-8072-a8ee71e5e200",
+      "storySessionIdOut": "56233d42-1a8a-4021-8072-a8ee71e5e200",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 259,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 30145,
+      "warnings": []
+    },
+    {
+      "turnIndex": 3,
+      "userInput": "լսենք ծիրանի ծառի պատմությունը",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "լսենք ծիրանի ծառի պատմությունը",
+      "storySessionIdIn": "56233d42-1a8a-4021-8072-a8ee71e5e200",
+      "assistantBody": "Ծիրանի ծառը սկսեց պատմել իր պատմությունը՝ տեղքից, որտեղ առաջին ծիրանը հայտնվեց: Կապիկը ուշադրությամբ լսում էր, երբ ծառը պատմում էր, թե ինչպես էր ձմռանը ծածկված սպիտակ ձյան տակ, իսկ ամռանը ծաղկում զառերով: Թռչունիկը ևս ավելացրեց, որ այդ ծառը մի օր փայլեց նոր աստղի լույսի տակ, որը ծառի վրա գոհացրեց բոլորին:",
+      "choiceA": "Շարունակենք լսել ծիրանի պատմությունը",
+      "choiceB": "Խնդրենք թռչունիկին ավելի պատմել",
+      "conversationId": "56233d42-1a8a-4021-8072-a8ee71e5e200",
+      "storySessionIdOut": "56233d42-1a8a-4021-8072-a8ee71e5e200",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 306,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 31507,
+      "warnings": []
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 75,
+    "childSuitabilityScore": 100,
+    "choiceQualityScore": 85,
+    "continuationCoherenceScore": 80,
+    "overallVerdict": "WARN",
+    "averageScore": 88,
+    "minScore": 75
+  },
+  "gitSha": "a9c948bccea0c85f5fef543a2dc995f5809b00d2",
+  "branch": "main",
+  "dirty": true
+}

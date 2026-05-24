@@ -173,9 +173,18 @@ public class EvaluatorsTests
     [Fact]
     public void EvaluateTurn_PureArmenianStoryTurnWithChoices_NoWarnings()
     {
+        // Body must mention BOTH choice nouns to satisfy the stricter
+        // ChoiceNounsAppearInBody check: «նապաստակը» grounds ChoiceA,
+        // «իմաստուն բուն» grounds ChoiceB. Filler padding keeps the
+        // body length above MinBodyChars.
         var input = new TurnEvaluationInput
         {
-            Body = new string('ա', 200) + " ոզնին քայլեց անտառով",
+            // Body uses dative «Նապաստակին» so the stemmer reduces it
+            // to «նապաստակ» (matching ChoiceA's noun stem). The nominative
+            // «Նապաստակը» keeps its trailing «ը» under the current
+            // stemmer contract (pinned by ArmenianStem_* test).
+            Body = "Ոզնին քայլեց անտառով։ Նապաստակին և իմաստուն բուն բարևեցին նրան։ "
+                   + new string('ա', 150),
             ChoiceA = "Մոտենալ նապաստակին",
             ChoiceB = "Հարցնել իմաստուն բուին",
             HasChoices = true,
@@ -342,5 +351,195 @@ public class EvaluatorsTests
     public void ArmenianStem_NonArmenianToken_PassesThroughLowercased()
     {
         Assert.Equal("hello", Evaluators.ArmenianStem("Hello"));
+    }
+
+    // ===== Same-turn noun grounding (Phase 1) =====
+    //
+    // The four tests below pin the "concrete noun must appear in body"
+    // rule that closes the verb-only grounding gap observed in the
+    // 20260524-121218 live evidence (Turn 0 of S01 had ChoiceA
+    // «Մոտենանք տերևին» while the body talked about a flower under a
+    // branch — never mentioning a leaf).
+
+    [Fact]
+    public void ChoiceNounMissingFromBody_ShouldWarn()
+    {
+        // Body has the verb «մոտեցավ» (so the OLD verb-stem grounding
+        // would have passed) but never mentions «տերև» — the noun
+        // ChoiceA introduces.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Փոքրիկ ոզնին մոտեցավ ճյուղին և տեսավ վարդագույն ծաղկիկ։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք տերևին",
+            ChoiceB = "Նայենք ծաղիկին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.Contains("choice_a_noun_not_in_body", w);
+    }
+
+    [Fact]
+    public void ChoiceNounPresentInBody_ShouldNotWarn()
+    {
+        // Same shape, but the body now contains «տերև» — ChoiceA is
+        // grounded and the new warning must NOT fire.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Փոքրիկ ոզնին մոտեցավ տերևին և տեսավ վարդագույն ծաղկիկ։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք տերևին",
+            ChoiceB = "Նայենք ծաղիկին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.DoesNotContain("choice_a_noun_not_in_body", w);
+    }
+
+    [Fact]
+    public void ChoiceBNounMissingFromBody_ShouldWarn()
+    {
+        // Body mentions the bird but not the house. ChoiceB introduces
+        // «տուն» that the body never establishes.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Փոքրիկ աստղը լսեց թռչունիկի գեղգեղանքը անտառի ծառերի վերևից։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք թռչունիկին",
+            ChoiceB = "Նայենք տունին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.Contains("choice_b_noun_not_in_body", w);
+        Assert.DoesNotContain("choice_a_noun_not_in_body", w);
+    }
+
+    [Fact]
+    public void ChoiceNounStems_FilterDropsVerbsAndFillers_KeepsConcreteNouns()
+    {
+        // «մոտենանք» → stem մոտե, filtered. «նապաստակին» → stem
+        // նապաստակ, kept. «փոքրիկ» filler stem prefix «փոքր», filtered.
+        var nouns = Evaluators.ChoiceNounStems("Մոտենանք փոքրիկ նապաստակին");
+        Assert.Single(nouns);
+        Assert.Contains("նապաստակ", nouns);
+    }
+
+    [Fact]
+    public void ChoiceNounStems_AllVerb_NoConcreteNouns()
+    {
+        // A choice whose tokens are all verb-like must yield zero noun
+        // candidates so the caller treats it as "grounded by default"
+        // (no noun warning).
+        Assert.Empty(Evaluators.ChoiceNounStems("Շարունակել"));
+        Assert.Empty(Evaluators.ChoiceNounStems("Մոտենանք"));
+    }
+
+    // ===== Cross-turn repeated choice-pair (Phase 2) =====
+
+    [Fact]
+    public void RepeatedChoicePairInSameSession_ShouldWarnOnLaterTurn()
+    {
+        var pairs = new List<(string? A, string? B)>
+        {
+            ("Մոտենանք թռչունիկին", "Նայենք տունին"),     // turn 0 — first
+            ("Հետևենք թռչունիկին", "Լսենք թռչունիկի երգը"),  // turn 1 — different
+            ("Մոտենանք թռչունիկին", "Նայենք տունին"),     // turn 2 — REPEAT
+        };
+        var warnings = Evaluators.DetectRepeatedChoicePairs(pairs);
+
+        Assert.Equal(3, warnings.Count);
+        Assert.Empty(warnings[0]);                             // first occurrence is silent
+        Assert.Empty(warnings[1]);
+        Assert.Contains("choices_repeated_from_earlier_turn", warnings[2]);
+    }
+
+    [Fact]
+    public void RepeatedChoicePair_NormalizationIgnoresWhitespaceCaseAndTrailingPunct()
+    {
+        var pairs = new List<(string? A, string? B)>
+        {
+            ("Մոտենանք թռչունիկին", "Նայենք տունին"),
+            ("մոտենանք  թռչունիկին։", "ՆԱՅԵՆՔ ՏՈՒՆԻՆ."),     // same after normalize
+        };
+        var warnings = Evaluators.DetectRepeatedChoicePairs(pairs);
+        Assert.Contains("choices_repeated_from_earlier_turn", warnings[1]);
+    }
+
+    [Fact]
+    public void RepeatedChoicePairAcrossDifferentSessions_ShouldNotMatter()
+    {
+        // Session A finishes; session B starts fresh. The detector is
+        // intentionally scoped to a single call — there is no global
+        // state across calls, so the same pair in two separate calls
+        // never trips the warning.
+        var session1 = new List<(string? A, string? B)>
+        {
+            ("Մոտենանք թռչունիկին", "Նայենք տունին"),
+        };
+        var session2 = new List<(string? A, string? B)>
+        {
+            ("Մոտենանք թռչունիկին", "Նայենք տունին"),
+        };
+        var w1 = Evaluators.DetectRepeatedChoicePairs(session1);
+        var w2 = Evaluators.DetectRepeatedChoicePairs(session2);
+        Assert.Empty(w1[0]);
+        Assert.Empty(w2[0]);
+    }
+
+    [Fact]
+    public void RepeatedChoicePair_NullOrEmptyChoices_Skipped()
+    {
+        // A turn that recorded no choices (safety fallback / final turn)
+        // must not be picked up by the comparator: a null/null pair
+        // repeated across turns should NOT warn.
+        var pairs = new List<(string? A, string? B)>
+        {
+            (null, null),
+            ("", ""),
+            (null, "X"),
+            ("Մոտենանք թռչունիկին", "Նայենք տունին"),
+        };
+        var warnings = Evaluators.DetectRepeatedChoicePairs(pairs);
+        Assert.All(warnings, Assert.Empty);
+    }
+
+    // ===== Verdict integration: new warnings reach the right axis =====
+
+    [Fact]
+    public void EvaluateSession_NounMissingWarnings_DockChoiceQualityToWarn()
+    {
+        // Two noun-missing warnings (across two turns) drop ChoiceQuality
+        // by 30 (15 each) → 70, which is < 80 → WARN.
+        var v = Evaluators.EvaluateSession(new List<IReadOnlyList<string>>
+        {
+            new[] { "choice_a_noun_not_in_body" },
+            new[] { "choice_b_noun_not_in_body" },
+        });
+        Assert.Equal(70, v.ChoiceQualityScore);
+        Assert.Equal("WARN", v.OverallVerdict);
+    }
+
+    [Fact]
+    public void EvaluateSession_RepeatedPair_DocksContinuationCoherenceToWarn()
+    {
+        // One repeated-pair warning drops ContinuationCoherence by 20 →
+        // 80. 80 is NOT < 80, so the verdict stays PASS on this alone.
+        // Two repeats land it at 60, well under the WARN bar.
+        var vOne = Evaluators.EvaluateSession(new List<IReadOnlyList<string>>
+        {
+            Array.Empty<string>(),
+            new[] { "choices_repeated_from_earlier_turn" },
+        });
+        Assert.Equal(80, vOne.ContinuationCoherenceScore);
+        Assert.Equal("PASS", vOne.OverallVerdict);
+
+        var vTwo = Evaluators.EvaluateSession(new List<IReadOnlyList<string>>
+        {
+            Array.Empty<string>(),
+            new[] { "choices_repeated_from_earlier_turn" },
+            new[] { "choices_repeated_from_earlier_turn" },
+        });
+        Assert.Equal(60, vTwo.ContinuationCoherenceScore);
+        Assert.Equal("WARN", vTwo.OverallVerdict);
     }
 }

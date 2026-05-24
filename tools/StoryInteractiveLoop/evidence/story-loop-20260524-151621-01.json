@@ -1,0 +1,106 @@
+{
+  "runStamp": "20260524-151621",
+  "sessionIndex": 1,
+  "seedId": "S01",
+  "seedPrompt": "Պատմիր հեքիաթ փոքրիկ ոզնիի մասին",
+  "startChoiceStrategy": "A",
+  "deviceId": "58edab38-947d-447b-9ba6-caa94a7c01b9",
+  "startedAtUtc": "2026-05-24T15:16:22.0013779Z",
+  "endedAtUtc": "2026-05-24T15:17:58.7156667Z",
+  "stopReason": "max_turns_reached",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ փոքրիկ ոզնիի մասին",
+      "assistantBody": "Փոքրիկ ոզնին անտառում խաղում էր։ Նա տեսավ փայլուն մի բան, որ կոտրած տերևների մեջ էր։ Մոտեցավ ու զարմացավ, երբ տեսավ, որ դա ոսկեգույն մի դրամատիկ է։ Ոզնին ուրախացավ ու մտածեց, թե ինչպես կարող է այն օգտագործել։ Կարևոր էր իմանալ՝ ընկերներին կարծիքը նույնպես:",
+      "choiceA": "Մոտենանք ընկերին",
+      "choiceB": "Նայենք տերևին",
+      "conversationId": "cceb4cab-c24c-495f-9600-46d6b159c7e3",
+      "storySessionIdOut": "cceb4cab-c24c-495f-9600-46d6b159c7e3",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 255,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 7770,
+      "warnings": [
+        "choice_b_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 1,
+      "userInput": "Մոտենանք ընկերին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք ընկերին",
+      "storySessionIdIn": "cceb4cab-c24c-495f-9600-46d6b159c7e3",
+      "assistantBody": "Ոզնին ուրախությամբ մոտենեց իր ընկերոջը և ցույց տվեց ոսկեգույն դրամատիկը։ Ընկերը զարմացավ ու ասաց, որ սա չեպաղակի հին ժամանակներից կարող է լինել։ Նրանք որոշեցին միասին որոնել, թե արդյոք այս դրամատիկի հետ կապված է որևէ գաղտնիք։",
+      "choiceA": "Մոտենանք ընկերոջին",
+      "choiceB": "Նայենք փնտրին",
+      "conversationId": "cceb4cab-c24c-495f-9600-46d6b159c7e3",
+      "storySessionIdOut": "cceb4cab-c24c-495f-9600-46d6b159c7e3",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 225,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 12795,
+      "warnings": [
+        "choice_a_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 2,
+      "userInput": "Նայենք փնտրին",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "Նայենք փնտրին",
+      "storySessionIdIn": "cceb4cab-c24c-495f-9600-46d6b159c7e3",
+      "assistantBody": "Ոզնին ու ընկերը սկսեցին նայել փայլուն դրամատիկը` փորձելով հասկանալ, ինչ գաղտնիք է թաքնված դրա վրա։ Նրանք արագ տեսավին, որ դրա վրա դասված են փոքրիկ պատկերներ, որոնք թվում էին որպես ուղղորդող նշաններ։ Իրենց հետաքրքրությունը վառվեց, և նրանք պատրաստվեցին փնտրել այս գաղտնիքներով աշխարհը։",
+      "choiceA": "Մոտենանք քարտեզին",
+      "choiceB": "Նայենք ուղին",
+      "conversationId": "cceb4cab-c24c-495f-9600-46d6b159c7e3",
+      "storySessionIdOut": "cceb4cab-c24c-495f-9600-46d6b159c7e3",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 283,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 44416,
+      "warnings": [
+        "choice_a_noun_not_in_body",
+        "choice_b_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 3,
+      "userInput": "Մոտենանք քարտեզին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք քարտեզին",
+      "storySessionIdIn": "cceb4cab-c24c-495f-9600-46d6b159c7e3",
+      "assistantBody": "Ոզնին ու ընկերը մոտեցան քարտեզին, որը եկել էր իրենց ճանապարհի մեջտեղում։ Քարտեզը լի էր անծանոթ նշաններով և խորը գաղտնիքներով։ Դա վերածվեց նրանց ճանապարհորդության կարևոր ուղեկիցներից մեկը, և նրանք որոշեցին հետևել քարտեզի գծին։ Ուրեմն, համբերում էր խորը անտառը՝ լի արկածներով։",
+      "choiceA": "Նայենք քարտեզի փորագրությունները",
+      "choiceB": "Հետևենք քարտեզի գծին",
+      "conversationId": "cceb4cab-c24c-495f-9600-46d6b159c7e3",
+      "storySessionIdOut": "cceb4cab-c24c-495f-9600-46d6b159c7e3",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 274,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 31275,
+      "warnings": []
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 100,
+    "choiceQualityScore": 40,
+    "continuationCoherenceScore": 100,
+    "overallVerdict": "WARN",
+    "averageScore": 88,
+    "minScore": 40
+  },
+  "gitSha": "a9c948bccea0c85f5fef543a2dc995f5809b00d2",
+  "branch": "main",
+  "dirty": true
+}

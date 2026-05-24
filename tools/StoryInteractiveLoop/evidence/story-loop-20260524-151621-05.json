@@ -1,0 +1,40 @@
+{
+  "runStamp": "20260524-151621",
+  "sessionIndex": 5,
+  "seedId": "S05",
+  "seedPrompt": "Պատմիր հեքիաթ փոքրիկ աղվեսի և կախարդական քամու մասին",
+  "startChoiceStrategy": "A",
+  "deviceId": "7d46084f-67cc-4387-87ab-cc298c5592e5",
+  "startedAtUtc": "2026-05-24T15:22:33.2534594Z",
+  "endedAtUtc": "2026-05-24T15:22:38.6605451Z",
+  "stopReason": "http_error",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ փոքրիկ աղվեսի և կախարդական քամու մասին",
+      "conversationId": "00000000-0000-0000-0000-000000000000",
+      "safetyFlag": 0,
+      "bodyLen": 0,
+      "armenianRatio": 0,
+      "httpStatus": 502,
+      "latencyMs": 5354,
+      "errorMessage": "Response status code does not indicate success: 502 (Bad Gateway).",
+      "warnings": [
+        "http_error"
+      ]
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 100,
+    "choiceQualityScore": 100,
+    "continuationCoherenceScore": 100,
+    "overallVerdict": "PASS",
+    "averageScore": 100,
+    "minScore": 100
+  },
+  "gitSha": "a9c948bccea0c85f5fef543a2dc995f5809b00d2",
+  "branch": "main",
+  "dirty": true
+}

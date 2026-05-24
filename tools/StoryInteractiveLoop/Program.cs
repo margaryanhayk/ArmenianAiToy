@@ -310,6 +310,18 @@ internal static class Program
             record.StopReason = "max_turns_reached";
 
         record.EndedAtUtc = DateTime.UtcNow;
+
+        // Session-level: detect (ChoiceA, ChoiceB) pairs that repeat
+        // across turns inside this one session and append the warning
+        // to the second-or-later occurrence's per-turn warning list,
+        // BEFORE the verdict scorer reads them.
+        var pairs = record.Turns
+            .Select(t => (t.ChoiceA, t.ChoiceB))
+            .ToList();
+        var repeated = Evaluators.DetectRepeatedChoicePairs(pairs);
+        for (int i = 0; i < record.Turns.Count; i++)
+            record.Turns[i].Warnings.AddRange(repeated[i]);
+
         record.Verdict = Evaluators.EvaluateSession(
             record.Turns.Select(t => (IReadOnlyList<string>)t.Warnings).ToList());
 
