@@ -1,7 +1,7 @@
 # StoryInteractiveLoop — Latest Run Summary
 
-- **Run stamp**: `20260524-170208` (UTC)
-- **Git SHA**: `b3abf2ed` (dirty=True)
+- **Run stamp**: `20260524-181621` (UTC)
+- **Git SHA**: `00d05e3a` (dirty=True)
 - **Branch**: `main`
 - **Base URL**: `http://localhost:5000`
 - **Sessions**: 5 (max=5, turns=4, strategy=alternating, allowLarger=True)
@@ -10,38 +10,39 @@
 
 | Metric | Value |
 |--------|-------|
-| Sessions PASS | 5 |
-| Sessions WARN | 0 |
+| Sessions PASS | 3 |
+| Sessions WARN | 2 |
 | Sessions FAIL | 0 |
-| Total turns   | 5 |
+| Total turns   | 20 |
 | Avg Armenian   | 100.0 |
 | Avg Story logic | 100.0 |
-| Avg Suitability | 80.0 |
-| Avg Choice quality | 100.0 |
+| Avg Suitability | 100.0 |
+| Avg Choice quality | 85.0 |
 | Avg Continuation | 100.0 |
 
 ## Recurring warnings (turn-count)
 
 | Code | Count |
 |------|-------|
-| `body_too_short` | 5 |
+| `choice_a_noun_not_in_body` | 3 |
+| `choice_b_noun_not_in_body` | 2 |
 
 ## Sessions
 
 | # | Seed | Stop reason | Turns | Verdict | Arm | Logic | Suit | Choice | Cont |
 |---|------|-------------|-------|---------|-----|-------|------|--------|------|
-| 1 | `S01` | safety_fallback:2 | 1 | **PASS** | 100 | 100 | 80 | 100 | 100 |
-| 2 | `S02` | safety_fallback:2 | 1 | **PASS** | 100 | 100 | 80 | 100 | 100 |
-| 3 | `S03` | safety_fallback:2 | 1 | **PASS** | 100 | 100 | 80 | 100 | 100 |
-| 4 | `S04` | safety_fallback:2 | 1 | **PASS** | 100 | 100 | 80 | 100 | 100 |
-| 5 | `S05` | safety_fallback:2 | 1 | **PASS** | 100 | 100 | 80 | 100 | 100 |
+| 1 | `S01` | max_turns_reached | 4 | **PASS** | 100 | 100 | 100 | 85 | 100 |
+| 2 | `S02` | max_turns_reached | 4 | **PASS** | 100 | 100 | 100 | 100 | 100 |
+| 3 | `S03` | max_turns_reached | 4 | **PASS** | 100 | 100 | 100 | 100 | 100 |
+| 4 | `S04` | max_turns_reached | 4 | **WARN** | 100 | 100 | 100 | 70 | 100 |
+| 5 | `S05` | max_turns_reached | 4 | **WARN** | 100 | 100 | 100 | 70 | 100 |
 
 ## Per-session evidence files
 
-- session 1: `story-loop-20260524-170208-01.md` / `story-loop-20260524-170208-01.json`
-- session 2: `story-loop-20260524-170208-02.md` / `story-loop-20260524-170208-02.json`
-- session 3: `story-loop-20260524-170208-03.md` / `story-loop-20260524-170208-03.json`
-- session 4: `story-loop-20260524-170208-04.md` / `story-loop-20260524-170208-04.json`
-- session 5: `story-loop-20260524-170208-05.md` / `story-loop-20260524-170208-05.json`
+- session 1: `story-loop-20260524-181621-01.md` / `story-loop-20260524-181621-01.json`
+- session 2: `story-loop-20260524-181621-02.md` / `story-loop-20260524-181621-02.json`
+- session 3: `story-loop-20260524-181621-03.md` / `story-loop-20260524-181621-03.json`
+- session 4: `story-loop-20260524-181621-04.md` / `story-loop-20260524-181621-04.json`
+- session 5: `story-loop-20260524-181621-05.md` / `story-loop-20260524-181621-05.json`
 
 > This file is overwritten on every run. Per-session MD/JSON files persist.

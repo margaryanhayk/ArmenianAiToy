@@ -1,0 +1,103 @@
+{
+  "runStamp": "20260524-181621",
+  "sessionIndex": 5,
+  "seedId": "S05",
+  "seedPrompt": "Պատմիր հեքիաթ փոքրիկ աղվեսի և կախարդական քամու մասին",
+  "startChoiceStrategy": "A",
+  "deviceId": "d81661f8-fb25-4b57-a0e1-3fcbabdfb138",
+  "startedAtUtc": "2026-05-24T18:22:39.549144Z",
+  "endedAtUtc": "2026-05-24T18:24:40.5972378Z",
+  "stopReason": "max_turns_reached",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ փոքրիկ աղվեսի և կախարդական քամու մասին",
+      "assistantBody": "Փոքրիկ աղվեսը մի օր անտառում խաղում էր, երբ քամին հանկարծ սկսեց փչել շատ ուժեղ ու մոգական: Աղվեսը զարմացած նայեց շուրջը և տեսավ, որ ծառերի տերևները ծաղիկների նման ծաղկում են նրա շուրջը: Քամին կարծես նրան դեպի մի հատուկ տեղ էր քշում, որտեղ գաղտնիքներ էին չքնաղորեն թաքնված։ Աղվեսը ուրախացավ՝ մտածելով, թե ինչ կա այդտեղ:",
+      "choiceA": "Մոտենանք ծառին",
+      "choiceB": "Նայենք տերևին",
+      "conversationId": "7b6fca78-fd03-46ed-8238-f4d267b48489",
+      "storySessionIdOut": "7b6fca78-fd03-46ed-8238-f4d267b48489",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 318,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 28839,
+      "warnings": [
+        "choice_a_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 1,
+      "userInput": "Մոտենանք ծառին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք ծառին",
+      "storySessionIdIn": "7b6fca78-fd03-46ed-8238-f4d267b48489",
+      "assistantBody": "Աղվեսը մոտեցավ ծառին և տեսավ մի փոքրիկ դրախտ, որի տակ մի փայլուն քարը շողում էր արևի գույների մեջ։ Ծառի վրա նստած մի թիթեռ ծիծաղում էր, երբ քամին ծաղիկների սերմերով խաղում էր, պտտելով դրանք շուրջը։ Աղվեսը ուրախությամբ ուզեց քամու հետ պարի գնալ՝ թիթեռի հետ միասին։",
+      "choiceA": "Մոտենանք թիթեռին",
+      "choiceB": "Նայենք ծառին",
+      "conversationId": "7b6fca78-fd03-46ed-8238-f4d267b48489",
+      "storySessionIdOut": "7b6fca78-fd03-46ed-8238-f4d267b48489",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 263,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 31532,
+      "warnings": []
+    },
+    {
+      "turnIndex": 2,
+      "userInput": "Նայենք ծառին",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "Նայենք ծառին",
+      "storySessionIdIn": "7b6fca78-fd03-46ed-8238-f4d267b48489",
+      "assistantBody": "Աղվեսը նայեց ծառին և տեսավ, որ դրա բնի վրա մի փոքրիկ դուռ է հայտնվել: Դուռը կարծես նրան հրավիրում էր ներս մտնել՝ տեսնելու, թե ինչ կախարդական աշխարհ կարող է լինել ներսում։ Աղվեսը հետաքրքրված մոտեցավ այդ դռանը:",
+      "choiceA": "Մոտենանք ծառին",
+      "choiceB": "Նայենք դուռին",
+      "conversationId": "7b6fca78-fd03-46ed-8238-f4d267b48489",
+      "storySessionIdOut": "7b6fca78-fd03-46ed-8238-f4d267b48489",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 208,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 29140,
+      "warnings": []
+    },
+    {
+      "turnIndex": 3,
+      "userInput": "Մոտենանք ծառին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք ծառին",
+      "storySessionIdIn": "7b6fca78-fd03-46ed-8238-f4d267b48489",
+      "assistantBody": "Աղվեսը մոտեցավ ծառին և զգուշորեն բացեց դուռը, որը թաքնված էր բնի վրա։ Ներսում նա հայտնվեց մի փոքր լույսավորված սենյակում, որտեղ կախված էին փայլուն պսպղուն հանգույցներ: Երեսուն մի փոքրիկ սկյուռիկ երևաց՝ ջերմությունով ողջունելով աղվեսին: Աղվեսը զարմացած ժպտաց:",
+      "choiceA": "Մոտենանք լույսավորվին",
+      "choiceB": "Նայենք սկյուռիկին",
+      "conversationId": "7b6fca78-fd03-46ed-8238-f4d267b48489",
+      "storySessionIdOut": "7b6fca78-fd03-46ed-8238-f4d267b48489",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 258,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 31496,
+      "warnings": [
+        "choice_a_noun_not_in_body"
+      ]
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 100,
+    "choiceQualityScore": 70,
+    "continuationCoherenceScore": 100,
+    "overallVerdict": "WARN",
+    "averageScore": 94,
+    "minScore": 70
+  },
+  "gitSha": "00d05e3a8057a799e77047a355d72e2d4ce0bada",
+  "branch": "main",
+  "dirty": true
+}
