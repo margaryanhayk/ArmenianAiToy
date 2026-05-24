@@ -1188,6 +1188,7 @@ about access control, not about cardinality.
 | `aat_rate_limit_rejected_total` | `policy` | `chat` / `auth` | Shared `OnRejected` handler in `Program.cs`; tag derived from the matched endpoint's `[EnableRateLimiting]` metadata via `RateLimitRejectionPolicy.ResolvePolicyTag` |
 | `aat_health_probe_total` | `result` | `ok` / `unhealthy` | `GET /api/health` endpoint lambda |
 | `aat_audit_events_written_total` | `event_type` | enum names of `AuditEventType` | `ParentService.TrackAndAddAudit` helper on every successful `AuditEvent` write |
+| `aat_moderation_failclosed_total` | `reason` | `rate_limited_retry_failed` / `auth_error` / `server_error` / `timeout` / `network_error` / `parse_error` / `unknown` | `OpenAIModerationAdapter.FailClosed` (one increment per outer `CheckContentAsync` that ends in fail-closed; genuine content flags do NOT increment this counter) |
 
 **Invariants (do not regress)**:
 

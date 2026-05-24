@@ -191,6 +191,16 @@ public class OpenAIModerationAdapter : IModerationService
         _logger.LogError(ex,
             "Moderation unavailable. reason={Reason} status={Status} latency_ms={LatencyMs} retry_count={RetryCount} preview={Preview}",
             reason, status, latencyMs, retryCount, Preview(content));
+        // Exactly one increment per outer CheckContentAsync invocation
+        // that ends in fail-closed — the retry path collapses the
+        // initial-429 + retry-429 pair into a single
+        // `rate_limited_retry_failed` sample here. Tag value is
+        // normalized so the cardinality of the `reason` tag stays
+        // strictly bounded by ModerationFailClosedReason.
+        AppMeter.ModerationFailClosed.Add(
+            1,
+            new KeyValuePair<string, object?>(
+                "reason", ModerationFailClosedReason.Normalize(reason)));
         return new AppModerationResult(false, new List<string> { "moderation_unavailable" });
     }
 

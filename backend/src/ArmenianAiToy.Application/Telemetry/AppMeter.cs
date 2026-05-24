@@ -183,6 +183,38 @@ public static class AppMeter
             description: "End-to-end duration of the moderation classify call.");
 
     /// <summary>
+    /// Count of moderation fail-closed events — incremented exactly
+    /// once per outer <c>OpenAIModerationAdapter.CheckContentAsync</c>
+    /// call whose outcome is <c>IsSafe=false</c> with the
+    /// <c>moderation_unavailable</c> category. Genuine content flags
+    /// (Sexual / Violence / SelfHarm / Hate / Harassment) exit the
+    /// happy path and do NOT increment this counter.
+    /// <para>
+    /// Tag <c>reason</c> is one of the seven values defined on
+    /// <see cref="ModerationFailClosedReason"/>:
+    /// <c>rate_limited_retry_failed</c>, <c>auth_error</c>,
+    /// <c>server_error</c>, <c>timeout</c>, <c>network_error</c>,
+    /// <c>parse_error</c>, <c>unknown</c>. Bounded enum — safe under
+    /// the no-high-cardinality invariant. The retry path is collapsed
+    /// to a single increment with reason <c>rate_limited_retry_failed</c>
+    /// (the initial 429 is NOT counted separately — the adapter is
+    /// designed to swallow a transient 429 silently and the metric
+    /// reflects the FINAL outcome, not internal retry mechanics).
+    /// </para>
+    /// <para>
+    /// Complements — does NOT replace — the existing
+    /// <c>FailClosed.LogError</c> structured-log line which still
+    /// carries the exception, HTTP status, and latency. The counter
+    /// gives Prometheus an aggregate signal; the log carries the
+    /// per-incident detail.
+    /// </para>
+    /// </summary>
+    public static readonly Counter<long> ModerationFailClosed =
+        Instance.CreateCounter<long>(
+            name: "aat_moderation_failclosed_total",
+            description: "Count of moderation fail-closed events by classified reason.");
+
+    /// <summary>
     /// Count of per-device daily OpenAI cost-cap trips
     /// (<c>OpenAICostMeter.IsOverCap</c> returned true ahead of a chat
     /// or audio-chat request). Tag <c>kind</c> is one of <c>chat</c>
