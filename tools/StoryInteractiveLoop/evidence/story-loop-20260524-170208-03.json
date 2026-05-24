@@ -1,0 +1,40 @@
+{
+  "runStamp": "20260524-170208",
+  "sessionIndex": 3,
+  "seedId": "S03",
+  "seedPrompt": "Պատմիր հեքիաթ Արարատի մոտ կորած փոքրիկ աստղի մասին",
+  "startChoiceStrategy": "A",
+  "deviceId": "bdd09fef-7d92-4509-b94c-fcad7b54aacb",
+  "startedAtUtc": "2026-05-24T17:02:13.6161793Z",
+  "endedAtUtc": "2026-05-24T17:02:16.3835114Z",
+  "stopReason": "safety_fallback:2",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ Արարատի մոտ կորած փոքրիկ աստղի մասին",
+      "assistantBody": "Մի րոպե սպասիր, ու նորից փորձենք։",
+      "conversationId": "da3e7b9e-ebcb-4b8d-9d3b-54de3d53850f",
+      "safetyFlag": 2,
+      "bodyLen": 33,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 2744,
+      "warnings": [
+        "body_too_short"
+      ]
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 80,
+    "choiceQualityScore": 100,
+    "continuationCoherenceScore": 100,
+    "overallVerdict": "PASS",
+    "averageScore": 96,
+    "minScore": 80
+  },
+  "gitSha": "b3abf2edb5bc89c9778e9ac170429a147d360089",
+  "branch": "main",
+  "dirty": true
+}

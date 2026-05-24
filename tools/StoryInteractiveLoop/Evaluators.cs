@@ -508,9 +508,38 @@ public static class Evaluators
         return stems;
     }
 
-    // Light Armenian stemmer — mirrors StoryBenchmark's ArmenianStem.
-    // Strips a closed list of common verb/noun endings, then handles
-    // the «ն»/«ց» verb-root alternation. Conservative on purpose.
+    // Light Armenian stemmer — lightweight benchmark / evaluator
+    // helper, NOT a full Armenian morphological analyzer. It strips
+    // a closed list of common verb / noun endings and handles the
+    // «ն»/«ց» verb-root alternation. Behavior is deliberately
+    // conservative: the length guard
+    // `stem.Length - e.Length >= 4` keeps stems ≥ 4 chars, so a
+    // bare 4-char noun is never truncated.
+    //
+    // Suffix-list contract (do not reorder without re-running tests):
+    //   * Endings are tried longest-first. The loop stops on the
+    //     first match.
+    //   * Whenever ending A is a strict suffix of ending B (e.g.
+    //     «ին» is a suffix of «ոջին»; «ը» is a suffix of «ոջը»),
+    //     the LONGER one MUST appear first or the longer form will
+    //     never be stripped.
+    //
+    // Noun endings covered (length-grouped):
+    //   5: ներին / ներով / ներից
+    //   4: ները / ների / ոջին
+    //   3: ներ / ոջը / ում
+    //   2: ին / ից / ով / ոջ
+    //   1: ի / ը                 (length-gated to words >= 5 chars)
+    //
+    // Known limitations (acceptable for the deterministic loop
+    // evaluator, NOT for production NLP):
+    //   * Short nouns like «ուղի» / «ուղին» cannot strip «ին»
+    //     because the >=4-char guard refuses it. Choices that name
+    //     a short noun the body does not mention still surface a
+    //     real "noun_not_in_body" warning — this is the correct
+    //     outcome for grounding.
+    //   * Diminutive «-իկ» (e.g. թռչուն vs թռչունիկ) is not
+    //     normalized. Different surface forms remain distinct stems.
     public static string ArmenianStem(string? token)
     {
         if (string.IsNullOrEmpty(token)) return token ?? "";
@@ -522,8 +551,19 @@ public static class Evaluators
         }
 
         string[] verbEndings = { "ալով", "ենք", "անք", "ում", "ավ", "եց", "ալ", "ել", "իր" };
-        string[] nounEndings = { "ներին", "ներով", "ներից", "ները", "ներ",
-                                 "ին", "ից", "ով", "ում", "ոջ", "ի" };
+        string[] nounEndings =
+        {
+            // Length 5 (plural cases — must precede 4-char plural forms)
+            "ներին", "ներով", "ներից",
+            // Length 4 (must precede 2-3 char endings that are their suffixes)
+            "ները", "ների", "ոջին",
+            // Length 3
+            "ներ", "ոջը", "ում",
+            // Length 2
+            "ին", "ից", "ով", "ոջ",
+            // Length 1 (must come last — they are suffixes of nearly everything above)
+            "ի", "ը"
+        };
 
         string stem = lower;
         foreach (var endings in new[] { verbEndings, nounEndings })

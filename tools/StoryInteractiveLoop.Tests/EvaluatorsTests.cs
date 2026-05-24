@@ -329,13 +329,36 @@ public class EvaluatorsTests
     // ----- ArmenianStem -----
 
     [Theory]
-    [InlineData("նապաստակը", "նապաստակը")]   // short suffix, doesn't strip below 4 chars
+    [InlineData("նապաստակը", "նապաստակ")]      // «ը» definite article stripped (len 9-1=8 ≥ 4)
     [InlineData("ընկերին", "ընկեր")]
     [InlineData("ընկերոջ", "ընկեր")]
     [InlineData("թիթեռիկներին", "թիթեռիկ")]
+    [InlineData("տերևների", "տերև")]            // «ների» plural genitive
+    [InlineData("ընկերոջը", "ընկեր")]           // «ոջը» possessive-definite (3-char ending)
+    [InlineData("ընկերոջին", "ընկեր")]          // «ոջին» possessive-dative (4-char ending)
     public void ArmenianStem_KnownInflections_CollapseToRoot(string token, string expected)
     {
         Assert.Equal(expected, Evaluators.ArmenianStem(token));
+    }
+
+    [Fact]
+    public void ArmenianStem_StripsPluralNeri()
+    {
+        Assert.Equal("տերև", Evaluators.ArmenianStem("տերևների"));
+    }
+
+    [Fact]
+    public void ArmenianStem_StripsDefiniteArticle()
+    {
+        Assert.Equal("նապաստակ", Evaluators.ArmenianStem("նապաստակը"));
+    }
+
+    [Fact]
+    public void ArmenianStem_DoesNotStripDefiniteArticleWhenWouldShortenBelowFour()
+    {
+        // «արջը» is 4 chars; stripping «ը» would leave a 3-char stem,
+        // which the >=4-char length guard refuses. Stem stays as-is.
+        Assert.Equal("արջը", Evaluators.ArmenianStem("արջը"));
     }
 
     [Fact]
@@ -517,6 +540,88 @@ public class EvaluatorsTests
         });
         Assert.Equal(70, v.ChoiceQualityScore);
         Assert.Equal("WARN", v.OverallVerdict);
+    }
+
+    // ===== Stemmer-driven false-positive fixes for noun grounding =====
+    //
+    // The four tests below pin specific cases observed in the
+    // 20260524-151621 live run where the old stemmer mismatched body
+    // and choice forms of the SAME concrete noun. They also pin that
+    // the genuinely missing nouns (քարտեզ / ուղի) still surface a
+    // warning — improving the stemmer must not silence real positives.
+
+    [Fact]
+    public void ChoiceNounPresentAsPluralInBody_ShouldNotWarn()
+    {
+        // S01 turn 0 case: body uses the plural genitive «տերևների»,
+        // choice uses the singular dative «տերևին». Both must reduce
+        // to «տերև» so the noun grounding check finds the overlap.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Փոքրիկ ոզնին քայլեց անտառով և տեսավ կոտրած տերևների միջից մի ծաղկիկ։ "
+                   + new string('ա', 150),
+            ChoiceA = "Նայենք տերևին",
+            ChoiceB = "Մոտենանք ծաղկիկին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.DoesNotContain("choice_a_noun_not_in_body", w);
+    }
+
+    [Fact]
+    public void ChoiceNounMissingStillWarns_ForMap()
+    {
+        // S01 turn 2 case: choice introduces «քարտեզ» that the body
+        // never establishes. The improved stemmer MUST NOT mask this
+        // real grounding break.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Ոզնին ու ընկերոջը սկսեցին նայել փայլուն դրամատիկը։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք քարտեզին",
+            ChoiceB = "Հարցնենք ընկերոջը",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.Contains("choice_a_noun_not_in_body", w);
+    }
+
+    [Fact]
+    public void ChoiceNounMissingStillWarns_ForPath()
+    {
+        // S01 turn 2 case (B-side): choice introduces «ուղի». The
+        // body never mentions it — short-noun length guard means
+        // «ուղին» itself is the stem and the absence is still seen.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Ոզնին ու ընկերոջը կարդացին դրամատիկի վրա դասված նշանները։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք ընկերոջը",
+            ChoiceB = "Նայենք ուղին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.Contains("choice_b_noun_not_in_body", w);
+    }
+
+    [Fact]
+    public void ChoiceNounMatchesViaPossessiveSuffixes_ShouldNotWarn()
+    {
+        // S01 turn 1 case: body has the possessive-definite «ընկերոջը»,
+        // choice has the possessive-dative «ընկերոջին». Both must
+        // reduce to «ընկեր» so the noun grounding check finds the
+        // overlap. Without «ոջը» / «ոջին» stripping this was a
+        // false positive in the previous run.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Ոզնին ուրախությամբ մոտեցավ իր ընկերոջը և ցույց տվեց ոսկեգույն դրամատիկը։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք ընկերոջին",
+            ChoiceB = "Հարցնենք ոսկեգույնի մասին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.DoesNotContain("choice_a_noun_not_in_body", w);
     }
 
     [Fact]

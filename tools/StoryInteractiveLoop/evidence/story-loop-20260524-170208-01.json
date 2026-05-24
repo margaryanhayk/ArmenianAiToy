@@ -1,0 +1,40 @@
+{
+  "runStamp": "20260524-170208",
+  "sessionIndex": 1,
+  "seedId": "S01",
+  "seedPrompt": "Պատմիր հեքիաթ փոքրիկ ոզնիի մասին",
+  "startChoiceStrategy": "A",
+  "deviceId": "0a09ee76-2f20-46dd-a616-f6fed571f848",
+  "startedAtUtc": "2026-05-24T17:02:08.5819925Z",
+  "endedAtUtc": "2026-05-24T17:02:10.9625519Z",
+  "stopReason": "safety_fallback:2",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ փոքրիկ ոզնիի մասին",
+      "assistantBody": "Մի րոպե սպասիր, ու նորից փորձենք։",
+      "conversationId": "ebacc079-6510-48a4-b7ee-1a4d8cbf02f2",
+      "safetyFlag": 2,
+      "bodyLen": 33,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 2239,
+      "warnings": [
+        "body_too_short"
+      ]
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 80,
+    "choiceQualityScore": 100,
+    "continuationCoherenceScore": 100,
+    "overallVerdict": "PASS",
+    "averageScore": 96,
+    "minScore": 80
+  },
+  "gitSha": "b3abf2edb5bc89c9778e9ac170429a147d360089",
+  "branch": "main",
+  "dirty": true
+}

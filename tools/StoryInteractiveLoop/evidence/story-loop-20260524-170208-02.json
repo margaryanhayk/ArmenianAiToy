@@ -1,0 +1,40 @@
+{
+  "runStamp": "20260524-170208",
+  "sessionIndex": 2,
+  "seedId": "S02",
+  "seedPrompt": "Պատմիր հեքիաթ ծիրանի ծառի տակ ապրող փոքրիկ նապաստակի մասին",
+  "startChoiceStrategy": "B",
+  "deviceId": "9047d0a6-82bc-4485-9961-db244ee9efe1",
+  "startedAtUtc": "2026-05-24T17:02:10.984411Z",
+  "endedAtUtc": "2026-05-24T17:02:13.6146015Z",
+  "stopReason": "safety_fallback:2",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ ծիրանի ծառի տակ ապրող փոքրիկ նապաստակի մասին",
+      "assistantBody": "Մի րոպե սպասիր, ու նորից փորձենք։",
+      "conversationId": "a9665aca-715e-448f-8aa8-484b46f1cbbf",
+      "safetyFlag": 2,
+      "bodyLen": 33,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 2607,
+      "warnings": [
+        "body_too_short"
+      ]
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 80,
+    "choiceQualityScore": 100,
+    "continuationCoherenceScore": 100,
+    "overallVerdict": "PASS",
+    "averageScore": 96,
+    "minScore": 80
+  },
+  "gitSha": "b3abf2edb5bc89c9778e9ac170429a147d360089",
+  "branch": "main",
+  "dirty": true
+}

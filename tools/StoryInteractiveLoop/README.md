@@ -115,25 +115,45 @@ Aggregation:
 - Verdict: **FAIL** if any of {Armenian, Story logic, Suitability}
   drops below 60; **WARN** if any dimension < 80; otherwise **PASS**.
 
+## ArmenianStem (lightweight stemmer)
+
+`Evaluators.ArmenianStem` is a **lightweight, deterministic** suffix-
+stripping helper, **not** a full Armenian morphological analyzer.
+Its only job is to normalize a handful of common surface forms so the
+noun-grounding and recap-overlap checks line up between body and choice.
+
+Suffixes it currently understands (length-gated to keep stems ≥ 4 chars):
+
+| Length | Endings |
+|-------:|---------|
+| 5      | `ներին`, `ներով`, `ներից` |
+| 4      | `ները`, `ների`, `ոջին` |
+| 3      | `ներ`, `ոջը`, `ում` |
+| 2      | `ին`, `ից`, `ով`, `ոջ` |
+| 1      | `ի`, `ը` (needs source word ≥ 5 chars) |
+
+Plus a verb-root alternation pass that drops a trailing `ն` / `ց`
+when the stem is ≥ 5 chars (so `մոտեցավ` and `մոտենանք` collapse to
+the same `մոտե`).
+
+Known stemmer limitations (acceptable for the evaluator, **not** for
+production NLP):
+
+- Short nouns like `ուղի` / `ուղին` cannot strip `ին` (the ≥ 4-char
+  guard refuses it). Choices that name a short noun the body does
+  not mention still surface a real `noun_not_in_body` warning.
+- Diminutive `-իկ` (e.g. `թռչուն` vs `թռչունիկ`) is not normalized.
+- No vowel mutation handling beyond the `ն` / `ց` verb-root drop.
+
 ## Known limitations / next-prompt recommendations
 
-These were observed during initial runs but are out of scope for this
+These were observed during runs but are out of scope for the current
 slice. Each is a candidate for a future small slice:
 
-1. **Same-turn choice grounding currently passes when only the verb
-   stem overlaps the body.** If a choice introduces a noun absent
-   from the body (e.g. body talks about a flower but the choice says
-   "approach the leaf"), the verb-only overlap counts as grounded.
-   A stricter check would require either a verb AND a non-verb noun
-   overlap, or use embeddings — out of scope here.
-2. **Cross-turn choice-set repetition is not detected.** A story
-   that loops the same choice pair across non-adjacent turns
-   (observed in S03 turn 0 ↔ turn 2) currently passes. Adding a
-   "choices repeated from earlier turn" warning would catch it.
-3. **No LLM-based reviewer.** All checks are deterministic. A
+1. **No LLM-based reviewer.** All checks are deterministic. A
    secondary LLM-graded pass for naturalness / fairy-tale quality
    could complement (not replace) the deterministic surface.
-4. **Default seed bank is limited to 10 prompts.** Extending the
+2. **Default seed bank is limited to 10 prompts.** Extending the
    seed bank or wiring `--seed-set <name>` to read from
    `tools/StoryModelBakeoff/bakeoff-prompts*.json` would broaden
    coverage without duplicating prompts.

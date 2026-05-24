@@ -1,0 +1,40 @@
+{
+  "runStamp": "20260524-170208",
+  "sessionIndex": 4,
+  "seedId": "S04",
+  "seedPrompt": "Պատմիր հեքիաթ բարի ռոբոտ Արեգի մասին",
+  "startChoiceStrategy": "B",
+  "deviceId": "92f5eb59-8fee-4a89-aa48-e10385ca203a",
+  "startedAtUtc": "2026-05-24T17:02:16.3867474Z",
+  "endedAtUtc": "2026-05-24T17:02:18.5709279Z",
+  "stopReason": "safety_fallback:2",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ բարի ռոբոտ Արեգի մասին",
+      "assistantBody": "Մի րոպե սպասիր, ու նորից փորձենք։",
+      "conversationId": "7fa66921-6c44-4f54-8d01-01329a7dea12",
+      "safetyFlag": 2,
+      "bodyLen": 33,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 2151,
+      "warnings": [
+        "body_too_short"
+      ]
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 80,
+    "choiceQualityScore": 100,
+    "continuationCoherenceScore": 100,
+    "overallVerdict": "PASS",
+    "averageScore": 96,
+    "minScore": 80
+  },
+  "gitSha": "b3abf2edb5bc89c9778e9ac170429a147d360089",
+  "branch": "main",
+  "dirty": true
+}
