@@ -1,0 +1,103 @@
+{
+  "runStamp": "20260524-200655",
+  "sessionIndex": 3,
+  "seedId": "S03",
+  "seedPrompt": "Պատմիր հեքիաթ Արարատի մոտ կորած փոքրիկ աստղի մասին",
+  "startChoiceStrategy": "A",
+  "deviceId": "e9287da8-5634-4872-b143-a8e9fb55c30d",
+  "startedAtUtc": "2026-05-24T20:10:01.2223006Z",
+  "endedAtUtc": "2026-05-24T20:12:02.3644917Z",
+  "stopReason": "max_turns_reached",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ Արարատի մոտ կորած փոքրիկ աստղի մասին",
+      "assistantBody": "Առավոտյան փայլը Արարատի վրա ծփում էր, երբ փոքրիկ աստղը անսպասելիորեն ընկավ իսկական երկնքից։ Աստղիկը նայեց շուրջ, սքանչացրեց հրաշալի տեսարանը։ Գլորելով ժայռերի վրա, նա փորձում էր գտնել իր ճանապարհը։ Արձակում էր փոքրիկ փայլուն կետիկներ, որոնք շողում էին գորտերի նման։ Աստղիկը տխրել էր, բայց միաժամանակ հիացած ուսումին շրջապատող աշխարհով։",
+      "choiceA": "Մոտենանք լույսին",
+      "choiceB": "Նայենք կետիկին",
+      "conversationId": "617d2282-ca9d-4b47-b2c7-b898c4fc1a57",
+      "storySessionIdOut": "617d2282-ca9d-4b47-b2c7-b898c4fc1a57",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 335,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 28730,
+      "warnings": [
+        "choice_a_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 1,
+      "userInput": "Մոտենանք լույսին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք լույսին",
+      "storySessionIdIn": "617d2282-ca9d-4b47-b2c7-b898c4fc1a57",
+      "assistantBody": "Փոքրիկ աստղը որոշեց մոտենալ փայլուն լույսին, որն ավելի ու ավելի պայծառ էր դառնում։ Նա տեսավ կապույտ թել, որը պտտվում էր լույսի կողքին՝ կարծես մոտենալով նրան։ Փայլուն լույսը սկսեց երգել, և աստղիկը զարմացած և ուրախ զգաց իր սրտում։ Խորը շնչելով, նա գրեթե լսեց մատի վրա թրթռացող լույսի մեղեդին։ Գուցե այս լույսը կարող է նրան օգնություն տալ իր ճանապարհը գտնելու համար։",
+      "choiceA": "Պահենք կապույտ թելը",
+      "choiceB": "Լսենք լույսի մեղեդին",
+      "conversationId": "617d2282-ca9d-4b47-b2c7-b898c4fc1a57",
+      "storySessionIdOut": "617d2282-ca9d-4b47-b2c7-b898c4fc1a57",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 363,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 30006,
+      "warnings": []
+    },
+    {
+      "turnIndex": 2,
+      "userInput": "Լսենք լույսի մեղեդին",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "Լսենք լույսի մեղեդին",
+      "storySessionIdIn": "617d2282-ca9d-4b47-b2c7-b898c4fc1a57",
+      "assistantBody": "Փոքրիկ աստղը ուշադիր լսեց լույսի մեղեդին, որն այնքան քնքուշ էր ու բալիկի քնի պես հանդարտ։ Մեղեդու նրբությունն իր սրտի մեջ հանգստություն բերեց և նրա աչքերը փայլեցին ուրախությունից։ Լույսի մեջ նա տեսավ մի փոքրիկ ճանապարհ՝ մագլցելով իր առջև։",
+      "choiceA": "Մոտենանք լույսին",
+      "choiceB": "Նայենք փոքրիկին",
+      "conversationId": "617d2282-ca9d-4b47-b2c7-b898c4fc1a57",
+      "storySessionIdOut": "617d2282-ca9d-4b47-b2c7-b898c4fc1a57",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 238,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 30959,
+      "warnings": [
+        "choice_repeated_from_earlier_turn"
+      ]
+    },
+    {
+      "turnIndex": 3,
+      "userInput": "Մոտենանք լույսին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք լույսին",
+      "storySessionIdIn": "617d2282-ca9d-4b47-b2c7-b898c4fc1a57",
+      "assistantBody": "Փոքրիկ աստղը կրկին մոտենալով լույսին, զգաց, թե ինչպես մեղեդին ձգվում էր գիշերային երկինքում՝ փաթաթելով նրան նվագական հեքիաթով։ Լույսը սկսեց ավելի վառ շողալ, և աստղիկը զգաց, թե ինչպես շնչում է նրա ջերմությունը։ Հանկարծ նա տեսավ, որ կապույտ թելը սկսեց նրբորեն շարժվել դեպի աստղիկը՝ կարծես պատրաստ լինելով ուղեկցել նրան։",
+      "choiceA": "Հետևենք կապույտ թելին",
+      "choiceB": "Դիպչենք լույսին",
+      "conversationId": "617d2282-ca9d-4b47-b2c7-b898c4fc1a57",
+      "storySessionIdOut": "617d2282-ca9d-4b47-b2c7-b898c4fc1a57",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 317,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 31422,
+      "warnings": []
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 100,
+    "choiceQualityScore": 85,
+    "continuationCoherenceScore": 80,
+    "overallVerdict": "PASS",
+    "averageScore": 93,
+    "minScore": 80
+  },
+  "gitSha": "28a16ed031d0fedc1e4e735614a5ae0cd80c083d",
+  "branch": "main",
+  "dirty": true
+}

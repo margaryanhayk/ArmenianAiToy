@@ -1,0 +1,103 @@
+{
+  "runStamp": "20260524-200655",
+  "sessionIndex": 2,
+  "seedId": "S02",
+  "seedPrompt": "Պատմիր հեքիաթ ծիրանի ծառի տակ ապրող փոքրիկ նապաստակի մասին",
+  "startChoiceStrategy": "B",
+  "deviceId": "bf97463d-8f87-4b32-9354-fae171561351",
+  "startedAtUtc": "2026-05-24T20:08:00.9165919Z",
+  "endedAtUtc": "2026-05-24T20:10:01.2202175Z",
+  "stopReason": "max_turns_reached",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ ծիրանի ծառի տակ ապրող փոքրիկ նապաստակի մասին",
+      "assistantBody": "Փոքրիկ նապաստակը ապրում էր ծիրանի ծառի տակ։ Ամեն առավոտ նա արթնանում էր, երբ արևի լույսը փայլում էր ծիրանի կատարին։ Նապաստակն ուներ մի փոքրիկ բույսերի պարտեզ, որտեղ աճեցնում էր իր սիրած մրգերը։ Նա հաճախ նստում էր այգում և ծուլանում՝ լսելով երեխայի մեղմ ձայներն ու շնչառությունը։ Ահա մի առավոտ, նապաստակը տեսավ մի փոքրիկ փայլատ պահարան ծառի տակ:",
+      "choiceA": "Մոտենանք նապաստակին",
+      "choiceB": "Նայենք ծառին",
+      "conversationId": "e1c203a4-437a-4909-be34-d7712a98bb81",
+      "storySessionIdOut": "e1c203a4-437a-4909-be34-d7712a98bb81",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 344,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 28995,
+      "warnings": []
+    },
+    {
+      "turnIndex": 1,
+      "userInput": "Նայենք ծառին",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "Նայենք ծառին",
+      "storySessionIdIn": "e1c203a4-437a-4909-be34-d7712a98bb81",
+      "assistantBody": "Փոքրիկ նապաստակը նայեց ծառին ու տեսավ, որ ծիրաններն արդեն հասել էին ու փայլում էին արևի մեջ։ Հանկարծ նա տեսավ մի փոքրիկ սպիտակ թիթեռնիկ, որ խաղում էր ծիրանի տերևներին։ Այս փորձանքը ուրախությամբ ու գիշերային հմայքով լցրեց նապաստակին։ Մինչ նա մտածում էր, թե ինչ անի հետո, լսեց ևս մի մեղմ ձայն՝ կարծես ծիրանի ծառի վրա նստած թռչունիկ էր երգում։",
+      "choiceA": "Մոտենանք թիթեռին",
+      "choiceB": "Նայենք թռչունիկին",
+      "conversationId": "e1c203a4-437a-4909-be34-d7712a98bb81",
+      "storySessionIdOut": "e1c203a4-437a-4909-be34-d7712a98bb81",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 340,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 30451,
+      "warnings": [
+        "choice_a_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 2,
+      "userInput": "Մոտենանք թիթեռին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք թիթեռին",
+      "storySessionIdIn": "e1c203a4-437a-4909-be34-d7712a98bb81",
+      "assistantBody": "Փոքրիկ նապաստակը մոտեցավ թիթեռին և տեսավ, որ թիթեռը իջել էր մերձավոր ծաղկի վրա։ Թիթեռի թևերը փայլում էին գունավոր զարդերով, և նապաստակը ուրախությամբ դիտում էր նրան։ Թիթեռնիկը շուտով թառեց նրա քթի վրա, ինչը նապաստակին ծիծաղեցրեց։",
+      "choiceA": "Մոտենանք թիթեռնիկին",
+      "choiceB": "Նայենք նապաստակին",
+      "conversationId": "e1c203a4-437a-4909-be34-d7712a98bb81",
+      "storySessionIdOut": "e1c203a4-437a-4909-be34-d7712a98bb81",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 228,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 30706,
+      "warnings": []
+    },
+    {
+      "turnIndex": 3,
+      "userInput": "Նայենք նապաստակին",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "Նայենք նապաստակին",
+      "storySessionIdIn": "e1c203a4-437a-4909-be34-d7712a98bb81",
+      "assistantBody": "Նայեցինք փոքրիկ նապաստակին, և նա դեռ էլ թիթեռի հետ խաղում էր։ Նրա աչքերը ուրախությունից փայլում էին, քանի որ թիթեռնիկը իր շուրջը պարում էր։ Հանկարծ թիթեռը իջավ և նստեց մայր գույնյա ծաղկին՝ նապաստակի կողքին։ Նապաստակը այս հրաշալի երեկոն վայելելով մտածեց, թե ինչ անի հետո։",
+      "choiceA": "Մոտենանք նապաստակին",
+      "choiceB": "Նայենք թիթեռին",
+      "conversationId": "e1c203a4-437a-4909-be34-d7712a98bb81",
+      "storySessionIdOut": "e1c203a4-437a-4909-be34-d7712a98bb81",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 270,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 30127,
+      "warnings": [
+        "choice_repeated_from_earlier_turn"
+      ]
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 100,
+    "choiceQualityScore": 85,
+    "continuationCoherenceScore": 80,
+    "overallVerdict": "PASS",
+    "averageScore": 93,
+    "minScore": 80
+  },
+  "gitSha": "28a16ed031d0fedc1e4e735614a5ae0cd80c083d",
+  "branch": "main",
+  "dirty": true
+}

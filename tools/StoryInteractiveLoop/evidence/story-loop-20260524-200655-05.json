@@ -1,0 +1,105 @@
+{
+  "runStamp": "20260524-200655",
+  "sessionIndex": 5,
+  "seedId": "S05",
+  "seedPrompt": "Պատմիր հեքիաթ փոքրիկ աղվեսի և կախարդական քամու մասին",
+  "startChoiceStrategy": "A",
+  "deviceId": "844b3153-fffc-48c3-976c-aa91045815e1",
+  "startedAtUtc": "2026-05-24T20:13:46.7424292Z",
+  "endedAtUtc": "2026-05-24T20:15:45.9818938Z",
+  "stopReason": "max_turns_reached",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ փոքրիկ աղվեսի և կախարդական քամու մասին",
+      "assistantBody": "Փոքրիկ աղվեսը հեքիաթային անտառի միջով քայլում էր։ Նա շատ ծարավ էր և փորձում էր գտնել առու։ Հանկարծակի զգաց քամու մեղմ շունչը։ Այդ քամին կարծես ինչ-որ բան լուռ երգում էր։ Աղվեսը մի պահ կանգ առավ, զարմացավ ու ամուր հողամասի վրա նստեց։",
+      "choiceA": "Մոտենանք լսենքին",
+      "choiceB": "Նայենք քամուին",
+      "conversationId": "e6cf6e74-b091-4244-a736-28f21268401e",
+      "storySessionIdOut": "e6cf6e74-b091-4244-a736-28f21268401e",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 232,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 29089,
+      "warnings": []
+    },
+    {
+      "turnIndex": 1,
+      "userInput": "Մոտենանք լսենքին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք լսենքին",
+      "storySessionIdIn": "e6cf6e74-b091-4244-a736-28f21268401e",
+      "assistantBody": "Աղվեսը մոտեցավ լսեցին և զգաց, որ քամու մեղմ երգը սրտահայեց: Քամին նրա ամպշահար էր հանում մեղմությամբ ու հանգստացնում։ Նա զգաց, որ ուզում է ավելի մոտիկից հասկանալ այդ երգի պատմությունը։ Շուտով քամու մեջ հայտնվեց փոքրիկ փայլուն քար։ Աղվեսը հետաքրքրված կանգ առավ:",
+      "choiceA": "Մոտենանք քարին",
+      "choiceB": "Նայենք աղվեսին",
+      "conversationId": "e6cf6e74-b091-4244-a736-28f21268401e",
+      "storySessionIdOut": "e6cf6e74-b091-4244-a736-28f21268401e",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 260,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 30201,
+      "warnings": [
+        "choice_a_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 2,
+      "userInput": "Նայենք աղվեսին",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "Նայենք աղվեսին",
+      "storySessionIdIn": "e6cf6e74-b091-4244-a736-28f21268401e",
+      "assistantBody": "Աղվեսին նայելով՝ նա հասկացավ, թե որքան հետաքրքրված էր այդ փայլուն քարի պատճառով։ Քարը սկսեց արձագանքել աղվեսի հայացքին և անգին լույսեր արձակել։ Քամին ծաղկաշունչ փչում էր, գրկելով աղվեսին մեղմորեն։",
+      "choiceA": "Մոտենալ փայլուն քարին",
+      "choiceB": "Փորձել երգել քամու հետ",
+      "conversationId": "e6cf6e74-b091-4244-a736-28f21268401e",
+      "storySessionIdOut": "e6cf6e74-b091-4244-a736-28f21268401e",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 196,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 46491,
+      "warnings": [
+        "choice_b_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 3,
+      "userInput": "Մոտենալ փայլուն քարին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենալ փայլուն քարին",
+      "storySessionIdIn": "e6cf6e74-b091-4244-a736-28f21268401e",
+      "assistantBody": "Աղվեսը դանդաղ քայլերով մոտեցավ փայլուն քարին։ Քարին ապշեցնող երանգներ էին կարկաչում, կարծես մի հեքիաթային աշխարհ էր անմիջապես բացվում։ Քարը կարծես ձայն էր հանում՝ երկար ժամանակից ի վեր մոռացված մի հին երգ։",
+      "choiceA": "Բացենք փայլուն քարը",
+      "choiceB": "Լսենք երգի շարունակությունը",
+      "conversationId": "e6cf6e74-b091-4244-a736-28f21268401e",
+      "storySessionIdOut": "e6cf6e74-b091-4244-a736-28f21268401e",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 205,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 13420,
+      "warnings": [
+        "choice_b_noun_not_in_body"
+      ]
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 100,
+    "choiceQualityScore": 55,
+    "continuationCoherenceScore": 100,
+    "overallVerdict": "WARN",
+    "averageScore": 91,
+    "minScore": 55
+  },
+  "gitSha": "28a16ed031d0fedc1e4e735614a5ae0cd80c083d",
+  "branch": "main",
+  "dirty": true
+}

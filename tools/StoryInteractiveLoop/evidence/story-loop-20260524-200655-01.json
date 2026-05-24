@@ -1,0 +1,106 @@
+{
+  "runStamp": "20260524-200655",
+  "sessionIndex": 1,
+  "seedId": "S01",
+  "seedPrompt": "Պատմիր հեքիաթ փոքրիկ ոզնիի մասին",
+  "startChoiceStrategy": "A",
+  "deviceId": "315cc25f-c4f3-48c4-88d6-005bdfb330e6",
+  "startedAtUtc": "2026-05-24T20:06:55.6282103Z",
+  "endedAtUtc": "2026-05-24T20:08:00.8678633Z",
+  "stopReason": "max_turns_reached",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ փոքրիկ ոզնիի մասին",
+      "assistantBody": "Փոքրիկ ոզնին՝ Նիկը, լուսավոր օրվա մեջ դուրս եկավ իր բույնից։ Շուրջը բացատն էր, որտեղ ծաղկում էին տարբեր գույների ծաղիկներ։ Նիկը սիրով նայում էր այդ ծաղիկներին ու ուրախանում։ Սակայն նրա հետաքրքրասիրությունը հաղթեց, և նա որոշեց դուրս գալ ու տեսնել, թե ինչ նոր ընկերներ կարող է գտնել բացատի մյուս կողմում։ Նա կյանքով լի էր ու ցանկանում էր արկածներ գտնել։",
+      "choiceA": "Մոտենանք թռչունիկին",
+      "choiceB": "Նայենք ընկերին",
+      "conversationId": "0eaf9a1a-80da-43b3-bf73-f180855a2efb",
+      "storySessionIdOut": "0eaf9a1a-80da-43b3-bf73-f180855a2efb",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 351,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 8426,
+      "warnings": [
+        "choice_a_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 1,
+      "userInput": "Մոտենանք թռչունիկին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք թռչունիկին",
+      "storySessionIdIn": "0eaf9a1a-80da-43b3-bf73-f180855a2efb",
+      "assistantBody": "Նիկը մոտեցավ թռչունիկին, որը նստած էր մոտակա ծառի ճյուղին։ Թռչունիկն ուրախորեն երգում էր, և նրա ձայնը լցնում էր ամբողջ բացատը։ Նիկը զարմանքով լսում էր այդ գեղեցիկ մեղեդին։ Վերջապես, թռչունիկը կանգ առավ ու փոքր ձայնով ասաց. - Բարև՛, Նիկ։ Ուզո՞ւմ ես մի նոր ծածկված գաղտնիք գտնել։",
+      "choiceA": "Սովորենք թռչունիկից գաղտնիքը",
+      "choiceB": "Նայենք բացատի ծաղիկներին",
+      "conversationId": "0eaf9a1a-80da-43b3-bf73-f180855a2efb",
+      "storySessionIdOut": "0eaf9a1a-80da-43b3-bf73-f180855a2efb",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 277,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 7554,
+      "warnings": [
+        "choice_b_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 2,
+      "userInput": "Նայենք բացատի ծաղիկներին",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "Նայենք բացատի ծաղիկներին",
+      "storySessionIdIn": "0eaf9a1a-80da-43b3-bf73-f180855a2efb",
+      "assistantBody": "Նիկը նայեց բացատի գեղեցիկ ծաղիկներին, որոնք նրբորեն հյութախաղ էին օդի մեջ։ Ծաղիկներից մեկը շատ անկեղծ տեսք ուներ, կարծես հենց իրան ցածուր տեղից նայում էր՝ ցանկանալով մի բան պատմել։ Նիկը զգաց, որ հնարավոր է այս ծաղիկը ունի մի գաղտնիք, որը ցանկանում է կիսվել։ Նա մոտեցավ ծաղկին, փորձելով լսել, միգուցե այն ինչ-որ հետաքրքիր բան կհայտնի։",
+      "choiceA": "Մոտենանք թռչունիկին",
+      "choiceB": "Նայենք ծաղիկին",
+      "conversationId": "0eaf9a1a-80da-43b3-bf73-f180855a2efb",
+      "storySessionIdOut": "0eaf9a1a-80da-43b3-bf73-f180855a2efb",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 333,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 19287,
+      "warnings": [
+        "choice_a_noun_not_in_body",
+        "choice_repeated_from_earlier_turn"
+      ]
+    },
+    {
+      "turnIndex": 3,
+      "userInput": "Մոտենանք թռչունիկին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք թռչունիկին",
+      "storySessionIdIn": "0eaf9a1a-80da-43b3-bf73-f180855a2efb",
+      "assistantBody": "Փոքրիկ ոզնին՝ Նիկը, մոտեցավ թռչունիկին, որը սպասում էր ծառի գլխին։ Թռչունիկը նրան կանչեց հետևել իրեն՝ որին Նիկը մեծ սիրով համաձայնվեց։ Նրանք միասին քայլեցին դեպի բարակ ջրի հոսանքը, որը բյուրեղյա ձայնով շշնջում էր։ Նիկը հիացանքով լսում էր այդ ձայնը։",
+      "choiceA": "Մոտենանք ձայնին",
+      "choiceB": "Նայենք թռչունիկին",
+      "conversationId": "0eaf9a1a-80da-43b3-bf73-f180855a2efb",
+      "storySessionIdOut": "0eaf9a1a-80da-43b3-bf73-f180855a2efb",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 248,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 29815,
+      "warnings": []
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 100,
+    "choiceQualityScore": 55,
+    "continuationCoherenceScore": 80,
+    "overallVerdict": "WARN",
+    "averageScore": 87,
+    "minScore": 55
+  },
+  "gitSha": "28a16ed031d0fedc1e4e735614a5ae0cd80c083d",
+  "branch": "main",
+  "dirty": true
+}
