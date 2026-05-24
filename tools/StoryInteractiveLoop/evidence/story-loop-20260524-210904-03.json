@@ -1,0 +1,103 @@
+{
+  "runStamp": "20260524-210904",
+  "sessionIndex": 3,
+  "seedId": "S03",
+  "seedPrompt": "Պատմիր հեքիաթ Արարատի մոտ կորած փոքրիկ աստղի մասին",
+  "startChoiceStrategy": "A",
+  "deviceId": "ece1989b-bcdb-4c2d-a877-6043b35b8f5f",
+  "startedAtUtc": "2026-05-24T21:11:42.9350807Z",
+  "endedAtUtc": "2026-05-24T21:13:28.8716971Z",
+  "stopReason": "max_turns_reached",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ Արարատի մոտ կորած փոքրիկ աստղի մասին",
+      "assistantBody": "Արարատի լանջերին ապրում էր մի փոքրիկ սկյուռիկ, անունով Տիկո։ Մի գիշեր, երբ նա նայում էր երկինք, տեսավ մի փոքրիկ աստղ, որ իջել էր լեռան մոտ։ Տիկոյը զարմացավ, երբ տեսավ, որ աստղը շողում էր այնքան պայծառ, որ լուսավորում էր շրջակայքը։ Նա մոտեցավ աստղին և լսեց, թե ինչպես նա ջերմ սրտով խոսում էր։ Սակայն ինչպես կարող էր աստղը կրկին վերադառնալ երկինք։",
+      "choiceA": "Մոտենանք երկինքին",
+      "choiceB": "Նայենք օգնին",
+      "conversationId": "aed5c664-2f50-4f17-ab0c-36ec3a7f4efe",
+      "storySessionIdOut": "aed5c664-2f50-4f17-ab0c-36ec3a7f4efe",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 345,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 30594,
+      "warnings": []
+    },
+    {
+      "turnIndex": 1,
+      "userInput": "Մոտենանք երկինքին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք երկինքին",
+      "storySessionIdIn": "aed5c664-2f50-4f17-ab0c-36ec3a7f4efe",
+      "assistantBody": "Տիկոն մոտեցավ երկինքին և տեսավ, որ աստղը կարծես փորձում էր իրեն վերադարձնել իր տուն՝ երկինք։ Նա զգաց, թե ինչպես քամին փափուկ փչում էր, կարծես օգնում էր աստղին։ Տիկոն կանգնած էր, մտածելով, թե ինչպես կարող էր օգնել փոքրիկ աստղին։ Նրա սիրտը լի էր ուշադրությամբ ու պատրաստակամությամբ։",
+      "choiceA": "Մոտենանք քարին",
+      "choiceB": "Նայենք փնտրին",
+      "conversationId": "aed5c664-2f50-4f17-ab0c-36ec3a7f4efe",
+      "storySessionIdOut": "aed5c664-2f50-4f17-ab0c-36ec3a7f4efe",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 280,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 28425,
+      "warnings": [
+        "choice_a_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 2,
+      "userInput": "Նայենք փնտրին",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "Նայենք փնտրին",
+      "storySessionIdIn": "aed5c664-2f50-4f17-ab0c-36ec3a7f4efe",
+      "assistantBody": "Տիկոն դանդաղ նայեց փնտրին և տեսավ, որ աստղը խոսում էր ոչ միայն նրա հետ, այլև հետ էր մեկնվում երկինք։ Փոքրիկ աստղը կարծես շշնջում էր իր երազների մասին։ Տիկոն լսեց այդ խոսքերը և զգաց ուրախություն։ Փոքրիկ աստղի պայծառ լույսը նրան թվում էր որպես կախարդական։",
+      "choiceA": "Մոտենանք լույսին",
+      "choiceB": "Նայենք օգնին",
+      "conversationId": "aed5c664-2f50-4f17-ab0c-36ec3a7f4efe",
+      "storySessionIdOut": "aed5c664-2f50-4f17-ab0c-36ec3a7f4efe",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 253,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 31319,
+      "warnings": [
+        "choice_repeated_from_earlier_turn"
+      ]
+    },
+    {
+      "turnIndex": 3,
+      "userInput": "Մոտենանք լույսին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք լույսին",
+      "storySessionIdIn": "aed5c664-2f50-4f17-ab0c-36ec3a7f4efe",
+      "assistantBody": "Տիկոն մոտեցավ լույսին, և հանկարծ լույսը սկսեց մեղմ շշնջալ մի երգ։ Այդ հնչյունները լցրեցին շրջակայքը հանգստությամբ ու խաղաղությամբ։ Ավելի մոտից նայելով, Տիկոն տեսավ, որ աստղից մի փոքրիկ կամուրջ առաջացավ՝ կառուցված լույսից։ Հետաքրքրությամբ նա մտածեց, թե ինչ կլինի, եթե անցնի այդ կամրջով։",
+      "choiceA": "Անցնենք լույսի կամրջով",
+      "choiceB": "Լսենք աստղի երգը",
+      "conversationId": "aed5c664-2f50-4f17-ab0c-36ec3a7f4efe",
+      "storySessionIdOut": "aed5c664-2f50-4f17-ab0c-36ec3a7f4efe",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 285,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 15573,
+      "warnings": []
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 100,
+    "choiceQualityScore": 85,
+    "continuationCoherenceScore": 80,
+    "overallVerdict": "PASS",
+    "averageScore": 93,
+    "minScore": 80
+  },
+  "gitSha": "82c3a91f692a5d9d2c9c303bfddf83016cb71a30",
+  "branch": "main",
+  "dirty": true
+}
