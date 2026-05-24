@@ -354,16 +354,18 @@ public class EvaluatorsTests
     }
 
     [Fact]
-    public void ArmenianStem_DoesNotStripDefiniteArticleWhenWouldShortenBelowFour()
+    public void ArmenianStem_StripsDefiniteArticleFromFourCharSource()
     {
-        // «արջը» is 4 chars; stripping «ը» would leave a 3-char stem,
-        // which the >=4-char length guard refuses. Stem stays as-is.
-        // (Note: this is the DEFAULT 4-char rule for the «ը» ending,
-        // which is NOT in the short-stem-allowed set — see the
-        // ArmenianStem_StripsInFromShortNoun family below for the
-        // narrower 3-char-result exception that applies only to
-        // «ին» / «ից» / «ով».)
-        Assert.Equal("արջը", Evaluators.ArmenianStem("արջը"));
+        // CONTRACT CHANGE: «ը» (1-char definite article) joined
+        // ShortStemAllowedEndings in the body-side asymmetric fix
+        // slice. «արջը» (4 chars) now strips «ը» to «արջ» (3 chars).
+        // Before that slice, the default >=4-char-result rule
+        // refused this strip, which made body «արջը» and choice
+        // «արջին» yield different stems for the same noun — the
+        // exact false-positive class observed in the
+        // 20260524-193512 live evidence on նոun forms like
+        // «ծառը» / «քարը» / «ծառի» / «քարի».
+        Assert.Equal("արջ", Evaluators.ArmenianStem("արջը"));
     }
 
     // ===== Short-noun 2-char-ending exception =====
@@ -438,6 +440,113 @@ public class EvaluatorsTests
                    + new string('ա', 150),
             ChoiceA = "Մոտենանք ծառին",
             ChoiceB = "Լսենք նապաստակին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.Contains("choice_a_noun_not_in_body", w);
+    }
+
+    // ===== Body-side short-noun stripping (1-char endings) =====
+    //
+    // The 20260524-193512 evidence showed that the previous
+    // commit's choice-side fix («ին»/«ից»/«ով» strip to 3-char
+    // stems) created an asymmetric stem class with the body
+    // side: body «ծառի» / «ծառը» / «քարի» / «քարը» (4-char
+    // source) could not strip the 1-char «ի» / «ը» because the
+    // default 4-char-result rule still applied to those endings.
+    // This slice adds «ի» and «ը» to the relaxed set so the
+    // body side normalizes to the SAME 3-char stem the choice
+    // side already produces.
+
+    [Fact]
+    public void ArmenianStem_StripsIFromShortNoun()
+    {
+        Assert.Equal("ծառ", Evaluators.ArmenianStem("ծառի"));
+    }
+
+    [Fact]
+    public void ArmenianStem_StripsDefiniteArticleFromShortNoun()
+    {
+        Assert.Equal("ծառ", Evaluators.ArmenianStem("ծառը"));
+    }
+
+    [Fact]
+    public void ArmenianStem_StripsIFromShortStoneNoun()
+    {
+        Assert.Equal("քար", Evaluators.ArmenianStem("քարի"));
+    }
+
+    [Fact]
+    public void ArmenianStem_StripsDefiniteArticleFromShortStoneNoun()
+    {
+        Assert.Equal("քար", Evaluators.ArmenianStem("քարը"));
+    }
+
+    [Fact]
+    public void ArmenianStem_DoesNotStripBelowThreeCharResult()
+    {
+        // 4-char outer guard still applies. A bare 3-char noun
+        // never enters the strip loop. A 4-char source with a
+        // 2-char ending (e.g. «տնից» -> would-be «տն») is also
+        // refused because the result would be 2, below the
+        // 3-char floor.
+        Assert.Equal("տնից", Evaluators.ArmenianStem("տնից"));
+        // 3-char input short-circuits via outer guard.
+        Assert.Equal("ծառ", Evaluators.ArmenianStem("ծառ"));
+    }
+
+    [Fact]
+    public void ChoiceNounPresentWithBodyShortIEnding_ShouldNotWarn()
+    {
+        // The asymmetric body/choice mismatch this slice fixes:
+        // body uses 4-char «ծառի» (genitive); choice uses 5-char
+        // «ծառին» (dative). Both must reduce to «ծառ» so the
+        // grounding check finds the overlap. Before this slice
+        // the body stayed «ծառի» and the choice stripped to
+        // «ծառ» — a spurious noun_not_in_body warning.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Փոքրիկ նապաստակը նստել էր ծառի կողքին և լսում էր թռչուններին։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք ծառին",
+            ChoiceB = "Հարցնենք նապաստակին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.DoesNotContain("choice_a_noun_not_in_body", w);
+    }
+
+    [Fact]
+    public void ChoiceNounPresentWithBodyShortDefiniteEnding_ShouldNotWarn()
+    {
+        // S04 turn 0/1 case from the 20260524-193512 evidence:
+        // body uses 4-char «քարը» (definite); choice uses 5-char
+        // «քարին» (dative). Both must reduce to «քար».
+        var input = new TurnEvaluationInput
+        {
+            Body = "Արեգը տեսավ մի փայլուն քարը խաղաղ արահետի մոտ։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք քարին",
+            ChoiceB = "Շարունակենք արահետով",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.DoesNotContain("choice_a_noun_not_in_body", w);
+    }
+
+    [Fact]
+    public void ChoiceNounStillWarns_WhenShortNounReallyAbsent_AfterBodySideFix()
+    {
+        // Real noun-grounding gaps must NOT be silenced by the
+        // wider stripping rule. Body genuinely has no
+        // «ծառ»/«քար» family in any form; choice introduces
+        // «ծառին». Warning still fires.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Փոքրիկ ոզնին քայլում էր անտառում միայնակ։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք ծառին",
+            ChoiceB = "Լսենք ոզնիին",
             HasChoices = true
         };
         var w = Evaluators.EvaluateTurn(input);

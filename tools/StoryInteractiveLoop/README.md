@@ -138,13 +138,16 @@ Suffixes it currently understands (length-gated to keep stems ≥ 4 chars):
 | 4      | `ները`, `ների`, `ոջին` |
 | 3      | `ներ`, `ոջը`, `ում` |
 | 2      | `ին`, `ից`, `ով`, `ոջ` (`ին`/`ից`/`ով` may strip to a 3-char root) |
-| 1      | `ի`, `ը` (needs source word ≥ 5 chars) |
+| 1      | `ի`, `ը` (may strip to a 3-char root) |
 
-The three 2-char endings `ին` / `ից` / `ով` are special-cased to
-allow a 3-char result instead of the default 4-char floor, so common
-short concrete nouns (`ծառին` → `ծառ`, `ուղին` → `ուղ`,
-`քարով` → `քար`, `քարից` → `քար`) normalize for the noun-grounding
-check. All other endings keep the stricter 4-char floor.
+Five short noun endings — `ին` / `ից` / `ով` / `ի` / `ը` — are
+special-cased to allow a 3-char result instead of the default
+4-char floor. The choice-side 2-char endings let
+`ծառին` → `ծառ`, `ուղին` → `ուղ`, `քարով` → `քար`. The
+body-side 1-char endings let `ծառի` → `ծառ`, `ծառը` → `ծառ`,
+`քարի` → `քար`, `քարը` → `քար` — so the same noun normalizes
+to the same stem regardless of which side it appears on. All
+other endings keep the stricter 4-char floor.
 
 Plus a verb-root alternation pass that drops a trailing `ն` / `ց`
 when the stem is ≥ 5 chars (so `մոտեցավ` and `մոտենանք` collapse to

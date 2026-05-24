@@ -575,14 +575,24 @@ public static class Evaluators
     // `stem.Length - e.Length >= 4` keeps stems ≥ 4 chars, so a
     // bare 4-char noun is never truncated.
     //
-    // Per-ending exception: the three short 2-char noun-case
+    // Per-ending exception: the five short noun-case / article
     // endings in <see cref="ShortStemAllowedEndings"/> may strip
-    // down to a 3-char stem instead of 4. This lets common short
-    // Armenian concrete nouns normalize: «ծառին» → «ծառ»,
-    // «ուղին» → «ուղ», «քարով» → «քար», «քարից» → «քար».
-    // Without this exception, body «ծառերի» (stems to «ծառեր»)
-    // and choice «ծառին» (would stay as «ծառին») wouldn't share
-    // any stem, producing a spurious noun_not_in_body warning.
+    // down to a 3-char stem instead of the default 4. This lets
+    // common short Armenian concrete nouns normalize on BOTH
+    // sides of the body/choice comparison:
+    //
+    //   Choice-side (2-char dative / ablative / instrumental):
+    //     «ծառին» → «ծառ», «ուղին» → «ուղ»,
+    //     «քարով» → «քար», «քարից» → «քար».
+    //   Body-side (1-char genitive / definite article):
+    //     «ծառի» → «ծառ», «ծառը» → «ծառ»,
+    //     «քարի» → «քար», «քարը» → «քար».
+    //
+    // Without the BODY-side 1-char entries, choice «ծառին» (5,
+    // strips to «ծառ») and body «ծառի» / «ծառը» (4, default
+    // 4-char-result rule refuses any strip) would have different
+    // stems for the same noun — the asymmetric false-positive
+    // class observed in the 20260524-193512 live validation.
     //
     // Suffix-list contract (do not reorder without re-running tests):
     //   * Endings are tried longest-first. The loop stops on the
@@ -597,7 +607,7 @@ public static class Evaluators
     //   4: ները / ների / ոջին
     //   3: ներ / ոջը / ում
     //   2: ին / ից / ով / ոջ       (ին / ից / ով may strip to 3-char stem)
-    //   1: ի / ը                   (length-gated to words >= 5 chars)
+    //   1: ի / ը                   (may strip to 3-char stem)
     //
     // Known limitations (acceptable for the deterministic loop
     // evaluator, NOT for production NLP):
@@ -607,16 +617,21 @@ public static class Evaluators
     //     "box" but produce different stems. That requires embeddings
     //     or a thesaurus, out of scope for this stemmer.
 
-    // The three short 2-char noun-case endings that are allowed to
-    // strip down to a 3-char stem. Picked deliberately narrow:
+    // The five short noun-case / article endings that are allowed
+    // to strip down to a 3-char stem. Picked deliberately narrow:
     //   * «ին» — dative singular (ծառին / ուղին / թռչունին)
     //   * «ից» — ablative singular (քարից / ծառից)
     //   * «ով» — instrumental singular (քարով / ձեռքով)
+    //   * «ի»  — genitive singular (ծառի / քարի)         [body-side]
+    //   * «ը»  — definite article (ծառը / քարը / արջը)   [body-side]
     // «ոջ» is NOT in the set: the kid-noun population of 5-char
     // «-ոջ» words is essentially empty, and «ընկերոջ» (6) already
-    // strips fine under the default 4-char rule.
+    // strips fine under the default 4-char rule. The 4-char source
+    // floor still applies through the outer guard
+    // (`if (lower.Length < 4) return lower;`), so a 3-char noun
+    // like «ոզն» itself never enters the strip loop.
     private static readonly HashSet<string> ShortStemAllowedEndings =
-        new(StringComparer.Ordinal) { "ին", "ից", "ով" };
+        new(StringComparer.Ordinal) { "ին", "ից", "ով", "ի", "ը" };
 
     private static int MinResultLengthFor(string ending) =>
         ShortStemAllowedEndings.Contains(ending) ? 3 : 4;
