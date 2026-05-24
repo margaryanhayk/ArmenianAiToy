@@ -358,7 +358,90 @@ public class EvaluatorsTests
     {
         // «արջը» is 4 chars; stripping «ը» would leave a 3-char stem,
         // which the >=4-char length guard refuses. Stem stays as-is.
+        // (Note: this is the DEFAULT 4-char rule for the «ը» ending,
+        // which is NOT in the short-stem-allowed set — see the
+        // ArmenianStem_StripsInFromShortNoun family below for the
+        // narrower 3-char-result exception that applies only to
+        // «ին» / «ից» / «ով».)
         Assert.Equal("արջը", Evaluators.ArmenianStem("արջը"));
+    }
+
+    // ===== Short-noun 2-char-ending exception =====
+    //
+    // Three noun-case endings (`ին` / `ից` / `ով`) are special-cased
+    // to allow a 3-char result instead of the default 4. This lets
+    // common short Armenian concrete nouns normalize so that
+    // body `ծառերի` / `ծառերին` and choice `ծառին` (both refer to
+    // "tree") share a stem under the noun-grounding check.
+
+    [Fact]
+    public void ArmenianStem_StripsInFromShortNoun()
+    {
+        Assert.Equal("ծառ", Evaluators.ArmenianStem("ծառին"));
+    }
+
+    [Fact]
+    public void ArmenianStem_StripsInFromShortPathNoun()
+    {
+        Assert.Equal("ուղ", Evaluators.ArmenianStem("ուղին"));
+    }
+
+    [Fact]
+    public void ArmenianStem_StripsOvFromShortNoun()
+    {
+        Assert.Equal("քար", Evaluators.ArmenianStem("քարով"));
+    }
+
+    [Fact]
+    public void ArmenianStem_StripsIcFromShortNoun()
+    {
+        Assert.Equal("քար", Evaluators.ArmenianStem("քարից"));
+    }
+
+    [Fact]
+    public void ArmenianStem_DoesNotStripShortInEndingBelowThree()
+    {
+        // 4-char source word + 2-char ending would leave a 2-char
+        // stem — below the 3-char floor even for the relaxed rule.
+        // «տնից» (4 chars: տ-ն-ի-ց) must therefore stay as-is.
+        Assert.Equal("տնից", Evaluators.ArmenianStem("տնից"));
+    }
+
+    [Fact]
+    public void ChoiceNounPresentWithShortInEnding_ShouldNotWarn()
+    {
+        // Body uses «ծառին» (5 chars) which stems to «ծառ» under the
+        // new rule. Choice uses the same form. Both must share the
+        // «ծառ» stem so the grounding check finds the overlap.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Անտառում մեծ ծառին նստեց փոքրիկ թռչունիկ, "
+                   + "որ սկսեց երգել իր մեղմ ձայնով։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք ծառին",
+            ChoiceB = "Լսենք թռչունիկին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.DoesNotContain("choice_a_noun_not_in_body", w);
+    }
+
+    [Fact]
+    public void ChoiceNounStillWarns_WhenShortNounAbsent()
+    {
+        // Same shape, but the body now never mentions «ծառ» (or any
+        // form that would stem to it). The choice's «ծառին» -> «ծառ»
+        // stem has nothing to match in the body. Warning fires.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Անտառում քայլում էր փոքրիկ նապաստակը հանգիստ։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք ծառին",
+            ChoiceB = "Լսենք նապաստակին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.Contains("choice_a_noun_not_in_body", w);
     }
 
     [Fact]

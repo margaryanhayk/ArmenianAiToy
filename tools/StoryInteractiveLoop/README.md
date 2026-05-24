@@ -129,8 +129,14 @@ Suffixes it currently understands (length-gated to keep stems ≥ 4 chars):
 | 5      | `ներին`, `ներով`, `ներից` |
 | 4      | `ները`, `ների`, `ոջին` |
 | 3      | `ներ`, `ոջը`, `ում` |
-| 2      | `ին`, `ից`, `ով`, `ոջ` |
+| 2      | `ին`, `ից`, `ով`, `ոջ` (`ին`/`ից`/`ով` may strip to a 3-char root) |
 | 1      | `ի`, `ը` (needs source word ≥ 5 chars) |
+
+The three 2-char endings `ին` / `ից` / `ով` are special-cased to
+allow a 3-char result instead of the default 4-char floor, so common
+short concrete nouns (`ծառին` → `ծառ`, `ուղին` → `ուղ`,
+`քարով` → `քար`, `քարից` → `քար`) normalize for the noun-grounding
+check. All other endings keep the stricter 4-char floor.
 
 Plus a verb-root alternation pass that drops a trailing `ն` / `ց`
 when the stem is ≥ 5 chars (so `մոտեցավ` and `մոտենանք` collapse to
@@ -139,9 +145,11 @@ the same `մոտե`).
 Known stemmer limitations (acceptable for the evaluator, **not** for
 production NLP):
 
-- Short nouns like `ուղի` / `ուղին` cannot strip `ին` (the ≥ 4-char
-  guard refuses it). Choices that name a short noun the body does
-  not mention still surface a real `noun_not_in_body` warning.
+- Very short nouns (3-char roots) still cannot strip 2-char endings
+  when the source word itself is 4 chars or shorter — the floor is
+  3, not 2. So `տնից` stays as-is (would strip to a 2-char `տն`).
+  Real cases where a 4-char-or-shorter form on the body / choice
+  pair fails to normalize are still possible but uncommon.
 - Diminutive `-իկ` (e.g. `թռչուն` vs `թռչունիկ`) is not normalized.
 - No vowel mutation handling beyond the `ն` / `ց` verb-root drop.
 

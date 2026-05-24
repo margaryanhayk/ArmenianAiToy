@@ -512,9 +512,18 @@ public static class Evaluators
     // helper, NOT a full Armenian morphological analyzer. It strips
     // a closed list of common verb / noun endings and handles the
     // «ն»/«ց» verb-root alternation. Behavior is deliberately
-    // conservative: the length guard
+    // conservative: the default length guard
     // `stem.Length - e.Length >= 4` keeps stems ≥ 4 chars, so a
     // bare 4-char noun is never truncated.
+    //
+    // Per-ending exception: the three short 2-char noun-case
+    // endings in <see cref="ShortStemAllowedEndings"/> may strip
+    // down to a 3-char stem instead of 4. This lets common short
+    // Armenian concrete nouns normalize: «ծառին» → «ծառ»,
+    // «ուղին» → «ուղ», «քարով» → «քար», «քարից» → «քար».
+    // Without this exception, body «ծառերի» (stems to «ծառեր»)
+    // and choice «ծառին» (would stay as «ծառին») wouldn't share
+    // any stem, producing a spurious noun_not_in_body warning.
     //
     // Suffix-list contract (do not reorder without re-running tests):
     //   * Endings are tried longest-first. The loop stops on the
@@ -528,18 +537,31 @@ public static class Evaluators
     //   5: ներին / ներով / ներից
     //   4: ները / ների / ոջին
     //   3: ներ / ոջը / ում
-    //   2: ին / ից / ով / ոջ
-    //   1: ի / ը                 (length-gated to words >= 5 chars)
+    //   2: ին / ից / ով / ոջ       (ին / ից / ով may strip to 3-char stem)
+    //   1: ի / ը                   (length-gated to words >= 5 chars)
     //
     // Known limitations (acceptable for the deterministic loop
     // evaluator, NOT for production NLP):
-    //   * Short nouns like «ուղի» / «ուղին» cannot strip «ին»
-    //     because the >=4-char guard refuses it. Choices that name
-    //     a short noun the body does not mention still surface a
-    //     real "noun_not_in_body" warning — this is the correct
-    //     outcome for grounding.
     //   * Diminutive «-իկ» (e.g. թռչուն vs թռչունիկ) is not
     //     normalized. Different surface forms remain distinct stems.
+    //   * Synonyms are not normalized — «տուփ» and «արկղ» both mean
+    //     "box" but produce different stems. That requires embeddings
+    //     or a thesaurus, out of scope for this stemmer.
+
+    // The three short 2-char noun-case endings that are allowed to
+    // strip down to a 3-char stem. Picked deliberately narrow:
+    //   * «ին» — dative singular (ծառին / ուղին / թռչունին)
+    //   * «ից» — ablative singular (քարից / ծառից)
+    //   * «ով» — instrumental singular (քարով / ձեռքով)
+    // «ոջ» is NOT in the set: the kid-noun population of 5-char
+    // «-ոջ» words is essentially empty, and «ընկերոջ» (6) already
+    // strips fine under the default 4-char rule.
+    private static readonly HashSet<string> ShortStemAllowedEndings =
+        new(StringComparer.Ordinal) { "ին", "ից", "ով" };
+
+    private static int MinResultLengthFor(string ending) =>
+        ShortStemAllowedEndings.Contains(ending) ? 3 : 4;
+
     public static string ArmenianStem(string? token)
     {
         if (string.IsNullOrEmpty(token)) return token ?? "";
@@ -572,7 +594,7 @@ public static class Evaluators
             foreach (var e in endings)
             {
                 if (stem.EndsWith(e, StringComparison.Ordinal)
-                    && stem.Length - e.Length >= 4)
+                    && stem.Length - e.Length >= MinResultLengthFor(e))
                 {
                     stem = stem[..^e.Length];
                     stripped = true;
