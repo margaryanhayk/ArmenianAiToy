@@ -1,0 +1,105 @@
+{
+  "runStamp": "20260524-193512",
+  "sessionIndex": 4,
+  "seedId": "S04",
+  "seedPrompt": "Պատմիր հեքիաթ բարի ռոբոտ Արեգի մասին",
+  "startChoiceStrategy": "B",
+  "deviceId": "e9618f21-03e9-45c6-b40d-6654b3f3bab8",
+  "startedAtUtc": "2026-05-24T19:40:51.415276Z",
+  "endedAtUtc": "2026-05-24T19:42:52.8520786Z",
+  "stopReason": "max_turns_reached",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ բարի ռոբոտ Արեգի մասին",
+      "assistantBody": "Մի օր Արեգը՝ բարի փոքրիկ ռոբոտիկը, դիմել էր զբոսանքի սարահարթերով։ Նրա համար ամեն ինչ նոր էր և զարմանք առաջացնող։ Հանկարծ նա տեսավ մի փայլուն քար, որը կարծես ներքին լույսով էր լցված։ Արեգը մոտեցավ և զգաց, թե ինչպես հոգին ուրախացավ այդ լույսից։",
+      "choiceA": "Մոտենանք քարին",
+      "choiceB": "Նայենք լույսին",
+      "conversationId": "6deb387d-f6be-4c4b-9211-cff97f21bcc3",
+      "storySessionIdOut": "6deb387d-f6be-4c4b-9211-cff97f21bcc3",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 243,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 29694,
+      "warnings": [
+        "choice_a_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 1,
+      "userInput": "Նայենք լույսին",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "Նայենք լույսին",
+      "storySessionIdIn": "6deb387d-f6be-4c4b-9211-cff97f21bcc3",
+      "assistantBody": "Արեգը նայեց լույսին, և քարը հանկարծ սկսեց փայլուն գույների շարժում ներկայացնել։ Նա զարմացավ, երբ տեսավ, որ լույսը շարժվում էր՝ կարծես քարի մեջ փոքրիկ ծիածան էր թաքնվել։ Քարի լուսավոր բույրերը տեղափոխեցին նրան խաղաղ և ուրախ աշխարհ։",
+      "choiceA": "Մոտենանք լույսին",
+      "choiceB": "Նայենք քարին",
+      "conversationId": "6deb387d-f6be-4c4b-9211-cff97f21bcc3",
+      "storySessionIdOut": "6deb387d-f6be-4c4b-9211-cff97f21bcc3",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 230,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 29186,
+      "warnings": [
+        "choice_b_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 2,
+      "userInput": "Մոտենանք լույսին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք լույսին",
+      "storySessionIdIn": "6deb387d-f6be-4c4b-9211-cff97f21bcc3",
+      "assistantBody": "Արեգը մոտեցավ լույսին, և հանգիստ շնչելով բույրը, տեսավ, որ քարն սկսեց ցնցել ու երաժշտական ձայն հնչեցնել։ Նոր տոհմիկ երաժշտական գտածոն անհավանական էր, նրա սիրտը լցվում էր երջանկությամբ։ Արեգը կանգնած՝ լսում էր և զարմանքով վայելում բոլորովին նոր երաժշտությունը։",
+      "choiceA": "Փորձենք հավաքել քարը",
+      "choiceB": "Ուշադիր լսենք երաժշտությունը",
+      "conversationId": "6deb387d-f6be-4c4b-9211-cff97f21bcc3",
+      "storySessionIdOut": "6deb387d-f6be-4c4b-9211-cff97f21bcc3",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 259,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 30682,
+      "warnings": [
+        "choice_a_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 3,
+      "userInput": "Ուշադիր լսենք երաժշտությունը",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "Ուշադիր լսենք երաժշտությունը",
+      "storySessionIdIn": "6deb387d-f6be-4c4b-9211-cff97f21bcc3",
+      "assistantBody": "Ուշադիր լսելով երաժշտությունը, Արեգը զգաց, թե ինչպես երաժշտական նոտաները իր շուրջը փոքրիկ փայլուն աստղեր էին դառնում։ Նա զգաց, թե ինչպես նրբիկ ցնցվում էր օդում յուրաքանչյուր նոտայից, կարծես նա էլ երաժշտության մասն էր։ Եվ հենց այն ժամանակ, մեղմիկ ձայնով մեկը ձայնեց նրան ընկերանալ։",
+      "choiceA": "Մոտենանք ձայնին",
+      "choiceB": "Նայենք ընկերանին",
+      "conversationId": "6deb387d-f6be-4c4b-9211-cff97f21bcc3",
+      "storySessionIdOut": "6deb387d-f6be-4c4b-9211-cff97f21bcc3",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 280,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 31845,
+      "warnings": []
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 100,
+    "choiceQualityScore": 55,
+    "continuationCoherenceScore": 100,
+    "overallVerdict": "WARN",
+    "averageScore": 91,
+    "minScore": 55
+  },
+  "gitSha": "90daaea7991a2dd056be40c4b7da6976164ec131",
+  "branch": "main",
+  "dirty": true
+}

@@ -1,0 +1,103 @@
+{
+  "runStamp": "20260524-193512",
+  "sessionIndex": 2,
+  "seedId": "S02",
+  "seedPrompt": "Պատմիր հեքիաթ ծիրանի ծառի տակ ապրող փոքրիկ նապաստակի մասին",
+  "startChoiceStrategy": "B",
+  "deviceId": "bd2b5647-6ea0-49e2-af1a-e858b855daf9",
+  "startedAtUtc": "2026-05-24T19:36:22.3883476Z",
+  "endedAtUtc": "2026-05-24T19:38:36.025183Z",
+  "stopReason": "max_turns_reached",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ ծիրանի ծառի տակ ապրող փոքրիկ նապաստակի մասին",
+      "assistantBody": "Փոքրիկ նապաստակը ամեն առավոտ արթնանում էր ծիրանի ծառի տակ։ Ծառը իր գեղեցիկ վարդագույն ծաղիկներով ծածկում էր նրա փոքրիկ տունը։ Մի անգամ, նապաստակը տեսավ, որ ծառի բնից մի փայլուն բան է ցցվում։ Նա մոտեցավ և ուրախացավ, որովհետև շատ հետաքրքիր էր հասկանալ, թե ինչ կարող է լինել դա։",
+      "choiceA": "Մոտենանք նապաստակին",
+      "choiceB": "Նայենք ծառին",
+      "conversationId": "a7ed1823-feaf-423b-a627-aad5b15e2234",
+      "storySessionIdOut": "a7ed1823-feaf-423b-a627-aad5b15e2234",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 275,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 27149,
+      "warnings": [
+        "choice_b_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 1,
+      "userInput": "Նայենք ծառին",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "Նայենք ծառին",
+      "storySessionIdIn": "a7ed1823-feaf-423b-a627-aad5b15e2234",
+      "assistantBody": "Նայելով ծառին, նապաստակը տեսավ, որ փայլուն կոճակի կողքին մի փոքրիկ թիթեռ է խաղում։ Թիթեռի թևերը զարմանալի գույների էին՝ վարդագույն և կապույտ։ Նապաստակը զարմացավ և մոտեցավ թիթեռին, որ ավելի լավ տեսնի։",
+      "choiceA": "Խոսենք թիթեռի հետ",
+      "choiceB": "Հետևենք թիթեռին",
+      "conversationId": "a7ed1823-feaf-423b-a627-aad5b15e2234",
+      "storySessionIdOut": "a7ed1823-feaf-423b-a627-aad5b15e2234",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 199,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 46592,
+      "warnings": []
+    },
+    {
+      "turnIndex": 2,
+      "userInput": "Խոսենք թիթեռի հետ",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Խոսենք թիթեռի հետ",
+      "storySessionIdIn": "a7ed1823-feaf-423b-a627-aad5b15e2234",
+      "assistantBody": "Նապաստակը մոտեցավ և սկսեց խոսել թիթեռի հետ։ Թիթեռը քաղցր ձայնով ասաց, թե ինչպես է սիրում ծիրանի ծառի ծաղիկներով խաղալ։ Նապաստակը ուրախացավ ու հարցրեց, թե արդյոք թիթեռը գիտի, թե ինչ է անում փայլուն կոճակը։",
+      "choiceA": "Մոտենանք նապաստակին",
+      "choiceB": "Նայենք թիթեռին",
+      "conversationId": "a7ed1823-feaf-423b-a627-aad5b15e2234",
+      "storySessionIdOut": "a7ed1823-feaf-423b-a627-aad5b15e2234",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 204,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 35798,
+      "warnings": [
+        "choice_repeated_from_earlier_turn"
+      ]
+    },
+    {
+      "turnIndex": 3,
+      "userInput": "Նայենք թիթեռին",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "Նայենք թիթեռին",
+      "storySessionIdIn": "a7ed1823-feaf-423b-a627-aad5b15e2234",
+      "assistantBody": "Նայելով թիթեռին, նապաստակը տեսավ, թե ինչպես էր նա իր գեղեցիկ թևերով փայլում արևի ճառագայթներում։ Թիթեռնիկը սկսեց շուրջը պտտել այնպես, կարծես ծաղիկներով պարըներ։ Նապաստակին հետաքրքրեց, եթե թիթեռնիկը գիտի ինչ-որ գաղտնիք, որի մասին նա դեռ չի լսել։",
+      "choiceA": "Խաղանք թիթեռի հետ",
+      "choiceB": "Հարցնենք թիթեռին գաղտնիքը",
+      "conversationId": "a7ed1823-feaf-423b-a627-aad5b15e2234",
+      "storySessionIdOut": "a7ed1823-feaf-423b-a627-aad5b15e2234",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 244,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 24074,
+      "warnings": []
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 100,
+    "choiceQualityScore": 85,
+    "continuationCoherenceScore": 80,
+    "overallVerdict": "PASS",
+    "averageScore": 93,
+    "minScore": 80
+  },
+  "gitSha": "90daaea7991a2dd056be40c4b7da6976164ec131",
+  "branch": "main",
+  "dirty": true
+}

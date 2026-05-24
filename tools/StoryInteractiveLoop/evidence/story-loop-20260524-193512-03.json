@@ -1,0 +1,103 @@
+{
+  "runStamp": "20260524-193512",
+  "sessionIndex": 3,
+  "seedId": "S03",
+  "seedPrompt": "Պատմիր հեքիաթ Արարատի մոտ կորած փոքրիկ աստղի մասին",
+  "startChoiceStrategy": "A",
+  "deviceId": "cb5eb92a-9fd4-4fbb-bea8-251b437c3147",
+  "startedAtUtc": "2026-05-24T19:38:36.0324886Z",
+  "endedAtUtc": "2026-05-24T19:40:51.4120848Z",
+  "stopReason": "max_turns_reached",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ Արարատի մոտ կորած փոքրիկ աստղի մասին",
+      "assistantBody": "Մի գիշեր, Արարատի լանջերին, մի փոքրիկ աստղ ընկավ երկնքից։ Այն փայլում էր դեղին գույնով ու կարծես փնտրում էր իր ճանապարհը վեր։ Փոքրիկ բվիկը, ով թռավ մոտ, տեսավ աստղը և ջերմորեն հարցրեց. \"Ինչու՞ ես այստեղ։\" Աստղը վախեցավ, բայց հետո ուրախացավ, որ ընկեր գտավ։",
+      "choiceA": "Փնտրենք աստղը երկնքում",
+      "choiceB": "Հարցնենք Արարատին ուղին",
+      "conversationId": "1685f7eb-7eee-42ed-838a-d0a88a873af1",
+      "storySessionIdOut": "1685f7eb-7eee-42ed-838a-d0a88a873af1",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 255,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 28703,
+      "warnings": []
+    },
+    {
+      "turnIndex": 1,
+      "userInput": "Փնտրենք աստղը երկնքում",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Փնտրենք աստղը երկնքում",
+      "storySessionIdIn": "1685f7eb-7eee-42ed-838a-d0a88a873af1",
+      "assistantBody": "Փոքրիկ բվիկը և աստղը միասին սկսեցին փնտրել աստղը երկնքում։ Լույսերը փայլուն էին և կարծես ժպտում էին նրանց։ Նրանց սրտերն առավոտյան արեւի նման տաքացան, երբ տեսան հանկարծակի շողացող աստղը մեծ լույսերի մեջ։",
+      "choiceA": "Մոտենանք լույսին",
+      "choiceB": "Նայենք նրանցին",
+      "conversationId": "1685f7eb-7eee-42ed-838a-d0a88a873af1",
+      "storySessionIdOut": "1685f7eb-7eee-42ed-838a-d0a88a873af1",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 202,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 30221,
+      "warnings": [
+        "choice_a_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 2,
+      "userInput": "Նայենք նրանցին",
+      "selectedChoice": "B",
+      "selectedChoiceLabel": "Նայենք նրանցին",
+      "storySessionIdIn": "1685f7eb-7eee-42ed-838a-d0a88a873af1",
+      "assistantBody": "Փոքրիկ բվիկը և աստղը սկսեցին նայել նրանցին, և տեսավին ժպտացող այլ փոքր աստղեր, որոնք կարծես բերանացնում էին երգ։ Բվիկը զարմացած լսեց նրանց երգը, որն աստիճանաբար լցրեց գիշերային օդը։ Փոքրիկ աստղը ուրախացավ, երբ ողջույնի նշան բերեց նրանց։",
+      "choiceA": "Մոտենանք լսենքին",
+      "choiceB": "Նայենք երգողին",
+      "conversationId": "1685f7eb-7eee-42ed-838a-d0a88a873af1",
+      "storySessionIdOut": "1685f7eb-7eee-42ed-838a-d0a88a873af1",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 236,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 30435,
+      "warnings": [
+        "choice_b_noun_not_in_body"
+      ]
+    },
+    {
+      "turnIndex": 3,
+      "userInput": "Մոտենանք լսենքին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք լսենքին",
+      "storySessionIdIn": "1685f7eb-7eee-42ed-838a-d0a88a873af1",
+      "assistantBody": "Փոքրիկ բվիկը մոտեցավ և սկսեց լսել նրանց մեղեդին, որն ավելի ու ավելի էր ուրախացնում իր հոգին։ Մեղեդու ամենատարբեր ձայները պատմում էին գիշերային երկնքի գաղտնիքները։ Բվիկը որոշեց սերտել այս կախարդական տեղի պատմությունը։",
+      "choiceA": "Մոտենանք բվիկին",
+      "choiceB": "Նայենք սերտին",
+      "conversationId": "1685f7eb-7eee-42ed-838a-d0a88a873af1",
+      "storySessionIdOut": "1685f7eb-7eee-42ed-838a-d0a88a873af1",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 216,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 45996,
+      "warnings": []
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 100,
+    "choiceQualityScore": 70,
+    "continuationCoherenceScore": 100,
+    "overallVerdict": "WARN",
+    "averageScore": 94,
+    "minScore": 70
+  },
+  "gitSha": "90daaea7991a2dd056be40c4b7da6976164ec131",
+  "branch": "main",
+  "dirty": true
+}
