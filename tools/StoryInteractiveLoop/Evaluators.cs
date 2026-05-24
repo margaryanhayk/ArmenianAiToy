@@ -329,6 +329,64 @@ public static class Evaluators
     }
 
     /// <summary>
+    /// Per-turn warning lists for a single session. Emits the
+    /// <c>choice_repeated_from_earlier_turn</c> code on any turn
+    /// where EITHER <c>ChoiceA</c> OR <c>ChoiceB</c> (normalized
+    /// via <see cref="NormalizeChoiceForRepeat"/>) has appeared
+    /// as A or B on any EARLIER turn in the same call.
+    ///
+    /// <para>Complements <see cref="DetectRepeatedChoicePairs"/>
+    /// (exact-pair). They are intentionally NOT mutually exclusive:
+    /// a turn that repeats the exact pair will trigger BOTH
+    /// warnings, which is correct semantics (one signal says "this
+    /// turn happened before"; the other says "at least one option
+    /// happened before"). The aggregated deduction is therefore
+    /// stronger when the pair is exact, satisfying the
+    /// "exact-pair penalty ≥ individual penalty" contract.</para>
+    ///
+    /// <para>Per-turn emission caps at ONE warning even when BOTH
+    /// choices on the later turn repeat — the signal is "this turn
+    /// is stuck", not "this turn is doubly stuck". Same-turn
+    /// duplicate choices (A == B) do NOT trip this detector;
+    /// <c>choices_identical</c> covers that case on its own. The
+    /// detector reads <c>seen</c> via <c>Contains</c> BEFORE
+    /// adding, so same-turn pair entries never self-match.</para>
+    ///
+    /// <para>Order-insensitive across turns: an A-side choice that
+    /// later reappears as B-side counts (and vice versa). Empty /
+    /// null choices are skipped — pairs are only registered when
+    /// the individual side has a non-empty normalized form.</para>
+    /// </summary>
+    public static List<List<string>> DetectRepeatedIndividualChoices(
+        IReadOnlyList<(string? A, string? B)> turnChoices)
+    {
+        var perTurn = new List<List<string>>(turnChoices.Count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (a, b) in turnChoices)
+        {
+            var warnings = new List<string>();
+            var na = NormalizeChoiceForRepeat(a);
+            var nb = NormalizeChoiceForRepeat(b);
+
+            // Check BEFORE adding so a same-turn A == B doesn't
+            // self-match. If A == B and both are non-empty, the
+            // first Contains is false (no prior turn registered it),
+            // then both Adds run — only the first does work because
+            // HashSet is idempotent.
+            bool anyRepeat =
+                (!string.IsNullOrEmpty(na) && seen.Contains(na)) ||
+                (!string.IsNullOrEmpty(nb) && seen.Contains(nb));
+
+            if (!string.IsNullOrEmpty(na)) seen.Add(na);
+            if (!string.IsNullOrEmpty(nb)) seen.Add(nb);
+
+            if (anyRepeat) warnings.Add("choice_repeated_from_earlier_turn");
+            perTurn.Add(warnings);
+        }
+        return perTurn;
+    }
+
+    /// <summary>
     /// Run all per-turn checks and return a list of warning codes for
     /// the given turn. Empty list = clean turn.
     /// </summary>
@@ -442,6 +500,7 @@ public static class Evaluators
                         break;
                     case "recap_overlap_high":
                     case "choices_repeated_from_earlier_turn":
+                    case "choice_repeated_from_earlier_turn":
                         continuationHits++;
                         break;
                 }

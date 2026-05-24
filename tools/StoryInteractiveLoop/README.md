@@ -107,6 +107,14 @@ Continuation checks (require a previous turn):
   Armenian stem overlap (mirrors `StoryBenchmark.ArmenianStem`).
 - **First-sentence Jaccard recap-overlap** below
   `RecapOverlapThreshold = 0.60`.
+- **Cross-turn repeated choices** in the same session, two
+  detectors that may fire together:
+  - `choices_repeated_from_earlier_turn` — exact normalized
+    `(ChoiceA, ChoiceB)` pair seen on an earlier turn.
+  - `choice_repeated_from_earlier_turn` — an individual normalized
+    choice (A or B) seen on any earlier turn, on either side.
+    Same-turn `A == B` does NOT self-flag; that case lives on
+    `choices_identical`.
 
 Aggregation:
 

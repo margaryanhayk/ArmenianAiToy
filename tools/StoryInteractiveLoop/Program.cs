@@ -322,6 +322,16 @@ internal static class Program
         for (int i = 0; i < record.Turns.Count; i++)
             record.Turns[i].Warnings.AddRange(repeated[i]);
 
+        // Complementary detector: catches individual-choice reuse
+        // across turns even when the exact (A, B) pair never
+        // repeats. Both detectors may legitimately fire on the
+        // same turn — the per-turn warning lists carry whatever
+        // they emit; the verdict scorer treats both codes as
+        // ContinuationCoherence hits.
+        var repeatedIndividual = Evaluators.DetectRepeatedIndividualChoices(pairs);
+        for (int i = 0; i < record.Turns.Count; i++)
+            record.Turns[i].Warnings.AddRange(repeatedIndividual[i]);
+
         record.Verdict = Evaluators.EvaluateSession(
             record.Turns.Select(t => (IReadOnlyList<string>)t.Warnings).ToList());
 

@@ -609,6 +609,172 @@ public class EvaluatorsTests
         Assert.All(warnings, Assert.Empty);
     }
 
+    // ===== Cross-turn individual-choice repetition =====
+    //
+    // Complementary to the exact-pair detector. Catches the S01
+    // «approach leaf / look at leaf» ping-pong pattern observed in
+    // the 20260524-181621 evidence, where the EXACT (A,B) pair
+    // never repeated but the same individual choice text reappeared
+    // on a later turn (sometimes on the OTHER side).
+
+    [Fact]
+    public void RepeatedIndividualChoice_SameChoiceAOnLaterTurn_ShouldWarn()
+    {
+        var pairs = new List<(string? A, string? B)>
+        {
+            ("Մոտենանք տերևին", "Նայենք ծառին"),      // turn 0 — first
+            ("Հետևենք քամուն", "Լսենք երգին"),         // turn 1 — distinct
+            ("Մոտենանք տերևին", "Լսենք քամուն"),       // turn 2 — A repeats
+        };
+        var warnings = Evaluators.DetectRepeatedIndividualChoices(pairs);
+
+        Assert.Equal(3, warnings.Count);
+        Assert.Empty(warnings[0]);
+        Assert.Empty(warnings[1]);
+        Assert.Contains("choice_repeated_from_earlier_turn", warnings[2]);
+    }
+
+    [Fact]
+    public void RepeatedIndividualChoice_ReappearsAsChoiceB_ShouldWarn()
+    {
+        // An A-side choice that reappears as a later turn's B-side
+        // also counts. Order-insensitive across turns.
+        var pairs = new List<(string? A, string? B)>
+        {
+            ("Նայենք տերևին", "Մոտենանք ծառին"),        // turn 0
+            ("Մոտենանք քամուն", "Լսենք երգին"),         // turn 1
+            ("Գնանք պարտեզ", "Լսենք ձայնը"),            // turn 2
+            ("Լսենք ձայնը", "Նայենք տերևին"),           // turn 3 — A==prev,B==first
+        };
+        var warnings = Evaluators.DetectRepeatedIndividualChoices(pairs);
+
+        // Turn 2 itself was clean (Գնանք պարտեզ + Լսենք ձայնը — new).
+        // Turn 3's A («Լսենք ձայնը») repeats turn 2's B; turn 3's B
+        // («Նայենք տերևին») repeats turn 0's A. Either one trips
+        // the warning; the cap is one per turn.
+        Assert.Empty(warnings[0]);
+        Assert.Empty(warnings[1]);
+        Assert.Empty(warnings[2]);
+        Assert.Contains("choice_repeated_from_earlier_turn", warnings[3]);
+        Assert.Single(warnings[3]); // one cap even though both sides match
+    }
+
+    [Fact]
+    public void RepeatedIndividualChoice_NormalizationIgnoresWhitespaceCaseAndTrailingPunct()
+    {
+        var pairs = new List<(string? A, string? B)>
+        {
+            ("Մոտենանք տերևին", "Նայենք ծառին"),
+            // Same A semantically — extra spaces, lowercase, trailing
+            // verjaket. Must still match.
+            ("մոտենանք  տերևին։", "Լսենք քամուն"),
+        };
+        var warnings = Evaluators.DetectRepeatedIndividualChoices(pairs);
+        Assert.Contains("choice_repeated_from_earlier_turn", warnings[1]);
+    }
+
+    [Fact]
+    public void RepeatedIndividualChoice_DifferentObject_ShouldNotWarn()
+    {
+        // Same verb, different object across turns — no surface-string
+        // match, so the detector must NOT warn. Confirms that the
+        // detector is exact-normalized-string matching ONLY: it does
+        // not collapse "approach X" with "approach Y" as related.
+        var pairs = new List<(string? A, string? B)>
+        {
+            ("Մոտենանք տերևին", "Նայենք ծառին"),
+            ("Մոտենանք ծիածանին", "Լսենք քամուն"), // same verb, new object
+        };
+        var warnings = Evaluators.DetectRepeatedIndividualChoices(pairs);
+        Assert.All(warnings, Assert.Empty);
+    }
+
+    [Fact]
+    public void RepeatedIndividualChoice_DifferentVerbSameObject_DoesNotWarn()
+    {
+        // Same object («տերև») but distinct verb forms — surface
+        // strings differ, no warning. Pinned per the slice's spec:
+        // "Same object but meaningfully different action: do NOT
+        // implement semantic similarity yet."
+        var pairs = new List<(string? A, string? B)>
+        {
+            ("Մոտենանք տերևին", "Նայենք ծառին"),
+            ("Վերցնենք տերևը", "Լսենք քամուն"),
+        };
+        var warnings = Evaluators.DetectRepeatedIndividualChoices(pairs);
+        Assert.All(warnings, Assert.Empty);
+    }
+
+    [Fact]
+    public void RepeatedIndividualChoice_DifferentSession_ShouldNotMatter()
+    {
+        // Each call holds its own `seen` set. The same choice in two
+        // separate calls never trips the warning.
+        var session1 = new List<(string? A, string? B)>
+        {
+            ("Մոտենանք տերևին", "Նայենք ծառին"),
+        };
+        var session2 = new List<(string? A, string? B)>
+        {
+            ("Մոտենանք տերևին", "Նայենք ծառին"),
+        };
+        var w1 = Evaluators.DetectRepeatedIndividualChoices(session1);
+        var w2 = Evaluators.DetectRepeatedIndividualChoices(session2);
+        Assert.Empty(w1[0]);
+        Assert.Empty(w2[0]);
+    }
+
+    [Fact]
+    public void RepeatedIndividualChoice_NullOrEmptyChoices_DoNotCount()
+    {
+        // Empty/null sides are skipped from registration and matching.
+        // A later turn that records null/null after a real turn must
+        // not warn.
+        var pairs = new List<(string? A, string? B)>
+        {
+            ("Մոտենանք տերևին", "Նայենք ծառին"),
+            (null, null),
+            ("", ""),
+        };
+        var warnings = Evaluators.DetectRepeatedIndividualChoices(pairs);
+        Assert.All(warnings, Assert.Empty);
+    }
+
+    [Fact]
+    public void RepeatedIndividualChoice_SameTurnIdenticalChoices_DoesNotSelfMatch()
+    {
+        // The exact-pair check sees A == B (covered by
+        // `choices_identical`); the individual-repeat detector must
+        // NOT spuriously self-flag on the SAME turn just because A
+        // equals B. Subtle bug guard: the detector reads `seen` via
+        // Contains BEFORE adding.
+        var pairs = new List<(string? A, string? B)>
+        {
+            ("Մոտենանք տերևին", "Մոտենանք տերևին"),
+        };
+        var warnings = Evaluators.DetectRepeatedIndividualChoices(pairs);
+        Assert.Empty(warnings[0]);
+    }
+
+    [Fact]
+    public void RepeatedIndividualChoice_FiresAlongsideExactPair_WhenPairAlsoRepeats()
+    {
+        // When the exact (A, B) pair repeats, BOTH detectors should
+        // fire — they are complementary signals. Pin that they
+        // coexist without de-duplication: pair = "this turn happened
+        // before", individual = "at least one option happened before".
+        var pairs = new List<(string? A, string? B)>
+        {
+            ("Մոտենանք տերևին", "Նայենք ծառին"),
+            ("Մոտենանք տերևին", "Նայենք ծառին"),
+        };
+        var pairWarnings = Evaluators.DetectRepeatedChoicePairs(pairs);
+        var indWarnings = Evaluators.DetectRepeatedIndividualChoices(pairs);
+
+        Assert.Contains("choices_repeated_from_earlier_turn", pairWarnings[1]);
+        Assert.Contains("choice_repeated_from_earlier_turn", indWarnings[1]);
+    }
+
     // ===== Verdict integration: new warnings reach the right axis =====
 
     [Fact]
@@ -729,5 +895,51 @@ public class EvaluatorsTests
         });
         Assert.Equal(60, vTwo.ContinuationCoherenceScore);
         Assert.Equal("WARN", vTwo.OverallVerdict);
+    }
+
+    [Fact]
+    public void EvaluateSession_RepeatedIndividualChoice_DocksContinuationCoherenceToWarn()
+    {
+        // Same -20-per-hit deduction as the exact-pair warning, so a
+        // single isolated individual repeat keeps the session at PASS
+        // (80 is not < 80) while a second repeat drives it to WARN.
+        // This is the per-turn cap (one warning per affected turn)
+        // working as designed — three turns with repeated individual
+        // choices = three warnings = 60.
+        var vOne = Evaluators.EvaluateSession(new List<IReadOnlyList<string>>
+        {
+            Array.Empty<string>(),
+            new[] { "choice_repeated_from_earlier_turn" },
+        });
+        Assert.Equal(80, vOne.ContinuationCoherenceScore);
+        Assert.Equal("PASS", vOne.OverallVerdict);
+
+        var vTwo = Evaluators.EvaluateSession(new List<IReadOnlyList<string>>
+        {
+            Array.Empty<string>(),
+            new[] { "choice_repeated_from_earlier_turn" },
+            new[] { "choice_repeated_from_earlier_turn" },
+        });
+        Assert.Equal(60, vTwo.ContinuationCoherenceScore);
+        Assert.Equal("WARN", vTwo.OverallVerdict);
+    }
+
+    [Fact]
+    public void EvaluateSession_BothPairAndIndividualWarningsOnSameTurn_StackToFortyDeduction()
+    {
+        // When the exact (A, B) pair repeats, BOTH the pair warning
+        // and the individual warning fire on the same turn. They
+        // stack (-20 + -20 = -40). This is the design contract:
+        // exact-pair penalty (40) ≥ individual-only penalty (20).
+        var v = Evaluators.EvaluateSession(new List<IReadOnlyList<string>>
+        {
+            Array.Empty<string>(),
+            new[] {
+                "choices_repeated_from_earlier_turn",
+                "choice_repeated_from_earlier_turn",
+            },
+        });
+        Assert.Equal(60, v.ContinuationCoherenceScore);
+        Assert.Equal("WARN", v.OverallVerdict);
     }
 }
