@@ -634,6 +634,64 @@ public class EvaluatorsTests
         Assert.Contains("choice_a_noun_not_in_body", w);
     }
 
+    // ===== «-ու» instrumental case (closes S05 Turn 2 case) =====
+    //
+    // The 20260524-200655 live evidence flagged S05 Turn 2 because
+    // body «քամին» stemmed to «քամ» (via the choice-side relaxed
+    // «-ին» rule) but choice «քամու» had NO matching ending in
+    // the stemmer's list and stayed as «քամու» — asymmetric stems
+    // for the same noun. Adding «ու» to ShortStemAllowedEndings
+    // (with the 3-char-result floor — «քամու» is 5 codepoints
+    // because «ու» is the digraph «ո»+«ւ») closes that gap.
+
+    [Fact]
+    public void ArmenianStem_StripsUFromWindCase()
+    {
+        Assert.Equal("քամ", Evaluators.ArmenianStem("քամու"));
+    }
+
+    [Fact]
+    public void ChoiceNounPresentWithUCase_ShouldNotWarn()
+    {
+        // S05 Turn 2 class: body uses dative «քամին» which stems
+        // to «քամ»; choice uses instrumental «քամու» which NOW
+        // also stems to «քամ». Stems match → no warning.
+        // («Լսենք» is in the ignore-prefix list as exact «լսենք»,
+        // so it does NOT contribute a noun stem. «ձայնը» stems
+        // to «ձայն» — body also mentions «ձայն», so it overlaps
+        // independently. The defining check here is the «քամու»
+        // contribution, which the new rule normalizes.)
+        var input = new TurnEvaluationInput
+        {
+            Body = "Փոքրիկ աղվեսը նստած էր ծառի տակ և լսում էր քամին, "
+                   + "որի ձայնը նրա սիրտը խաղաղեցնում էր։ "
+                   + new string('ա', 150),
+            ChoiceA = "Լսենք քամու ձայնը",
+            ChoiceB = "Մոտենանք ծառին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.DoesNotContain("choice_a_noun_not_in_body", w);
+    }
+
+    [Fact]
+    public void ChoiceNounStillWarns_WhenUCaseNounAbsent()
+    {
+        // Negative-space pin: the new rule must not silence a
+        // real grounding gap. The body genuinely never mentions
+        // «քամ» in any form.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Փոքրիկ ոզնին քայլում էր անտառում միայնակ ու հանգիստ։ "
+                   + new string('ա', 150),
+            ChoiceA = "Լսենք քամու ձայնը",
+            ChoiceB = "Մոտենանք ոզնիին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.Contains("choice_a_noun_not_in_body", w);
+    }
+
     [Fact]
     public void FirstSentenceRecapOverlap_StillExcludesShortTokens()
     {

@@ -137,17 +137,18 @@ Suffixes it currently understands (length-gated to keep stems ≥ 4 chars):
 | 5      | `ներին`, `ներով`, `ներից` |
 | 4      | `ները`, `ների`, `ոջին` |
 | 3      | `ներ`, `ոջը`, `ում` |
-| 2      | `ին`, `ից`, `ով`, `ոջ` (`ին`/`ից`/`ով` may strip to a 3-char root) |
+| 2      | `ին`, `ից`, `ով`, `ու`, `ոջ` (`ին`/`ից`/`ով`/`ու` may strip to a 3-char root) |
 | 1      | `ի`, `ը` (may strip to a 3-char root) |
 
-Five short noun endings — `ին` / `ից` / `ով` / `ի` / `ը` — are
-special-cased to allow a 3-char result instead of the default
-4-char floor. The choice-side 2-char endings let
-`ծառին` → `ծառ`, `ուղին` → `ուղ`, `քարով` → `քար`. The
-body-side 1-char endings let `ծառի` → `ծառ`, `ծառը` → `ծառ`,
-`քարի` → `քար`, `քարը` → `քար` — so the same noun normalizes
-to the same stem regardless of which side it appears on. All
-other endings keep the stricter 4-char floor.
+Six short noun endings — `ին` / `ից` / `ով` / `ու` / `ի` /
+`ը` — are special-cased to allow a 3-char result instead of
+the default 4-char floor. The choice-side 2-char endings let
+`ծառին` → `ծառ`, `ուղին` → `ուղ`, `քարով` → `քար`,
+`քամու` → `քամ`. The body-side 1-char endings let
+`ծառի` → `ծառ`, `ծառը` → `ծառ`, `քարի` → `քար`, `քարը` →
+`քար` — so the same noun normalizes to the same stem
+regardless of which side it appears on. All other endings
+keep the stricter 4-char floor.
 
 The body-side noun-grounding extraction (inside
 `ChoiceNounsAppearInBody`) uses `minLen: 3` so a bare 3-char

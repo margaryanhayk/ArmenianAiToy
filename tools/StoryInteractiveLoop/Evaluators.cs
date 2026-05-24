@@ -626,7 +626,7 @@ public static class Evaluators
     //   5: ներին / ներով / ներից
     //   4: ները / ների / ոջին
     //   3: ներ / ոջը / ում
-    //   2: ին / ից / ով / ոջ       (ին / ից / ով may strip to 3-char stem)
+    //   2: ին / ից / ով / ու / ոջ  (ին / ից / ով / ու may strip to 3-char stem)
     //   1: ի / ը                   (may strip to 3-char stem)
     //
     // Known limitations (acceptable for the deterministic loop
@@ -637,11 +637,17 @@ public static class Evaluators
     //     "box" but produce different stems. That requires embeddings
     //     or a thesaurus, out of scope for this stemmer.
 
-    // The five short noun-case / article endings that are allowed
+    // The six short noun-case / article endings that are allowed
     // to strip down to a 3-char stem. Picked deliberately narrow:
     //   * «ին» — dative singular (ծառին / ուղին / թռչունին)
     //   * «ից» — ablative singular (քարից / ծառից)
     //   * «ով» — instrumental singular (քարով / ձեռքով)
+    //   * «ու» — alternate instrumental form for short -ի nouns
+    //            (քամի → քամու, ձեռք → ձեռքու).  «քամու» is 5
+    //            codepoints (ք+ա+մ+ո+ւ — note «ու» is a digraph
+    //            of «ո»+«ւ»), strip 2 → 3, needs the 3-char
+    //            floor to match body «քամին» / «քամի» which both
+    //            stem to «քամ».
     //   * «ի»  — genitive singular (ծառի / քարի)         [body-side]
     //   * «ը»  — definite article (ծառը / քարը / արջը)   [body-side]
     // «ոջ» is NOT in the set: the kid-noun population of 5-char
@@ -651,7 +657,7 @@ public static class Evaluators
     // (`if (lower.Length < 4) return lower;`), so a 3-char noun
     // like «ոզն» itself never enters the strip loop.
     private static readonly HashSet<string> ShortStemAllowedEndings =
-        new(StringComparer.Ordinal) { "ին", "ից", "ով", "ի", "ը" };
+        new(StringComparer.Ordinal) { "ին", "ից", "ով", "ու", "ի", "ը" };
 
     private static int MinResultLengthFor(string ending) =>
         ShortStemAllowedEndings.Contains(ending) ? 3 : 4;
@@ -676,7 +682,7 @@ public static class Evaluators
             // Length 3
             "ներ", "ոջը", "ում",
             // Length 2
-            "ին", "ից", "ով", "ոջ",
+            "ին", "ից", "ով", "ու", "ոջ",
             // Length 1 (must come last — they are suffixes of nearly everything above)
             "ի", "ը"
         };
