@@ -149,6 +149,15 @@ body-side 1-char endings let `ծառի` → `ծառ`, `ծառը` → `ծառ`,
 to the same stem regardless of which side it appears on. All
 other endings keep the stricter 4-char floor.
 
+The body-side noun-grounding extraction (inside
+`ChoiceNounsAppearInBody`) uses `minLen: 3` so a bare 3-char
+body noun like «քար», «երգ», «բու» can match a choice's
+short-stem form («քարին» → «քար», etc.). Choice-side token
+extraction stays at `minLen: 4` to skip short stop-words like
+«մի», «նոր», «այս». `FirstSentenceRecapOverlap` and the
+cross-turn `ChoiceGroundedInBody` keep their own `minLen: 4`
+floors — they tolerate noise differently.
+
 Plus a verb-root alternation pass that drops a trailing `ն` / `ց`
 when the stem is ≥ 5 chars (so `մոտեցավ` and `մոտենանք` collapse to
 the same `մոտե`).

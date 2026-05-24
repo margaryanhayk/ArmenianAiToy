@@ -269,13 +269,33 @@ public static class Evaluators
     /// True when at least one of a choice's noun stems appears in the
     /// body. A choice with no noun-stem candidates is considered grounded
     /// (conservative: we don't flag what we can't reliably classify).
+    ///
+    /// <para>BODY-SIDE asymmetry: body stems are extracted at
+    /// <c>minLen: 3</c> while choice noun stems still come from
+    /// <c>minLen: 4</c> token extraction. The short-noun stemmer fixes
+    /// (commits f89fdc5, 28a16ed) let the choice side reduce
+    /// inflected 5+-char forms like «քարին» / «ծառին» / «բուին» to
+    /// 3-char stems «քար» / «ծառ» / «բու», but the body extraction
+    /// would previously skip those same bare 3-char nouns at the
+    /// minLen filter — producing a false-positive
+    /// <c>choice_X_noun_not_in_body</c> warning whenever the body
+    /// happened to use the nominative bare form. Lowering ONLY the
+    /// body-side extraction to 3 closes that asymmetry without
+    /// touching choice-side noise control (which keeps minLen=4 to
+    /// skip short stop-words like «մի», «նոր», «այս» that appear
+    /// inside choice phrases).</para>
+    ///
+    /// <para>Recap-overlap (<see cref="FirstSentenceRecapOverlap"/>)
+    /// and the cross-turn verb-stem grounding
+    /// (<see cref="ChoiceGroundedInBody"/>) keep their minLen=4
+    /// floors — they tolerate noise differently.</para>
     /// </summary>
     public static bool ChoiceNounsAppearInBody(string? choice, string? body)
     {
         var nounStems = ChoiceNounStems(choice);
         if (nounStems.Count == 0) return true;
         if (string.IsNullOrWhiteSpace(body)) return false;
-        var bodyStems = ExtractArmenianStems(body, minLen: 4);
+        var bodyStems = ExtractArmenianStems(body, minLen: 3);
         return nounStems.Overlaps(bodyStems);
     }
 

@@ -553,6 +553,114 @@ public class EvaluatorsTests
         Assert.Contains("choice_a_noun_not_in_body", w);
     }
 
+    // ===== Bare 3-char body nouns matching short-stem choice =====
+    //
+    // After the short-noun stemmer fixes (commits f89fdc5, 28a16ed)
+    // choice nouns like «քարին» / «երգին» / «բուին» reduce to 3-char
+    // stems («քար» / «երգ» / «բու»). But the body extraction was
+    // still calling ExtractArmenianStems(body, minLen: 4), so a body
+    // that mentioned the bare 3-char form was invisible to the
+    // grounding check. The slice that produced this test family
+    // lowered ChoiceNounsAppearInBody's body-side extraction to
+    // minLen=3 ONLY for that helper, so bare 3-char body nouns now
+    // match.
+
+    [Fact]
+    public void ChoiceNounPresentWithBareThreeCharBodyNoun_ShouldNotWarn_Stone()
+    {
+        // S05-Turn-1 class from the 20260524-200655 evidence.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Աղվեսը տեսավ մի փայլուն քար գետի մոտ։ Քամին փչում էր մեղմորեն։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք քարին",
+            ChoiceB = "Լսենք քամուն",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.DoesNotContain("choice_a_noun_not_in_body", w);
+    }
+
+    [Fact]
+    public void ChoiceNounPresentWithBareThreeCharBodyNoun_ShouldNotWarn_Song()
+    {
+        // S05-Turn-3 class from the 20260524-200655 evidence.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Քարը ձայն էր հանում՝ մի հին մոռացված երգ։ Աղվեսը կանգ առավ զարմացած։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք երգին",
+            ChoiceB = "Հարցնենք աղվեսին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.DoesNotContain("choice_a_noun_not_in_body", w);
+    }
+
+    [Fact]
+    public void ChoiceNounPresentWithBareThreeCharBodyNoun_ShouldNotWarn_Owl()
+    {
+        // «բու» is 3 Armenian chars (բ + ո + ւ; the «ու» digraph is
+        // two code points). After the slice's body-side fix, bare
+        // «բու» in the body is now extracted as a stem and matches
+        // choice «բուին» (5 chars, strips «ին» → «բու»).
+        var input = new TurnEvaluationInput
+        {
+            Body = "Անտառում ապրում էր մի իմաստուն բու, որը գիտեր բոլոր գիշերային գաղտնիքները։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք բուին",
+            ChoiceB = "Հարցնենք գաղտնիքների մասին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.DoesNotContain("choice_a_noun_not_in_body", w);
+    }
+
+    [Fact]
+    public void ChoiceNounStillWarns_WhenBareThreeCharNounAbsent()
+    {
+        // Negative-space pin: lowering the floor must NOT silence
+        // legitimate noun-grounding gaps. The body genuinely never
+        // mentions «քար» in any form.
+        var input = new TurnEvaluationInput
+        {
+            Body = "Աղվեսը քայլում էր անտառում միայնակ ու երազում էր նոր ընկերների մասին։ "
+                   + new string('ա', 150),
+            ChoiceA = "Մոտենանք քարին",
+            ChoiceB = "Հարցնենք աղվեսին",
+            HasChoices = true
+        };
+        var w = Evaluators.EvaluateTurn(input);
+        Assert.Contains("choice_a_noun_not_in_body", w);
+    }
+
+    [Fact]
+    public void FirstSentenceRecapOverlap_StillExcludesShortTokens()
+    {
+        // Guard: this slice's minLen=3 change is BODY-side noun
+        // grounding ONLY. FirstSentenceRecapOverlap MUST keep its
+        // own internal minLen=4 — short tokens like «մեկ» / «քար» /
+        // «կար» / «տակ» (all 3 chars) must NOT be counted as
+        // recap-overlap signal, even though they're now visible to
+        // the noun-grounding extractor.
+        //
+        // Fixture: two first-sentences that share several 3-char
+        // tokens and only ONE ≥4-char token («սարը» = "the
+        // mountain"). With minLen=4 the union is 3 (սարը + dashti
+        // + dashtum), the intersection is 1 (սարը), Jaccard ≈ 0.33
+        // — well under the 0.60 threshold. If the recap helper
+        // dropped to 3, the shared 3-char tokens would push overlap
+        // way over the threshold.
+        var prev = "Մեկ քար կար տակ դաշտում սարը ուներ։";
+        var next = "Մեկ քար կար տակ դաշտի սարը գտնվում էր։";
+
+        var overlap = Evaluators.FirstSentenceRecapOverlap(prev, next);
+
+        Assert.True(overlap < Evaluators.RecapOverlapThreshold,
+            $"recap overlap must stay below threshold (was {overlap:F2}) — " +
+            "the body-side noun-grounding fix must not lower the recap floor");
+    }
+
     [Fact]
     public void ArmenianStem_VerbRootAlternation_DropsTrailingN()
     {
