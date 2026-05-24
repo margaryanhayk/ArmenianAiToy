@@ -1,0 +1,61 @@
+{
+  "runStamp": "20260524-120951",
+  "sessionIndex": 1,
+  "seedId": "S01",
+  "seedPrompt": "Պատմիր հեքիաթ փոքրիկ ոզնիի մասին",
+  "startChoiceStrategy": "A",
+  "deviceId": "3f522da1-1b2f-423b-bcb6-0a074a58f65e",
+  "startedAtUtc": "2026-05-24T12:09:51.7156826Z",
+  "endedAtUtc": "2026-05-24T12:10:10.1876489Z",
+  "stopReason": "max_turns_reached",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userInput": "Պատմիր հեքիաթ փոքրիկ ոզնիի մասին",
+      "assistantBody": "Փոքրիկ ոզնին՝ Զարիկը, սիրով ապրում էր մի փոքրիկ անտառում։ Նա շատ էր սիրում հանգիստ առավոտները, երբ արեւը փայլում էր ծառերի միջից։ Մի օր, Զարիկը գտավ մի մեծ կաղնու ճյուղի տակ վարդագույն ծաղկիկ։ Նա զարմացավ, թե ինչի՞ց է այդ ծաղիկը այդքան փայլուն։ Որոշեց մոտենալ և ավելի լավ նայել։",
+      "choiceA": "Մոտենանք տերևին",
+      "choiceB": "Նայենք ծաղիկին",
+      "conversationId": "1b4977ae-7e66-47cf-9e44-a19717d389d5",
+      "storySessionIdOut": "1b4977ae-7e66-47cf-9e44-a19717d389d5",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 278,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 10549,
+      "warnings": []
+    },
+    {
+      "turnIndex": 1,
+      "userInput": "Մոտենանք տերևին",
+      "selectedChoice": "A",
+      "selectedChoiceLabel": "Մոտենանք տերևին",
+      "storySessionIdIn": "1b4977ae-7e66-47cf-9e44-a19717d389d5",
+      "assistantBody": "Զարիկը մոտեցավ տերևին և տեսավ, որ դրա տակ մի փոքրիկ թիթեռ պառկած է քնած։ Թիթեռի թևերի վրա փոքրիկ փայլուն կետեր կային, որոնք արևի լույսի տակ փայլում էին։ Զարիկը ուրախացավ այս հայտնագործելու համար և փորձեց նիհար հպել թիթեռի թևերին։ Հանկարծ թիթեռը զարթնեց և բարևեց Զարիկին ջերմ ժպիտով։",
+      "choiceA": "Մոտենանք թիթեռին",
+      "choiceB": "Նայենք արևին",
+      "conversationId": "1b4977ae-7e66-47cf-9e44-a19717d389d5",
+      "storySessionIdOut": "1b4977ae-7e66-47cf-9e44-a19717d389d5",
+      "safetyFlag": 0,
+      "mode": "story",
+      "bodyLen": 282,
+      "armenianRatio": 1,
+      "httpStatus": 200,
+      "latencyMs": 7786,
+      "warnings": []
+    }
+  ],
+  "verdict": {
+    "armenianQualityScore": 100,
+    "storyLogicScore": 100,
+    "childSuitabilityScore": 100,
+    "choiceQualityScore": 100,
+    "continuationCoherenceScore": 100,
+    "overallVerdict": "PASS",
+    "averageScore": 100,
+    "minScore": 100
+  },
+  "gitSha": "56acec5d7237d788c8bba2cceeec9bf8f7b55bea",
+  "branch": "main",
+  "dirty": true
+}

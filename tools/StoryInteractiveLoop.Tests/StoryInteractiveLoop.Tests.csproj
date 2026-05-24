@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>ArmenianAiToy.Tools.StoryInteractiveLoop.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <!--
+    Link the evaluator source file directly. The runner is an Exe and
+    the test project does not take a project reference on it — both
+    projects compile this single source file independently.
+  -->
+  <ItemGroup>
+    <Compile Include="..\StoryInteractiveLoop\Evaluators.cs" Link="Evaluators.cs" />
+  </ItemGroup>
+</Project>
