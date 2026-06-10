@@ -40,4 +40,13 @@
     </None>
   </ItemGroup>
 
+  <!--
+    Story-file fixture for EmbeddedCuratedStoryLibraryTests. Embedded
+    in the TEST assembly only (content-library Slice 1) — the
+    Application assembly intentionally embeds no story content yet.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="Fixtures\Stories\*.story.json" />
+  </ItemGroup>
+
 </Project>

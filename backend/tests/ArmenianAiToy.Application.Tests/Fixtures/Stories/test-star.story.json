@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "test-star",
+  "title": "Փոքրիկ աստղիկը",
+  "minAge": 4,
+  "maxAge": 7,
+  "tone": "warm",
+  "tags": ["nature", "calm"],
+  "category": "general",
+  "bedtimeSafe": true,
+  "segments": [
+    "Երկնքում փայլում էր մի փոքրիկ աստղիկ։ Նա սիրում էր նայել քնած քաղաքին։",
+    "Աստղիկը կամաց ժպտաց։ Հետո նա էլ քնեց իր ամպե բարձիկի վրա։"
+  ],
+  "reflectionText": "Գիշերը երկինքն էլ է հանգստանում։",
+  "reflectionQuestions": ["Իսկ դու սիրու՞մ ես աստղեր նայել։"],
+  "review": {
+    "status": "approved",
+    "linguisticReviewAt": "2026-06-10",
+    "listenTestAt": "2026-06-10",
+    "notes": "TEST FIXTURE ONLY — embedded in the test project, never ships, never enters the runtime library."
+  }
+}
