@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ArmenianAiToy.Tools.TtsVoiceBakeoff</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    Application only — for InMemoryCuratedStoryLibrary (sample texts read
+    directly, byte-identical, never hand-copied). Deliberately NO
+    Infrastructure reference: this is an EXPLORATION tool using raw HTTP
+    to /v1/audio/speech (so gpt-4o-mini-tts `instructions` can be sent,
+    which the pinned OpenAI SDK version does not expose). It must not
+    look like production parity — that guarantee belongs exclusively to
+    tools/TtsListenTest.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\backend\src\ArmenianAiToy.Application\ArmenianAiToy.Application.csproj" />
+  </ItemGroup>
+
+</Project>
