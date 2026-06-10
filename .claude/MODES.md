@@ -136,17 +136,36 @@ stories off, identically.
 - Backend state (StoryId + SegmentIndex, 30-minute sliding inactivity
   expiry) is the only position authority. v1: no story-selection-by-name;
   a title request gets normal selection plus a warm canned lead-in.
+- **Playback is AUTOPLAY.** Once a story starts, the toy tells it segment
+  by segment to the end without requiring any child response. A short
+  fixed pause between segments (code-controlled playback pacing, tuned at
+  wiring time) is not a wait-for-input state. Reaching the final segment
+  with no interruption flows directly into the ending/reflection turn
+  (see Endings).
 
-**Continue cues.** While a `LibraryStorySession` is active, a
-deterministic continue-cue check runs BEFORE ModeDetector and before the
-Q&A router: a normalized match against a fixed cue list («շարունակիր»,
-«շարունակի», «հետո», «հետո՞», «հա», «էլի», or the device's continue
-signal) advances the session by exactly one segment with no GPT
-involvement in routing. «հետո՞» is a pacing cue, not a question — it must
-never reach the Q&A handler. Garbled input never matches a continue cue
-and never starts, advances, selects, or clears a story (deterministic
-pre-GPT guard unchanged; reply byte-identical:
-«Կներե՛ս, լավ չլսեցի։ Կրկնի՞ր, խնդրում եմ։»).
+**Interrupts and resume cues.** Autoplay is interrupt-capable: the child
+can stop playback at any time. MVP interrupt signal is the device
+button / wake action — deterministic and immune to the toy hearing its
+own speaker audio. Always-listening barge-in during playback is a FUTURE
+optional enhancement (requires echo-safe mic handling) and is not part of
+this contract. On interrupt: playback stops, the device records the
+child, and the backend routes the utterance through the existing pipeline
+(garbled guard → continue-cue check → in-story Q&A). After the response,
+the backend resumes the SAME story from the tracked position with
+verbatim library text.
+
+Continue cues are RESUME signals, not per-segment gates. While a
+`LibraryStorySession` is active but playback is paused (after an
+interrupt, a manual stop, or a Game/Riddle detour), a deterministic
+continue-cue check runs BEFORE ModeDetector and before the Q&A router: a
+normalized match against a fixed cue list («շարունակիր», «շարունակի»,
+«հետո», «հետո՞», «հա», «էլի», or the device's continue signal) resumes
+autoplay from the tracked position with no GPT involvement in routing.
+«հետո՞» is a pacing cue, not a question — it must never reach the Q&A
+handler. The toy never stops after a segment to wait for a cue. Garbled
+input never matches a continue cue and never starts, advances, selects,
+or clears a story (deterministic pre-GPT guard unchanged; reply
+byte-identical: «Կներե՛ս, լավ չլսեցի։ Կրկնի՞ր, խնդրում եմ։»).
 
 **In-story questions (the only GPT surface).** Routed to a single bounded
 story-guide call: context is the story text served so far + current
@@ -206,6 +225,10 @@ legacy engine only.
   a paused session.
 - A moderation-blocked input mid-story does NOT clear the session: safety
   fallback reply, story resumable.
+- Interrupt transport: button/wake action in MVP; the backend contract is
+  transport-agnostic (it sees "playback stopped + an utterance arrived").
+  Always-listening barge-in is a future hardware enhancement and changes
+  nothing in this section when it lands.
 
 **GPT boundary (summary).** Code owns: engine routing, story selection,
 no-repeat and BedtimeSafe filters, age filter, segment sequencing, story
@@ -218,8 +241,10 @@ answer content and its tone.
   native-speaker read-aloud pass; passes `armenian-linguistic-reviewer`
   and `areg-story-evaluator` before entering the library.
 - Sentences mostly single-clause, ≤10–12 words. Segment = one scene beat,
-  2–4 sentences (~≤300 chars), ending at a natural pause that invites
-  «շարունակիր» — a soft hook, never a fear cliffhanger, never a question.
+  2–4 sentences (~≤300 chars), ending at a natural pause that carries the
+  listener into the next segment — a soft hook, never a fear cliffhanger,
+  never a question. (Segments are autoplayed; the pause is a storytelling
+  beat, not a prompt for the child to respond.)
 - No second-person text assuming the child's name, gender, or age
   (segments are verbatim and shared across children).
 - TTS: Armenian script only — no Latin, no Cyrillic, no digits (numbers
@@ -468,9 +493,9 @@ resolve in this order (highest priority first):
 3. **Active mode continuation** — if the conversation is already in a
    mode (e.g. story has pending choices or an active
    `LibraryStorySession`), continue that mode unless one of the
-   higher-priority cues fires. An active library session at segment N
-   resumes at N+1 on ambiguous input — never restarts, never re-triggers
-   story selection.
+   higher-priority cues fires. An active library session is autoplaying
+   by default; ambiguous input while paused resumes autoplay from the
+   tracked position — never restarts, never re-triggers story selection.
 4. **Explicit mode trigger** in the new message (story / game / riddle).
 5. **History trigger** in the last 2 user messages.
 6. **Default**: Story.
