@@ -53,12 +53,13 @@ public class CuratedStoryLibraryTests
     }
 
     [Fact]
-    public void ListAvailable_ReturnsExactlyOneStory()
+    public void ListAvailable_ReturnsBothStories()
     {
         var stories = _library.ListAvailable();
 
-        Assert.Single(stories);
-        Assert.Equal(InMemoryCuratedStoryLibrary.LittleCloudId, stories[0].Id);
+        Assert.Equal(2, stories.Count);
+        Assert.Contains(stories, s => s.Id == InMemoryCuratedStoryLibrary.LittleCloudId);
+        Assert.Contains(stories, s => s.Id == InMemoryCuratedStoryLibrary.HedgehogAppleId);
     }
 
     [Fact]
@@ -121,6 +122,60 @@ public class CuratedStoryLibraryTests
     public void Story_Title_IsPinnedVerbatim()
     {
         Assert.Equal(ExpectedTitle, _library.SelectDefault().Title);
+    }
+
+    // ── Second story «Ոզնիկն ու խնձորը» — reviewed text, pinned
+    //    byte-for-byte. Same contract as the first story: changing
+    //    these constants requires a fresh armenian-story-master
+    //    linguistic review first.
+
+    private const string ExpectedHedgehogTitle = "Ոզնիկն ու խնձորը";
+    private static readonly string[] ExpectedHedgehogSegments =
+    [
+        "Անտառում ապրում էր մի փոքրիկ ոզնիկ։ Մի առավոտ նա գտավ մի մեծ կարմիր խնձոր։ Խնձորը շատ համով էր երևում։ Բայց խնձորը ծանր էր, շատ ծանր։",
+        "Ոզնիկը կանչեց իր ընկեր նապաստակին։ Նրանք միասին գլորեցին խնձորը։ Խնձորը դանդաղ գլորվեց մինչև ոզնիկի տնակը։",
+        "Ոզնիկն ու նապաստակը միասին կերան խնձորը։ Խնձորն իսկապես շատ քաղցր էր։ Հետո նրանք նստեցին ծառի տակ։ Անտառում խաղաղ էր ու հանգիստ։",
+    ];
+    private const string ExpectedHedgehogReflection =
+        "Ընկերոջ հետ նույնիսկ ծանր խնձորը հեշտ է գլորվում։";
+    private const string ExpectedHedgehogQuestion =
+        "Իսկ դու ի՞նչ ես սիրում անել ընկերոջդ հետ։";
+
+    [Fact]
+    public void HedgehogStory_TextIsPinnedVerbatim()
+    {
+        var story = _library.GetById(InMemoryCuratedStoryLibrary.HedgehogAppleId);
+
+        Assert.NotNull(story);
+        Assert.Equal(ExpectedHedgehogTitle, story!.Title);
+        Assert.Equal(ExpectedHedgehogSegments.Length, story.Segments.Count);
+        for (var i = 0; i < ExpectedHedgehogSegments.Length; i++)
+        {
+            Assert.Equal(ExpectedHedgehogSegments[i], story.Segments[i].Text);
+        }
+        Assert.Equal(ExpectedHedgehogReflection, story.ReflectionText);
+        var question = Assert.Single(story.ReflectionQuestions);
+        Assert.Equal(ExpectedHedgehogQuestion, question);
+    }
+
+    [Fact]
+    public void HedgehogStory_IsBedtimeSafeAndAgeRangedForTargetAudience()
+    {
+        var story = _library.GetById(InMemoryCuratedStoryLibrary.HedgehogAppleId)!;
+
+        Assert.True(story.BedtimeSafe);
+        Assert.Equal(4, story.MinAge);
+        Assert.Equal(7, story.MaxAge);
+    }
+
+    [Fact]
+    public void SelectDefault_IsUnchangedByAddingSecondStory()
+    {
+        // The deterministic default remains the first launch story —
+        // adding library content must never silently change what a
+        // future serving site would pick as default.
+        Assert.Equal(InMemoryCuratedStoryLibrary.LittleCloudId, _library.SelectDefault().Id);
+        Assert.Equal(InMemoryCuratedStoryLibrary.LittleCloudId, new InMemoryCuratedStoryLibrary().SelectDefault().Id);
     }
 
     [Fact]
