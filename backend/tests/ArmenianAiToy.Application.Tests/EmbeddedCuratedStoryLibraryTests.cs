@@ -220,6 +220,63 @@ public class EmbeddedCuratedStoryLibraryTests
         Assert.Contains("age", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    // ── Slice 2: real content migration ──────────────────────────────
+
+    [Fact]
+    public void RealContent_ApplicationAssembly_EmbedsExactlyTheTwoLaunchStories()
+    {
+        var real = new EmbeddedCuratedStoryLibrary(
+            typeof(CuratedStory).Assembly,
+            "ArmenianAiToy.Application.Stories.Content");
+
+        var ids = real.ListAvailable().Select(s => s.Id).OrderBy(i => i, StringComparer.Ordinal).ToList();
+        Assert.Equal(["hedgehog-apple", "little-cloud"], ids);
+    }
+
+    [Fact]
+    public void RealContent_WrapperAndDirectLoader_ServeIdenticalStories()
+    {
+        // The compatibility wrapper must be a pure pass-through over the
+        // embedded content — same object data, no transformation. The
+        // byte-pins in CuratedStoryLibraryTests prove the loaded text
+        // equals the pre-migration hardcoded strings; this test proves
+        // the wrapper adds nothing on top of the loader.
+        var direct = new EmbeddedCuratedStoryLibrary(
+            typeof(CuratedStory).Assembly,
+            "ArmenianAiToy.Application.Stories.Content");
+        var wrapper = new InMemoryCuratedStoryLibrary();
+
+        foreach (var id in new[] { "little-cloud", "hedgehog-apple" })
+        {
+            var fromDirect = direct.GetById(id)!;
+            var fromWrapper = wrapper.GetById(id)!;
+            Assert.Equal(fromDirect.Title, fromWrapper.Title);
+            Assert.Equal(
+                fromDirect.Segments.Select(s => s.Text),
+                fromWrapper.Segments.Select(s => s.Text));
+            Assert.Equal(fromDirect.ReflectionText, fromWrapper.ReflectionText);
+            Assert.Equal(fromDirect.ReflectionQuestions, fromWrapper.ReflectionQuestions);
+        }
+    }
+
+    [Fact]
+    public void RealContent_WrapperSelectDefault_RemainsLittleCloud()
+    {
+        // Ordinal-first in the embedded set is "hedgehog-apple"; the
+        // wrapper deliberately pins the pre-migration default so the
+        // migration cannot silently change serving behavior.
+        Assert.Equal("little-cloud", new InMemoryCuratedStoryLibrary().SelectDefault().Id);
+    }
+
+    [Fact]
+    public void Loader_DuplicateIds_AcrossResources_Throws()
+    {
+        var ex = Assert.Throws<InvalidDataException>(() => new EmbeddedCuratedStoryLibrary(
+            TestAssembly,
+            "ArmenianAiToy.Application.Tests.Fixtures.DuplicateIdStories"));
+        Assert.Contains("dup-story", ex.Message);
+    }
+
     // ── Runtime-dead pin ─────────────────────────────────────────────
 
     [Fact]

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "dup-story",
+  "title": "Կրկնվող պատմություն Բ",
+  "minAge": 4,
+  "maxAge": 7,
+  "tone": "warm",
+  "tags": ["nature"],
+  "category": "general",
+  "bedtimeSafe": true,
+  "segments": ["Փորձնական հատված է։"],
+  "reflectionText": "Փորձնական միտք է։",
+  "reflectionQuestions": ["Փորձնակա՞ն հարց է։"],
+  "review": {
+    "status": "approved",
+    "linguisticReviewAt": "2026-06-10",
+    "listenTestAt": "2026-06-10",
+    "notes": "TEST FIXTURE ONLY — duplicate-id pair (b)."
+  }
+}

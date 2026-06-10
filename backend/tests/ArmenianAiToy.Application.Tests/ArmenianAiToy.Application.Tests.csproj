@@ -41,12 +41,13 @@
   </ItemGroup>
 
   <!--
-    Story-file fixture for EmbeddedCuratedStoryLibraryTests. Embedded
-    in the TEST assembly only (content-library Slice 1) — the
-    Application assembly intentionally embeds no story content yet.
+    Story-file fixtures for EmbeddedCuratedStoryLibraryTests, embedded
+    in the TEST assembly only: Fixtures/Stories (valid fixture library)
+    and Fixtures/DuplicateIdStories (two same-id files under distinct
+    subfolders, exercising the loader's duplicate-id rejection).
   -->
   <ItemGroup>
-    <EmbeddedResource Include="Fixtures\Stories\*.story.json" />
+    <EmbeddedResource Include="Fixtures\**\*.story.json" />
   </ItemGroup>
 
 </Project>

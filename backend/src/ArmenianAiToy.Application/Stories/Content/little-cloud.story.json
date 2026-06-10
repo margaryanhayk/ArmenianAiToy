@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "little-cloud",
+  "title": "Փոքրիկ ամպիկը",
+  "minAge": 4,
+  "maxAge": 7,
+  "tone": "warm",
+  "tags": ["kindness", "helping", "friendship"],
+  "category": "general",
+  "bedtimeSafe": true,
+  "segments": [
+    "Երկնքում ապրում էր մի փոքրիկ ամպիկ։ Նա շատ էր սիրում թռչել քամու հետ։ Մի օր ամպիկը տեսավ մի փոքրիկ ծաղիկ։ Ծաղիկը ծարավ էր։",
+    "Ամպիկը մոտեցավ ծաղկին։ Նա մի քիչ անձրև մաղեց։ Ծաղիկն ուրախացավ ու բացեց իր թերթիկները։",
+    "Ծաղիկն ասաց՝ շնորհակալ եմ, ամպի՛կ ջան։ Ամպիկը ժպտաց ու թռավ երկինք։ Նրանք դարձան լավ ընկերներ։"
+  ],
+  "reflectionText": "Երբ օգնում ենք ուրիշներին, մեր սիրտն էլ է ուրախանում։",
+  "reflectionQuestions": ["Իսկ դու ո՞ւմ ես սիրում օգնել։"],
+  "review": {
+    "status": "approved",
+    "linguisticReviewAt": "2026-06-10",
+    "listenTestAt": "2026-06-10",
+    "notes": "armenian-story-master review passed (two passes, byte-pinned). Rendered for listen test 2026-06-10 on tts-1/Nova; re-listen required on the final production voice after the bakeoff adoption slice. Text migrated byte-identical from InMemoryCuratedStoryLibrary — do not edit without a fresh linguistic review."
+  }
+}

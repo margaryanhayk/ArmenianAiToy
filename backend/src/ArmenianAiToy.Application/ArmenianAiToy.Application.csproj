@@ -23,4 +23,14 @@
     <InternalsVisibleTo Include="ArmenianAiToy.Application.Tests" />
   </ItemGroup>
 
+  <!--
+    Approved curated story content. Presence in Stories/Content/ means
+    APPROVED — the embedded loader hard-fails on any file whose
+    review.status is not "approved". Drafts live outside backend/src
+    (backend/content/story-drafts/) and are never embedded.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="Stories\Content\*.story.json" />
+  </ItemGroup>
+
 </Project>

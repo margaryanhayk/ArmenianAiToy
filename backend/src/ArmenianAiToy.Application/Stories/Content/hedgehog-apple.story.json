@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "hedgehog-apple",
+  "title": "Ոզնիկն ու խնձորը",
+  "minAge": 4,
+  "maxAge": 7,
+  "tone": "warm",
+  "tags": ["friendship", "sharing", "helping"],
+  "category": "general",
+  "bedtimeSafe": true,
+  "segments": [
+    "Անտառում ապրում էր մի փոքրիկ ոզնիկ։ Մի առավոտ նա գտավ մի մեծ կարմիր խնձոր։ Խնձորը շատ համով էր երևում։ Բայց խնձորը ծանր էր, շատ ծանր։",
+    "Ոզնիկը կանչեց իր ընկեր նապաստակին։ Նրանք միասին գլորեցին խնձորը։ Խնձորը դանդաղ գլորվեց մինչև ոզնիկի տնակը։",
+    "Ոզնիկն ու նապաստակը միասին կերան խնձորը։ Խնձորն իսկապես շատ քաղցր էր։ Հետո նրանք նստեցին ծառի տակ։ Անտառում խաղաղ էր ու հանգիստ։"
+  ],
+  "reflectionText": "Ընկերոջ հետ նույնիսկ ծանր խնձորը հեշտ է գլորվում։",
+  "reflectionQuestions": ["Իսկ դու ի՞նչ ես սիրում անել ընկերոջդ հետ։"],
+  "review": {
+    "status": "approved",
+    "linguisticReviewAt": "2026-06-10",
+    "listenTestAt": "2026-06-10",
+    "notes": "armenian-story-master review passed (pre-hardcoding + on-disk re-verification, byte-pinned). Rendered for listen test 2026-06-10 on tts-1/Nova; re-listen required on the final production voice after the bakeoff adoption slice. Text migrated byte-identical from InMemoryCuratedStoryLibrary — do not edit without a fresh linguistic review."
+  }
+}
