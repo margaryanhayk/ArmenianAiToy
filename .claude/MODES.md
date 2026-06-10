@@ -15,7 +15,8 @@ file first, then the prompt/code, then tests.
 
 | Mode             | Purpose                          | Energy   | Output structure                           |
 |------------------|----------------------------------|----------|--------------------------------------------|
-| Story            | Lead a child through a tale      | Medium   | 3–5 sentences + CHOICE_A/CHOICE_B block    |
+| Story — Library engine (target default) | Tell a curated, human-reviewed tale in verbatim segments | Medium | Authored segment text; no tail block |
+| Story — Legacy engine (transitional)    | Lead a child through a generated tale | Medium | 3–5 sentences + CHOICE_A/CHOICE_B block |
 | Game             | Run a short play activity        | High     | Short instruction + reaction               |
 | Riddle           | Pose a riddle, give warm hints   | Medium   | Riddle setup, optional hint, no choices    |
 | Curiosity Window | Brief real exchange, then return | Low-med  | One question, short response, return       |
@@ -24,9 +25,22 @@ file first, then the prompt/code, then tests.
 Default mode when unsure: **Story**. Story mode is the most established and
 the safest fallback for an Armenian-speaking play leader.
 
+Which Story engine serves is resolved by the deterministic `Story:Engine`
+config flag (`library` | `legacy`) — never by a heuristic. The
+≥15-reviewed-stories threshold for flipping the flag to `library` is a
+**human release criterion** evaluated before deployment; it is never
+evaluated at runtime, and no code may switch engines based on library size.
+
 ---
 
-## 1. Story Mode
+## 1. Story Mode — Legacy free-generation engine (transitional)
+
+> **Scope.** This section governs ONLY the legacy engine
+> (`Story:Engine = legacy`). The "never resolves" rule, the mandatory
+> CHOICE_A/CHOICE_B tail block, and STORY_MEMORY apply to this engine
+> alone. The target default is the Library engine (§1A). The legacy
+> engine is retained unchanged until the library flag flips, then
+> deprecated.
 
 **Purpose.** Tell a short, child-led tale in Eastern Armenian. Areg is the
 narrator and gentle guide. The child steers the story by choosing between
@@ -94,6 +108,151 @@ mood: ...
 - StoryBenchmark `prompts.json` covers 27 story-start prompts.
 - Any tone change must be re-run through StoryBenchmark and reviewed by
   `areg-story-evaluator` and `armenian-linguistic-reviewer`.
+
+---
+
+## 1A. Story Mode — Library engine (curated stories; target default)
+
+**Purpose.** Tell a short, pre-written, human-reviewed Eastern Armenian
+story in verbatim segments. Areg is the storyteller and guide; GPT is the
+story explainer, never the story author. Code owns the story; the model
+owns only bounded in-story answers.
+
+**Engine routing.** `Story:Engine = library | legacy` — a deterministic
+config flag, never a heuristic. The library engine does NOT bypass the
+B5 device / per-child Story-disabled gates: Story off means library
+stories off, identically.
+
+**Delivery.**
+- The backend selects a story deterministically: no-repeat-last-N
+  (per-device, recency-windowed), BedtimeSafe filter when bedtime-adjacent,
+  age filter when ChildId is present (fallback: only stories covering the
+  full 4–7 band), parent mode flags.
+- Segments are served VERBATIM — byte-identical to the reviewed asset. No
+  paraphrase, no model touch, no post-processing mutation (the Calm `?!`
+  stripper never edits library text; BedtimeSafe segments contain zero
+  questions/exclamations by authoring). Output moderation still runs on
+  every served segment as defense-in-depth.
+- Backend state (StoryId + SegmentIndex, 30-minute sliding inactivity
+  expiry) is the only position authority. v1: no story-selection-by-name;
+  a title request gets normal selection plus a warm canned lead-in.
+
+**Continue cues.** While a `LibraryStorySession` is active, a
+deterministic continue-cue check runs BEFORE ModeDetector and before the
+Q&A router: a normalized match against a fixed cue list («շարունակիր»,
+«շարունակի», «հետո», «հետո՞», «հա», «էլի», or the device's continue
+signal) advances the session by exactly one segment with no GPT
+involvement in routing. «հետո՞» is a pacing cue, not a question — it must
+never reach the Q&A handler. Garbled input never matches a continue cue
+and never starts, advances, selects, or clears a story (deterministic
+pre-GPT guard unchanged; reply byte-identical:
+«Կներե՛ս, լավ չլսեցի։ Կրկնի՞ր, խնդրում եմ։»).
+
+**In-story questions (the only GPT surface).** Routed to a single bounded
+story-guide call: context is the story text served so far + current
+position; answer is 1–2 short Armenian sentences; deterministic
+post-validation (length cap; Armenian-only — no Latin, no digits; no
+structural tokens (`---`, CHOICE_A/B, STORY_MEMORY); no new proper nouns —
+any capitalized non-sentence-initial token must appear in the story text
+served so far; output moderation unchanged). On validation failure: one
+retry, then a canned fallback line. After any answer the backend resumes
+the SAME story at the SAME segment with a pre-written return-to-story
+line. GPT never rewrites, paraphrases, or continues authored text.
+
+**Curiosity collision (library story active).** While a
+`LibraryStorySession` is active, the standalone Curiosity Window overlay
+is structurally disabled. Code routes every child question to the single
+in-story Q&A handler; the presence of an active session is the only
+routing signal — never model judgment. Story-related questions are
+answered from the story text; genuinely off-topic questions get a brief,
+honest Curiosity-style answer («Չգիտեմ ես, բայց հետաքրքիր է» is allowed).
+The distinction lives inside the single call and affects only answer
+content — never routing, never story position. Curiosity Window as a
+standalone overlay applies only when no library story session is active.
+
+**Choices.** Library stories are LINEAR — no CHOICE_A/CHOICE_B block, no
+tail block. Authored branch points (2–3 per story, every branch
+pre-written and reviewed; labels matched via the ChoiceNormalizer
+pattern) are a future optional extension, not part of this contract.
+
+**Endings (library engine only).** A library story ends. At the final
+segment, code — not GPT — delivers in one turn: the authored final
+segment, the story's pre-written reflection sentence, and, outside Calm
+mode and outside the bedtime-adjacent band, exactly ONE pre-written
+reflection question selected deterministically from the story's list
+(`CuratedStory.ReflectionQuestions` allows up to two entries; the serving
+site selects the first). In Calm or bedtime-adjacent contexts the
+reflection question is structurally suppressed in code: the turn ends
+after the reflection sentence with zero questions. The session is then
+cleared deterministically. The child's reply to a reflection question
+receives one short, warm, canned, code-owned acknowledgment and never
+re-opens or extends the story. The legacy "never resolves" rule is scoped to the
+legacy engine only.
+
+**After the end.**
+- «էլի» / «մեկ ուրիշ» / «ուրիշ հեքիաթ» → a NEW story via no-repeat
+  selection.
+- An explicit repeat request («նորից պատմիր», «էդ նորից») → repeat the
+  just-finished story; repeats are exempt from no-repeat (beloved repeats
+  are a feature at ages 4–7).
+
+**Interruptions and transitions.**
+- Bedtime cue mid-story: Calm wins instantly — no "let me finish the
+  story". The soft close is a canned, pre-written, reviewed line owned by
+  code, never generated.
+- Game/Riddle cue mid-story: the session persists, paused (30-min expiry
+  still applies); on return the story resumes at the same segment with a
+  canned resume line. Only an explicit new-story request or expiry clears
+  a paused session.
+- A moderation-blocked input mid-story does NOT clear the session: safety
+  fallback reply, story resumable.
+
+**GPT boundary (summary).** Code owns: engine routing, story selection,
+no-repeat and BedtimeSafe filters, age filter, segment sequencing, story
+position, verbatim delivery, ending/reflection delivery, all canned
+replies, story pause/resume. GPT owns only: the bounded in-story Q&A
+answer content and its tone.
+
+**Authoring requirements (acceptance checklist for every library story).**
+- Natural spoken Eastern Armenian, child register, ages 4–7; mandatory
+  native-speaker read-aloud pass; passes `armenian-linguistic-reviewer`
+  and `areg-story-evaluator` before entering the library.
+- Sentences mostly single-clause, ≤10–12 words. Segment = one scene beat,
+  2–4 sentences (~≤300 chars), ending at a natural pause that invites
+  «շարունակիր» — a soft hook, never a fear cliffhanger, never a question.
+- No second-person text assuming the child's name, gender, or age
+  (segments are verbatim and shared across children).
+- TTS: Armenian script only — no Latin, no Cyrillic, no digits (numbers
+  spelled out), no emoji, no symbols. Armenian punctuation only («», «։»,
+  «,», «՝» for dialogue framing, «՞» on the questioned word, «՛»/«՜»
+  sparingly). Mandatory listen test on
+  the production TTS voice before acceptance; mispronounced words are
+  rewritten, not phonetically hacked.
+- BedtimeSafe stories additionally: descending energy across segments and
+  the reflection sentence, no startles, no chase/threat beats, zero
+  questions and exclamations.
+- Reflection: one gentle storyteller sentence — warmth, not pedagogy. No
+  morals-as-lecture, no fear-recall questions, no emotional-companion
+  phrasing; the question must be answerable by a 4-year-old from the
+  story.
+- Original stories and generic fairy-tale material only; NO folklore
+  characters or adaptations until the folklore postponement is lifted.
+- No Russian calques, no English idiom calques, no translated-sounding
+  rhythm — reviewer rejects on sight.
+
+**Code touch points.**
+- `CuratedStory`, `CuratedStorySegment`, `ICuratedStoryLibrary`,
+  `InMemoryCuratedStoryLibrary`, `LibraryStorySessionTracker`
+  (`backend/src/.../Application/Stories/` — shipped runtime-dead in
+  commit dfc831d). Routing/wiring: future slice, gated on this contract.
+
+**Test / benchmark implications.**
+- Library/tracker already pinned by `CuratedStoryLibraryTests` and
+  `LibraryStorySessionTrackerTests` (verbatim byte-pins, expiry,
+  isolation).
+- The wiring slice must add: continue-cue routing tests, Q&A validation
+  tests, Calm/bedtime question-suppression pins, session-pause/resume
+  tests, and a flag-off byte-identical regression pin.
 
 ---
 
@@ -301,10 +460,17 @@ resolve in this order (highest priority first):
 
 1. **Calm** — bedtime cues always win. Safety + parent trust.
 2. **Curiosity Window** — a real off-topic question always gets a real
-   answer, even mid-story.
+   answer, even mid-story. **Exception:** while a `LibraryStorySession`
+   is active, the standalone overlay is disabled and all questions route
+   to the in-story Q&A handler (§1A), which gives off-topic questions a
+   brief Curiosity-style answer inside the story envelope, then returns
+   to the story.
 3. **Active mode continuation** — if the conversation is already in a
-   mode (e.g. story has pending choices), continue that mode unless one
-   of the higher-priority cues fires.
+   mode (e.g. story has pending choices or an active
+   `LibraryStorySession`), continue that mode unless one of the
+   higher-priority cues fires. An active library session at segment N
+   resumes at N+1 on ambiguous input — never restarts, never re-triggers
+   story selection.
 4. **Explicit mode trigger** in the new message (story / game / riddle).
 5. **History trigger** in the last 2 user messages.
 6. **Default**: Story.
@@ -336,7 +502,8 @@ These are constant across modes and must never drift:
 
 | Mode             | Detection              | Prompt section                     | Quality gate                          | Session persistence |
 |------------------|------------------------|------------------------------------|---------------------------------------|---------------------|
-| Story            | `ModeDetector` ✅      | `StoryChoiceInstruction` ✅         | universal + subject_mismatch ✅       | `PendingChoices` ✅ |
+| Story — Legacy   | `ModeDetector` ✅      | `StoryChoiceInstruction` ✅         | universal + subject_mismatch ✅       | `PendingChoices` ✅ |
+| Story — Library  | model/tracker shipped runtime-dead (dfc831d) ✅ — not wired | n/a (verbatim segments, no prompt section) | wiring slice: continue-cue + Q&A validation gates ⏳ | `LibraryStorySessionTracker` ✅ (not wired) |
 | Game             | `ModeDetector` ✅      | `GameModeInstruction` ✅            | `game_too_long` (>150 chars) ✅       | `ActiveModes` ✅    |
 | Riddle           | `ModeDetector` ✅      | `RiddleModeInstruction` ✅          | universal ✅                          | `ActiveModes` ✅    |
 | Curiosity Window | `ModeDetector` ✅      | `CuriosityWindowInstruction` ✅     | `curiosity_question` / `too_long` ✅  | one-turn (choices preserved) |
