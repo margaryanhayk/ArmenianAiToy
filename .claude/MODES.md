@@ -265,6 +265,24 @@ answer content and its tone.
 - No Russian calques, no English idiom calques, no translated-sounding
   rhythm — reviewer rejects on sight.
 
+**Draft story authoring workflow.** New stories are authored as DATA,
+never as code, through a gated pipeline:
+1. Draft `<id>.story.json` (schema v1, `review.status: "draft"`)
+   written to `backend/content/story-drafts/` — outside `backend/src`,
+   never embedded, structurally invisible to runtime. A future
+   authoring skill/agent may write drafts; it can never approve them.
+2. **armenian-story-master** linguistic/story review.
+3. Automated schema + authoring-linter tests pass
+   (`StoryDraftFolderTests` sweeps the drafts folder on every test
+   run; a draft marked "approved" in place fails the build).
+4. TTS listen test on the production voice; mispronounced words are
+   rewritten through a fresh review, never phonetically hacked.
+5. **Human approval**: move the file to
+   `Application/Stories/Content/`, flip `review.status` to
+   `"approved"`, stamp `linguisticReviewAt` / `listenTestAt`, and
+   commit as a data-only story slice. Presence in `Stories/Content/`
+   means approved — the embedded loader hard-fails on anything else.
+
 **Code touch points.**
 - `CuratedStory`, `CuratedStorySegment`, `ICuratedStoryLibrary`,
   `InMemoryCuratedStoryLibrary`, `LibraryStorySessionTracker`
