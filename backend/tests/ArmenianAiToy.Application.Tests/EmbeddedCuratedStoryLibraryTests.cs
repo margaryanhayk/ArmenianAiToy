@@ -165,6 +165,44 @@ public class EmbeddedCuratedStoryLibraryTests
     }
 
     [Fact]
+    public void Parser_AllowsSource_WhenRequireApprovedIsFalse()
+    {
+        // "source" is the exact-reference-import status (see
+        // backend/content/source-stories/): lintable like a draft…
+        var json = ValidJson.Replace("\"status\": \"approved\"", "\"status\": \"source\"");
+
+        var story = StoryFileParser.Parse(json, "test", requireApproved: false);
+
+        Assert.Equal("valid-story", story.Id);
+    }
+
+    [Fact]
+    public void Parser_RejectsSourceStory_WhenRequireApproved()
+    {
+        // …but structurally unservable: the runtime posture accepts
+        // ONLY "approved". A source import can never load at runtime.
+        var json = ValidJson.Replace("\"status\": \"approved\"", "\"status\": \"source\"");
+
+        var ex = Assert.Throws<InvalidDataException>(() => StoryFileParser.Parse(json, "test"));
+        Assert.Contains("approved", ex.Message);
+    }
+
+    [Fact]
+    public void Parser_RejectsStatusOutsideVocabulary_EvenWithRequireApprovedFalse()
+    {
+        // The vocabulary is exactly draft | approved | source — any
+        // other status fails even at linting posture.
+        foreach (var badStatus in new[] { "Source", "imported", "reference", "pending", "" })
+        {
+            var json = ValidJson.Replace("\"status\": \"approved\"", $"\"status\": \"{badStatus}\"");
+
+            var ex = Assert.Throws<InvalidDataException>(
+                () => StoryFileParser.Parse(json, "test", requireApproved: false));
+            Assert.Contains("status", ex.Message);
+        }
+    }
+
+    [Fact]
     public void Parser_RejectsApprovedStoryMissingListenTest()
     {
         var json = ValidJson.Replace("\"listenTestAt\": \"2026-06-10\"", "\"listenTestAt\": null");

@@ -62,8 +62,18 @@ internal static class StoryFileParser
     public static readonly IReadOnlyList<string> AllowedCategories =
         ["general", "therapeutic", "prophylactic"];
 
+    /// <summary>Review statuses. "draft" = story in the promotion
+    /// pipeline (backend/content/story-drafts/) — original material or
+    /// an owner-designated exact classic text (e.g. anban-huri).
+    /// "approved" = the ONLY status the runtime loader accepts.
+    /// "source" = exact reference/research import
+    /// (backend/content/source-stories/) — never served, never
+    /// embedded, never approved in place; it leaves that folder only
+    /// as inspiration for a new-id draft or via an explicit owner
+    /// designation that moves it into the drafts pipeline. Like
+    /// "draft", "source" fails any requireApproved:true parse.</summary>
     public static readonly IReadOnlyList<string> AllowedStatuses =
-        ["draft", "approved"];
+        ["draft", "approved", "source"];
 
     private static readonly Regex KebabCaseId =
         new("^[a-z]+(-[a-z]+)*$", RegexOptions.CultureInvariant);

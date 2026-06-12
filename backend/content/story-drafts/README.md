@@ -34,9 +34,22 @@ This folder holds **draft** curated-story JSON files
 
 ## Content rules
 
-- **Original material only.** Do not copy or adapt copyrighted
-  stories or text scraped from the internet. No folklore characters
-  or adaptations (postponed product decision — see MODES.md).
+- **Original material only — with explicit owner exceptions.** Do
+  not copy or adapt copyrighted stories or text scraped from the
+  internet. The general folklore postponement (see MODES.md) still
+  applies to NEW material; however, a classic title the product
+  owner has explicitly designated as a product story enters this
+  pipeline as an exact-text draft. Current owner-designated titles:
+  `anban-huri` («Անբան Հուռին», owner decision 2026-06-12). For
+  these, the story segments are byte-frozen — the normal review
+  pipeline applies to the listen test, the reflection metadata, and
+  the promotion act, never to rewriting the text.
+- **Un-designated exact source imports do NOT belong here.**
+  Verbatim reference/research imports of existing stories that the
+  owner has NOT designated as product stories live in
+  `../source-stories/` with `review.status: "source"` — see that
+  folder's README. A `"source"`-status file in this folder fails
+  `StoryDraftFolderTests`.
 - Follow the full §1A authoring checklist in `.claude/MODES.md`
   (segment shape, Armenian-script-only TTS rules, BedtimeSafe rules,
   bounded tags/categories).

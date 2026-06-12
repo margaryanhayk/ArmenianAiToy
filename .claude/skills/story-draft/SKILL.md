@@ -101,7 +101,11 @@ Hard schema rules for NEW drafts:
 ### Story structure
 - Exactly **3 segments**, each ending at a natural soft pause that
   carries into the next — never a fear cliffhanger, never a question
-  (segments are autoplayed).
+  (segments are autoplayed). Exception: **owner-designated exact
+  classic drafts** (e.g. `anban-huri`, owner decision 2026-06-12) keep
+  the source's natural segment count and byte-frozen text — never
+  force-resegment them to 3; they enter story-drafts via the owner-
+  designation path, not via this skill.
 - `reflectionText`: one gentle storyteller sentence — warmth, not
   pedagogy, no morals-as-lecture.
 - Exactly **1 reflection question**, answerable by a four-year-old

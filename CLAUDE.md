@@ -23,6 +23,14 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 - **Identity stays the same across modes.**
 - **Hardware/audio is out of scope** for current work.
 - **Armenian folklore integration is postponed** — do NOT add it.
+  **Single recorded exception (owner decision 2026-06-12):** the
+  owner-designated exact classic title `anban-huri` («Անբան Հուռին»)
+  is a real product story draft in `backend/content/story-drafts/`.
+  Its story segments are byte-frozen — review, TTS listen test, and
+  promotion affect spoken-reflection metadata and approval state only,
+  never the story text. It is NOT runtime-served until the TTS listen
+  test passes and a human promotes it to approved `Stories/Content/`.
+  No other folklore titles may be added without a new owner decision.
 
 ## Build & Test
 

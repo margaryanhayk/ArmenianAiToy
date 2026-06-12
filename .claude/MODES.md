@@ -169,7 +169,7 @@ byte-identical: «Կներե՛ս, լավ չլսեցի։ Կրկնի՞ր, խնդր
 
 **In-story questions (the only GPT surface).** Routed to a single bounded
 story-guide call: context is the story text served so far + current
-position; answer is 1–2 short Armenian sentences; deterministic
+position; answer is 1–3 short Armenian sentences; deterministic
 post-validation (length cap; Armenian-only — no Latin, no digits; no
 structural tokens (`---`, CHOICE_A/B, STORY_MEMORY); no new proper nouns —
 any capitalized non-sentence-initial token must appear in the story text
@@ -262,6 +262,17 @@ answer content and its tone.
   story.
 - Original stories and generic fairy-tale material only; NO folklore
   characters or adaptations until the folklore postponement is lifted.
+  **Owner-designation exception** (recorded product decision): the
+  product owner may designate an exact classic title as a real product
+  story. Designated so far: `anban-huri` («Անբան Հուռին»), owner
+  decision 2026-06-12. A designated title lives in
+  `backend/content/story-drafts/` as an exact-text draft whose story
+  segments are **byte-frozen** — linguistic review, the TTS listen
+  test, and human promotion apply to the spoken reflection metadata
+  and the approval state only, never to rewriting, modernizing, or
+  re-segmenting the story text. A designated title is NOT
+  runtime-served until it passes the production-voice TTS listen test
+  and a human promotes it to approved `Stories/Content/`.
 - No Russian calques, no English idiom calques, no translated-sounding
   rhythm — reviewer rejects on sight.
 
@@ -526,6 +537,9 @@ resolve in this order (highest priority first):
 - English in child-facing output (Armenian only, with rare exceptions
   for proper nouns).
 - Folklore integration (postponed product decision — do not add).
+  The single recorded exception is an explicit owner designation of an
+  exact classic title — see §1A authoring requirements; currently only
+  `anban-huri` («Անբան Հուռին», 2026-06-12).
 - Audio / hardware references in text (out of scope for backend).
 - Bypassing input or output moderation.
 
