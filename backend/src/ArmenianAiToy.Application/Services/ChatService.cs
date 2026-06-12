@@ -1378,6 +1378,32 @@ public class ChatService : IChatService
         // Step 3: Store user message
         await _conversations.AddMessageAsync(conversation.Id, MessageRole.User, userMessage);
 
+        // Step 3.5: Garbled-input guard. Deterministic short-circuit for
+        // clearly non-language ARMENIAN input (vowel-less consonant clusters,
+        // 3+ repeated letters — likely STT mistranscription). Conservative by
+        // contract: every evaluable Armenian token must look garbled, and
+        // pure-Latin input deliberately passes through (Whisper is pinned
+        // Language=hy on the voice path; English text triggers like "tell me
+        // a story" must keep working — pinned by
+        // IsGarbledInput_PureLatinInput_PassesThrough). Returns the canonical
+        // Armenian clarification line verbatim — no GPT call, no cost. Sits
+        // AFTER user-message persistence so the parent dashboard still sees
+        // what the child actually said. Same envelope shape as the dangerous-
+        // input prefilter above (clean SafetyFlag — we are not blocking the
+        // child, just asking them to repeat).
+        if (ArmenianVoiceReplyGuard.IsGarbledInput(userMessage))
+        {
+            _logger.LogInformation(
+                "Garbled-input guard triggered. ConversationId: {ConversationId}, Preview: {Preview}",
+                conversation.Id,
+                userMessage.Length > 40 ? userMessage[..40] + "..." : userMessage);
+
+            var clarification = ArmenianVoiceReplyGuard.ClarificationResponse;
+            var clarificationMsg = await _conversations.AddMessageAsync(
+                conversation.Id, MessageRole.Assistant, clarification, SafetyFlag.Clean);
+            return new ChatResponse(clarification, conversation.Id, clarificationMsg.Id, SafetyFlag.Clean);
+        }
+
         // Step 4: Resolve choice — explicit client selection or heuristic normalization
         string? normalizedChoice = null;
         string? choiceLabel = null;
@@ -2086,6 +2112,22 @@ public class ChatService : IChatService
         // Step 10e: Strip any leaked internal formatting (CHOICE_A/B, STORY_MEMORY,
         // --- separators) that survived parsing. Safety net for visible text.
         aiResponse = ResponseCleaner.Clean(aiResponse);
+
+        // Step 10e-voice: Voice-reply guard. Applies only outside Story mode —
+        // Story has its own length contract (3-5 sentences + CHOICE_A/B tail
+        // already parsed off above) and its choice-anchored shape would be
+        // damaged by a hard sentence cap. For every other detected mode the
+        // toy is speaking aloud over TTS, so we enforce a sentence cap and
+        // fold in the tiny curated typo list. The cap is mode-aware per
+        // MODES.md pacing: Calm/Bedtime allows 2-4 sentences (the wind-down
+        // benefits from the fourth), everything else (None, Game, Riddle,
+        // Curiosity) is capped at 3.
+        if (!isStoryMode)
+        {
+            aiResponse = ArmenianVoiceReplyGuard.ApplyTypoFixes(aiResponse);
+            var maxSentences = detectedMode == DetectedMode.Calm ? 4 : 3;
+            aiResponse = ArmenianVoiceReplyGuard.EnforceMaxSentences(aiResponse, maxSentences);
+        }
 
         // Step 10f: Mode-specific punctuation cleanup. Belt-and-suspenders for
         // when the quality gate retry also produces forbidden punctuation.
