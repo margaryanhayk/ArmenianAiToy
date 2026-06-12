@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
+using ArmenianAiToy.Application.Stories;
 using ArmenianAiToy.Domain.Enums;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -1297,6 +1298,17 @@ public class ChatService : IChatService
     // instance (the gate is stateless).
     private readonly IStoryChoiceCoherenceGate _coherenceGate;
 
+    // Library Story engine seams (W2). OPTIONAL constructor parameters —
+    // same pattern as ParentService's IAudioBlobStore seam — so the many
+    // pre-existing ChatService-constructing tests compile and behave
+    // unchanged (null ⇒ the Step 3.7 routing block is structurally
+    // skipped, identical to engine-off). Real DI injects all three
+    // (registered in W1); the playback service itself is additionally
+    // hard-gated on the deterministic Story:Engine flag.
+    private readonly LibraryStoryPlaybackService? _libraryPlayback;
+    private readonly ICuratedStoryLibrary? _storyLibrary;
+    private readonly LibraryStoryQuestionService? _libraryQuestions;
+
     public ChatService(
         IAiChatClient aiClient,
         IModerationService moderation,
@@ -1304,7 +1316,10 @@ public class ChatService : IChatService
         IChildService childService,
         IConfiguration config,
         ILogger<ChatService> logger,
-        IStoryChoiceCoherenceGate coherenceGate)
+        IStoryChoiceCoherenceGate coherenceGate,
+        LibraryStoryPlaybackService? libraryPlayback = null,
+        ICuratedStoryLibrary? storyLibrary = null,
+        LibraryStoryQuestionService? libraryQuestions = null)
     {
         _aiClient = aiClient;
         _moderation = moderation;
@@ -1313,6 +1328,71 @@ public class ChatService : IChatService
         _config = config;
         _logger = logger;
         _coherenceGate = coherenceGate;
+        _libraryPlayback = libraryPlayback;
+        _storyLibrary = storyLibrary;
+        _libraryQuestions = libraryQuestions;
+    }
+
+    /// <summary>
+    /// Step 3.7 handler: one child utterance while a library story is
+    /// active. Two deterministic branches — a continue cue resumes with
+    /// the canned lead-in plus the CURRENT verbatim segment (no GPT
+    /// anywhere); anything else is an in-story question answered by the
+    /// bounded <see cref="LibraryStoryQuestionService"/> (prompt →
+    /// filter → one repair → canned fallback; its Text is the ONLY
+    /// speakable output). Both branches run output moderation
+    /// (defense-in-depth — the §1A dual-moderation invariant holds on
+    /// every turn even though segments are approved text and Q&amp;A
+    /// text is already filter-guaranteed), persist the assistant
+    /// message, and return with NO session mutation: the tracker is
+    /// read, never advanced or cleared, so playback resumes from the
+    /// exact pre-interrupt position. The legacy pipeline (ModeDetector,
+    /// prompts, tail blocks, quality gates) is never entered.
+    /// </summary>
+    private async Task<ChatResponse> HandleLibraryStoryInterruptAsync(
+        Guid conversationId, LibraryStoryPlaybackState playback, string userMessage)
+    {
+        string responseText;
+        if (ContinueCueDetector.IsContinueCue(userMessage))
+        {
+            _logger.LogInformation(
+                "Library story continue cue. ConversationId: {ConversationId}, Story: {StoryId}, Segment: {SegmentIndex}",
+                conversationId, playback.StoryId, playback.SegmentIndex);
+            responseText =
+                LibraryStoryCannedLines.ResumeLeadIn + "\n" + playback.SegmentText;
+        }
+        else
+        {
+            // Non-null by contract: playback.GetCurrent just resolved this
+            // story against the same singleton library.
+            var story = _storyLibrary!.GetById(playback.StoryId)!;
+            var answer = await _libraryQuestions!.AnswerAsync(
+                story, playback.SegmentIndex, userMessage);
+            _logger.LogInformation(
+                "Library story Q&A answered. ConversationId: {ConversationId}, Story: {StoryId}, Segment: {SegmentIndex}, UsedFallback: {UsedFallback}, FirstRejection: {FirstRejection}",
+                conversationId, playback.StoryId, playback.SegmentIndex,
+                answer.UsedFallback, answer.FirstRejection);
+            responseText = answer.Text;
+        }
+
+        // Output moderation — same fail-safe direction as Step 9: a
+        // flagged (or fail-closed "moderation_unavailable") result never
+        // reaches the child; the canned safety fallback speaks instead.
+        var outputModeration = await _moderation.CheckContentAsync(responseText);
+        if (!outputModeration.IsSafe)
+        {
+            _logger.LogWarning(
+                "Library story reply flagged by output moderation. ConversationId: {ConversationId}, Story: {StoryId}",
+                conversationId, playback.StoryId);
+            var fallback = _config["SafetyFallbackResponse"] ?? "Արի, մի հեքիաթ սկսենք։";
+            var blockedMsg = await _conversations.AddMessageAsync(
+                conversationId, MessageRole.Assistant, fallback, SafetyFlag.Blocked);
+            return new ChatResponse(fallback, conversationId, blockedMsg.Id, SafetyFlag.Blocked);
+        }
+
+        var message = await _conversations.AddMessageAsync(
+            conversationId, MessageRole.Assistant, responseText, SafetyFlag.Clean);
+        return new ChatResponse(responseText, conversationId, message.Id, SafetyFlag.Clean);
     }
 
     public async Task<ChatResponse> GetResponseAsync(Guid deviceId, string userMessage, Guid? childId = null,
@@ -1402,6 +1482,32 @@ public class ChatService : IChatService
             var clarificationMsg = await _conversations.AddMessageAsync(
                 conversation.Id, MessageRole.Assistant, clarification, SafetyFlag.Clean);
             return new ChatResponse(clarification, conversation.Id, clarificationMsg.Id, SafetyFlag.Clean);
+        }
+
+        // Step 3.7: Library-story interrupt routing (W2). Fires ONLY when
+        // every layer agrees: the W1 seams are injected, the deterministic
+        // Story:Engine flag is "library" (playback.GetCurrent returns null
+        // when the engine is off), AND this conversation has a live
+        // LibraryStorySession. The presence of the active session is the
+        // ONLY routing signal — never model judgment (MODES.md §1A). With
+        // the shipped legacy default, or with no session, execution falls
+        // straight through to the unchanged legacy Step 4+ pipeline.
+        // Ordering contracts: input moderation (Step 2) already ran, the
+        // garbled guard (Step 3.5) already returned its exact canned line
+        // — so garbled input can never start, advance, or clear a story,
+        // and never reaches the Q&A handler. A session whose story id no
+        // longer resolves is cleared inside playback.GetCurrent (defensive)
+        // and the turn falls through to legacy. NOTE: GetCurrent→answer is
+        // not atomic under concurrent same-conversation calls — same
+        // semantics as the tracker itself; fine for one device per
+        // conversation.
+        if (_libraryPlayback is not null && _storyLibrary is not null && _libraryQuestions is not null)
+        {
+            var playback = _libraryPlayback.GetCurrent(conversation.Id);
+            if (playback is not null)
+            {
+                return await HandleLibraryStoryInterruptAsync(conversation.Id, playback, userMessage);
+            }
         }
 
         // Step 4: Resolve choice — explicit client selection or heuristic normalization
