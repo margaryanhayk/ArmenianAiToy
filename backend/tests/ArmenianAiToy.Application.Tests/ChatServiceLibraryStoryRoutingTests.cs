@@ -236,8 +236,10 @@ public class ChatServiceLibraryStoryRoutingTests
     [InlineData("Շարունակի՛ր")]
     [InlineData("հա")]
     [InlineData("էլի")]
-    public async Task ContinueCue_ResumesWithCannedLeadInAndVerbatimSegment_NoGpt(string cue)
+    public async Task ContinueCue_AdvancesAndServesNextVerbatimSegment_NoGpt(string cue)
     {
+        // W3 contract: continue cues ADVANCE the story by one segment
+        // and serve the canned lead-in + the NEXT verbatim segment.
         _tracker.Start(_conversationId, InMemoryCuratedStoryLibrary.LittleCloudId);
         var story = _library.GetById(InMemoryCuratedStoryLibrary.LittleCloudId)!;
         var service = MakeService("library");
@@ -245,12 +247,11 @@ public class ChatServiceLibraryStoryRoutingTests
         var result = await service.GetResponseAsync(Guid.NewGuid(), cue);
 
         Assert.Equal(
-            LibraryStoryCannedLines.ResumeLeadIn + "\n" + story.Segments[0].Text,
+            LibraryStoryCannedLines.ResumeLeadIn + "\n" + story.Segments[1].Text,
             result.Response);
         Assert.Equal(0, QaAiCalls());      // «հետո՞» must NEVER reach Q&A
         Assert.Equal(0, await LegacyAiCalls());
-        // Resume is position-read-only too: W3 owns advancement.
-        Assert.Equal(0, _tracker.GetCurrent(_conversationId)!.SegmentIndex);
+        Assert.Equal(1, _tracker.GetCurrent(_conversationId)!.SegmentIndex);
     }
 
     [Theory]

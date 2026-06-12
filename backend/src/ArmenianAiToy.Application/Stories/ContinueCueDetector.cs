@@ -39,7 +39,10 @@ internal static class ContinueCueDetector
         return Cues.Contains(normalized, StringComparer.Ordinal);
     }
 
-    private static string Normalize(string input)
+    /// <summary>Shared cue normalization (also used by
+    /// <see cref="StoryStartCueDetector"/>): lowercase, strip Armenian
+    /// intonation marks and terminal/framing punctuation, trim.</summary>
+    internal static string Normalize(string input)
     {
         var sb = new StringBuilder(input.Length);
         foreach (var c in input.Trim().ToLowerInvariant())
@@ -57,12 +60,60 @@ internal static class ContinueCueDetector
     }
 }
 
+/// <summary>
+/// Deterministic story-START cue check for the library engine (W3).
+/// While NO library session is active and the engine flag is on, a
+/// normalized whole-utterance match against this fixed request list
+/// starts an approved library story — code routing, never model
+/// judgment, and never GPT. Anything else falls through to the
+/// unchanged legacy pipeline (including the legacy free-generation
+/// Story mode, which keeps serving all non-matching story requests
+/// until the engine flag flips and richer detection lands).
+/// </summary>
+internal static class StoryStartCueDetector
+{
+    /// <summary>Fixed start-request vocabulary. Whole-utterance match
+    /// after <see cref="ContinueCueDetector.Normalize"/> — extending it
+    /// is a reviewed code change by design. English entries exist
+    /// because the text-API test/QA surface uses them as canonical
+    /// triggers; the voice path is pinned Language=hy.</summary>
+    private static readonly string[] Cues =
+    [
+        "հեքիաթ պատմիր",
+        "պատմիր հեքիաթ",
+        "մի հեքիաթ պատմիր",
+        "արի հեքիաթ",
+        "հեքիաթ ուզում եմ",
+        "ուզում եմ հեքիաթ",
+        "tell me a story",
+    ];
+
+    /// <summary>True when the whole normalized utterance equals one of
+    /// the fixed start requests.</summary>
+    public static bool IsStoryStartCue(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return false;
+        }
+
+        var normalized = ContinueCueDetector.Normalize(input);
+        return Cues.Contains(normalized, StringComparer.Ordinal);
+    }
+}
+
 /// <summary>Code-owned canned Armenian lines for the library-story
 /// flow. Pre-written and reviewed (armenian-story-master) — never
 /// generated, never edited at runtime.</summary>
 internal static class LibraryStoryCannedLines
 {
-    /// <summary>Spoken before re-serving the current verbatim segment
-    /// when the child gives a continue cue. Reviewed 2026-06-13.</summary>
+    /// <summary>Spoken before serving the next verbatim segment when
+    /// the child gives a continue cue. Reviewed 2026-06-13.</summary>
     public const string ResumeLeadIn = "Ուրեմն, շարունակում ենք հեքիաթը։";
+
+    /// <summary>Spoken before the verbatim first segment when a story
+    /// start cue opens a library story. Deliberate minimal pair with
+    /// <see cref="ResumeLeadIn"/> (same particle, same frame).
+    /// Reviewed 2026-06-13.</summary>
+    public const string StartLeadIn = "Ուրեմն, սկսում ենք հեքիաթը։";
 }

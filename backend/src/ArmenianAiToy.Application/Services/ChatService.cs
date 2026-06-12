@@ -1352,38 +1352,74 @@ public class ChatService : IChatService
     private async Task<ChatResponse> HandleLibraryStoryInterruptAsync(
         Guid conversationId, LibraryStoryPlaybackState playback, string userMessage)
     {
-        string responseText;
         if (ContinueCueDetector.IsContinueCue(userMessage))
         {
-            _logger.LogInformation(
-                "Library story continue cue. ConversationId: {ConversationId}, Story: {StoryId}, Segment: {SegmentIndex}",
-                conversationId, playback.StoryId, playback.SegmentIndex);
-            responseText =
-                LibraryStoryCannedLines.ResumeLeadIn + "\n" + playback.SegmentText;
-        }
-        else
-        {
-            // Non-null by contract: playback.GetCurrent just resolved this
-            // story against the same singleton library.
-            var story = _storyLibrary!.GetById(playback.StoryId)!;
-            var answer = await _libraryQuestions!.AnswerAsync(
-                story, playback.SegmentIndex, userMessage);
-            _logger.LogInformation(
-                "Library story Q&A answered. ConversationId: {ConversationId}, Story: {StoryId}, Segment: {SegmentIndex}, UsedFallback: {UsedFallback}, FirstRejection: {FirstRejection}",
-                conversationId, playback.StoryId, playback.SegmentIndex,
-                answer.UsedFallback, answer.FirstRejection);
-            responseText = answer.Text;
+            // W3: continue cues ADVANCE. Three deterministic outcomes —
+            // next segment (lead-in + verbatim text), story end (the
+            // authored reflection turn, delivered in this SAME turn
+            // because Advance already cleared the session), or an
+            // expiry race (re-serve the segment we already resolved —
+            // never an error to the child).
+            var advance = _libraryPlayback!.Advance(conversationId);
+            if (advance.StoryEnded)
+            {
+                var endedStory = _storyLibrary!.GetById(playback.StoryId)!;
+                _logger.LogInformation(
+                    "Library story ended. ConversationId: {ConversationId}, Story: {StoryId}",
+                    conversationId, playback.StoryId);
+                // Authored, reviewed ending data: reflection sentence +
+                // exactly one reflection question (the serving site
+                // selects the first — MODES.md §1A Endings).
+                return await RespondWithLibraryTextAsync(
+                    conversationId,
+                    endedStory.ReflectionText + "\n" + endedStory.ReflectionQuestions[0]);
+            }
+            if (advance.Next is not null)
+            {
+                _logger.LogInformation(
+                    "Library story advanced. ConversationId: {ConversationId}, Story: {StoryId}, Segment: {SegmentIndex}",
+                    conversationId, advance.Next.StoryId, advance.Next.SegmentIndex);
+                return await RespondWithLibraryTextAsync(
+                    conversationId,
+                    LibraryStoryCannedLines.ResumeLeadIn + "\n" + advance.Next.SegmentText);
+            }
+            return await RespondWithLibraryTextAsync(
+                conversationId,
+                LibraryStoryCannedLines.ResumeLeadIn + "\n" + playback.SegmentText);
         }
 
-        // Output moderation — same fail-safe direction as Step 9: a
-        // flagged (or fail-closed "moderation_unavailable") result never
-        // reaches the child; the canned safety fallback speaks instead.
+        // In-story question (W2, unchanged): bounded Q&A; position is
+        // read-only — the session is never advanced or cleared here.
+        // Story non-null by contract: playback.GetCurrent just resolved
+        // it against the same singleton library.
+        var story = _storyLibrary!.GetById(playback.StoryId)!;
+        var answer = await _libraryQuestions!.AnswerAsync(
+            story, playback.SegmentIndex, userMessage);
+        _logger.LogInformation(
+            "Library story Q&A answered. ConversationId: {ConversationId}, Story: {StoryId}, Segment: {SegmentIndex}, UsedFallback: {UsedFallback}, FirstRejection: {FirstRejection}",
+            conversationId, playback.StoryId, playback.SegmentIndex,
+            answer.UsedFallback, answer.FirstRejection);
+        return await RespondWithLibraryTextAsync(conversationId, answer.Text);
+    }
+
+    /// <summary>Shared tail for every library-engine reply (start /
+    /// advance / ending / Q&amp;A): output moderation with the same
+    /// fail-safe direction as Step 9 — a flagged (or fail-closed
+    /// "moderation_unavailable") result never reaches the child; the
+    /// canned safety fallback speaks instead — then assistant-message
+    /// persistence. Library text deliberately BYPASSES the Step 10
+    /// post-processing (simplifier, cleaner, voice cap, punctuation
+    /// rewrites): approved segments are served byte-verbatim per
+    /// MODES.md §1A.</summary>
+    private async Task<ChatResponse> RespondWithLibraryTextAsync(
+        Guid conversationId, string responseText)
+    {
         var outputModeration = await _moderation.CheckContentAsync(responseText);
         if (!outputModeration.IsSafe)
         {
             _logger.LogWarning(
-                "Library story reply flagged by output moderation. ConversationId: {ConversationId}, Story: {StoryId}",
-                conversationId, playback.StoryId);
+                "Library story reply flagged by output moderation. ConversationId: {ConversationId}",
+                conversationId);
             var fallback = _config["SafetyFallbackResponse"] ?? "Արի, մի հեքիաթ սկսենք։";
             var blockedMsg = await _conversations.AddMessageAsync(
                 conversationId, MessageRole.Assistant, fallback, SafetyFlag.Blocked);
@@ -1507,6 +1543,28 @@ public class ChatService : IChatService
             if (playback is not null)
             {
                 return await HandleLibraryStoryInterruptAsync(conversation.Id, playback, userMessage);
+            }
+
+            // Step 3.7-start (W3): no active session — a deterministic
+            // story-start cue opens an approved library story (default
+            // selection; drafts structurally unreachable) and serves the
+            // first segment verbatim. No GPT anywhere. Non-matching input
+            // — including all richer story requests — falls through to
+            // the unchanged legacy pipeline.
+            if (_libraryPlayback.IsEngineEnabled && StoryStartCueDetector.IsStoryStartCue(userMessage))
+            {
+                var started = _libraryPlayback.Start(conversation.Id);
+                if (started is not null)
+                {
+                    _logger.LogInformation(
+                        "Library story started. ConversationId: {ConversationId}, Story: {StoryId}, Segments: {SegmentCount}",
+                        conversation.Id, started.StoryId, started.SegmentCount);
+                    return await RespondWithLibraryTextAsync(
+                        conversation.Id,
+                        LibraryStoryCannedLines.StartLeadIn + "\n" + started.SegmentText);
+                }
+                // Start returned null (no approved story resolvable) —
+                // fall through to legacy rather than serving an error.
             }
         }
 
