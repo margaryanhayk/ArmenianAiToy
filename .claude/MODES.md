@@ -298,15 +298,31 @@ never as code, through a gated pipeline:
 - `CuratedStory`, `CuratedStorySegment`, `ICuratedStoryLibrary`,
   `InMemoryCuratedStoryLibrary`, `LibraryStorySessionTracker`
   (`backend/src/.../Application/Stories/` — shipped runtime-dead in
-  commit dfc831d). Routing/wiring: future slice, gated on this contract.
+  commit dfc831d).
+- Wiring (W1–W3, commits 0f0676b / 18d0106 / af9d52d): `StoryEngineOptions`
+  (deterministic `Story:Engine` flag, default legacy),
+  `LibraryStoryPlaybackService` (start / current / advance / end /
+  clear), `ContinueCueDetector` + `StoryStartCueDetector` (fixed cue
+  vocabularies), `LibraryStoryQuestionService` +
+  `LibraryStoryQuestionPromptBuilder` + `StoryAnswerFilter` (bounded
+  in-story Q&A), and ChatService Step 3.7 (after the garbled guard):
+  start cue → first segment; continue cue → advance; final continue →
+  reflection turn + session clear; anything else with an active
+  session → bounded Q&A, position read-only.
 
 **Test / benchmark implications.**
 - Library/tracker already pinned by `CuratedStoryLibraryTests` and
   `LibraryStorySessionTrackerTests` (verbatim byte-pins, expiry,
   isolation).
-- The wiring slice must add: continue-cue routing tests, Q&A validation
-  tests, Calm/bedtime question-suppression pins, session-pause/resume
-  tests, and a flag-off byte-identical regression pin.
+- Wiring pins landed (W1–W3): continue-cue routing tests, Q&A
+  validation tests, session-pause/resume tests, flag-off regression
+  pins, full-lifecycle start→advance→ending tests, verbatim
+  post-processing-bypass pins (`ChatServiceLibraryStoryRoutingTests`,
+  `ChatServiceLibraryStoryLifecycleTests`,
+  `LibraryStoryPlaybackServiceTests`, `LibraryStoryQuestion*Tests`).
+- Still pending (pre-release polish): Calm/bedtime-adjacent
+  reflection-question suppression pin, post-end «էլի»/repeat handling,
+  broader story-start detection, real-device bench QA.
 
 ---
 
@@ -555,12 +571,12 @@ These are constant across modes and must never drift:
 
 ---
 
-## Implementation status (as of 2026-04-13)
+## Implementation status (as of 2026-06-13)
 
 | Mode             | Detection              | Prompt section                     | Quality gate                          | Session persistence |
 |------------------|------------------------|------------------------------------|---------------------------------------|---------------------|
 | Story — Legacy   | `ModeDetector` ✅      | `StoryChoiceInstruction` ✅         | universal + subject_mismatch ✅       | `PendingChoices` ✅ |
-| Story — Library  | model/tracker shipped runtime-dead (dfc831d) ✅ — not wired | n/a (verbatim segments, no prompt section) | wiring slice: continue-cue + Q&A validation gates ⏳ | `LibraryStorySessionTracker` ✅ (not wired) |
+| Story — Library  | wired behind `Story:Engine=library` ✅ (W1–W3: flag+DI 0f0676b, interrupt Q&A 18d0106, start/advance/ending af9d52d) | n/a for segments (verbatim); bounded Q&A prompt via `LibraryStoryQuestionPromptBuilder` ✅ | `StoryAnswerFilter` + repair-once + canned fallback + output moderation ✅; Calm reflection-question suppression ⏳ | `LibraryStorySessionTracker` via `LibraryStoryPlaybackService` ✅ |
 | Game             | `ModeDetector` ✅      | `GameModeInstruction` ✅            | `game_too_long` (>150 chars) ✅       | `ActiveModes` ✅    |
 | Riddle           | `ModeDetector` ✅      | `RiddleModeInstruction` ✅          | universal ✅                          | `ActiveModes` ✅    |
 | Curiosity Window | `ModeDetector` ✅      | `CuriosityWindowInstruction` ✅     | `curiosity_question` / `too_long` ✅  | one-turn (choices preserved) |
@@ -574,6 +590,17 @@ Post-processing strips forbidden punctuation from Calm (`?!`) and
 Curiosity (`?`) as a belt-and-suspenders after the quality gate retry.
 Emoji codepoints stripped from all responses. Mode-aware safety fallback
 for Calm returns a bedtime message instead of the default.
+
+**Library-engine release status (2026-06-13).** The library engine is
+functionally complete behind the flag, but `Story:Engine` ships and
+remains **`legacy`** — enabling `library` in production is an explicit
+OWNER release act, never automated. «Անբան Հուռին» (anban-huri) remains
+a `draft` in `backend/content/story-drafts/` and is NOT runtime-served
+until the production-voice TTS listen test passes and a human promotes
+it to approved `Stories/Content/`. Remaining pre-release polish:
+Calm/bedtime-adjacent reflection-question suppression, post-end
+«էլի»/repeat handling per "After the end", broader story-start
+detection, and real-device bench QA over the voice path.
 
 ---
 
