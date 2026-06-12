@@ -4,6 +4,7 @@ using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Notifications;
 using ArmenianAiToy.Application.Services;
+using ArmenianAiToy.Application.Stories;
 using ArmenianAiToy.Infrastructure.Audio;
 using ArmenianAiToy.Infrastructure.Auth;
 using ArmenianAiToy.Infrastructure.Background;
@@ -77,6 +78,24 @@ public static class DependencyInjection
         // Adapters
         services.AddScoped<IAiChatClient, OpenAIChatClientAdapter>();
         services.AddScoped<IModerationService, OpenAIModerationAdapter>();
+
+        // Library Story engine (W1 — session lifecycle only, NOT wired
+        // into live chat turns; ChatService routing is the separate,
+        // human-approved W2 slice). Engine selection is the
+        // deterministic Story:Engine flag: shipped default "legacy",
+        // and missing/unrecognized values resolve to legacy, so these
+        // registrations change no live behavior until a human flips
+        // the flag. The library serves ONLY approved embedded
+        // Stories/Content resources — drafts (e.g. anban-huri) are
+        // structurally unreachable. Singletons: the tracker is
+        // process-local session state (same pattern as ExportCooldown)
+        // and the library/playback service are stateless over it. The
+        // W2 Q&A consumer is scoped because IAiChatClient is scoped.
+        services.AddSingleton(StoryEngineOptions.FromConfiguration(config));
+        services.AddSingleton<ICuratedStoryLibrary, InMemoryCuratedStoryLibrary>();
+        services.AddSingleton<LibraryStorySessionTracker>();
+        services.AddSingleton<LibraryStoryPlaybackService>();
+        services.AddScoped<LibraryStoryQuestionService>();
 
         // Application services
         services.AddSingleton<IStoryChoiceCoherenceGate, StoryChoiceCoherenceGate>();

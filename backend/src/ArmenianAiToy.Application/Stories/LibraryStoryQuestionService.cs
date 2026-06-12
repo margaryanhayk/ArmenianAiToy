@@ -14,7 +14,7 @@ namespace ArmenianAiToy.Application.Stories;
 /// <see cref="StoryAnswerRejection.None"/> when it passed.</param>
 /// <param name="RetryRejection">Why the repair answer was rejected;
 /// null when no retry was needed.</param>
-internal sealed record StoryQuestionAnswer(
+public sealed record StoryQuestionAnswer(
     string Text,
     bool UsedFallback,
     StoryAnswerRejection FirstRejection,
@@ -36,7 +36,7 @@ internal sealed record StoryQuestionAnswer(
 /// the next, human-approved slice.
 /// </para>
 /// </summary>
-internal sealed class LibraryStoryQuestionService
+public sealed class LibraryStoryQuestionService
 {
     private readonly IAiChatClient _ai;
 

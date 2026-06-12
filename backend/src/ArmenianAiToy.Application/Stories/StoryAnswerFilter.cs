@@ -1,8 +1,10 @@
 namespace ArmenianAiToy.Application.Stories;
 
 /// <summary>Why a GPT story-question answer was rejected before TTS.
-/// <see cref="None"/> means the answer passed every check.</summary>
-internal enum StoryAnswerRejection
+/// <see cref="None"/> means the answer passed every check. Public
+/// because it rides on the public <see cref="StoryQuestionAnswer"/>
+/// result shape (logging/metrics only — never child-facing output).</summary>
+public enum StoryAnswerRejection
 {
     None,
     Empty,
