@@ -256,6 +256,69 @@ public class LibraryStoryPlaybackServiceTests
         Assert.False(service.Clear(conversationId));
     }
 
+    // ── W4: recently-ended marker ───────────────────────────────────
+
+    [Fact]
+    public void AdvancePastFinal_SetsRecentlyEndedMarker()
+    {
+        var service = MakeService("library", out var tracker);
+        var conversationId = Guid.NewGuid();
+
+        var state = service.Start(conversationId)!;
+        while (!state.IsFinalSegment)
+        {
+            state = service.Advance(conversationId).Next!;
+        }
+        Assert.False(service.HasRecentlyEnded(conversationId));
+
+        var end = service.Advance(conversationId);
+
+        Assert.True(end.StoryEnded);
+        Assert.True(service.HasRecentlyEnded(conversationId));
+        Assert.Equal(
+            InMemoryCuratedStoryLibrary.LittleCloudId,
+            tracker.GetRecentlyEnded(conversationId)!.StoryId);
+    }
+
+    [Fact]
+    public void StartingANewStory_ClearsTheEndedMarker()
+    {
+        var service = MakeService("library", out var tracker);
+        var conversationId = Guid.NewGuid();
+        tracker.MarkEnded(conversationId, InMemoryCuratedStoryLibrary.LittleCloudId);
+        Assert.True(service.HasRecentlyEnded(conversationId));
+
+        service.Start(conversationId);
+
+        Assert.False(service.HasRecentlyEnded(conversationId));
+        Assert.Null(tracker.GetRecentlyEnded(conversationId));
+    }
+
+    [Fact]
+    public void HasRecentlyEnded_IsEngineGated()
+    {
+        var service = MakeService("legacy", out var tracker);
+        var conversationId = Guid.NewGuid();
+        tracker.MarkEnded(conversationId, InMemoryCuratedStoryLibrary.LittleCloudId);
+
+        Assert.False(service.HasRecentlyEnded(conversationId));
+    }
+
+    [Fact]
+    public void EndedMarker_ExpiresAfterThirtyMinutes()
+    {
+        var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        var tracker = new LibraryStorySessionTracker(clock);
+        var conversationId = Guid.NewGuid();
+        tracker.MarkEnded(conversationId, InMemoryCuratedStoryLibrary.LittleCloudId);
+
+        clock.Advance(TimeSpan.FromMinutes(29));
+        Assert.NotNull(tracker.GetRecentlyEnded(conversationId));
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.Null(tracker.GetRecentlyEnded(conversationId));
+    }
+
     [Fact]
     public void Sessions_AreIsolatedPerConversation()
     {

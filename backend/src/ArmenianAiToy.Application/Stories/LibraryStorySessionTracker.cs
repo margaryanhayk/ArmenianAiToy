@@ -17,6 +17,19 @@ public sealed record LibraryStorySession(
     DateTimeOffset ActivatedAt);
 
 /// <summary>
+/// Marker left behind when a library story finishes (W4): which story
+/// just ended for this conversation, and when. Lets the post-end
+/// repeat cues («էլի», «նորից», …) deterministically distinguish
+/// "story just finished" from "no story context at all" after the
+/// session itself has been cleared. Same 30-minute expiry convention.
+/// </summary>
+/// <param name="StoryId">Library id of the story that ended.</param>
+/// <param name="EndedAt">UTC timestamp of the ending turn.</param>
+public sealed record LibraryStoryEnded(
+    string StoryId,
+    DateTimeOffset EndedAt);
+
+/// <summary>
 /// In-memory per-conversation tracker for active curated-library
 /// stories, mirroring the shape of ChatService's PendingChoices /
 /// StoryMemories dictionaries (keyed by conversation id, 30-minute
@@ -38,6 +51,7 @@ public sealed class LibraryStorySessionTracker
     public static readonly TimeSpan SessionExpiry = TimeSpan.FromMinutes(30);
 
     private readonly ConcurrentDictionary<Guid, LibraryStorySession> _sessions = new();
+    private readonly ConcurrentDictionary<Guid, LibraryStoryEnded> _ended = new();
     private readonly TimeProvider _clock;
 
     public LibraryStorySessionTracker() : this(TimeProvider.System) { }
@@ -58,7 +72,40 @@ public sealed class LibraryStorySessionTracker
         ArgumentException.ThrowIfNullOrWhiteSpace(storyId);
         var session = new LibraryStorySession(storyId, 0, _clock.GetUtcNow());
         _sessions[conversationId] = session;
+        // A fresh session supersedes any "just ended" state — repeat
+        // cues now mean "continue" again, not "play it again".
+        _ended.TryRemove(conversationId, out _);
         return session;
+    }
+
+    /// <summary>Records that a story just finished for this
+    /// conversation (called by the playback service on the ending
+    /// turn, after the session is cleared).</summary>
+    public void MarkEnded(Guid conversationId, string storyId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(storyId);
+        _ended[conversationId] = new LibraryStoryEnded(storyId, _clock.GetUtcNow());
+    }
+
+    /// <summary>Returns the conversation's recently-ended marker, or
+    /// null when none exists or it has sat for
+    /// <see cref="SessionExpiry"/> or longer (stale entries are
+    /// removed on detection — same convention as
+    /// <see cref="GetCurrent"/>).</summary>
+    public LibraryStoryEnded? GetRecentlyEnded(Guid conversationId)
+    {
+        if (!_ended.TryGetValue(conversationId, out var ended))
+        {
+            return null;
+        }
+
+        if (_clock.GetUtcNow() - ended.EndedAt >= SessionExpiry)
+        {
+            _ended.TryRemove(conversationId, out _);
+            return null;
+        }
+
+        return ended;
     }
 
     /// <summary>

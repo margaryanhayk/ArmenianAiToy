@@ -320,6 +320,127 @@ public class ChatServiceLibraryStoryLifecycleTests
             AudioStoryResponseComposer.ComposeTtsText(endingTurn, null, null, null));
     }
 
+    // ── W4: post-end repeat cues ────────────────────────────────────
+
+    /// <summary>Starts the default story and walks it to the ending
+    /// turn (reflection delivered, session cleared, ended marker set).</summary>
+    private async Task FinishDefaultStoryAsync(IChatService service, Guid deviceId)
+    {
+        var story = DefaultStory();
+        await service.GetResponseAsync(deviceId, "հեքիաթ պատմիր");
+        for (var i = 1; i < story.Segments.Count; i++)
+        {
+            await service.GetResponseAsync(deviceId, "հետո՞");
+        }
+        var ending = await service.GetResponseAsync(deviceId, "հետո՞");
+        Assert.StartsWith(story.ReflectionText, ending.Response);
+        Assert.Null(_tracker.GetCurrent(_conversationId));
+    }
+
+    [Theory]
+    [InlineData("էլի")]
+    [InlineData("նորից")]
+    [InlineData("Էլի՛ պատմիր")]
+    public async Task PostEnd_RepeatCue_StartsFreshApprovedStory_NoGpt(string repeatCue)
+    {
+        var service = MakeService("library");
+        var deviceId = Guid.NewGuid();
+        var story = DefaultStory();
+        await FinishDefaultStoryAsync(service, deviceId);
+
+        var result = await service.GetResponseAsync(deviceId, repeatCue);
+
+        Assert.Equal(
+            LibraryStoryCannedLines.StartLeadIn + "\n" + story.Segments[0].Text,
+            result.Response);
+        var session = _tracker.GetCurrent(_conversationId);
+        Assert.NotNull(session);
+        Assert.Equal(story.Id, session!.StoryId);          // default approved story
+        Assert.NotEqual("anban-huri", session.StoryId);    // never the draft
+        Assert.Equal(0, session.SegmentIndex);
+        Assert.Equal(0, LegacyAiCalls());
+        Assert.Equal(0, QaAiCalls());
+    }
+
+    [Theory]
+    [InlineData("նորից")]
+    [InlineData("էլի")]
+    public async Task RepeatCue_WithoutRecentEnding_StaysLegacy_NoSession(string repeatCue)
+    {
+        // No story ever played in this conversation — a bare repeat
+        // word has no story context and must not start anything.
+        var service = MakeService("library");
+
+        await service.GetResponseAsync(Guid.NewGuid(), repeatCue);
+
+        Assert.True(LegacyAiCalls() > 0);
+        Assert.Equal(0, QaAiCalls());
+        Assert.Null(_tracker.GetCurrent(_conversationId));
+    }
+
+    // ── W4: broader start cues ──────────────────────────────────────
+
+    [Theory]
+    [InlineData("հեքիաթ կպատմե՞ս")]
+    [InlineData("ուզում եմ հեքիաթ լսել")]
+    [InlineData("արի մի հեքիաթ լսենք")]
+    public async Task NewStartCues_StartDefaultApprovedStory(string request)
+    {
+        var service = MakeService("library");
+        var story = DefaultStory();
+
+        var result = await service.GetResponseAsync(Guid.NewGuid(), request);
+
+        Assert.Equal(
+            LibraryStoryCannedLines.StartLeadIn + "\n" + story.Segments[0].Text,
+            result.Response);
+        Assert.Equal(story.Id, _tracker.GetCurrent(_conversationId)!.StoryId);
+        Assert.Equal(0, LegacyAiCalls());
+        Assert.Equal(0, QaAiCalls());
+    }
+
+    [Fact]
+    public async Task SentenceContainingHekiat_NotInFixedList_StaysLegacy()
+    {
+        // No broad substring matching: mentioning «հեքիաթ» is not a
+        // request to start one.
+        var service = MakeService("library");
+
+        await service.GetResponseAsync(Guid.NewGuid(), "երեկ մի հեքիաթ կարդացի մայրիկիս հետ");
+
+        Assert.True(LegacyAiCalls() > 0);
+        Assert.Null(_tracker.GetCurrent(_conversationId));
+    }
+
+    [Fact]
+    public async Task LegacyEngine_NewStartCue_StaysLegacy_NoSession()
+    {
+        var service = MakeService("legacy");
+
+        await service.GetResponseAsync(Guid.NewGuid(), "հեքիաթ կպատմես");
+
+        Assert.True(LegacyAiCalls() > 0);
+        Assert.Equal(0, QaAiCalls());
+        Assert.Null(_tracker.GetCurrent(_conversationId));
+    }
+
+    // ── RepeatCueDetector unit pins ─────────────────────────────────
+
+    [Theory]
+    [InlineData("էլի", true)]
+    [InlineData("Նորի՛ց", true)]
+    [InlineData("մեկ էլ", true)]
+    [InlineData("նորից պատմիր", true)]
+    [InlineData("ուրիշ հեքիաթ", true)]
+    [InlineData("նորից եմ ուզում լսել այդ հեքիաթը", false)] // sentence, not a cue
+    [InlineData("Բարև Արեգ", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void RepeatCueDetector_MatchesWholeUtteranceOnly(string? input, bool expected)
+    {
+        Assert.Equal(expected, RepeatCueDetector.IsRepeatCue(input));
+    }
+
     // ── StoryStartCueDetector unit pins ─────────────────────────────
 
     [Theory]

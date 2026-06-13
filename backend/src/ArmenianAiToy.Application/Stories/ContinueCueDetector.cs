@@ -85,12 +85,64 @@ internal static class StoryStartCueDetector
         "արի հեքիաթ",
         "հեքիաթ ուզում եմ",
         "ուզում եմ հեքիաթ",
+        // W4: common natural request forms — still whole-utterance,
+        // still a fixed list (intonation marks like «կպատմե՞ս» are
+        // stripped by normalization, so the question form matches too).
+        "հեքիաթ պատմի",
+        "հեքիաթ կպատմես",
+        "մի հեքիաթ կպատմես",
+        "ուզում եմ հեքիաթ լսել",
+        "արի մի հեքիաթ լսենք",
         "tell me a story",
     ];
 
     /// <summary>True when the whole normalized utterance equals one of
     /// the fixed start requests.</summary>
     public static bool IsStoryStartCue(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return false;
+        }
+
+        var normalized = ContinueCueDetector.Normalize(input);
+        return Cues.Contains(normalized, StringComparer.Ordinal);
+    }
+}
+
+/// <summary>
+/// Deterministic post-end REPEAT cue check (W4, MODES.md §1A "After
+/// the end"). Consulted ONLY when no session is active AND the
+/// tracker carries a recently-ended marker — so «էլի» right after a
+/// story's ending restarts a story, while the same word with no story
+/// context (or mid-story, where it is a continue cue) never reaches
+/// this path. Whole-utterance normalized match against a fixed list;
+/// no GPT anywhere.
+/// </summary>
+internal static class RepeatCueDetector
+{
+    /// <summary>Fixed repeat-request vocabulary (MODES.md §1A names
+    /// «էլի», «նորից պատմիր», «էդ նորից»; the short bare forms are
+    /// included because the ending turn just asked the reflection
+    /// question and a bare «էլի» / «նորից» is the natural child
+    /// reply). Extending it is a reviewed code change.</summary>
+    private static readonly string[] Cues =
+    [
+        "էլի",
+        "կրկին",
+        "նորից",
+        "մեկ էլ",
+        "նորից պատմիր",
+        "էլի պատմիր",
+        "էդ նորից",
+        "մեկ էլ պատմիր",
+        "մեկ ուրիշ",
+        "ուրիշ հեքիաթ",
+    ];
+
+    /// <summary>True when the whole normalized utterance equals one of
+    /// the fixed repeat cues.</summary>
+    public static bool IsRepeatCue(string? input)
     {
         if (string.IsNullOrWhiteSpace(input))
         {

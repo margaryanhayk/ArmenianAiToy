@@ -1551,7 +1551,14 @@ public class ChatService : IChatService
             // first segment verbatim. No GPT anywhere. Non-matching input
             // — including all richer story requests — falls through to
             // the unchanged legacy pipeline.
-            if (_libraryPlayback.IsEngineEnabled && StoryStartCueDetector.IsStoryStartCue(userMessage))
+            // W4: a repeat cue («էլի», «նորից», …) also starts a story,
+            // but ONLY when a library story recently ended for this
+            // conversation (deterministic tracker marker) — the same
+            // word with no story context stays legacy.
+            if (_libraryPlayback.IsEngineEnabled
+                && (StoryStartCueDetector.IsStoryStartCue(userMessage)
+                    || (RepeatCueDetector.IsRepeatCue(userMessage)
+                        && _libraryPlayback.HasRecentlyEnded(conversation.Id))))
             {
                 var started = _libraryPlayback.Start(conversation.Id);
                 if (started is not null)

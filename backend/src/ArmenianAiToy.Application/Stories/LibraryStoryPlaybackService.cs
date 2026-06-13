@@ -147,6 +147,11 @@ public sealed class LibraryStoryPlaybackService
         if (current.IsFinalSegment)
         {
             _tracker.Clear(conversationId);
+            // W4: leave the deterministic "just ended" marker so the
+            // post-end repeat cues («էլի», «նորից», …) can restart a
+            // story without any session existing. The marker shares the
+            // 30-minute expiry and is superseded by any new Start.
+            _tracker.MarkEnded(conversationId, current.StoryId);
             return new LibraryStoryAdvanceResult(Next: null, StoryEnded: true);
         }
 
@@ -166,6 +171,14 @@ public sealed class LibraryStoryPlaybackService
     /// are no-ops). Returns true when a session was present.</summary>
     public bool Clear(Guid conversationId) =>
         IsEngineEnabled && _tracker.Clear(conversationId);
+
+    /// <summary>True when a library story finished for this
+    /// conversation within the marker's 30-minute window (and the
+    /// engine is on). The W4 post-end repeat cues consult this so
+    /// «էլի» right after an ending restarts a story, while the same
+    /// word with no story context stays on the legacy pipeline.</summary>
+    public bool HasRecentlyEnded(Guid conversationId) =>
+        IsEngineEnabled && _tracker.GetRecentlyEnded(conversationId) is not null;
 
     private static LibraryStoryPlaybackState State(CuratedStory story, int segmentIndex) =>
         new(
