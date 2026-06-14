@@ -19,27 +19,59 @@
 
 // --- Wi-Fi credentials ---------------------------------------
 #ifndef AREG_WIFI_SSID
-#define AREG_WIFI_SSID          "CHANGEME_SSID"
+#define AREG_WIFI_SSID          "OVIO_0114707"
 #endif
 #ifndef AREG_WIFI_PASSWORD
-#define AREG_WIFI_PASSWORD      "CHANGEME_PASSWORD"
+#define AREG_WIFI_PASSWORD      "Katrin2018"
 #endif
 
 // --- Backend endpoint ----------------------------------------
 // Point this at your dev laptop on the same LAN. Plain HTTP is
 // fine on a bench LAN; TLS is a later-phase concern.
 #ifndef AREG_BACKEND_URL
-#define AREG_BACKEND_URL        "http://192.168.1.100:5000/api/chat/audio"
+#define AREG_BACKEND_URL        "http://192.168.1.8:5000/api/chat/audio"
+#endif
+
+// Continuous story narration (pre-rendered, streamed). The device
+// streams this MP3 and decodes it on the fly; resume appends
+// "?from=<byteOffset>". Same host/port as the backend above.
+#ifndef AREG_STORY_AUDIO_URL
+#define AREG_STORY_AUDIO_URL    "http://192.168.1.8:5000/api/story-audio/anban-huri"
+#endif
+
+// Library story id (matches the path in AREG_STORY_AUDIO_URL); sent to
+// the Q&A endpoint so the backend answers from the right story.
+#ifndef AREG_STORY_ID
+#define AREG_STORY_ID           "anban-huri"
+#endif
+
+// In-story Q&A. On barge-in the device records the question and POSTs
+// the WAV here as "?storyId=<id>&offset=<byteOffset>"; the response is
+// the spoken answer MP3. Device-auth headers ARE sent on this POST.
+#ifndef AREG_STORY_QA_URL
+#define AREG_STORY_QA_URL       "http://192.168.1.8:5000/api/chat/story-qa"
+#endif
+
+// Resume-offset correction. getPos() reports bytes the decoder has
+// CONSUMED, which runs ahead of what the speaker has actually played
+// (decoded audio still buffered in the I2S DMA when barge-in cuts it).
+// We resume from (getPos - this) so playback lands at — or slightly
+// before — the audible pause point. Erring slightly toward overlap
+// (re-hear a moment) is far better than skipping words. ~24 KB ≈ ~1 s
+// at the narration bitrate. Tune here if resume skips (raise) or
+// repeats too much (lower).
+#ifndef AREG_STORY_RESUME_FUDGE_BYTES
+#define AREG_STORY_RESUME_FUDGE_BYTES 8192
 #endif
 
 // --- Device credentials --------------------------------------
 // Get these once via POST /api/devices/register against the backend.
 // See README.md "First-run provisioning" for the curl invocation.
 #ifndef AREG_DEVICE_ID
-#define AREG_DEVICE_ID          "00000000-0000-0000-0000-000000000000"
+#define AREG_DEVICE_ID          "8E1B6F80-B189-4301-9C61-52D6630E254E"
 #endif
 #ifndef AREG_DEVICE_API_KEY
-#define AREG_DEVICE_API_KEY     "dtk_change_me"
+#define AREG_DEVICE_API_KEY     "dtk_demo_local_only_do_not_distribute"
 #endif
 
 // --- Pin map (ESP32-S3-DevKitC-1 defaults) -------------------
@@ -59,6 +91,15 @@
 // --- Audio parameters ----------------------------------------
 #define AREG_SAMPLE_RATE_HZ     16000  // Whisper-friendly, bandwidth-friendly
 #define AREG_SAMPLE_BITS        16     // linear PCM
+
+// --- Hands-free library-story autoplay -----------------------
+// After playing a library segment whose response carried
+// X-Areg-Continue: 1, the device auto-fetches the next segment with
+// no button press, looping until the backend returns 204 / no
+// continue header. This cap is a safety stop so a backend bug can
+// never spin the loop forever (the longest curated story is well
+// under this).
+#define AREG_MAX_AUTOPLAY_SEGMENTS 30
 
 // --- Capture + playback limits -------------------------------
 #define AREG_MAX_RECORD_MS      15000  // 15 s hard cap on button-hold

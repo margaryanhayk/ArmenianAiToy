@@ -45,6 +45,33 @@ bool audio_speaker_begin();
 // decoder error, empty buffer, or setup failure.
 bool audio_play_mp3_buffer(const uint8_t *data, size_t length);
 
+// Continuous, interruptible STORY playback. Streams an MP3 directly
+// from `url` (ESP8266Audio HTTP source) and decodes it as it
+// downloads — so an arbitrarily long story plays start-to-finish
+// without buffering the whole clip (no 512 KB limit, no segments).
+//
+// `barge_in` is polled every decode iteration; when it returns true
+// the audio is cut IMMEDIATELY (true barge-in) and the byte offset
+// reached is written to `*out_resume_offset` so the caller can resume
+// the SAME file from that exact point (append `?from=<offset>` to the
+// URL). A small offset fudge is subtracted so resume overlaps rather
+// than skips the I2S-buffered tail.
+//
+// `base_offset` is the absolute byte offset this stream was opened at
+// (the `?from=` value, or 0 from the start). It is REQUIRED for correct
+// resume because the HTTP source's getPos() counts from 0 of the
+// current (partial) response, so the absolute file position is
+// base_offset + getPos().
+//
+// Returns true when interrupted (resume from *out_resume_offset, an
+// ABSOLUTE file offset); false when the story played to its natural end
+// (*out_resume_offset is left 0).
+typedef bool (*audio_barge_in_fn)();
+bool audio_play_story_stream(const char *url,
+                             uint32_t base_offset,
+                             audio_barge_in_fn barge_in,
+                             uint32_t *out_resume_offset);
+
 // Write a canonical 44-byte PCM WAV header into `hdr_out`
 // describing `pcm_sample_count` mono 16-bit samples at
 // AREG_SAMPLE_RATE_HZ. `hdr_out` must be at least 44 bytes.
