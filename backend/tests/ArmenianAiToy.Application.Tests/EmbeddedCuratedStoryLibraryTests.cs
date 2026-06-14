@@ -322,8 +322,9 @@ public class EmbeddedCuratedStoryLibraryTests
     {
         // Wiring the library into the live flow would require an
         // implementation or adapter in Api/Infrastructure. Pin that the
-        // only implementations live in Application (InMemory + Embedded)
-        // and that Api/Infrastructure carry none.
+        // only implementations live in Application (InMemory + Embedded
+        // + the bench/local Configurable decorator) and that
+        // Api/Infrastructure carry none.
         var apiTypes = typeof(ChatController).Assembly.GetTypes();
         var infraTypes = typeof(LocalDiskAudioBlobStore).Assembly.GetTypes();
 
@@ -335,6 +336,8 @@ public class EmbeddedCuratedStoryLibraryTests
             .Select(t => t.Name)
             .OrderBy(n => n, StringComparer.Ordinal)
             .ToList();
-        Assert.Equal(["EmbeddedCuratedStoryLibrary", "InMemoryCuratedStoryLibrary"], applicationImpls);
+        Assert.Equal(
+            ["ConfigurableCuratedStoryLibrary", "EmbeddedCuratedStoryLibrary", "InMemoryCuratedStoryLibrary"],
+            applicationImpls);
     }
 }

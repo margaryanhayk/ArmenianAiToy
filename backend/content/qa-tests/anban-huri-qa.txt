@@ -1,0 +1,44 @@
+# ─────────────────────────────────────────────────────────────────────
+# Anban Huri — in-story Q&A test cases (TEXT only; no ESP32, no voice)
+#
+# Write one test per line:   <segment> | <your question in Armenian>
+#   - <segment> = where in the story the child "stops" to ask (0–8).
+#   - Lines starting with #, and blank lines, are ignored.
+#
+# Then ask me to run it (run-qa-tests.ps1) — I post each line to the
+# backend's real Q&A pipeline and print the answer text. You and I both
+# review the answers; I also run them through the Armenian agent.
+#
+# POSITION GUIDE — what the child has heard by each segment:
+#   0  Huri is introduced: a lazy, unskilled girl who sits idle and sings
+#      a little song about putting work off.
+#   1  Neighbors nickname her "Lazy Huri"; her mother walks around
+#      praising her as a golden-fingered, hard-working craftswoman.
+#   2  A young merchant hears the praise, marries Huri, and before a
+#      trading trip leaves her loads of cotton to card and spin.
+#   3  By the river Huri hears frogs croaking ("Pepel… Kekel…"), thinks
+#      they agree to spin, and throws all the cotton into the river.
+#   4  Days later there's no yarn; she decides the green moss is a carpet
+#      the frogs wove, steps into the water for payment, and luckily
+#      finds a piece of gold, bringing it home as her husband returns.
+#   5  The husband sees the gold, believes she sold the cotton, joyfully
+#      thanks her mother with gifts, and throws a feast.
+#   6  The cunning mother, fearing the truth, greets a beetle that buzzes
+#      in as her long-lost aunt.
+#   7  The mother claims the "aunt" worked so hard she shrank smaller and
+#      smaller until she became a beetle — the whole family shrinks from
+#      too much work.
+#   8  The frightened husband forbids Huri to touch any work so she won't
+#      turn into a beetle like the "aunt".
+# ─────────────────────────────────────────────────────────────────────
+
+# ── Example cases (the golden ones) — edit / add your own below ──
+1 | Ինչո՞ւ էին ասում Անբան Հուռի
+3 | Գորտերը իրո՞ք բամբակ մանեցին
+6 | Բզեզը իրո՞ք մորքուրն էր
+1 | Հուռին վա՞տն էր
+
+# ── Add your own (delete these comment lines or keep them) ──
+# 0 | Ո՞վ է Հուռին
+# 4 | Որտեղի՞ց գտավ Հուռին ոսկին
+# 8 | Ինչո՞ւ էր ամուսինը վախենում

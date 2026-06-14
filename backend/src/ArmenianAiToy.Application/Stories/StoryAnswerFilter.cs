@@ -31,7 +31,7 @@ public enum StoryAnswerRejection
 /// can reach the child (see <see cref="FilterOrFallback"/>).
 /// </para>
 /// </summary>
-internal static class StoryAnswerFilter
+public static class StoryAnswerFilter
 {
     /// <summary>Canned Armenian fallback when the answer (and its one
     /// repair retry) fails validation. Pre-written, reviewed, byte-

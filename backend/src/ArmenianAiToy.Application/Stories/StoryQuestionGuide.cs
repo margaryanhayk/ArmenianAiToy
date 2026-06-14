@@ -25,7 +25,7 @@ namespace ArmenianAiToy.Application.Stories;
 /// <param name="EssenceNotes">Interpretation rules: humor framing,
 /// what is real vs misunderstood vs a trick inside the story, and
 /// what the answer must never teach.</param>
-internal sealed record StoryQuestionGuide(
+public sealed record StoryQuestionGuide(
     string StoryId,
     IReadOnlyList<string> Characters,
     string StorySummary,
@@ -83,6 +83,12 @@ internal static class StoryQuestionGuides
             "The frogs never really spin or weave anything. Huri misunderstands their croaking; the gold is a lucky find, not payment from frogs.",
             "The beetle is just a beetle. The 'aunt who shrank from working too much' is a trick the mother invents so Huri will not be given work; people do not really turn into beetles.",
             "Explain gently what happens in the story. Do not teach lying, laziness, name-calling, or shame; do not moralize heavily — one light, warm thought at most.",
+            "Huri's only character traits are lazy (ծույլ) and naive/gullible (միամիտ). Never describe her as suspicious (կասկածոտ) or distrustful — that is the opposite of who she is.",
+            "People do not really turn into beetles. The beetle is just a beetle; if a child asks, say so plainly to reassure them.",
+            "Huri did not get help from the frogs. She misheard their croaking (սխալ հասկացավ) and only thought they were helping — never say she got lost (մոլորվեց) or that they really spun or wove.",
+            "When a child asks why Huri is called a lazy/silly name, keep the warm reframe: we don't hurt people with names; the story is only laughing kindly at her laziness.",
+            "The young merchant MARRIED Huri (ամուսնացավ Հուռիի հետ). He never bought, purchased, or paid for her — never phrase it as buying a person.",
+            "Child-simple meanings of the old/dialect words a child may ask about (use these, do not invent): մաստակ = a gum you chew but do not eat; մտիկ անել = to look at / watch; լիդր = a soft lump of combed wool or cotton, ready to be spun into thread; գզել = to fluff and comb the wool/cotton; մանել = to twist the fibers into thread; զոքանչ = the wife's mother (the husband's mother-in-law).",
         ]);
 
     /// <summary>Looks up the guide for a story id; null when the

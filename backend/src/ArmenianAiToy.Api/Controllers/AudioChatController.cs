@@ -1,5 +1,6 @@
 using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Application.Audio;
+using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Telemetry;
@@ -92,6 +93,17 @@ public class AudioChatController : ControllerBase
     public async Task<IActionResult> Chat(CancellationToken cancellationToken)
     {
         var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
+
+        // Hands-free autoplay continuation. After playing a library
+        // segment whose response carried `X-Areg-Continue: 1`, the
+        // firmware re-POSTs with this header and NO audio body to fetch
+        // the next segment — no button press, no STT, no GPT. Handled
+        // before body buffering / gates / STT.
+        if (string.Equals(Request.Headers["X-Areg-Continue"], "1", StringComparison.Ordinal))
+        {
+            return await ContinueAutoplayAsync(deviceId, cancellationToken);
+        }
+
         var inboundContentType = Request.ContentType;
         if (string.IsNullOrWhiteSpace(inboundContentType))
             inboundContentType = "audio/wav";
@@ -189,11 +201,13 @@ public class AudioChatController : ControllerBase
         // Text → existing ChatService pipeline, unchanged.
         ChatResponseShape chatResult;
         string ttsText;
+        var autoContinue = false;
         try
         {
             var response = await _chatService.GetResponseAsync(deviceId, transcript);
             chatResult = new ChatResponseShape(
                 response.Response, response.ConversationId, response.MessageId);
+            autoContinue = response.LibraryAutoContinue;
             // Canonical Message.Content (already persisted by ChatService) is the
             // stripped story text. The toy has no screen — the choice handoff has
             // to be spoken. Compose a Story-only TTS-only bridge so the child
@@ -258,6 +272,61 @@ public class AudioChatController : ControllerBase
             assistantAudio: tts,
             cancellationToken);
 
+        // Drive hands-free autoplay: when this was a library segment with
+        // more of the story (or its ending) still to come, tell the
+        // firmware to fetch the next segment automatically.
+        if (autoContinue)
+        {
+            Response.Headers["X-Areg-Continue"] = "1";
+        }
+        return File(tts.Content, tts.MimeType);
+    }
+
+    /// <summary>
+    /// Autoplay continuation turn: no audio, no STT. Advances the
+    /// device's active library story by one segment (or delivers the
+    /// ending) and streams that MP3. Returns 204 No Content when there
+    /// is nothing left to play, which stops the firmware's autoplay
+    /// loop. Emits `X-Areg-Continue: 1` while more remains.
+    /// </summary>
+    private async Task<IActionResult> ContinueAutoplayAsync(
+        Guid deviceId, CancellationToken cancellationToken)
+    {
+        ChatResponse result;
+        try
+        {
+            result = await _chatService.ContinueLibraryStoryAsync(deviceId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Audio autoplay-continue: ChatService failure for Device {DeviceId}", deviceId);
+            return StatusCode(502, new { error = "AI service unavailable. Please try again." });
+        }
+
+        // Nothing live to continue → 204 stops the device loop.
+        if (string.IsNullOrEmpty(result.Response))
+        {
+            return NoContent();
+        }
+
+        AudioSynthesisResult tts;
+        try
+        {
+            tts = await _synthesis.SynthesizeArmenianAsync(result.Response, cancellationToken);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Audio autoplay-continue: TTS failure for Device {DeviceId}", deviceId);
+            return StatusCode(502, new { error = "AI service unavailable. Please try again." });
+        }
+
+        if (result.LibraryAutoContinue)
+        {
+            Response.Headers["X-Areg-Continue"] = "1";
+        }
         return File(tts.Content, tts.MimeType);
     }
 

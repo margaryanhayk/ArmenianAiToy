@@ -37,6 +37,10 @@ ArmenianAiToy_Project_Status.pdf
 # WAV + assistant MP3 here; not source).
 backend/src/ArmenianAiToy.Api/audio-blobs/
 
+# Pre-rendered whole-story MP3 cache (StoryAudioController renders here on
+# first request and re-uses it; regenerated on demand, not source).
+backend/src/ArmenianAiToy.Api/story-audio-cache/
+
 # F1 — StoryModelBakeoff per-run side-by-side reports (slice 2 only;
 # scaffold ships empty). Local research output, not source.
 tools/StoryModelBakeoff/results/
