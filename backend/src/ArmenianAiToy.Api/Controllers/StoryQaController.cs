@@ -27,11 +27,25 @@ namespace ArmenianAiToy.Api.Controllers;
 [EnableRateLimiting(ChatRateLimiter.PolicyName)]
 public class StoryQaController : ControllerBase
 {
-    // Warm return-to-story line appended to every spoken answer so the
-    // narration doesn't resume abruptly after a question. Reviewed by
-    // armenian-story-master (2026-06-14): one calm statement, not a
-    // question (the story resumes right after).
-    private const string ReturnToStoryBridge = "Իսկ հիմա վերադառնանք մեր հեքիաթին։";
+    // Warm return-to-story lines spoken after the answer (and the pause)
+    // so the narration doesn't resume abruptly. ROTATED across requests so
+    // the child doesn't hear the identical phrase every time — a fixed
+    // re-entry string "quickly becomes monotonous and robotic" (Google
+    // Conversation Design). All are "return" markers (resume the story),
+    // never "introduction" openers like «Մի անգամ…», which would signal the
+    // previous story was abandoned rather than resumed. One calm statement,
+    // never a question (the story resumes right after).
+    // All five validated by armenian-story-master (2026-06-16) as natural
+    // resume markers (not openers) for ages 4-7. Line 2 has no comma — a
+    // calmer TTS cadence per that review.
+    private static readonly string[] ReturnToStoryBridges =
+    [
+        "Իսկ հիմա վերադառնանք մեր հեքիաթին։",
+        "Ուրեմն շարունակենք մեր հեքիաթը։",
+        "Իսկ հիմա տեսնենք՝ ինչ եղավ հետո։",
+        "Հիմա նորից մտնենք մեր հեքիաթի մեջ։",
+        "Իսկ հիմա վերադառնանք այնտեղ, որտեղ կանգ առանք։",
+    ];
 
     private readonly IAudioTranscriptionService _transcription;
     private readonly IAudioSynthesisService _synthesis;
@@ -135,15 +149,14 @@ public class StoryQaController : ControllerBase
             "Story-QA pair. StoryId: {StoryId} | Q: «{Question}» | A: «{Answer}»",
             storyId, string.IsNullOrWhiteSpace(question) ? "(empty)" : question, answerText);
 
-        // Smooth the resume: end the spoken answer with a warm
-        // return-to-story bridge so the narration doesn't snap back in.
-        var spokenText = answerText.TrimEnd() + " " + ReturnToStoryBridge;
-
-        // Text → voice.
+        // Text → voice. Render the ANSWER on its own, then a calm pause,
+        // then the (cached) return-to-story bridge — so the child has a
+        // beat to take in the answer before the narration resumes, instead
+        // of the answer and "let's go back" snapping together.
+        AudioSynthesisResult answerTts;
         try
         {
-            var tts = await _synthesis.SynthesizeArmenianAsync(spokenText, cancellationToken);
-            return File(tts.Content, tts.MimeType);
+            answerTts = await _synthesis.SynthesizeArmenianAsync(answerText.TrimEnd(), cancellationToken);
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
@@ -151,6 +164,113 @@ public class StoryQaController : ControllerBase
             _logger.LogWarning(ex, "Story-QA: TTS failure for {StoryId}", storyId);
             return StatusCode(502, new { error = "AI service unavailable. Please try again." });
         }
+
+        byte[] bridgeAudio;
+        try
+        {
+            var bridgeIndex = (int)((uint)Interlocked.Increment(ref _bridgeRotation) % ReturnToStoryBridges.Length);
+            bridgeAudio = await GetBridgeAudioAsync(bridgeIndex, cancellationToken);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            // Bridge render failed: still give the child the answer rather
+            // than a 502 — losing the soft return line degrades gracefully.
+            _logger.LogWarning(ex, "Story-QA: bridge TTS failure for {StoryId}; returning answer only", storyId);
+            return File(answerTts.Content, answerTts.MimeType);
+        }
+
+        var spoken = ComposeAnswerWithPause(answerTts.Content, bridgeAudio);
+        return File(spoken, answerTts.MimeType);
+    }
+
+    // ── Spoken-answer assembly: answer + silent pause + return-to-story bridge ──
+
+    // Measured duration of the embedded 24 kHz mono MP3 silence unit. The
+    // pause is built by repeating this unit, so the configured pause is
+    // rounded to the nearest multiple of this value.
+    private const int SilenceUnitMs = 264;
+
+    private static readonly byte[]?[] _bridgeAudios = new byte[]?[ReturnToStoryBridges.Length];
+    private static readonly SemaphoreSlim _bridgeLock = new(1, 1);
+    private static int _bridgeRotation = -1;
+    private static byte[]? _silenceUnit;
+
+    /// <summary>Renders one return-to-story bridge (by index) and caches it
+    /// for the process lifetime — the lines are fixed, so each costs at most
+    /// one TTS call regardless of traffic.</summary>
+    private async Task<byte[]> GetBridgeAudioAsync(int index, CancellationToken ct)
+    {
+        if (_bridgeAudios[index] is { } cached)
+        {
+            return cached;
+        }
+        await _bridgeLock.WaitAsync(ct);
+        try
+        {
+            if (_bridgeAudios[index] is null)
+            {
+                var rendered = await _synthesis.SynthesizeArmenianAsync(ReturnToStoryBridges[index], ct);
+                _bridgeAudios[index] = rendered.Content;
+            }
+            return _bridgeAudios[index]!;
+        }
+        finally
+        {
+            _bridgeLock.Release();
+        }
+    }
+
+    /// <summary>Loads the embedded silence unit once. Empty array if the
+    /// resource is somehow missing — the answer then flows straight into
+    /// the bridge with no pause, never an error.</summary>
+    private static byte[] LoadSilenceUnit()
+    {
+        if (_silenceUnit is not null)
+        {
+            return _silenceUnit;
+        }
+        var asm = typeof(StoryQaController).Assembly;
+        var name = asm.GetManifestResourceNames()
+            .FirstOrDefault(n => n.EndsWith("silence-24k-mono.mp3", StringComparison.Ordinal));
+        if (name is null)
+        {
+            _silenceUnit = [];
+            return _silenceUnit;
+        }
+        using var stream = asm.GetManifestResourceStream(name)!;
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        _silenceUnit = ms.ToArray();
+        return _silenceUnit;
+    }
+
+    /// <summary>Concatenates answer + N silence units + bridge into one
+    /// 24 kHz mono MP3 byte stream (same format the firmware already
+    /// decodes for the streamed story). Pause length is
+    /// <c>StoryQa:AnswerBridgePauseMs</c> (default 1200 ms), rounded to a
+    /// whole number of silence units and capped so it can't run away.</summary>
+    private byte[] ComposeAnswerWithPause(byte[] answer, byte[] bridge)
+    {
+        var pauseMs = 1200;
+        if (int.TryParse(_config["StoryQa:AnswerBridgePauseMs"], out var configured) && configured >= 0)
+        {
+            pauseMs = configured;
+        }
+
+        var unit = LoadSilenceUnit();
+        var repeats = unit.Length == 0
+            ? 0
+            : Math.Clamp((int)Math.Round(pauseMs / (double)SilenceUnitMs), 0, 16);
+
+        using var ms = new MemoryStream(answer.Length + (unit.Length * repeats) + bridge.Length);
+        ms.Write(answer, 0, answer.Length);
+        for (var i = 0; i < repeats; i++)
+        {
+            ms.Write(unit, 0, unit.Length);
+        }
+        ms.Write(bridge, 0, bridge.Length);
+        return ms.ToArray();
     }
 
     /// <summary>

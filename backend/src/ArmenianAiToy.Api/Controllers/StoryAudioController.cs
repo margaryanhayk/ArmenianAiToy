@@ -39,6 +39,13 @@ public class StoryAudioController : ControllerBase
     // don't both render the same story.
     private static readonly SemaphoreSlim RenderLock = new(1, 1);
 
+    // In-memory cache of each story's sentence-start byte-offset map
+    // (loaded from the `.offsets.json` sidecar). Used to snap a resume
+    // offset DOWN to the start of the sentence the child was hearing, so
+    // narration re-reads the last line instead of resuming mid-sentence
+    // (the "micro-rewind" — research-backed re-entry after a Q&A).
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, long[]> OffsetMaps = new();
+
     private readonly IAudioSynthesisService _synthesis;
     private readonly ICuratedStoryLibrary _library;
     private readonly IWebHostEnvironment _env;
@@ -81,19 +88,24 @@ public class StoryAudioController : ControllerBase
         }
 
         var cachePath = CachePathFor(storyId);
-        if (refresh && System.IO.File.Exists(cachePath))
+        var offsetsPath = OffsetsPathFor(cachePath);
+        if (refresh)
         {
-            System.IO.File.Delete(cachePath);
+            if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
+            if (System.IO.File.Exists(offsetsPath)) System.IO.File.Delete(offsetsPath);
+            OffsetMaps.TryRemove(storyId, out _);
         }
 
-        if (!System.IO.File.Exists(cachePath))
+        // Render when the audio OR its sentence-offset sidecar is missing,
+        // so a cache from before the micro-rewind feature regenerates both.
+        if (!System.IO.File.Exists(cachePath) || !System.IO.File.Exists(offsetsPath))
         {
             await RenderLock.WaitAsync(cancellationToken);
             try
             {
-                if (!System.IO.File.Exists(cachePath))
+                if (!System.IO.File.Exists(cachePath) || !System.IO.File.Exists(offsetsPath))
                 {
-                    await RenderAndCacheAsync(story, cachePath, cancellationToken);
+                    await RenderAndCacheAsync(story, cachePath, offsetsPath, cancellationToken);
                 }
             }
             catch (OperationCanceledException) { throw; }
@@ -121,10 +133,15 @@ public class StoryAudioController : ControllerBase
             {
                 return NoContent(); // past the end → nothing left to play
             }
+            // Micro-rewind: snap the resume offset DOWN to the start of the
+            // sentence the child was hearing, so narration re-reads the last
+            // line rather than snapping in mid-sentence. No-op if the offset
+            // map is unavailable (serves the exact byte, as before).
+            var resumeFrom = SnapToSentenceStart(storyId, offsetsPath, from);
             var stream = new FileStream(
                 cachePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            stream.Seek(from, SeekOrigin.Begin);
-            return File(stream, "audio/mpeg"); // streams [from, end)
+            stream.Seek(resumeFrom, SeekOrigin.Begin);
+            return File(stream, "audio/mpeg"); // streams [resumeFrom, end)
         }
 
         // Full playback. enableRangeProcessing => Accept-Ranges + 206 on
@@ -146,25 +163,49 @@ public class StoryAudioController : ControllerBase
         return Path.Combine(root, $"{safe}.mp3");
     }
 
+    private static string OffsetsPathFor(string cachePath) =>
+        Path.ChangeExtension(cachePath, ".offsets.json");
+
     /// <summary>Renders the full verbatim narration (all segments) to one
-    /// MP3 and writes it to <paramref name="cachePath"/>. Splits into
+    /// MP3 at <paramref name="cachePath"/> and writes a sentence-start
+    /// byte-offset map to <paramref name="offsetsPath"/>. Splits into
     /// ≤<see cref="MaxChunkChars"/> chunks at Armenian sentence ends and
-    /// concatenates the rendered audio.</summary>
+    /// concatenates the rendered audio (narration flow is unchanged — the
+    /// map is derived alongside, it does not change how audio is rendered).</summary>
     private async Task RenderAndCacheAsync(
-        CuratedStory story, string cachePath, CancellationToken cancellationToken)
+        CuratedStory story, string cachePath, string offsetsPath, CancellationToken cancellationToken)
     {
         var chunks = SplitForTts(story.Segments.Select(s => s.Text));
         _logger.LogInformation(
             "Rendering story audio for {StoryId}: {Segments} segments -> {Chunks} TTS chunk(s)",
             story.Id, story.Segments.Count, chunks.Count);
 
+        // Sentence-start byte offsets across the whole MP3. 0 is always a
+        // boundary. Within each rendered chunk, a sentence's byte position
+        // is estimated proportionally from its character position (CBR MP3,
+        // so bytes ≈ time ≈ chars within one chunk) — accurate to ~a second,
+        // which is all the micro-rewind needs.
+        var sentenceOffsets = new List<long> { 0 };
+        long byteCursor = 0;
+
         var tmp = cachePath + ".tmp";
         await using (var output = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
         {
             foreach (var chunk in chunks)
             {
-                var rendered = await _synthesis.SynthesizeArmenianAsync(chunk, cancellationToken);
+                var rendered = await _synthesis.SynthesizeArmenianAsync(chunk.Text, cancellationToken);
+                var chunkBytes = rendered.Content.Length;
+                var chunkChars = chunk.Text.Length;
+                foreach (var sentenceStartChar in chunk.SentenceStarts)
+                {
+                    if (sentenceStartChar <= 0) continue; // chunk start already a boundary
+                    var b = byteCursor + (chunkChars > 0
+                        ? (long)(chunkBytes * (double)sentenceStartChar / chunkChars)
+                        : 0);
+                    sentenceOffsets.Add(b);
+                }
                 await output.WriteAsync(rendered.Content, cancellationToken);
+                byteCursor += chunkBytes;
             }
         }
         // Atomic-ish publish so a half-written file is never served.
@@ -174,36 +215,83 @@ public class StoryAudioController : ControllerBase
         }
         System.IO.File.Move(tmp, cachePath);
 
+        var map = sentenceOffsets.Distinct().OrderBy(x => x).ToArray();
+        await System.IO.File.WriteAllTextAsync(
+            offsetsPath, System.Text.Json.JsonSerializer.Serialize(map), cancellationToken);
+        OffsetMaps[story.Id] = map;
+
         _logger.LogInformation(
-            "Story audio cached: {StoryId} -> {Path} ({Bytes} bytes)",
-            story.Id, cachePath, new FileInfo(cachePath).Length);
+            "Story audio cached: {StoryId} -> {Path} ({Bytes} bytes, {Boundaries} sentence boundaries)",
+            story.Id, cachePath, new FileInfo(cachePath).Length, map.Length);
     }
+
+    /// <summary>Snaps a requested resume byte offset DOWN to the start of
+    /// the sentence the child was hearing. Returns <paramref name="from"/>
+    /// unchanged when no offset map is available (graceful fallback).</summary>
+    private long SnapToSentenceStart(string storyId, string offsetsPath, long from)
+    {
+        var map = OffsetMaps.GetOrAdd(storyId, _ => LoadOffsets(offsetsPath));
+        if (map.Length == 0)
+        {
+            return from;
+        }
+        var i = Array.BinarySearch(map, from);
+        if (i >= 0)
+        {
+            return map[i]; // exact boundary
+        }
+        // ~i is the index of the first boundary > from; the one before it is
+        // the start of the sentence `from` falls inside.
+        var prev = ~i - 1;
+        return prev >= 0 ? map[prev] : from;
+    }
+
+    private static long[] LoadOffsets(string offsetsPath)
+    {
+        try
+        {
+            if (!System.IO.File.Exists(offsetsPath)) return [];
+            var json = System.IO.File.ReadAllText(offsetsPath);
+            return System.Text.Json.JsonSerializer.Deserialize<long[]>(json) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    /// <summary>A TTS chunk plus the char offsets (within the chunk) where
+    /// each sentence begins — used to derive the sentence-offset map.</summary>
+    private sealed record ChunkInfo(string Text, IReadOnlyList<int> SentenceStarts);
 
     /// <summary>Joins the verbatim segments and splits the narration into
     /// TTS-sized chunks at Armenian sentence terminators («։»/«.»), never
-    /// mid-sentence.</summary>
-    private static List<string> SplitForTts(IEnumerable<string> segments)
+    /// mid-sentence, recording where each sentence starts within its chunk.</summary>
+    private static List<ChunkInfo> SplitForTts(IEnumerable<string> segments)
     {
         // One flowing narration: segments separated by a newline so TTS
         // takes a natural beat between scenes without a hard pause.
         var full = string.Join("\n", segments);
 
-        var chunks = new List<string>();
+        var chunks = new List<ChunkInfo>();
         var sb = new StringBuilder();
+        var starts = new List<int>();
         foreach (var sentence in SplitSentences(full))
         {
             if (sb.Length > 0 && sb.Length + sentence.Length > MaxChunkChars)
             {
-                chunks.Add(sb.ToString());
+                chunks.Add(new ChunkInfo(sb.ToString(), starts));
                 sb.Clear();
+                starts = new List<int>();
             }
+            starts.Add(sb.Length); // char offset of this sentence within the chunk
             sb.Append(sentence);
         }
         if (sb.Length > 0)
         {
-            chunks.Add(sb.ToString());
+            chunks.Add(new ChunkInfo(sb.ToString(), starts));
         }
-        return chunks.Count > 0 ? chunks : [full];
+        return chunks.Count > 0 ? chunks : [new ChunkInfo(full, [0])];
     }
 
     /// <summary>Yields sentences WITH their trailing terminator so the
