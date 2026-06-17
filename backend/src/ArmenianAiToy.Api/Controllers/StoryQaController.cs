@@ -2,6 +2,7 @@ using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
+using ArmenianAiToy.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -53,6 +54,7 @@ public class StoryQaController : ControllerBase
     private readonly ICuratedStoryLibrary _library;
     private readonly LibraryStoryQuestionService _questions;
     private readonly IModerationService _moderation;
+    private readonly IConversationService _conversations;
     private readonly IWebHostEnvironment _env;
     private readonly IConfiguration _config;
     private readonly ILogger<StoryQaController> _logger;
@@ -63,6 +65,7 @@ public class StoryQaController : ControllerBase
         ICuratedStoryLibrary library,
         LibraryStoryQuestionService questions,
         IModerationService moderation,
+        IConversationService conversations,
         IWebHostEnvironment env,
         IConfiguration config,
         ILogger<StoryQaController> logger)
@@ -72,6 +75,7 @@ public class StoryQaController : ControllerBase
         _library = library;
         _questions = questions;
         _moderation = moderation;
+        _conversations = conversations;
         _env = env;
         _config = config;
         _logger = logger;
@@ -91,6 +95,11 @@ public class StoryQaController : ControllerBase
         {
             return NotFound(new { error = "Unknown story." });
         }
+
+        // Route is under /api/chat, so DeviceAuthMiddleware has already
+        // validated and stamped the device id — used to attach the
+        // persisted Q&A turn to this device's conversation.
+        var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
 
         // Where the child was when they barged in — used both to ground the
         // Q&A prompt and to pick that segment's re-anchor (recap) line.
@@ -125,7 +134,13 @@ public class StoryQaController : ControllerBase
 
         // Bounded Q&A. Empty transcript → the canned fallback line is
         // spoken (no GPT call); the child still hears a warm response.
+        // Safety flags persisted for the turn mirror the text path: a
+        // moderation-blocked input is stored as Blocked (child row) +
+        // Flagged (assistant fallback row) so the parent dashboard can
+        // distinguish it; everything else is Clean.
         string answerText;
+        var userFlag = SafetyFlag.Clean;
+        var assistantFlag = SafetyFlag.Clean;
         if (string.IsNullOrWhiteSpace(question))
         {
             answerText = StoryAnswerFilter.SafeFallback;
@@ -152,6 +167,8 @@ public class StoryQaController : ControllerBase
                     storyId, segmentIndex,
                     string.Join(", ", inputModeration.FlaggedCategories), moderationUnavailable);
                 answerText = StoryAnswerFilter.SafeFallback;
+                userFlag = SafetyFlag.Blocked;
+                assistantFlag = SafetyFlag.Flagged;
             }
             else
             {
@@ -178,6 +195,17 @@ public class StoryQaController : ControllerBase
         _logger.LogInformation(
             "Story-QA pair. StoryId: {StoryId} | Q: «{Question}» | A: «{Answer}»",
             storyId, string.IsNullOrWhiteSpace(question) ? "(empty)" : question, answerText);
+
+        // Persist the turn so it appears in the parent dashboard and is
+        // covered by retention/delete — the streaming story path is
+        // otherwise stateless, leaving the child's voice unrecorded. Text
+        // is canonical, mirroring the chat paths. An empty transcript
+        // carries no child words, so nothing is persisted for it.
+        if (!string.IsNullOrWhiteSpace(question))
+        {
+            await PersistTurnAsync(
+                deviceId, question, answerText, userFlag, assistantFlag, cancellationToken);
+        }
 
         // Text → voice. Render the ANSWER on its own, then a calm pause,
         // then the (cached) return-to-story bridge — so the child has a
@@ -237,6 +265,34 @@ public class StoryQaController : ControllerBase
 
         var spoken = ComposeAnswerWithPause(answerTts.Content, bridgeAudio, recapAudio);
         return File(spoken, answerTts.MimeType);
+    }
+
+    /// <summary>Records the child's question + Areg's answer as a User /
+    /// Assistant message pair on the device's active conversation, so the
+    /// turn surfaces in the parent dashboard and is caught by the existing
+    /// retention / delete cascades (Conversation → Message). Best-effort:
+    /// a persistence failure is logged but never denies the child the
+    /// spoken answer — the safety record is the moderation log line.</summary>
+    private async Task PersistTurnAsync(
+        Guid deviceId, string question, string answerText,
+        SafetyFlag userFlag, SafetyFlag assistantFlag, CancellationToken ct)
+    {
+        try
+        {
+            var conversation = await _conversations.GetOrCreateActiveConversationAsync(
+                deviceId, childId: null);
+            await _conversations.AddMessageAsync(
+                conversation.Id, MessageRole.User, question, userFlag);
+            await _conversations.AddMessageAsync(
+                conversation.Id, MessageRole.Assistant, answerText, assistantFlag);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Story-QA: turn persistence failed for Device {DeviceId}; continuing (child still hears the answer)",
+                deviceId);
+        }
     }
 
     // ── Spoken-answer assembly: answer + silent pause + return-to-story bridge ──

@@ -4,12 +4,15 @@ using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
+using ArmenianAiToy.Domain.Entities;
+using ArmenianAiToy.Domain.Enums;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 
 namespace ArmenianAiToy.Application.Tests;
 
@@ -38,7 +41,10 @@ public class StoryQaControllerModerationTests
         IAudioTranscriptionService Transcription,
         IAudioSynthesisService Synthesis,
         IModerationService Moderation,
-        IAiChatClient AiChatClient);
+        IAiChatClient AiChatClient,
+        IConversationService Conversations,
+        Guid DeviceId,
+        Guid ConversationId);
 
     private static Harness Create()
     {
@@ -46,6 +52,7 @@ public class StoryQaControllerModerationTests
         var synthesis = Substitute.For<IAudioSynthesisService>();
         var moderation = Substitute.For<IModerationService>();
         var aiChatClient = Substitute.For<IAiChatClient>();
+        var conversations = Substitute.For<IConversationService>();
         var library = new InMemoryCuratedStoryLibrary();
         // Real question service over the substituted answer model, so we
         // can assert whether the GPT call happened from the controller's
@@ -60,16 +67,41 @@ public class StoryQaControllerModerationTests
         synthesis.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new AudioSynthesisResult(TtsMp3, "audio/mpeg"));
 
+        var deviceId = Guid.NewGuid();
+        var conversationId = Guid.NewGuid();
+        conversations.GetOrCreateActiveConversationAsync(Arg.Any<Guid>(), Arg.Any<Guid?>())
+            .Returns(new Conversation
+            {
+                Id = conversationId,
+                DeviceId = deviceId,
+                StartedAt = DateTime.UtcNow
+            });
+        conversations.AddMessageAsync(
+                Arg.Any<Guid>(), Arg.Any<MessageRole>(), Arg.Any<string>(), Arg.Any<SafetyFlag>())
+            .Returns(ci => new Message
+            {
+                Id = Guid.NewGuid(),
+                ConversationId = ci.ArgAt<Guid>(0),
+                Role = ci.ArgAt<MessageRole>(1),
+                Content = ci.ArgAt<string>(2),
+                SafetyFlag = ci.ArgAt<SafetyFlag>(3),
+                Timestamp = DateTime.UtcNow
+            });
+
         var controller = new StoryQaController(
-            transcription, synthesis, library, questions, moderation, env, config, logger);
+            transcription, synthesis, library, questions, moderation,
+            conversations, env, config, logger);
 
         var httpContext = new DefaultHttpContext();
+        httpContext.Items["DeviceId"] = deviceId;
         httpContext.Request.Body = new MemoryStream(InboundWav);
         httpContext.Request.ContentType = "audio/wav";
         httpContext.Request.ContentLength = InboundWav.Length;
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
-        return new Harness(controller, transcription, synthesis, moderation, aiChatClient);
+        return new Harness(
+            controller, transcription, synthesis, moderation, aiChatClient,
+            conversations, deviceId, conversationId);
     }
 
     private static void WireTranscript(Harness h, string transcript) =>
@@ -161,5 +193,82 @@ public class StoryQaControllerModerationTests
         await h.Moderation.DidNotReceiveWithAnyArgs().CheckContentAsync(default!);
         await h.AiChatClient.DidNotReceiveWithAnyArgs()
             .GetCompletionAsync(default!, default!);
+    }
+
+    // --- Gap 3: turn persistence (dashboard + retention) --------------
+
+    [Fact]
+    public async Task SafeTranscript_PersistsUserAndAssistantMessages_Clean()
+    {
+        var h = Create();
+        const string Question = "Ո՞վ է փոքրիկ ամպիկը";
+        WireTranscript(h, Question);
+        h.Moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
+        h.AiChatClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Փոքրիկ ամպիկը երկնքի ընկերն է։");
+
+        await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        await h.Conversations.Received(1)
+            .GetOrCreateActiveConversationAsync(h.DeviceId, null);
+        // Child question stored verbatim as a Clean User row.
+        await h.Conversations.Received(1).AddMessageAsync(
+            h.ConversationId, MessageRole.User, Question, SafetyFlag.Clean);
+        // Assistant answer stored as a Clean Assistant row.
+        await h.Conversations.Received(1).AddMessageAsync(
+            h.ConversationId, MessageRole.Assistant, Arg.Any<string>(), SafetyFlag.Clean);
+    }
+
+    [Fact]
+    public async Task UnsafeTranscript_PersistsBlockedUser_AndFlaggedFallbackAssistant()
+    {
+        var h = Create();
+        const string Question = "ինչ-որ վտանգավոր բան";
+        WireTranscript(h, Question);
+        h.Moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(IsSafe: false, FlaggedCategories: new List<string> { "violence" }));
+
+        await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        // Blocked child row + Flagged assistant fallback row — mirrors the
+        // text path so the parent dashboard can distinguish this turn.
+        await h.Conversations.Received(1).AddMessageAsync(
+            h.ConversationId, MessageRole.User, Question, SafetyFlag.Blocked);
+        await h.Conversations.Received(1).AddMessageAsync(
+            h.ConversationId, MessageRole.Assistant,
+            StoryAnswerFilter.SafeFallback, SafetyFlag.Flagged);
+    }
+
+    [Fact]
+    public async Task EmptyTranscript_PersistsNothing()
+    {
+        var h = Create();
+        WireTranscript(h, "   ");
+
+        await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        await h.Conversations.DidNotReceiveWithAnyArgs()
+            .GetOrCreateActiveConversationAsync(default, default);
+        await h.Conversations.DidNotReceiveWithAnyArgs()
+            .AddMessageAsync(default, default, default!, default);
+    }
+
+    [Fact]
+    public async Task PersistenceFailure_IsNonFatal_StillReturnsAudio()
+    {
+        var h = Create();
+        WireTranscript(h, "Ո՞վ է փոքրիկ ամպիկը");
+        h.Moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
+        h.AiChatClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Փոքրիկ ամպիկը երկնքի ընկերն է։");
+        h.Conversations.GetOrCreateActiveConversationAsync(Arg.Any<Guid>(), Arg.Any<Guid?>())
+            .Throws(new InvalidOperationException("db down"));
+
+        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        // The child still hears the answer despite the persistence failure.
+        Assert.IsType<FileContentResult>(result);
     }
 }
