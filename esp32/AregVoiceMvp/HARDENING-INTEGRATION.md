@@ -230,3 +230,145 @@ Dead air (gap 5):
   snippets. They are written against the current sketch's structure but have
   **not been compiled or flashed** — treat the code as a precise spec, not
   drop-in source.
+
+---
+
+## 6. Offline-first mode — do everything that doesn't NEED the cloud, on-device
+
+**Design principle: offline is the DEFAULT, the cloud is an ENHANCEMENT.** Power
+on with no Wi-Fi → the toy is still a working storyteller. Connectivity adds
+exactly **two** things and nothing else: live in-story Q&A *answers* (GPT) and
+the *STT* that feeds them. Everything else must run from local assets. The toy
+must never be bricked by a missing connection.
+
+### 6.1 What runs offline vs what needs the cloud
+
+| Capability | Offline? | How |
+|---|---|---|
+| Tell a story (narration) | ✅ | Decode a pre-rendered MP3 from the SD card |
+| Pick a story | ✅ | Local selection over an on-SD manifest |
+| Barge-in → pause / resume | ✅ | Already local — offset tracking needs no server |
+| Micro-rewind on resume | ✅ | Port the snap to firmware + ship the offset sidecar |
+| Return-to-story bridge after a pause | ✅ | Bridges are 5 fixed lines — pre-render them to SD |
+| Scene recap | ✅ | Recaps are fixed per segment — pre-render to SD |
+| "Thinking" earcon / failure / offline cues | ✅ | Small local audio clips on SD |
+| LED states | ✅ | Already local |
+| **In-story Q&A — the spoken ANSWER** | ❌ | GPT. Offline → play a canned "let's keep listening" clip |
+| **Speech-to-text of the question** | ❌ | Whisper (cloud) |
+| Moderation | n/a offline | Only runs on child *input*, which isn't processed offline |
+
+> So offline = "pick a story and listen, with pause/resume/rewind"; online simply
+> *adds* "ask Areg about it." Build the offline half first and completely.
+
+### 6.2 The microSD card
+
+A genuine **8–16 GB SanDisk / Samsung / Kingston** microSD, **FAT32** (MBR).
+- Capacity is trivial: 100 stories ≈ 200–450 MB. 8 GB is plenty.
+- **Speed class is irrelevant** — MP3 playback needs ~16 KB/s; any card has 1000×
+  headroom. Don't pay for UHS / V30 / A2.
+- Read-heavy workload (stories pre-loaded) → low wear; a standard card is fine.
+- Prefer **SDHC (≤32 GB) + FAT32** (read natively by the Arduino/ESP-IDF SD libs);
+  avoid SDXC/exFAT unless you add exFAT support.
+- The real risk is **counterfeit cards** — buy genuine from a trusted seller.
+
+### 6.3 SD wiring (ESP32-S3, datasheet-grounded)
+
+The ESP32-S3 has a real SD/MMC host (1/4/8-bit) **and** works over SPI. For a toy,
+**SPI mode is the pragmatic choice** (4 pins, simplest, throughput is a non-issue).
+
+- **3.3 V native — NO level shifter** (VDD33 = 3.0–3.6 V; never feed 5 V to a GPIO).
+- Add **pull-ups on CMD/DAT** per the SD spec.
+- **AVOID strapping pins for SD:** `GPIO0, GPIO3, GPIO45, GPIO46`. Also avoid
+  `GPIO19/20` (USB) and, on **octal-PSRAM** modules only (R8/R16V), `GPIO35/36/37`.
+  The DevKitC-1's common **N8R2** is *quad* PSRAM, so 35/36/37 are free there.
+- **No conflict with the two I2S peripherals.** SD on SPI2 is a third, independent
+  DMA peripheral; mic-I2S + amp-I2S + SD-SPI run together fine. Just keep the GPIOs
+  non-overlapping with the existing map (`config.h`: mic 4/5/6, amp 7/15/16,
+  button 0, LED 48).
+- Pins are routable to any free GPIO via the GPIO Matrix. Example SPI set to
+  validate against your PCB: `CS=10, SCK=12, MOSI=11, MISO=13` (adjust to your
+  wiring; the only hard rule is the avoid-list above).
+
+Add the pins to `config.h`:
+```cpp
+// --- microSD (SPI mode) --------------------------------------
+#define AREG_PIN_SD_CS    10
+#define AREG_PIN_SD_SCK   12
+#define AREG_PIN_SD_MOSI  11
+#define AREG_PIN_SD_MISO  13
+```
+
+### 6.4 On-SD content pack layout
+
+```
+/manifest.json                     # [{id, title, bedtimeSafe}, ...] — drives selection
+/stories/<id>/narration.mp3        # the pre-rendered, re-encoded narration
+/stories/<id>/narration.offsets.json   # sentence-start byte map (micro-rewind)
+/stories/<id>/narration.segments.json  # segment-start byte map (recap anchoring)
+/clips/bridge_0.mp3 ... bridge_4.mp3    # the 5 fixed return-to-story lines
+/clips/recap_<id>_<segment>.mp3         # per-segment recaps (optional, if used)
+/clips/thinking.mp3                     # instant earcon (also used online — §2A)
+/clips/offline_qa.mp3                   # "Հիմա չեմ կարող պատասխանել, շարունակե՛նք լսել։"
+/clips/failure.mp3                      # generic "can't reach you" (already exists)
+```
+
+The `.mp3`, `.offsets.json`, `.segments.json` are **exactly the artifacts the
+backend already produces** for `/api/story-audio` (the MP3 + the two sidecars).
+The content pack is just those files copied to SD, per approved story.
+
+### 6.5 Firmware changes for offline playback
+
+1. **SD init + mount** at boot (FAT32). If no card → fall back to the 1–2 stories
+   baked into internal flash (see §6.7); never hard-fail.
+2. **`audio_play_story_file(path, start_byte, barge_in, out_resume_offset)`** — an
+   SD-source sibling of the existing `audio_play_story_stream(url, …)`
+   (`audio_io.h`). Same barge-in + resume contract; resume is just a **file
+   `seek(start_byte)`** (simpler than the HTTP `base_offset + getPos()` math).
+   ESP8266Audio reads from an `AudioFileSourceSD` instead of the HTTP source.
+3. **Local micro-rewind.** Port the backend's pure snap — `StoryAudioController.SnapOffset(map, from)` (binary-search the largest boundary ≤ `from`) — into the
+   firmware, loading `<story>.offsets.json` once per session. Identical logic, no
+   server round-trip.
+4. **Story selection** over `/manifest.json` (e.g. a button gesture to cycle, or
+   whatever the product UI decides). Keep v1 minimal — cycle + play.
+5. **Offline Q&A degrade.** A held barge-in while offline must NOT attempt an
+   upload — play `/clips/offline_qa.mp3` and auto-resume. Online keeps the existing
+   `voice_upload_question()` path. Decide by `voice_wifi_is_connected()` (already
+   in `voice_client.h`) + a quick reachability check.
+6. **Never block on Wi-Fi.** Connect in the background; playback starts immediately
+   from SD regardless of connectivity.
+
+### 6.6 Content-pack build step (tooling, off-device)
+
+For each **approved** story (`Stories/Content/*.story.json` — NOT drafts):
+1. Render once via the backend `GET /api/story-audio/<id>` → yields `mp3` +
+   `.offsets.json` + `.segments.json` in the story-audio cache.
+2. **Re-encode** the MP3 to **48 kbps mono** (`ffmpeg -i in.mp3 -ac 1 -b:a 48k out.mp3`)
+   — transparent for kids' speech on a small speaker, ~2 MB/story.
+3. ⚠️ **Byte maps are encoding-specific.** The `.offsets.json` / `.segments.json`
+   byte offsets are tied to the *exact* MP3 bytes. If you re-encode AFTER
+   generating them, they go stale. So either render at the target bitrate, **or**
+   regenerate the maps from the re-encoded file (the maps are char-proportional —
+   a tiny script can recompute them from the story's sentence/segment char
+   positions × the re-encoded file's chunk byte sizes). **Ship maps that match the
+   MP3 actually on the SD.**
+4. Copy into the `/stories/<id>/` layout, append the story to `/manifest.json`,
+   pre-render the bridges/recaps/cues into `/clips/`.
+
+A future small CLI (`tools/ContentPackBuilder`) should automate steps 1–4 so a
+fresh SD image is reproducible.
+
+### 6.7 "Works out of the box" baseline
+
+Bake **1–2 stories** (+ their sidecars + the canned clips) into the internal-flash
+LittleFS partition (≈13.6 MB usable on a 16 MB module — fits a couple at 48 kbps).
+So even with **no SD card and no Wi-Fi**, the toy tells a story on first power-on.
+The SD card is what scales that to 100+.
+
+### 6.8 Build order (offline first)
+
+1. SD mount + `audio_play_story_file` + play one hard-coded story from SD.
+2. Local micro-rewind (`SnapOffset` port + offsets sidecar).
+3. Manifest-driven selection.
+4. Offline Q&A degrade clip + connectivity gating.
+5. Internal-flash baseline story (no-SD fallback).
+6. *Then* layer the online enhancements (token §1, Q&A, dead-air §2) on top.
