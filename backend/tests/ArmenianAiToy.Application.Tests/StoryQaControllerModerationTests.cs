@@ -271,4 +271,53 @@ public class StoryQaControllerModerationTests
         // The child still hears the answer despite the persistence failure.
         Assert.IsType<FileContentResult>(result);
     }
+
+    // --- Gap 4: transient failure -> spoken fallback, never silence ---
+
+    [Fact]
+    public async Task SttFailure_ReturnsSpokenFallbackAudio_Not502()
+    {
+        var h = Create();
+        h.Transcription.TranscribeArmenianAsync(
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Throws(new InvalidOperationException("whisper down"));
+
+        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        // 200 audio (the cached safe-fallback clip), not a silent 502.
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("audio/mpeg", file.ContentType);
+        // No GPT, no persistence on the STT-failure path.
+        await h.AiChatClient.DidNotReceiveWithAnyArgs().GetCompletionAsync(default!, default!);
+        await h.Conversations.DidNotReceiveWithAnyArgs()
+            .GetOrCreateActiveConversationAsync(default, default);
+    }
+
+    [Fact]
+    public async Task AnswerTtsFailure_ReturnsSpokenFallbackAudio_Not502()
+    {
+        var h = Create();
+        WireTranscript(h, "Ո՞վ է փոքրիկ ամպիկը");
+        h.Moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
+        h.AiChatClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Փոքրիկ ամպիկը երկնքի ընկերն է։");
+
+        // The FIRST synthesis call (the answer) fails; the fallback-clip
+        // render (or its cache) still produces audio. Counting calls keeps
+        // this deterministic regardless of the answer-filter outcome.
+        var calls = 0;
+        h.Synthesis.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                calls++;
+                if (calls == 1) throw new InvalidOperationException("tts down for the answer");
+                return new AudioSynthesisResult(TtsMp3, "audio/mpeg");
+            });
+
+        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("audio/mpeg", file.ContentType);
+    }
 }

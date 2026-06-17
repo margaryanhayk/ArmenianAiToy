@@ -129,7 +129,7 @@ public class StoryQaController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Story-QA: STT failure for story {StoryId}", storyId);
-            return StatusCode(502, new { error = "AI service unavailable. Please try again." });
+            return await SpokenFailureResultAsync(cancellationToken);
         }
 
         // Bounded Q&A. Empty transcript → the canned fallback line is
@@ -185,7 +185,7 @@ public class StoryQaController : ControllerBase
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Story-QA: answer failure for {StoryId}", storyId);
-                    return StatusCode(502, new { error = "AI service unavailable. Please try again." });
+                    return await SpokenFailureResultAsync(cancellationToken);
                 }
             }
         }
@@ -220,7 +220,7 @@ public class StoryQaController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Story-QA: TTS failure for {StoryId}", storyId);
-            return StatusCode(502, new { error = "AI service unavailable. Please try again." });
+            return await SpokenFailureResultAsync(cancellationToken);
         }
 
         byte[] bridgeAudio;
@@ -295,6 +295,56 @@ public class StoryQaController : ControllerBase
         }
     }
 
+    /// <summary>On a transient STT / answer / TTS failure, serve the cached
+    /// spoken safe-fallback as 200 audio so the child hears a warm line and
+    /// the story can resume — instead of a silent 502 the firmware can't
+    /// play. Falls back to the sanitized 502 only when the clip cannot be
+    /// produced at all (TTS down AND nothing cached yet — the same
+    /// first-hit-during-outage edge the C1 voice path documents).</summary>
+    private async Task<IActionResult> SpokenFailureResultAsync(CancellationToken ct)
+    {
+        try
+        {
+            var clip = await GetFailureClipAsync(ct);
+            return File(clip, "audio/mpeg");
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Story-QA: spoken-fallback render failed; returning sanitized 502");
+            return StatusCode(502, new { error = "AI service unavailable. Please try again." });
+        }
+    }
+
+    /// <summary>Renders the in-story safe-fallback line once and caches it
+    /// for the process lifetime (same lazy-TTS-cache pattern as the bridge
+    /// clips), so a transient failure is answered with a warm spoken line
+    /// at zero per-request cost. Reuses <see cref="_bridgeLock"/> as the
+    /// render lock.</summary>
+    private async Task<byte[]> GetFailureClipAsync(CancellationToken ct)
+    {
+        if (_failureClip is { } cached)
+        {
+            return cached;
+        }
+        await _bridgeLock.WaitAsync(ct);
+        try
+        {
+            if (_failureClip is null)
+            {
+                var rendered = await _synthesis.SynthesizeArmenianAsync(
+                    StoryAnswerFilter.SafeFallback, ct);
+                _failureClip = rendered.Content;
+            }
+            return _failureClip!;
+        }
+        finally
+        {
+            _bridgeLock.Release();
+        }
+    }
+
     // ── Spoken-answer assembly: answer + silent pause + return-to-story bridge ──
 
     // Measured duration of the embedded 24 kHz mono MP3 silence unit. The
@@ -306,6 +356,11 @@ public class StoryQaController : ControllerBase
     private static readonly SemaphoreSlim _bridgeLock = new(1, 1);
     private static int _bridgeRotation = -1;
     private static byte[]? _silenceUnit;
+
+    // Cached spoken safe-fallback clip, rendered once and reused on any
+    // transient failure path so the child hears a warm line instead of a
+    // silent 502. Rendered under _bridgeLock (see GetFailureClipAsync).
+    private static byte[]? _failureClip;
 
     // Cached recap audio per "{storyId}:{segmentIndex}" — recap lines are
     // fixed per story segment, so each costs at most one TTS call.
