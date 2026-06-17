@@ -1,7 +1,11 @@
+using System.Security.Cryptography;
 using System.Text;
+using ArmenianAiToy.Api.RateLimiting;
+using ArmenianAiToy.Api.Security;
 using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.Stories;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace ArmenianAiToy.Api.Controllers;
 
@@ -25,6 +29,7 @@ namespace ArmenianAiToy.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/story-audio")]
+[EnableRateLimiting(StoryAudioRateLimiter.PolicyName)]
 public class StoryAudioController : ControllerBase
 {
     // Split the narration at Armenian sentence ends and render each
@@ -79,6 +84,8 @@ public class StoryAudioController : ControllerBase
         string storyId,
         [FromQuery] bool refresh = false,
         [FromQuery] long from = 0,
+        [FromQuery] string? token = null,
+        [FromQuery] string? refreshToken = null,
         CancellationToken cancellationToken = default)
     {
         var story = _library.GetById(storyId);
@@ -87,8 +94,31 @@ public class StoryAudioController : ControllerBase
             return NotFound(new { error = "Unknown story." });
         }
 
+        // Access gate. When StoryAudio:SigningKey is configured, the
+        // header-less stream requires a valid signed token (minted by the
+        // device-authed /api/chat/story-audio-token endpoint). A missing /
+        // tampered / expired / wrong-story token returns the SAME 404 as an
+        // unknown story — concealment, so the endpoint reveals nothing to a
+        // token-less caller. Unset key => open (dev/bench), opt-in posture.
+        if (!IsTokenAccepted(storyId, token))
+        {
+            return NotFound(new { error = "Unknown story." });
+        }
+
         var cachePath = CachePathFor(storyId);
         var offsetsPath = OffsetsPathFor(cachePath);
+
+        // ?refresh forces a re-render — the only UNBOUNDED OpenAI-TTS cost
+        // vector on this otherwise-cached endpoint. Honor it ONLY when the
+        // caller presents the operator secret StoryAudio:RefreshToken. With
+        // no secret configured, refresh is disabled (delete the cache file
+        // for a dev re-render). This is the cost-cap for this endpoint.
+        if (refresh && !IsRefreshAuthorized(refreshToken))
+        {
+            _logger.LogWarning(
+                "Story-audio refresh denied for {StoryId} (missing/invalid refresh token)", storyId);
+            refresh = false;
+        }
         if (refresh)
         {
             if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
@@ -165,6 +195,35 @@ public class StoryAudioController : ControllerBase
 
     private static string OffsetsPathFor(string cachePath) =>
         Path.ChangeExtension(cachePath, ".offsets.json");
+
+    /// <summary>Access gate for the header-less stream. Open when
+    /// <c>StoryAudio:SigningKey</c> is unset (dev/bench); otherwise the
+    /// query <c>token</c> must be a valid signed token bound to this
+    /// story and not yet expired.</summary>
+    private bool IsTokenAccepted(string storyId, string? token)
+    {
+        var signingKey = _config["StoryAudio:SigningKey"];
+        if (string.IsNullOrWhiteSpace(signingKey))
+        {
+            return true; // enforcement off
+        }
+        return StoryAudioToken.TryValidate(token, storyId, signingKey, DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>Whether a re-render is authorized. Requires the configured
+    /// operator secret <c>StoryAudio:RefreshToken</c> to be present AND
+    /// matched (constant-time). With no secret configured, refresh is
+    /// always denied — the public re-render cost vector is closed.</summary>
+    private bool IsRefreshAuthorized(string? refreshToken)
+    {
+        var expected = _config["StoryAudio:RefreshToken"];
+        if (string.IsNullOrWhiteSpace(expected) || string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return false;
+        }
+        return CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(refreshToken), Encoding.UTF8.GetBytes(expected));
+    }
 
     /// <summary>Renders the full verbatim narration (all segments) to one
     /// MP3 at <paramref name="cachePath"/> and writes a sentence-start

@@ -13,9 +13,11 @@ namespace ArmenianAiToy.Api.RateLimiting;
 ///
 /// <para>
 /// <b>Bounded value space:</b> the returned string is guaranteed to be
-/// exactly one of <see cref="ChatTag"/> or <see cref="AuthTag"/>. The
-/// AppMeter contract's no-high-cardinality invariant is preserved by
-/// construction — this slice's map is two values total.
+/// exactly one of <see cref="ChatTag"/>, <see cref="AuthTag"/>, or
+/// <see cref="StoryAudioTag"/>. The AppMeter contract's
+/// no-high-cardinality invariant is preserved by construction — the map
+/// is three fixed values total. A future fourth policy extends this set
+/// by one explicit value, never an unbounded dimension.
 /// </para>
 ///
 /// <para>
@@ -37,6 +39,7 @@ public static class RateLimitRejectionPolicy
 {
     public const string ChatTag = "chat";
     public const string AuthTag = "auth";
+    public const string StoryAudioTag = "story_audio";
 
     public static string ResolvePolicyTag(HttpContext context)
     {
@@ -45,8 +48,11 @@ public static class RateLimitRejectionPolicy
             .GetMetadata<EnableRateLimitingAttribute>()
             ?.PolicyName;
 
-        return policyName == AuthRateLimiter.PolicyName
-            ? AuthTag
-            : ChatTag;
+        return policyName switch
+        {
+            AuthRateLimiter.PolicyName => AuthTag,
+            StoryAudioRateLimiter.PolicyName => StoryAudioTag,
+            _ => ChatTag,
+        };
     }
 }
