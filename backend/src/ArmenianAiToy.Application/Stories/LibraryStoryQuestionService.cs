@@ -96,6 +96,22 @@ public sealed class LibraryStoryQuestionService
             StoryAnswerFilter.SafeFallback, UsedFallback: true, firstRejection, retryRejection);
     }
 
+    /// <summary>The authored child-facing re-anchor line for a story
+    /// segment, or null when the story has no recap for that index.
+    /// Spoken on return from a longer in-story question to re-establish
+    /// the scene before narration resumes. Pure data lookup — no model
+    /// call — so the caller can use it unconditionally.</summary>
+    public static string? GetSegmentRecap(string storyId, int segmentIndex)
+    {
+        var guide = StoryQuestionGuides.TryGet(storyId);
+        if (guide is null || segmentIndex < 0 || segmentIndex >= guide.SegmentRecaps.Count)
+        {
+            return null;
+        }
+        var recap = guide.SegmentRecaps[segmentIndex];
+        return string.IsNullOrWhiteSpace(recap) ? null : recap;
+    }
+
     /// <summary>One model call; an exception becomes a null answer,
     /// which the filter rejects as Empty — routing into repair/fallback
     /// instead of surfacing an error to the child.</summary>

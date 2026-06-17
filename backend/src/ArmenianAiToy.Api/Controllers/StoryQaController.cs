@@ -88,6 +88,10 @@ public class StoryQaController : ControllerBase
             return NotFound(new { error = "Unknown story." });
         }
 
+        // Where the child was when they barged in — used both to ground the
+        // Q&A prompt and to pick that segment's re-anchor (recap) line.
+        var segmentIndex = OffsetToSegment(storyId, offset, story.Segments.Count);
+
         var inboundContentType = Request.ContentType;
         if (string.IsNullOrWhiteSpace(inboundContentType))
             inboundContentType = "audio/wav";
@@ -127,7 +131,6 @@ public class StoryQaController : ControllerBase
         {
             try
             {
-                var segmentIndex = OffsetToSegment(storyId, offset, story.Segments.Count);
                 var answer = await _questions.AnswerAsync(story, segmentIndex, question);
                 answerText = answer.Text;
                 _logger.LogInformation(
@@ -180,7 +183,32 @@ public class StoryQaController : ControllerBase
             return File(answerTts.Content, answerTts.MimeType);
         }
 
-        var spoken = ComposeAnswerWithPause(answerTts.Content, bridgeAudio);
+        // Tier 2 — a short "remember where we are" recap after the bridge,
+        // re-establishing the scene before narration resumes (the
+        // goal-reactivation step). Gated by answer length via
+        // StoryQa:RecapMinAnswerChars (default 0 = always) so it can later
+        // be limited to longer interruptions. Best-effort: a recap TTS
+        // failure just drops the recap, never the answer.
+        byte[]? recapAudio = null;
+        if (ShouldIncludeRecap(answerText))
+        {
+            var recapText = LibraryStoryQuestionService.GetSegmentRecap(storyId, segmentIndex);
+            if (!string.IsNullOrWhiteSpace(recapText))
+            {
+                try
+                {
+                    recapAudio = await GetRecapAudioAsync(storyId, segmentIndex, recapText!, cancellationToken);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Story-QA: recap TTS failed for {StoryId} seg {Segment}; skipping recap", storyId, segmentIndex);
+                }
+            }
+        }
+
+        var spoken = ComposeAnswerWithPause(answerTts.Content, bridgeAudio, recapAudio);
         return File(spoken, answerTts.MimeType);
     }
 
@@ -195,6 +223,10 @@ public class StoryQaController : ControllerBase
     private static readonly SemaphoreSlim _bridgeLock = new(1, 1);
     private static int _bridgeRotation = -1;
     private static byte[]? _silenceUnit;
+
+    // Cached recap audio per "{storyId}:{segmentIndex}" — recap lines are
+    // fixed per story segment, so each costs at most one TTS call.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> _recapAudios = new();
 
     /// <summary>Renders one return-to-story bridge (by index) and caches it
     /// for the process lifetime — the lines are fixed, so each costs at most
@@ -214,6 +246,48 @@ public class StoryQaController : ControllerBase
                 _bridgeAudios[index] = rendered.Content;
             }
             return _bridgeAudios[index]!;
+        }
+        finally
+        {
+            _bridgeLock.Release();
+        }
+    }
+
+    /// <summary>Whether to append the segment recap, gated on the answer
+    /// length (a proxy for how long the child was away). Default threshold
+    /// 0 → always include; raise <c>StoryQa:RecapMinAnswerChars</c> to
+    /// limit the recap to longer interruptions.</summary>
+    private bool ShouldIncludeRecap(string answerText)
+    {
+        var minChars = 0;
+        if (int.TryParse(_config["StoryQa:RecapMinAnswerChars"], out var m) && m >= 0)
+        {
+            minChars = m;
+        }
+        return (answerText?.Trim().Length ?? 0) >= minChars;
+    }
+
+    /// <summary>Renders a segment's recap line and caches it per
+    /// (story, segment) for the process lifetime — the lines are fixed, so
+    /// each costs at most one TTS call.</summary>
+    private async Task<byte[]> GetRecapAudioAsync(
+        string storyId, int segmentIndex, string recapText, CancellationToken ct)
+    {
+        var key = $"{storyId}:{segmentIndex}";
+        if (_recapAudios.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+        await _bridgeLock.WaitAsync(ct);
+        try
+        {
+            if (!_recapAudios.TryGetValue(key, out cached))
+            {
+                var rendered = await _synthesis.SynthesizeArmenianAsync(recapText, ct);
+                cached = rendered.Content;
+                _recapAudios[key] = cached;
+            }
+            return cached;
         }
         finally
         {
@@ -245,12 +319,14 @@ public class StoryQaController : ControllerBase
         return _silenceUnit;
     }
 
-    /// <summary>Concatenates answer + N silence units + bridge into one
-    /// 24 kHz mono MP3 byte stream (same format the firmware already
-    /// decodes for the streamed story). Pause length is
-    /// <c>StoryQa:AnswerBridgePauseMs</c> (default 1200 ms), rounded to a
-    /// whole number of silence units and capped so it can't run away.</summary>
-    private byte[] ComposeAnswerWithPause(byte[] answer, byte[] bridge)
+    /// <summary>Concatenates answer + N silence units + bridge (+ a short
+    /// beat + recap, when present) into one 24 kHz mono MP3 byte stream
+    /// (same format the firmware already decodes for the streamed story).
+    /// Pause length is <c>StoryQa:AnswerBridgePauseMs</c> (default 1200 ms),
+    /// rounded to a whole number of silence units and capped so it can't
+    /// run away. The recap, when supplied, follows the bridge after one
+    /// silence-unit breath.</summary>
+    private byte[] ComposeAnswerWithPause(byte[] answer, byte[] bridge, byte[]? recap)
     {
         var pauseMs = 1200;
         if (int.TryParse(_config["StoryQa:AnswerBridgePauseMs"], out var configured) && configured >= 0)
@@ -263,13 +339,20 @@ public class StoryQaController : ControllerBase
             ? 0
             : Math.Clamp((int)Math.Round(pauseMs / (double)SilenceUnitMs), 0, 16);
 
-        using var ms = new MemoryStream(answer.Length + (unit.Length * repeats) + bridge.Length);
+        var capacity = answer.Length + (unit.Length * repeats) + bridge.Length
+            + (recap is not null ? unit.Length + recap.Length : 0);
+        using var ms = new MemoryStream(capacity);
         ms.Write(answer, 0, answer.Length);
         for (var i = 0; i < repeats; i++)
         {
             ms.Write(unit, 0, unit.Length);
         }
         ms.Write(bridge, 0, bridge.Length);
+        if (recap is not null)
+        {
+            ms.Write(unit, 0, unit.Length); // a short breath, then the recap
+            ms.Write(recap, 0, recap.Length);
+        }
         return ms.ToArray();
     }
 
