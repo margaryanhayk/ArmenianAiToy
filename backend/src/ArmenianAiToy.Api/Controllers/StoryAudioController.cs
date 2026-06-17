@@ -107,6 +107,7 @@ public class StoryAudioController : ControllerBase
 
         var cachePath = CachePathFor(storyId);
         var offsetsPath = OffsetsPathFor(cachePath);
+        var segmentsPath = SegmentsPathFor(cachePath);
 
         // ?refresh forces a re-render — the only UNBOUNDED OpenAI-TTS cost
         // vector on this otherwise-cached endpoint. Honor it ONLY when the
@@ -123,19 +124,25 @@ public class StoryAudioController : ControllerBase
         {
             if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
             if (System.IO.File.Exists(offsetsPath)) System.IO.File.Delete(offsetsPath);
+            if (System.IO.File.Exists(segmentsPath)) System.IO.File.Delete(segmentsPath);
             OffsetMaps.TryRemove(storyId, out _);
         }
 
-        // Render when the audio OR its sentence-offset sidecar is missing,
-        // so a cache from before the micro-rewind feature regenerates both.
-        if (!System.IO.File.Exists(cachePath) || !System.IO.File.Exists(offsetsPath))
+        // Render when the audio OR either sidecar (sentence-offset map,
+        // segment-offset map) is missing, so a cache from before these
+        // features regenerates all three together.
+        if (!System.IO.File.Exists(cachePath)
+            || !System.IO.File.Exists(offsetsPath)
+            || !System.IO.File.Exists(segmentsPath))
         {
             await RenderLock.WaitAsync(cancellationToken);
             try
             {
-                if (!System.IO.File.Exists(cachePath) || !System.IO.File.Exists(offsetsPath))
+                if (!System.IO.File.Exists(cachePath)
+                    || !System.IO.File.Exists(offsetsPath)
+                    || !System.IO.File.Exists(segmentsPath))
                 {
-                    await RenderAndCacheAsync(story, cachePath, offsetsPath, cancellationToken);
+                    await RenderAndCacheAsync(story, cachePath, offsetsPath, segmentsPath, cancellationToken);
                 }
             }
             catch (OperationCanceledException) { throw; }
@@ -196,6 +203,13 @@ public class StoryAudioController : ControllerBase
     private static string OffsetsPathFor(string cachePath) =>
         Path.ChangeExtension(cachePath, ".offsets.json");
 
+    /// <summary>Sidecar holding the per-segment START byte offsets across
+    /// the whole MP3 (one entry per story segment, segment 0 at byte 0).
+    /// Lets the Q&amp;A path map a resume offset to the exact segment the
+    /// child is in, instead of assuming every segment is 1/N of the file.</summary>
+    private static string SegmentsPathFor(string cachePath) =>
+        Path.ChangeExtension(cachePath, ".segments.json");
+
     /// <summary>Access gate for the header-less stream. Open when
     /// <c>StoryAudio:SigningKey</c> is unset (dev/bench); otherwise the
     /// query <c>token</c> must be a valid signed token bound to this
@@ -232,7 +246,8 @@ public class StoryAudioController : ControllerBase
     /// concatenates the rendered audio (narration flow is unchanged — the
     /// map is derived alongside, it does not change how audio is rendered).</summary>
     private async Task RenderAndCacheAsync(
-        CuratedStory story, string cachePath, string offsetsPath, CancellationToken cancellationToken)
+        CuratedStory story, string cachePath, string offsetsPath, string segmentsPath,
+        CancellationToken cancellationToken)
     {
         var chunks = SplitForTts(story.Segments.Select(s => s.Text));
         _logger.LogInformation(
@@ -246,6 +261,13 @@ public class StoryAudioController : ControllerBase
         // which is all the micro-rewind needs.
         var sentenceOffsets = new List<long> { 0 };
         long byteCursor = 0;
+
+        // Per-chunk (char, byte) spans, captured alongside the render so the
+        // segment-start byte map below can be derived from the SAME real
+        // byte accumulation — exact at chunk boundaries, proportional within
+        // a chunk. The audio bytes are unchanged; this is derived metadata.
+        long charCursor = 0;
+        var chunkSpans = new List<(long CharStart, long ByteStart, int Chars, int Bytes)>(chunks.Count);
 
         var tmp = cachePath + ".tmp";
         await using (var output = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
@@ -263,8 +285,10 @@ public class StoryAudioController : ControllerBase
                         : 0);
                     sentenceOffsets.Add(b);
                 }
+                chunkSpans.Add((charCursor, byteCursor, chunkChars, chunkBytes));
                 await output.WriteAsync(rendered.Content, cancellationToken);
                 byteCursor += chunkBytes;
+                charCursor += chunkChars;
             }
         }
         // Atomic-ish publish so a half-written file is never served.
@@ -279,9 +303,63 @@ public class StoryAudioController : ControllerBase
             offsetsPath, System.Text.Json.JsonSerializer.Serialize(map), cancellationToken);
         OffsetMaps[story.Id] = map;
 
+        // Segment-start byte map: byte offset where each story segment begins.
+        // Char positions match SplitForTts's "\n"-joined text (segment i
+        // starts after the prior segments' text + i newline separators).
+        var segmentMap = ComputeSegmentByteOffsets(
+            story.Segments.Select(s => s.Text).ToList(), chunkSpans, byteCursor);
+        await System.IO.File.WriteAllTextAsync(
+            segmentsPath, System.Text.Json.JsonSerializer.Serialize(segmentMap), cancellationToken);
+
         _logger.LogInformation(
-            "Story audio cached: {StoryId} -> {Path} ({Bytes} bytes, {Boundaries} sentence boundaries)",
-            story.Id, cachePath, new FileInfo(cachePath).Length, map.Length);
+            "Story audio cached: {StoryId} -> {Path} ({Bytes} bytes, {Boundaries} sentence boundaries, {Segments} segment boundaries)",
+            story.Id, cachePath, new FileInfo(cachePath).Length, map.Length, segmentMap.Length);
+    }
+
+    /// <summary>Maps each segment's start character (in the "\n"-joined
+    /// narration) to its byte offset in the rendered MP3, using the
+    /// per-chunk (char→byte) spans. Exact where a segment starts on a chunk
+    /// boundary; proportional within a chunk (same ~1 s precision as the
+    /// sentence map). Strictly more accurate than the old uniform
+    /// 1/N-of-file assumption, which ignored unequal segment lengths.</summary>
+    private static long[] ComputeSegmentByteOffsets(
+        IReadOnlyList<string> segmentTexts,
+        IReadOnlyList<(long CharStart, long ByteStart, int Chars, int Bytes)> spans,
+        long totalBytes)
+    {
+        var result = new long[segmentTexts.Count];
+        long charStart = 0;
+        for (var i = 0; i < segmentTexts.Count; i++)
+        {
+            result[i] = CharToByte(charStart, spans, totalBytes);
+            charStart += segmentTexts[i].Length + 1; // +1 = the "\n" join separator
+        }
+        return result;
+    }
+
+    private static long CharToByte(
+        long charPos,
+        IReadOnlyList<(long CharStart, long ByteStart, int Chars, int Bytes)> spans,
+        long totalBytes)
+    {
+        if (charPos <= 0)
+        {
+            return 0;
+        }
+        foreach (var s in spans)
+        {
+            if (charPos < s.CharStart + s.Chars)
+            {
+                if (charPos <= s.CharStart)
+                {
+                    return s.ByteStart; // exact chunk boundary
+                }
+                return s.ByteStart + (s.Chars > 0
+                    ? (long)(s.Bytes * (double)(charPos - s.CharStart) / s.Chars)
+                    : 0);
+            }
+        }
+        return totalBytes; // past the last chunk → end of file
     }
 
     /// <summary>Snaps a requested resume byte offset DOWN to the start of

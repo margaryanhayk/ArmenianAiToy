@@ -495,12 +495,16 @@ public class StoryQaController : ControllerBase
     }
 
     /// <summary>
-    /// Best-effort map of a byte offset in the pre-rendered story MP3 to
-    /// a segment index, proportional to the cached file size, so the
-    /// Q&amp;A prompt's "current segment" roughly matches where the child
-    /// is. Falls back to segment 0 when the cache size is unknown — the
-    /// whole-story summary + essence in the prompt answer correctly
-    /// regardless, so position is only a context refinement.
+    /// Maps a byte offset in the pre-rendered story MP3 to the segment the
+    /// child is in, so the Q&amp;A prompt's "current segment" and the
+    /// re-anchor recap line match where they barged in. Prefers the exact
+    /// per-segment byte map written by the render
+    /// (<c>{story}.segments.json</c>): the largest segment whose start byte
+    /// is ≤ the offset. Falls back to the old proportional-to-file-size
+    /// estimate only when that sidecar is absent (a cache rendered before
+    /// the segment map existed). Falls back to segment 0 on any failure —
+    /// the whole-story summary in the prompt answers correctly regardless,
+    /// so position is only a context refinement.
     /// </summary>
     private int OffsetToSegment(string storyId, long offset, int segmentCount)
     {
@@ -517,6 +521,18 @@ public class StoryQaController : ControllerBase
             }
             var safe = string.Concat(storyId.Where(c => char.IsLetterOrDigit(c) || c == '-'));
             var path = Path.Combine(root, $"{safe}.mp3");
+
+            // Preferred: exact segment-start byte map. Q&A is infrequent
+            // (one per barge-in), so reading the small sidecar per call is
+            // cheap and avoids any stale-cache risk on re-render.
+            var segmentsPath = Path.ChangeExtension(path, ".segments.json");
+            var segmentMap = LoadSegmentMap(segmentsPath);
+            if (segmentMap.Length > 1)
+            {
+                return SegmentForOffset(segmentMap, offset, segmentCount);
+            }
+
+            // Fallback: proportional to file size (pre-segment-map caches).
             if (!System.IO.File.Exists(path))
             {
                 return 0;
@@ -526,12 +542,47 @@ public class StoryQaController : ControllerBase
             {
                 return 0;
             }
-            var seg = (int)(offset * segmentCount / size);
-            return Math.Clamp(seg, 0, segmentCount - 1);
+            var proportional = (int)(offset * segmentCount / size);
+            return Math.Clamp(proportional, 0, segmentCount - 1);
         }
         catch
         {
             return 0;
+        }
+    }
+
+    /// <summary>Given the segment-start byte map (ascending; entry i is the
+    /// first byte of segment i, entry 0 == 0), returns the index of the
+    /// segment that <paramref name="offset"/> falls in — the largest segment
+    /// whose start byte is ≤ the offset. Clamped to a valid segment index.
+    /// Internal for direct unit testing of the lookup.</summary>
+    internal static int SegmentForOffset(long[] segmentStartBytes, long offset, int segmentCount)
+    {
+        if (segmentStartBytes.Length <= 1 || segmentCount <= 1 || offset <= 0)
+        {
+            return 0;
+        }
+        var i = Array.BinarySearch(segmentStartBytes, offset);
+        var seg = i >= 0 ? i : ~i - 1; // largest start ≤ offset
+        return Math.Clamp(seg, 0, segmentCount - 1);
+    }
+
+    /// <summary>Loads the segment-start byte map sidecar, or an empty array
+    /// when it is missing / unreadable (caller then falls back).</summary>
+    private static long[] LoadSegmentMap(string segmentsPath)
+    {
+        try
+        {
+            if (!System.IO.File.Exists(segmentsPath))
+            {
+                return [];
+            }
+            var json = System.IO.File.ReadAllText(segmentsPath);
+            return System.Text.Json.JsonSerializer.Deserialize<long[]>(json) ?? [];
+        }
+        catch
+        {
+            return [];
         }
     }
 }
