@@ -1,5 +1,6 @@
 using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Application.Audio;
+using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -51,6 +52,7 @@ public class StoryQaController : ControllerBase
     private readonly IAudioSynthesisService _synthesis;
     private readonly ICuratedStoryLibrary _library;
     private readonly LibraryStoryQuestionService _questions;
+    private readonly IModerationService _moderation;
     private readonly IWebHostEnvironment _env;
     private readonly IConfiguration _config;
     private readonly ILogger<StoryQaController> _logger;
@@ -60,6 +62,7 @@ public class StoryQaController : ControllerBase
         IAudioSynthesisService synthesis,
         ICuratedStoryLibrary library,
         LibraryStoryQuestionService questions,
+        IModerationService moderation,
         IWebHostEnvironment env,
         IConfiguration config,
         ILogger<StoryQaController> logger)
@@ -68,6 +71,7 @@ public class StoryQaController : ControllerBase
         _synthesis = synthesis;
         _library = library;
         _questions = questions;
+        _moderation = moderation;
         _env = env;
         _config = config;
         _logger = logger;
@@ -129,20 +133,43 @@ public class StoryQaController : ControllerBase
         }
         else
         {
-            try
+            // Input moderation on the transcribed question BEFORE any GPT
+            // call — mirrors the text path (ChatService step 2). An unsafe
+            // transcript is never sent to the answer model; the child hears
+            // the warm in-story fallback and the story resumes normally.
+            // CheckContentAsync is fail-closed-to-(IsSafe=false) by contract
+            // and never throws, so it needs no try/catch (same as the text
+            // path). The "moderation_unavailable" distinction is logged so an
+            // infra hiccup is separable from a genuine content flag, but the
+            // child hears the same in-story fallback either way.
+            var inputModeration = await _moderation.CheckContentAsync(question);
+            if (!inputModeration.IsSafe)
             {
-                var answer = await _questions.AnswerAsync(story, segmentIndex, question);
-                answerText = answer.Text;
-                _logger.LogInformation(
-                    "Story-QA answered. Story: {StoryId}, Segment: {Segment}, UsedFallback: {Fallback}, Q: {Q}",
-                    storyId, segmentIndex, answer.UsedFallback,
-                    question.Length > 40 ? question[..40] + "…" : question);
+                var moderationUnavailable =
+                    inputModeration.FlaggedCategories.Contains("moderation_unavailable");
+                _logger.LogWarning(
+                    "Story-QA input blocked. StoryId: {StoryId}, Segment: {Segment}, Categories: {Categories}, unavailable={Unavailable}",
+                    storyId, segmentIndex,
+                    string.Join(", ", inputModeration.FlaggedCategories), moderationUnavailable);
+                answerText = StoryAnswerFilter.SafeFallback;
             }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
+            else
             {
-                _logger.LogWarning(ex, "Story-QA: answer failure for {StoryId}", storyId);
-                return StatusCode(502, new { error = "AI service unavailable. Please try again." });
+                try
+                {
+                    var answer = await _questions.AnswerAsync(story, segmentIndex, question);
+                    answerText = answer.Text;
+                    _logger.LogInformation(
+                        "Story-QA answered. Story: {StoryId}, Segment: {Segment}, UsedFallback: {Fallback}, Q: {Q}",
+                        storyId, segmentIndex, answer.UsedFallback,
+                        question.Length > 40 ? question[..40] + "…" : question);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Story-QA: answer failure for {StoryId}", storyId);
+                    return StatusCode(502, new { error = "AI service unavailable. Please try again." });
+                }
             }
         }
 
