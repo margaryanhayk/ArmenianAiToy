@@ -4,6 +4,7 @@ using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Api.Security;
 using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.Stories;
+using ArmenianAiToy.Application.Telemetry;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -143,6 +144,10 @@ public class StoryAudioController : ControllerBase
                     || !System.IO.File.Exists(segmentsPath))
                 {
                     await RenderAndCacheAsync(story, cachePath, offsetsPath, segmentsPath, cancellationToken);
+                    // Count the cold render (the cost-bearing event). A serve
+                    // from cache does not reach here, so it is not counted.
+                    AppMeter.StoryAudioRender.Add(1,
+                        new KeyValuePair<string, object?>("result", "success"));
                 }
             }
             catch (OperationCanceledException) { throw; }
@@ -150,6 +155,8 @@ public class StoryAudioController : ControllerBase
             {
                 _logger.LogWarning(ex,
                     "Story-audio render failed for {StoryId}", storyId);
+                AppMeter.StoryAudioRender.Add(1,
+                    new KeyValuePair<string, object?>("result", "failure"));
                 return StatusCode(502, new { error = "AI service unavailable. Please try again." });
             }
             finally

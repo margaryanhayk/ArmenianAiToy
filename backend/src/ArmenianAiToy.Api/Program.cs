@@ -72,6 +72,14 @@ otel.WithMetrics(m => m
         {
             Boundaries = openAiLatencyBuckets
         })
+    .AddView(
+        // Voice Q&A end-to-end latency — the "dead air" metric. Shares the
+        // OpenAI latency buckets so dashboards stay comparable.
+        instrumentName: "aat_story_qa_duration_seconds",
+        metricStreamConfiguration: new ExplicitBucketHistogramConfiguration
+        {
+            Boundaries = openAiLatencyBuckets
+        })
     .AddPrometheusExporter());
 otel.WithTracing(t =>
 {

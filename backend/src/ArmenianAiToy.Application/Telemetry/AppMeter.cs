@@ -234,4 +234,59 @@ public static class AppMeter
         Instance.CreateCounter<long>(
             name: "aat_openai_cost_cap_trip_total",
             description: "Count of per-device daily OpenAI cost-cap trips, by kind.");
+
+    /// <summary>
+    /// Count of in-story voice Q&amp;A turns handled by
+    /// <c>StoryQaController.Ask</c> (one increment per turn that reaches
+    /// transcription — input-validation rejections like unknown-story 404
+    /// or empty-body 400 are NOT counted). Tag <c>outcome</c> is one of a
+    /// bounded five-value set:
+    /// <list type="bullet">
+    ///   <item><c>answered</c> — GPT answered and passed the answer filter.</item>
+    ///   <item><c>answer_fallback</c> — the bounded Q&amp;A returned its safe
+    ///     fallback (model/filter rejected; not a safety block).</item>
+    ///   <item><c>moderation_blocked</c> — input moderation blocked the
+    ///     transcript; no GPT call.</item>
+    ///   <item><c>empty_transcript</c> — Whisper returned nothing.</item>
+    ///   <item><c>transient_failure</c> — STT / answer / TTS threw and the
+    ///     child was served the spoken safe-fallback (the no-silence path).</item>
+    /// </list>
+    /// Bounded enum — safe under the no-high-cardinality invariant. Do NOT
+    /// add story_id / device_id here.
+    /// </summary>
+    public static readonly Counter<long> StoryQaTurn =
+        Instance.CreateCounter<long>(
+            name: "aat_story_qa_turn_total",
+            description: "Count of in-story voice Q&A turns by outcome.");
+
+    /// <summary>
+    /// End-to-end duration (unit = <b>seconds</b>) of a voice Q&amp;A turn
+    /// in <c>StoryQaController.Ask</c> — from just before Whisper STT
+    /// through GPT, TTS, and bridge/recap composition. This is the metric
+    /// for the perceived "dead air" after a barge-in. Recorded for every
+    /// metered turn regardless of outcome (incl. the spoken-fallback
+    /// failure path). Untagged; bucket boundaries are wired via an OTel
+    /// view in <c>Program.cs</c> (shared with the OpenAI latency
+    /// histograms). Same no-high-cardinality invariant — no story_id /
+    /// device_id / model_name tags.
+    /// </summary>
+    public static readonly Histogram<double> StoryQaDuration =
+        Instance.CreateHistogram<double>(
+            name: "aat_story_qa_duration_seconds",
+            unit: "s",
+            description: "End-to-end duration of an in-story voice Q&A turn.");
+
+    /// <summary>
+    /// Count of whole-story narration TTS renders in
+    /// <c>StoryAudioController</c> — the expensive, cost-bearing cold-cache
+    /// event (cached serves do NOT increment this). Tag <c>result</c> is
+    /// one of <c>success</c> or <c>failure</c>. Bounded two-value
+    /// enumeration. A high render rate signals cache churn / a re-render
+    /// abuse attempt; pair with the <c>story_audio</c> rate-limit-rejection
+    /// signal. Do NOT add story_id here.
+    /// </summary>
+    public static readonly Counter<long> StoryAudioRender =
+        Instance.CreateCounter<long>(
+            name: "aat_story_audio_render_total",
+            description: "Count of whole-story narration TTS renders, by result.");
 }

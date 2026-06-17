@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
+using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -117,6 +119,19 @@ public class StoryQaController : ControllerBase
         }
         var audioBytes = audioBuffer.ToArray();
 
+        // Voice-path observability: time the whole turn (this is the "dead
+        // air" the child perceives after a barge-in) and record the outcome.
+        // The 404/400 input-validation rejections above are deliberately NOT
+        // metered — only real turns that reach transcription. RecordTurn is
+        // called exactly once on every return path below.
+        var turnStopwatch = Stopwatch.StartNew();
+        void RecordTurn(string outcome)
+        {
+            turnStopwatch.Stop();
+            AppMeter.StoryQaDuration.Record(turnStopwatch.Elapsed.TotalSeconds);
+            AppMeter.StoryQaTurn.Add(1, new KeyValuePair<string, object?>("outcome", outcome));
+        }
+
         // Voice → text (Whisper, Armenian).
         string question;
         try
@@ -129,6 +144,7 @@ public class StoryQaController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Story-QA: STT failure for story {StoryId}", storyId);
+            RecordTurn("transient_failure");
             return await SpokenFailureResultAsync(cancellationToken);
         }
 
@@ -141,9 +157,11 @@ public class StoryQaController : ControllerBase
         string answerText;
         var userFlag = SafetyFlag.Clean;
         var assistantFlag = SafetyFlag.Clean;
+        var turnOutcome = "answered";
         if (string.IsNullOrWhiteSpace(question))
         {
             answerText = StoryAnswerFilter.SafeFallback;
+            turnOutcome = "empty_transcript";
             _logger.LogInformation("Story-QA: empty transcript for {StoryId}; speaking fallback", storyId);
         }
         else
@@ -169,6 +187,7 @@ public class StoryQaController : ControllerBase
                 answerText = StoryAnswerFilter.SafeFallback;
                 userFlag = SafetyFlag.Blocked;
                 assistantFlag = SafetyFlag.Flagged;
+                turnOutcome = "moderation_blocked";
             }
             else
             {
@@ -176,6 +195,7 @@ public class StoryQaController : ControllerBase
                 {
                     var answer = await _questions.AnswerAsync(story, segmentIndex, question);
                     answerText = answer.Text;
+                    turnOutcome = answer.UsedFallback ? "answer_fallback" : "answered";
                     _logger.LogInformation(
                         "Story-QA answered. Story: {StoryId}, Segment: {Segment}, UsedFallback: {Fallback}, Q: {Q}",
                         storyId, segmentIndex, answer.UsedFallback,
@@ -185,6 +205,7 @@ public class StoryQaController : ControllerBase
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Story-QA: answer failure for {StoryId}", storyId);
+                    RecordTurn("transient_failure");
                     return await SpokenFailureResultAsync(cancellationToken);
                 }
             }
@@ -220,6 +241,7 @@ public class StoryQaController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Story-QA: TTS failure for {StoryId}", storyId);
+            RecordTurn("transient_failure");
             return await SpokenFailureResultAsync(cancellationToken);
         }
 
@@ -235,6 +257,7 @@ public class StoryQaController : ControllerBase
             // Bridge render failed: still give the child the answer rather
             // than a 502 — losing the soft return line degrades gracefully.
             _logger.LogWarning(ex, "Story-QA: bridge TTS failure for {StoryId}; returning answer only", storyId);
+            RecordTurn(turnOutcome);
             return File(answerTts.Content, answerTts.MimeType);
         }
 
@@ -264,6 +287,7 @@ public class StoryQaController : ControllerBase
         }
 
         var spoken = ComposeAnswerWithPause(answerTts.Content, bridgeAudio, recapAudio);
+        RecordTurn(turnOutcome);
         return File(spoken, answerTts.MimeType);
     }
 
