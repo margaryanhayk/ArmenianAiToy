@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>ArmenianAiToy.Tools.ContentPackBuilder.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <!--
+    Link the testable core directly (same pattern as StoryInteractiveLoop.Tests):
+    the runner is an Exe and the re-encode/IO core has no external deps, so we
+    compile ContentPack.cs into the test assembly rather than project-referencing
+    the Exe. FfmpegReencoder.cs and Program.cs are deliberately NOT linked.
+  -->
+  <ItemGroup>
+    <Compile Include="..\ContentPackBuilder\ContentPack.cs" Link="ContentPack.cs" />
+  </ItemGroup>
+</Project>
