@@ -113,6 +113,34 @@ public class StoryAudioSegmentMapTests
         Assert.Equal(0, StoryQaController.SegmentForOffset([], 500, 5));    // empty map
     }
 
+    // --- 3. Resume snap (micro-rewind) ------------------------------
+    // Pins the snap behaviour the sentence-byte map drives. The map stays
+    // a proportional estimate by design (exact offsets would need
+    // per-sentence TTS, which degrades the narration audio); these tests
+    // pin the snap logic, not sub-second precision.
+
+    [Fact]
+    public void SnapOffset_ExactBoundary_ReturnsItself()
+    {
+        long[] map = [0, 100, 250, 400];
+        Assert.Equal(250, StoryAudioController.SnapOffset(map, 250));
+    }
+
+    [Fact]
+    public void SnapOffset_BetweenBoundaries_SnapsDownToSentenceStart()
+    {
+        long[] map = [0, 100, 250, 400];
+        Assert.Equal(100, StoryAudioController.SnapOffset(map, 180)); // mid-sentence -> its start
+        Assert.Equal(0, StoryAudioController.SnapOffset(map, 99));
+        Assert.Equal(400, StoryAudioController.SnapOffset(map, 9999)); // past last -> last start
+    }
+
+    [Fact]
+    public void SnapOffset_EmptyMap_ReturnsFromUnchanged()
+    {
+        Assert.Equal(1234, StoryAudioController.SnapOffset([], 1234));
+    }
+
     [Fact]
     public void SegmentForOffset_DemonstratesImprovementOverProportional()
     {

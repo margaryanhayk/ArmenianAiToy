@@ -266,6 +266,20 @@ public class StoryAudioController : ControllerBase
         // is estimated proportionally from its character position (CBR MP3,
         // so bytes ≈ time ≈ chars within one chunk) — accurate to ~a second,
         // which is all the micro-rewind needs.
+        //
+        // DELIBERATE TRADE-OFF (do NOT "fix" by rendering per sentence):
+        // making these offsets EXACT would require one TTS call per sentence
+        // so each sentence's start byte is a real chunk boundary. That would
+        // (a) change the narration AUDIO — a sentence synthesized in
+        // isolation has different prosody/pacing than within its scene, so
+        // the story would sound choppier at every sentence seam, degrading
+        // the product's core (storytelling quality), and (b) multiply TTS
+        // cost/latency on the cold render. The residual ~1-2 s drift only
+        // affects where a post-Q&A resume re-enters, and the design already
+        // prefers re-hearing a moment over skipping words (the firmware's
+        // AREG_STORY_RESUME_FUDGE_BYTES biases the same way). Keeping the
+        // proportional estimate is the correct call; exactness is not worth
+        // the audio regression.
         var sentenceOffsets = new List<long> { 0 };
         long byteCursor = 0;
 
@@ -375,6 +389,16 @@ public class StoryAudioController : ControllerBase
     private long SnapToSentenceStart(string storyId, string offsetsPath, long from)
     {
         var map = OffsetMaps.GetOrAdd(storyId, _ => LoadOffsets(offsetsPath));
+        return SnapOffset(map, from);
+    }
+
+    /// <summary>Pure snap: the start byte of the sentence <paramref name="from"/>
+    /// falls inside (the largest boundary ≤ from), or <paramref name="from"/>
+    /// unchanged when the map is empty. Internal for direct unit testing —
+    /// the resume snap was previously only reachable through the full
+    /// render+stream path.</summary>
+    internal static long SnapOffset(long[] map, long from)
+    {
         if (map.Length == 0)
         {
             return from;
