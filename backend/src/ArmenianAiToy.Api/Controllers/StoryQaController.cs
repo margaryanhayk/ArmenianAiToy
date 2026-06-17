@@ -132,13 +132,16 @@ public class StoryQaController : ControllerBase
             AppMeter.StoryQaTurn.Add(1, new KeyValuePair<string, object?>("outcome", outcome));
         }
 
-        // Voice → text (Whisper, Armenian).
+        // Voice → text (Whisper, Armenian). Bias decoding with the current
+        // story scene so short / single-word answers — the model's weakest
+        // case — resolve to the proper nouns and vocabulary actually in play.
+        var transcriptionBias = BuildTranscriptionBias(story, segmentIndex);
         string question;
         try
         {
             using var sttStream = new MemoryStream(audioBytes, writable: false);
             question = await _transcription.TranscribeArmenianAsync(
-                sttStream, inboundContentType!, cancellationToken);
+                sttStream, inboundContentType!, transcriptionBias, cancellationToken);
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
@@ -589,6 +592,29 @@ public class StoryQaController : ControllerBase
         var i = Array.BinarySearch(segmentStartBytes, offset);
         var seg = i >= 0 ? i : ~i - 1; // largest start ≤ offset
         return Math.Clamp(seg, 0, segmentCount - 1);
+    }
+
+    /// <summary>Builds the Whisper biasing context for a Q&amp;A turn: the
+    /// current story segment (the scene the child is asking about),
+    /// prefixed with the previous segment for a little more vocabulary, and
+    /// capped to <c>MaxBiasChars</c>. The cap keeps the END of the text —
+    /// the current scene — because Whisper weights the tail of the prompt
+    /// most. Returns null when there is nothing useful to bias with.</summary>
+    internal static string? BuildTranscriptionBias(CuratedStory story, int segmentIndex)
+    {
+        const int MaxBiasChars = 600;
+        if (story.Segments.Count == 0)
+        {
+            return null;
+        }
+        var idx = Math.Clamp(segmentIndex, 0, story.Segments.Count - 1);
+        var prefix = idx > 0 ? story.Segments[idx - 1].Text + " " : string.Empty;
+        var context = prefix + story.Segments[idx].Text;
+        if (context.Length > MaxBiasChars)
+        {
+            context = context[^MaxBiasChars..]; // keep the current scene (tail)
+        }
+        return string.IsNullOrWhiteSpace(context) ? null : context;
     }
 
     /// <summary>Loads the segment-start byte map sidecar, or an empty array

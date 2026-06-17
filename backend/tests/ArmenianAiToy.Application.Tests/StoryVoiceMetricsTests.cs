@@ -49,7 +49,7 @@ public class StoryVoiceMetricsTests
             "aat_story_qa_turn_total", "aat_story_qa_duration_seconds");
         var (controller, deps) = CreateQa();
         deps.Transcription.TranscribeArmenianAsync(
-                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns("Ո՞վ է փոքրիկ ամպիկը");
         deps.Moderation.CheckContentAsync(Arg.Any<string>())
             .Returns(new ModerationResult(true, new List<string>()));
@@ -71,7 +71,7 @@ public class StoryVoiceMetricsTests
         using var capture = MetricCapture.Start("aat_story_qa_turn_total");
         var (controller, deps) = CreateQa();
         deps.Transcription.TranscribeArmenianAsync(
-                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns("վտանգավոր բան");
         deps.Moderation.CheckContentAsync(Arg.Any<string>())
             .Returns(new ModerationResult(false, new List<string> { "violence" }));
@@ -88,7 +88,7 @@ public class StoryVoiceMetricsTests
         using var capture = MetricCapture.Start("aat_story_qa_turn_total");
         var (controller, deps) = CreateQa();
         deps.Transcription.TranscribeArmenianAsync(
-                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Throws(new InvalidOperationException("whisper down"));
 
         await controller.Ask(StoryId, 0, CancellationToken.None);

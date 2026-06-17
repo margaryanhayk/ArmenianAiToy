@@ -25,4 +25,19 @@ public interface IAudioTranscriptionService
         Stream audio,
         string contentType,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// As <see cref="TranscribeArmenianAsync(Stream,string,CancellationToken)"/>,
+    /// but biases decoding with <paramref name="prompt"/> — short Armenian
+    /// context (e.g. the current story scene) that primes the model toward
+    /// the proper nouns and vocabulary actually in play. This is the main
+    /// lever for a child's short / single-word Armenian utterances, which
+    /// Whisper otherwise mangles. A null / empty prompt behaves exactly
+    /// like the 3-argument overload.
+    /// </summary>
+    Task<string> TranscribeArmenianAsync(
+        Stream audio,
+        string contentType,
+        string? prompt,
+        CancellationToken cancellationToken = default);
 }

@@ -106,7 +106,7 @@ public class StoryQaControllerModerationTests
 
     private static void WireTranscript(Harness h, string transcript) =>
         h.Transcription.TranscribeArmenianAsync(
-                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(transcript);
 
     // --- Unsafe transcript: gated before GPT, child hears fallback ----
@@ -195,6 +195,28 @@ public class StoryQaControllerModerationTests
             .GetCompletionAsync(default!, default!);
     }
 
+    // --- Gap 6: Whisper biasing with the current scene ---------------
+
+    [Fact]
+    public async Task Transcription_IsBiasedWithCurrentSceneText()
+    {
+        var h = Create();
+        WireTranscript(h, "Ո՞վ է փոքրիկ ամպիկը");
+        h.Moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
+        h.AiChatClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Փոքրիկ ամպիկը երկնքի ընկերն է։");
+        // offset 0 → segment 0; the bias is (the tail of) that segment's text.
+        var seg0 = new InMemoryCuratedStoryLibrary().GetById(StoryId)!.Segments[0].Text;
+
+        await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        await h.Transcription.Received(1).TranscribeArmenianAsync(
+            Arg.Any<Stream>(), Arg.Any<string>(),
+            Arg.Is<string?>(p => !string.IsNullOrEmpty(p) && seg0.EndsWith(p)),
+            Arg.Any<CancellationToken>());
+    }
+
     // --- Gap 3: turn persistence (dashboard + retention) --------------
 
     [Fact]
@@ -279,7 +301,7 @@ public class StoryQaControllerModerationTests
     {
         var h = Create();
         h.Transcription.TranscribeArmenianAsync(
-                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Throws(new InvalidOperationException("whisper down"));
 
         var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);

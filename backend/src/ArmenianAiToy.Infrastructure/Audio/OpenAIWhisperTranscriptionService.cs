@@ -30,8 +30,12 @@ public sealed class OpenAIWhisperTranscriptionService : IAudioTranscriptionServi
         _logger = logger;
     }
 
-    public async Task<string> TranscribeArmenianAsync(
+    public Task<string> TranscribeArmenianAsync(
         Stream audio, string contentType, CancellationToken cancellationToken = default)
+        => TranscribeArmenianAsync(audio, contentType, prompt: null, cancellationToken);
+
+    public async Task<string> TranscribeArmenianAsync(
+        Stream audio, string contentType, string? prompt, CancellationToken cancellationToken = default)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(RequestTimeout);
@@ -42,12 +46,20 @@ public sealed class OpenAIWhisperTranscriptionService : IAudioTranscriptionServi
             Language = "hy",
             ResponseFormat = AudioTranscriptionFormat.Text
         };
+        // Bias decoding toward the supplied context (e.g. the current story
+        // scene), which sharply improves short / single-word Armenian — the
+        // model's weakest case. Whisper weights the END of the prompt most,
+        // and the caller already places the most-relevant text last.
+        if (!string.IsNullOrWhiteSpace(prompt))
+        {
+            options.Prompt = prompt;
+        }
 
         var result = await _client.TranscribeAudioAsync(audio, filename, options, cts.Token);
         var text = result.Value?.Text ?? string.Empty;
         _logger.LogInformation(
-            "Whisper transcription completed: bytes_hint={FilenameHint} chars={TranscriptChars}",
-            filename, text.Length);
+            "Whisper transcription completed: bytes_hint={FilenameHint} chars={TranscriptChars} biased={Biased}",
+            filename, text.Length, !string.IsNullOrWhiteSpace(prompt));
         return text;
     }
 
