@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using ArmenianAiToy.Application.Audio;
 using Microsoft.Extensions.Logging;
+using OpenAI;
 using OpenAI.Audio;
 
 namespace ArmenianAiToy.Infrastructure.Audio;
@@ -23,6 +25,19 @@ public sealed class OpenAIWhisperTranscriptionService : IAudioTranscriptionServi
     private readonly AudioClient _client;
     private readonly ILogger<OpenAIWhisperTranscriptionService> _logger;
 
+    // Optional per-call model override seam (latency). The constructor's
+    // injected <see cref="AudioClient"/> is the configured DEFAULT model
+    // (OpenAI:TranscriptionModel, "whisper-1") and is used whenever no
+    // override is requested — so existing behavior is unchanged. When a
+    // caller (the in-story Q&A path) passes a different model name, we
+    // resolve a dedicated AudioClient for it lazily and cache it for the
+    // process lifetime. _factory is null when this service was constructed
+    // with only a baked client (e.g. tests / legacy wiring): in that case
+    // any override request transparently falls back to the default client.
+    private readonly OpenAIClient? _factory;
+    private readonly string? _defaultModel;
+    private readonly ConcurrentDictionary<string, AudioClient> _byModel = new();
+
     public OpenAIWhisperTranscriptionService(
         AudioClient client, ILogger<OpenAIWhisperTranscriptionService> logger)
     {
@@ -30,16 +45,34 @@ public sealed class OpenAIWhisperTranscriptionService : IAudioTranscriptionServi
         _logger = logger;
     }
 
+    /// <summary>
+    /// Wiring overload that also keeps the <see cref="OpenAIClient"/> so a
+    /// per-call <c>model</c> override (the in-story Q&amp;A latency seam) can
+    /// resolve a dedicated <see cref="AudioClient"/>. <paramref name="defaultModel"/>
+    /// is the model baked into <paramref name="client"/>; an override equal
+    /// to it (or null) reuses the default client and changes nothing.
+    /// </summary>
+    public OpenAIWhisperTranscriptionService(
+        AudioClient client, OpenAIClient factory, string defaultModel,
+        ILogger<OpenAIWhisperTranscriptionService> logger)
+        : this(client, logger)
+    {
+        _factory = factory;
+        _defaultModel = defaultModel;
+    }
+
     public Task<string> TranscribeArmenianAsync(
         Stream audio, string contentType, CancellationToken cancellationToken = default)
         => TranscribeArmenianAsync(audio, contentType, prompt: null, cancellationToken);
 
     public async Task<string> TranscribeArmenianAsync(
-        Stream audio, string contentType, string? prompt, CancellationToken cancellationToken = default)
+        Stream audio, string contentType, string? prompt,
+        CancellationToken cancellationToken = default, string? model = null)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(RequestTimeout);
 
+        var client = ResolveClient(model);
         var filename = ResolveFilenameHint(contentType);
         var options = new AudioTranscriptionOptions
         {
@@ -55,12 +88,29 @@ public sealed class OpenAIWhisperTranscriptionService : IAudioTranscriptionServi
             options.Prompt = prompt;
         }
 
-        var result = await _client.TranscribeAudioAsync(audio, filename, options, cts.Token);
+        var result = await client.TranscribeAudioAsync(audio, filename, options, cts.Token);
         var text = result.Value?.Text ?? string.Empty;
         _logger.LogInformation(
-            "Whisper transcription completed: bytes_hint={FilenameHint} chars={TranscriptChars} biased={Biased}",
-            filename, text.Length, !string.IsNullOrWhiteSpace(prompt));
+            "Whisper transcription completed: bytes_hint={FilenameHint} chars={TranscriptChars} biased={Biased} model={Model}",
+            filename, text.Length, !string.IsNullOrWhiteSpace(prompt),
+            string.IsNullOrWhiteSpace(model) ? _defaultModel ?? "(default)" : model);
         return text;
+    }
+
+    /// <summary>Picks the <see cref="AudioClient"/> for a transcription call.
+    /// Returns the default (constructor-injected) client when no override is
+    /// requested, when the override equals the default model, or when this
+    /// service has no <see cref="OpenAIClient"/> factory. Otherwise resolves
+    /// and caches a dedicated client for the requested model.</summary>
+    private AudioClient ResolveClient(string? model)
+    {
+        if (string.IsNullOrWhiteSpace(model)
+            || _factory is null
+            || string.Equals(model, _defaultModel, StringComparison.Ordinal))
+        {
+            return _client;
+        }
+        return _byModel.GetOrAdd(model, m => _factory.GetAudioClient(m));
     }
 
     /// <summary>

@@ -34,10 +34,21 @@ public interface IAudioTranscriptionService
     /// lever for a child's short / single-word Armenian utterances, which
     /// Whisper otherwise mangles. A null / empty prompt behaves exactly
     /// like the 3-argument overload.
+    /// <para>
+    /// <paramref name="model"/> is an OPTIONAL per-call STT model override
+    /// (latency seam). <c>null</c> (the default) keeps the implementation's
+    /// configured default model — i.e. existing behavior is unchanged. The
+    /// in-story Q&amp;A path passes <c>StoryQa:TranscriptionModel</c> here so
+    /// an operator can later flip the bounded Q&amp;A turn to a faster
+    /// transcription model (e.g. <c>gpt-4o-mini-transcribe</c>) WITHOUT
+    /// changing the C1 voice path's model — but only AFTER an Armenian
+    /// transcription-quality benchmark. The shipped default leaves it null.
+    /// </para>
     /// </summary>
     Task<string> TranscribeArmenianAsync(
         Stream audio,
         string contentType,
         string? prompt,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string? model = null);
 }

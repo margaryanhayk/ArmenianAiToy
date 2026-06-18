@@ -106,8 +106,37 @@ public class StoryQaControllerModerationTests
 
     private static void WireTranscript(Harness h, string transcript) =>
         h.Transcription.TranscribeArmenianAsync(
-                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>(), Arg.Any<string?>())
             .Returns(transcript);
+
+    /// <summary>Materializes the response body to bytes whether the controller
+    /// returned the buffered failure-clip result (<see cref="FileContentResult"/>)
+    /// or the happy-path streaming result (<see cref="StreamingAudioResult"/>).
+    /// Confirms the response is 200 audio/mpeg either way.</summary>
+    private static async Task<byte[]> ReadBodyAsync(IActionResult result)
+    {
+        switch (result)
+        {
+            case FileContentResult file:
+                Assert.Equal("audio/mpeg", file.ContentType);
+                return file.FileContents;
+            case StreamingAudioResult streaming:
+            {
+                var http = new DefaultHttpContext();
+                using var body = new MemoryStream();
+                http.Response.Body = body;
+                await streaming.ExecuteResultAsync(
+                    new ActionContext { HttpContext = http });
+                Assert.Equal(200, http.Response.StatusCode);
+                Assert.Equal("audio/mpeg", http.Response.ContentType);
+                return body.ToArray();
+            }
+            default:
+                Assert.Fail($"Unexpected result type {result.GetType().Name}");
+                return [];
+        }
+    }
 
     // --- Unsafe transcript: gated before GPT, child hears fallback ----
 
@@ -122,7 +151,7 @@ public class StoryQaControllerModerationTests
         var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
 
         // 200 audio (no 502, no silence).
-        Assert.IsType<FileContentResult>(result);
+        await ReadBodyAsync(result);
 
         // Moderation ran; GPT answer model NEVER called.
         await h.Moderation.Received(1).CheckContentAsync(Arg.Any<string>());
@@ -147,7 +176,7 @@ public class StoryQaControllerModerationTests
 
         var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
 
-        Assert.IsType<FileContentResult>(result);
+        await ReadBodyAsync(result);
         await h.AiChatClient.DidNotReceiveWithAnyArgs()
             .GetCompletionAsync(default!, default!);
         await h.Synthesis.Received().SynthesizeArmenianAsync(
@@ -170,7 +199,7 @@ public class StoryQaControllerModerationTests
 
         var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
 
-        Assert.IsType<FileContentResult>(result);
+        await ReadBodyAsync(result);
         await h.Moderation.Received(1).CheckContentAsync(Arg.Any<string>());
         await h.AiChatClient.ReceivedWithAnyArgs()
             .GetCompletionAsync(default!, default!);
@@ -188,7 +217,7 @@ public class StoryQaControllerModerationTests
 
         var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
 
-        Assert.IsType<FileContentResult>(result);
+        await ReadBodyAsync(result);
         // No text to check → moderation not consulted, GPT not called.
         await h.Moderation.DidNotReceiveWithAnyArgs().CheckContentAsync(default!);
         await h.AiChatClient.DidNotReceiveWithAnyArgs()
@@ -214,7 +243,7 @@ public class StoryQaControllerModerationTests
         await h.Transcription.Received(1).TranscribeArmenianAsync(
             Arg.Any<Stream>(), Arg.Any<string>(),
             Arg.Is<string?>(p => !string.IsNullOrEmpty(p) && seg0.EndsWith(p)),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(), Arg.Any<string?>());
     }
 
     // --- Gap 3: turn persistence (dashboard + retention) --------------
@@ -291,7 +320,7 @@ public class StoryQaControllerModerationTests
         var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
 
         // The child still hears the answer despite the persistence failure.
-        Assert.IsType<FileContentResult>(result);
+        await ReadBodyAsync(result);
     }
 
     // --- Gap 4: transient failure -> spoken fallback, never silence ---
@@ -301,7 +330,8 @@ public class StoryQaControllerModerationTests
     {
         var h = Create();
         h.Transcription.TranscribeArmenianAsync(
-                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>(), Arg.Any<string?>())
             .Throws(new InvalidOperationException("whisper down"));
 
         var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
@@ -341,5 +371,187 @@ public class StoryQaControllerModerationTests
 
         var file = Assert.IsType<FileContentResult>(result);
         Assert.Equal("audio/mpeg", file.ContentType);
+    }
+
+    // --- PART B: streamed answer audio (backward-compatible) ----------
+
+    /// <summary>The happy path now returns a chunked
+    /// <see cref="StreamingAudioResult"/> (audio/mpeg, status 200) rather
+    /// than a buffered <see cref="FileContentResult"/>. The core PART B
+    /// guarantee: the FIRST bytes on the wire are the already-VALIDATED
+    /// answer's audio (never raw GPT tokens), and the tail clips (pause +
+    /// bridge) follow — so the streamed body is strictly longer than the
+    /// answer alone. A client that buffers the whole body still gets the
+    /// full clip (backward-compatible).</summary>
+    [Fact]
+    public async Task SafeTranscript_StreamsValidatedAnswerFirst_ThenTail()
+    {
+        var h = Create();
+        WireTranscript(h, "Ո՞վ է փոքրիկ ամպիկը");
+        h.Moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
+        h.AiChatClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Փոքրիկ ամպիկը երկնքի ընկերն է։");
+
+        // Distinct bytes per synthesized text so we can locate the answer
+        // portion in the streamed body. The answer text is whatever passed
+        // the filter (GPT answer or the safe fallback) — both are VALIDATED
+        // before any audio byte is produced.
+        h.Synthesis.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ci => new AudioSynthesisResult(
+                Encoding.UTF8.GetBytes("TTS::" + ci.ArgAt<string>(0)), "audio/mpeg"));
+
+        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        // Backward-compatible: streamed, 200, audio/mpeg, full body buffers fine.
+        var streaming = Assert.IsType<StreamingAudioResult>(result);
+        var body = await ReadBodyAsync(streaming);
+        Assert.NotEmpty(body);
+
+        // The validated answer (the FIRST synthesis call) is the START of the
+        // body, and the body is strictly longer (the pause + bridge tail
+        // follows it), confirming answer-first streaming with the tail behind.
+        var answerText = (string)h.Synthesis.ReceivedCalls()
+            .First(c => c.GetMethodInfo().Name == nameof(IAudioSynthesisService.SynthesizeArmenianAsync))
+            .GetArguments()[0]!;
+        var answerBytes = Encoding.UTF8.GetBytes("TTS::" + answerText);
+        Assert.True(body.AsSpan().StartsWith(answerBytes),
+            "the validated answer audio must be the first bytes on the wire");
+        Assert.True(body.Length > answerBytes.Length,
+            "the pause + bridge tail must follow the answer in the body");
+    }
+
+    /// <summary>The streamed body is byte-identical (bytes + order) to the
+    /// canonical buffered composition
+    /// <c>ComposeAnswerWithPause(answer, bridge, recap)</c> built from the
+    /// SAME answer + bridge clips — i.e. WHAT the child hears is unchanged;
+    /// only WHEN the bytes start flowing differs. Resilient to the process-
+    /// static bridge cache: we read back the exact answer and bridge bytes
+    /// the controller actually streamed rather than re-synthesizing.</summary>
+    [Fact]
+    public async Task StreamedBody_IsByteIdentical_ToBufferedComposition()
+    {
+        var h = Create();
+        const string AnswerInput = "Փոքրիկ ամպիկը երկնքի ընկերն է։";
+        WireTranscript(h, "Ո՞վ է փոքրիկ ամպիկը");
+        h.Moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
+        h.AiChatClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(AnswerInput);
+        h.Synthesis.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ci => new AudioSynthesisResult(
+                Encoding.UTF8.GetBytes("TTS::" + ci.ArgAt<string>(0)), "audio/mpeg"));
+
+        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+        var body = await ReadBodyAsync(Assert.IsType<StreamingAudioResult>(result));
+
+        // The answer that was spoken (first synthesis call) — used to derive
+        // the answer clip. The bridge clip is recovered from the body itself
+        // (everything after answer + pause), making the reference robust to
+        // whatever the cross-test bridge cache contains.
+        var spokenAnswer = (string)h.Synthesis.ReceivedCalls()
+            .First(c => c.GetMethodInfo().Name == nameof(IAudioSynthesisService.SynthesizeArmenianAsync))
+            .GetArguments()[0]!;
+        var answer = Encoding.UTF8.GetBytes("TTS::" + spokenAnswer);
+
+        // Reconstruct pause length the same way the controller does, then the
+        // bridge is the remainder of the body. LittleCloud has no recap, so
+        // the recap slot is null in both the body and the reference.
+        var pauseBytes = await PauseByteCountAsync(h);
+        var bridge = body[(answer.Length + pauseBytes)..];
+
+        var expected = h.Controller.ComposeAnswerWithPause(answer, bridge, recap: null);
+        Assert.Equal(expected, body);
+    }
+
+    /// <summary>Reconstructs the controller's silence-pause byte count via a
+    /// throwaway composition: ComposeAnswerWithPause(empty, empty, null)
+    /// yields exactly the pause bytes.</summary>
+    private static Task<int> PauseByteCountAsync(Harness h) =>
+        Task.FromResult(h.Controller.ComposeAnswerWithPause([], [], recap: null).Length);
+
+    // --- PART A: STT model seam (default unchanged) -------------------
+
+    /// <summary>Builds a controller with the supplied real configuration so a
+    /// test can set (or omit) <c>StoryQa:TranscriptionModel</c>. Mirrors the
+    /// main harness but takes config explicitly.</summary>
+    private static Harness CreateWithConfig(IConfiguration config)
+    {
+        var transcription = Substitute.For<IAudioTranscriptionService>();
+        var synthesis = Substitute.For<IAudioSynthesisService>();
+        synthesis.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisResult(TtsMp3, "audio/mpeg"));
+        var moderation = Substitute.For<IModerationService>();
+        var aiChatClient = Substitute.For<IAiChatClient>();
+        var conversations = Substitute.For<IConversationService>();
+        conversations.GetOrCreateActiveConversationAsync(Arg.Any<Guid>(), Arg.Any<Guid?>())
+            .Returns(new Conversation { Id = Guid.NewGuid(), DeviceId = Guid.NewGuid(), StartedAt = DateTime.UtcNow });
+        conversations.AddMessageAsync(
+                Arg.Any<Guid>(), Arg.Any<MessageRole>(), Arg.Any<string>(), Arg.Any<SafetyFlag>())
+            .Returns(new Message { Id = Guid.NewGuid() });
+
+        var controller = new StoryQaController(
+            transcription, synthesis, new InMemoryCuratedStoryLibrary(),
+            new LibraryStoryQuestionService(aiChatClient), moderation, conversations,
+            Substitute.For<IWebHostEnvironment>(), config,
+            Substitute.For<ILogger<StoryQaController>>());
+
+        var deviceId = Guid.NewGuid();
+        var http = new DefaultHttpContext();
+        http.Items["DeviceId"] = deviceId;
+        http.Request.Body = new MemoryStream(InboundWav);
+        http.Request.ContentType = "audio/wav";
+        http.Request.ContentLength = InboundWav.Length;
+        controller.ControllerContext = new ControllerContext { HttpContext = http };
+
+        return new Harness(controller, transcription, synthesis, moderation,
+            aiChatClient, conversations, deviceId, Guid.NewGuid());
+    }
+
+    /// <summary>DEFAULT behavior unchanged: with no
+    /// <c>StoryQa:TranscriptionModel</c> configured, the controller passes
+    /// <c>model: null</c> to the transcription call, so the STT service keeps
+    /// its configured default model (whisper-1).</summary>
+    [Fact]
+    public async Task NoTranscriptionModelConfigured_PassesNullModel_DefaultUnchanged()
+    {
+        var config = new ConfigurationBuilder().Build(); // no StoryQa:* keys
+        var h = CreateWithConfig(config);
+        WireTranscript(h, "Ո՞վ է փոքրիկ ամպիկը");
+        h.Moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(true, new List<string>()));
+        h.AiChatClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Փոքրիկ ամպիկը երկնքի ընկերն է։");
+
+        await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        await h.Transcription.Received(1).TranscribeArmenianAsync(
+            Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<string?>(),
+            Arg.Any<CancellationToken>(), null);
+    }
+
+    /// <summary>The seam works: when an operator sets
+    /// <c>StoryQa:TranscriptionModel</c>, that model name is threaded to the
+    /// per-call STT override. (Defaults stay whisper-1; this only flips when
+    /// configured, post-benchmark.)</summary>
+    [Fact]
+    public async Task ConfiguredTranscriptionModel_IsThreadedToSttCall()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new[]
+        {
+            new KeyValuePair<string, string?>("StoryQa:TranscriptionModel", "gpt-4o-mini-transcribe"),
+        }).Build();
+        var h = CreateWithConfig(config);
+        WireTranscript(h, "Ո՞վ է փոքրիկ ամպիկը");
+        h.Moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(true, new List<string>()));
+        h.AiChatClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Փոքրիկ ամպիկը երկնքի ընկերն է։");
+
+        await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        await h.Transcription.Received(1).TranscribeArmenianAsync(
+            Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<string?>(),
+            Arg.Any<CancellationToken>(), "gpt-4o-mini-transcribe");
     }
 }
