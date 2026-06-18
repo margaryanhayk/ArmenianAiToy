@@ -19,6 +19,7 @@
 
 #include <driver/i2s_std.h>
 #include <esp_err.h>
+#include <math.h>   // sinf() for S1 earcon tone synthesis (UNVERIFIED)
 // AREG_DISABLE_MP3_PLAYBACK — bench rollback switch.
 //
 // Capture has been migrated to the new i2s_std driver, so the
@@ -417,6 +418,172 @@ bool audio_play_story_stream(const char *url,
                   interrupted ? "true" : "false");
     Serial.flush();
     return interrupted;
+#endif
+}
+
+// -------------------------------------------------------------
+// Dead-air mitigation — S1 (earcon) + S3 (Q&A stream)
+// UNVERIFIED — not compiled/flashed. See HARDENING-INTEGRATION.md §2.
+// -------------------------------------------------------------
+
+// ---- Shared helper: synthesize and write a soft sine tone ----
+//
+// Writes a pure sine at `freq_hz` for `duration_ms` milliseconds directly
+// to an already-opened AudioOutputI2S. The tone is generated sample-by-
+// sample into a small stack buffer and pushed via out.ConsumeSample().
+//
+// HARDWARE ASSUMPTION: AudioOutputI2S is already begin()-ed and configured
+// at AREG_SAMPLE_RATE_HZ. ConsumeSample() is the ESP8266Audio sample-push
+// API — it takes a pair of 16-bit values (left, right, packed as int16_t[2])
+// and returns false when the I2S DMA buffer is full (back-pressure signal).
+// When it returns false we yield briefly with delay(1) and retry.
+//
+// The envelope ramps the amplitude up for the first 50 ms and down for the
+// last 50 ms (linear fade) to avoid a click at start/end.
+#ifndef AREG_DISABLE_MP3_PLAYBACK
+static void synth_write_tone(AudioOutputI2S &out,
+                             uint16_t freq_hz,
+                             uint32_t duration_ms,
+                             int16_t  amplitude) {
+    // HARDWARE ASSUMPTION: AREG_SAMPLE_RATE_HZ is 16000. If it is changed,
+    // this function adapts automatically via the constant.
+    const uint32_t total_samples =
+        (uint32_t)AREG_SAMPLE_RATE_HZ * duration_ms / 1000;
+    const uint32_t fade_samples  = (uint32_t)AREG_SAMPLE_RATE_HZ * 50 / 1000; // 50 ms fade
+    // Phase accumulator: integer steps of (freq_hz / sample_rate) in
+    // units of 1/65536 of a cycle. Stays exact over the call's lifetime.
+    uint32_t phase     = 0;
+    uint32_t phase_inc = ((uint32_t)freq_hz << 16) / AREG_SAMPLE_RATE_HZ;
+
+    for (uint32_t i = 0; i < total_samples; ++i) {
+        // Map the 32-bit phase accumulator (0..0xFFFFFFFF) onto 0..2π and
+        // compute sinf(). The Xtensa LX7 has hardware FPU — this is fast.
+        // HARDWARE ASSUMPTION: ESP32-S3 Xtensa LX7 FPU handles sinf in ~10 cycles.
+        float angle = ((float)(phase) / (float)0xFFFFFFFFu) * (2.0f * 3.14159265f);
+        int16_t raw = (int16_t)(sinf(angle) * (float)amplitude);
+
+        // Linear fade envelope.
+        if (i < fade_samples) {
+            raw = (int16_t)((int32_t)raw * (int32_t)i / (int32_t)fade_samples);
+        } else if (i > total_samples - fade_samples) {
+            uint32_t tail = total_samples - i;
+            raw = (int16_t)((int32_t)raw * (int32_t)tail / (int32_t)fade_samples);
+        }
+
+        // ConsumeSample expects AudioOutput::AudioType (int16_t[2] packed
+        // as a uint32_t on some versions, or two separate calls — the
+        // public API is ConsumeSample(int16_t lr[2])). Use the two-element
+        // array form which is consistent across ESP8266Audio versions.
+        // HARDWARE ASSUMPTION: mono signal — copy left to right.
+        int16_t lr[2] = { raw, raw };
+        // Back-pressure: if DMA buffers are full, yield and retry.
+        while (!out.ConsumeSample(lr)) {
+            delay(1);
+        }
+        phase += phase_inc;
+    }
+}
+#endif  // AREG_DISABLE_MP3_PLAYBACK
+
+// ---- S1: audio_play_thinking_earcon() -----------------------
+bool audio_play_thinking_earcon() {
+    Serial.println("[audio] earcon_begin");
+    Serial.flush();
+#ifdef AREG_DISABLE_MP3_PLAYBACK
+    // Playback disabled for bench I2S isolation — treat as success
+    // (the important thing is we didn't add silence; earcon is optional).
+    Serial.println("[audio] earcon: playback disabled, skipping");
+    Serial.flush();
+    return true;
+#else
+    // HARDWARE ASSUMPTION: audio_speaker_begin() was called before this.
+    // AudioOutputI2S is constructed fresh each call so it does its own
+    // I2S peripheral init, matching the pattern in audio_play_mp3_buffer.
+    AudioOutputI2S out;
+    out.SetPinout(AREG_PIN_AMP_BCK, AREG_PIN_AMP_LRC, AREG_PIN_AMP_DATA);
+    // HARDWARE ASSUMPTION: OutputMode is INTERNAL_DAC=0, I2S=1. The
+    // default constructor on ESP8266Audio AudioOutputI2S uses I2S mode.
+    // HARDWARE ASSUMPTION: SetBitsPerSample(16) is the default; not
+    // calling it explicitly here to match audio_play_mp3_buffer style.
+    out.SetGain(0.6f);
+    if (!out.begin()) {
+        Serial.println("[audio] earcon: out.begin() failed");
+        Serial.flush();
+        return false;
+    }
+
+    synth_write_tone(out,
+                     AREG_EARCON_FREQ_HZ,
+                     AREG_EARCON_DURATION_MS,
+                     AREG_EARCON_AMPLITUDE);
+
+    out.stop();
+    Serial.println("[audio] earcon_end");
+    Serial.flush();
+    return true;
+#endif
+}
+
+// ---- S3: audio_play_qa_stream() -----------------------------
+//
+// Streams the Q&A answer MP3 from a URL incrementally, playing audio
+// as bytes arrive. Reuses the exact same ESP8266Audio HTTP path used by
+// audio_play_story_stream but without barge-in / resume machinery.
+//
+// HARDWARE ASSUMPTION: the ESP8266Audio AudioFileSourceHTTPStream is
+// capable of streaming from the backend's chunked HTTP/1.1 response.
+// The transfer-encoding=chunked decoding happens inside HTTPClient /
+// Arduino WiFiClient; the AudioFileSourceHTTPStream layer just reads
+// bytes and the MP3 decoder consumes them incrementally.
+bool audio_play_qa_stream(const char *url) {
+    Serial.printf("[audio] qa_stream_begin url=%s\n", url);
+    Serial.flush();
+#ifdef AREG_DISABLE_MP3_PLAYBACK
+    (void)url;
+    Serial.println("[audio] qa_stream: playback disabled, skipping");
+    Serial.flush();
+    return false;  // false = caller should try buffered fallback (none here)
+#else
+    // HARDWARE ASSUMPTION: audio_speaker_begin() was already called.
+    // AudioFileSourceHTTPStream opens a TCP connection and begins the GET.
+    // On a first-response latency of e.g. 300 ms the mp3.loop() decode
+    // loop below will block briefly until the server sends the first MP3
+    // sync word — this is fine; the decoder handles streaming natively.
+    AudioFileSourceHTTPStream http(url);
+    if (!http.isOpen()) {
+        Serial.println("[audio] qa_stream: http open failed; caller may use buffered fallback");
+        Serial.flush();
+        return false;
+    }
+
+    AudioOutputI2S out;
+    out.SetPinout(AREG_PIN_AMP_BCK, AREG_PIN_AMP_LRC, AREG_PIN_AMP_DATA);
+    out.SetGain(0.6f);
+
+    AudioGeneratorMP3 mp3;
+    if (!mp3.begin(&http, &out)) {
+        Serial.println("[audio] qa_stream: mp3.begin failed; caller may use buffered fallback");
+        Serial.flush();
+        return false;
+    }
+
+    uint32_t last_yield = millis();
+    while (mp3.isRunning()) {
+        if (!mp3.loop()) {
+            mp3.stop();
+            break;
+        }
+        // Yield to FreeRTOS so Wi-Fi housekeeping / watchdog are not
+        // starved. Same 50 ms window as audio_play_story_stream.
+        if (millis() - last_yield > 50) {
+            delay(1);
+            last_yield = millis();
+        }
+    }
+    out.stop();
+    Serial.println("[audio] qa_stream_end ok=true");
+    Serial.flush();
+    return true;
 #endif
 }
 

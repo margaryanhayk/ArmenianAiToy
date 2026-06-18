@@ -67,3 +67,58 @@ VoiceTurnResult voice_continue_turn();
 // Free the PSRAM response buffer owned by voice_client. Safe
 // to call even if the last upload failed.
 void voice_release_last_response();
+
+// ---------------------------------------------------------------
+// Async Q&A upload (S3 dead-air mitigation)
+// UNVERIFIED — not compiled/flashed. See HARDENING-INTEGRATION.md §2.
+// ---------------------------------------------------------------
+//
+// voice_start_question_upload_async() launches a FreeRTOS task on CORE 1
+// that performs the same POST as voice_upload_question() while the main
+// loop (CORE 0) plays the thinking-bed audio.
+//
+// OWNERSHIP CONTRACT:
+//   - `payload` MUST remain valid (caller-owned PSRAM) until
+//     voice_async_upload_done() returns true AND the caller calls
+//     voice_release_last_response(). The task reads from the payload
+//     pointer directly; it does NOT copy it.
+//   - The internal PSRAM response buffer is allocated by the task
+//     (heap_caps_malloc on PSRAM) and owned by voice_client, exactly
+//     like the synchronous voice_upload_question() path. voice_release_
+//     last_response() frees it in both cases.
+//   - voice_start_question_upload_async() returns immediately. The task
+//     handle is private. Do NOT call it again before the prior task has
+//     been reaped (i.e. voice_async_upload_done() returned true AND
+//     voice_release_last_response() called OR handle cleanup done).
+//
+// CORE ASSIGNMENT:
+//   - The upload task is pinned to CORE 1 (xTaskCreatePinnedToCore,
+//     tskNO_AFFINITY falls back to core 1 when core 0 is saturated).
+//   - HARDWARE ASSUMPTION: the ESP32-S3 has two cores; the Arduino
+//     loop() runs on CORE 1 by default in the Arduino-ESP32 framework.
+//     Pinning the upload task to CORE 0 leaves CORE 1 (where loop() runs)
+//     free for the thinking-bed decode. If Arduino changes its core
+//     assignment, update the pinToCore constant below.
+//   - I2S access is CORE-agnostic (I2S DMA is handled by the hardware +
+//     ESP-IDF interrupt, not tied to a single core), so the upload task
+//     holding the Wi-Fi socket while CORE 1 calls AudioOutputI2S is safe.
+//
+// Start the async upload. Returns immediately. The task is pinned to CORE 0.
+// payload / length / offset have the same meaning as voice_upload_question().
+void voice_start_question_upload_async(const uint8_t *payload,
+                                       size_t length,
+                                       uint32_t offset);
+
+// Returns true once the background task has finished (successfully or not).
+// Call this in a polling loop from CORE 1's thinking-bed player. It is
+// safe to call repeatedly; once it returns true the task has exited and
+// voice_client owns the completed result in its internal state.
+//
+// After this returns true, retrieve the result via voice_get_async_result()
+// then call voice_release_last_response() when done with the bytes.
+bool voice_async_upload_done();
+
+// Retrieve the result after voice_async_upload_done() returns true.
+// The returned VoiceTurnResult has the same semantics as voice_upload_question().
+// MUST only be called after voice_async_upload_done() == true.
+VoiceTurnResult voice_get_async_result();

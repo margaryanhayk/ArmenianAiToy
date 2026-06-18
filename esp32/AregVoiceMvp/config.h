@@ -133,3 +133,53 @@
 
 // --- Serial --------------------------------------------------
 #define AREG_SERIAL_BAUD        115200
+
+// --- Dead-air mitigation (S1 earcon + S3 streamed Q&A) -------
+// UNVERIFIED — not compiled/flashed. All values are best-guess
+// for a 16 kHz / MAX98357A setup; tune on the bench.
+
+// S1: Thinking-earcon synthesized tone.
+//   Frequency of the soft "thinking" chime written directly to I2S.
+//   440 Hz = A4; lower values (e.g. 330 Hz) feel warmer on a small speaker.
+// HARDWARE ASSUMPTION: the MAX98357A accepts 16 kHz / 16-bit PCM from
+//   AudioOutputI2S at the rate set by AREG_SAMPLE_RATE_HZ.
+#ifndef AREG_EARCON_FREQ_HZ
+#define AREG_EARCON_FREQ_HZ     440
+#endif
+// Duration of the synthesized earcon in milliseconds.
+// Keep <= 800 ms so it doesn't drag; the child needs to hear it reacted
+// before the server returns.
+#ifndef AREG_EARCON_DURATION_MS
+#define AREG_EARCON_DURATION_MS 600
+#endif
+// Amplitude of the synthesized sine (0..32767). Keep gentle (< 2000)
+// so it doesn't startle and the child understands it as a soft cue.
+// HARDWARE ASSUMPTION: amplitude below full scale avoids clipping on the
+//   MAX98357A's default gain strapping. Adjust with the GAIN pin.
+#ifndef AREG_EARCON_AMPLITUDE
+#define AREG_EARCON_AMPLITUDE   1200
+#endif
+
+// S3: Thinking-bed tone played while network fetch is in flight.
+//   Synthesized the same way as the earcon but at a lower pitch —
+//   acts as a soft "hmm, still thinking" pulse.
+// Frequency of the thinking-bed soft tone.
+#ifndef AREG_THINKBED_FREQ_HZ
+#define AREG_THINKBED_FREQ_HZ   280
+#endif
+// Duration of one thinking-bed pulse (ms). The loop plays N of these
+// until the FreeRTOS upload task signals completion.
+#ifndef AREG_THINKBED_PULSE_MS
+#define AREG_THINKBED_PULSE_MS  500
+#endif
+// Amplitude of the thinking-bed tone (should be quieter than the earcon).
+#ifndef AREG_THINKBED_AMPLITUDE
+#define AREG_THINKBED_AMPLITUDE 700
+#endif
+// Maximum number of thinking-bed pulses before hard-stopping and waiting
+// for the upload task to complete anyway. Guards against a hung network call
+// lasting long enough to confuse the child (= AREG_HTTP_READ_MS / pulse ms +
+// a few extra). At 500 ms/pulse and 30 s read timeout: 70 pulses = 35 s cap.
+#ifndef AREG_THINKBED_MAX_PULSES
+#define AREG_THINKBED_MAX_PULSES 70
+#endif

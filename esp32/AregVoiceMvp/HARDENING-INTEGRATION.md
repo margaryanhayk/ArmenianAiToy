@@ -139,51 +139,110 @@ silent — that's the dead air. The state is `ST_UPLOADING`.
 - `aat_story_qa_duration_seconds` is recorded server-side, so you can see
   the server's contribution to the latency in Prometheus.
 
-### Firmware options 🔧⚠️
+### Status of firmware options ⚠️ UNVERIFIED — not compiled/flashed
 
-**(A) Instant "thinking" earcon — quick win, firmware-only, low risk.**
-Play a short cue the moment recording ends, *before* the blocking upload, so
-the child gets immediate acknowledgement instead of silence:
+**(A) Instant "thinking" earcon — IMPLEMENTED (unverified) ✅🔧⚠️**
 
-```cpp
-// in handle_story_session(), right after record_question() decides to upload:
-transition_to(ST_UPLOADING);
-audio_speaker_begin();
-audio_play_thinking_earcon();      // ~0.4–0.8 s: a soft chime, or a tiny
-                                   // pre-rendered «Հըմմ…» MP3 in PROGMEM
-VoiceTurnResult turn = voice_upload_question(...);
-```
-Caveat: because the upload is synchronous on the same core, the earcon
-plays then returns to silence for the *rest* of the wait. It removes the
-"is it broken?" gap at the front but doesn't fill the whole window. Still
-the highest value-per-effort step. Add a new `audio_play_thinking_earcon()`
-to `audio_io` (generate a short tone to I2S, or decode a tiny embedded MP3
-via the existing `audio_play_mp3_buffer`). Consider reusing/!extending the
-`ST_UPLOADING` LED so the visual + audio cue agree.
+`audio_play_thinking_earcon()` is implemented in `audio_io.cpp`. It
+synthesizes a soft tone (~600 ms at 440 Hz) directly to I2S via
+`synth_write_tone()` (a new static helper in `audio_io.cpp`) and writes
+samples via `AudioOutputI2S.ConsumeSample()`. No network, no SD, no PSRAM
+allocation.
 
-**(B) Async upload + looping "thinking" bed — full mitigation, higher effort.**
-Run `voice_upload_question()` on the second core (FreeRTOS task) while core 0
-loops a low "thinking" hum until the response arrives. This fills the entire
-window but needs care around the PSRAM response-buffer ownership
-(`voice_release_last_response()`) and I2S handoff. Only worth it if (A) +
-measurement show the perceived latency is still too long.
+Called in `handle_story_session()` immediately after `record_question()`
+decides to upload — at the `ST_UPLOADING` transition — so the child hears
+an instant acoustic acknowledgement before any network activity begins.
 
-**(C) Stream the reply — best perceived latency, backend + firmware.**
-Have the server stream the answer MP3 as its TTS chunks become ready (chunked
-transfer) and decode it incrementally on the device. The firmware already has
-streaming MP3 decode for the story (`audio_play_story_stream`, ESP8266Audio
-HTTP source) — the same technique applies to a streamed Q&A response. This is
-the real fix for the *whole* window but is the largest change and was
-**deliberately not done backend-side without a device to verify against** (a
-half-streamed change the current firmware can't consume would regress the
-working buffered path). Pair it with the firmware streaming-decode work in
-one device-side session.
+New constants in `config.h`:
+- `AREG_EARCON_FREQ_HZ` (440 Hz)
+- `AREG_EARCON_DURATION_MS` (600 ms)
+- `AREG_EARCON_AMPLITUDE` (1200 — soft, non-startling)
 
-### Recommended order
-1. Add an on-device latency log for `release → answer-play-begin` (mirror the
-   existing `[latency]` line) so you can measure before/after.
-2. Ship **(A)** the earcon. Re-measure perceived latency with a child.
-3. Only if still poor, do **(B)** or **(C)**.
+**On-device verification required:**
+- [ ] Earcon plays within ~150 ms of button release (Serial log: `[qa] earcon done`).
+- [ ] No I2S click at start/end of tone (the linear fade-in/out should prevent this;
+      tune `AREG_EARCON_AMPLITUDE` if clicks persist).
+- [ ] `AREG_DISABLE_MP3_PLAYBACK` build still compiles (earcon no-ops to true).
+- [ ] The `synth_write_tone` `ConsumeSample` API matches the installed
+      ESP8266Audio version (see "Hardware assumptions" below).
+
+**(B/C) Async upload + looping "thinking" bed + streamed Q&A reply —
+IMPLEMENTED (unverified) 🔧⚠️**
+
+This implements options B and C together:
+
+- `voice_start_question_upload_async()` / `voice_async_upload_done()` /
+  `voice_get_async_result()` added to `voice_client.cpp` and `voice_client.h`.
+  The upload runs in a FreeRTOS task pinned to CORE 0 (`xTaskCreatePinnedToCore`,
+  core 0 = PRO_CPU). The main loop (CORE 1 = APP_CPU) polls
+  `voice_async_upload_done()` between each thinking-bed pulse.
+
+- The thinking-bed loop in `handle_story_session()` calls
+  `audio_play_thinking_earcon()` repeatedly (reusing the earcon function)
+  while the upload task is in flight. Each pulse is ~600 ms; up to
+  `AREG_THINKBED_MAX_PULSES` (70) pulses before a silent busy-wait fallback.
+
+- `audio_play_qa_stream()` added to `audio_io.cpp` / `audio_io.h`.
+  When the async upload completes with `turn.ok == true`, the firmware first
+  tries to stream the answer via `audio_play_qa_stream()` (a GET to the same
+  Q&A URL), which decodes the MP3 incrementally as bytes arrive — same
+  `AudioFileSourceHTTPStream` pattern as `audio_play_story_stream`. If the
+  stream fails (non-200, connection error, or backend doesn't yet have a
+  GET endpoint), it falls back to `audio_play_mp3_buffer()` with the already-
+  buffered bytes from the async task. **No regression possible** — the
+  buffered path is always available.
+
+New constants in `config.h`:
+- `AREG_THINKBED_FREQ_HZ` (280 Hz — lower/warmer than the earcon)
+- `AREG_THINKBED_PULSE_MS` (500 ms per pulse)
+- `AREG_THINKBED_AMPLITUDE` (700 — quieter than the earcon)
+- `AREG_THINKBED_MAX_PULSES` (70)
+
+A latency log line is emitted at playback start:
+`[latency] qa_release->play_begin_ms=<n>`
+
+**PSRAM ownership contract (documented in voice_client.h):**
+- `payload` pointer (caller-owned PSRAM) must remain valid until
+  `voice_async_upload_done()` returns true. The task reads from it but
+  does NOT free it. Caller frees it after the task is done.
+- `s_response_buffer` (voice_client-owned PSRAM) is allocated by the task
+  via `read_response_into()`. Freed by `voice_release_last_response()` as
+  in the synchronous path.
+
+**Core assignment (HARDWARE ASSUMPTION — needs on-device verification):**
+- Upload task: `xTaskCreatePinnedToCore(..., 0)` → CORE 0 (PRO_CPU).
+- Loop / thinking-bed / playback: CORE 1 (APP_CPU, where `loop()` runs in
+  Arduino-ESP32 by default).
+- If Arduino-ESP32 changes its default core assignment, the `core=0`
+  constant in `voice_client.cpp` must be updated.
+
+**On-device verification required:**
+- [ ] `xTaskCreate` succeeds (Serial log: no `[qa-async] xTaskCreate FAILED`).
+- [ ] Thinking-bed pulses play continuously without audio dropout during upload.
+- [ ] Task completes within expected time (< 30 s for AREG_HTTP_READ_MS limit).
+- [ ] `voice_release_last_response()` is not called from both cores simultaneously
+      (the task calls it at the top of `upload_question_task()`; by that point
+      the prior turn's response has already been freed by the story-resume path —
+      verify no double-free in back-to-back Q&A turns).
+- [ ] Streaming path (GET) works if/when the backend implements a GET endpoint
+      at `AREG_STORY_QA_URL`; until then, buffered fallback plays correctly.
+- [ ] Three back-to-back Q&A turns: no silent gaps, story auto-resumes each time.
+
+**Known TODO (refactor once verified on device):**
+- The thinking-bed loop calls `audio_play_thinking_earcon()` (which uses
+  `AREG_EARCON_FREQ_HZ` and `AREG_EARCON_DURATION_MS`). To use the separate
+  `AREG_THINKBED_*` constants, expose `synth_write_tone()` (currently a static
+  helper in `audio_io.cpp`) or add an `audio_play_thinking_bed_pulse()` that
+  reads the thinkbed constants. Deferred until the coexistence of repeated
+  AudioOutputI2S init and the FreeRTOS task is verified on hardware.
+
+### Summary: what each option achieves
+
+| Option | Fills "is it broken?" gap (first ~0.6 s) | Fills whole wait window | Streaming decode | Status |
+|---|---|---|---|---|
+| A earcon | ✅ | ❌ (earcon ends, then silence until server) | n/a | IMPLEMENTED ⚠️ unverified |
+| B async + thinking bed | ✅ (earcon first) | ✅ (pulses throughout wait) | ❌ (buffered) | IMPLEMENTED ⚠️ unverified |
+| C streamed reply | ✅ | ✅ | ✅ (incremental) | IMPLEMENTED ⚠️ unverified — needs backend GET endpoint |
 
 ---
 
@@ -212,11 +271,22 @@ Token (gap 1), with `StoryAudio:SigningKey` set on the backend:
 - [ ] With the signing key **empty**, the unmodified flow still works
       (regression guard).
 
-Dead air (gap 5):
-- [ ] Serial shows `release → answer-play-begin` ms before the change.
-- [ ] Earcon plays within ~150 ms of the button release.
-- [ ] Three back-to-back Q&A turns: no silent gaps, story auto-resumes each
-      time.
+Dead air (gap 5) — S1 earcon:
+- [ ] Serial log shows `[qa] earcon done` within ~150 ms of button release.
+- [ ] No audible click at start/end of earcon tone (linear fade should prevent it).
+- [ ] `AREG_DISABLE_MP3_PLAYBACK` build compiles and earcon silently no-ops.
+- [ ] Verify `AudioOutputI2S.ConsumeSample(int16_t[2])` signature matches
+      the installed ESP8266Audio library version (see audio_io.cpp comment).
+
+Dead air (gap 5) — S3 async upload + thinking bed + streamed Q&A:
+- [ ] `[qa-async] POST` appears in Serial immediately after `[qa] earcon done`.
+- [ ] Thinking-bed pulses are audible throughout the upload wait (no silent gap).
+- [ ] `xTaskCreatePinnedToCore` succeeds (no `FAILED` line in Serial).
+- [ ] `[latency] qa_release->play_begin_ms=<n>` appears; compare to pre-change value.
+- [ ] Streamed path plays correctly when backend GET endpoint is available.
+- [ ] Buffered fallback plays correctly when stream fails (e.g. backend GET returns 404).
+- [ ] Three back-to-back Q&A turns without double-free or crash.
+- [ ] Story auto-resumes from `s_story_offset` after each answered question.
 
 ---
 
@@ -226,10 +296,42 @@ Dead air (gap 5):
   token, rate-limit + refresh gate, transcript moderation, turn persistence,
   502→spoken-fallback, offset→segment map, Whisper scene-biasing,
   voice-path metrics. All covered by unit tests (full suite green).
-- **NOT verified here (needs the device):** everything in this doc's firmware
-  snippets. They are written against the current sketch's structure but have
-  **not been compiled or flashed** — treat the code as a precise spec, not
-  drop-in source.
+- **NOT verified here (needs the device):** all firmware code in this doc and
+  in the S1/S3 implementation. The files compile in the Arduino IDE only — this
+  repo has no ESP32 toolchain configured. All new code is marked
+  `UNVERIFIED — not compiled/flashed`. Treat it as a precise spec + working
+  draft; on-device bring-up is required.
+
+### Hardware assumptions in S1/S3 (must verify on bench)
+
+1. **`AudioOutputI2S.ConsumeSample(int16_t lr[2])`** — the sample-push API
+   used by `synth_write_tone()`. This is the correct signature for ESP8266Audio
+   >= 2.3.0. Earlier versions use a different prototype. Check the installed
+   version in the Arduino Library Manager.
+
+2. **`AudioOutputI2S.begin()` is the correct init call** for the standalone
+   (non-MP3-decoder-driven) output path used by the earcon. Some ESP8266Audio
+   versions require `SetPinout()` before `begin()`; the code does this.
+
+3. **`xTaskCreatePinnedToCore(..., 0)`** pins to PRO_CPU (core 0). Arduino-ESP32
+   runs `loop()` on APP_CPU (core 1) by default. If this assignment is wrong
+   on your board configuration, the thinking-bed loop and the upload task would
+   run on the same core and the thinking bed would starve until the upload
+   finishes (same as before, but worse if the watchdog fires). Verify with
+   `xPortGetCoreID()` prints from both contexts.
+
+4. **FreeRTOS task stack 8192 bytes** is sufficient for `HTTPClient` + `WiFiClient`
+   within `upload_question_task`. Monitor with `uxTaskGetStackHighWaterMark`.
+
+5. **Repeated `AudioOutputI2S` construction/destruction per thinking-bed pulse.**
+   Each call to `audio_play_thinking_earcon()` (used for thinking-bed pulses too)
+   creates a fresh `AudioOutputI2S` stack object and calls `begin()` + `stop()`.
+   The MAX98357A I2S amp should tolerate this; if audible pops occur, the fix is
+   to hold a persistent `AudioOutputI2S` across calls (requires refactoring
+   `synth_write_tone` to accept it as a parameter).
+
+6. **`sinf()` in `synth_write_tone()`** — the Xtensa LX7 FPU handles this in
+   hardware (~10 cycles). No soft-float fallback needed on ESP32-S3.
 
 ---
 

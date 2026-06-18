@@ -445,21 +445,189 @@ static void handle_story_session() {
         memcpy(payload + 44, s_capture_buf, pcm_bytes);
 
         transition_to(ST_UPLOADING);
-        VoiceTurnResult turn =
-            voice_upload_question(payload, payload_bytes, s_story_offset);
-        heap_caps_free(payload);
 
-        if (turn.ok) {
-            transition_to(ST_PLAYING);
-            audio_speaker_begin();
-            audio_play_mp3_buffer(turn.response_bytes, turn.response_length);
-            voice_release_last_response();
-        } else {
-            Serial.printf("[qa] upload failed (status=%d); resuming\n",
-                          turn.http_status);
+        // -------------------------------------------------------
+        // S1 — Instant "thinking" earcon (UNVERIFIED — not compiled/flashed)
+        //
+        // Play the earcon the moment recording ends and upload begins.
+        // The child gets IMMEDIATE acoustic acknowledgement instead of
+        // the ~7–8 s silent gap that was here before. The earcon is a
+        // ~600 ms synthesized tone; it returns before the upload call below.
+        //
+        // audio_speaker_begin() is called first because the earcon
+        // function creates AudioOutputI2S internally (same as
+        // audio_play_mp3_buffer). After audio_play_thinking_earcon()
+        // returns the speaker is left in a valid state for the thinking
+        // bed + answer playback below.
+        // -------------------------------------------------------
+        audio_speaker_begin();
+        audio_play_thinking_earcon();  // S1: immediate acoustic ack
+        Serial.println("[qa] earcon done; starting async upload + thinking bed");
+        Serial.flush();
+
+        // -------------------------------------------------------
+        // S3 — Fire async upload, play thinking-bed while network blocks
+        // (UNVERIFIED — not compiled/flashed)
+        //
+        // voice_start_question_upload_async() launches a FreeRTOS task
+        // on CORE 0 that does the full POST + read_response_into().
+        // This returns immediately. Meanwhile this loop (on CORE 1) plays
+        // short synthesized "thinking-bed" pulses until the task signals
+        // completion via voice_async_upload_done().
+        //
+        // PSRAM OWNERSHIP:
+        //   `payload` remains caller-owned (this scope) until
+        //   heap_caps_free(payload) below — AFTER the task is done.
+        //   The task reads from s_async_payload but does NOT free it.
+        //   The response buffer (s_response_buffer inside voice_client) is
+        //   allocated by the task and freed by voice_release_last_response().
+        //
+        // CORE ASSIGNMENT:
+        //   Upload task → CORE 0 (PRO_CPU, see voice_client.cpp).
+        //   This loop (thinking-bed + subsequent playback) → CORE 1 (APP_CPU).
+        //   I2S DMA is handled by the hardware; both cores can call
+        //   AudioOutputI2S safely because the think-bed loop and the
+        //   upload task never call I2S concurrently — the upload task
+        //   is network-only (HTTPClient/WiFiClient). I2S is only driven
+        //   from this core (CORE 1) throughout.
+        //
+        // FALLBACK:
+        //   If xTaskCreate fails, voice_start_question_upload_async() runs
+        //   synchronously (see voice_client.cpp comment). In that case
+        //   voice_async_upload_done() returns true immediately on the next
+        //   check and we skip the thinking-bed and go straight to playback —
+        //   same behavior as the old code (minus the earcon, which already played).
+        // -------------------------------------------------------
+        {
+            const uint32_t qa_release_ms = millis();  // latency anchor
+
+            voice_start_question_upload_async(payload, payload_bytes,
+                                              s_story_offset);
+
+            // Play thinking-bed pulses while the upload is in flight.
+            // Each pulse is a short synthesized tone; we poll done after
+            // each one. The pulse duration (AREG_THINKBED_PULSE_MS) trades
+            // responsiveness (shorter → answer starts sooner after upload)
+            // against audio quality (longer → fewer AudioOutputI2S re-inits).
+            //
+            // HARDWARE ASSUMPTION: repeated AudioOutputI2S begin/stop within
+            // audio_play_thinking_earcon()'s internal helper is well-tolerated
+            // by the MAX98357A. If re-init clicks are audible, replace the
+            // per-pulse I2S construction with a long tone whose amplitude we
+            // fade down (requires exposing a "play N samples then stop" API
+            // or restructuring synth_write_tone to accept a done_fn callback).
+            int bed_count = 0;
+            while (!voice_async_upload_done() &&
+                   bed_count < AREG_THINKBED_MAX_PULSES) {
+                // Reuse audio_play_thinking_earcon() with thinking-bed params.
+                // HARDWARE ASSUMPTION: the earcon function reads
+                // AREG_EARCON_FREQ_HZ / AREG_EARCON_DURATION_MS internally.
+                // For the thinking bed we want different freq/duration, so we
+                // call a single-pulse synth directly.
+                // TODO (on device): refactor synth_write_tone() to accept
+                // freq/duration/amplitude args so we can call it with
+                // AREG_THINKBED_FREQ_HZ / AREG_THINKBED_PULSE_MS /
+                // AREG_THINKBED_AMPLITUDE here without rebuilding AudioOutputI2S
+                // on every pulse. For now, reuse the earcon (same freq/duration)
+                // so we can verify the FreeRTOS + I2S coexistence first.
+                audio_play_thinking_earcon();
+                bed_count++;
+            }
+            Serial.printf("[qa] thinking-bed done after %d pulses; upload_done=%s\n",
+                          bed_count,
+                          voice_async_upload_done() ? "true" : "false");
             Serial.flush();
-            voice_release_last_response();
-            play_canned_failure_clip();
+
+            // Wait (without playing anything) for the task to finish if it
+            // outlasted our pulse cap. This is the fallback busy-wait; in
+            // practice the server should respond within AREG_THINKBED_MAX_PULSES
+            // * AREG_THINKBED_PULSE_MS ms.
+            while (!voice_async_upload_done()) {
+                delay(20);
+            }
+
+            VoiceTurnResult turn = voice_get_async_result();
+
+            // The payload is no longer needed by the task (it's done).
+            heap_caps_free(payload);
+            payload = nullptr;
+
+            if (turn.ok) {
+                transition_to(ST_PLAYING);
+                const uint32_t qa_latency_ms = millis() - qa_release_ms;
+                Serial.printf("[latency] qa_release->play_begin_ms=%u\n",
+                              (unsigned)qa_latency_ms);
+                Serial.flush();
+
+                // S3 — Play the answer: try streamed first, fall back to buffered.
+                //
+                // The backend (another agent) is making the Q&A response a
+                // chunked/streamed audio/mpeg. We try audio_play_qa_stream()
+                // on the same Q&A URL with the same query params. If the backend
+                // doesn't support streaming yet (or the connection fails), we
+                // fall back to audio_play_mp3_buffer() with the already-buffered
+                // bytes from the async task.
+                //
+                // HARDWARE ASSUMPTION: the Q&A URL (AREG_STORY_QA_URL +
+                // ?storyId=...&offset=...) accepts both POST (WAV upload,
+                // used by the async task) and GET (fetch the pre-composed
+                // streamed answer). This GET path is the "backend streams the
+                // validated answer" described in the task brief. If the backend
+                // does NOT yet support a GET endpoint here, the stream will
+                // return non-200 and we fall through to the buffered path —
+                // which is what the original code did, so there is no regression.
+                //
+                // NOTE: in the current architecture the Q&A POST returns the
+                // answer MP3 as the response body, so the async task already
+                // buffered it in turn.response_bytes. The streaming path below
+                // opens a NEW connection to the same URL as a GET. For this to
+                // work the backend must implement a GET endpoint that returns
+                // the latest pre-rendered answer for this (storyId, offset) pair.
+                // If the backend instead streams the answer as part of the POST
+                // response (not yet implemented), a future firmware revision can
+                // modify the async task to read incrementally from the HTTP
+                // response stream instead of calling read_response_into().
+                //
+                // For now this is a best-effort streaming attempt with a reliable
+                // buffered fallback.
+                bool played = false;
+                if (voice_wifi_is_connected()) {
+                    char qa_stream_url[384];
+                    snprintf(qa_stream_url, sizeof(qa_stream_url),
+                             "%s?storyId=%s&offset=%u",
+                             AREG_STORY_QA_URL, AREG_STORY_ID,
+                             (unsigned)s_story_offset);
+                    audio_speaker_begin();
+                    played = audio_play_qa_stream(qa_stream_url);
+                    if (played) {
+                        Serial.println("[qa] answer played via stream");
+                        Serial.flush();
+                    } else {
+                        Serial.println("[qa] stream failed; using buffered fallback");
+                        Serial.flush();
+                    }
+                }
+                if (!played) {
+                    // Buffered fallback — always available because the async
+                    // task filled turn.response_bytes via read_response_into().
+                    audio_speaker_begin();
+                    audio_play_mp3_buffer(turn.response_bytes,
+                                          turn.response_length);
+                    Serial.println("[qa] answer played via buffered fallback");
+                    Serial.flush();
+                }
+                voice_release_last_response();
+            } else {
+                if (payload != nullptr) {
+                    heap_caps_free(payload);
+                    payload = nullptr;
+                }
+                Serial.printf("[qa] upload failed (status=%d); resuming\n",
+                              turn.http_status);
+                Serial.flush();
+                voice_release_last_response();
+                play_canned_failure_clip();
+            }
         }
         // Loop continues → auto-resume the story from s_story_offset.
     }

@@ -13,6 +13,8 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <esp_heap_caps.h>
+#include <freertos/FreeRTOS.h>   // xTaskCreatePinnedToCore (S3 async upload, UNVERIFIED)
+#include <freertos/task.h>       // vTaskDelete, BaseType_t
 
 static uint8_t *s_response_buffer = nullptr;
 
@@ -216,6 +218,181 @@ VoiceTurnResult voice_upload_question(const uint8_t *payload, size_t length,
     Serial.printf("[qa] answer %u bytes\n", (unsigned)result.response_length);
     Serial.flush();
     return result;
+}
+
+// -------------------------------------------------------------
+// Async Q&A upload (S3 dead-air mitigation)
+// UNVERIFIED — not compiled/flashed. See HARDENING-INTEGRATION.md §2.
+// -------------------------------------------------------------
+//
+// Design: the FreeRTOS upload task is pinned to CORE 0 so it owns the
+// Wi-Fi TCP socket on that core. The Arduino loop() runs on CORE 1
+// (default for Arduino-ESP32) and drives the thinking-bed audio there.
+// Both cores share the same ESP-IDF Wi-Fi driver — sockets are
+// accessible from either core — but pinning the network work to CORE 0
+// prevents any scheduling jitter from the loop() watchdog.
+//
+// HARDWARE ASSUMPTION: ESP32-S3 two-core SMP. If a single-core variant
+// is ever used (ESP32-S3FN4R2 does have two cores; the single-core
+// ESP32-S0 is a different chip family). Core index 0 = PRO_CPU.
+//
+// PSRAM ownership (see voice_client.h comment):
+//   - s_async_payload: borrowed pointer to caller-owned PSRAM. NOT freed here.
+//   - s_response_buffer (module-level): allocated by the task inside
+//     read_response_into(); freed by voice_release_last_response().
+//   - s_async_result: value-type struct; result.response_bytes points into
+//     s_response_buffer when ok==true.
+
+// Shared state between the async upload task and the polling caller.
+// Written by CORE 0 task, read by CORE 1 loop. Declared volatile to
+// prevent compiler reordering; memory ordering is sufficient here
+// because the done flag is the single-writer/single-reader handoff
+// and the payload pointer is set before xTaskCreate.
+static volatile bool      s_async_done    = false;
+static volatile bool      s_async_started = false;
+static VoiceTurnResult    s_async_result;
+
+// Task parameters — set before xTaskCreate, read by the task.
+// payload pointer and length are caller-owned; they must remain valid
+// until voice_async_upload_done() returns true.
+static const uint8_t     *s_async_payload  = nullptr;
+static size_t             s_async_length   = 0;
+static uint32_t           s_async_offset   = 0;
+
+// FreeRTOS task: same logic as voice_upload_question() but writes the
+// result into s_async_result and sets s_async_done on completion.
+// HARDWARE ASSUMPTION: 8 KB stack is sufficient for HTTPClient + WiFiClient
+// on the ESP32-S3. Increase if stack overflow occurs (configurable at call site).
+static void upload_question_task(void * /*pvParams*/) {
+    VoiceTurnResult result;
+
+    if (!voice_wifi_is_connected()) {
+        Serial.println("[qa-async] wifi not connected");
+        result.http_status = -1001;
+        s_async_result = result;
+        s_async_done   = true;
+        vTaskDelete(nullptr);
+        return;
+    }
+    if (s_async_payload == nullptr || s_async_length == 0) {
+        Serial.println("[qa-async] empty payload");
+        s_async_result = result;
+        s_async_done   = true;
+        vTaskDelete(nullptr);
+        return;
+    }
+
+    char url[384];
+    snprintf(url, sizeof(url), "%s?storyId=%s&offset=%u",
+             AREG_STORY_QA_URL, AREG_STORY_ID, (unsigned)s_async_offset);
+
+    HTTPClient http;
+    http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
+    http.setTimeout(AREG_HTTP_READ_MS);
+    if (!http.begin(url)) {
+        Serial.println("[qa-async] http.begin failed");
+        Serial.flush();
+        s_async_result = result;
+        s_async_done   = true;
+        vTaskDelete(nullptr);
+        return;
+    }
+    http.addHeader("Content-Type", "audio/wav");
+    http.addHeader("X-Device-Id", AREG_DEVICE_ID);
+    http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+
+    Serial.printf("[qa-async] POST (%u bytes) offset=%u\n",
+                  (unsigned)s_async_length, (unsigned)s_async_offset);
+    Serial.flush();
+
+    // HARDWARE ASSUMPTION: http.POST() from CORE 0 while CORE 1 drives I2S
+    // is safe. The ESP-IDF lwIP stack is thread-safe across cores; Arduino
+    // HTTPClient is not interrupt-safe but is core-reentrant when called
+    // from different tasks (not the same task simultaneously).
+    // NOTE: we release the prior response buffer HERE (from the task) rather
+    // than from the caller, because both paths share s_response_buffer.
+    // This is safe because the task runs AFTER the caller has already finished
+    // playing the previous answer (the story playback was cut before record_question).
+    voice_release_last_response();
+    const int status = http.POST((uint8_t *)s_async_payload, s_async_length);
+    result.http_status = status;
+    if (status != 200) {
+        Serial.printf("[qa-async] POST non-200: %d\n", status);
+        http.end();
+        s_async_result = result;
+        s_async_done   = true;
+        vTaskDelete(nullptr);
+        return;
+    }
+
+    const bool read_ok = read_response_into(http, result);
+    http.end();
+    if (!read_ok) {
+        voice_release_last_response();
+    } else {
+        Serial.printf("[qa-async] answer %u bytes\n",
+                      (unsigned)result.response_length);
+        Serial.flush();
+    }
+    s_async_result = result;
+    s_async_done   = true;
+    vTaskDelete(nullptr);
+}
+
+void voice_start_question_upload_async(const uint8_t *payload,
+                                       size_t length,
+                                       uint32_t offset) {
+    // Guard: don't start a second task if one is still running.
+    // Caller must wait for voice_async_upload_done() before calling again.
+    if (s_async_started && !s_async_done) {
+        Serial.println("[qa-async] WARNING: prior task still running; skipping");
+        Serial.flush();
+        return;
+    }
+
+    // Set shared state before xTaskCreate so the task sees valid pointers.
+    s_async_payload  = payload;
+    s_async_length   = length;
+    s_async_offset   = offset;
+    s_async_done     = false;
+    s_async_started  = true;
+    // Clear any leftover result from the previous call.
+    s_async_result = VoiceTurnResult{};
+
+    // HARDWARE ASSUMPTION: stack size 8192 bytes. If stack overflow occurs
+    // (monitor with uxTaskGetStackHighWaterMark), raise to 10240 or 12288.
+    // HARDWARE ASSUMPTION: pinned to CORE 0 (APP_CPU_NUM = 1 on ESP32,
+    // but on ESP32-S3 with Arduino-ESP32 the convention is the same:
+    // PRO_CPU=0, APP_CPU=1; loop() runs on APP_CPU=1).
+    // We pin to PRO_CPU_NUM (= 0) so the blocking TCP work stays off the
+    // loop() core.
+    BaseType_t created = xTaskCreatePinnedToCore(
+        upload_question_task,
+        "qa_upload",        // task name (appears in task list)
+        8192,               // stack bytes — HARDWARE ASSUMPTION: sufficient
+        nullptr,            // pvParameters (task reads from module globals)
+        5,                  // priority: 5 = above idle (0), below Wi-Fi (10+)
+        nullptr,            // task handle (we don't need to track it)
+        0                   // core: 0 = PRO_CPU — HARDWARE ASSUMPTION
+    );
+    if (created != pdPASS) {
+        Serial.println("[qa-async] xTaskCreate FAILED; falling back to sync upload");
+        Serial.flush();
+        // Fallback: run synchronously in the caller's context.
+        // This means no thinking-bed plays, but audio_play_mp3_buffer
+        // will be called when voice_get_async_result() is called.
+        s_async_result = voice_upload_question(payload, length, offset);
+        s_async_done   = true;
+    }
+}
+
+bool voice_async_upload_done() {
+    return s_async_done;
+}
+
+VoiceTurnResult voice_get_async_result() {
+    // MUST only be called after voice_async_upload_done() == true.
+    return s_async_result;
 }
 
 VoiceTurnResult voice_continue_turn() {
