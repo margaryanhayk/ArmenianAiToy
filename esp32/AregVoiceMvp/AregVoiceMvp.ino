@@ -590,32 +590,21 @@ static void handle_story_session() {
                 //
                 // For now this is a best-effort streaming attempt with a reliable
                 // buffered fallback.
-                bool played = false;
-                if (voice_wifi_is_connected()) {
-                    char qa_stream_url[384];
-                    snprintf(qa_stream_url, sizeof(qa_stream_url),
-                             "%s?storyId=%s&offset=%u",
-                             AREG_STORY_QA_URL, AREG_STORY_ID,
-                             (unsigned)s_story_offset);
-                    audio_speaker_begin();
-                    played = audio_play_qa_stream(qa_stream_url);
-                    if (played) {
-                        Serial.println("[qa] answer played via stream");
-                        Serial.flush();
-                    } else {
-                        Serial.println("[qa] stream failed; using buffered fallback");
-                        Serial.flush();
-                    }
-                }
-                if (!played) {
-                    // Buffered fallback — always available because the async
-                    // task filled turn.response_bytes via read_response_into().
-                    audio_speaker_begin();
-                    audio_play_mp3_buffer(turn.response_bytes,
-                                          turn.response_length);
-                    Serial.println("[qa] answer played via buffered fallback");
-                    Serial.flush();
-                }
+                // Play the answer the async task already buffered from the
+                // POST response body. DO NOT open a separate GET to the Q&A
+                // URL to "stream": that route is POST-only, so a GET 404s —
+                // and if a GET were ever added it would RE-RUN the whole
+                // STT+GPT+TTS pipeline and DOUBLE-BILL for one question.
+                // The real latency win (TODO, needs on-device verification) is
+                // to decode incrementally from THIS POST response stream
+                // instead of read_response_into() buffering it first — i.e.
+                // change the async task to hand the live HTTP stream to the
+                // MP3 decoder. Until that lands, buffered playback is correct
+                // and matches the backend's byte-identical streamed body.
+                audio_speaker_begin();
+                audio_play_mp3_buffer(turn.response_bytes, turn.response_length);
+                Serial.println("[qa] answer played (buffered POST response)");
+                Serial.flush();
                 voice_release_last_response();
             } else {
                 if (payload != nullptr) {

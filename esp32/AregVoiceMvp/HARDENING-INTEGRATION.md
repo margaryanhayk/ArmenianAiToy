@@ -182,15 +182,19 @@ This implements options B and C together:
   while the upload task is in flight. Each pulse is ~600 ms; up to
   `AREG_THINKBED_MAX_PULSES` (70) pulses before a silent busy-wait fallback.
 
-- `audio_play_qa_stream()` added to `audio_io.cpp` / `audio_io.h`.
-  When the async upload completes with `turn.ok == true`, the firmware first
-  tries to stream the answer via `audio_play_qa_stream()` (a GET to the same
-  Q&A URL), which decodes the MP3 incrementally as bytes arrive — same
-  `AudioFileSourceHTTPStream` pattern as `audio_play_story_stream`. If the
-  stream fails (non-200, connection error, or backend doesn't yet have a
-  GET endpoint), it falls back to `audio_play_mp3_buffer()` with the already-
-  buffered bytes from the async task. **No regression possible** — the
-  buffered path is always available.
+- **Answer playback (corrected after review):** when the async upload
+  completes the firmware plays the answer the task already buffered from the
+  **POST response body** via `audio_play_mp3_buffer()`. The earlier
+  separate-`GET`-to-the-Q&A-URL attempt was **REMOVED** — that route is
+  POST-only (a GET 404s) and, if a GET were ever added, it would RE-RUN the
+  whole STT+GPT+TTS pipeline and **double-bill** for a single question.
+  `audio_play_qa_stream()` remains in `audio_io.*` for a future story-style
+  stream source but is NOT used on the Q&A path.
+  **TODO (real latency win, needs on-device verification):** decode
+  incrementally from the live POST response stream — change the async task to
+  hand the HTTP stream to the MP3 decoder instead of `read_response_into()`
+  buffering it first. The backend already sends a byte-identical *streamed*
+  POST body (S2), so only the firmware side needs this change.
 
 New constants in `config.h`:
 - `AREG_THINKBED_FREQ_HZ` (280 Hz — lower/warmer than the earcon)
