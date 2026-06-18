@@ -28,6 +28,16 @@
   </ItemGroup>
 
   <!--
+    Format-matched (24 kHz mono MP3) silence unit, generated once with
+    ffmpeg. StoryQaController repeats it to insert a tunable pause between
+    a spoken answer and the return-to-story bridge. Embedded so it ships
+    with the API regardless of the working directory at runtime.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\silence-24k-mono.mp3" />
+  </ItemGroup>
+
+  <!--
     Matches the InternalsVisibleTo declarations already present on
     Application and Infrastructure. Lets the test project reference
     internal constants on Api controllers (e.g. ChatController.CostCapResponse

@@ -310,4 +310,32 @@ public class LibraryStoryQuestionTests
         Assert.Same(Guide, StoryQuestionGuides.TryGet("anban-huri"));
         Assert.Null(StoryQuestionGuides.TryGet("no-such-story"));
     }
+
+    [Fact]
+    public void Guide_SegmentRecaps_AlignWithStorySegments()
+    {
+        // Tier 2: one re-anchor line per segment, index-aligned, all
+        // non-empty Armenian (no Latin/digits), ending with the Armenian
+        // full stop so TTS reads them cleanly.
+        Assert.Equal(Story.Segments.Count, Guide.SegmentRecaps.Count);
+        foreach (var recap in Guide.SegmentRecaps)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(recap));
+            Assert.EndsWith("։", recap);
+            Assert.DoesNotContain(':', recap); // never the Latin colon
+            Assert.DoesNotContain(recap, c => c is >= 'a' and <= 'z' or >= 'A' and <= 'Z');
+        }
+    }
+
+    [Fact]
+    public void GetSegmentRecap_ReturnsLine_InRange_NullOutOfRange()
+    {
+        Assert.Equal(Guide.SegmentRecaps[0], LibraryStoryQuestionService.GetSegmentRecap("anban-huri", 0));
+        Assert.Equal(
+            Guide.SegmentRecaps[Story.Segments.Count - 1],
+            LibraryStoryQuestionService.GetSegmentRecap("anban-huri", Story.Segments.Count - 1));
+        Assert.Null(LibraryStoryQuestionService.GetSegmentRecap("anban-huri", -1));
+        Assert.Null(LibraryStoryQuestionService.GetSegmentRecap("anban-huri", 999));
+        Assert.Null(LibraryStoryQuestionService.GetSegmentRecap("no-such-story", 0));
+    }
 }

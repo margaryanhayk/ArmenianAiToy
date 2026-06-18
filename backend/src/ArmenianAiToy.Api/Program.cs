@@ -72,6 +72,14 @@ otel.WithMetrics(m => m
         {
             Boundaries = openAiLatencyBuckets
         })
+    .AddView(
+        // Voice Q&A end-to-end latency — the "dead air" metric. Shares the
+        // OpenAI latency buckets so dashboards stay comparable.
+        instrumentName: "aat_story_qa_duration_seconds",
+        metricStreamConfiguration: new ExplicitBucketHistogramConfiguration
+        {
+            Boundaries = openAiLatencyBuckets
+        })
     .AddPrometheusExporter());
 otel.WithTracing(t =>
 {
@@ -135,6 +143,13 @@ var authPermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Auth:Pe
     ?? AuthRateLimiter.DefaultPermitLimit;
 var authWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:Auth:WindowSeconds")
     ?? AuthRateLimiter.DefaultWindowSeconds;
+// Per-caller-IP rate limit for the header-less /api/story-audio stream.
+// Separate bucket again — story streaming must not share quota with chat
+// or auth. See StoryAudioRateLimiter for keying + the looser default.
+var storyAudioPermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:StoryAudio:PermitLimit")
+    ?? StoryAudioRateLimiter.DefaultPermitLimit;
+var storyAudioWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:StoryAudio:WindowSeconds")
+    ?? StoryAudioRateLimiter.DefaultWindowSeconds;
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -142,12 +157,15 @@ builder.Services.AddRateLimiter(options =>
         ChatRateLimiter.PolicyFactory(ctx, chatPermitLimit, chatWindowSeconds));
     options.AddPolicy(AuthRateLimiter.PolicyName, ctx =>
         AuthRateLimiter.PolicyFactory(ctx, authPermitLimit, authWindowSeconds));
+    options.AddPolicy(StoryAudioRateLimiter.PolicyName, ctx =>
+        StoryAudioRateLimiter.PolicyFactory(ctx, storyAudioPermitLimit, storyAudioWindowSeconds));
     options.OnRejected = async (context, cancellationToken) =>
     {
         // Count the rejection before mutating the response — if writing
         // the body fails for any reason, the metric still reflects the
         // fact that the limiter tripped. Shared counter across both
-        // policies (chat + auth); bounded `policy` tag ({chat, auth})
+        // policies (chat + auth + story-audio); bounded `policy` tag
+        // ({chat, auth, story_audio})
         // derived from the matched endpoint's [EnableRateLimiting]
         // metadata via RateLimitRejectionPolicy.ResolvePolicyTag. Stays
         // within the AppMeter no-high-cardinality invariant — no

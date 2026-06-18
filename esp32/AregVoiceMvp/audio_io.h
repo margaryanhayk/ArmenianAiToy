@@ -45,6 +45,80 @@ bool audio_speaker_begin();
 // decoder error, empty buffer, or setup failure.
 bool audio_play_mp3_buffer(const uint8_t *data, size_t length);
 
+// Continuous, interruptible STORY playback. Streams an MP3 directly
+// from `url` (ESP8266Audio HTTP source) and decodes it as it
+// downloads — so an arbitrarily long story plays start-to-finish
+// without buffering the whole clip (no 512 KB limit, no segments).
+//
+// `barge_in` is polled every decode iteration; when it returns true
+// the audio is cut IMMEDIATELY (true barge-in) and the byte offset
+// reached is written to `*out_resume_offset` so the caller can resume
+// the SAME file from that exact point (append `?from=<offset>` to the
+// URL). A small offset fudge is subtracted so resume overlaps rather
+// than skips the I2S-buffered tail.
+//
+// `base_offset` is the absolute byte offset this stream was opened at
+// (the `?from=` value, or 0 from the start). It is REQUIRED for correct
+// resume because the HTTP source's getPos() counts from 0 of the
+// current (partial) response, so the absolute file position is
+// base_offset + getPos().
+//
+// Returns true when interrupted (resume from *out_resume_offset, an
+// ABSOLUTE file offset); false when the story played to its natural end
+// (*out_resume_offset is left 0).
+typedef bool (*audio_barge_in_fn)();
+bool audio_play_story_stream(const char *url,
+                             uint32_t base_offset,
+                             audio_barge_in_fn barge_in,
+                             uint32_t *out_resume_offset);
+
+// ---------------------------------------------------------------
+// Dead-air mitigation (S1 + S3)
+// UNVERIFIED — not compiled/flashed. See HARDENING-INTEGRATION.md §2.
+// ---------------------------------------------------------------
+
+// S1 — Instant "thinking" earcon.
+//
+// Synthesizes a short soft tone (~AREG_EARCON_DURATION_MS ms at
+// AREG_EARCON_FREQ_HZ) and writes it directly to the I2S output in one
+// blocking call. No network, no SD, no heap allocation beyond a small
+// stack-local sine table. Intended to be called the instant recording
+// ends and upload begins (ST_UPLOADING), so the child gets IMMEDIATE
+// acoustic feedback instead of silence.
+//
+// HARDWARE ASSUMPTION: audio_speaker_begin() must have been called
+// before this. The function creates its own AudioOutputI2S + i2s_write
+// path (same pins as audio_play_mp3_buffer) and leaves the speaker
+// peripheral in a clean state on return.
+//
+// Returns true on success, false if I2S setup fails (non-fatal —
+// silent earcon is still better than a crash).
+bool audio_play_thinking_earcon();
+
+// S3 — Stream a Q&A answer incrementally from a URL.
+//
+// Opens `url` as an HTTP stream and decodes the MP3 response chunk-by-
+// chunk via ESP8266Audio's AudioFileSourceHTTPStream, playing audio as
+// bytes arrive. The first audible audio begins as soon as the server
+// sends its first MP3 frame — no full-buffer-wait.
+//
+// Semantically identical to audio_play_story_stream but:
+//   - No barge-in poll (Q&A answers are short; interrupt at this layer
+//     would cut the child's answer mid-sentence).
+//   - No resume-offset output (Q&A is not a pausable asset).
+//   - Falls through cleanly if the stream fails to open, so the caller
+//     can play the buffered fallback instead.
+//
+// Returns true on clean playback (stream played to end-of-body or
+// decoder reached EOS); false on stream-open failure or decode error.
+// In the false case the caller should play the buffered fallback via
+// audio_play_mp3_buffer() if it already has a response in hand.
+//
+// HARDWARE ASSUMPTION: audio_speaker_begin() must have been called
+// before this. The URL must be reachable (caller is responsible for
+// checking Wi-Fi connectivity).
+bool audio_play_qa_stream(const char *url);
+
 // Write a canonical 44-byte PCM WAV header into `hdr_out`
 // describing `pcm_sample_count` mono 16-bit samples at
 // AREG_SAMPLE_RATE_HZ. `hdr_out` must be at least 44 bytes.

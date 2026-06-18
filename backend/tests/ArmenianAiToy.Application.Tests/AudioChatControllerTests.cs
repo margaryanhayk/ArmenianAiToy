@@ -338,6 +338,25 @@ public class AudioChatControllerTests
     }
 
     [Fact]
+    public async Task AudioChat_AutoplayContinue_OnPausedDevice_ReturnsCanned_NoChatService()
+    {
+        await using var h = await CreateAsync();
+        h.DeviceService.IsDevicePausedAsync(h.DeviceId).Returns(true);
+        h.Synthesis.SynthesizeArmenianAsync(
+                Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisResult(TtsMp3, MimeMp3));
+        // Autoplay-continue request: the X-Areg-Continue header, no body.
+        var httpContext = (DefaultHttpContext)h.Controller.HttpContext;
+        httpContext.Request.Headers["X-Areg-Continue"] = "1";
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        // Gated BEFORE the autoplay advance — canned clip, no library call.
+        Assert.IsType<FileContentResult>(result);
+        await h.ChatService.DidNotReceiveWithAnyArgs().ContinueLibraryStoryAsync(default);
+    }
+
+    [Fact]
     public async Task AudioChat_CannedClipCached_SecondGatedRequestDoesNotReRender()
     {
         await using var h = await CreateAsync();

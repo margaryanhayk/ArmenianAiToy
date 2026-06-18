@@ -52,9 +52,14 @@ public static class DependencyInjection
         var ttsModel = config["OpenAI:TtsModel"] ?? "tts-1";
         var whisperClient = openAiClient.GetAudioClient(whisperModel);
         var ttsClient = openAiClient.GetAudioClient(ttsModel);
+        // Pass the OpenAIClient + default model so the transcription adapter
+        // can honor an OPTIONAL per-call STT model override. The default
+        // path (C1 voice + Q&A with no override) still uses whisperClient,
+        // so shipped behavior is unchanged. See the StoryQa:TranscriptionModel
+        // seam below.
         services.AddSingleton<IAudioTranscriptionService>(sp =>
             new OpenAIWhisperTranscriptionService(
-                whisperClient,
+                whisperClient, openAiClient, whisperModel,
                 sp.GetRequiredService<ILogger<OpenAIWhisperTranscriptionService>>()));
         services.AddSingleton<IAudioSynthesisService>(sp =>
             new OpenAITtsSynthesisService(
@@ -92,10 +97,61 @@ public static class DependencyInjection
         // and the library/playback service are stateless over it. The
         // W2 Q&A consumer is scoped because IAiChatClient is scoped.
         services.AddSingleton(StoryEngineOptions.FromConfiguration(config));
-        services.AddSingleton<ICuratedStoryLibrary, InMemoryCuratedStoryLibrary>();
+        // Story library. Production path is the approved-only embedded
+        // library. BENCH/LOCAL override (both keys optional, both inert
+        // when unset, so production is unchanged): Story:DefaultStoryId
+        // picks which story SelectDefault returns, and
+        // Story:ExtraStoryFiles[] side-loads extra story files from disk
+        // (requireApproved:false) so an un-promoted DRAFT (e.g.
+        // anban-huri) can be served LOCALLY for a bench without changing
+        // its text, status, dates, or embedding/promoting it.
+        var defaultStoryId = config["Story:DefaultStoryId"];
+        var extraStoryFiles = config.GetSection("Story:ExtraStoryFiles")
+            .GetChildren()
+            .Select(c => c.Value)
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v!)
+            .ToList();
+        if (string.IsNullOrWhiteSpace(defaultStoryId) && extraStoryFiles.Count == 0)
+        {
+            services.AddSingleton<ICuratedStoryLibrary, InMemoryCuratedStoryLibrary>();
+        }
+        else
+        {
+            var configuredLibrary = ConfigurableCuratedStoryLibrary.Create(
+                new InMemoryCuratedStoryLibrary(),
+                extraStoryFiles,
+                defaultStoryId,
+                msg => Console.Error.WriteLine($"[story-library] {msg}"));
+            services.AddSingleton<ICuratedStoryLibrary>(configuredLibrary);
+        }
         services.AddSingleton<LibraryStorySessionTracker>();
         services.AddSingleton<LibraryStoryPlaybackService>();
-        services.AddScoped<LibraryStoryQuestionService>();
+
+        // Bounded in-story Q&A answer-model seam (latency). The bounded Q&A
+        // task (prompt → answer → StoryAnswerFilter validate → one repair →
+        // canned fallback) is a far simpler surface than open chat, so an
+        // operator can later run it on a faster/cheaper model. StoryQa:AnswerModel
+        // DEFAULTS to OpenAI:ChatModel (gpt-4o today) so behavior is unchanged
+        // out of the box; flip it to e.g. gpt-4o-mini ONLY after an
+        // Armenian-quality benchmark. This dedicated chat client is isolated
+        // to the Q&A service — the live ChatService chat path keeps using the
+        // ambient IAiChatClient/OpenAI:ChatModel, untouched. Routed through
+        // the same OpenAIReliabilityGate as the main chat adapter.
+        var qaAnswerModel = config["StoryQa:AnswerModel"];
+        if (string.IsNullOrWhiteSpace(qaAnswerModel) || qaAnswerModel == chatModel)
+        {
+            // No override (or same model): reuse the ambient IAiChatClient so
+            // there is exactly one chat client when nothing was configured.
+            services.AddScoped<LibraryStoryQuestionService>();
+        }
+        else
+        {
+            var qaChatClient = openAiClient.GetChatClient(qaAnswerModel);
+            services.AddScoped(sp => new LibraryStoryQuestionService(
+                new OpenAIChatClientAdapter(
+                    qaChatClient, sp.GetRequiredService<OpenAIReliabilityGate>())));
+        }
 
         // Application services
         services.AddSingleton<IStoryChoiceCoherenceGate, StoryChoiceCoherenceGate>();

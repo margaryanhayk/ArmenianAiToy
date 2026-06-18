@@ -60,6 +60,14 @@ public class RateLimitRejectionPolicyTests
     }
 
     [Fact]
+    public void ResolvePolicyTag_StoryAudioEndpoint_ReturnsStoryAudio()
+    {
+        var ctx = CtxWithRateLimitingAttribute(StoryAudioRateLimiter.PolicyName);
+        Assert.Equal(RateLimitRejectionPolicy.StoryAudioTag,
+            RateLimitRejectionPolicy.ResolvePolicyTag(ctx));
+    }
+
+    [Fact]
     public void ResolvePolicyTag_NoEndpoint_FallsBackToChat()
     {
         // Defensive fallback documented on the helper — keeps the
@@ -81,20 +89,25 @@ public class RateLimitRejectionPolicyTests
     }
 
     [Fact]
-    public void ResolvePolicyTag_ValueSpace_IsExactlyChatAndAuth()
+    public void ResolvePolicyTag_ValueSpace_IsExactlyChatAuthAndStoryAudio()
     {
         // Documents the bounded-value-space invariant at a place where
-        // a failing test would surface ANY accidental widening. If a
-        // third constant sneaks in, this comparison breaks.
+        // a failing test would surface ANY accidental widening. The map
+        // is exactly three fixed values; a fourth must be added here
+        // explicitly (never an unbounded dimension).
         Assert.Equal("chat", RateLimitRejectionPolicy.ChatTag);
         Assert.Equal("auth", RateLimitRejectionPolicy.AuthTag);
+        Assert.Equal("story_audio", RateLimitRejectionPolicy.StoryAudioTag);
 
-        // And confirm only these two possibilities come out of the
+        // And confirm only these three possibilities come out of the
         // helper under the inputs we care about.
         var chatCtx = CtxWithRateLimitingAttribute(ChatRateLimiter.PolicyName);
         var authCtx = CtxWithRateLimitingAttribute(AuthRateLimiter.PolicyName);
+        var storyCtx = CtxWithRateLimitingAttribute(StoryAudioRateLimiter.PolicyName);
         var chatTag = RateLimitRejectionPolicy.ResolvePolicyTag(chatCtx);
         var authTag = RateLimitRejectionPolicy.ResolvePolicyTag(authCtx);
-        Assert.Equal(new[] { "auth", "chat" }, new[] { authTag, chatTag });
+        var storyTag = RateLimitRejectionPolicy.ResolvePolicyTag(storyCtx);
+        Assert.Equal(new[] { "auth", "chat", "story_audio" },
+            new[] { authTag, chatTag, storyTag });
     }
 }

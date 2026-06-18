@@ -8,10 +8,13 @@
 // -------------------------------------------------------------
 #include "voice_client.h"
 #include "config.h"
+#include "diag.h"
 
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <esp_heap_caps.h>
+#include <freertos/FreeRTOS.h>   // xTaskCreatePinnedToCore (S3 async upload, UNVERIFIED)
+#include <freertos/task.h>       // vTaskDelete, BaseType_t
 
 static uint8_t *s_response_buffer = nullptr;
 
@@ -55,6 +58,61 @@ void voice_release_last_response() {
     }
 }
 
+// Reads an already-confirmed-200 response body in full into a fresh
+// PSRAM buffer and records the X-Areg-Continue header. Leaves `http`
+// open for the caller to end(). Returns true on a fully-buffered body;
+// on false it has freed any partial buffer and set nothing on result.
+static bool read_response_into(HTTPClient &http, VoiceTurnResult &result) {
+    const int body_len = http.getSize();
+    if (body_len <= 0) {
+        Serial.printf("[voice] http: unexpected body length %d\n", body_len);
+        return false;
+    }
+    if ((size_t)body_len > AREG_PLAYBACK_BUFFER_BYTES) {
+        Serial.printf("[voice] http: body %d exceeds playback buffer %u\n",
+                      body_len, (unsigned)AREG_PLAYBACK_BUFFER_BYTES);
+        return false;
+    }
+    uint8_t *buf = (uint8_t *)heap_caps_malloc((size_t)body_len, MALLOC_CAP_SPIRAM);
+    if (buf == nullptr) {
+        Serial.println("[voice] psram allocation failed for response");
+        return false;
+    }
+    WiFiClient *stream = http.getStreamPtr();
+    size_t read_total = 0;
+    const uint32_t read_deadline = millis() + AREG_HTTP_READ_MS;
+    while (read_total < (size_t)body_len) {
+        if (millis() > read_deadline) {
+            Serial.println("[voice] http read timeout");
+            heap_caps_free(buf);
+            return false;
+        }
+        size_t avail = stream->available();
+        if (avail == 0) {
+            delay(5);
+            continue;
+        }
+        size_t want = (size_t)body_len - read_total;
+        if (avail > want) avail = want;
+        int got = stream->readBytes(buf + read_total, avail);
+        if (got <= 0) {
+            delay(5);
+            continue;
+        }
+        read_total += (size_t)got;
+    }
+    s_response_buffer = buf;
+    result.ok = true;
+    result.response_bytes = buf;
+    result.response_length = (size_t)body_len;
+    result.continue_more = (http.header("X-Areg-Continue") == "1");
+    Serial.printf("[voice] http 200, body=%u bytes (psram), continue=%s\n",
+                  (unsigned)result.response_length,
+                  result.continue_more ? "1" : "0");
+    Serial.flush();
+    return true;
+}
+
 VoiceTurnResult voice_upload_turn(const uint8_t *payload, size_t length) {
     VoiceTurnResult result;
     voice_release_last_response();  // defensive — prior call's buffer
@@ -72,15 +130,23 @@ VoiceTurnResult voice_upload_turn(const uint8_t *payload, size_t length) {
     HTTPClient http;
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
     http.setTimeout(AREG_HTTP_READ_MS);
+    DIAG_MARK(5000, "http_begin_before");
     if (!http.begin(AREG_BACKEND_URL)) {
+        DIAG_MARK(5001, "http_begin_fail");
         Serial.println("[voice] http.begin failed");
+        Serial.flush();
         return result;
     }
+    DIAG_MARK(5002, "http_begin_after_ok");
     http.addHeader("Content-Type", "audio/wav");
     http.addHeader("X-Device-Id", AREG_DEVICE_ID);
     http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+    static const char *kCollectHeaders[] = {"X-Areg-Continue"};
+    http.collectHeaders(kCollectHeaders, 1);
 
+    DIAG_MARK(5010, "http_post_before");
     const int status = http.POST((uint8_t *)payload, length);
+    DIAG_MARK(5011, "http_post_after");
     result.http_status = status;
     if (status != 200) {
         Serial.printf("[voice] http POST non-200: %d\n", status);
@@ -88,59 +154,291 @@ VoiceTurnResult voice_upload_turn(const uint8_t *payload, size_t length) {
         return result;
     }
 
-    // Response body — read in full into PSRAM. HTTP/1.1 against
-    // the dev backend returns Content-Length reliably.
-    const int body_len = http.getSize();
-    if (body_len <= 0) {
-        Serial.printf("[voice] http: unexpected body length %d\n", body_len);
-        http.end();
-        return result;
-    }
-    if ((size_t)body_len > AREG_PLAYBACK_BUFFER_BYTES) {
-        Serial.printf("[voice] http: body %d exceeds playback buffer %u\n",
-                      body_len, (unsigned)AREG_PLAYBACK_BUFFER_BYTES);
-        http.end();
-        return result;
-    }
-
-    uint8_t *buf = (uint8_t *)heap_caps_malloc((size_t)body_len, MALLOC_CAP_SPIRAM);
-    if (buf == nullptr) {
-        Serial.println("[voice] psram allocation failed for response");
-        http.end();
-        return result;
-    }
-
-    WiFiClient *stream = http.getStreamPtr();
-    size_t read_total = 0;
-    const uint32_t read_deadline = millis() + AREG_HTTP_READ_MS;
-    while (read_total < (size_t)body_len) {
-        if (millis() > read_deadline) {
-            Serial.println("[voice] http read timeout");
-            heap_caps_free(buf);
-            http.end();
-            return result;
-        }
-        size_t avail = stream->available();
-        if (avail == 0) {
-            delay(5);
-            continue;
-        }
-        size_t want = (size_t)body_len - read_total;
-        if (avail > want) avail = want;
-        int got = stream->readBytes(buf + read_total, avail);
-        if (got <= 0) {
-            delay(5);
-            continue;
-        }
-        read_total += (size_t)got;
-    }
+    DIAG_MARK(5020, "http_read_body_before");
+    const bool read_ok = read_response_into(http, result);
+    DIAG_MARK(5021, "http_read_body_after_ok");
     http.end();
+    DIAG_MARK(5030, "http_end_after");
+    if (!read_ok) {
+        voice_release_last_response();
+        return result;  // ok stays false
+    }
+    DIAG_MARK(5099, "voice_upload_exit_ok");
+    return result;
+}
 
-    s_response_buffer = buf;
-    result.ok = true;
-    result.response_bytes = buf;
-    result.response_length = (size_t)body_len;
-    Serial.printf("[voice] http 200, body=%u bytes (psram)\n",
-                  (unsigned)result.response_length);
+VoiceTurnResult voice_upload_question(const uint8_t *payload, size_t length,
+                                      uint32_t offset) {
+    VoiceTurnResult result;
+    voice_release_last_response();
+
+    if (!voice_wifi_is_connected()) {
+        Serial.println("[qa] upload: wifi not connected");
+        result.http_status = -1001;
+        return result;
+    }
+    if (payload == nullptr || length == 0) {
+        Serial.println("[qa] upload: empty payload");
+        return result;
+    }
+
+    char url[384];
+    snprintf(url, sizeof(url), "%s?storyId=%s&offset=%u",
+             AREG_STORY_QA_URL, AREG_STORY_ID, (unsigned)offset);
+
+    HTTPClient http;
+    http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
+    http.setTimeout(AREG_HTTP_READ_MS);
+    if (!http.begin(url)) {
+        Serial.println("[qa] http.begin failed");
+        Serial.flush();
+        return result;
+    }
+    http.addHeader("Content-Type", "audio/wav");
+    http.addHeader("X-Device-Id", AREG_DEVICE_ID);
+    http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+
+    Serial.printf("[qa] POST question (%u bytes) offset=%u\n",
+                  (unsigned)length, (unsigned)offset);
+    Serial.flush();
+    const int status = http.POST((uint8_t *)payload, length);
+    result.http_status = status;
+    if (status != 200) {
+        Serial.printf("[qa] http POST non-200: %d\n", status);
+        http.end();
+        return result;
+    }
+
+    const bool read_ok = read_response_into(http, result);
+    http.end();
+    if (!read_ok) {
+        voice_release_last_response();
+        return result;
+    }
+    Serial.printf("[qa] answer %u bytes\n", (unsigned)result.response_length);
+    Serial.flush();
+    return result;
+}
+
+// -------------------------------------------------------------
+// Async Q&A upload (S3 dead-air mitigation)
+// UNVERIFIED — not compiled/flashed. See HARDENING-INTEGRATION.md §2.
+// -------------------------------------------------------------
+//
+// Design: the FreeRTOS upload task is pinned to CORE 0 so it owns the
+// Wi-Fi TCP socket on that core. The Arduino loop() runs on CORE 1
+// (default for Arduino-ESP32) and drives the thinking-bed audio there.
+// Both cores share the same ESP-IDF Wi-Fi driver — sockets are
+// accessible from either core — but pinning the network work to CORE 0
+// prevents any scheduling jitter from the loop() watchdog.
+//
+// HARDWARE ASSUMPTION: ESP32-S3 two-core SMP. If a single-core variant
+// is ever used (ESP32-S3FN4R2 does have two cores; the single-core
+// ESP32-S0 is a different chip family). Core index 0 = PRO_CPU.
+//
+// PSRAM ownership (see voice_client.h comment):
+//   - s_async_payload: borrowed pointer to caller-owned PSRAM. NOT freed here.
+//   - s_response_buffer (module-level): allocated by the task inside
+//     read_response_into(); freed by voice_release_last_response().
+//   - s_async_result: value-type struct; result.response_bytes points into
+//     s_response_buffer when ok==true.
+
+// Shared state between the async upload task and the polling caller.
+// Written by CORE 0 task, read by CORE 1 loop. Declared volatile to
+// prevent compiler reordering; memory ordering is sufficient here
+// because the done flag is the single-writer/single-reader handoff
+// and the payload pointer is set before xTaskCreate.
+static volatile bool      s_async_done    = false;
+static volatile bool      s_async_started = false;
+static VoiceTurnResult    s_async_result;
+
+// Task parameters — set before xTaskCreate, read by the task.
+// payload pointer and length are caller-owned; they must remain valid
+// until voice_async_upload_done() returns true.
+static const uint8_t     *s_async_payload  = nullptr;
+static size_t             s_async_length   = 0;
+static uint32_t           s_async_offset   = 0;
+
+// FreeRTOS task: same logic as voice_upload_question() but writes the
+// result into s_async_result and sets s_async_done on completion.
+// HARDWARE ASSUMPTION: 8 KB stack is sufficient for HTTPClient + WiFiClient
+// on the ESP32-S3. Increase if stack overflow occurs (configurable at call site).
+static void upload_question_task(void * /*pvParams*/) {
+    VoiceTurnResult result;
+
+    if (!voice_wifi_is_connected()) {
+        Serial.println("[qa-async] wifi not connected");
+        result.http_status = -1001;
+        s_async_result = result;
+        s_async_done   = true;
+        vTaskDelete(nullptr);
+        return;
+    }
+    if (s_async_payload == nullptr || s_async_length == 0) {
+        Serial.println("[qa-async] empty payload");
+        s_async_result = result;
+        s_async_done   = true;
+        vTaskDelete(nullptr);
+        return;
+    }
+
+    char url[384];
+    snprintf(url, sizeof(url), "%s?storyId=%s&offset=%u",
+             AREG_STORY_QA_URL, AREG_STORY_ID, (unsigned)s_async_offset);
+
+    HTTPClient http;
+    http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
+    http.setTimeout(AREG_HTTP_READ_MS);
+    if (!http.begin(url)) {
+        Serial.println("[qa-async] http.begin failed");
+        Serial.flush();
+        s_async_result = result;
+        s_async_done   = true;
+        vTaskDelete(nullptr);
+        return;
+    }
+    http.addHeader("Content-Type", "audio/wav");
+    http.addHeader("X-Device-Id", AREG_DEVICE_ID);
+    http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+
+    Serial.printf("[qa-async] POST (%u bytes) offset=%u\n",
+                  (unsigned)s_async_length, (unsigned)s_async_offset);
+    Serial.flush();
+
+    // HARDWARE ASSUMPTION: http.POST() from CORE 0 while CORE 1 drives I2S
+    // is safe. The ESP-IDF lwIP stack is thread-safe across cores; Arduino
+    // HTTPClient is not interrupt-safe but is core-reentrant when called
+    // from different tasks (not the same task simultaneously).
+    // NOTE: we release the prior response buffer HERE (from the task) rather
+    // than from the caller, because both paths share s_response_buffer.
+    // This is safe because the task runs AFTER the caller has already finished
+    // playing the previous answer (the story playback was cut before record_question).
+    voice_release_last_response();
+    const int status = http.POST((uint8_t *)s_async_payload, s_async_length);
+    result.http_status = status;
+    if (status != 200) {
+        Serial.printf("[qa-async] POST non-200: %d\n", status);
+        http.end();
+        s_async_result = result;
+        s_async_done   = true;
+        vTaskDelete(nullptr);
+        return;
+    }
+
+    const bool read_ok = read_response_into(http, result);
+    http.end();
+    if (!read_ok) {
+        voice_release_last_response();
+    } else {
+        Serial.printf("[qa-async] answer %u bytes\n",
+                      (unsigned)result.response_length);
+        Serial.flush();
+    }
+    s_async_result = result;
+    s_async_done   = true;
+    vTaskDelete(nullptr);
+}
+
+void voice_start_question_upload_async(const uint8_t *payload,
+                                       size_t length,
+                                       uint32_t offset) {
+    // Guard: don't start a second task if one is still running.
+    // Caller must wait for voice_async_upload_done() before calling again.
+    if (s_async_started && !s_async_done) {
+        Serial.println("[qa-async] WARNING: prior task still running; skipping");
+        Serial.flush();
+        return;
+    }
+
+    // Set shared state before xTaskCreate so the task sees valid pointers.
+    s_async_payload  = payload;
+    s_async_length   = length;
+    s_async_offset   = offset;
+    s_async_done     = false;
+    s_async_started  = true;
+    // Clear any leftover result from the previous call.
+    s_async_result = VoiceTurnResult{};
+
+    // HARDWARE ASSUMPTION: stack size 8192 bytes. If stack overflow occurs
+    // (monitor with uxTaskGetStackHighWaterMark), raise to 10240 or 12288.
+    // HARDWARE ASSUMPTION: pinned to CORE 0 (APP_CPU_NUM = 1 on ESP32,
+    // but on ESP32-S3 with Arduino-ESP32 the convention is the same:
+    // PRO_CPU=0, APP_CPU=1; loop() runs on APP_CPU=1).
+    // We pin to PRO_CPU_NUM (= 0) so the blocking TCP work stays off the
+    // loop() core.
+    BaseType_t created = xTaskCreatePinnedToCore(
+        upload_question_task,
+        "qa_upload",        // task name (appears in task list)
+        8192,               // stack bytes — HARDWARE ASSUMPTION: sufficient
+        nullptr,            // pvParameters (task reads from module globals)
+        5,                  // priority: 5 = above idle (0), below Wi-Fi (10+)
+        nullptr,            // task handle (we don't need to track it)
+        0                   // core: 0 = PRO_CPU — HARDWARE ASSUMPTION
+    );
+    if (created != pdPASS) {
+        Serial.println("[qa-async] xTaskCreate FAILED; falling back to sync upload");
+        Serial.flush();
+        // Fallback: run synchronously in the caller's context.
+        // This means no thinking-bed plays, but audio_play_mp3_buffer
+        // will be called when voice_get_async_result() is called.
+        s_async_result = voice_upload_question(payload, length, offset);
+        s_async_done   = true;
+    }
+}
+
+bool voice_async_upload_done() {
+    return s_async_done;
+}
+
+VoiceTurnResult voice_get_async_result() {
+    // MUST only be called after voice_async_upload_done() == true.
+    return s_async_result;
+}
+
+VoiceTurnResult voice_continue_turn() {
+    VoiceTurnResult result;
+    voice_release_last_response();  // defensive — prior call's buffer
+
+    if (!voice_wifi_is_connected()) {
+        Serial.println("[voice] continue: wifi not connected");
+        result.http_status = -1001;
+        return result;
+    }
+
+    HTTPClient http;
+    http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
+    http.setTimeout(AREG_HTTP_READ_MS);
+    if (!http.begin(AREG_BACKEND_URL)) {
+        Serial.println("[voice] continue: http.begin failed");
+        return result;
+    }
+    http.addHeader("X-Device-Id", AREG_DEVICE_ID);
+    http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+    http.addHeader("X-Areg-Continue", "1");
+    static const char *kCollectHeaders[] = {"X-Areg-Continue"};
+    http.collectHeaders(kCollectHeaders, 1);
+
+    // Empty body — the backend skips STT and advances the active
+    // library story.
+    const int status = http.POST((uint8_t *)"", 0);
+    result.http_status = status;
+    if (status == 204) {
+        // No more story to play — clean end of autoplay.
+        Serial.println("[voice] continue: 204 (story complete)");
+        http.end();
+        return result;  // ok=false, continue_more=false
+    }
+    if (status != 200) {
+        Serial.printf("[voice] continue: non-200 %d\n", status);
+        http.end();
+        return result;
+    }
+
+    const bool read_ok = read_response_into(http, result);
+    http.end();
+    if (!read_ok) {
+        voice_release_last_response();
+        return result;
+    }
     return result;
 }

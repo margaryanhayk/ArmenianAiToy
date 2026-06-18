@@ -1334,6 +1334,22 @@ public class ChatService : IChatService
     }
 
     /// <summary>
+    /// Bench/local override (config <c>Story:BenchAutoStory</c>). When
+    /// true and the library engine is on, the engine reacts to ANY
+    /// non-garbled child input: it STARTS the default story when none
+    /// is active and ADVANCES it (verbatim next segment) otherwise —
+    /// bypassing the strict start/continue cue lists and DISABLING
+    /// in-story Q&amp;A entirely. This makes a hands-on bench demo immune
+    /// to Whisper mistranscription, which otherwise (a) routes a
+    /// misheard "tell a story" to the legacy engine, or (b) turns a
+    /// misheard word during an active story into a GPT Q&amp;A summary
+    /// instead of the next authored segment. Inert/off in production
+    /// (key unset) — the normal cue-gated routing applies.
+    /// </summary>
+    private bool BenchAutoStory =>
+        string.Equals(_config["Story:BenchAutoStory"], "true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Step 3.7 handler: one child utterance while a library story is
     /// active. Two deterministic branches — a continue cue resumes with
     /// the canned lead-in plus the CURRENT verbatim segment (no GPT
@@ -1352,7 +1368,8 @@ public class ChatService : IChatService
     private async Task<ChatResponse> HandleLibraryStoryInterruptAsync(
         Guid conversationId, LibraryStoryPlaybackState playback, string userMessage)
     {
-        if (ContinueCueDetector.IsContinueCue(userMessage))
+        // Bench mode advances on ANY input (no Q&A) — see BenchAutoStory.
+        if (BenchAutoStory || ContinueCueDetector.IsContinueCue(userMessage))
         {
             // W3: continue cues ADVANCE. Three deterministic outcomes —
             // next segment (lead-in + verbatim text), story end (the
@@ -1428,8 +1445,66 @@ public class ChatService : IChatService
 
         var message = await _conversations.AddMessageAsync(
             conversationId, MessageRole.Assistant, responseText, SafetyFlag.Clean);
-        return new ChatResponse(responseText, conversationId, message.Id, SafetyFlag.Clean);
+        // Autoplay signal: an active library session still exists after
+        // this turn (more segments, or the ending turn, to follow). The
+        // ending/reflection turn clears the session BEFORE this runs, so
+        // it reports false and the device stops the loop.
+        var autoContinue = _libraryPlayback?.GetCurrent(conversationId) is not null;
+        return new ChatResponse(
+            responseText, conversationId, message.Id, SafetyFlag.Clean,
+            LibraryAutoContinue: autoContinue);
     }
+
+    /// <inheritdoc />
+    public async Task<ChatResponse> ContinueLibraryStoryAsync(Guid deviceId, Guid? childId = null)
+    {
+        var child = childId.HasValue
+            ? await _childService.GetChildAsync(childId.Value)
+            : await _childService.GetDefaultChildForDeviceAsync(deviceId);
+        var conversation = await _conversations.GetOrCreateActiveConversationAsync(deviceId, child?.Id);
+
+        // Engine off / seams absent / no live session → stop the loop.
+        if (_libraryPlayback is null || _storyLibrary is null)
+        {
+            return StopAutoplay(conversation.Id);
+        }
+        var playback = _libraryPlayback.GetCurrent(conversation.Id);
+        if (playback is null)
+        {
+            return StopAutoplay(conversation.Id);
+        }
+
+        var advance = _libraryPlayback.Advance(conversation.Id);
+        if (advance.StoryEnded)
+        {
+            // Final turn: authored reflection (session already cleared by
+            // Advance, so RespondWithLibraryTextAsync reports
+            // LibraryAutoContinue = false → device stops after this).
+            var endedStory = _storyLibrary.GetById(playback.StoryId)!;
+            _logger.LogInformation(
+                "Library autoplay ended. ConversationId: {ConversationId}, Story: {StoryId}",
+                conversation.Id, playback.StoryId);
+            return await RespondWithLibraryTextAsync(
+                conversation.Id,
+                endedStory.ReflectionText + "\n" + endedStory.ReflectionQuestions[0]);
+        }
+        if (advance.Next is not null)
+        {
+            _logger.LogInformation(
+                "Library autoplay advanced. ConversationId: {ConversationId}, Story: {StoryId}, Segment: {SegmentIndex}",
+                conversation.Id, advance.Next.StoryId, advance.Next.SegmentIndex);
+            return await RespondWithLibraryTextAsync(
+                conversation.Id,
+                LibraryStoryCannedLines.ResumeLeadIn + "\n" + advance.Next.SegmentText);
+        }
+        // Session expired between GetCurrent and Advance — stop.
+        return StopAutoplay(conversation.Id);
+    }
+
+    /// <summary>Empty, non-continuing response — tells the voice
+    /// transport to end the autoplay loop and return to idle.</summary>
+    private static ChatResponse StopAutoplay(Guid conversationId) =>
+        new(string.Empty, conversationId, Guid.Empty, SafetyFlag.Clean, LibraryAutoContinue: false);
 
     public async Task<ChatResponse> GetResponseAsync(Guid deviceId, string userMessage, Guid? childId = null,
         Guid? storySessionId = null, string? selectedChoice = null)
@@ -1556,7 +1631,8 @@ public class ChatService : IChatService
             // conversation (deterministic tracker marker) — the same
             // word with no story context stays legacy.
             if (_libraryPlayback.IsEngineEnabled
-                && (StoryStartCueDetector.IsStoryStartCue(userMessage)
+                && (BenchAutoStory
+                    || StoryStartCueDetector.IsStoryStartCue(userMessage)
                     || (RepeatCueDetector.IsRepeatCue(userMessage)
                         && _libraryPlayback.HasRecentlyEnded(conversation.Id))))
             {

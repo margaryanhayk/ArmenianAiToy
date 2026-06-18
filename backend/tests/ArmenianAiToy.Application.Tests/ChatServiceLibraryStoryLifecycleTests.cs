@@ -81,13 +81,14 @@ public class ChatServiceLibraryStoryLifecycleTests
             });
     }
 
-    private IChatService MakeService(string engine)
+    private IChatService MakeService(string engine, bool benchAutoStory = false)
     {
         var childService = Substitute.For<IChildService>();
         childService.GetDefaultChildForDeviceAsync(Arg.Any<Guid>()).Returns((Child?)null);
         var config = Substitute.For<IConfiguration>();
         config["SystemPrompt"].Returns("You are a test assistant.");
         config["SafetyFallbackResponse"].Returns("Արի, մի հեքիաթ սկսենք։");
+        config["Story:BenchAutoStory"].Returns(benchAutoStory ? "true" : null);
 
         var playback = new LibraryStoryPlaybackService(
             _library, _tracker, new StoryEngineOptions { Engine = engine });
@@ -318,6 +319,123 @@ public class ChatServiceLibraryStoryLifecycleTests
             AudioStoryResponseComposer.ComposeTtsText(startTurn, null, null, null));
         Assert.Equal(endingTurn,
             AudioStoryResponseComposer.ComposeTtsText(endingTurn, null, null, null));
+    }
+
+    // ── Bench auto-story (Whisper-proof: any input starts/advances) ─
+
+    [Fact]
+    public async Task BenchAutoStory_AnyInput_StartsThenAdvancesVerbatim_NeverQa()
+    {
+        var service = MakeService("library", benchAutoStory: true);
+        var story = DefaultStory();
+        var deviceId = Guid.NewGuid();
+
+        // Input that is NOT a start cue still starts the default story.
+        var start = await service.GetResponseAsync(deviceId, "ինչ որ բան");
+        Assert.Equal(
+            LibraryStoryCannedLines.StartLeadIn + "\n" + story.Segments[0].Text,
+            start.Response);
+        Assert.Equal(0, _tracker.GetCurrent(_conversationId)!.SegmentIndex);
+
+        // A misheard re-press (not a continue cue) ADVANCES verbatim —
+        // it must NOT become a GPT Q&A summary.
+        var next = await service.GetResponseAsync(deviceId, "Բատմիր հեկիաթ");
+        Assert.Equal(
+            LibraryStoryCannedLines.ResumeLeadIn + "\n" + story.Segments[1].Text,
+            next.Response);
+        Assert.Equal(1, _tracker.GetCurrent(_conversationId)!.SegmentIndex);
+        Assert.Equal(0, QaAiCalls());      // GPT Q&A never invoked
+        Assert.Equal(0, LegacyAiCalls());  // legacy never invoked
+    }
+
+    [Fact]
+    public async Task BenchAutoStory_Off_PreservesQaForNonCueInput()
+    {
+        // With the flag off, a non-cue question during an active session
+        // still routes to Q&A (unchanged production behavior).
+        var service = MakeService("library", benchAutoStory: false);
+        var deviceId = Guid.NewGuid();
+        await service.GetResponseAsync(deviceId, "հեքիաթ պատմիր"); // start
+
+        var q = await service.GetResponseAsync(deviceId, "Ինչո՞ւ էր ամպիկը տխուր");
+
+        Assert.Equal(QaReply, q.Response);
+        Assert.Equal(1, QaAiCalls());
+        Assert.Equal(0, _tracker.GetCurrent(_conversationId)!.SegmentIndex); // not advanced
+    }
+
+    // ── Hands-free autoplay (ContinueLibraryStoryAsync) ─────────────
+
+    [Fact]
+    public async Task Autoplay_StartSignalsContinue_ThenWalksToEndingAndStops()
+    {
+        var service = MakeService("library");
+        var story = DefaultStory();
+        var deviceId = Guid.NewGuid();
+
+        // Start turn (real audio in production) signals "more to play".
+        var start = await service.GetResponseAsync(deviceId, "հեքիաթ պատմիր");
+        Assert.True(start.LibraryAutoContinue);
+        Assert.Equal(0, _tracker.GetCurrent(_conversationId)!.SegmentIndex);
+
+        // Each continue (no audio, no button, no GPT) advances one segment.
+        for (var i = 1; i < story.Segments.Count; i++)
+        {
+            var step = await service.ContinueLibraryStoryAsync(deviceId);
+            Assert.Equal(
+                LibraryStoryCannedLines.ResumeLeadIn + "\n" + story.Segments[i].Text,
+                step.Response);
+            Assert.True(step.LibraryAutoContinue);
+            Assert.Equal(i, _tracker.GetCurrent(_conversationId)!.SegmentIndex);
+            Assert.Equal(0, QaAiCalls());
+            Assert.Equal(0, LegacyAiCalls());
+        }
+
+        // One more continue → authored ending; session cleared; STOP signal.
+        var ending = await service.ContinueLibraryStoryAsync(deviceId);
+        Assert.Equal(
+            story.ReflectionText + "\n" + story.ReflectionQuestions[0],
+            ending.Response);
+        Assert.False(ending.LibraryAutoContinue);
+        Assert.Null(_tracker.GetCurrent(_conversationId));
+
+        // A continue with no live session → empty stop response.
+        var after = await service.ContinueLibraryStoryAsync(deviceId);
+        Assert.Equal(string.Empty, after.Response);
+        Assert.False(after.LibraryAutoContinue);
+    }
+
+    [Fact]
+    public async Task ContinueLibraryStory_NoActiveSession_ReturnsEmptyStop_NoGpt()
+    {
+        var service = MakeService("library");
+
+        var r = await service.ContinueLibraryStoryAsync(Guid.NewGuid());
+
+        Assert.Equal(string.Empty, r.Response);
+        Assert.False(r.LibraryAutoContinue);
+        Assert.Equal(0, QaAiCalls());
+        Assert.Equal(0, LegacyAiCalls());
+    }
+
+    [Fact]
+    public async Task LegacyEngine_ContinueLibraryStory_IsInert()
+    {
+        var service = MakeService("legacy");
+
+        var r = await service.ContinueLibraryStoryAsync(Guid.NewGuid());
+
+        Assert.Equal(string.Empty, r.Response);
+        Assert.False(r.LibraryAutoContinue);
+    }
+
+    [Fact]
+    public async Task NonLibraryTurn_DoesNotSignalContinue()
+    {
+        // A legacy reply must never carry the autoplay-continue signal.
+        var service = MakeService("library");
+        var r = await service.GetResponseAsync(Guid.NewGuid(), "Բարև Արեգ։");
+        Assert.False(r.LibraryAutoContinue);
     }
 
     // ── W4: post-end repeat cues ────────────────────────────────────

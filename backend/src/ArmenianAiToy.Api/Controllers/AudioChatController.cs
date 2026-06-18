@@ -1,5 +1,6 @@
 using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Application.Audio;
+using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Telemetry;
@@ -92,6 +93,17 @@ public class AudioChatController : ControllerBase
     public async Task<IActionResult> Chat(CancellationToken cancellationToken)
     {
         var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
+
+        // Hands-free autoplay continuation. After playing a library
+        // segment whose response carried `X-Areg-Continue: 1`, the
+        // firmware re-POSTs with this header and NO audio body to fetch
+        // the next segment — no button press, no STT, no GPT. Handled
+        // before body buffering / gates / STT.
+        if (string.Equals(Request.Headers["X-Areg-Continue"], "1", StringComparison.Ordinal))
+        {
+            return await ContinueAutoplayAsync(deviceId, cancellationToken);
+        }
+
         var inboundContentType = Request.ContentType;
         if (string.IsNullOrWhiteSpace(inboundContentType))
             inboundContentType = "audio/wav";
@@ -107,61 +119,14 @@ public class AudioChatController : ControllerBase
             return BadRequest(new { error = "Audio body is required" });
         var audioBytes = audioBuffer.ToArray();
 
-        // Paused / bedtime short-circuit BEFORE STT — runs zero cost
-        // against the upstream providers. Mode-disabled short-circuit
-        // is a Story-specific check (C1 voice is Story-only) so we
-        // can run it without transcription too.
-        if (await _deviceService.IsDevicePausedAsync(deviceId))
+        // Gates (pause > bedtime > mode) + the per-device daily cost cap.
+        // Extracted so the autoplay-continue path runs the SAME checks and
+        // cannot bypass parent policy / the cost cap (see
+        // CheckGatesAndCostCapAsync). Runs BEFORE STT — zero upstream cost.
+        var gated = await CheckGatesAndCostCapAsync(deviceId, cancellationToken);
+        if (gated is not null)
         {
-            AppMeter.ChatGateTrip.Add(1,
-                new KeyValuePair<string, object?>("gate", "paused"));
-            return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
-        }
-        if (await _deviceService.IsDeviceInBedtimeWindowAsync(deviceId, DateTime.UtcNow))
-        {
-            AppMeter.ChatGateTrip.Add(1,
-                new KeyValuePair<string, object?>("gate", "bedtime"));
-            return await CannedResultAsync(CannedVoiceClips.BedtimeKey, cancellationToken);
-        }
-        // C1 voice is Story-only. Story-disabled on the device / child
-        // → canned "let's try something else" without transcription.
-        // Other modes over voice land in a later phase.
-        var storyEnabled = await _deviceService.IsModeEnabledForRequestAsync(
-            deviceId, childId: null, DetectedMode.Story);
-        if (!storyEnabled)
-        {
-            AppMeter.ChatGateTrip.Add(1,
-                new KeyValuePair<string, object?>("gate", "mode_disabled"));
-            return await CannedResultAsync(
-                CannedVoiceClips.ModeDisabledKey, cancellationToken);
-        }
-
-        // P0 daily cost cap. Fires BEFORE Whisper STT so a runaway
-        // client cannot rack up further transcription / chat / TTS
-        // cost in the same UTC day. Reuses the paused canned clip
-        // because the v1 child-facing message ("take a small break")
-        // is shape-compatible with the paused envelope; a future
-        // slice can add a distinct cost-cap voice clip if operators
-        // want to distinguish the two on the device side.
-        var costCapOpts = _costCapOptions.Value;
-        if (costCapOpts.Enabled)
-        {
-            var nowUtc = DateTime.UtcNow;
-            var cap = costCapOpts.CapForDevice(deviceId);
-            if (_costMeter.IsOverCap(deviceId, cap, nowUtc))
-            {
-                AppMeter.OpenAICostCapTrip.Add(1,
-                    new KeyValuePair<string, object?>("kind", "audio"));
-                if (_costMeter.ShouldLogCapTrip(deviceId, nowUtc))
-                {
-                    _logger.LogWarning(
-                        "OpenAI daily cost cap reached. DeviceId={DeviceId} Kind={Kind} CurrentEstimatedUsd={Current:F4} CapUsd={Cap:F4} UtcDate={Date:yyyy-MM-dd}",
-                        deviceId, "audio",
-                        _costMeter.GetCurrentTotal(deviceId, nowUtc), cap, nowUtc.Date);
-                }
-                return await CannedResultAsync(
-                    CannedVoiceClips.PausedKey, cancellationToken);
-            }
+            return gated;
         }
 
         // Voice → text. Whisper with Language=hy is the C1 impl.
@@ -189,11 +154,13 @@ public class AudioChatController : ControllerBase
         // Text → existing ChatService pipeline, unchanged.
         ChatResponseShape chatResult;
         string ttsText;
+        var autoContinue = false;
         try
         {
             var response = await _chatService.GetResponseAsync(deviceId, transcript);
             chatResult = new ChatResponseShape(
                 response.Response, response.ConversationId, response.MessageId);
+            autoContinue = response.LibraryAutoContinue;
             // Canonical Message.Content (already persisted by ChatService) is the
             // stripped story text. The toy has no screen — the choice handoff has
             // to be spoken. Compose a Story-only TTS-only bridge so the child
@@ -229,7 +196,7 @@ public class AudioChatController : ControllerBase
         // TTS all succeeded. Wrapped in its own try/catch so a bug in
         // the estimator can never break the audio path. Three samples:
         // Whisper bytes-in, chat text-in/out, TTS chars-out.
-        if (costCapOpts.Enabled)
+        if (_costCapOptions.Value.Enabled)
         {
             try
             {
@@ -258,7 +225,117 @@ public class AudioChatController : ControllerBase
             assistantAudio: tts,
             cancellationToken);
 
+        // Drive hands-free autoplay: when this was a library segment with
+        // more of the story (or its ending) still to come, tell the
+        // firmware to fetch the next segment automatically.
+        if (autoContinue)
+        {
+            Response.Headers["X-Areg-Continue"] = "1";
+        }
         return File(tts.Content, tts.MimeType);
+    }
+
+    /// <summary>
+    /// Autoplay continuation turn: no audio, no STT. Advances the
+    /// device's active library story by one segment (or delivers the
+    /// ending) and streams that MP3. Returns 204 No Content when there
+    /// is nothing left to play, which stops the firmware's autoplay
+    /// loop. Emits `X-Areg-Continue: 1` while more remains.
+    /// </summary>
+    private async Task<IActionResult> ContinueAutoplayAsync(
+        Guid deviceId, CancellationToken cancellationToken)
+    {
+        // Autoplay-continue is paid TTS too — it MUST honor the same gates +
+        // cost cap as a normal turn, or a client could re-POST X-Areg-Continue
+        // on a paused / bedtime / over-cap device for unmetered speech.
+        var gated = await CheckGatesAndCostCapAsync(deviceId, cancellationToken);
+        if (gated is not null)
+        {
+            return gated;
+        }
+
+        ChatResponse result;
+        try
+        {
+            result = await _chatService.ContinueLibraryStoryAsync(deviceId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Audio autoplay-continue: ChatService failure for Device {DeviceId}", deviceId);
+            return StatusCode(502, new { error = "AI service unavailable. Please try again." });
+        }
+
+        // Nothing live to continue → 204 stops the device loop.
+        if (string.IsNullOrEmpty(result.Response))
+        {
+            return NoContent();
+        }
+
+        AudioSynthesisResult tts;
+        try
+        {
+            tts = await _synthesis.SynthesizeArmenianAsync(result.Response, cancellationToken);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Audio autoplay-continue: TTS failure for Device {DeviceId}", deviceId);
+            return StatusCode(502, new { error = "AI service unavailable. Please try again." });
+        }
+
+        if (result.LibraryAutoContinue)
+        {
+            Response.Headers["X-Areg-Continue"] = "1";
+        }
+        return File(tts.Content, tts.MimeType);
+    }
+
+    /// <summary>Pause &gt; bedtime &gt; mode gates + the per-device daily cost
+    /// cap, shared by the normal chat turn AND the autoplay-continue path so
+    /// neither can bypass parent policy or rack up unmetered TTS. Returns a
+    /// canned-clip result to short-circuit, or null to proceed. Zero upstream
+    /// cost.</summary>
+    private async Task<IActionResult?> CheckGatesAndCostCapAsync(
+        Guid deviceId, CancellationToken cancellationToken)
+    {
+        if (await _deviceService.IsDevicePausedAsync(deviceId))
+        {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "paused"));
+            return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
+        }
+        if (await _deviceService.IsDeviceInBedtimeWindowAsync(deviceId, DateTime.UtcNow))
+        {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "bedtime"));
+            return await CannedResultAsync(CannedVoiceClips.BedtimeKey, cancellationToken);
+        }
+        // C1 voice is Story-only; other modes over voice land in a later phase.
+        if (!await _deviceService.IsModeEnabledForRequestAsync(deviceId, childId: null, DetectedMode.Story))
+        {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "mode_disabled"));
+            return await CannedResultAsync(CannedVoiceClips.ModeDisabledKey, cancellationToken);
+        }
+
+        var costCapOpts = _costCapOptions.Value;
+        if (costCapOpts.Enabled)
+        {
+            var nowUtc = DateTime.UtcNow;
+            var cap = costCapOpts.CapForDevice(deviceId);
+            if (_costMeter.IsOverCap(deviceId, cap, nowUtc))
+            {
+                AppMeter.OpenAICostCapTrip.Add(1, new KeyValuePair<string, object?>("kind", "audio"));
+                if (_costMeter.ShouldLogCapTrip(deviceId, nowUtc))
+                {
+                    _logger.LogWarning(
+                        "OpenAI daily cost cap reached. DeviceId={DeviceId} Kind={Kind} CurrentEstimatedUsd={Current:F4} CapUsd={Cap:F4} UtcDate={Date:yyyy-MM-dd}",
+                        deviceId, "audio",
+                        _costMeter.GetCurrentTotal(deviceId, nowUtc), cap, nowUtc.Date);
+                }
+                return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
+            }
+        }
+        return null;
     }
 
     private async Task<IActionResult> CannedResultAsync(

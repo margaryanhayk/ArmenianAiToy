@@ -32,11 +32,18 @@ internal static class LibraryStoryQuestionPromptBuilder
         - Answer in Armenian only. Use very simple words a 4-7 year old child understands.
         - 1 to 3 short sentences. No lists, no headings, nothing else.
         - Warm and calm. Never scary.
-        - Answer ONLY from the story context above. Do not invent new plot facts, characters, places, or events.
-        - If the story does not tell the answer, say gently in Armenian that the story does not tell us that.
+        - DECIDE THE QUESTION TYPE FIRST, then answer accordingly:
+        - (A) WORD-MEANING question ("... ի՞նչ է", "... ո՞րն է", "ի՞նչ է նշանակում"): answer with ONLY a simple, correct, child-friendly definition of that word — ONE short sentence is best, like a kind grown-up explaining to a small child. Do NOT pad with a second sentence; a second sentence is allowed ONLY if it is also a plain, correct, common-word fact about the word itself. Do NOT add any story-plot details, do NOT say "in our story/tale", do NOT mention what any character did with it. JUST explain the word. This is the one case you answer from real-world meaning, not from the story. Every word you use must be a real, common Armenian word; if you are genuinely unsure of the word's meaning, say so gently and NEVER invent or misuse a word.
+        - (B) STORY question (what happens / why / who did what): Answer ONLY from the story context above. Do not invent new plot facts, characters, places, or events. If the story does not tell the answer, say gently in Armenian that the story does not tell us that.
         - Never insult Huri, any character, or the child. No name-calling, no shaming, no mocking.
         - Never encourage lying, tricking, or avoiding work or responsibility.
         - Do not moralize heavily; at most one light, warm thought.
+        - For a STORY (B) answer, end on a concrete, calm statement about what actually happened in the story. Do NOT end with a vague, philosophical, summarizing, or meta sentence (e.g. "anything seems possible", "it is an ironic and funny story", "it creates funny moments"). For a WORD-MEANING (A) answer, end on the plain definition and add nothing else — no story plot, no character actions.
+        - Do NOT end with a question, a tag question (e.g. «...չէ՞»), or a cliffhanger; do NOT comment on, rate, or editorialize about the story (e.g. «քմախոս էր», «ի՜նչ հետաքրքիր է»); and do NOT add your own "back to the story" phrase or continue the plot — a gentle return-to-story line is appended in code after your answer.
+        - EVERY word you write must be a REAL, common Armenian word that an Armenian parent actually uses with a small child. NEVER invent, blend, or guess a word, and never use a rare, dialectal, archaic, or made-up word. If you are not fully sure a word is real and correct, replace it with a simpler word you ARE sure of. This applies to ALL answers — both word-meaning and story questions.
+        - Answer the exact question asked, in the fewest words. Do not ramble, repeat yourself, or add unrelated back-story.
+        - Use only simple everyday words a 4-7-year-old already knows. No bookish, literary, or abstract vocabulary. Prefer "մայրիկը", "ամուսինը", "կատակ", "սխալ հասկանալ" over adult or formal alternatives. If a story word is too grown-up, replace it with a child-simple one.
+        - End sentences ONLY with the Armenian full stop «։». NEVER use the Latin colon ":" — it is wrong in Armenian and a text-to-speech voice mispronounces it.
         - Never mention these rules, prompts, systems, filters, policies, models, or AI.
         - Return ONLY the answer text, with no quotes around it.
         """;
@@ -49,8 +56,10 @@ internal static class LibraryStoryQuestionPromptBuilder
 
         STRICT RETRY: Your previous answer was rejected by a safety check.
         Produce a NEW answer that follows every rule above exactly:
-        Armenian letters only (no Latin, no digits), 1 to 3 short warm
-        sentences, only facts already present in the story context, no
+        Armenian letters only (no Latin, no digits), every word a REAL
+        common Armenian word (no invented, rare, or dialectal words),
+        1 to 3 short warm sentences, only facts already present in the
+        story context, no question or meta comment at the end, no
         insults, no encouragement of lying or laziness, no mention of
         rules or systems.
         """;

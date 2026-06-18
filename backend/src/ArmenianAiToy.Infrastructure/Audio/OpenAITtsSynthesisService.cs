@@ -22,6 +22,15 @@ public sealed class OpenAITtsSynthesisService : IAudioSynthesisService
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
     private const string ResponseMimeType = "audio/mpeg";
 
+    // One retry on a transient failure. The OpenAI TTS call occasionally
+    // drops mid-flight (timeout / socket abort / upstream 5xx); without a
+    // retry that momentary blip surfaces to the child as a sanitized 502.
+    // Unlike the chat path's OpenAIReliabilityGate (full retry + circuit
+    // breaker), TTS only needs a single cheap re-attempt — this mirrors the
+    // moderation adapter's minimal single-retry posture.
+    private const int MaxAttempts = 2;
+    private static readonly TimeSpan RetryBackoff = TimeSpan.FromMilliseconds(400);
+
     private readonly AudioClient _client;
     private readonly ILogger<OpenAITtsSynthesisService> _logger;
 
@@ -34,6 +43,31 @@ public sealed class OpenAITtsSynthesisService : IAudioSynthesisService
 
     public async Task<AudioSynthesisResult> SynthesizeArmenianAsync(
         string text, CancellationToken cancellationToken = default)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await SynthesizeOnceAsync(text, cancellationToken);
+            }
+            // Retry only a transient failure, and only when the CALLER did
+            // not cancel — an internal timeout fires the linked token while
+            // `cancellationToken` stays uncancelled, so this check cleanly
+            // separates "momentary blip" (retry) from "request aborted"
+            // (propagate). On the final attempt the filter is false, so the
+            // exception flows out to the controller's sanitized-502 catch.
+            catch (Exception ex) when (
+                attempt < MaxAttempts && !cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogWarning(ex,
+                    "OpenAI TTS attempt {Attempt} failed transiently; retrying once", attempt);
+                await Task.Delay(RetryBackoff, cancellationToken);
+            }
+        }
+    }
+
+    private async Task<AudioSynthesisResult> SynthesizeOnceAsync(
+        string text, CancellationToken cancellationToken)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(RequestTimeout);
