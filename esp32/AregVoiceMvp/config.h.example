@@ -142,9 +142,10 @@
 #ifndef AREG_EARCON_DURATION_MS
 #define AREG_EARCON_DURATION_MS 600
 #endif
-// Amplitude of the synthesized sine (0..32767). Keep gentle (< 2000).
+// Amplitude of the synthesized sine (0..32767). 8000 is audible over a
+// MAX98357A at default gain on a small speaker; drop it if it startles.
 #ifndef AREG_EARCON_AMPLITUDE
-#define AREG_EARCON_AMPLITUDE   1200
+#define AREG_EARCON_AMPLITUDE   8000
 #endif
 
 // S3: Thinking-bed tone played while the network fetch is in flight.
@@ -155,7 +156,7 @@
 #define AREG_THINKBED_PULSE_MS  500
 #endif
 #ifndef AREG_THINKBED_AMPLITUDE
-#define AREG_THINKBED_AMPLITUDE 700
+#define AREG_THINKBED_AMPLITUDE 5000
 #endif
 // Max thinking-bed pulses before hard-stopping (≈ read timeout / pulse ms).
 #ifndef AREG_THINKBED_MAX_PULSES
