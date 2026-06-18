@@ -2,6 +2,7 @@ using System.Text;
 using ArmenianAiToy.Api.Controllers;
 using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
 using ArmenianAiToy.Domain.Entities;
@@ -225,6 +226,28 @@ public class StoryQaControllerModerationTests
         await h.Moderation.DidNotReceiveWithAnyArgs().CheckContentAsync(default!);
         await h.AiChatClient.DidNotReceiveWithAnyArgs()
             .GetCompletionAsync(default!, default!);
+    }
+
+    // --- Garbled transcript -> ask the child to repeat (no GPT) ------
+
+    [Fact]
+    public async Task GarbledTranscript_AsksChildToRepeat_NeverCallsGpt()
+    {
+        var h = Create();
+        // Vowel-less consonant clusters across all tokens — a classic STT
+        // mistranscription that ArmenianVoiceReplyGuard flags as garbled.
+        WireTranscript(h, "քրռռռռ բխխխ");
+        h.Moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
+
+        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        // Child hears the reviewed clarification line, the story resumes.
+        Assert.IsType<StreamingAudioResult>(result);
+        await h.Synthesis.Received().SynthesizeArmenianAsync(
+            ArmenianVoiceReplyGuard.ClarificationResponse, Arg.Any<CancellationToken>());
+        // Noise is NOT sent to the answer model — no confidently-wrong answer.
+        await h.AiChatClient.DidNotReceiveWithAnyArgs().GetCompletionAsync(default!, default!);
     }
 
     // --- OUTPUT moderation on the spoken answer (P0 fix) -------------

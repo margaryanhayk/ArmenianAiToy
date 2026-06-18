@@ -250,6 +250,8 @@ public static class AppMeter
     ///   <item><c>answer_blocked</c> — the generated answer failed OUTPUT
     ///     moderation and was replaced by the safe fallback before TTS.</item>
     ///   <item><c>empty_transcript</c> — Whisper returned nothing.</item>
+    ///   <item><c>unclear</c> — the transcript looked garbled (likely STT
+    ///     mistranscription); the child was asked to repeat, no GPT call.</item>
     ///   <item><c>transient_failure</c> — STT / answer / TTS threw and the
     ///     child was served the spoken safe-fallback (the no-silence path).</item>
     /// </list>

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Application.Audio;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
 using ArmenianAiToy.Application.Telemetry;
@@ -169,6 +170,10 @@ public class StoryQaController : ControllerBase
         var userFlag = SafetyFlag.Clean;
         var assistantFlag = SafetyFlag.Clean;
         var turnOutcome = "answered";
+        // Only a model-authored answer needs OUTPUT moderation below; every
+        // canned/pre-reviewed line (empty / input-blocked / garbled / filter
+        // fallback) is already safe and skips that extra classifier call.
+        var answerIsModelAuthored = false;
         if (string.IsNullOrWhiteSpace(question))
         {
             answerText = StoryAnswerFilter.SafeFallback;
@@ -200,12 +205,26 @@ public class StoryQaController : ControllerBase
                 assistantFlag = SafetyFlag.Flagged;
                 turnOutcome = "moderation_blocked";
             }
+            else if (ArmenianVoiceReplyGuard.IsGarbledInput(question))
+            {
+                // Likely STT mistranscription (vowel-less clusters / repeated
+                // letters). Feeding noise to GPT yields a confidently-WRONG
+                // answer, so instead ask the child to repeat — the same
+                // reviewed line the text path uses. Clean flag: we are not
+                // blocking the child, just didn't catch them. The firmware
+                // auto-resumes the story and the child can barge in to re-ask.
+                answerText = ArmenianVoiceReplyGuard.ClarificationResponse;
+                turnOutcome = "unclear";
+                _logger.LogInformation(
+                    "Story-QA: garbled transcript for {StoryId}; asking the child to repeat", storyId);
+            }
             else
             {
                 try
                 {
                     var answer = await _questions.AnswerAsync(story, segmentIndex, question);
                     answerText = answer.Text;
+                    answerIsModelAuthored = !answer.UsedFallback;
                     turnOutcome = answer.UsedFallback ? "answer_fallback" : "answered";
                     _logger.LogInformation(
                         "Story-QA answered. Story: {StoryId}, Segment: {Segment}, UsedFallback: {Fallback}, Q: {Q}",
@@ -231,7 +250,7 @@ public class StoryQaController : ControllerBase
         // ChatService does. Skipped when the answer is already the canned
         // fallback (empty / input-blocked / filter-fallback paths): that text
         // is pre-reviewed and re-checking it only adds latency.
-        if (!string.Equals(answerText, StoryAnswerFilter.SafeFallback, StringComparison.Ordinal))
+        if (answerIsModelAuthored)
         {
             var outputModeration = await _moderation.CheckContentAsync(answerText);
             if (!outputModeration.IsSafe)
