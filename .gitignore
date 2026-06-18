@@ -47,3 +47,6 @@ tools/StoryModelBakeoff/results/
 
 # Generated offline SD content pack (audio artifacts — see tools/ContentPackBuilder)
 sd-content-pack/
+
+# Firmware secrets — copy config.h.example -> config.h and fill in locally.
+esp32/AregVoiceMvp/config.h

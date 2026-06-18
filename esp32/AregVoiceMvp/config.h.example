@@ -1,42 +1,41 @@
 // -------------------------------------------------------------
-// AregVoiceMvp / config.h
+// AregVoiceMvp / config.h.example  — TEMPLATE
 //
-// All compile-time constants for the C1 bench voice loop. Hardcoded
-// on purpose — provisioning UX, config files, NVS storage, and OTA
-// are explicitly out of scope for this slice.
+// Copy this file to `config.h` and fill in the five secret values
+// before the first flash. `config.h` is gitignored and MUST NOT be
+// committed (it holds Wi-Fi + device credentials). Keep all non-secret
+// defaults (pins / audio / timing / LED) in sync with this template.
 //
-// Fill in the four credential values before the first flash:
-//   - WIFI_SSID / WIFI_PASSWORD — your dev Wi-Fi
-//   - BACKEND_URL — your dev laptop's LAN address + port
+//   cp config.h.example config.h    # then edit the secrets below
+//
+// Secrets to fill in:
+//   - WIFI_SSID / WIFI_PASSWORD  — your dev Wi-Fi
+//   - BACKEND_URL host           — your dev laptop's LAN address + port
 //   - DEVICE_ID / DEVICE_API_KEY — returned from POST /api/devices/register
-//
-// Pin numbers below default to ESP32-S3-DevKitC-1 sensible choices.
-// Adjust if your wiring differs.
 // -------------------------------------------------------------
 #pragma once
 
 #include <Arduino.h>
 
-// --- Wi-Fi credentials ---------------------------------------
+// --- Wi-Fi credentials (SECRET — fill in) --------------------
 #ifndef AREG_WIFI_SSID
-#define AREG_WIFI_SSID          "OVIO_0114707"
+#define AREG_WIFI_SSID          "YOUR_WIFI_SSID"
 #endif
 #ifndef AREG_WIFI_PASSWORD
-#define AREG_WIFI_PASSWORD      "Katrin2018"
+#define AREG_WIFI_PASSWORD      "YOUR_WIFI_PASSWORD"
 #endif
 
-// --- Backend endpoint ----------------------------------------
-// Point this at your dev laptop on the same LAN. Plain HTTP is
-// fine on a bench LAN; TLS is a later-phase concern.
+// --- Backend endpoint (set host to your dev laptop's LAN IP) --
+// Plain HTTP is fine on a bench LAN; TLS is a later-phase concern.
 #ifndef AREG_BACKEND_URL
-#define AREG_BACKEND_URL        "http://192.168.1.8:5000/api/chat/audio"
+#define AREG_BACKEND_URL        "http://YOUR_LAN_IP:5000/api/chat/audio"
 #endif
 
 // Continuous story narration (pre-rendered, streamed). The device
 // streams this MP3 and decodes it on the fly; resume appends
 // "?from=<byteOffset>". Same host/port as the backend above.
 #ifndef AREG_STORY_AUDIO_URL
-#define AREG_STORY_AUDIO_URL    "http://192.168.1.8:5000/api/story-audio/anban-huri"
+#define AREG_STORY_AUDIO_URL    "http://YOUR_LAN_IP:5000/api/story-audio/anban-huri"
 #endif
 
 // Library story id (matches the path in AREG_STORY_AUDIO_URL); sent to
@@ -49,29 +48,27 @@
 // the WAV here as "?storyId=<id>&offset=<byteOffset>"; the response is
 // the spoken answer MP3. Device-auth headers ARE sent on this POST.
 #ifndef AREG_STORY_QA_URL
-#define AREG_STORY_QA_URL       "http://192.168.1.8:5000/api/chat/story-qa"
+#define AREG_STORY_QA_URL       "http://YOUR_LAN_IP:5000/api/chat/story-qa"
 #endif
 
 // Resume-offset correction. getPos() reports bytes the decoder has
 // CONSUMED, which runs ahead of what the speaker has actually played
 // (decoded audio still buffered in the I2S DMA when barge-in cuts it).
 // We resume from (getPos - this) so playback lands at — or slightly
-// before — the audible pause point. Erring slightly toward overlap
-// (re-hear a moment) is far better than skipping words. ~24 KB ≈ ~1 s
-// at the narration bitrate. Tune here if resume skips (raise) or
-// repeats too much (lower).
+// before — the audible pause point. ~24 KB ≈ ~1 s at the narration
+// bitrate. Tune if resume skips (raise) or repeats too much (lower).
 #ifndef AREG_STORY_RESUME_FUDGE_BYTES
 #define AREG_STORY_RESUME_FUDGE_BYTES 8192
 #endif
 
-// --- Device credentials --------------------------------------
+// --- Device credentials (SECRET — fill in) -------------------
 // Get these once via POST /api/devices/register against the backend.
 // See README.md "First-run provisioning" for the curl invocation.
 #ifndef AREG_DEVICE_ID
-#define AREG_DEVICE_ID          "8E1B6F80-B189-4301-9C61-52D6630E254E"
+#define AREG_DEVICE_ID          "YOUR_DEVICE_GUID"
 #endif
 #ifndef AREG_DEVICE_API_KEY
-#define AREG_DEVICE_API_KEY     "dtk_demo_local_only_do_not_distribute"
+#define AREG_DEVICE_API_KEY     "YOUR_DEVICE_API_KEY"
 #endif
 
 // --- Pin map (ESP32-S3-DevKitC-1 defaults) -------------------
@@ -138,48 +135,29 @@
 // UNVERIFIED — not compiled/flashed. All values are best-guess
 // for a 16 kHz / MAX98357A setup; tune on the bench.
 
-// S1: Thinking-earcon synthesized tone.
-//   Frequency of the soft "thinking" chime written directly to I2S.
-//   440 Hz = A4; lower values (e.g. 330 Hz) feel warmer on a small speaker.
-// HARDWARE ASSUMPTION: the MAX98357A accepts 16 kHz / 16-bit PCM from
-//   AudioOutputI2S at the rate set by AREG_SAMPLE_RATE_HZ.
+// S1: Thinking-earcon synthesized tone (soft "thinking" chime to I2S).
 #ifndef AREG_EARCON_FREQ_HZ
 #define AREG_EARCON_FREQ_HZ     440
 #endif
-// Duration of the synthesized earcon in milliseconds.
-// Keep <= 800 ms so it doesn't drag; the child needs to hear it reacted
-// before the server returns.
 #ifndef AREG_EARCON_DURATION_MS
 #define AREG_EARCON_DURATION_MS 600
 #endif
-// Amplitude of the synthesized sine (0..32767). Keep gentle (< 2000)
-// so it doesn't startle and the child understands it as a soft cue.
-// HARDWARE ASSUMPTION: amplitude below full scale avoids clipping on the
-//   MAX98357A's default gain strapping. Adjust with the GAIN pin.
+// Amplitude of the synthesized sine (0..32767). Keep gentle (< 2000).
 #ifndef AREG_EARCON_AMPLITUDE
 #define AREG_EARCON_AMPLITUDE   1200
 #endif
 
-// S3: Thinking-bed tone played while network fetch is in flight.
-//   Synthesized the same way as the earcon but at a lower pitch —
-//   acts as a soft "hmm, still thinking" pulse.
-// Frequency of the thinking-bed soft tone.
+// S3: Thinking-bed tone played while the network fetch is in flight.
 #ifndef AREG_THINKBED_FREQ_HZ
 #define AREG_THINKBED_FREQ_HZ   280
 #endif
-// Duration of one thinking-bed pulse (ms). The loop plays N of these
-// until the FreeRTOS upload task signals completion.
 #ifndef AREG_THINKBED_PULSE_MS
 #define AREG_THINKBED_PULSE_MS  500
 #endif
-// Amplitude of the thinking-bed tone (should be quieter than the earcon).
 #ifndef AREG_THINKBED_AMPLITUDE
 #define AREG_THINKBED_AMPLITUDE 700
 #endif
-// Maximum number of thinking-bed pulses before hard-stopping and waiting
-// for the upload task to complete anyway. Guards against a hung network call
-// lasting long enough to confuse the child (= AREG_HTTP_READ_MS / pulse ms +
-// a few extra). At 500 ms/pulse and 30 s read timeout: 70 pulses = 35 s cap.
+// Max thinking-bed pulses before hard-stopping (≈ read timeout / pulse ms).
 #ifndef AREG_THINKBED_MAX_PULSES
 #define AREG_THINKBED_MAX_PULSES 70
 #endif
