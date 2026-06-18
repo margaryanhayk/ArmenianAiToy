@@ -8,6 +8,7 @@ using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace ArmenianAiToy.Api.Controllers;
 
@@ -58,6 +59,10 @@ public class StoryQaController : ControllerBase
     private readonly LibraryStoryQuestionService _questions;
     private readonly IModerationService _moderation;
     private readonly IConversationService _conversations;
+    private readonly IDeviceService _deviceService;
+    private readonly CannedVoiceClips _canned;
+    private readonly OpenAICostMeter _costMeter;
+    private readonly IOptions<OpenAIDailyCostCapOptions> _costCapOptions;
     private readonly IWebHostEnvironment _env;
     private readonly IConfiguration _config;
     private readonly ILogger<StoryQaController> _logger;
@@ -69,6 +74,10 @@ public class StoryQaController : ControllerBase
         LibraryStoryQuestionService questions,
         IModerationService moderation,
         IConversationService conversations,
+        IDeviceService deviceService,
+        CannedVoiceClips canned,
+        OpenAICostMeter costMeter,
+        IOptions<OpenAIDailyCostCapOptions> costCapOptions,
         IWebHostEnvironment env,
         IConfiguration config,
         ILogger<StoryQaController> logger)
@@ -79,6 +88,10 @@ public class StoryQaController : ControllerBase
         _questions = questions;
         _moderation = moderation;
         _conversations = conversations;
+        _deviceService = deviceService;
+        _canned = canned;
+        _costMeter = costMeter;
+        _costCapOptions = costCapOptions;
         _env = env;
         _config = config;
         _logger = logger;
@@ -103,6 +116,49 @@ public class StoryQaController : ControllerBase
         // validated and stamped the device id — used to attach the
         // persisted Q&A turn to this device's conversation.
         var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
+
+        // Gate order pause > bedtime > mode — mirrors the C1 audio + text
+        // paths. A paused / bedtime-windowed / Story-disabled device must NOT
+        // incur paid STT+GPT+TTS, and parent policy ("paused means paused")
+        // must hold here too. Runs before the body is read, so a gated
+        // request costs nothing upstream and returns the same canned clip the
+        // C1 voice path uses.
+        if (await _deviceService.IsDevicePausedAsync(deviceId))
+        {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "paused"));
+            return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
+        }
+        if (await _deviceService.IsDeviceInBedtimeWindowAsync(deviceId, DateTime.UtcNow))
+        {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "bedtime"));
+            return await CannedResultAsync(CannedVoiceClips.BedtimeKey, cancellationToken);
+        }
+        if (!await _deviceService.IsModeEnabledForRequestAsync(deviceId, childId: null, DetectedMode.Story))
+        {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "mode_disabled"));
+            return await CannedResultAsync(CannedVoiceClips.ModeDisabledKey, cancellationToken);
+        }
+
+        // Per-device daily OpenAI cost cap — story-qa is the costliest path
+        // (STT + GPT + TTS), so it MUST be capped exactly like /api/chat/audio.
+        // Fires before STT so a runaway client cannot keep spending.
+        var costCapOpts = _costCapOptions.Value;
+        if (costCapOpts.Enabled)
+        {
+            var nowUtc = DateTime.UtcNow;
+            var cap = costCapOpts.CapForDevice(deviceId);
+            if (_costMeter.IsOverCap(deviceId, cap, nowUtc))
+            {
+                AppMeter.OpenAICostCapTrip.Add(1, new KeyValuePair<string, object?>("kind", "story_qa"));
+                if (_costMeter.ShouldLogCapTrip(deviceId, nowUtc))
+                {
+                    _logger.LogWarning(
+                        "OpenAI daily cost cap reached. DeviceId={DeviceId} Kind=story_qa CurrentEstimatedUsd={Current:F4} CapUsd={Cap:F4} UtcDate={Date:yyyy-MM-dd}",
+                        deviceId, _costMeter.GetCurrentTotal(deviceId, nowUtc), cap, nowUtc.Date);
+                }
+                return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
+            }
+        }
 
         // Where the child was when they barged in — used both to ground the
         // Q&A prompt and to pick that segment's re-anchor (recap) line.
@@ -298,6 +354,25 @@ public class StoryQaController : ControllerBase
             return await SpokenFailureResultAsync(cancellationToken);
         }
 
+        // Best-effort per-device cost recording (STT + GPT + answer TTS).
+        // Wrapped so an estimator bug can never break the turn; bridge/recap
+        // are cached after first render, so the answer TTS dominates here.
+        if (costCapOpts.Enabled)
+        {
+            try
+            {
+                var sttCost = OpenAICostEstimator.EstimateWhisperCostUsd(audioBytes.LongLength);
+                var chatCost = OpenAICostEstimator.EstimateChatCostUsd(question, answerText);
+                var ttsCost = OpenAICostEstimator.EstimateTtsCostUsd(answerText);
+                _costMeter.Record(deviceId, sttCost + chatCost + ttsCost, DateTime.UtcNow);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Story-QA cost-record failure (suppressed). DeviceId={DeviceId}", deviceId);
+            }
+        }
+
         // The answer is now fully GENERATED, VALIDATED (moderation +
         // StoryAnswerFilter/repair/fallback above), persisted, and
         // SYNTHESIZED. ONLY now do we begin emitting audio — and we stream it
@@ -431,6 +506,24 @@ public class StoryQaController : ControllerBase
             _logger.LogWarning(ex,
                 "Story-QA: turn persistence failed for Device {DeviceId}; continuing (child still hears the answer)",
                 deviceId);
+        }
+    }
+
+    /// <summary>Serves a canned voice clip (paused / bedtime / mode-disabled)
+    /// as 200 audio, mirroring the C1 voice path's gated responses. A clip
+    /// render failure collapses to the same sanitized 502.</summary>
+    private async Task<IActionResult> CannedResultAsync(string key, CancellationToken ct)
+    {
+        try
+        {
+            var clip = await _canned.GetAsync(key, ct);
+            return File(clip.Content, clip.MimeType);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Story-QA: canned clip render failure for key={Key}", key);
+            return StatusCode(502, new { error = "AI service unavailable. Please try again." });
         }
     }
 

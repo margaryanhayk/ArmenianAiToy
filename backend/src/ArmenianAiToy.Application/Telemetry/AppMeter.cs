@@ -217,9 +217,9 @@ public static class AppMeter
     /// <summary>
     /// Count of per-device daily OpenAI cost-cap trips
     /// (<c>OpenAICostMeter.IsOverCap</c> returned true ahead of a chat
-    /// or audio-chat request). Tag <c>kind</c> is one of <c>chat</c>
-    /// or <c>audio</c>. Bounded two-value enumeration — safe under
-    /// the no-high-cardinality invariant.
+    /// or audio-chat request). Tag <c>kind</c> is one of <c>chat</c>,
+    /// <c>audio</c>, or <c>story_qa</c> (the in-story voice Q&amp;A path).
+    /// Bounded enumeration — safe under the no-high-cardinality invariant.
     /// <para>
     /// Trips fire once per request, so a buggy client that hits the
     /// cap many times in one day produces many counter increments

@@ -3,6 +3,7 @@ using System.Text;
 using ArmenianAiToy.Api.Controllers;
 using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
 using ArmenianAiToy.Application.Telemetry;
@@ -13,6 +14,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -154,9 +156,18 @@ public class StoryVoiceMetricsTests
                 Arg.Any<Guid>(), Arg.Any<MessageRole>(), Arg.Any<string>(), Arg.Any<SafetyFlag>())
             .Returns(new Message { Id = Guid.NewGuid() });
 
+        // Not paused / not bedtime / Story enabled so the new gates pass.
+        var deviceService = Substitute.For<IDeviceService>();
+        deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
+        deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(false);
+        deviceService.IsModeEnabledForRequestAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), DetectedMode.Story)
+            .Returns(true);
+
         var controller = new StoryQaController(
             transcription, synthesis, new InMemoryCuratedStoryLibrary(),
             new LibraryStoryQuestionService(ai), moderation, conversations,
+            deviceService, new CannedVoiceClips(synthesis), new OpenAICostMeter(),
+            Options.Create(new OpenAIDailyCostCapOptions { Enabled = false }),
             Substitute.For<IWebHostEnvironment>(), new ConfigurationBuilder().Build(),
             Substitute.For<ILogger<StoryQaController>>());
 

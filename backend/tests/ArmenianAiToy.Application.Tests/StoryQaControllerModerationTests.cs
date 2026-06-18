@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -44,16 +45,19 @@ public class StoryQaControllerModerationTests
         IModerationService Moderation,
         IAiChatClient AiChatClient,
         IConversationService Conversations,
+        IDeviceService DeviceService,
+        OpenAICostMeter CostMeter,
         Guid DeviceId,
         Guid ConversationId);
 
-    private static Harness Create()
+    private static Harness Create(OpenAIDailyCostCapOptions? costCap = null)
     {
         var transcription = Substitute.For<IAudioTranscriptionService>();
         var synthesis = Substitute.For<IAudioSynthesisService>();
         var moderation = Substitute.For<IModerationService>();
         var aiChatClient = Substitute.For<IAiChatClient>();
         var conversations = Substitute.For<IConversationService>();
+        var deviceService = Substitute.For<IDeviceService>();
         var library = new InMemoryCuratedStoryLibrary();
         // Real question service over the substituted answer model, so we
         // can assert whether the GPT call happened from the controller's
@@ -67,6 +71,18 @@ public class StoryQaControllerModerationTests
         // recap) so composition succeeds without inspecting content.
         synthesis.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new AudioSynthesisResult(TtsMp3, "audio/mpeg"));
+
+        // Default: not paused, not in bedtime, Story mode enabled — so the
+        // gates pass and existing tests reach the Q&A flow unchanged.
+        deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
+        deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(false);
+        deviceService.IsModeEnabledForRequestAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), DetectedMode.Story)
+            .Returns(true);
+
+        var canned = new CannedVoiceClips(synthesis);
+        var costMeter = new OpenAICostMeter();
+        var costCapOptions = Options.Create(
+            costCap ?? new OpenAIDailyCostCapOptions { Enabled = false });
 
         var deviceId = Guid.NewGuid();
         var conversationId = Guid.NewGuid();
@@ -91,7 +107,8 @@ public class StoryQaControllerModerationTests
 
         var controller = new StoryQaController(
             transcription, synthesis, library, questions, moderation,
-            conversations, env, config, logger);
+            conversations, deviceService, canned, costMeter, costCapOptions,
+            env, config, logger);
 
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = deviceId;
@@ -102,7 +119,7 @@ public class StoryQaControllerModerationTests
 
         return new Harness(
             controller, transcription, synthesis, moderation, aiChatClient,
-            conversations, deviceId, conversationId);
+            conversations, deviceService, costMeter, deviceId, conversationId);
     }
 
     private static void WireTranscript(Harness h, string transcript) =>
@@ -280,6 +297,64 @@ public class StoryQaControllerModerationTests
             StoryAnswerFilter.SafeFallback, Arg.Any<CancellationToken>());
         await h.Synthesis.DidNotReceive().SynthesizeArmenianAsync(
             ModelAnswer, Arg.Any<CancellationToken>());
+    }
+
+    // --- Gates + daily cost cap (parent-trust + unbounded-cost fix) --
+
+    [Fact]
+    public async Task PausedDevice_ReturnsCannedClip_NoSttNoGpt()
+    {
+        var h = Create();
+        h.DeviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(true);
+
+        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        await h.Transcription.DidNotReceiveWithAnyArgs()
+            .TranscribeArmenianAsync(default!, default!, default, default, default);
+        await h.AiChatClient.DidNotReceiveWithAnyArgs().GetCompletionAsync(default!, default!);
+    }
+
+    [Fact]
+    public async Task BedtimeWindow_ReturnsCannedClip_NoStt()
+    {
+        var h = Create();
+        h.DeviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(true);
+
+        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        await h.Transcription.DidNotReceiveWithAnyArgs()
+            .TranscribeArmenianAsync(default!, default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task StoryModeDisabled_ReturnsCannedClip_NoStt()
+    {
+        var h = Create();
+        h.DeviceService.IsModeEnabledForRequestAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), DetectedMode.Story)
+            .Returns(false);
+
+        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        await h.Transcription.DidNotReceiveWithAnyArgs()
+            .TranscribeArmenianAsync(default!, default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task OverDailyCostCap_ReturnsCannedClip_NoSttNoGpt()
+    {
+        var h = Create(new OpenAIDailyCostCapOptions { Enabled = true });
+        // Push this device well over any sane cap for today.
+        h.CostMeter.Record(h.DeviceId, 999m, DateTime.UtcNow);
+
+        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        await h.Transcription.DidNotReceiveWithAnyArgs()
+            .TranscribeArmenianAsync(default!, default!, default, default, default);
+        await h.AiChatClient.DidNotReceiveWithAnyArgs().GetCompletionAsync(default!, default!);
     }
 
     // --- Gap 6: Whisper biasing with the current scene ---------------
@@ -548,9 +623,18 @@ public class StoryQaControllerModerationTests
                 Arg.Any<Guid>(), Arg.Any<MessageRole>(), Arg.Any<string>(), Arg.Any<SafetyFlag>())
             .Returns(new Message { Id = Guid.NewGuid() });
 
+        var deviceService = Substitute.For<IDeviceService>();
+        deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
+        deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(false);
+        deviceService.IsModeEnabledForRequestAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), DetectedMode.Story)
+            .Returns(true);
+        var costMeter = new OpenAICostMeter();
+
         var controller = new StoryQaController(
             transcription, synthesis, new InMemoryCuratedStoryLibrary(),
             new LibraryStoryQuestionService(aiChatClient), moderation, conversations,
+            deviceService, new CannedVoiceClips(synthesis), costMeter,
+            Options.Create(new OpenAIDailyCostCapOptions { Enabled = false }),
             Substitute.For<IWebHostEnvironment>(), config,
             Substitute.For<ILogger<StoryQaController>>());
 
@@ -563,7 +647,7 @@ public class StoryQaControllerModerationTests
         controller.ControllerContext = new ControllerContext { HttpContext = http };
 
         return new Harness(controller, transcription, synthesis, moderation,
-            aiChatClient, conversations, deviceId, Guid.NewGuid());
+            aiChatClient, conversations, deviceService, costMeter, deviceId, Guid.NewGuid());
     }
 
     /// <summary>DEFAULT behavior unchanged: with no
