@@ -200,7 +200,10 @@ public class StoryQaControllerModerationTests
         var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
 
         await ReadBodyAsync(result);
-        await h.Moderation.Received(1).CheckContentAsync(Arg.Any<string>());
+        // Moderation runs on the question (input); the answer is also output-
+        // moderated now, so this is "at least once" — the exact dual-call
+        // contract is pinned by UnsafeAnswer_IsOutputModerated_*.
+        await h.Moderation.Received().CheckContentAsync("Ո՞վ է փոքրիկ ամպիկը");
         await h.AiChatClient.ReceivedWithAnyArgs()
             .GetCompletionAsync(default!, default!);
     }
@@ -222,6 +225,38 @@ public class StoryQaControllerModerationTests
         await h.Moderation.DidNotReceiveWithAnyArgs().CheckContentAsync(default!);
         await h.AiChatClient.DidNotReceiveWithAnyArgs()
             .GetCompletionAsync(default!, default!);
+    }
+
+    // --- OUTPUT moderation on the spoken answer (P0 fix) -------------
+
+    [Fact]
+    public async Task UnsafeAnswer_IsOutputModerated_SpeaksFallback_NotTheAnswer()
+    {
+        var h = Create();
+        const string Question = "Ինչու էր ամպիկը տխուր";
+        // A model answer that PASSES StoryAnswerFilter (short Armenian, no
+        // markers/digits/unknown proper nouns) so it reaches output moderation.
+        const string ModelAnswer = "Նա շատ ուրախ էր այդ օրը։";
+        WireTranscript(h, Question);
+        // Input (question) safe; OUTPUT (answer) flagged by the classifier.
+        h.Moderation.CheckContentAsync(Question)
+            .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
+        h.Moderation.CheckContentAsync(ModelAnswer)
+            .Returns(new ModerationResult(IsSafe: false, FlaggedCategories: new List<string> { "violence" }));
+        h.AiChatClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(ModelAnswer);
+
+        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        // Still a normal (streamed) audio turn — never a 502/silence.
+        Assert.IsType<StreamingAudioResult>(result);
+        // The answer WAS run through output moderation...
+        await h.Moderation.Received(1).CheckContentAsync(ModelAnswer);
+        // ...and the child hears the safe fallback, NOT the flagged answer.
+        await h.Synthesis.Received().SynthesizeArmenianAsync(
+            StoryAnswerFilter.SafeFallback, Arg.Any<CancellationToken>());
+        await h.Synthesis.DidNotReceive().SynthesizeArmenianAsync(
+            ModelAnswer, Arg.Any<CancellationToken>());
     }
 
     // --- Gap 6: Whisper biasing with the current scene ---------------

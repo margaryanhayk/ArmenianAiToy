@@ -222,7 +222,30 @@ public class StoryQaController : ControllerBase
             }
         }
 
-        // Log the full Q&A pair (raw answer, pre-bridge) so it can be
+        // OUTPUT moderation on the spoken answer — mirrors the text path's
+        // output-moderation step. StoryAnswerFilter validates story-fidelity
+        // and format ONLY; it is NOT a safety classifier, and the bounded
+        // Q&A's word-meaning branch can produce model-authored real-world
+        // text. So the FINAL answer must clear the safety classifier before
+        // it is spoken — fail-closed to the canned safe fallback, exactly as
+        // ChatService does. Skipped when the answer is already the canned
+        // fallback (empty / input-blocked / filter-fallback paths): that text
+        // is pre-reviewed and re-checking it only adds latency.
+        if (!string.Equals(answerText, StoryAnswerFilter.SafeFallback, StringComparison.Ordinal))
+        {
+            var outputModeration = await _moderation.CheckContentAsync(answerText);
+            if (!outputModeration.IsSafe)
+            {
+                _logger.LogWarning(
+                    "Story-QA OUTPUT blocked. StoryId: {StoryId}, Segment: {Segment}, Categories: {Categories}",
+                    storyId, segmentIndex, string.Join(", ", outputModeration.FlaggedCategories));
+                answerText = StoryAnswerFilter.SafeFallback;
+                assistantFlag = SafetyFlag.Flagged;
+                turnOutcome = "answer_blocked";
+            }
+        }
+
+        // Log the full Q&A pair (post-moderation answer) so it can be
         // reviewed for Armenian quality by armenian-story-master.
         _logger.LogInformation(
             "Story-QA pair. StoryId: {StoryId} | Q: «{Question}» | A: «{Answer}»",
