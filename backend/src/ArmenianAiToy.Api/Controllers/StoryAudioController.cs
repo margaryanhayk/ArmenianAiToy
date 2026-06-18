@@ -103,6 +103,14 @@ public class StoryAudioController : ControllerBase
         // token-less caller. Unset key => open (dev/bench), opt-in posture.
         if (!IsTokenAccepted(storyId, token))
         {
+            // Wire response is the SAME 404 as an unknown story (concealment —
+            // external callers learn nothing). But log distinctly so an
+            // operator who has enabled StoryAudio:SigningKey can tell a
+            // rejected/expired/missing token apart from a genuinely unknown
+            // story when playback starts 404-ing.
+            _logger.LogWarning(
+                "Story-audio token rejected for {StoryId} (enforcement on; token missing/invalid/expired/wrong-story). Returning concealment 404.",
+                storyId);
             return NotFound(new { error = "Unknown story." });
         }
 
