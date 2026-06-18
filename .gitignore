@@ -44,3 +44,6 @@ backend/src/ArmenianAiToy.Api/story-audio-cache/
 # F1 — StoryModelBakeoff per-run side-by-side reports (slice 2 only;
 # scaffold ships empty). Local research output, not source.
 tools/StoryModelBakeoff/results/
+
+# Generated offline SD content pack (audio artifacts — see tools/ContentPackBuilder)
+sd-content-pack/
