@@ -59,6 +59,7 @@ public class StoryQaController : ControllerBase
     private readonly LibraryStoryQuestionService _questions;
     private readonly IModerationService _moderation;
     private readonly IConversationService _conversations;
+    private readonly IChildService _childService;
     private readonly IDeviceService _deviceService;
     private readonly CannedVoiceClips _canned;
     private readonly OpenAICostMeter _costMeter;
@@ -74,6 +75,7 @@ public class StoryQaController : ControllerBase
         LibraryStoryQuestionService questions,
         IModerationService moderation,
         IConversationService conversations,
+        IChildService childService,
         IDeviceService deviceService,
         CannedVoiceClips canned,
         OpenAICostMeter costMeter,
@@ -88,6 +90,7 @@ public class StoryQaController : ControllerBase
         _questions = questions;
         _moderation = moderation;
         _conversations = conversations;
+        _childService = childService;
         _deviceService = deviceService;
         _canned = canned;
         _costMeter = costMeter;
@@ -117,6 +120,14 @@ public class StoryQaController : ControllerBase
         // persisted Q&A turn to this device's conversation.
         var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
 
+        // Resolve the device's child the SAME way the text / C1-audio paths do
+        // (GetResponseAsync), so the per-child mode override applies to voice
+        // Q&A and the persisted turn is child-stamped instead of orphaned to
+        // childId=null. Null when the device has no child (then device-level
+        // flags decide, exactly as before).
+        var child = await _childService.GetDefaultChildForDeviceAsync(deviceId);
+        var childId = child?.Id;
+
         // Gate order pause > bedtime > mode — mirrors the C1 audio + text
         // paths. A paused / bedtime-windowed / Story-disabled device must NOT
         // incur paid STT+GPT+TTS, and parent policy ("paused means paused")
@@ -133,7 +144,7 @@ public class StoryQaController : ControllerBase
             AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "bedtime"));
             return await CannedResultAsync(CannedVoiceClips.BedtimeKey, cancellationToken);
         }
-        if (!await _deviceService.IsModeEnabledForRequestAsync(deviceId, childId: null, DetectedMode.Story))
+        if (!await _deviceService.IsModeEnabledForRequestAsync(deviceId, childId, DetectedMode.Story))
         {
             AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "mode_disabled"));
             return await CannedResultAsync(CannedVoiceClips.ModeDisabledKey, cancellationToken);
@@ -334,7 +345,7 @@ public class StoryQaController : ControllerBase
         if (!string.IsNullOrWhiteSpace(question))
         {
             await PersistTurnAsync(
-                deviceId, question, answerText, userFlag, assistantFlag, cancellationToken);
+                deviceId, childId, question, answerText, userFlag, assistantFlag, cancellationToken);
         }
 
         // Text → voice. Render the ANSWER on its own, then a calm pause,
@@ -488,13 +499,13 @@ public class StoryQaController : ControllerBase
     /// a persistence failure is logged but never denies the child the
     /// spoken answer — the safety record is the moderation log line.</summary>
     private async Task PersistTurnAsync(
-        Guid deviceId, string question, string answerText,
+        Guid deviceId, Guid? childId, string question, string answerText,
         SafetyFlag userFlag, SafetyFlag assistantFlag, CancellationToken ct)
     {
         try
         {
             var conversation = await _conversations.GetOrCreateActiveConversationAsync(
-                deviceId, childId: null);
+                deviceId, childId);
             await _conversations.AddMessageAsync(
                 conversation.Id, MessageRole.User, question, userFlag);
             await _conversations.AddMessageAsync(

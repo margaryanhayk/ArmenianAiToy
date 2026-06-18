@@ -157,6 +157,8 @@ public class StoryVoiceMetricsTests
             .Returns(new Message { Id = Guid.NewGuid() });
 
         // Not paused / not bedtime / Story enabled so the new gates pass.
+        var childService = Substitute.For<IChildService>();
+        childService.GetDefaultChildForDeviceAsync(Arg.Any<Guid>()).Returns((Child?)null);
         var deviceService = Substitute.For<IDeviceService>();
         deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
         deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(false);
@@ -166,7 +168,7 @@ public class StoryVoiceMetricsTests
         var controller = new StoryQaController(
             transcription, synthesis, new InMemoryCuratedStoryLibrary(),
             new LibraryStoryQuestionService(ai), moderation, conversations,
-            deviceService, new CannedVoiceClips(synthesis), new OpenAICostMeter(),
+            childService, deviceService, new CannedVoiceClips(synthesis), new OpenAICostMeter(),
             Options.Create(new OpenAIDailyCostCapOptions { Enabled = false }),
             Substitute.For<IWebHostEnvironment>(), new ConfigurationBuilder().Build(),
             Substitute.For<ILogger<StoryQaController>>());

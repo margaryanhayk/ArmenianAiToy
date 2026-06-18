@@ -45,6 +45,7 @@ public class StoryQaControllerModerationTests
         IModerationService Moderation,
         IAiChatClient AiChatClient,
         IConversationService Conversations,
+        IChildService ChildService,
         IDeviceService DeviceService,
         OpenAICostMeter CostMeter,
         Guid DeviceId,
@@ -57,6 +58,8 @@ public class StoryQaControllerModerationTests
         var moderation = Substitute.For<IModerationService>();
         var aiChatClient = Substitute.For<IAiChatClient>();
         var conversations = Substitute.For<IConversationService>();
+        var childService = Substitute.For<IChildService>();
+        childService.GetDefaultChildForDeviceAsync(Arg.Any<Guid>()).Returns((Child?)null);
         var deviceService = Substitute.For<IDeviceService>();
         var library = new InMemoryCuratedStoryLibrary();
         // Real question service over the substituted answer model, so we
@@ -107,7 +110,7 @@ public class StoryQaControllerModerationTests
 
         var controller = new StoryQaController(
             transcription, synthesis, library, questions, moderation,
-            conversations, deviceService, canned, costMeter, costCapOptions,
+            conversations, childService, deviceService, canned, costMeter, costCapOptions,
             env, config, logger);
 
         var httpContext = new DefaultHttpContext();
@@ -119,7 +122,7 @@ public class StoryQaControllerModerationTests
 
         return new Harness(
             controller, transcription, synthesis, moderation, aiChatClient,
-            conversations, deviceService, costMeter, deviceId, conversationId);
+            conversations, childService, deviceService, costMeter, deviceId, conversationId);
     }
 
     private static void WireTranscript(Harness h, string transcript) =>
@@ -340,6 +343,32 @@ public class StoryQaControllerModerationTests
         Assert.IsType<FileContentResult>(result);
         await h.Transcription.DidNotReceiveWithAnyArgs()
             .TranscribeArmenianAsync(default!, default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task PerChildStoryOverrideOff_GatesVoiceQa_NoStt()
+    {
+        // The device's default child has Story forced OFF (per-child override).
+        // The voice Q&A path must honor it — previously it passed childId:null
+        // and the override silently never applied.
+        var h = Create();
+        var childId = Guid.NewGuid();
+        h.ChildService.GetDefaultChildForDeviceAsync(Arg.Any<Guid>())
+            .Returns(new Child { Id = childId, DeviceId = h.DeviceId, Name = "Անի" });
+        // Device-level Story enabled, but the CHILD override disables it.
+        h.DeviceService.IsModeEnabledForRequestAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), DetectedMode.Story)
+            .Returns(true);
+        h.DeviceService.IsModeEnabledForRequestAsync(h.DeviceId, childId, DetectedMode.Story)
+            .Returns(false);
+
+        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        await h.Transcription.DidNotReceiveWithAnyArgs()
+            .TranscribeArmenianAsync(default!, default!, default, default, default);
+        // The gate was evaluated with the resolved child id, not null.
+        await h.DeviceService.Received()
+            .IsModeEnabledForRequestAsync(h.DeviceId, childId, DetectedMode.Story);
     }
 
     [Fact]
@@ -623,6 +652,8 @@ public class StoryQaControllerModerationTests
                 Arg.Any<Guid>(), Arg.Any<MessageRole>(), Arg.Any<string>(), Arg.Any<SafetyFlag>())
             .Returns(new Message { Id = Guid.NewGuid() });
 
+        var childService = Substitute.For<IChildService>();
+        childService.GetDefaultChildForDeviceAsync(Arg.Any<Guid>()).Returns((Child?)null);
         var deviceService = Substitute.For<IDeviceService>();
         deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
         deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(false);
@@ -633,7 +664,7 @@ public class StoryQaControllerModerationTests
         var controller = new StoryQaController(
             transcription, synthesis, new InMemoryCuratedStoryLibrary(),
             new LibraryStoryQuestionService(aiChatClient), moderation, conversations,
-            deviceService, new CannedVoiceClips(synthesis), costMeter,
+            childService, deviceService, new CannedVoiceClips(synthesis), costMeter,
             Options.Create(new OpenAIDailyCostCapOptions { Enabled = false }),
             Substitute.For<IWebHostEnvironment>(), config,
             Substitute.For<ILogger<StoryQaController>>());
@@ -647,7 +678,7 @@ public class StoryQaControllerModerationTests
         controller.ControllerContext = new ControllerContext { HttpContext = http };
 
         return new Harness(controller, transcription, synthesis, moderation,
-            aiChatClient, conversations, deviceService, costMeter, deviceId, Guid.NewGuid());
+            aiChatClient, conversations, childService, deviceService, costMeter, deviceId, Guid.NewGuid());
     }
 
     /// <summary>DEFAULT behavior unchanged: with no
