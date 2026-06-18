@@ -76,6 +76,44 @@ foreach (var story in library.ListAvailable())
     }
 }
 
+// ── Optional: render a single DRAFT story file's offline clips
+//    (--draft <path-to-.story.json>). Produces exactly the three clips the
+//    screenless-selection + post-story design needs — announce (title),
+//    conclusion (reflectionText), question-N (reflectionQuestions) — WITHOUT
+//    adding the draft to the runtime library. Used for the owner-recorded
+//    anban-huri listen test. When set, ONLY the draft is rendered (the
+//    library items above are dropped) so no unintended paid renders happen.
+var draftPath = GetOptionValue(args, "--draft");
+if (draftPath is not null)
+{
+    items.Clear();
+    using var draftDoc = JsonDocument.Parse(File.ReadAllText(draftPath));
+    var draftRoot = draftDoc.RootElement;
+    var draftId = draftRoot.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "draft" : "draft";
+    if (draftRoot.TryGetProperty("title", out var titleEl) && titleEl.GetString() is { Length: > 0 } title)
+    {
+        items.Add(MakeItem(draftId, "announce", title));
+    }
+    if (draftRoot.TryGetProperty("reflectionText", out var reflEl) && reflEl.GetString() is { Length: > 0 } refl)
+    {
+        items.Add(MakeItem(draftId, "conclusion", refl));
+    }
+    if (draftRoot.TryGetProperty("reflectionQuestions", out var qsEl) && qsEl.ValueKind == JsonValueKind.Array)
+    {
+        var qi = 0;
+        foreach (var q in qsEl.EnumerateArray())
+        {
+            if (q.GetString() is { Length: > 0 } qt)
+            {
+                items.Add(MakeItem(draftId, $"question-{qi}", qt));
+            }
+            qi++;
+        }
+    }
+    Console.WriteLine($"DRAFT mode: {draftPath} → {items.Count} clip(s) [{string.Join(", ", items.Select(i => i.Label))}]");
+    Console.WriteLine();
+}
+
 // ── Render safety gate: --render without --confirm-paid-api fails fast
 //    BEFORE any client construction or network access.
 if (render && !confirmPaid)
