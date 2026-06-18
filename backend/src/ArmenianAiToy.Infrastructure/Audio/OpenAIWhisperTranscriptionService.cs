@@ -18,9 +18,20 @@ namespace ArmenianAiToy.Infrastructure.Audio;
 /// dependency, no new auth config — reuses <c>OpenAI:ApiKey</c>.
 /// </para>
 /// </summary>
-public sealed class OpenAIWhisperTranscriptionService : IAudioTranscriptionService
+// Not sealed: the TranscribeOnceAsync seam below is overridden by tests to
+// script transient failures without a network call (mirrors OpenAIModerationAdapter).
+public class OpenAIWhisperTranscriptionService : IAudioTranscriptionService
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
+
+    // One retry on a transient failure (timeout / socket abort / upstream
+    // 5xx), mirroring the TTS adapter's minimal single-retry posture. STT
+    // had ZERO resilience before this — a momentary blip surfaced to the
+    // child as the spoken safe-fallback. Not routed through the chat path's
+    // OpenAIReliabilityGate (full retry + circuit breaker): a single cheap
+    // re-attempt is the right weight for the voice path.
+    private const int MaxAttempts = 2;
+    private static readonly TimeSpan RetryBackoff = TimeSpan.FromMilliseconds(400);
 
     private readonly AudioClient _client;
     private readonly ILogger<OpenAIWhisperTranscriptionService> _logger;
@@ -69,6 +80,43 @@ public sealed class OpenAIWhisperTranscriptionService : IAudioTranscriptionServi
         Stream audio, string contentType, string? prompt,
         CancellationToken cancellationToken = default, string? model = null)
     {
+        // Buffer the audio ONCE so a retry can re-send it: the SDK consumes
+        // the stream per attempt and an inbound stream may not be seekable.
+        byte[] audioBytes;
+        using (var buffer = new MemoryStream())
+        {
+            await audio.CopyToAsync(buffer, cancellationToken);
+            audioBytes = buffer.ToArray();
+        }
+
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await TranscribeOnceAsync(audioBytes, contentType, prompt, model, cancellationToken);
+            }
+            // Retry only a transient failure, and only when the CALLER did not
+            // cancel (an internal timeout fires the linked token while
+            // `cancellationToken` stays uncancelled). On the final attempt the
+            // filter is false, so the exception flows to the controller's
+            // sanitized spoken-fallback catch. Mirrors the TTS adapter.
+            catch (Exception ex) when (
+                attempt < MaxAttempts && !cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogWarning(ex,
+                    "OpenAI Whisper attempt {Attempt} failed transiently; retrying once", attempt);
+                await Task.Delay(RetryBackoff, cancellationToken);
+            }
+        }
+    }
+
+    /// <summary>One transcription attempt. <c>protected virtual</c> so tests
+    /// can script transient failures without touching the network (mirrors
+    /// the moderation adapter's seam).</summary>
+    protected virtual async Task<string> TranscribeOnceAsync(
+        byte[] audioBytes, string contentType, string? prompt, string? model,
+        CancellationToken cancellationToken)
+    {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(RequestTimeout);
 
@@ -88,7 +136,8 @@ public sealed class OpenAIWhisperTranscriptionService : IAudioTranscriptionServi
             options.Prompt = prompt;
         }
 
-        var result = await client.TranscribeAudioAsync(audio, filename, options, cts.Token);
+        using var attemptStream = new MemoryStream(audioBytes, writable: false);
+        var result = await client.TranscribeAudioAsync(attemptStream, filename, options, cts.Token);
         var text = result.Value?.Text ?? string.Empty;
         _logger.LogInformation(
             "Whisper transcription completed: bytes_hint={FilenameHint} chars={TranscriptChars} biased={Biased} model={Model}",
