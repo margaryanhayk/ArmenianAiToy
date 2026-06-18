@@ -391,24 +391,56 @@ static size_t record_question() {
 //                     stays, and the next button press resumes it.
 // Reaching the natural end resets to the beginning.
 static void handle_story_session() {
+    // Story-audio access token (gap 1). UNVERIFIED — not compiled/flashed.
+    // When the backend has StoryAudio:SigningKey set, the header-less
+    // /api/story-audio stream requires ?token=. Fetch it once per session
+    // (TTL ~1 h >> a story). Empty/false when enforcement is OFF → we stream
+    // without a token, which is correct in that case.
+    static char story_token[256];
+    bool have_token = voice_fetch_story_audio_token(
+        AREG_STORY_ID, story_token, sizeof(story_token));
+    bool token_retry_used = false;
+
     bool active = true;
     while (active) {
-        char url[320];
+        // Room for the base URL + ?from=<u32> + &token=<opaque>.
+        char url[640];
         if (s_story_offset > 0) {
-            snprintf(url, sizeof(url), "%s?from=%u",
-                     AREG_STORY_AUDIO_URL, (unsigned)s_story_offset);
-            Serial.printf("[story] play from byte %u\n", (unsigned)s_story_offset);
+            snprintf(url, sizeof(url), "%s?from=%u%s%s",
+                     AREG_STORY_AUDIO_URL, (unsigned)s_story_offset,
+                     have_token ? "&token=" : "", have_token ? story_token : "");
+            Serial.printf("[story] play from byte %u (token=%d)\n",
+                          (unsigned)s_story_offset, have_token ? 1 : 0);
         } else {
-            snprintf(url, sizeof(url), "%s", AREG_STORY_AUDIO_URL);
-            Serial.println("[story] play from beginning");
+            snprintf(url, sizeof(url), "%s%s%s",
+                     AREG_STORY_AUDIO_URL,
+                     have_token ? "?token=" : "", have_token ? story_token : "");
+            Serial.printf("[story] play from beginning (token=%d)\n", have_token ? 1 : 0);
         }
         Serial.flush();
 
         transition_to(ST_PLAYING);
         audio_speaker_begin();
         uint32_t resume_offset = 0;
+        const uint32_t play_started_ms = millis();
         const bool interrupted = audio_play_story_stream(
             url, s_story_offset, story_barge_in_poll, &resume_offset);
+        const uint32_t played_ms = millis() - play_started_ms;
+
+        // Token-rejection recovery (UNVERIFIED heuristic): a curated story
+        // plays for minutes, so a near-instant non-interrupted return WHILE a
+        // token is in use almost always means the stream open hit the
+        // concealment 404 (token expired / rejected). Re-fetch the token ONCE
+        // and retry the same position before treating it as the natural end.
+        // Tune the threshold on the bench.
+        if (!interrupted && have_token && !token_retry_used && played_ms < 1500) {
+            Serial.println("[story] instant return with a token — re-fetching token, retrying once");
+            Serial.flush();
+            token_retry_used = true;
+            have_token = voice_fetch_story_audio_token(
+                AREG_STORY_ID, story_token, sizeof(story_token));
+            continue;  // retry from the same s_story_offset
+        }
 
         if (!interrupted) {
             s_story_offset = 0;
@@ -417,6 +449,7 @@ static void handle_story_session() {
             break;
         }
         s_story_offset = resume_offset;
+        token_retry_used = false;  // a real segment played; allow a fresh retry later
 
         // Barge-in: capture the question while the button stays held.
         transition_to(ST_RECORDING);

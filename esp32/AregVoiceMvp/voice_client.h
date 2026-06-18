@@ -68,6 +68,16 @@ VoiceTurnResult voice_continue_turn();
 // to call even if the last upload failed.
 void voice_release_last_response();
 
+// Fetches a story-audio access token from the backend (device-authed GET to
+// /api/chat/story-audio-token?storyId=<id>; the URL is derived from
+// AREG_BACKEND_URL, so no extra config constant is needed). Writes the token
+// into out_token (capacity out_cap) and returns true on HTTP 200 with a
+// non-null token. Returns false when enforcement is OFF (the backend returns
+// token: null) OR on any error — the caller then streams WITHOUT a token,
+// which is the correct behavior while StoryAudio:SigningKey is unset.
+// UNVERIFIED — not compiled or flashed.
+bool voice_fetch_story_audio_token(const char *story_id, char *out_token, size_t out_cap);
+
 // ---------------------------------------------------------------
 // Async Q&A upload (S3 dead-air mitigation)
 // UNVERIFIED — not compiled/flashed. See HARDENING-INTEGRATION.md §2.
