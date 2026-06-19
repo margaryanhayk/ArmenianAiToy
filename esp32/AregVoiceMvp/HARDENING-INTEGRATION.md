@@ -37,7 +37,31 @@ default) the stream stays open and the *current firmware keeps working
 unchanged*. The firmware change below is only required before an operator
 sets the signing key. **Do the firmware change first, then flip the key.**
 
-### Firmware change 🔧
+### Firmware change — IMPLEMENTED (unverified) ✅🔧⚠️
+
+> Landed in `voice_client.h/.cpp` (`voice_fetch_story_audio_token`) and
+> `AregVoiceMvp.ino` (`handle_story_session`). **UNVERIFIED — not compiled or
+> flashed.** What shipped vs the original sketch below:
+> - **No new config constant.** The token URL is DERIVED from `AREG_BACKEND_URL`
+>   (`.../api/chat/audio` → `.../api/chat/story-audio-token`), so the operator
+>   doesn't have to add a key to the now-untracked `config.h`.
+> - **Token fetched once per session** at the top of `handle_story_session`
+>   (TTL ~1 h ≫ a story) and appended as `?token=` / `&token=` on the
+>   from-start and `?from=` resume URLs (`url[]` bumped to 640).
+> - **404 recovery via heuristic, not HTTP status:** `audio_play_story_stream`
+>   does not surface the HTTP code, so instead a near-instant
+>   (< 1500 ms) non-interrupted return *while a token is in use* triggers a
+>   single token re-fetch + retry of the same position. Tune the threshold on
+>   the bench; a cleaner future version would have the stream report the open
+>   status directly.
+> - Minimal manual JSON parse (no ArduinoJson). `token: null` (enforcement off)
+>   → false → stream without a token.
+>
+> **On-device verification still required:** confirm playback works with a key
+> set; confirm the retry fires on an expired token; confirm the derived URL is
+> correct for your `AREG_BACKEND_URL`.
+
+The original sketch (superseded by the above):
 
 **`config.h`** — the URLs already exist; nothing new needed there, but note
 the token is fetched at runtime (not a compile-time constant).

@@ -58,6 +58,78 @@ void voice_release_last_response() {
     }
 }
 
+// -------------------------------------------------------------
+// Story-audio access token (gap 1). UNVERIFIED — not compiled/flashed.
+//
+// The header-less GET /api/story-audio stream requires ?token= when the
+// backend has StoryAudio:SigningKey set. We fetch a short-lived signed
+// token from the device-authed /api/chat/story-audio-token endpoint. The
+// URL is derived from AREG_BACKEND_URL (".../api/chat/audio" ->
+// ".../api/chat/story-audio-token") so there is no new config constant to
+// keep in sync. A null token (enforcement off) or any error returns false,
+// and the caller streams without a token — correct while the key is unset.
+// -------------------------------------------------------------
+bool voice_fetch_story_audio_token(const char *story_id, char *out_token, size_t out_cap) {
+    if (out_token == nullptr || out_cap == 0) {
+        return false;
+    }
+    out_token[0] = '\0';
+    if (story_id == nullptr || !voice_wifi_is_connected()) {
+        return false;
+    }
+
+    String tokenUrl = AREG_BACKEND_URL;
+    tokenUrl.replace("/api/chat/audio", "/api/chat/story-audio-token");
+    tokenUrl += "?storyId=";
+    tokenUrl += story_id;
+
+    HTTPClient http;
+    if (!http.begin(tokenUrl)) {
+        return false;
+    }
+    http.addHeader("X-Device-Id", AREG_DEVICE_ID);
+    http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+    http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
+    http.setTimeout(AREG_HTTP_READ_MS);
+
+    const int status = http.GET();
+    if (status != 200) {
+        Serial.printf("[token] story-audio-token GET status=%d\n", status);
+        Serial.flush();
+        http.end();
+        return false;
+    }
+    String body = http.getString();
+    http.end();
+
+    // Minimal parse of {"token":"<opaque>",...} or {"token":null,...}. No
+    // ArduinoJson dependency — the body is tiny and the token is a base64url
+    // string ('.'-separated, no embedded quotes).
+    int tk = body.indexOf("\"token\"");
+    if (tk < 0) {
+        return false;
+    }
+    int colon = body.indexOf(':', tk);
+    if (colon < 0) {
+        return false;
+    }
+    int p = colon + 1;
+    while (p < (int)body.length() && (body.charAt(p) == ' ' || body.charAt(p) == '\t')) {
+        p++;
+    }
+    if (p >= (int)body.length() || body.charAt(p) != '"') {
+        // "token": null → enforcement is off; stream without a token.
+        return false;
+    }
+    int start = p + 1;
+    int end = body.indexOf('"', start);
+    if (end <= start || (size_t)(end - start) >= out_cap) {
+        return false;
+    }
+    body.substring(start, end).toCharArray(out_token, out_cap);
+    return out_token[0] != '\0';
+}
+
 // Reads an already-confirmed-200 response body in full into a fresh
 // PSRAM buffer and records the X-Areg-Continue header. Leaves `http`
 // open for the caller to end(). Returns true on a fully-buffered body;

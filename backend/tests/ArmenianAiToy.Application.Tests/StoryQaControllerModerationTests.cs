@@ -131,31 +131,20 @@ public class StoryQaControllerModerationTests
                 Arg.Any<CancellationToken>(), Arg.Any<string?>())
             .Returns(transcript);
 
-    /// <summary>Materializes the response body to bytes whether the controller
-    /// returned the buffered failure-clip result (<see cref="FileContentResult"/>)
-    /// or the happy-path streaming result (<see cref="StreamingAudioResult"/>).
-    /// Confirms the response is 200 audio/mpeg either way.</summary>
-    private static async Task<byte[]> ReadBodyAsync(IActionResult result)
+    /// <summary>Materializes the buffered audio response body to bytes and
+    /// confirms it is a 200 audio/mpeg <see cref="FileContentResult"/> (the
+    /// story-qa response is buffered with a Content-Length so the firmware can
+    /// read it; a streamed/chunked variant was reverted).</summary>
+    private static Task<byte[]> ReadBodyAsync(IActionResult result)
     {
         switch (result)
         {
             case FileContentResult file:
                 Assert.Equal("audio/mpeg", file.ContentType);
-                return file.FileContents;
-            case StreamingAudioResult streaming:
-            {
-                var http = new DefaultHttpContext();
-                using var body = new MemoryStream();
-                http.Response.Body = body;
-                await streaming.ExecuteResultAsync(
-                    new ActionContext { HttpContext = http });
-                Assert.Equal(200, http.Response.StatusCode);
-                Assert.Equal("audio/mpeg", http.Response.ContentType);
-                return body.ToArray();
-            }
+                return Task.FromResult(file.FileContents);
             default:
                 Assert.Fail($"Unexpected result type {result.GetType().Name}");
-                return [];
+                return Task.FromResult<byte[]>([]);
         }
     }
 
@@ -263,7 +252,7 @@ public class StoryQaControllerModerationTests
         var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
 
         // Child hears the reviewed clarification line, the story resumes.
-        Assert.IsType<StreamingAudioResult>(result);
+        Assert.IsType<FileContentResult>(result);
         await h.Synthesis.Received().SynthesizeArmenianAsync(
             ArmenianVoiceReplyGuard.ClarificationResponse, Arg.Any<CancellationToken>());
         // Noise is NOT sent to the answer model — no confidently-wrong answer.
@@ -292,7 +281,7 @@ public class StoryQaControllerModerationTests
         var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
 
         // Still a normal (streamed) audio turn — never a 502/silence.
-        Assert.IsType<StreamingAudioResult>(result);
+        Assert.IsType<FileContentResult>(result);
         // The answer WAS run through output moderation...
         await h.Moderation.Received(1).CheckContentAsync(ModelAnswer);
         // ...and the child hears the safe fallback, NOT the flagged answer.
@@ -537,16 +526,15 @@ public class StoryQaControllerModerationTests
 
     // --- PART B: streamed answer audio (backward-compatible) ----------
 
-    /// <summary>The happy path now returns a chunked
-    /// <see cref="StreamingAudioResult"/> (audio/mpeg, status 200) rather
-    /// than a buffered <see cref="FileContentResult"/>. The core PART B
-    /// guarantee: the FIRST bytes on the wire are the already-VALIDATED
-    /// answer's audio (never raw GPT tokens), and the tail clips (pause +
-    /// bridge) follow — so the streamed body is strictly longer than the
-    /// answer alone. A client that buffers the whole body still gets the
-    /// full clip (backward-compatible).</summary>
+    /// <summary>The happy path returns a BUFFERED <see cref="FileContentResult"/>
+    /// (audio/mpeg, with a Content-Length so the firmware can size its receive
+    /// buffer — a streamed/chunked variant was reverted). The body is the
+    /// canonical <c>ComposeAnswerWithPause(answer, bridge, recap)</c>: the
+    /// VALIDATED answer first, then the pause, then the return bridge — so it
+    /// starts with the answer and is strictly longer. LittleCloud has no
+    /// recap, so that slot is null.</summary>
     [Fact]
-    public async Task SafeTranscript_StreamsValidatedAnswerFirst_ThenTail()
+    public async Task SafeAnswer_BufferedBody_IsAnswerThenPauseThenBridge()
     {
         var h = Create();
         WireTranscript(h, "Ո՞վ է փոքրիկ ամպիկը");
@@ -554,76 +542,31 @@ public class StoryQaControllerModerationTests
             .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
         h.AiChatClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns("Փոքրիկ ամպիկը երկնքի ընկերն է։");
-
         // Distinct bytes per synthesized text so we can locate the answer
-        // portion in the streamed body. The answer text is whatever passed
-        // the filter (GPT answer or the safe fallback) — both are VALIDATED
-        // before any audio byte is produced.
+        // portion (the answer text is whatever passed the filter — both the
+        // GPT answer and the safe fallback are VALIDATED before synthesis).
         h.Synthesis.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(ci => new AudioSynthesisResult(
                 Encoding.UTF8.GetBytes("TTS::" + ci.ArgAt<string>(0)), "audio/mpeg"));
 
         var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
 
-        // Backward-compatible: streamed, 200, audio/mpeg, full body buffers fine.
-        var streaming = Assert.IsType<StreamingAudioResult>(result);
-        var body = await ReadBodyAsync(streaming);
-        Assert.NotEmpty(body);
+        // Buffered (Content-Length set) so HTTPClient.getSize() on the device works.
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("audio/mpeg", file.ContentType);
+        var body = file.FileContents;
 
-        // The validated answer (the FIRST synthesis call) is the START of the
-        // body, and the body is strictly longer (the pause + bridge tail
-        // follows it), confirming answer-first streaming with the tail behind.
-        var answerText = (string)h.Synthesis.ReceivedCalls()
-            .First(c => c.GetMethodInfo().Name == nameof(IAudioSynthesisService.SynthesizeArmenianAsync))
-            .GetArguments()[0]!;
-        var answerBytes = Encoding.UTF8.GetBytes("TTS::" + answerText);
-        Assert.True(body.AsSpan().StartsWith(answerBytes),
-            "the validated answer audio must be the first bytes on the wire");
-        Assert.True(body.Length > answerBytes.Length,
-            "the pause + bridge tail must follow the answer in the body");
-    }
-
-    /// <summary>The streamed body is byte-identical (bytes + order) to the
-    /// canonical buffered composition
-    /// <c>ComposeAnswerWithPause(answer, bridge, recap)</c> built from the
-    /// SAME answer + bridge clips — i.e. WHAT the child hears is unchanged;
-    /// only WHEN the bytes start flowing differs. Resilient to the process-
-    /// static bridge cache: we read back the exact answer and bridge bytes
-    /// the controller actually streamed rather than re-synthesizing.</summary>
-    [Fact]
-    public async Task StreamedBody_IsByteIdentical_ToBufferedComposition()
-    {
-        var h = Create();
-        const string AnswerInput = "Փոքրիկ ամպիկը երկնքի ընկերն է։";
-        WireTranscript(h, "Ո՞վ է փոքրիկ ամպիկը");
-        h.Moderation.CheckContentAsync(Arg.Any<string>())
-            .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
-        h.AiChatClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
-            .Returns(AnswerInput);
-        h.Synthesis.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(ci => new AudioSynthesisResult(
-                Encoding.UTF8.GetBytes("TTS::" + ci.ArgAt<string>(0)), "audio/mpeg"));
-
-        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
-        var body = await ReadBodyAsync(Assert.IsType<StreamingAudioResult>(result));
-
-        // The answer that was spoken (first synthesis call) — used to derive
-        // the answer clip. The bridge clip is recovered from the body itself
-        // (everything after answer + pause), making the reference robust to
-        // whatever the cross-test bridge cache contains.
         var spokenAnswer = (string)h.Synthesis.ReceivedCalls()
             .First(c => c.GetMethodInfo().Name == nameof(IAudioSynthesisService.SynthesizeArmenianAsync))
             .GetArguments()[0]!;
         var answer = Encoding.UTF8.GetBytes("TTS::" + spokenAnswer);
+        Assert.True(body.AsSpan().StartsWith(answer), "answer audio must be first");
+        Assert.True(body.Length > answer.Length, "pause + bridge must follow the answer");
 
-        // Reconstruct pause length the same way the controller does, then the
-        // bridge is the remainder of the body. LittleCloud has no recap, so
-        // the recap slot is null in both the body and the reference.
+        // Full body equals the canonical composition (answer + pause + bridge).
         var pauseBytes = await PauseByteCountAsync(h);
         var bridge = body[(answer.Length + pauseBytes)..];
-
-        var expected = h.Controller.ComposeAnswerWithPause(answer, bridge, recap: null);
-        Assert.Equal(expected, body);
+        Assert.Equal(h.Controller.ComposeAnswerWithPause(answer, bridge, recap: null), body);
     }
 
     /// <summary>Reconstructs the controller's silence-pause byte count via a

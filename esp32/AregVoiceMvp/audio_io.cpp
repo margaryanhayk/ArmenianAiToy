@@ -506,6 +506,13 @@ bool audio_play_thinking_earcon() {
     // HARDWARE ASSUMPTION: SetBitsPerSample(16) is the default; not
     // calling it explicitly here to match audio_play_mp3_buffer style.
     out.SetGain(0.6f);
+    // The synth path MUST set the I2S sample rate. The MP3 path gets it from
+    // the decoder (mp3.begin → out.SetRate); without it here the channel runs
+    // at ESP8266Audio's default 44.1 kHz, so the 16 kHz-generated tone is
+    // clocked ~2.75x too fast — mis-paced and inaudible — and synth_write_tone
+    // returns almost instantly (which is why the thinking-bed loop spins,
+    // spamming earcon_begin/earcon_end). Setting the rate fixes both.
+    out.SetRate(AREG_SAMPLE_RATE_HZ);
     if (!out.begin()) {
         Serial.println("[audio] earcon: out.begin() failed");
         Serial.flush();

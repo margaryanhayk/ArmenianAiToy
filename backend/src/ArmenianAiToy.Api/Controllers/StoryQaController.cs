@@ -384,80 +384,54 @@ public class StoryQaController : ControllerBase
             }
         }
 
-        // The answer is now fully GENERATED, VALIDATED (moderation +
-        // StoryAnswerFilter/repair/fallback above), persisted, and
-        // SYNTHESIZED. ONLY now do we begin emitting audio — and we stream it
-        // so the child starts hearing the validated answer immediately,
-        // instead of waiting ~7-8s for the whole answer+pause+bridge+recap
-        // clip to be assembled and transmitted. We NEVER stream raw GPT
-        // tokens; only the already-validated answer's audio plus the fixed
-        // pause/bridge/recap clips flow over the wire.
+        // The answer is fully GENERATED, VALIDATED (moderation +
+        // StoryAnswerFilter/repair/fallback above), persisted, and SYNTHESIZED.
+        // Compose answer + calm pause + return-to-story bridge (+ recap) into
+        // ONE buffered MP3 and return it with a Content-Length.
         //
-        // Wire bytes are IDENTICAL and in the SAME ORDER as the previous
-        // buffered ComposeAnswerWithPause(answer, bridge, recap) output:
-        // answer → N silence units → bridge → [breath + recap]. A client
-        // that buffers the full body (today's firmware) gets exactly the
-        // same result; a client that plays as it receives gets early audio.
-        var bridgeIndex = (int)((uint)Interlocked.Increment(ref _bridgeRotation) % ReturnToStoryBridges.Length);
-        var includeRecap = ShouldIncludeRecap(answerText);
-        var recapText = includeRecap
-            ? LibraryStoryQuestionService.GetSegmentRecap(storyId, segmentIndex)
-            : null;
-
+        // NOTE: a streamed/chunked response was REVERTED here. The firmware
+        // sizes its receive buffer from HTTPClient.getSize() (Content-Length);
+        // a chunked body reports -1, so the device dropped the answer and
+        // played nothing. The device buffers the whole body before decoding
+        // anyway, so streaming bought no on-device latency — only this bug.
         RecordTurn(turnOutcome);
 
-        // The turn outcome is already metered above (the validated answer is
-        // produced); writing the tail clips is best-effort and never changes
-        // the recorded outcome, mirroring the previous buffered behavior
-        // (bridge failure → answer only; recap failure → drop recap).
-        async Task WriteSpokenAsync(Stream body, CancellationToken ct)
+        byte[] bridgeAudio;
+        try
         {
-            // 1) The validated answer — flushed first so playback can begin.
-            await body.WriteAsync(answerTts.Content, ct);
-            await body.FlushAsync(ct);
+            var bridgeIndex = (int)((uint)Interlocked.Increment(ref _bridgeRotation) % ReturnToStoryBridges.Length);
+            bridgeAudio = await GetBridgeAudioAsync(bridgeIndex, cancellationToken);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            // Bridge render failed: still give the child the answer (with a
+            // Content-Length) rather than nothing.
+            _logger.LogWarning(ex, "Story-QA: bridge TTS failure for {StoryId}; returning answer only", storyId);
+            return File(answerTts.Content, answerTts.MimeType);
+        }
 
-            // 2) The calm pause (whole silence units), 3) the return-to-story
-            //    bridge. A bridge render failure degrades to "answer only":
-            //    the answer is already on the wire, so we just stop.
-            byte[] bridgeAudio;
-            try
-            {
-                bridgeAudio = await GetBridgeAudioAsync(bridgeIndex, ct);
-            }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "Story-QA: bridge TTS failure for {StoryId}; answer only", storyId);
-                return;
-            }
-
-            await WriteSilenceUnitsAsync(body, PauseRepeats(), ct);
-            await body.WriteAsync(bridgeAudio, ct);
-            await body.FlushAsync(ct);
-
-            // 4) Tier 2 recap after a short breath — best-effort: a recap
-            //    render failure just drops the recap, never the answer/bridge.
+        byte[]? recapAudio = null;
+        if (ShouldIncludeRecap(answerText))
+        {
+            var recapText = LibraryStoryQuestionService.GetSegmentRecap(storyId, segmentIndex);
             if (!string.IsNullOrWhiteSpace(recapText))
             {
                 try
                 {
-                    var recapAudio = await GetRecapAudioAsync(storyId, segmentIndex, recapText!, ct);
-                    await WriteSilenceUnitsAsync(body, 1, ct); // a short breath
-                    await body.WriteAsync(recapAudio, ct);
-                    await body.FlushAsync(ct);
+                    recapAudio = await GetRecapAudioAsync(storyId, segmentIndex, recapText!, cancellationToken);
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex,
-                        "Story-QA: recap TTS failed for {StoryId} seg {Segment}; skipping recap",
-                        storyId, segmentIndex);
+                        "Story-QA: recap TTS failed for {StoryId} seg {Segment}; skipping recap", storyId, segmentIndex);
                 }
             }
         }
 
-        return new StreamingAudioResult(answerTts.MimeType, WriteSpokenAsync);
+        var spoken = ComposeAnswerWithPause(answerTts.Content, bridgeAudio, recapAudio);
+        return File(spoken, answerTts.MimeType);
     }
 
     /// <summary>Number of whole silence units to emit between the answer and
@@ -475,21 +449,6 @@ public class StoryQaController : ControllerBase
         return unit.Length == 0
             ? 0
             : Math.Clamp((int)Math.Round(pauseMs / (double)SilenceUnitMs), 0, 16);
-    }
-
-    /// <summary>Writes the embedded silence unit <paramref name="count"/>
-    /// times (the same bytes <see cref="ComposeAnswerWithPause"/> concatenates).</summary>
-    private static async Task WriteSilenceUnitsAsync(Stream body, int count, CancellationToken ct)
-    {
-        var unit = LoadSilenceUnit();
-        if (unit.Length == 0)
-        {
-            return;
-        }
-        for (var i = 0; i < count; i++)
-        {
-            await body.WriteAsync(unit, ct);
-        }
     }
 
     /// <summary>Records the child's question + Areg's answer as a User /
@@ -702,13 +661,11 @@ public class StoryQaController : ControllerBase
 
     /// <summary>
     /// Composes answer + N silence units + bridge (+ a short beat + recap,
-    /// when present) into one 24 kHz mono MP3 byte stream — the canonical
-    /// byte ORDER the streamed response (the <c>WriteSpokenAsync</c> local in
-    /// <see cref="Ask"/>) writes incrementally. Retained as the single
-    /// reference for that order and reused by tests that assert the streamed
-    /// body is byte-identical to the previously-buffered composition. Pause
-    /// length is <c>StoryQa:AnswerBridgePauseMs</c> (default 1200 ms), rounded
-    /// to a whole number of silence units and capped so it can't run away.
+    /// when present) into one 24 kHz mono MP3 byte buffer, returned by
+    /// <see cref="Ask"/> as a <c>File(...)</c> with a Content-Length so the
+    /// firmware can size its receive buffer. Pause length is
+    /// <c>StoryQa:AnswerBridgePauseMs</c> (default 1200 ms), rounded to a whole
+    /// number of silence units and capped so it can't run away.
     /// </summary>
     internal byte[] ComposeAnswerWithPause(byte[] answer, byte[] bridge, byte[]? recap)
     {
@@ -845,41 +802,5 @@ public class StoryQaController : ControllerBase
         {
             return [];
         }
-    }
-}
-
-/// <summary>
-/// A chunked (no Content-Length) audio response that writes its body via a
-/// caller-supplied async writer. The in-story Q&amp;A path uses it to push
-/// the already-validated answer's audio onto the wire immediately, then the
-/// pause + bridge (+ recap), so the child starts hearing the answer without
-/// waiting for the whole clip to be assembled and transmitted.
-/// <para>
-/// BACKWARD-COMPATIBLE: the bytes (and their order) are exactly what the
-/// previous buffered <c>File(ComposeAnswerWithPause(...))</c> returned, just
-/// flushed incrementally. A client that buffers the entire response body
-/// (today's firmware) reconstructs the identical clip; a client that plays as
-/// it receives gets early audio. Content-Type stays <c>audio/mpeg</c>.
-/// </para>
-/// </summary>
-public sealed class StreamingAudioResult : IActionResult
-{
-    private readonly string _contentType;
-    private readonly Func<Stream, CancellationToken, Task> _writeBody;
-
-    public StreamingAudioResult(string contentType, Func<Stream, CancellationToken, Task> writeBody)
-    {
-        _contentType = contentType;
-        _writeBody = writeBody;
-    }
-
-    public async Task ExecuteResultAsync(ActionContext context)
-    {
-        var response = context.HttpContext.Response;
-        response.StatusCode = StatusCodes.Status200OK;
-        response.ContentType = _contentType;
-        // No Content-Length → Kestrel uses chunked transfer-encoding, so the
-        // first flushed bytes leave the server before the tail is assembled.
-        await _writeBody(response.Body, context.HttpContext.RequestAborted);
     }
 }
