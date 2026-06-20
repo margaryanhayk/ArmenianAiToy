@@ -53,6 +53,28 @@ public class StoryQaController : ControllerBase
         "Իսկ հիմա վերադառնանք այնտեղ, որտեղ կանգ առանք։",
     ];
 
+    // Warm post-story acknowledgement lines, spoken after the child answers
+    // Areg's reflection question (then a calm pause, then the fixed close
+    // below). ROTATED so a child doesn't hear the identical line each story.
+    // These AFFIRM ENGAGEMENT, never correctness — we never tell a 4-7 year
+    // old their answer was right or wrong. Produced DETERMINISTICALLY (never by
+    // GPT): a model paraphrase would drift into grading («ճիշտ պատասխանեցիր»),
+    // breaking that rule. All five + the close validated by
+    // armenian-story-master (2026-06-20).
+    private static readonly string[] ReflectionAcknowledgements =
+    [
+        "Ապրե՛ս, շատ լավ մտածեցիր։",
+        "Շնորհակալ եմ, որ պատասխանեցիր։ Շատ լավ էր։",
+        "Ի՜նչ ուշադիր ես լսել հեքիաթը։ Ապրե՛ս։",
+        "Շնորհակալ եմ քո պատասխանի համար։ Ուրախ եմ, որ միասին լսեցինք։",
+        "Քո խոսքերը շատ հաճելի էին։ Ապրե՛ս, փոքրի՛կս։",
+    ];
+
+    // Fixed gentle close, spoken after the (rotated) acknowledgement with a
+    // calm pause between. Also spoken ALONE when the child's answer is blocked
+    // or empty — a warm goodbye that never affirms flagged/absent content.
+    private const string ReflectionClose = "Հիմա հանգստացի՛ր, փոքրիկ ընկեր։";
+
     private readonly IAudioTranscriptionService _transcription;
     private readonly IAudioSynthesisService _synthesis;
     private readonly ICuratedStoryLibrary _library;
@@ -434,6 +456,208 @@ public class StoryQaController : ControllerBase
         return File(spoken, answerTts.MimeType);
     }
 
+    /// <summary>
+    /// Post-story reflection answer. After the narration + conclusion + the
+    /// reflection question have played (the conclusion + question ship on the
+    /// offline SD pack — see ContentPackBuilder), the child speaks their answer
+    /// and the firmware POSTs that audio here. Areg replies with a warm,
+    /// rotated acknowledgement + a gentle close — affirming that the child
+    /// engaged, NEVER grading the answer right or wrong.
+    ///
+    /// Connectivity is required only for STT (transcribing the child) and the
+    /// safety record; the spoken reply is a pre-approved DETERMINISTIC line
+    /// (no GPT), so there is no answer-model surface here at all — and thus no
+    /// output-moderation step. Same gate chain, cost-cap, input moderation,
+    /// persistence, and buffered (Content-Length) response shape as
+    /// <see cref="Ask"/>.
+    /// </summary>
+    [HttpPost("reflection-answer")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(502)]
+    public async Task<IActionResult> AnswerReflection(
+        [FromQuery] string storyId,
+        [FromQuery] int questionIndex = 0,
+        CancellationToken cancellationToken = default)
+    {
+        var story = _library.GetById(storyId);
+        if (story is null
+            || questionIndex < 0
+            || questionIndex >= story.ReflectionQuestions.Count)
+        {
+            // Uniform 404 — no existence leak across unknown story vs bad index.
+            return NotFound(new { error = "Unknown story or question." });
+        }
+
+        var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
+        var child = await _childService.GetDefaultChildForDeviceAsync(deviceId);
+        var childId = child?.Id;
+
+        // Gate chain pause > bedtime > Story-mode, identical to Ask(): a paused
+        // / bedtime / Story-disabled device must not incur paid STT and gets
+        // the same canned clip the rest of the voice path returns.
+        if (await _deviceService.IsDevicePausedAsync(deviceId))
+        {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "paused"));
+            return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
+        }
+        if (await _deviceService.IsDeviceInBedtimeWindowAsync(deviceId, DateTime.UtcNow))
+        {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "bedtime"));
+            return await CannedResultAsync(CannedVoiceClips.BedtimeKey, cancellationToken);
+        }
+        if (!await _deviceService.IsModeEnabledForRequestAsync(deviceId, childId, DetectedMode.Story))
+        {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "mode_disabled"));
+            return await CannedResultAsync(CannedVoiceClips.ModeDisabledKey, cancellationToken);
+        }
+
+        // Daily cost cap — cheaper than Ask() (STT only; ack + close TTS are
+        // cached after first render), but STT still costs, so cap it the same.
+        var costCapOpts = _costCapOptions.Value;
+        if (costCapOpts.Enabled)
+        {
+            var nowUtc = DateTime.UtcNow;
+            var cap = costCapOpts.CapForDevice(deviceId);
+            if (_costMeter.IsOverCap(deviceId, cap, nowUtc))
+            {
+                AppMeter.OpenAICostCapTrip.Add(1, new KeyValuePair<string, object?>("kind", "story_qa"));
+                return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
+            }
+        }
+
+        var inboundContentType = Request.ContentType;
+        if (string.IsNullOrWhiteSpace(inboundContentType))
+            inboundContentType = "audio/wav";
+
+        using var audioBuffer = new MemoryStream();
+        await Request.Body.CopyToAsync(audioBuffer, cancellationToken);
+        if (audioBuffer.Length == 0)
+        {
+            return BadRequest(new { error = "Audio body is required" });
+        }
+        var audioBytes = audioBuffer.ToArray();
+
+        var turnStopwatch = Stopwatch.StartNew();
+        void RecordTurn(string outcome)
+        {
+            turnStopwatch.Stop();
+            AppMeter.StoryQaDuration.Record(turnStopwatch.Elapsed.TotalSeconds);
+            AppMeter.StoryQaTurn.Add(1, new KeyValuePair<string, object?>("outcome", outcome));
+        }
+
+        // Voice → text (Whisper, Armenian). Bias with the reflection question
+        // the child is answering. The transcript is used ONLY for the safety
+        // record + the parent dashboard — the spoken reply does NOT depend on
+        // its content (it is a fixed warm line), so STT accuracy is not
+        // load-bearing here.
+        string answer;
+        try
+        {
+            using var sttStream = new MemoryStream(audioBytes, writable: false);
+            answer = await _transcription.TranscribeArmenianAsync(
+                sttStream, inboundContentType!, story.ReflectionQuestions[questionIndex],
+                cancellationToken, model: null);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Reflection: STT failure for story {StoryId}", storyId);
+            RecordTurn("transient_failure");
+            return await SpokenFailureResultAsync(cancellationToken);
+        }
+
+        // Input moderation on the child's answer (same fail-closed contract as
+        // Ask()). A blocked or empty answer still gets a warm goodbye, but we do
+        // NOT speak an affirming line over flagged/absent content — only the
+        // neutral close — and we record the flag for the parent dashboard.
+        var userFlag = SafetyFlag.Clean;
+        var assistantFlag = SafetyFlag.Clean;
+        var affirm = true;
+        var outcome = "reflection_answered";
+        if (string.IsNullOrWhiteSpace(answer))
+        {
+            affirm = false;
+            outcome = "reflection_empty";
+        }
+        else
+        {
+            var inputModeration = await _moderation.CheckContentAsync(answer);
+            if (!inputModeration.IsSafe)
+            {
+                _logger.LogWarning(
+                    "Reflection input blocked. StoryId: {StoryId}, Categories: {Categories}",
+                    storyId, string.Join(", ", inputModeration.FlaggedCategories));
+                affirm = false;
+                userFlag = SafetyFlag.Blocked;
+                assistantFlag = SafetyFlag.Flagged;
+                outcome = "reflection_blocked";
+            }
+        }
+
+        // Compose the spoken reply from PRE-APPROVED cached clips: a rotated
+        // acknowledgement (only when affirming) + a calm pause + the fixed
+        // close. No model-authored child-facing text → no output-moderation
+        // surface. The chosen ack line is captured so the persisted assistant
+        // text matches exactly what was spoken.
+        string? ackLineText = null;
+        byte[] spoken;
+        try
+        {
+            var closeAudio = await GetReflectionCloseAudioAsync(cancellationToken);
+            if (affirm)
+            {
+                var ackIndex = (int)((uint)Interlocked.Increment(ref _reflectionAckRotation)
+                    % ReflectionAcknowledgements.Length);
+                ackLineText = ReflectionAcknowledgements[ackIndex];
+                var ackAudio = await GetReflectionAckAudioAsync(ackIndex, cancellationToken);
+                spoken = ComposeAnswerWithPause(ackAudio, closeAudio, null);
+            }
+            else
+            {
+                spoken = closeAudio;
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Reflection: clip render failure for {StoryId}", storyId);
+            RecordTurn("transient_failure");
+            return await SpokenFailureResultAsync(cancellationToken);
+        }
+
+        // Persist the turn (child answer + the spoken reply text) for the parent
+        // dashboard + retention, mirroring Ask(). Nothing to persist for an
+        // empty transcript.
+        if (!string.IsNullOrWhiteSpace(answer))
+        {
+            var assistantText = ackLineText is null
+                ? ReflectionClose
+                : ackLineText + " " + ReflectionClose;
+            await PersistTurnAsync(
+                deviceId, childId, answer, assistantText, userFlag, assistantFlag, cancellationToken);
+        }
+
+        // Best-effort per-device cost recording (STT only — ack/close TTS are
+        // cached). Wrapped so an estimator bug can never break the turn.
+        if (costCapOpts.Enabled)
+        {
+            try
+            {
+                var sttCost = OpenAICostEstimator.EstimateWhisperCostUsd(audioBytes.LongLength);
+                _costMeter.Record(deviceId, sttCost, DateTime.UtcNow);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Reflection cost-record failure (suppressed). DeviceId={DeviceId}", deviceId);
+            }
+        }
+
+        RecordTurn(outcome);
+        return File(spoken, "audio/mpeg");
+    }
+
     /// <summary>Number of whole silence units to emit between the answer and
     /// the bridge — <c>StoryQa:AnswerBridgePauseMs</c> (default 1200 ms)
     /// rounded to the nearest unit and capped, matching the buffered
@@ -568,6 +792,13 @@ public class StoryQaController : ControllerBase
     // fixed per story segment, so each costs at most one TTS call.
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> _recapAudios = new();
 
+    // Cached post-story reflection clips — the acknowledgement lines and the
+    // close are fixed, so each costs at most one TTS call regardless of
+    // traffic. Rendered under _bridgeLock (same pattern as the bridges).
+    private static readonly byte[]?[] _reflectionAckAudios = new byte[]?[ReflectionAcknowledgements.Length];
+    private static byte[]? _reflectionCloseAudio;
+    private static int _reflectionAckRotation = -1;
+
     /// <summary>Renders one return-to-story bridge (by index) and caches it
     /// for the process lifetime — the lines are fixed, so each costs at most
     /// one TTS call regardless of traffic.</summary>
@@ -628,6 +859,55 @@ public class StoryQaController : ControllerBase
                 _recapAudios[key] = cached;
             }
             return cached;
+        }
+        finally
+        {
+            _bridgeLock.Release();
+        }
+    }
+
+    /// <summary>Renders one reflection acknowledgement (by index) and caches
+    /// it for the process lifetime — the lines are fixed, so each costs at most
+    /// one TTS call regardless of traffic.</summary>
+    private async Task<byte[]> GetReflectionAckAudioAsync(int index, CancellationToken ct)
+    {
+        if (_reflectionAckAudios[index] is { } cached)
+        {
+            return cached;
+        }
+        await _bridgeLock.WaitAsync(ct);
+        try
+        {
+            if (_reflectionAckAudios[index] is null)
+            {
+                var rendered = await _synthesis.SynthesizeArmenianAsync(ReflectionAcknowledgements[index], ct);
+                _reflectionAckAudios[index] = rendered.Content;
+            }
+            return _reflectionAckAudios[index]!;
+        }
+        finally
+        {
+            _bridgeLock.Release();
+        }
+    }
+
+    /// <summary>Renders the fixed reflection close line once and caches it for
+    /// the process lifetime.</summary>
+    private async Task<byte[]> GetReflectionCloseAudioAsync(CancellationToken ct)
+    {
+        if (_reflectionCloseAudio is { } cached)
+        {
+            return cached;
+        }
+        await _bridgeLock.WaitAsync(ct);
+        try
+        {
+            if (_reflectionCloseAudio is null)
+            {
+                var rendered = await _synthesis.SynthesizeArmenianAsync(ReflectionClose, ct);
+                _reflectionCloseAudio = rendered.Content;
+            }
+            return _reflectionCloseAudio!;
         }
         finally
         {
