@@ -147,7 +147,10 @@ const tabs = {
   },
   async stories(){
     const s = (await api('/stories')).stories;
-    main.innerHTML = table([
+    const active = s.filter(x=>x.isDefault).length;
+    main.innerHTML = `<div class="msg info">${active} active story (served on the device) · ${s.length} in the library
+      (the rest are built-in sample stories).</div>` + table([
+      {h:'',f:r=>r.isDefault?'<span class="pill on">default</span>':'<span class="mut">sample</span>'},
       {h:'Id',f:r=>`<span class="mono">${esc(r.id)}</span>`},
       {h:'Title',f:r=>esc(r.title)},
       {h:'Ages',f:r=>`${r.minAge}–${r.maxAge}`},

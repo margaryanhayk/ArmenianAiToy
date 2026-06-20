@@ -9,6 +9,7 @@ using ArmenianAiToy.Domain.Enums;
 using ArmenianAiToy.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using NSubstitute;
 
 namespace ArmenianAiToy.Application.Tests;
@@ -28,10 +29,12 @@ public class InternalControllerTests
             .Options);
 
     private static InternalController NewController(
-        AppDbContext db, IAiChatClient? ai = null, IModerationService? moderation = null) =>
+        AppDbContext db, IAiChatClient? ai = null, IModerationService? moderation = null,
+        IConfiguration? config = null) =>
         new(db, new InMemoryCuratedStoryLibrary(), new OpenAICostMeter(),
             new LibraryStoryQuestionService(ai ?? Substitute.For<IAiChatClient>()),
-            moderation ?? SafeModeration());
+            moderation ?? SafeModeration(),
+            config ?? new ConfigurationBuilder().Build());
 
     private static IModerationService SafeModeration()
     {
@@ -181,6 +184,23 @@ public class InternalControllerTests
         var json = Json(result);
         // The in-memory curated library always carries little-cloud.
         Assert.Contains(InMemoryCuratedStoryLibrary.LittleCloudId, json);
+    }
+
+    [Fact]
+    public void Stories_MarksConfiguredDefault()
+    {
+        var db = NewDb();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new[]
+        {
+            new KeyValuePair<string, string?>("Story:DefaultStoryId", InMemoryCuratedStoryLibrary.LittleCloudId),
+        }).Build();
+        var result = NewController(db, config: config).Stories();
+        using var doc = JsonDocument.Parse(Json(result));
+        var arr = doc.RootElement.GetProperty("stories");
+        Assert.Equal(InMemoryCuratedStoryLibrary.LittleCloudId, arr[0].GetProperty("id").GetString()); // default sorts first
+        Assert.True(arr[0].GetProperty("isDefault").GetBoolean());
+        for (var i = 1; i < arr.GetArrayLength(); i++)
+            Assert.False(arr[i].GetProperty("isDefault").GetBoolean());
     }
 
     // ── Story-QA tuning playground (Phase 2) ───────────────────────

@@ -5,6 +5,7 @@ using ArmenianAiToy.Domain.Enums;
 using ArmenianAiToy.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 
 namespace ArmenianAiToy.Api.Controllers;
@@ -48,16 +49,19 @@ public class InternalController : ControllerBase
     private readonly OpenAICostMeter _costMeter;
     private readonly LibraryStoryQuestionService _questions;
     private readonly IModerationService _moderation;
+    private readonly IConfiguration _config;
 
     public InternalController(
         AppDbContext db, ICuratedStoryLibrary library, OpenAICostMeter costMeter,
-        LibraryStoryQuestionService questions, IModerationService moderation)
+        LibraryStoryQuestionService questions, IModerationService moderation,
+        IConfiguration config)
     {
         _db = db;
         _library = library;
         _costMeter = costMeter;
         _questions = questions;
         _moderation = moderation;
+        _config = config;
     }
 
     /// <summary>System-wide counts + today's activity + total in-process
@@ -180,6 +184,11 @@ public class InternalController : ControllerBase
     [HttpGet("stories")]
     public IActionResult Stories()
     {
+        // The story actually served on the bench / by the device, from
+        // Story:DefaultStoryId. The other library entries are built-in samples;
+        // marking the default makes "the one active story" unmistakable without
+        // hiding the curated catalog.
+        var defaultId = _config["Story:DefaultStoryId"];
         var rows = _library.ListAvailable().Select(s => new AdminStoryDto(
             Id: s.Id,
             Title: s.Title,
@@ -189,7 +198,11 @@ public class InternalController : ControllerBase
             Segments: s.Segments.Count,
             BedtimeSafe: s.BedtimeSafe,
             HasReflectionText: !string.IsNullOrWhiteSpace(s.ReflectionText),
-            ReflectionQuestions: s.ReflectionQuestions.Count))
+            ReflectionQuestions: s.ReflectionQuestions.Count,
+            IsDefault: !string.IsNullOrEmpty(defaultId)
+                && string.Equals(s.Id, defaultId, StringComparison.OrdinalIgnoreCase)))
+            .OrderByDescending(s => s.IsDefault)
+            .ThenBy(s => s.Title, StringComparer.Ordinal)
             .ToList();
         return Ok(new { stories = rows });
     }

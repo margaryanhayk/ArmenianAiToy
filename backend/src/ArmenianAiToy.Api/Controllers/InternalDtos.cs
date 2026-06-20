@@ -74,7 +74,8 @@ public sealed record AdminStoryDto(
     int Segments,
     bool BedtimeSafe,
     bool HasReflectionText,
-    int ReflectionQuestions);
+    int ReflectionQuestions,
+    bool IsDefault);
 
 public sealed record AdminFlaggedMessageDto(
     Guid Id,
