@@ -60,6 +60,7 @@
   <a data-tab="flagged">Flagged</a>
   <a data-tab="conversations">Conversations</a>
   <a data-tab="audit">Audit</a>
+  <a data-tab="tuning">Tuning</a>
 </nav>
 <main id="main">
   <div class="msg info">Enter the admin token and press Connect. The console is read-only.</div>
@@ -81,6 +82,17 @@ async function api(path){
   const r = await fetch('/api/internal'+path, { headers: { 'Authorization': 'Bearer '+TOKEN } });
   if (r.status === 404) throw new Error('404 — invalid token, or the console is not enabled (set Internal:AdminToken on the backend).');
   if (!r.ok) throw new Error('HTTP '+r.status);
+  return r.json();
+}
+
+async function apiPost(path, body){
+  const r = await fetch('/api/internal'+path, {
+    method:'POST',
+    headers:{ 'Authorization':'Bearer '+TOKEN, 'Content-Type':'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (r.status === 404) throw new Error('404 — invalid token, or the console is not enabled.');
+  if (!r.ok){ let m='HTTP '+r.status; try{ const j=await r.json(); if(j && j.error) m=j.error; }catch{} throw new Error(m); }
   return r.json();
 }
 
@@ -176,7 +188,50 @@ const tabs = {
       {h:'Metadata',f:r=>r.metadata?`<code class="mono">${esc(JSON.stringify(r.metadata))}</code>`:'<span class="mut">—</span>'},
     ], e);
   },
+  async tuning(){
+    const s = (await api('/stories')).stories;
+    const opts = s.map(x=>`<option value="${esc(x.id)}">${esc(x.title)} — ${esc(x.id)} (${x.segments} seg)</option>`).join('');
+    main.innerHTML = `
+      <div class="msg info">Type a child's question and see Areg's <b>bounded</b> answer through the real pipeline
+        (input moderation → GPT → answer filter → repair → fallback → output moderation). Text only — no TTS, nothing saved.
+        <b>Calls OpenAI (costs credits).</b></div>
+      <div class="row">
+        <select id="tStory">${opts}</select>
+        <label class="mut">segment <input id="tSeg" type="text" value="0" style="width:60px"></label>
+        <button id="tAsk">Ask Areg</button>
+      </div>
+      <textarea id="tQ" placeholder="Type a child question in Armenian, e.g. «Ի՞նչ գտավ Հուռին գետում»…"
+        style="width:100%;min-height:70px;background:#0c1116;border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:8px;font:inherit"></textarea>
+      <div id="tOut"></div>`;
+    $('#tAsk').addEventListener('click', askTuning);
+    $('#tQ').addEventListener('keydown', ev=>{ if(ev.key==='Enter' && (ev.ctrlKey||ev.metaKey)) askTuning(); });
+  },
 };
+
+async function askTuning(){
+  const btn=$('#tAsk'), out=$('#tOut');
+  const body={ storyId:$('#tStory').value, segmentIndex:parseInt($('#tSeg').value||'0',10)||0, question:$('#tQ').value };
+  if(!body.question.trim()){ out.innerHTML='<div class="msg err">Type a question first.</div>'; return; }
+  btn.disabled=true; out.innerHTML='<div class="msg info">Asking Areg… (calling OpenAI)</div>';
+  try{
+    const r=await apiPost('/story-qa-test', body);
+    const cls = r.outcome==='answered' ? 'on' : ((r.outcome==='input_blocked'||r.outcome==='output_blocked') ? 'blk' : 'flag');
+    out.innerHTML=`
+      <div class="card" style="margin-top:12px">
+        <div class="l">Areg's answer</div>
+        <div style="font-size:18px;margin:8px 0">${esc(r.answer)}</div>
+        <div class="mut">outcome <span class="pill ${cls}">${esc(r.outcome)}</span>
+          · usedFallback <b>${r.usedFallback}</b>
+          · input ${r.inputSafe?'safe':'<b>BLOCKED</b>'} · output ${r.outputSafe?'safe':'<b>BLOCKED</b>'}
+          · firstRejection <code>${esc(r.firstRejection)}</code>${r.retryRejection?` · retry <code>${esc(r.retryRejection)}</code>`:''}</div>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="l">Segment ${r.segmentIndex} — what the child just heard</div>
+        <div class="mut" style="margin-top:6px;white-space:pre-wrap">${esc(r.segmentText)}</div>
+      </div>`;
+  }catch(e){ out.innerHTML=`<div class="msg err">${esc(e.message)}</div>`; }
+  finally{ btn.disabled=false; }
+}
 
 window.openConv = async function(id){
   try {

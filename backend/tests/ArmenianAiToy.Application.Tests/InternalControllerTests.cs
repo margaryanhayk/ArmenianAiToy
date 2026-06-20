@@ -1,12 +1,15 @@
 using System.Text.Json;
 using ArmenianAiToy.Api.Controllers;
+using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Helpers;
+using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
 using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Domain.Enums;
 using ArmenianAiToy.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 
 namespace ArmenianAiToy.Application.Tests;
 
@@ -24,8 +27,19 @@ public class InternalControllerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options);
 
-    private static InternalController NewController(AppDbContext db) =>
-        new(db, new InMemoryCuratedStoryLibrary(), new OpenAICostMeter());
+    private static InternalController NewController(
+        AppDbContext db, IAiChatClient? ai = null, IModerationService? moderation = null) =>
+        new(db, new InMemoryCuratedStoryLibrary(), new OpenAICostMeter(),
+            new LibraryStoryQuestionService(ai ?? Substitute.For<IAiChatClient>()),
+            moderation ?? SafeModeration());
+
+    private static IModerationService SafeModeration()
+    {
+        var m = Substitute.For<IModerationService>();
+        m.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
+        return m;
+    }
 
     private static T Value<T>(IActionResult r) => (T)((OkObjectResult)r).Value!;
 
@@ -167,5 +181,76 @@ public class InternalControllerTests
         var json = Json(result);
         // The in-memory curated library always carries little-cloud.
         Assert.Contains(InMemoryCuratedStoryLibrary.LittleCloudId, json);
+    }
+
+    // ── Story-QA tuning playground (Phase 2) ───────────────────────
+
+    private sealed class FixedAi : IAiChatClient
+    {
+        private readonly string _answer;
+        public FixedAi(string answer) => _answer = answer;
+        public Task<string> GetCompletionAsync(string systemPrompt, List<(string Role, string Content)> messages)
+            => Task.FromResult(_answer);
+    }
+
+    [Fact]
+    public async Task StoryQaTest_SafeInput_RunsPipeline_ReturnsAnswer()
+    {
+        var db = NewDb();
+        // A clean, short Armenian answer grounded in the little-cloud story.
+        var ai = new FixedAi("Փոքրիկ ամպիկը երկնքի ընկերն է։");
+        var controller = NewController(db, ai);
+
+        var result = await controller.StoryQaTest(
+            new AdminStoryQaTestRequest(InMemoryCuratedStoryLibrary.LittleCloudId, 0, "Ո՞վ է փոքրիկ ամպիկը"),
+            default);
+
+        var dto = Value<AdminStoryQaTestResult>(result);
+        Assert.True(dto.InputSafe);
+        Assert.False(string.IsNullOrWhiteSpace(dto.Answer));
+        // Either the model answer passed the filter (answered) or it fell back —
+        // both are valid pipeline outcomes; the point is the pipeline ran safely.
+        Assert.Contains(dto.Outcome, new[] { "answered", "answer_fallback" });
+    }
+
+    [Fact]
+    public async Task StoryQaTest_UnsafeInput_BlocksBeforeGpt_ReturnsFallback()
+    {
+        var db = NewDb();
+        var blocking = Substitute.For<IModerationService>();
+        blocking.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(IsSafe: false, FlaggedCategories: new List<string> { "violence" }));
+        // If GPT were ever called the FixedAi would answer — but input
+        // moderation must short-circuit first.
+        var ai = new FixedAi("should not be used");
+        var controller = NewController(db, ai, blocking);
+
+        var result = await controller.StoryQaTest(
+            new AdminStoryQaTestRequest(InMemoryCuratedStoryLibrary.LittleCloudId, 0, "ինչ-որ վտանգավոր բան"),
+            default);
+
+        var dto = Value<AdminStoryQaTestResult>(result);
+        Assert.False(dto.InputSafe);
+        Assert.Equal("input_blocked", dto.Outcome);
+        Assert.Equal(StoryAnswerFilter.SafeFallback, dto.Answer);
+        Assert.DoesNotContain("should not be used", dto.Answer);
+    }
+
+    [Fact]
+    public async Task StoryQaTest_UnknownStory_Returns404()
+    {
+        var db = NewDb();
+        var result = await NewController(db).StoryQaTest(
+            new AdminStoryQaTestRequest("no-such-story", 0, "բարև"), default);
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task StoryQaTest_EmptyQuestion_Returns400()
+    {
+        var db = NewDb();
+        var result = await NewController(db).StoryQaTest(
+            new AdminStoryQaTestRequest(InMemoryCuratedStoryLibrary.LittleCloudId, 0, "   "), default);
+        Assert.IsType<BadRequestObjectResult>(result);
     }
 }

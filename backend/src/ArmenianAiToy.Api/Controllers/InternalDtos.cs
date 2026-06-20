@@ -119,3 +119,23 @@ public sealed record AdminAuditDto(
     Guid? TargetDeviceId,
     Guid? TargetChildId,
     JsonElement? Metadata);
+
+// Story-QA tuning playground (Phase 2). Operator-only; text-only; calls
+// OpenAI (cost) but mutates nothing and persists nothing.
+public sealed record AdminStoryQaTestRequest(
+    string StoryId,
+    int SegmentIndex,
+    string Question);
+
+public sealed record AdminStoryQaTestResult(
+    string StoryId,
+    int SegmentIndex,
+    string SegmentText,
+    string Question,
+    string Answer,
+    bool UsedFallback,
+    bool InputSafe,
+    bool OutputSafe,
+    string FirstRejection,
+    string? RetryRejection,
+    string Outcome);

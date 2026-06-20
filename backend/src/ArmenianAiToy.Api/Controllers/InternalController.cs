@@ -1,4 +1,5 @@
 using ArmenianAiToy.Application.Helpers;
+using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
 using ArmenianAiToy.Domain.Enums;
 using ArmenianAiToy.Infrastructure.Data;
@@ -45,13 +46,18 @@ public class InternalController : ControllerBase
     private readonly AppDbContext _db;
     private readonly ICuratedStoryLibrary _library;
     private readonly OpenAICostMeter _costMeter;
+    private readonly LibraryStoryQuestionService _questions;
+    private readonly IModerationService _moderation;
 
     public InternalController(
-        AppDbContext db, ICuratedStoryLibrary library, OpenAICostMeter costMeter)
+        AppDbContext db, ICuratedStoryLibrary library, OpenAICostMeter costMeter,
+        LibraryStoryQuestionService questions, IModerationService moderation)
     {
         _db = db;
         _library = library;
         _costMeter = costMeter;
+        _questions = questions;
+        _moderation = moderation;
     }
 
     /// <summary>System-wide counts + today's activity + total in-process
@@ -305,6 +311,87 @@ public class InternalController : ControllerBase
             a.ActorParentId, a.TargetDeviceId, a.TargetChildId,
             ParseMetadata(a.Metadata))).ToList();
         return Ok(new { events = dtos });
+    }
+
+    /// <summary>
+    /// Story-QA tuning playground (Phase 2). Runs a typed question through the
+    /// REAL bounded in-story Q&amp;A pipeline — input moderation → GPT →
+    /// <c>StoryAnswerFilter</c>/repair/fallback → output moderation — and
+    /// returns the answer TEXT plus the filter/fallback diagnostics. No TTS,
+    /// no persistence, no conversation write, no device gates. It DOES call
+    /// OpenAI (cost) — operator-initiated, so there is no cost-cap gate.
+    /// Mirrors <see cref="StoryQaController.Ask"/>'s decision logic, minus the
+    /// voice/transport concerns, so what you see here is what a child would
+    /// hear for the same (story, segment, question).
+    /// </summary>
+    [HttpPost("story-qa-test")]
+    public async Task<IActionResult> StoryQaTest(
+        [FromBody] AdminStoryQaTestRequest req, CancellationToken ct)
+    {
+        if (req is null
+            || string.IsNullOrWhiteSpace(req.StoryId)
+            || string.IsNullOrWhiteSpace(req.Question))
+        {
+            return BadRequest(new { error = "storyId and question are required." });
+        }
+
+        var story = _library.GetById(req.StoryId);
+        if (story is null) return NotFound(new { error = "Unknown story." });
+
+        var segIdx = story.Segments.Count == 0
+            ? 0
+            : Math.Clamp(req.SegmentIndex, 0, story.Segments.Count - 1);
+        var segText = story.Segments.Count > 0 ? story.Segments[segIdx].Text : string.Empty;
+        var question = req.Question.Trim();
+
+        try
+        {
+            // Input moderation BEFORE GPT — mirrors the real path.
+            var inputMod = await _moderation.CheckContentAsync(question);
+            if (!inputMod.IsSafe)
+            {
+                return Ok(new AdminStoryQaTestResult(
+                    req.StoryId, segIdx, segText, question,
+                    StoryAnswerFilter.SafeFallback, UsedFallback: true,
+                    InputSafe: false, OutputSafe: true,
+                    FirstRejection: "InputModerationBlocked", RetryRejection: null,
+                    Outcome: "input_blocked"));
+            }
+
+            // Bounded answer (prompt → GPT → filter → repair-once → fallback).
+            var answer = await _questions.AnswerAsync(story, segIdx, question);
+            var answerText = answer.Text;
+            var outputSafe = true;
+            var outcome = answer.UsedFallback ? "answer_fallback" : "answered";
+
+            // OUTPUT moderation only on model-authored answers (canned
+            // fallbacks are pre-reviewed) — same gate as the voice path.
+            if (!answer.UsedFallback)
+            {
+                var outMod = await _moderation.CheckContentAsync(answerText);
+                if (!outMod.IsSafe)
+                {
+                    answerText = StoryAnswerFilter.SafeFallback;
+                    outputSafe = false;
+                    outcome = "output_blocked";
+                }
+            }
+
+            return Ok(new AdminStoryQaTestResult(
+                req.StoryId, segIdx, segText, question, answerText,
+                UsedFallback: answer.UsedFallback || !outputSafe,
+                InputSafe: true, OutputSafe: outputSafe,
+                FirstRejection: answer.FirstRejection.ToString(),
+                RetryRejection: answer.RetryRejection?.ToString(),
+                Outcome: outcome));
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            // Operator-only surface — surface the real reason (e.g. OpenAI
+            // key missing / upstream error) so tuning failures are diagnosable.
+            return StatusCode(502, new { error = ex.Message });
+        }
     }
 
     // Trims a message/snippet to a dashboard-friendly length.

@@ -1724,6 +1724,21 @@ phase. Endpoints under `/api/internal/`:
 Pagination guard mirrors the parent endpoints (`offset < 0` / `limit < 1`
 → 400; `limit` clamped to 100).
 
+**Story-QA tuning playground (Phase 2).** The one non-GET endpoint:
+
+- `POST /api/internal/story-qa-test` body `{ storyId, segmentIndex, question }`
+  — runs a typed question through the REAL bounded in-story Q&A pipeline
+  (`LibraryStoryQuestionService`: input moderation → GPT → `StoryAnswerFilter`
+  / repair-once / canned fallback → output moderation) and returns the answer
+  TEXT plus diagnostics (`usedFallback`, `firstRejection`, `retryRejection`,
+  `inputSafe`, `outputSafe`, `outcome`, the segment text). **Text only** — no
+  TTS, no persistence, no conversation write, no device gates. It **calls
+  OpenAI (cost)** — operator-initiated, so no device cost-cap gate; it still
+  mutates nothing. Mirrors `StoryQaController.Ask`'s decision logic minus the
+  voice/transport concerns, so what you see is what a child would hear for the
+  same (story, segment, question). Pinned by `InternalControllerTests`
+  (`StoryQaTest_*`).
+
 **Secret invariants (do not regress):** the response DTOs in
 `Controllers/InternalDtos.cs` never carry `Device.ApiKey` /
 `Device.ApiKeyHash` or `Parent.PasswordHash` — excluded by construction.
@@ -1732,9 +1747,10 @@ Google linkage is surfaced as `GoogleLinked: bool`, never the raw
 (`Parents_NeverExposePasswordHash`, `Devices_NeverExposeApiKeyOrHash`).
 The fail-closed gate is pinned by `InternalAdminAuthTests`.
 
-**Out of scope (deferred):** operator actions (pause/bedtime/mode as
-admin, draft promote, delete), a live story-QA tuning playground, and
-parent/admin role unification — all Phase 2, separate approval.
+**Out of scope (deferred):** operator ACTIONS (pause/bedtime/mode as
+admin, draft promote, delete) and parent/admin role unification —
+separate approval. (The read-only god view and the story-QA tuning
+playground above are shipped.)
 
 ## Engineering Guardrails
 
