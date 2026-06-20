@@ -43,6 +43,10 @@
 #include <AudioFileSourceHTTPStream.h>
 #include <AudioGeneratorMP3.h>
 #include <AudioOutputI2S.h>
+// Slice 2 (offline content pack): decode narration straight off the SD card.
+#include <AudioFileSourceSD.h>
+#include <SPI.h>
+#include <SD.h>
 #endif
 
 // Use I2S port 0 for both capture and playback — we tear down
@@ -416,6 +420,141 @@ bool audio_play_story_stream(const char *url,
     out.stop();
     Serial.printf("[story] stream end interrupted=%s\n",
                   interrupted ? "true" : "false");
+    Serial.flush();
+    return interrupted;
+#endif
+}
+
+// -------------------------------------------------------------
+// Offline story playback from the microSD content pack (Slice 2)
+// UNVERIFIED — not compiled/flashed. See HARDENING-INTEGRATION.md §6.
+// -------------------------------------------------------------
+
+static bool s_sd_ok = false;
+
+bool audio_sd_begin() {
+#ifdef AREG_DISABLE_MP3_PLAYBACK
+    Serial.println("[sd] disabled (AREG_DISABLE_MP3_PLAYBACK)");
+    Serial.flush();
+    return false;
+#else
+    if (s_sd_ok) {
+        return true;  // idempotent
+    }
+    // Dedicated SPI bus for the card. Pins from config.h; clear of the
+    // strapping / USB pins (see HARDENING-INTEGRATION.md §6.3).
+    SPI.begin(AREG_PIN_SD_SCK, AREG_PIN_SD_MISO, AREG_PIN_SD_MOSI, AREG_PIN_SD_CS);
+    // 16 MHz is well within any genuine card's spec and far above the
+    // ~16 KB/s an MP3 needs; lower it if your wiring is long / noisy.
+    s_sd_ok = SD.begin(AREG_PIN_SD_CS, SPI, 16000000U);
+    if (s_sd_ok) {
+        Serial.printf("[sd] mounted; type=%d size=%lluMB\n",
+                      (int)SD.cardType(),
+                      (unsigned long long)(SD.cardSize() / (1024ULL * 1024ULL)));
+    } else {
+        Serial.println("[sd] SD.begin failed (no card / wiring / format?)");
+    }
+    Serial.flush();
+    return s_sd_ok;
+#endif
+}
+
+bool audio_sd_available() {
+    return s_sd_ok;
+}
+
+bool audio_sd_has_file(const char *path) {
+#ifdef AREG_DISABLE_MP3_PLAYBACK
+    (void)path;
+    return false;
+#else
+    if (!s_sd_ok || path == nullptr) {
+        return false;
+    }
+    return SD.exists(path);
+#endif
+}
+
+bool audio_play_story_file(const char *path,
+                           uint32_t start_byte,
+                           audio_barge_in_fn barge_in,
+                           uint32_t *out_resume_offset) {
+    if (out_resume_offset != nullptr) {
+        *out_resume_offset = 0;
+    }
+#ifdef AREG_DISABLE_MP3_PLAYBACK
+    (void)path; (void)start_byte; (void)barge_in;
+    Serial.println("[story] SD playback disabled (AREG_DISABLE_MP3_PLAYBACK)");
+    Serial.flush();
+    return false;
+#else
+    if (!s_sd_ok) {
+        Serial.println("[story] SD not mounted");
+        Serial.flush();
+        return false;
+    }
+    Serial.printf("[story] SD open: %s @ %u\n", path, (unsigned)start_byte);
+    Serial.flush();
+
+    AudioFileSourceSD file(path);
+    if (!file.isOpen()) {
+        Serial.printf("[story] SD open failed: %s\n", path);
+        Serial.flush();
+        return false;  // nothing to resume; caller treats as natural end
+    }
+    if (start_byte > 0) {
+        // Seek to the resume byte; the MP3 decoder re-syncs to the next frame
+        // header, exactly like the server-side ?from= resume.
+        if (!file.seek((int32_t)start_byte, SEEK_SET)) {
+            Serial.printf("[story] SD seek to %u failed; playing from start\n",
+                          (unsigned)start_byte);
+            Serial.flush();
+        }
+    }
+
+    AudioOutputI2S out;
+    out.SetPinout(AREG_PIN_AMP_BCK, AREG_PIN_AMP_LRC, AREG_PIN_AMP_DATA);
+    out.SetGain(0.6f);
+
+    AudioGeneratorMP3 mp3;
+    if (!mp3.begin(&file, &out)) {
+        Serial.println("[story] mp3.begin (SD) failed");
+        Serial.flush();
+        return false;
+    }
+
+    bool interrupted = false;
+    uint32_t last_yield = millis();
+    while (mp3.isRunning()) {
+        // True barge-in: poll the button DURING decode and cut instantly.
+        if (barge_in != nullptr && barge_in()) {
+            // getPos() on a file source is the ABSOLUTE file position — no
+            // base_offset bookkeeping needed (unlike the HTTP stream).
+            uint32_t abs_pos = (uint32_t)file.getPos();
+            // Back up past the decoded-but-unplayed I2S-buffered tail so resume
+            // lands at the audible pause point (overlap, not skip).
+            *out_resume_offset = (abs_pos > AREG_STORY_RESUME_FUDGE_BYTES)
+                ? (abs_pos - AREG_STORY_RESUME_FUDGE_BYTES) : 0;
+            mp3.stop();
+            interrupted = true;
+            Serial.printf("[story] SD barge-in: abs=%u resume_from=%u\n",
+                          (unsigned)abs_pos, (unsigned)*out_resume_offset);
+            Serial.flush();
+            break;
+        }
+        if (!mp3.loop()) {
+            mp3.stop();
+            break;
+        }
+        // Yield to FreeRTOS so watchdog / housekeeping are not starved.
+        if (millis() - last_yield > 50) {
+            delay(1);
+            last_yield = millis();
+        }
+    }
+    out.stop();
+    file.close();
+    Serial.printf("[story] SD end interrupted=%s\n", interrupted ? "true" : "false");
     Serial.flush();
     return interrupted;
 #endif

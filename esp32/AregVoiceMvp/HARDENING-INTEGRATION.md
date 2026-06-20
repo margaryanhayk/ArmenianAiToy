@@ -448,6 +448,37 @@ The content pack is just those files copied to SD, per approved story.
 
 ### 6.5 Firmware changes for offline playback
 
+> **Slice 2 — IMPLEMENTED (UNVERIFIED) ✅🔧⚠️ (2026-06-20).** Items 1, 2, and
+> the playback half of 6 below have landed and compile against the sketch, but
+> are **not yet flashed/verified on hardware**:
+> - `config.h(.example)`: `AREG_PIN_SD_{CS,SCK,MOSI,MISO}` (10/12/11/13) +
+>   `AREG_SD_STORY_NARRATION` = `/stories/<AREG_STORY_ID>/narration.mp3`.
+> - `audio_io.h/.cpp`: `audio_sd_begin()` / `audio_sd_available()` /
+>   `audio_sd_has_file()` / `audio_play_story_file()` (AudioFileSourceSD +
+>   `seek(start_byte)`; getPos() is absolute, so no base_offset).
+> - `AregVoiceMvp.ino`: SD mount in `setup()` (non-fatal); `handle_story_session()`
+>   picks SD **offline-first** when `AREG_SD_STORY_NARRATION` exists on the card,
+>   else the Wi-Fi stream (token fetch + retry scoped to the stream path).
+>
+> **Still deferred (NOT in Slice 2):** local micro-rewind `SnapOffset` port
+> (item 3 — today resume relies on the FUDGE-byte overlap only), manifest-driven
+> selection (item 4), offline Q&A degrade clip (item 5), internal-flash baseline
+> (§6.7). Build the content pack with `tools/ContentPackBuilder` and copy it to
+> the card root so `/stories/<id>/narration.mp3` is present.
+>
+> **On-device verification required:**
+> - [ ] `[boot] SD mounted; offline narration … = present` at boot with a card in.
+> - [ ] With the pack on the card: `[story] source = SD (offline)`, story plays
+>       with **Wi-Fi off** entirely.
+> - [ ] Barge-in cuts instantly; `[story] SD barge-in: abs=… resume_from=…`;
+>       a quick tap pause + press resumes near the same spot (FUDGE overlap).
+> - [ ] No card / empty card → `[boot] SD not mounted …` and the device still
+>       streams over Wi-Fi (regression guard).
+> - [ ] Confirm `AudioFileSourceSD::seek(int32_t, SEEK_SET)` + `getPos()` match
+>       the installed ESP8266Audio version (same library the stream path uses).
+> - [ ] SD-SPI (10/12/11/13) coexists with mic-I2S (4/5/6) + amp-I2S (7/15/16)
+>       with no bus contention or audible glitch.
+
 1. **SD init + mount** at boot (FAT32). If no card → fall back to the 1–2 stories
    baked into internal flash (see §6.7); never hard-fail.
 2. **`audio_play_story_file(path, start_byte, barge_in, out_resume_offset)`** — an
@@ -496,7 +527,9 @@ The SD card is what scales that to 100+.
 
 ### 6.8 Build order (offline first)
 
-1. SD mount + `audio_play_story_file` + play one hard-coded story from SD.
+1. ✅ (Slice 2, unverified) SD mount + `audio_play_story_file` + offline-first
+   selection in `handle_story_session` (plays `/stories/<id>/narration.mp3`
+   from the card when present, else the Wi-Fi stream).
 2. Local micro-rewind (`SnapOffset` port + offsets sidecar).
 3. Manifest-driven selection.
 4. Offline Q&A degrade clip + connectivity gating.

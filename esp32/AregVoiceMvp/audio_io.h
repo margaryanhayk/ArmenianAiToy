@@ -73,6 +73,46 @@ bool audio_play_story_stream(const char *url,
                              uint32_t *out_resume_offset);
 
 // ---------------------------------------------------------------
+// Offline story playback from the microSD content pack (Slice 2)
+// UNVERIFIED — not compiled/flashed. See HARDENING-INTEGRATION.md §6.
+// ---------------------------------------------------------------
+
+// Mount the microSD card (SPI). Call once at boot, after Serial. Returns
+// true when a FAT card is mounted and readable; false otherwise (no card,
+// wiring fault, unformatted). NON-FATAL by contract: the caller logs and
+// continues, falling back to Wi-Fi streaming — a missing card never bricks
+// the toy.
+bool audio_sd_begin();
+
+// Whether the card mounted (audio_sd_begin() returned true this boot).
+bool audio_sd_available();
+
+// Whether `path` exists on the mounted card. Always false when no card is
+// mounted (so callers can gate offline playback on a single check).
+bool audio_sd_has_file(const char *path);
+
+// Continuous, interruptible STORY playback from a FILE on the SD card — the
+// offline sibling of audio_play_story_stream(). Same barge-in / resume
+// contract, with two simplifications because the source is a seekable local
+// file (AudioFileSourceSD) rather than an HTTP response:
+//   - resume is a file seek(start_byte) before decode (the MP3 decoder
+//     re-syncs to the next frame header, exactly like the server ?from=),
+//   - getPos() is already the ABSOLUTE file position, so there is no
+//     base_offset parameter.
+// `barge_in` is polled every decode iteration; on a press the audio cuts
+// instantly and (abs_pos - AREG_STORY_RESUME_FUDGE_BYTES) is written to
+// *out_resume_offset so resume overlaps rather than skips the buffered tail.
+//
+// Returns true when interrupted (resume from *out_resume_offset); false when
+// the story played to its natural end (*out_resume_offset = 0) OR the file
+// could not be opened. Callers should audio_sd_has_file() first, so a false
+// return reliably means "natural end".
+bool audio_play_story_file(const char *path,
+                           uint32_t start_byte,
+                           audio_barge_in_fn barge_in,
+                           uint32_t *out_resume_offset);
+
+// ---------------------------------------------------------------
 // Dead-air mitigation (S1 + S3)
 // UNVERIFIED — not compiled/flashed. See HARDENING-INTEGRATION.md §2.
 // ---------------------------------------------------------------

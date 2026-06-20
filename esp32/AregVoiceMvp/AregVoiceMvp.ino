@@ -396,44 +396,61 @@ static void handle_story_session() {
     // /api/story-audio stream requires ?token=. Fetch it once per session
     // (TTL ~1 h >> a story). Empty/false when enforcement is OFF → we stream
     // without a token, which is correct in that case.
+    // OFFLINE-FIRST source (Slice 2). If the content pack's narration MP3 is on
+    // the SD card, play it from the card (no Wi-Fi, no token); otherwise fall
+    // back to the Wi-Fi story stream. Decided once per session.
+    const bool use_sd = audio_sd_has_file(AREG_SD_STORY_NARRATION);
+    Serial.printf("[story] source = %s\n", use_sd ? "SD (offline)" : "Wi-Fi stream");
+    Serial.flush();
+
+    // Story-audio access token (gap 1) — only the Wi-Fi stream needs it.
     static char story_token[256];
-    bool have_token = voice_fetch_story_audio_token(
-        AREG_STORY_ID, story_token, sizeof(story_token));
+    bool have_token = use_sd
+        ? false
+        : voice_fetch_story_audio_token(AREG_STORY_ID, story_token, sizeof(story_token));
     bool token_retry_used = false;
 
     bool active = true;
     while (active) {
-        // Room for the base URL + ?from=<u32> + &token=<opaque>.
-        char url[640];
-        if (s_story_offset > 0) {
-            snprintf(url, sizeof(url), "%s?from=%u%s%s",
-                     AREG_STORY_AUDIO_URL, (unsigned)s_story_offset,
-                     have_token ? "&token=" : "", have_token ? story_token : "");
-            Serial.printf("[story] play from byte %u (token=%d)\n",
-                          (unsigned)s_story_offset, have_token ? 1 : 0);
-        } else {
-            snprintf(url, sizeof(url), "%s%s%s",
-                     AREG_STORY_AUDIO_URL,
-                     have_token ? "?token=" : "", have_token ? story_token : "");
-            Serial.printf("[story] play from beginning (token=%d)\n", have_token ? 1 : 0);
-        }
-        Serial.flush();
-
         transition_to(ST_PLAYING);
         audio_speaker_begin();
         uint32_t resume_offset = 0;
         const uint32_t play_started_ms = millis();
-        const bool interrupted = audio_play_story_stream(
-            url, s_story_offset, story_barge_in_poll, &resume_offset);
+
+        bool interrupted;
+        if (use_sd) {
+            Serial.printf("[story] SD play from byte %u\n", (unsigned)s_story_offset);
+            Serial.flush();
+            interrupted = audio_play_story_file(
+                AREG_SD_STORY_NARRATION, s_story_offset, story_barge_in_poll, &resume_offset);
+        } else {
+            // Room for the base URL + ?from=<u32> + &token=<opaque>.
+            char url[640];
+            if (s_story_offset > 0) {
+                snprintf(url, sizeof(url), "%s?from=%u%s%s",
+                         AREG_STORY_AUDIO_URL, (unsigned)s_story_offset,
+                         have_token ? "&token=" : "", have_token ? story_token : "");
+                Serial.printf("[story] play from byte %u (token=%d)\n",
+                              (unsigned)s_story_offset, have_token ? 1 : 0);
+            } else {
+                snprintf(url, sizeof(url), "%s%s%s",
+                         AREG_STORY_AUDIO_URL,
+                         have_token ? "?token=" : "", have_token ? story_token : "");
+                Serial.printf("[story] play from beginning (token=%d)\n", have_token ? 1 : 0);
+            }
+            Serial.flush();
+            interrupted = audio_play_story_stream(
+                url, s_story_offset, story_barge_in_poll, &resume_offset);
+        }
         const uint32_t played_ms = millis() - play_started_ms;
 
-        // Token-rejection recovery (UNVERIFIED heuristic): a curated story
-        // plays for minutes, so a near-instant non-interrupted return WHILE a
-        // token is in use almost always means the stream open hit the
-        // concealment 404 (token expired / rejected). Re-fetch the token ONCE
-        // and retry the same position before treating it as the natural end.
-        // Tune the threshold on the bench.
-        if (!interrupted && have_token && !token_retry_used && played_ms < 1500) {
+        // Token-rejection recovery (Wi-Fi stream only; UNVERIFIED heuristic): a
+        // curated story plays for minutes, so a near-instant non-interrupted
+        // return WHILE a token is in use almost always means the stream open hit
+        // the concealment 404 (token expired / rejected). Re-fetch the token
+        // ONCE and retry the same position before treating it as the natural
+        // end. Tune the threshold on the bench.
+        if (!use_sd && !interrupted && have_token && !token_retry_used && played_ms < 1500) {
             Serial.println("[story] instant return with a token — re-fetching token, retrying once");
             Serial.flush();
             token_retry_used = true;
@@ -713,6 +730,22 @@ void setup() {
         }
     }
     DIAG_MARK(130, "psram_capture_buf_alloc_ok");
+
+    // microSD mount (offline content pack, Slice 2). NON-FATAL: a missing or
+    // failed card just means the device falls back to Wi-Fi streaming — never
+    // a hard stop. Logs whether the configured story's narration is on the card.
+    Serial.printf("[boot] sd_spi cs=%d sck=%d mosi=%d miso=%d\n",
+                  AREG_PIN_SD_CS, AREG_PIN_SD_SCK, AREG_PIN_SD_MOSI, AREG_PIN_SD_MISO);
+    Serial.flush();
+    if (audio_sd_begin()) {
+        Serial.printf("[boot] SD mounted; offline narration %s = %s\n",
+                      AREG_SD_STORY_NARRATION,
+                      audio_sd_has_file(AREG_SD_STORY_NARRATION) ? "present" : "absent");
+    } else {
+        Serial.println("[boot] SD not mounted — Wi-Fi streaming only");
+    }
+    Serial.flush();
+    DIAG_MARK(135, "sd_mount_done");
 
     // Diag: register Wi-Fi event handler BEFORE join so the
     // initial CONNECTED / GOT_IP / DISCONNECTED events surface
