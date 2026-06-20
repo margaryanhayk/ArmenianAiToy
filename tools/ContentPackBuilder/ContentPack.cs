@@ -55,12 +55,24 @@ public sealed class ContentPackBuilder
     /// <summary>Builds the pack. <paramref name="bitrateKbps"/> &lt;= 0 copies
     /// the MP3 verbatim (no re-encode, maps unchanged); &gt; 0 re-encodes and
     /// scales the byte maps to the new size. Stories with no cached MP3 are
-    /// skipped (not an error — render them first).</summary>
+    /// skipped (not an error — render them first).
+    /// <para>
+    /// When <paramref name="clipsDir"/> is supplied, the per-story offline
+    /// clips rendered by <c>TtsListenTest</c> (<c>&lt;id&gt;--announce.mp3</c>,
+    /// <c>&lt;id&gt;--conclusion.mp3</c>, <c>&lt;id&gt;--question-&lt;n&gt;.mp3</c>)
+    /// are laid down alongside the narration as <c>announce.mp3</c> /
+    /// <c>conclusion.mp3</c> / <c>question-&lt;n&gt;.mp3</c> in the story dir, and
+    /// the manifest gains <c>hasAnnounce</c> / <c>hasConclusion</c> /
+    /// <c>questionCount</c> so the firmware knows what offline assets exist.
+    /// Clips are optional — a missing clip (or a null/absent clips dir) is never
+    /// an error.
+    /// </para></summary>
     public async Task<BuildResult> BuildAsync(
         IReadOnlyList<StoryInput> stories,
         string cacheDir,
         string outDir,
         int bitrateKbps,
+        string? clipsDir = null,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(stories);
@@ -101,7 +113,29 @@ public sealed class ContentPackBuilder
                 Path.Combine(storyDir, "narration.segments.json"),
                 JsonSerializer.Serialize(finalSegments), ct);
 
-            manifest.Add(new { id = story.Id, title = story.Title, bedtimeSafe = story.BedtimeSafe });
+            // Offline conclusion + stored question clips (optional). These are
+            // the per-story clips TtsListenTest renders ("<id>--announce.mp3",
+            // "<id>--conclusion.mp3", "<id>--question-<n>.mp3"). They carry no
+            // byte maps (no mid-clip seeking), so they are re-encoded (or
+            // copied) straight into the story dir under stable, story-scoped
+            // names the firmware can open without consulting the manifest.
+            var hasAnnounce = await CopyClipAsync(clipsDir, story.Id, "announce", storyDir, "announce.mp3", bitrateKbps, ct);
+            var hasConclusion = await CopyClipAsync(clipsDir, story.Id, "conclusion", storyDir, "conclusion.mp3", bitrateKbps, ct);
+            var questionCount = 0;
+            while (await CopyClipAsync(clipsDir, story.Id, $"question-{questionCount}", storyDir, $"question-{questionCount}.mp3", bitrateKbps, ct))
+            {
+                questionCount++;
+            }
+
+            manifest.Add(new
+            {
+                id = story.Id,
+                title = story.Title,
+                bedtimeSafe = story.BedtimeSafe,
+                hasAnnounce,
+                hasConclusion,
+                questionCount
+            });
             written.Add(story.Id);
         }
 
@@ -141,6 +175,28 @@ public sealed class ContentPackBuilder
             prev = v;
         }
         return scaled;
+    }
+
+    /// <summary>
+    /// Copies one optional per-story clip (<c>&lt;storyId&gt;--&lt;label&gt;.mp3</c>)
+    /// from <paramref name="clipsDir"/> into the story's pack dir as
+    /// <paramref name="destName"/>, re-encoding to the speech bitrate when
+    /// <paramref name="bitrateKbps"/> &gt; 0 (clips carry no byte maps, so
+    /// nothing else changes). Returns <c>false</c> when the clips dir is
+    /// null/missing or the clip isn't present — clips are optional, never an
+    /// error.
+    /// </summary>
+    private async Task<bool> CopyClipAsync(
+        string? clipsDir, string storyId, string label,
+        string storyDir, string destName, int bitrateKbps, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(clipsDir)) return false;
+        var src = Path.Combine(clipsDir, $"{storyId}--{label}.mp3");
+        if (!File.Exists(src)) return false;
+        var bytes = await File.ReadAllBytesAsync(src, ct);
+        if (bitrateKbps > 0) bytes = await _reencoder.ReencodeAsync(bytes, bitrateKbps, ct);
+        await File.WriteAllBytesAsync(Path.Combine(storyDir, destName), bytes, ct);
+        return true;
     }
 
     private static long[] ReadLongArray(string path)

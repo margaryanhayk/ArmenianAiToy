@@ -70,6 +70,14 @@ public class ContentPackBuilderTests
         File.WriteAllText(Path.Combine(cacheDir, id + ".segments.json"), JsonSerializer.Serialize(segments));
     }
 
+    // Seeds a per-story offline clip exactly as TtsListenTest names them:
+    // "<id>--<label>.mp3" (e.g. "anban-huri--conclusion.mp3").
+    private static void SeedClip(string clipsDir, string id, string label, int bytes)
+    {
+        Directory.CreateDirectory(clipsDir);
+        File.WriteAllBytes(Path.Combine(clipsDir, $"{id}--{label}.mp3"), new byte[bytes]);
+    }
+
     [Fact]
     public async Task Build_ReEncodes_ScalesMaps_AndWritesPackLayout()
     {
@@ -168,6 +176,134 @@ public class ContentPackBuilderTests
         finally
         {
             Directory.Delete(cache, true);
+            Directory.Delete(outDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task Build_IncludesClips_AndDeclaresThemInManifest()
+    {
+        var cache = NewTempDir();
+        var clips = NewTempDir();
+        var outDir = NewTempDir();
+        try
+        {
+            SeedCache(cache, "anban-huri", mp3Bytes: 1000, offsets: [0, 1000], segments: [0]);
+            SeedClip(clips, "anban-huri", "announce", 40);
+            SeedClip(clips, "anban-huri", "conclusion", 200);
+            SeedClip(clips, "anban-huri", "question-0", 120);
+            var builder = new ContentPackBuilder(new StubReencoder(60));
+
+            var result = await builder.BuildAsync(
+                [new StoryInput("anban-huri", "Անբան Հուռին", BedtimeSafe: false)],
+                cache, outDir, bitrateKbps: 48, clipsDir: clips);
+
+            Assert.Equal(new[] { "anban-huri" }, result.Written);
+            var storyDir = Path.Combine(outDir, "stories", "anban-huri");
+            Assert.True(File.Exists(Path.Combine(storyDir, "announce.mp3")));
+            Assert.True(File.Exists(Path.Combine(storyDir, "conclusion.mp3")));
+            Assert.True(File.Exists(Path.Combine(storyDir, "question-0.mp3")));
+            // re-encoded → the stub's fixed output size
+            Assert.Equal(60, new FileInfo(Path.Combine(storyDir, "conclusion.mp3")).Length);
+
+            var manifest = await File.ReadAllTextAsync(Path.Combine(outDir, "manifest.json"));
+            Assert.Contains("\"hasAnnounce\": true", manifest);
+            Assert.Contains("\"hasConclusion\": true", manifest);
+            Assert.Contains("\"questionCount\": 1", manifest);
+        }
+        finally
+        {
+            Directory.Delete(cache, true);
+            Directory.Delete(clips, true);
+            Directory.Delete(outDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task Build_CountsMultipleQuestions_AndStopsAtFirstGap()
+    {
+        var cache = NewTempDir();
+        var clips = NewTempDir();
+        var outDir = NewTempDir();
+        try
+        {
+            SeedCache(cache, "s", 100, [0, 100], [0]);
+            SeedClip(clips, "s", "question-0", 10);
+            SeedClip(clips, "s", "question-1", 10);
+            // no question-2 → the count loop stops at 2
+
+            await new ContentPackBuilder(new StubReencoder(10))
+                .BuildAsync([new StoryInput("s", "S", true)], cache, outDir, bitrateKbps: 0, clipsDir: clips);
+
+            var storyDir = Path.Combine(outDir, "stories", "s");
+            Assert.True(File.Exists(Path.Combine(storyDir, "question-0.mp3")));
+            Assert.True(File.Exists(Path.Combine(storyDir, "question-1.mp3")));
+            Assert.False(File.Exists(Path.Combine(storyDir, "question-2.mp3")));
+
+            var manifest = await File.ReadAllTextAsync(Path.Combine(outDir, "manifest.json"));
+            Assert.Contains("\"questionCount\": 2", manifest);
+            Assert.Contains("\"hasConclusion\": false", manifest); // no conclusion clip seeded
+        }
+        finally
+        {
+            Directory.Delete(cache, true);
+            Directory.Delete(clips, true);
+            Directory.Delete(outDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task Build_NoClipsDir_DeclaresAbsentClips_AndWritesNoClipFiles()
+    {
+        var cache = NewTempDir();
+        var outDir = NewTempDir();
+        try
+        {
+            SeedCache(cache, "little-cloud", 500, [0, 500], [0]);
+
+            // clipsDir omitted (defaults to null) → clips skipped, never an error.
+            await new ContentPackBuilder(new StubReencoder(500))
+                .BuildAsync([new StoryInput("little-cloud", "A", true)], cache, outDir, bitrateKbps: 0);
+
+            var storyDir = Path.Combine(outDir, "stories", "little-cloud");
+            Assert.False(File.Exists(Path.Combine(storyDir, "conclusion.mp3")));
+            Assert.False(File.Exists(Path.Combine(storyDir, "announce.mp3")));
+
+            var manifest = await File.ReadAllTextAsync(Path.Combine(outDir, "manifest.json"));
+            Assert.Contains("\"hasAnnounce\": false", manifest);
+            Assert.Contains("\"hasConclusion\": false", manifest);
+            Assert.Contains("\"questionCount\": 0", manifest);
+        }
+        finally
+        {
+            Directory.Delete(cache, true);
+            Directory.Delete(outDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task Build_CopyMode_DoesNotReencodeClips()
+    {
+        var cache = NewTempDir();
+        var clips = NewTempDir();
+        var outDir = NewTempDir();
+        try
+        {
+            SeedCache(cache, "s", 100, [0, 100], [0]);
+            SeedClip(clips, "s", "conclusion", 222);
+            var stub = new StubReencoder(999);
+
+            await new ContentPackBuilder(stub).BuildAsync(
+                [new StoryInput("s", "S", true)], cache, outDir, bitrateKbps: 0, clipsDir: clips);
+
+            Assert.Equal(0, stub.Calls); // neither narration nor clip re-encoded in copy mode
+            var conclusion = Path.Combine(outDir, "stories", "s", "conclusion.mp3");
+            Assert.Equal(222, new FileInfo(conclusion).Length); // verbatim copy
+        }
+        finally
+        {
+            Directory.Delete(cache, true);
+            Directory.Delete(clips, true);
             Directory.Delete(outDir, true);
         }
     }
