@@ -1680,6 +1680,62 @@ no DB match older than a configurable grace window (default
 actor audit row on tick-with-deletions only, counts-only
 metadata. No content inspection, no parent-/user-facing endpoint.
 
+## Internal console (superuser)
+
+A read-only operator god-view across the WHOLE system — all parents,
+devices, conversations, stories, audit, and cost. Distinct from the
+parent dashboard (`parent.html`), which is per-parent-scoped. This is
+the owner/operator surface.
+
+**Auth — config admin token, fail-closed.** Gated by
+`Api/Observability/InternalAdminAuth.cs`, a clone of the
+`MetricsScrapeAuth` pattern: a bearer-token check wired as inline
+middleware in `Program.cs` over the `/api/internal/*` path prefix, run
+**before** `MapControllers`. NOT the parent JWT pipeline.
+
+- `Internal:AdminToken` (default `""`) — the expected bearer token.
+- `Internal:AllowUnauthenticated` (default `false`) — explicit dev bypass.
+- **Shipped default is fail-closed**: with both at defaults, every
+  `/api/internal/*` request gets a **404** (concealment, same posture as
+  `/metrics`). Operator opts in by setting the token and sending
+  `Authorization: Bearer <token>`. Constant-time token compare.
+- The `wwwroot/admin.html` page is served openly (an empty shell); it is
+  useless without the token, which all its data calls require.
+
+**Read-only by design (Phase 1).** Every endpoint is a GET. An admin
+token that could mutate (pause devices, promote drafts, delete) is a
+much larger blast radius and is deferred to a later, separately-approved
+phase. Endpoints under `/api/internal/`:
+
+- `GET /overview` — system counts + today's activity + total in-process
+  OpenAI cost (UTC day) + DB reachability.
+- `GET /devices` — ALL devices (safe fields) + nested children +
+  linked-parent count + per-device cost-today.
+- `GET /parents` — ALL parents (safe fields) + linked-device count +
+  audit-event count. Google linkage as a bool.
+- `GET /stories` — the runtime library (curated + side-loaded drafts)
+  with metadata (segments, bedtimeSafe, reflection text/question counts).
+- `GET /flagged?limit=&offset=` — all non-Clean messages, all devices.
+- `GET /conversations?deviceId=&limit=&offset=` (+ `/{id}`) — summaries
+  (any/all devices) and full detail with messages.
+- `GET /audit?limit=&offset=` — GLOBAL feed including system-actor rows
+  (`ActorParentId == null`) that parents can never see.
+
+Pagination guard mirrors the parent endpoints (`offset < 0` / `limit < 1`
+→ 400; `limit` clamped to 100).
+
+**Secret invariants (do not regress):** the response DTOs in
+`Controllers/InternalDtos.cs` never carry `Device.ApiKey` /
+`Device.ApiKeyHash` or `Parent.PasswordHash` — excluded by construction.
+Google linkage is surfaced as `GoogleLinked: bool`, never the raw
+`GoogleSubject`. Pinned by `InternalControllerTests`
+(`Parents_NeverExposePasswordHash`, `Devices_NeverExposeApiKeyOrHash`).
+The fail-closed gate is pinned by `InternalAdminAuthTests`.
+
+**Out of scope (deferred):** operator actions (pause/bedtime/mode as
+admin, draft promote, delete), a live story-QA tuning playground, and
+parent/admin role unification — all Phase 2, separate approval.
+
 ## Engineering Guardrails
 
 - **No architecture redesign.** Work within existing structure.

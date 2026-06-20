@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Areg Console — Superuser</title>
+<style>
+  :root { --bg:#0f1419; --panel:#1a2129; --line:#2a3441; --fg:#e6edf3; --mut:#8b98a5;
+          --acc:#4ea1ff; --warn:#ffb454; --bad:#ff6b6b; --ok:#5bd68a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+  header { background:var(--panel); border-bottom:1px solid var(--line); padding:12px 18px;
+           display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; margin-right:auto; font-weight:600; }
+  header h1 small { color:var(--mut); font-weight:400; }
+  input[type=password],input[type=text]{ background:#0c1116; border:1px solid var(--line); color:var(--fg);
+           border-radius:6px; padding:7px 10px; min-width:230px; }
+  button { background:var(--acc); color:#04111f; border:0; border-radius:6px; padding:7px 14px;
+           font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--fg); border:1px solid var(--line); font-weight:400; }
+  button:disabled { opacity:.5; cursor:default; }
+  nav { display:flex; gap:4px; padding:10px 18px 0; flex-wrap:wrap; }
+  nav a { padding:8px 14px; border-radius:8px 8px 0 0; color:var(--mut); cursor:pointer; user-select:none; }
+  nav a.active { background:var(--panel); color:var(--fg); }
+  main { padding:18px; }
+  .msg { padding:10px 14px; border-radius:8px; margin:8px 0; }
+  .msg.err { background:#3a1c1c; color:#ffc9c9; border:1px solid #5a2a2a; }
+  .msg.info { background:#13202b; color:var(--mut); border:1px solid var(--line); }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .card .n { font-size:24px; font-weight:700; }
+  .card .l { color:var(--mut); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  table { width:100%; border-collapse:collapse; background:var(--panel); border-radius:10px; overflow:hidden; }
+  th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--mut); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+  tr:last-child td { border-bottom:0; }
+  tr.click { cursor:pointer; }
+  tr.click:hover td { background:#141c24; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; }
+  .pill.on { background:#173a26; color:var(--ok); } .pill.off { background:#3a1c1c; color:var(--bad); }
+  .pill.flag { background:#3a2c12; color:var(--warn); } .pill.blk { background:#3a1c1c; color:var(--bad); }
+  .mut { color:var(--mut); } .mono { font-family:ui-monospace,Consolas,monospace; font-size:12px; }
+  code { background:#0c1116; padding:1px 5px; border-radius:4px; }
+  .hide { display:none; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Areg Console <small>— superuser</small></h1>
+  <input id="token" type="password" placeholder="Admin token (Internal:AdminToken)" autocomplete="off" />
+  <button id="connect">Connect</button>
+  <button id="disconnect" class="ghost hide">Disconnect</button>
+</header>
+<nav id="nav" class="hide">
+  <a data-tab="overview" class="active">Overview</a>
+  <a data-tab="devices">Devices</a>
+  <a data-tab="parents">Parents</a>
+  <a data-tab="stories">Stories</a>
+  <a data-tab="flagged">Flagged</a>
+  <a data-tab="conversations">Conversations</a>
+  <a data-tab="audit">Audit</a>
+</nav>
+<main id="main">
+  <div class="msg info">Enter the admin token and press Connect. The console is read-only.</div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const main = $('#main'), nav = $('#nav');
+let TOKEN = sessionStorage.getItem('aregAdminToken') || '';
+
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function err(m){ main.innerHTML = `<div class="msg err">${esc(m)}</div>`; }
+function info(m){ main.innerHTML = `<div class="msg info">${esc(m)}</div>`; }
+function dt(s){ return s ? new Date(s).toLocaleString() : '—'; }
+function onoff(b){ return b ? '<span class="pill on">on</span>' : '<span class="pill off">off</span>'; }
+function tri(v){ return v===null||v===undefined ? '<span class="mut">inherit</span>' : onoff(v); }
+
+async function api(path){
+  const r = await fetch('/api/internal'+path, { headers: { 'Authorization': 'Bearer '+TOKEN } });
+  if (r.status === 404) throw new Error('404 — invalid token, or the console is not enabled (set Internal:AdminToken on the backend).');
+  if (!r.ok) throw new Error('HTTP '+r.status);
+  return r.json();
+}
+
+function table(cols, rows, rowAttrs){
+  let h = '<table><thead><tr>'+cols.map(c=>`<th>${c.h}</th>`).join('')+'</tr></thead><tbody>';
+  if (!rows.length) h += `<tr><td colspan="${cols.length}" class="mut">Nothing here.</td></tr>`;
+  rows.forEach((r,i)=>{
+    h += `<tr ${rowAttrs?rowAttrs(r,i):''}>`+cols.map(c=>`<td>${c.f(r)}</td>`).join('')+'</tr>';
+  });
+  return h+'</tbody></table>';
+}
+
+const tabs = {
+  async overview(){
+    const o = await api('/overview');
+    const cards = [
+      ['Devices',o.devices],['Parents',o.parents],['Children',o.children],
+      ['Conversations',o.conversations],['Messages',o.messages],['Flagged',o.flaggedMessages],
+      ['Msgs today',o.messagesToday],['Flagged today',o.flaggedToday],['Paused devices',o.pausedDevices],
+      ['Cost today (USD)','$'+(o.costTodayUsd||0).toFixed(4)],
+      ['Database', o.databaseReachable?'OK':'DOWN'],
+    ];
+    main.innerHTML = `<div class="cards">`+cards.map(([l,n])=>`<div class="card"><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></div>`).join('')+`</div>`
+      + `<p class="mut">Generated ${dt(o.generatedAtUtc)} · cost is in-process (resets on backend restart).</p>`;
+  },
+  async devices(){
+    const d = (await api('/devices')).devices;
+    main.innerHTML = table([
+      {h:'Name',f:r=>esc(r.name)+`<div class="mono mut">${esc(r.macAddress)}</div>`},
+      {h:'Last seen',f:r=>dt(r.lastSeenAt)},
+      {h:'Paused',f:r=>r.isPaused?'<span class="pill blk">paused</span>':'<span class="mut">no</span>'},
+      {h:'Bedtime',f:r=>r.bedtimeStart?`${esc(r.bedtimeStart)}–${esc(r.bedtimeEnd)}`:'<span class="mut">—</span>'},
+      {h:'Modes (S/G/R/C)',f:r=>[r.storyEnabled,r.gameEnabled,r.riddleEnabled,r.curiosityEnabled].map(onoff).join(' ')},
+      {h:'Parents',f:r=>r.linkedParents},
+      {h:'Children',f:r=>r.childrenList.length?r.childrenList.map(c=>esc(c.name)+(c.age!=null?` (${c.age})`:'')).join(', '):'<span class="mut">—</span>'},
+      {h:'Cost today',f:r=>'$'+(r.costTodayUsd||0).toFixed(4)},
+      {h:'TZ',f:r=>`<span class="mono">${esc(r.timeZone)}</span>`},
+    ], d);
+  },
+  async parents(){
+    const p = (await api('/parents')).parents;
+    main.innerHTML = table([
+      {h:'Email',f:r=>esc(r.email)},
+      {h:'Verified',f:r=>r.emailVerifiedAt?'<span class="pill on">yes</span>':'<span class="pill off">no</span>'},
+      {h:'Google',f:r=>r.googleLinked?'<span class="pill on">linked</span>':'<span class="mut">—</span>'},
+      {h:'Last login',f:r=>dt(r.lastLoginAt)},
+      {h:'Registered',f:r=>dt(r.registeredAt)},
+      {h:'Devices',f:r=>r.linkedDevices},
+      {h:'Audit',f:r=>r.auditEvents},
+      {h:'Anonymized',f:r=>r.anonymizedAt?'<span class="pill blk">yes</span>':'<span class="mut">—</span>'},
+    ], p);
+  },
+  async stories(){
+    const s = (await api('/stories')).stories;
+    main.innerHTML = table([
+      {h:'Id',f:r=>`<span class="mono">${esc(r.id)}</span>`},
+      {h:'Title',f:r=>esc(r.title)},
+      {h:'Ages',f:r=>`${r.minAge}–${r.maxAge}`},
+      {h:'Tone',f:r=>esc(r.tone)},
+      {h:'Segments',f:r=>r.segments},
+      {h:'Bedtime-safe',f:r=>onoff(r.bedtimeSafe)},
+      {h:'Conclusion',f:r=>onoff(r.hasReflectionText)},
+      {h:'Questions',f:r=>r.reflectionQuestions},
+    ], s);
+  },
+  async flagged(){
+    const m = (await api('/flagged?limit=100')).messages;
+    main.innerHTML = table([
+      {h:'When',f:r=>dt(r.timestamp)},
+      {h:'Flag',f:r=>`<span class="pill ${r.safetyFlag==='Blocked'?'blk':'flag'}">${esc(r.safetyFlag)}</span>`},
+      {h:'Role',f:r=>esc(r.role)},
+      {h:'Snippet',f:r=>esc(r.snippet)},
+      {h:'Device',f:r=>`<span class="mono mut">${esc(r.deviceId.slice(0,8))}</span>`},
+    ], m);
+  },
+  async conversations(){
+    const c = (await api('/conversations?limit=100')).conversations;
+    main.innerHTML = `<div class="row mut">Click a conversation to see its messages.</div>` + table([
+      {h:'Started',f:r=>dt(r.startedAt)},
+      {h:'Device',f:r=>`<span class="mono mut">${esc(r.deviceId.slice(0,8))}</span>`},
+      {h:'Msgs',f:r=>r.messageCount},
+      {h:'Flagged',f:r=>r.flaggedCount?`<span class="pill flag">${r.flaggedCount}</span>`:'<span class="mut">0</span>'},
+      {h:'Snippet',f:r=>esc(r.snippet)},
+    ], c, r=>`class="click" onclick="openConv('${r.id}')"`);
+  },
+  async audit(){
+    const e = (await api('/audit?limit=100')).events;
+    main.innerHTML = table([
+      {h:'When',f:r=>dt(r.timestamp)},
+      {h:'Event',f:r=>esc(r.eventType)},
+      {h:'Actor',f:r=>r.actorParentId?`<span class="mono mut">${esc(r.actorParentId.slice(0,8))}</span>`:'<span class="pill flag">system</span>'},
+      {h:'Target dev',f:r=>r.targetDeviceId?`<span class="mono mut">${esc(r.targetDeviceId.slice(0,8))}</span>`:'<span class="mut">—</span>'},
+      {h:'Metadata',f:r=>r.metadata?`<code class="mono">${esc(JSON.stringify(r.metadata))}</code>`:'<span class="mut">—</span>'},
+    ], e);
+  },
+};
+
+window.openConv = async function(id){
+  try {
+    const c = await api('/conversations/'+id);
+    main.innerHTML = `<div class="row"><button class="ghost" onclick="show('conversations')">← back</button>
+      <span class="mut">conversation <span class="mono">${esc(id.slice(0,8))}</span> · device <span class="mono">${esc(c.deviceId.slice(0,8))}</span> · ${dt(c.startedAt)}</span></div>` + table([
+      {h:'When',f:m=>dt(m.timestamp)},
+      {h:'Role',f:m=>esc(m.role)},
+      {h:'Flag',f:m=>m.safetyFlag==='Clean'?'<span class="mut">clean</span>':`<span class="pill ${m.safetyFlag==='Blocked'?'blk':'flag'}">${esc(m.safetyFlag)}</span>`},
+      {h:'Content',f:m=>esc(m.content)},
+      {h:'Audio',f:m=>m.audioAvailable?'<span class="pill on">▶</span>':'<span class="mut">—</span>'},
+    ], c.messages);
+  } catch(e){ err(e.message); }
+};
+
+let current = 'overview';
+window.show = async function(tab){
+  current = tab;
+  [...nav.children].forEach(a=>a.classList.toggle('active', a.dataset.tab===tab));
+  info('Loading…');
+  try { await tabs[tab](); } catch(e){ err(e.message); }
+};
+
+nav.addEventListener('click', e=>{ if(e.target.dataset.tab) show(e.target.dataset.tab); });
+
+function setConnected(on){
+  nav.classList.toggle('hide', !on);
+  $('#disconnect').classList.toggle('hide', !on);
+  $('#connect').classList.toggle('hide', on);
+  $('#token').classList.toggle('hide', on);
+}
+
+$('#connect').addEventListener('click', async ()=>{
+  TOKEN = $('#token').value.trim();
+  if (!TOKEN){ err('Enter the admin token.'); return; }
+  info('Connecting…');
+  try {
+    await api('/overview');                       // probe
+    sessionStorage.setItem('aregAdminToken', TOKEN);
+    setConnected(true);
+    show('overview');
+  } catch(e){ err(e.message); }
+});
+$('#disconnect').addEventListener('click', ()=>{
+  TOKEN=''; sessionStorage.removeItem('aregAdminToken');
+  setConnected(false); info('Disconnected.');
+});
+
+// Auto-reconnect if a token is already in this session.
+if (TOKEN){ $('#token').value = TOKEN; setConnected(true); show('overview'); }
+</script>
+</body>
+</html>

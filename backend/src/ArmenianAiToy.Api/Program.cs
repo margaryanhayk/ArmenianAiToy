@@ -220,6 +220,32 @@ app.UseMiddleware<DeviceAuthMiddleware>();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
+// Superuser internal console API (/api/internal/*) — fail-closed bearer
+// gate, same pattern as the /metrics guard below (see InternalAdminAuth).
+// With Internal:AdminToken empty and Internal:AllowUnauthenticated false
+// (the appsettings.json defaults) every /api/internal request gets a 404,
+// so a fresh deploy exposes nothing. Runs BEFORE MapControllers so a denied
+// request never reaches the console controller. 404 (not 401) conceals the
+// surface. The per-parent JWT pipeline is unaffected — this guards only the
+// operator god-view.
+var internalAdminToken = builder.Configuration["Internal:AdminToken"];
+var internalAllowAnon = builder.Configuration
+    .GetValue<bool>("Internal:AllowUnauthenticated");
+app.Use(async (ctx, next) =>
+{
+    if (InternalAdminAuth.IsInternalPath(ctx.Request.Path))
+    {
+        var decision = InternalAdminAuth.Evaluate(
+            ctx, internalAdminToken, internalAllowAnon);
+        if (decision == InternalAdminAuth.Decision.Deny)
+        {
+            ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+    }
+    await next();
+});
+
 app.MapControllers();
 
 // Prometheus scrape surface for the AppMeter + AspNetCore/Runtime
