@@ -242,6 +242,9 @@ app.Use(async (ctx, next) =>
             ctx.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
         }
+        // The console is a live operator view — never let a browser or proxy
+        // serve a stale snapshot of the whole-system data.
+        ctx.Response.Headers["Cache-Control"] = "no-store";
     }
     await next();
 });
