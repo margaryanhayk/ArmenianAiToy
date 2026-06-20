@@ -530,6 +530,19 @@ The SD card is what scales that to 100+.
 1. ✅ (Slice 2, unverified) SD mount + `audio_play_story_file` + offline-first
    selection in `handle_story_session` (plays `/stories/<id>/narration.mp3`
    from the card when present, else the Wi-Fi stream).
+   ✅ (Slice 3, unverified) post-story flow `handle_post_story_flow()`:
+   conclusion (`/stories/<id>/conclusion.mp3`) → reflection question
+   (`/stories/<id>/question-0.mp3`), both OFFLINE; then ONLINE-only listen
+   window → record the child's answer → POST to
+   `/api/chat/story-qa/reflection-answer` (`voice_upload_reflection_answer`)
+   → play the warm acknowledgement. Offline, the answer step is skipped (it
+   needs STT+GPT); an optional `/clips/offline_close.mp3` plays instead.
+   **On-device verification:** with the pack on the card and Wi-Fi UP, finish a
+   story → hear conclusion + question → press & hold → speak → hear the
+   acknowledgement; with Wi-Fi DOWN, hear conclusion + question then a quiet
+   close (no upload attempt). New config: `AREG_SD_STORY_CONCLUSION`,
+   `AREG_SD_STORY_QUESTION0`, `AREG_SD_OFFLINE_CLOSE`,
+   `AREG_STORY_REFLECTION_URL`, `AREG_REFLECTION_LISTEN_MS`.
 2. Local micro-rewind (`SnapOffset` port + offsets sidecar).
 3. Manifest-driven selection.
 4. Offline Q&A degrade clip + connectivity gating.

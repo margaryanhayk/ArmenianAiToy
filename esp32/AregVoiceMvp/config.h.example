@@ -51,6 +51,14 @@
 #define AREG_STORY_QA_URL       "http://YOUR_LAN_IP:5000/api/chat/story-qa"
 #endif
 
+// Post-story reflection answer (Slice 3). After the story + conclusion +
+// reflection question, the child's spoken answer is POSTed here as
+// "?storyId=<id>&questionIndex=<n>"; the response is the spoken warm
+// acknowledgement MP3. Device-auth headers ARE sent. Sub-route of story-qa.
+#ifndef AREG_STORY_REFLECTION_URL
+#define AREG_STORY_REFLECTION_URL "http://YOUR_LAN_IP:5000/api/chat/story-qa/reflection-answer"
+#endif
+
 // Resume-offset correction. getPos() reports bytes the decoder has
 // CONSUMED, which runs ahead of what the speaker has actually played
 // (decoded audio still buffered in the I2S DMA when barge-in cuts it).
@@ -101,6 +109,18 @@
 // on the card, the device plays it OFFLINE; otherwise it falls back to the
 // Wi-Fi story stream.
 #define AREG_SD_STORY_NARRATION "/stories/" AREG_STORY_ID "/narration.mp3"
+
+// On-SD post-story clips (content-pack layout, Slice 1). The conclusion +
+// reflection question play OFFLINE after the story ends; the question's ANSWER
+// needs the cloud. /clips/offline_close.mp3 is OPTIONAL — played offline in
+// place of the (cloud) answer if present.
+#define AREG_SD_STORY_CONCLUSION "/stories/" AREG_STORY_ID "/conclusion.mp3"
+#define AREG_SD_STORY_QUESTION0  "/stories/" AREG_STORY_ID "/question-0.mp3"
+#define AREG_SD_OFFLINE_CLOSE    "/clips/offline_close.mp3"
+
+// How long (ms) after the reflection question to wait for the child to press &
+// hold to answer. No press in this window → quiet close (never force an answer).
+#define AREG_REFLECTION_LISTEN_MS 8000
 
 // --- Audio parameters ----------------------------------------
 #define AREG_SAMPLE_RATE_HZ     16000  // Whisper-friendly, bandwidth-friendly

@@ -379,6 +379,117 @@ static size_t record_question() {
     return captured;
 }
 
+// Post-story flow (Slice 3). UNVERIFIED — not compiled/flashed.
+//
+// Called once the story reaches its natural end. Plays the offline conclusion,
+// asks the offline reflection question, then — ONLINE ONLY — opens a listening
+// window for the child's spoken answer and plays the warm acknowledgement the
+// backend returns (POST /api/chat/story-qa/reflection-answer). Offline, the
+// answer step is skipped: the question's answer needs the cloud (STT + GPT).
+// Every clip comes from the SD content pack (Slice 1 layout); each step
+// self-gates on the file being present, so this is a safe no-op when playing
+// the Wi-Fi stream (no pack on the card).
+static void handle_post_story_flow() {
+    // 1. Conclusion (offline) — the finalization of the story.
+    if (audio_sd_has_file(AREG_SD_STORY_CONCLUSION)) {
+        transition_to(ST_PLAYING);
+        audio_speaker_begin();
+        Serial.println("[post] conclusion");
+        Serial.flush();
+        audio_play_story_file(AREG_SD_STORY_CONCLUSION, 0, nullptr, nullptr);
+    }
+
+    // 2. Reflection question (offline). No question on the card → done.
+    if (!audio_sd_has_file(AREG_SD_STORY_QUESTION0)) {
+        return;
+    }
+    transition_to(ST_PLAYING);
+    audio_speaker_begin();
+    Serial.println("[post] question");
+    Serial.flush();
+    audio_play_story_file(AREG_SD_STORY_QUESTION0, 0, nullptr, nullptr);
+
+    // 3. The ANSWER needs the cloud (STT + GPT). Offline → optional close, stop.
+    if (!voice_wifi_is_connected()) {
+        Serial.println("[post] offline — answer needs connectivity; closing");
+        Serial.flush();
+        if (audio_sd_has_file(AREG_SD_OFFLINE_CLOSE)) {
+            audio_speaker_begin();
+            audio_play_story_file(AREG_SD_OFFLINE_CLOSE, 0, nullptr, nullptr);
+        }
+        return;
+    }
+
+    // 4. Listening window: invite the child to press & hold and answer. The
+    //    recording color is the "your turn" cue. No press in the window → quiet
+    //    close (never force an answer from a small child).
+    Serial.println("[post] listening for the answer (press & hold to talk)");
+    Serial.flush();
+    led_for_state(ST_RECORDING);
+    bool got_press = false;
+    const uint32_t listen_started = millis();
+    while (millis() - listen_started < AREG_REFLECTION_LISTEN_MS) {
+        if (button_poll() == 'P') {
+            got_press = true;
+            break;
+        }
+        delay(AREG_BUTTON_POLL_MS);
+    }
+    if (!got_press) {
+        Serial.println("[post] no answer in window; closing quietly");
+        Serial.flush();
+        led_for_state(ST_IDLE);
+        return;
+    }
+
+    // 5. Record the answer while held, then POST to the reflection endpoint.
+    transition_to(ST_RECORDING);
+    const size_t captured = record_question();
+    const uint32_t ms_held = (captured * 1000) / AREG_SAMPLE_RATE_HZ;
+    if (ms_held < AREG_MIN_RECORD_MS) {
+        Serial.printf("[post] answer too short (%u ms); closing\n", (unsigned)ms_held);
+        Serial.flush();
+        led_for_state(ST_IDLE);
+        return;
+    }
+
+    const size_t pcm_bytes = captured * sizeof(int16_t);
+    const size_t payload_bytes = 44 + pcm_bytes;
+    uint8_t *payload = (uint8_t *)heap_caps_malloc(payload_bytes, MALLOC_CAP_SPIRAM);
+    if (payload == nullptr) {
+        Serial.println("[post] payload alloc failed; closing");
+        Serial.flush();
+        led_for_state(ST_IDLE);
+        return;
+    }
+    audio_write_wav_header(payload, (uint32_t)captured);
+    memcpy(payload + 44, s_capture_buf, pcm_bytes);
+
+    transition_to(ST_UPLOADING);
+    audio_speaker_begin();
+    audio_play_thinking_earcon();  // immediate acoustic ack while we upload
+    Serial.println("[post] uploading answer to reflection endpoint");
+    Serial.flush();
+
+    // questionIndex 0 — this slice asks the first reflection question only.
+    VoiceTurnResult turn = voice_upload_reflection_answer(payload, payload_bytes, 0);
+    heap_caps_free(payload);
+    payload = nullptr;
+
+    if (turn.ok) {
+        transition_to(ST_PLAYING);
+        audio_speaker_begin();
+        audio_play_mp3_buffer(turn.response_bytes, turn.response_length);
+        Serial.println("[post] acknowledgement played");
+        Serial.flush();
+    } else {
+        Serial.printf("[post] reflection upload failed (status=%d)\n", turn.http_status);
+        Serial.flush();
+    }
+    voice_release_last_response();
+    led_for_state(ST_IDLE);
+}
+
 // One continuous story session.
 //
 // Streams the whole story from s_story_offset. A button press cuts the
@@ -461,6 +572,10 @@ static void handle_story_session() {
 
         if (!interrupted) {
             s_story_offset = 0;
+            // Slice 3: conclusion → reflection question → (online) listen for the
+            // child's answer → warm acknowledgement. Self-gates on the SD pack,
+            // so it is a no-op when playing the Wi-Fi stream.
+            handle_post_story_flow();
             Serial.println("[story] finished — press to play again");
             Serial.flush();
             break;

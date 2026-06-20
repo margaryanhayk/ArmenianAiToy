@@ -55,6 +55,16 @@ VoiceTurnResult voice_upload_turn(const uint8_t *payload, size_t length);
 VoiceTurnResult voice_upload_question(const uint8_t *payload, size_t length,
                                       uint32_t offset);
 
+// Post-story reflection answer upload (Slice 3). POSTs the WAV `payload` (the
+// child's recorded answer to Areg's reflection question) to
+// AREG_STORY_REFLECTION_URL with "?storyId=AREG_STORY_ID&questionIndex=<n>"
+// and the device-auth headers. The response body (on HTTP 200) is the spoken
+// warm-acknowledgement MP3, returned via the result's PSRAM buffer exactly
+// like voice_upload_question. Synchronous; call voice_release_last_response()
+// when done with the bytes. UNVERIFIED — not compiled/flashed.
+VoiceTurnResult voice_upload_reflection_answer(const uint8_t *payload, size_t length,
+                                               int question_index);
+
 // Hands-free autoplay continuation: POST to AREG_BACKEND_URL with
 // the device-auth headers AND `X-Areg-Continue: 1` and an EMPTY
 // body. The backend advances the active library story and returns

@@ -293,6 +293,65 @@ VoiceTurnResult voice_upload_question(const uint8_t *payload, size_t length,
 }
 
 // -------------------------------------------------------------
+// Post-story reflection answer upload (Slice 3)
+// UNVERIFIED — not compiled/flashed. See HARDENING-INTEGRATION.md §6.
+// Mirrors voice_upload_question but targets the reflection-answer endpoint
+// and carries questionIndex instead of the story byte offset.
+// -------------------------------------------------------------
+VoiceTurnResult voice_upload_reflection_answer(const uint8_t *payload, size_t length,
+                                               int question_index) {
+    VoiceTurnResult result;
+    voice_release_last_response();
+
+    if (!voice_wifi_is_connected()) {
+        Serial.println("[post] upload: wifi not connected");
+        result.http_status = -1001;
+        return result;
+    }
+    if (payload == nullptr || length == 0) {
+        Serial.println("[post] upload: empty payload");
+        return result;
+    }
+
+    char url[384];
+    snprintf(url, sizeof(url), "%s?storyId=%s&questionIndex=%d",
+             AREG_STORY_REFLECTION_URL, AREG_STORY_ID, question_index);
+
+    HTTPClient http;
+    http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
+    http.setTimeout(AREG_HTTP_READ_MS);
+    if (!http.begin(url)) {
+        Serial.println("[post] http.begin failed");
+        Serial.flush();
+        return result;
+    }
+    http.addHeader("Content-Type", "audio/wav");
+    http.addHeader("X-Device-Id", AREG_DEVICE_ID);
+    http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+
+    Serial.printf("[post] POST answer (%u bytes) qIndex=%d\n",
+                  (unsigned)length, question_index);
+    Serial.flush();
+    const int status = http.POST((uint8_t *)payload, length);
+    result.http_status = status;
+    if (status != 200) {
+        Serial.printf("[post] http POST non-200: %d\n", status);
+        http.end();
+        return result;
+    }
+
+    const bool read_ok = read_response_into(http, result);
+    http.end();
+    if (!read_ok) {
+        voice_release_last_response();
+        return result;
+    }
+    Serial.printf("[post] ack %u bytes\n", (unsigned)result.response_length);
+    Serial.flush();
+    return result;
+}
+
+// -------------------------------------------------------------
 // Async Q&A upload (S3 dead-air mitigation)
 // UNVERIFIED — not compiled/flashed. See HARDENING-INTEGRATION.md §2.
 // -------------------------------------------------------------
