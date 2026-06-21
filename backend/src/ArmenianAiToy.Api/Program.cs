@@ -120,11 +120,32 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-// CORS: allow all for development
+// CORS (#037): permissive ONLY in Development. In any other environment, allow
+// only the origins explicitly listed in Cors:AllowedOrigins (empty => no cross-
+// origin access). The parent dashboard, admin console, and the device are all
+// SAME-ORIGIN, so a strict policy does not affect them — it only stops arbitrary
+// websites scripting the public endpoints (register / login-probe) from a
+// victim's browser. AllowAnyOrigin in prod was a standing CSRF-adjacent risk.
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
-        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+        }
+        else
+        {
+            var origins = builder.Configuration
+                .GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+            if (origins.Length > 0)
+            {
+                policy.WithOrigins(origins).AllowAnyMethod().AllowAnyHeader();
+            }
+            // No origins configured in a non-Development environment => default
+            // deny (no CORS headers emitted): cross-origin browser calls blocked.
+        }
+    });
 });
 
 // Per-device rate limit for /api/chat. Cost-containment layer — sits ahead
