@@ -50,11 +50,12 @@ public class InternalController : ControllerBase
     private readonly LibraryStoryQuestionService _questions;
     private readonly IModerationService _moderation;
     private readonly IConfiguration _config;
+    private readonly ILogger<InternalController> _logger;
 
     public InternalController(
         AppDbContext db, ICuratedStoryLibrary library, OpenAICostMeter costMeter,
         LibraryStoryQuestionService questions, IModerationService moderation,
-        IConfiguration config)
+        IConfiguration config, ILogger<InternalController> logger)
     {
         _db = db;
         _library = library;
@@ -62,6 +63,7 @@ public class InternalController : ControllerBase
         _questions = questions;
         _moderation = moderation;
         _config = config;
+        _logger = logger;
     }
 
     /// <summary>System-wide counts + today's activity + total in-process
@@ -401,9 +403,13 @@ public class InternalController : ControllerBase
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
-            // Operator-only surface — surface the real reason (e.g. OpenAI
-            // key missing / upstream error) so tuning failures are diagnosable.
-            return StatusCode(502, new { error = ex.Message });
+            // #059: do NOT echo the raw upstream exception text on the wire (it
+            // can leak OpenAI / internal detail). Log the real reason server-side
+            // for diagnosis; return a sanitized message — same posture as the
+            // public voice paths' 502 envelope.
+            _logger.LogWarning(ex,
+                "Internal story-qa-test failed for {StoryId}", req.StoryId);
+            return StatusCode(502, new { error = "Story-QA test failed. See server logs." });
         }
     }
 

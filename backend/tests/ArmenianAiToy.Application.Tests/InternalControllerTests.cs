@@ -10,6 +10,7 @@ using ArmenianAiToy.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace ArmenianAiToy.Application.Tests;
@@ -34,7 +35,8 @@ public class InternalControllerTests
         new(db, new InMemoryCuratedStoryLibrary(), new OpenAICostMeter(),
             new LibraryStoryQuestionService(ai ?? Substitute.For<IAiChatClient>()),
             moderation ?? SafeModeration(),
-            config ?? new ConfigurationBuilder().Build());
+            config ?? new ConfigurationBuilder().Build(),
+            Substitute.For<ILogger<InternalController>>());
 
     private static IModerationService SafeModeration()
     {
@@ -272,5 +274,25 @@ public class InternalControllerTests
         var result = await NewController(db).StoryQaTest(
             new AdminStoryQaTestRequest(InMemoryCuratedStoryLibrary.LittleCloudId, 0, "   "), default);
         Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task StoryQaTest_UpstreamError_Returns502_WithoutLeakingDetail()
+    {
+        // #059: an upstream failure must NOT echo the raw exception text on the
+        // wire. A faulted moderation call drives the catch.
+        var db = NewDb();
+        var throwing = Substitute.For<IModerationService>();
+        throwing.CheckContentAsync(Arg.Any<string>())
+            .Returns(Task.FromException<ModerationResult>(
+                new InvalidOperationException("SECRET-OPENAI-DETAIL-xyz")));
+
+        var result = await NewController(db, moderation: throwing).StoryQaTest(
+            new AdminStoryQaTestRequest(InMemoryCuratedStoryLibrary.LittleCloudId, 0, "բարև"), default);
+
+        var obj = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(502, obj.StatusCode);
+        Assert.DoesNotContain("SECRET-OPENAI-DETAIL-xyz",
+            JsonSerializer.Serialize(obj.Value));
     }
 }
