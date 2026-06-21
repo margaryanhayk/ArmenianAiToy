@@ -65,9 +65,10 @@ public class StoryQaTextController : ControllerBase
         var segment = Math.Clamp(request.Segment, 0, story.Segments.Count - 1);
         var answer = await _questions.AnswerAsync(story, segment, request.Question);
 
+        // Privacy (#005): never log the child's question / the answer text.
         _logger.LogInformation(
-            "Story-QA-text. StoryId: {StoryId} Segment: {Segment} | Q: «{Q}» | A: «{A}»",
-            request.StoryId, segment, request.Question, answer.Text);
+            "Story-QA-text. StoryId: {StoryId} Segment: {Segment} | UsedFallback: {Fallback} | QLen: {QLen} | ALen: {ALen}",
+            request.StoryId, segment, answer.UsedFallback, request.Question.Length, answer.Text.Length);
 
         return Ok(new QaTextResponse(
             request.StoryId, segment, request.Question,

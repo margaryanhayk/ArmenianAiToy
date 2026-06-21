@@ -315,10 +315,10 @@ public class StoryQaController : ControllerBase
                     answerText = answer.Text;
                     answerIsModelAuthored = !answer.UsedFallback;
                     turnOutcome = answer.UsedFallback ? "answer_fallback" : "answered";
+                    // Privacy (#005): never log the child's transcribed words.
                     _logger.LogInformation(
-                        "Story-QA answered. Story: {StoryId}, Segment: {Segment}, UsedFallback: {Fallback}, Q: {Q}",
-                        storyId, segmentIndex, answer.UsedFallback,
-                        question.Length > 40 ? question[..40] + "…" : question);
+                        "Story-QA answered. Story: {StoryId}, Segment: {Segment}, UsedFallback: {Fallback}, QLen: {QLen}",
+                        storyId, segmentIndex, answer.UsedFallback, question.Length);
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
@@ -353,11 +353,15 @@ public class StoryQaController : ControllerBase
             }
         }
 
-        // Log the full Q&A pair (post-moderation answer) so it can be
-        // reviewed for Armenian quality by armenian-story-master.
+        // Privacy (#005): do NOT log the child's transcribed words or the spoken
+        // answer to stdout — that is child PII with no retention owner / outside
+        // the delete cascade. The full turn is already persisted as Message rows
+        // (PersistTurnAsync) for consented, retention-governed QA review; log
+        // only non-PII metadata here.
         _logger.LogInformation(
-            "Story-QA pair. StoryId: {StoryId} | Q: «{Question}» | A: «{Answer}»",
-            storyId, string.IsNullOrWhiteSpace(question) ? "(empty)" : question, answerText);
+            "Story-QA pair. StoryId: {StoryId} | Segment: {Segment} | Outcome: {Outcome} | QLen: {QLen} | ALen: {ALen}",
+            storyId, segmentIndex, turnOutcome,
+            string.IsNullOrWhiteSpace(question) ? 0 : question.Length, answerText.Length);
 
         // Persist the turn so it appears in the parent dashboard and is
         // covered by retention/delete — the streaming story path is

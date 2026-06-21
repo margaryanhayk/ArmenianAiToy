@@ -1524,8 +1524,10 @@ public class ChatService : IChatService
         // (e.g. "how to make a bomb" returns Flagged=false on all categories).
         if (DangerousInputFilter.IsUnsafe(userMessage))
         {
-            _logger.LogWarning("Dangerous input prefilter triggered. Device: {DeviceId}, Preview: {Preview}",
-                deviceId, userMessage.Length > 80 ? userMessage[..80] + "..." : userMessage);
+            // Privacy (#005): do not log the child's input content (PII) to
+            // stdout; the blocked utterance is persisted as a Message row below.
+            _logger.LogWarning("Dangerous input prefilter triggered. Device: {DeviceId}, Len: {Len}",
+                deviceId, userMessage.Length);
 
             await _conversations.AddMessageAsync(
                 conversation.Id, MessageRole.User, userMessage, SafetyFlag.Blocked);
@@ -1584,10 +1586,10 @@ public class ChatService : IChatService
         // child, just asking them to repeat).
         if (ArmenianVoiceReplyGuard.IsGarbledInput(userMessage))
         {
+            // Privacy (#005): do not log the child's input content (PII).
             _logger.LogInformation(
-                "Garbled-input guard triggered. ConversationId: {ConversationId}, Preview: {Preview}",
-                conversation.Id,
-                userMessage.Length > 40 ? userMessage[..40] + "..." : userMessage);
+                "Garbled-input guard triggered. ConversationId: {ConversationId}, Len: {Len}",
+                conversation.Id, userMessage.Length);
 
             var clarification = ArmenianVoiceReplyGuard.ClarificationResponse;
             var clarificationMsg = await _conversations.AddMessageAsync(

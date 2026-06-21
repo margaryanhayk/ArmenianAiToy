@@ -207,8 +207,14 @@ public class OpenAIModerationAdapter : IModerationService
     private static int StatusOf(Exception ex) =>
         ex is ClientResultException c ? c.Status : 0;
 
+    // Privacy (#005): NEVER emit the child's content to logs. This helper used
+    // to return an 80-char content snippet for every moderation log line — a
+    // child-PII leak to stdout with no retention owner. It now returns only a
+    // redacted length marker; the actual (blocked) content is persisted as a
+    // Message row, which is the consented, retention-governed record. One edit
+    // here redacts all moderation log sites that call it.
     private static string Preview(string content) =>
-        content.Length > 80 ? content[..80] + "..." : content;
+        $"[redacted len={content.Length}]";
 
     private static bool ContainsViolenceKeyword(string content)
     {
