@@ -240,18 +240,27 @@ public class StoryAudioController : ControllerBase
     private static string SegmentsPathFor(string cachePath) =>
         Path.ChangeExtension(cachePath, ".segments.json");
 
-    /// <summary>Access gate for the header-less stream. Open when
-    /// <c>StoryAudio:SigningKey</c> is unset (dev/bench); otherwise the
-    /// query <c>token</c> must be a valid signed token bound to this
-    /// story and not yet expired.</summary>
+    /// <summary>Access gate for the header-less stream. When
+    /// <c>StoryAudio:SigningKey</c> is set, the query <c>token</c> must be a
+    /// valid signed token bound to this story and not yet expired. When no key
+    /// is configured the gate is FAIL-CLOSED (deny) unless
+    /// <c>StoryAudio:AllowUnauthenticated</c> is explicitly true (dev/bench
+    /// opt-in) — same posture as the /metrics and /api/internal guards.</summary>
     private bool IsTokenAccepted(string storyId, string? token)
     {
         var signingKey = _config["StoryAudio:SigningKey"];
-        if (string.IsNullOrWhiteSpace(signingKey))
+        if (!string.IsNullOrWhiteSpace(signingKey))
         {
-            return true; // enforcement off
+            return StoryAudioToken.TryValidate(token, storyId, signingKey, DateTimeOffset.UtcNow);
         }
-        return StoryAudioToken.TryValidate(token, storyId, signingKey, DateTimeOffset.UtcNow);
+        // #006: no signing key configured -> FAIL-CLOSED by default (deny),
+        // matching the /metrics and /api/internal guards. An operator opts into
+        // open access ONLY by explicitly setting StoryAudio:AllowUnauthenticated
+        // = true (dev/bench). This stops an un-configured deploy from silently
+        // serving the narration stream to any caller. The bypass is its own
+        // flag, not tied to the environment, so a forgotten dev shortcut can't
+        // quietly open the stream in prod.
+        return bool.TryParse(_config["StoryAudio:AllowUnauthenticated"], out var allow) && allow;
     }
 
     /// <summary>Whether a re-render is authorized. Requires the configured

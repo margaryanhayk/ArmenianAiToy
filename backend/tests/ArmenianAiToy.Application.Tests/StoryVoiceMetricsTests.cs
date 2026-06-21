@@ -113,7 +113,8 @@ public class StoryVoiceMetricsTests
         var config = new ConfigurationBuilder().AddInMemoryCollection(new[]
         {
             new KeyValuePair<string, string?>("StoryAudio:CacheRoot", cacheDir),
-            new KeyValuePair<string, string?>("StoryAudio:SigningKey", "")
+            new KeyValuePair<string, string?>("StoryAudio:SigningKey", ""),
+            new KeyValuePair<string, string?>("StoryAudio:AllowUnauthenticated", "true")
         }).Build();
         var synth = Substitute.For<IAudioSynthesisService>();
         synth.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())

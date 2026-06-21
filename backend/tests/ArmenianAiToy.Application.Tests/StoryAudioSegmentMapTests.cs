@@ -37,8 +37,10 @@ public class StoryAudioSegmentMapTests
             .AddInMemoryCollection(new[]
             {
                 new KeyValuePair<string, string?>("StoryAudio:CacheRoot", cacheDir),
-                // No signing key -> open access; the render path is what we test.
-                new KeyValuePair<string, string?>("StoryAudio:SigningKey", "")
+                // No signing key + explicit bypass -> open access (#006); the
+                // render path is what this test exercises, not the gate.
+                new KeyValuePair<string, string?>("StoryAudio:SigningKey", ""),
+                new KeyValuePair<string, string?>("StoryAudio:AllowUnauthenticated", "true")
             })
             .Build();
 

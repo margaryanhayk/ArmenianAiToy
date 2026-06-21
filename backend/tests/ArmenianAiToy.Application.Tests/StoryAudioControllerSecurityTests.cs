@@ -116,13 +116,31 @@ public class StoryAudioControllerSecurityTests
     }
 
     [Fact]
-    public async Task NoSigningKey_OpenAccess_ServesAudioWithoutToken()
+    public async Task NoSigningKey_WithExplicitBypass_ServesAudioWithoutToken()
     {
-        var (controller, _, _) = Create(Config(("StoryAudio:SigningKey", "")));
+        // #006: open access now requires the EXPLICIT bypass flag, not merely an
+        // empty signing key.
+        var (controller, _, _) = Create(Config(
+            ("StoryAudio:SigningKey", ""),
+            ("StoryAudio:AllowUnauthenticated", "true")));
 
         var result = await controller.GetStoryAudio(RealStoryId, token: null);
 
         Assert.IsType<PhysicalFileResult>(result);
+    }
+
+    [Fact]
+    public async Task NoSigningKey_NoBypass_FailsClosed_Returns404_WithoutRendering()
+    {
+        // #006: the shipped default (no key, no bypass) is fail-CLOSED — same
+        // posture as the /metrics + /api/internal guards. An un-configured
+        // deploy serves nothing and renders nothing.
+        var (controller, synth, _) = Create(Config(("StoryAudio:SigningKey", "")));
+
+        var result = await controller.GetStoryAudio(RealStoryId, token: null);
+
+        Assert.IsType<NotFoundObjectResult>(result);
+        await synth.DidNotReceiveWithAnyArgs().SynthesizeArmenianAsync(default!, default);
     }
 
     // --- Refresh lock-down (the cost vector) ------------------------
@@ -133,7 +151,9 @@ public class StoryAudioControllerSecurityTests
         // No RefreshToken configured → refresh is silently downgraded to a
         // normal (cached) serve. The request still succeeds; it just can't
         // force a re-render.
-        var (controller, _, _) = Create(Config(("StoryAudio:SigningKey", "")));
+        var (controller, _, _) = Create(Config(
+            ("StoryAudio:SigningKey", ""),
+            ("StoryAudio:AllowUnauthenticated", "true")));
 
         var result = await controller.GetStoryAudio(
             RealStoryId, refresh: true, refreshToken: "anything");
