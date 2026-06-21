@@ -85,9 +85,13 @@ public class AudioChatController : ControllerBase
     /// <c>DeviceAuthMiddleware</c>.
     /// </summary>
     [HttpPost]
+    // #060: cap the buffered audio body. The firmware sends <= ~0.5 MB of WAV;
+    // 2 MB is generous headroom and stops a malicious device exhausting memory.
+    [RequestSizeLimit(2_000_000)]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]
+    [ProducesResponseType(413)]
     [ProducesResponseType(429)]
     [ProducesResponseType(502)]
     public async Task<IActionResult> Chat(CancellationToken cancellationToken)

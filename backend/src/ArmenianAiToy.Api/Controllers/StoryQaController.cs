@@ -123,8 +123,11 @@ public class StoryQaController : ControllerBase
     }
 
     [HttpPost]
+    // #060: cap the buffered audio body (firmware sends <= ~0.5 MB WAV).
+    [RequestSizeLimit(2_000_000)]
     [ProducesResponseType(200)]
     [ProducesResponseType(404)]
+    [ProducesResponseType(413)]
     [ProducesResponseType(502)]
     public async Task<IActionResult> Ask(
         [FromQuery] string storyId,
@@ -476,8 +479,11 @@ public class StoryQaController : ControllerBase
     /// <see cref="Ask"/>.
     /// </summary>
     [HttpPost("reflection-answer")]
+    // #060: cap the buffered audio body (firmware sends <= ~0.5 MB WAV).
+    [RequestSizeLimit(2_000_000)]
     [ProducesResponseType(200)]
     [ProducesResponseType(404)]
+    [ProducesResponseType(413)]
     [ProducesResponseType(502)]
     public async Task<IActionResult> AnswerReflection(
         [FromQuery] string storyId,
