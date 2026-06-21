@@ -18,7 +18,8 @@ public class DeviceService : IDeviceService
         _logger = logger;
     }
 
-    public async Task<DeviceRegistrationResponse> RegisterDeviceAsync(DeviceRegistrationRequest request)
+    public async Task<DeviceRegistrationResponse?> RegisterDeviceAsync(
+        DeviceRegistrationRequest request, bool allowReRegister = false)
     {
         // Check if device already registered
         var existing = await _db.Set<Device>()
@@ -26,6 +27,20 @@ public class DeviceService : IDeviceService
 
         if (existing != null)
         {
+            // #011: never SILENTLY rotate an in-field device's credential. A
+            // plain re-registration is refused (null -> the controller returns
+            // 409) — the device already holds its key, and LastSeen is kept
+            // current by DeviceAuthMiddleware on authenticated requests. Rotating
+            // (or returning the legacy plaintext) is a deliberate re-provision,
+            // allowed only when the caller explicitly forces it.
+            if (!allowReRegister)
+            {
+                _logger.LogInformation(
+                    "Device {MacAddress} re-registration refused (no force; credential unchanged)",
+                    request.MacAddress);
+                return null;
+            }
+
             existing.LastSeenAt = DateTime.UtcNow;
             existing.FirmwareVersion = request.FirmwareVersion;
 

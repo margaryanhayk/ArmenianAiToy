@@ -79,11 +79,17 @@ No other libraries. `WiFi`, `HTTPClient`, `driver/i2s.h`, and
 
 ## First-run provisioning (one-time)
 
-1. Start the backend on your dev laptop:
+1. Start the backend on your dev laptop. Device registration is FAIL-CLOSED by
+   default (#009), so a dev/bench host must opt into open registration:
    ```
    cd backend
+   # bash / git-bash:
+   export Devices__AllowOpenRegistration=true
    dotnet run --project src/ArmenianAiToy.Api
    ```
+   In PRODUCTION do NOT enable open registration — instead set
+   `Devices:ProvisioningSecret` and send it in the `X-Provisioning-Secret`
+   header on the register call below.
 2. Find your laptop's LAN IP (the ESP32-S3 must be on the same
    network).
 3. Register one device against the backend and save the
@@ -91,8 +97,13 @@ No other libraries. `WiFi`, `HTTPClient`, `driver/i2s.h`, and
    ```
    curl -s -X POST http://<laptop-ip>:5000/api/devices/register \
      -H 'Content-Type: application/json' \
-     -d '{"macAddress":"bench-01","name":"AregBench"}'
+     -d '{"macAddress":"bench-01"}'
    ```
+   > With a prod provisioning secret set, add
+   > `-H 'X-Provisioning-Secret: <secret>'`. Registering an ALREADY-registered
+   > MAC is REFUSED with 409 and the device keeps its key (#011); to
+   > deliberately rotate a lost/compromised key, re-send the request with
+   > `-H 'X-Force-Rotate: true'`.
 4. Copy the four values into `config.h`:
    - `AREG_WIFI_SSID` / `AREG_WIFI_PASSWORD`
    - `AREG_BACKEND_URL` (e.g. `http://192.168.1.100:5000/api/chat/audio`

@@ -57,7 +57,7 @@ public class DeviceServiceTests
         var (service, db) = CreateService();
         var request = new DeviceRegistrationRequest("AA:BB:CC:DD:EE:FF");
 
-        var result = await service.RegisterDeviceAsync(request);
+        var result = (await service.RegisterDeviceAsync(request))!;
 
         Assert.NotEqual(Guid.Empty, result.DeviceId);
         Assert.StartsWith("dtk_", result.ApiKey);
@@ -72,8 +72,8 @@ public class DeviceServiceTests
     {
         var (service, db) = CreateService();
 
-        var result = await service.RegisterDeviceAsync(
-            new DeviceRegistrationRequest("AA:BB:CC:DD:EE:FF"));
+        var result = (await service.RegisterDeviceAsync(
+            new DeviceRegistrationRequest("AA:BB:CC:DD:EE:FF")))!;
 
         var device = await db.Set<Device>().FindAsync(result.DeviceId);
         Assert.NotNull(device);
@@ -107,8 +107,8 @@ public class DeviceServiceTests
         var oldHash = seed.ApiKeyHash;
         var oldLastSeen = seed.LastSeenAt;
 
-        var result = await service.RegisterDeviceAsync(
-            new DeviceRegistrationRequest("11:22:33:44:55:66"));
+        var result = (await service.RegisterDeviceAsync(
+            new DeviceRegistrationRequest("11:22:33:44:55:66"), allowReRegister: true))!;
 
         Assert.Equal(seed.Id, result.DeviceId);
         // The returned key is a freshly-rotated plaintext, NOT the original.
@@ -144,8 +144,8 @@ public class DeviceServiceTests
         db.Set<Device>().Add(seed);
         await db.SaveChangesAsync();
 
-        var result = await service.RegisterDeviceAsync(
-            new DeviceRegistrationRequest("11:22:33:44:55:66"));
+        var result = (await service.RegisterDeviceAsync(
+            new DeviceRegistrationRequest("11:22:33:44:55:66"), allowReRegister: true))!;
 
         Assert.Equal(seed.Id, result.DeviceId);
         // Idempotency contract for legacy rows: same key the device already
@@ -161,12 +161,42 @@ public class DeviceServiceTests
     }
 
     [Fact]
+    public async Task RegisterDeviceAsync_ExistingDevice_WithoutForce_RefusedAndKeyUnchanged()
+    {
+        // #011: a plain re-registration must NOT silently rotate an in-field
+        // device's credential — it is refused (null) and the key is left intact.
+        var (service, db) = CreateService();
+        var seed = new Device
+        {
+            Id = Guid.NewGuid(),
+            MacAddress = "11:22:33:44:55:66",
+            Name = "InField",
+            ApiKey = null,
+            ApiKeyHash = DeviceApiKeyHasher.Hash("dtk_infield"),
+            RegisteredAt = DateTime.UtcNow.AddDays(-1),
+            LastSeenAt = DateTime.UtcNow.AddDays(-1)
+        };
+        db.Set<Device>().Add(seed);
+        await db.SaveChangesAsync();
+        var oldHash = seed.ApiKeyHash;
+
+        var result = await service.RegisterDeviceAsync(
+            new DeviceRegistrationRequest("11:22:33:44:55:66")); // no force
+
+        Assert.Null(result); // refused, not silently rotated
+        var reloaded = await db.Set<Device>().FindAsync(seed.Id);
+        Assert.Equal(oldHash, reloaded!.ApiKeyHash);                      // unchanged
+        Assert.True(DeviceApiKeyHasher.Verify("dtk_infield", reloaded.ApiKeyHash));
+        Assert.Equal(1, await db.Set<Device>().CountAsync());
+    }
+
+    [Fact]
     public async Task RegisterDeviceAsync_WithFirmwareVersion_Stored()
     {
         var (service, db) = CreateService();
         var request = new DeviceRegistrationRequest("AA:BB:CC:DD:EE:FF", "v1.2.3");
 
-        var result = await service.RegisterDeviceAsync(request);
+        var result = (await service.RegisterDeviceAsync(request))!;
 
         var device = await db.Set<Device>().FindAsync(result.DeviceId);
         Assert.Equal("v1.2.3", device!.FirmwareVersion);
