@@ -51,6 +51,18 @@ public class OpenAIModerationAdapter : IModerationService
         "kill", "murder", "bomb", "weapon", "gun", "shoot", "stab",
         "poison", "explode", "suicide", "terrorist", "terror",
         "drug", "alcohol",
+        // #072: Eastern Armenian stems (lowercase; matched by ToLowerInvariant +
+        // ordinal Contains). Without these, an Armenian-phrased unsafe request
+        // scoring just under the ceiling had NO keyword match, so the violence
+        // false-positive OVERRIDE would lift the block. Vetted by
+        // armenian-story-master (2026-06-22) for HIGH PRECISION: kill uses only
+        // volitional conjugations (never the bare root, so heroic 3rd-person tale
+        // narration «սպանեց վիշապին» still passes), weapons/drugs are compounds
+        // or named items. Deliberately EXCLUDED as tale-colliding: սուր (sword),
+        // կռիվ (fight), կրակ (fire), մեռավ (died), bare սպան-/պայթ-, դեղ, գինի, օղի.
+        "ատրճանակ", "ատրճ", "հրացան", "ինքնաձիգ", "ռումբ", "պայթուցիկ",
+        "սպանեմ", "սպանես", "սպանենք", "սպանիր", "խեղդեմ", "ինքնասպան",
+        "թմրադեղ", "նարկոտիկ", "հերոին", "կոկաին", "հարբ", "սեքս", "պոռնո",
     ];
 
     // D2: narrow set of opening-story-request markers. Deliberately a subset
