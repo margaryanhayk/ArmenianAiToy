@@ -2,6 +2,8 @@ using System.Text;
 using System.Text.Json;
 using ArmenianAiToy.Api.Controllers;
 using ArmenianAiToy.Application.Audio;
+using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -52,7 +54,10 @@ public class StoryAudioSegmentMapTests
         var env = Substitute.For<IWebHostEnvironment>();
         var logger = Substitute.For<ILogger<StoryAudioController>>();
         var library = new InMemoryCuratedStoryLibrary();
-        var controller = new StoryAudioController(synth, library, env, config, logger);
+        var moderation = Substitute.For<IModerationService>();
+        moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
+        var controller = new StoryAudioController(synth, library, moderation, env, config, logger);
 
         var result = await controller.GetStoryAudio(RealStoryId);
         Assert.IsType<PhysicalFileResult>(result);

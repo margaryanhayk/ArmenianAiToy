@@ -119,8 +119,11 @@ public class StoryVoiceMetricsTests
         synth.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(ci => new AudioSynthesisResult(
                 new byte[((string)ci[0]!).Length], "audio/mpeg"));
+        var moderation = Substitute.For<IModerationService>();
+        moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
         var controller = new StoryAudioController(
-            synth, new InMemoryCuratedStoryLibrary(),
+            synth, new InMemoryCuratedStoryLibrary(), moderation,
             Substitute.For<IWebHostEnvironment>(), config,
             Substitute.For<ILogger<StoryAudioController>>());
 

@@ -3,6 +3,7 @@ using System.Text;
 using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Api.Security;
 using ArmenianAiToy.Application.Audio;
+using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
 using ArmenianAiToy.Application.Telemetry;
 using Microsoft.AspNetCore.Mvc;
@@ -54,6 +55,7 @@ public class StoryAudioController : ControllerBase
 
     private readonly IAudioSynthesisService _synthesis;
     private readonly ICuratedStoryLibrary _library;
+    private readonly IModerationService _moderation;
     private readonly IWebHostEnvironment _env;
     private readonly IConfiguration _config;
     private readonly ILogger<StoryAudioController> _logger;
@@ -61,12 +63,14 @@ public class StoryAudioController : ControllerBase
     public StoryAudioController(
         IAudioSynthesisService synthesis,
         ICuratedStoryLibrary library,
+        IModerationService moderation,
         IWebHostEnvironment env,
         IConfiguration config,
         ILogger<StoryAudioController> logger)
     {
         _synthesis = synthesis;
         _library = library;
+        _moderation = moderation;
         _env = env;
         _config = config;
         _logger = logger;
@@ -159,6 +163,17 @@ public class StoryAudioController : ControllerBase
                 }
             }
             catch (OperationCanceledException) { throw; }
+            catch (StoryContentBlockedException)
+            {
+                // #016: output moderation rejected the narration text — do NOT
+                // serve it. Concealment 404 (same wire shape as an unknown
+                // story / rejected token); the LogError inside the render path
+                // is the operator-facing signal, and the device plays its canned
+                // fallback rather than ever speaking the unsafe content.
+                AppMeter.StoryAudioRender.Add(1,
+                    new KeyValuePair<string, object?>("result", "blocked"));
+                return NotFound(new { error = "Unknown story." });
+            }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex,
@@ -268,6 +283,27 @@ public class StoryAudioController : ControllerBase
         _logger.LogInformation(
             "Rendering story audio for {StoryId}: {Segments} segments -> {Chunks} TTS chunk(s)",
             story.Id, story.Segments.Count, chunks.Count);
+
+        // OUTPUT MODERATION (#016): the narration AUDIO is what the child hears,
+        // so its TEXT must clear the safety classifier BEFORE it is rendered and
+        // cached. This is a pre-flight over every chunk, run BEFORE any audio is
+        // written, so an unsafe story never produces a (partial) cache file.
+        // FAIL-CLOSED: an unsafe chunk OR a moderation outage (CheckContentAsync
+        // returns IsSafe=false by contract) aborts the render — the story is not
+        // spoken to a child; the device gets the firmware's canned fallback.
+        // Cold-render only: a cache hit never reaches here, so streaming a
+        // previously-rendered story adds NO per-request moderation cost.
+        for (var ci = 0; ci < chunks.Count; ci++)
+        {
+            var mod = await _moderation.CheckContentAsync(chunks[ci].Text);
+            if (!mod.IsSafe)
+            {
+                _logger.LogError(
+                    "Story-audio BLOCKED by output moderation: {StoryId} chunk {Chunk}/{Total} unsafe (categories: {Categories}). Content NOT rendered or served.",
+                    story.Id, ci + 1, chunks.Count, string.Join(", ", mod.FlaggedCategories));
+                throw new StoryContentBlockedException(story.Id);
+            }
+        }
 
         // Sentence-start byte offsets across the whole MP3. 0 is always a
         // boundary. Within each rendered chunk, a sentence's byte position
@@ -487,5 +523,14 @@ public class StoryAudioController : ControllerBase
         {
             yield return text[start..];
         }
+    }
+
+    /// <summary>Thrown by the render path when output moderation rejects a
+    /// story's narration text. Caught in <see cref="GetStoryAudio"/> so the
+    /// unsafe story is never rendered, cached, or served (#016).</summary>
+    private sealed class StoryContentBlockedException : Exception
+    {
+        public StoryContentBlockedException(string storyId)
+            : base($"Story '{storyId}' blocked by output moderation.") { }
     }
 }

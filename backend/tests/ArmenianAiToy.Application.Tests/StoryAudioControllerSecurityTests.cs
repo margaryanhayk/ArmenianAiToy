@@ -2,6 +2,8 @@ using System.Text;
 using ArmenianAiToy.Api.Controllers;
 using ArmenianAiToy.Api.Security;
 using ArmenianAiToy.Application.Audio;
+using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -50,9 +52,12 @@ public class StoryAudioControllerSecurityTests
             .Returns(new AudioSynthesisResult(FakeMp3, "audio/mpeg"));
         var env = Substitute.For<IWebHostEnvironment>();
         var logger = Substitute.For<ILogger<StoryAudioController>>();
+        var moderation = Substitute.For<IModerationService>();
+        moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
 
         var controller = new StoryAudioController(
-            synth, new InMemoryCuratedStoryLibrary(), env, config, logger);
+            synth, new InMemoryCuratedStoryLibrary(), moderation, env, config, logger);
         return (controller, synth, cacheDir);
     }
 
