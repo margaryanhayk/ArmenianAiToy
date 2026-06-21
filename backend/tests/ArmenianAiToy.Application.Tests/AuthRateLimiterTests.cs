@@ -129,6 +129,19 @@ public class AuthRateLimiterTests
     public void DeleteAccount_HasAuthRateLimitAttribute()
         => Assert.True(HasAuthLimiterAttribute(nameof(ParentController.DeleteAccount)));
 
+    [Fact]
+    public void DeviceRegister_HasAuthRateLimitAttribute()
+    {
+        // #010: device registration mints a credential that can drive the paid
+        // STT+GPT+TTS endpoints, so it is throttled on the same per-IP auth
+        // bucket (denial-of-wallet mitigation).
+        var method = typeof(DeviceController).GetMethod(nameof(DeviceController.Register));
+        Assert.NotNull(method);
+        var attrs = method!.GetCustomAttributes(typeof(EnableRateLimitingAttribute), inherit: true)
+            .Cast<EnableRateLimitingAttribute>().ToArray();
+        Assert.Contains(attrs, a => a.PolicyName == AuthRateLimiter.PolicyName);
+    }
+
     // Spot-check: prove we did NOT accidentally blanket-apply the auth
     // limiter to unrelated parent endpoints. These are the candidates
     // that share the /api/parents prefix but are NOT auth-sensitive in
