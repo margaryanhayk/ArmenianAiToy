@@ -36,6 +36,7 @@ public class ParentService : IParentService
     private readonly INotifier _notifier;
     private readonly IGoogleIdTokenValidator? _googleValidator;
     private readonly IAudioBlobStore _blobStore;
+    private readonly LoginAttemptThrottle _loginThrottle;
 
     /// <summary>
     /// Standard constructor used by the DI container. Optional
@@ -73,7 +74,8 @@ public class ParentService : IParentService
         Func<string, string>? hashPassword = null,
         INotifier? notifier = null,
         IGoogleIdTokenValidator? googleValidator = null,
-        IAudioBlobStore? blobStore = null)
+        IAudioBlobStore? blobStore = null,
+        LoginAttemptThrottle? loginThrottle = null)
     {
         _db = db;
         _config = config;
@@ -82,6 +84,10 @@ public class ParentService : IParentService
         _notifier = notifier ?? NullNotifier.Instance;
         _googleValidator = googleValidator;
         _blobStore = blobStore ?? NullAudioBlobStore.Instance;
+        // Real DI registers a SINGLETON so the per-account counters persist
+        // across scoped requests; the default fresh instance exists only so
+        // unit tests for unrelated flows construct ParentService unchanged.
+        _loginThrottle = loginThrottle ?? new LoginAttemptThrottle();
     }
 
     // Private no-op notifier. Used as the safe default when no
@@ -229,6 +235,16 @@ public class ParentService : IParentService
 
     public async Task<ParentLoginResponse?> LoginAsync(string email, string password)
     {
+        // #040 — per-account lockout. After repeated failed logins for this
+        // email (across all IPs), reject for a cooldown with the SAME uniform
+        // null the wrong-password path returns (no enumeration oracle), and
+        // BEFORE the BCrypt verify so a locked account costs nothing. Keyed on
+        // the submitted email so an unknown email is locked identically.
+        if (_loginThrottle.IsLockedOut(email))
+        {
+            return null;
+        }
+
         // Filter anonymized rows at the query level — their Email is
         // empty-string by construction, so an empty-email login probe
         // would otherwise match one of those rows and BCrypt.Verify
@@ -238,7 +254,19 @@ public class ParentService : IParentService
         var parent = await _db.Set<Parent>()
             .FirstOrDefaultAsync(p => p.Email == email && p.AnonymizedAt == null);
         if (parent == null || !BCrypt.Net.BCrypt.Verify(password, parent.PasswordHash))
+        {
+            // #040 — count the failure; log once on the lockout transition
+            // (no email in the message — PII-free).
+            if (_loginThrottle.RecordFailure(email))
+            {
+                _logger.LogWarning(
+                    "Per-account login lockout engaged after repeated failed logins.");
+            }
             return null;
+        }
+
+        // #040 — successful auth clears the account's failure counter.
+        _loginThrottle.RecordSuccess(email);
 
         // JWT generation runs BEFORE the LastLoginAt stamp so a
         // misconfig (missing/legacy Jwt:Key) fails fast without

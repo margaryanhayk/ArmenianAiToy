@@ -164,6 +164,10 @@ public static class DependencyInjection
         services.AddScoped<IChatService, ChatService>();
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<IDeviceService, DeviceService>();
+        // #040 — per-account login throttle. SINGLETON so the failed-attempt
+        // counters persist across scoped requests / parents; injected into the
+        // scoped ParentService.
+        services.AddSingleton<LoginAttemptThrottle>();
         services.AddScoped<IParentService, ParentService>();
 
         // Google sign-in token validator. Always registered — the
