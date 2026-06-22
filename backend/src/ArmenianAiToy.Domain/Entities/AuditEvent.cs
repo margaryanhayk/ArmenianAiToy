@@ -616,4 +616,30 @@ public class AuditEvent
             verified_recipients_notified = verifiedRecipientsNotified
         })
     };
+
+    /// <summary>
+    /// #013 — a superuser-console operator read child-bearing data (a
+    /// conversation transcript, the flagged feed, or a device's conversations).
+    /// <see cref="ActorParentId"/> is null (the actor is an operator, not a
+    /// parent) so this stays out of parent-facing feeds, exactly like the other
+    /// system-actor events. The operator IDENTITY lives in metadata along with
+    /// the endpoint, target id, and row count — operational data, NOT child PII.
+    /// </summary>
+    public static AuditEvent InternalConsoleAccess(
+        string operatorName, string endpoint, Guid? targetId, int count) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.InternalConsoleAccess,
+        ActorParentId = null,
+        TargetDeviceId = null,
+        TargetChildId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            @operator = operatorName,
+            endpoint = endpoint,
+            target = targetId,
+            count = count
+        })
+    };
 }

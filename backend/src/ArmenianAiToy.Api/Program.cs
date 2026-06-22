@@ -249,20 +249,29 @@ app.UseStaticFiles();
 // request never reaches the console controller. 404 (not 401) conceals the
 // surface. The per-parent JWT pipeline is unaffected — this guards only the
 // operator god-view.
+// #012: per-operator identity. Named operators (Internal:Operators = [{Name,
+// Token}]) each get their own bearer token; the legacy single Internal:AdminToken
+// still works for back-compat / bench. The resolved operator NAME is stashed for
+// the #013 access audit so a leaked token is traceable to (and revocable as) one
+// operator. Fail-closed default unchanged (no token + no bypass => 404).
 var internalAdminToken = builder.Configuration["Internal:AdminToken"];
 var internalAllowAnon = builder.Configuration
     .GetValue<bool>("Internal:AllowUnauthenticated");
+var internalOperators = builder.Configuration.GetSection("Internal:Operators")
+    .Get<List<InternalAdminAuth.OperatorCredential>>() ?? new();
 app.Use(async (ctx, next) =>
 {
     if (InternalAdminAuth.IsInternalPath(ctx.Request.Path))
     {
-        var decision = InternalAdminAuth.Evaluate(
-            ctx, internalAdminToken, internalAllowAnon);
-        if (decision == InternalAdminAuth.Decision.Deny)
+        var operatorName = InternalAdminAuth.ResolveOperatorName(
+            ctx, internalOperators, internalAdminToken, internalAllowAnon);
+        if (operatorName is null)
         {
             ctx.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
         }
+        // #013: stash WHO is reading so the console can audit child-data access.
+        ctx.Items["InternalOperator"] = operatorName;
         // The console is a live operator view — never let a browser or proxy
         // serve a stale snapshot of the whole-system data.
         ctx.Response.Headers["Cache-Control"] = "no-store";

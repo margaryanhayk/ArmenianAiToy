@@ -1,6 +1,7 @@
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
+using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Domain.Enums;
 using ArmenianAiToy.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
@@ -236,6 +237,7 @@ public class InternalController : ControllerBase
         var dtos = rows.Select(r => new AdminFlaggedMessageDto(
             r.Id, r.ConversationId, r.DeviceId, r.Role.ToString(),
             Snippet(r.Content), r.Flag.ToString(), r.Timestamp)).ToList();
+        await AuditAccessAsync("flagged", targetId: null, dtos.Count, ct);
         return Ok(new { messages = dtos });
     }
 
@@ -268,6 +270,7 @@ public class InternalController : ControllerBase
 
         // Trim snippets after materialization (string ops don't translate cleanly).
         var dtos = rows.Select(r => r with { Snippet = Snippet(r.Snippet) }).ToList();
+        await AuditAccessAsync("conversations", deviceId, dtos.Count, ct);
         return Ok(new { conversations = dtos });
     }
 
@@ -294,6 +297,7 @@ public class InternalController : ControllerBase
             .FirstOrDefaultAsync(ct);
 
         if (conv is null) return NotFound(new { error = "Unknown conversation." });
+        await AuditAccessAsync("conversation-detail", conversationId, conv.Messages.Count, ct);
         return Ok(conv);
     }
 
@@ -410,6 +414,25 @@ public class InternalController : ControllerBase
             _logger.LogWarning(ex,
                 "Internal story-qa-test failed for {StoryId}", req.StoryId);
             return StatusCode(502, new { error = "Story-QA test failed. See server logs." });
+        }
+    }
+
+    // #013: record WHO (the resolved console operator) read child-bearing data,
+    // so an access can be traced in an incident. Best-effort — an audit-write
+    // failure must never break the read. ActorParentId is null on the row, so it
+    // stays out of every parent-facing feed (it shows only in the console's own
+    // /audit tab). The operator name comes from the gate (Program.cs stashes it).
+    private async Task AuditAccessAsync(string endpoint, Guid? targetId, int count, CancellationToken ct)
+    {
+        try
+        {
+            var op = HttpContext?.Items["InternalOperator"] as string ?? "unknown";
+            _db.AuditEvents.Add(AuditEvent.InternalConsoleAccess(op, endpoint, targetId, count));
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Internal console access-audit write failed for {Endpoint}", endpoint);
         }
     }
 

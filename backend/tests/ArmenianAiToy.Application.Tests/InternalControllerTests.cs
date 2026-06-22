@@ -7,6 +7,7 @@ using ArmenianAiToy.Application.Stories;
 using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Domain.Enums;
 using ArmenianAiToy.Infrastructure.Data;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -294,5 +295,30 @@ public class InternalControllerTests
         Assert.Equal(502, obj.StatusCode);
         Assert.DoesNotContain("SECRET-OPENAI-DETAIL-xyz",
             JsonSerializer.Serialize(obj.Value));
+    }
+
+    // ── #013: per-operator access audit on content reads ───────────
+
+    [Fact]
+    public async Task ConversationDetail_WritesAccessAudit_WithOperator_AndNullParentActor()
+    {
+        var db = NewDb();
+        var d = Dev();
+        db.Devices.Add(d);
+        var conv = new Conversation { Id = Guid.NewGuid(), DeviceId = d.Id, StartedAt = DateTime.UtcNow };
+        db.Conversations.Add(conv);
+        db.Messages.Add(new Message { Id = Guid.NewGuid(), ConversationId = conv.Id, Role = MessageRole.User, Content = "hi", Timestamp = DateTime.UtcNow, SafetyFlag = SafetyFlag.Clean });
+        await db.SaveChangesAsync();
+
+        var controller = NewController(db);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        controller.HttpContext.Items["InternalOperator"] = "alice-ops";
+
+        await controller.ConversationDetail(conv.Id, default);
+
+        var audit = await db.AuditEvents.SingleAsync(a => a.EventType == AuditEventType.InternalConsoleAccess);
+        Assert.Null(audit.ActorParentId);                  // operator, not a parent -> invisible to parent feeds
+        Assert.Contains("alice-ops", audit.Metadata!);     // identity is traceable / revocable (#012)
+        Assert.Contains("conversation-detail", audit.Metadata!);
     }
 }

@@ -20,5 +20,12 @@ public enum AuditEventType
     ParentEmailVerified,
     DeviceDormancyWarned,
     ParentGoogleSignIn,
-    DeviceDormancyDeleted
+    DeviceDormancyDeleted,
+
+    /// <summary>#013 — a superuser console operator read child-bearing data
+    /// (a conversation transcript, the flagged feed, or a device's
+    /// conversations). System-actor-style row (ActorParentId null, so it stays
+    /// out of parent-facing feeds); metadata carries the operator name + the
+    /// endpoint + target id + count. No child PII.</summary>
+    InternalConsoleAccess
 }

@@ -64,30 +64,58 @@ public static class InternalAdminAuth
     /// request may reach the console controller or must be short-circuited
     /// with a 404.
     /// </summary>
+    /// <summary>A named operator credential (from <c>Internal:Operators</c>).</summary>
+    public sealed record OperatorCredential(string Name, string Token);
+
+    /// <summary>Back-compat single-token decision. Delegates to
+    /// <see cref="ResolveOperatorName"/> with no named operators — Allow iff the
+    /// presented bearer matches the single token (or the bypass is on).</summary>
     public static Decision Evaluate(
         HttpContext ctx,
         string? configuredToken,
         bool allowUnauthenticated)
-    {
-        // Explicit bypass wins outright — the dev/local switch. The
-        // invariant is "protected by default"; the bypass is the opt-out
-        // an operator must knowingly set.
-        if (allowUnauthenticated) return Decision.Allow;
+        => ResolveOperatorName(ctx, Array.Empty<OperatorCredential>(), configuredToken, allowUnauthenticated)
+               is not null
+            ? Decision.Allow
+            : Decision.Deny;
 
-        // No token configured → cannot authenticate anyone → fail closed.
-        // This is the shipped default and is what makes a fresh deploy
-        // protected without extra config.
-        if (string.IsNullOrEmpty(configuredToken)) return Decision.Deny;
+    /// <summary>
+    /// #012 — resolves the calling operator's IDENTITY, or null = deny. The
+    /// presented bearer is matched (constant-time) against the named operators
+    /// first, then the legacy single token; the resolved NAME is what the access
+    /// audit (#013) records, so a leaked token is traceable to one operator and
+    /// can be revoked without rotating everyone. The explicit dev/bench bypass
+    /// returns the sentinel "dev-bypass". null => 404 (fail-closed default).
+    /// </summary>
+    public static string? ResolveOperatorName(
+        HttpContext ctx,
+        IReadOnlyList<OperatorCredential> operators,
+        string? legacyToken,
+        bool allowUnauthenticated)
+    {
+        // Explicit bypass wins outright — the dev/local switch.
+        if (allowUnauthenticated) return "dev-bypass";
 
         var header = ctx.Request.Headers[AuthorizationHeader].ToString();
         if (string.IsNullOrEmpty(header)
             || !header.StartsWith(BearerPrefix, StringComparison.OrdinalIgnoreCase))
-            return Decision.Deny;
+            return null;
 
         var presented = header[BearerPrefix.Length..];
-        return ConstantTimeEquals(presented, configuredToken)
-            ? Decision.Allow
-            : Decision.Deny;
+
+        // Named per-operator tokens first — the resolved name is what the access
+        // audit records, so an individual operator can be identified and revoked.
+        foreach (var op in operators)
+        {
+            if (!string.IsNullOrEmpty(op.Token) && ConstantTimeEquals(presented, op.Token))
+                return op.Name;
+        }
+        // Legacy single shared token (back-compat / bench). Anonymous-ish: there
+        // is no per-operator identity behind it, so the audit records it as such.
+        if (!string.IsNullOrEmpty(legacyToken) && ConstantTimeEquals(presented, legacyToken))
+            return "admin (shared token)";
+
+        return null;
     }
 
     private static bool ConstantTimeEquals(string a, string b)

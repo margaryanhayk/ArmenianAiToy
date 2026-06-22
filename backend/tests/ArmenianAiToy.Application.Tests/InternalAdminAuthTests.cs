@@ -88,6 +88,39 @@ public class InternalAdminAuthTests
             InternalAdminAuth.Evaluate(Ctx("Bearer wrong"), TestToken, true));
     }
 
+    // ── #012: per-operator identity resolution ──────────────────────
+
+    private static InternalAdminAuth.OperatorCredential[] Ops() =>
+    [
+        new("alice", "tok-alice"),
+        new("bob", "tok-bob"),
+    ];
+
+    [Fact]
+    public void ResolveOperator_NamedTokenMatch_ReturnsThatOperatorName()
+        => Assert.Equal("bob",
+            InternalAdminAuth.ResolveOperatorName(Ctx("Bearer tok-bob"), Ops(), legacyToken: null, allowUnauthenticated: false));
+
+    [Fact]
+    public void ResolveOperator_LegacyToken_ReturnsSharedLabel()
+        => Assert.Equal("admin (shared token)",
+            InternalAdminAuth.ResolveOperatorName(Ctx("Bearer legacy"), Ops(), legacyToken: "legacy", allowUnauthenticated: false));
+
+    [Fact]
+    public void ResolveOperator_WrongToken_ReturnsNull()
+        => Assert.Null(
+            InternalAdminAuth.ResolveOperatorName(Ctx("Bearer nope"), Ops(), legacyToken: "legacy", allowUnauthenticated: false));
+
+    [Fact]
+    public void ResolveOperator_NoCredsNoBypass_ReturnsNull()
+        => Assert.Null(
+            InternalAdminAuth.ResolveOperatorName(Ctx("Bearer anything"), [], legacyToken: null, allowUnauthenticated: false));
+
+    [Fact]
+    public void ResolveOperator_Bypass_ReturnsDevSentinel()
+        => Assert.Equal("dev-bypass",
+            InternalAdminAuth.ResolveOperatorName(Ctx(null), [], legacyToken: null, allowUnauthenticated: true));
+
     [Theory]
     [InlineData("/api/internal", true)]
     [InlineData("/api/internal/overview", true)]
