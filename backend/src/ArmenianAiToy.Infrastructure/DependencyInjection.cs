@@ -28,7 +28,13 @@ public static class DependencyInjection
     {
         // Database
         var connectionString = config["Database:ConnectionString"] ?? "Data Source=armenian_ai_toy.db";
-        services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
+        // #019 — concurrency stopgap for the single-file SQLite deployment:
+        // WAL + busy_timeout + synchronous=NORMAL on every opened connection
+        // so concurrent writers wait for the lock instead of throwing
+        // SQLITE_BUSY -> 500s. The real fix is moving off SQLite (#018).
+        services.AddDbContext<AppDbContext>(options =>
+            options.UseSqlite(connectionString)
+                   .AddInterceptors(new SqlitePragmaInterceptor()));
         services.AddScoped<DbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
         // OpenAI
