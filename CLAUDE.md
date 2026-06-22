@@ -1693,14 +1693,42 @@ the owner/operator surface.
 middleware in `Program.cs` over the `/api/internal/*` path prefix, run
 **before** `MapControllers`. NOT the parent JWT pipeline.
 
-- `Internal:AdminToken` (default `""`) — the expected bearer token.
-- `Internal:AllowUnauthenticated` (default `false`) — explicit dev bypass.
-- **Shipped default is fail-closed**: with both at defaults, every
-  `/api/internal/*` request gets a **404** (concealment, same posture as
-  `/metrics`). Operator opts in by setting the token and sending
-  `Authorization: Bearer <token>`. Constant-time token compare.
+- `Internal:Operators` (default `[]`) — **preferred**: an ordered list of
+  named per-operator credentials `[{ "Name": "...", "Token": "..." }]`. The
+  presented bearer is matched constant-time against each operator's token;
+  the FIRST match wins and resolves to that operator's name. A leaked token
+  traces to one operator and can be revoked (drop that entry) without
+  rotating everyone else.
+- `Internal:AdminToken` (default `""`) — legacy single shared token, still
+  honored as a fallback after the named operators. A match here resolves to
+  the sentinel name `"admin (shared token)"` (no per-operator identity).
+- `Internal:AllowUnauthenticated` (default `false`) — explicit dev bypass;
+  resolves to the sentinel name `"dev-bypass"`.
+- **Shipped default is fail-closed**: with `Operators` empty, `AdminToken`
+  empty, and the bypass off, every `/api/internal/*` request gets a **404**
+  (concealment, same posture as `/metrics`). Operator opts in by adding a
+  named operator (or setting the legacy token) and sending
+  `Authorization: Bearer <token>`. Constant-time compare throughout.
+- The gate resolves the caller via
+  `InternalAdminAuth.ResolveOperatorName(...)` (returns the operator name or
+  `null` = 404), stashes the name in `ctx.Items["InternalOperator"]`, and
+  sets `Cache-Control: no-store` on the response. `Evaluate(...)` is kept as
+  a thin back-compat delegate (Allow iff `ResolveOperatorName` is non-null).
 - The `wwwroot/admin.html` page is served openly (an empty shell); it is
-  useless without the token, which all its data calls require.
+  useless without a token, which all its data calls require.
+
+**Access audit (#013).** Every cross-family content read — `GET /flagged`,
+`GET /conversations`, `GET /conversations/{id}` — writes one
+`InternalConsoleAccess` audit row (`AuditEvent.InternalConsoleAccess`)
+carrying the resolved operator name, the endpoint, the target id, and the
+row count. `ActorParentId` is **null** (system-actor), so these rows are
+invisible to every parent-facing audit feed by the existing
+`ActorParentId == parentId` query filter — they surface only in the
+console's own GLOBAL `GET /audit`. `AuditEventType.InternalConsoleAccess`
+is string-converted (no migration). The audit write is best-effort
+(wrapped in try/catch + `LogWarning`) so an audit-write hiccup never breaks
+a read. Aggregate-count reads (`/overview`, `/devices`, `/parents`,
+`/stories`) are NOT audited — they expose no per-child transcript content.
 
 **Read-only by design (Phase 1).** Every endpoint is a GET. An admin
 token that could mutate (pause devices, promote drafts, delete) is a
@@ -1745,7 +1773,10 @@ Pagination guard mirrors the parent endpoints (`offset < 0` / `limit < 1`
 Google linkage is surfaced as `GoogleLinked: bool`, never the raw
 `GoogleSubject`. Pinned by `InternalControllerTests`
 (`Parents_NeverExposePasswordHash`, `Devices_NeverExposeApiKeyOrHash`).
-The fail-closed gate is pinned by `InternalAdminAuthTests`.
+The fail-closed gate and per-operator resolution are pinned by
+`InternalAdminAuthTests` (`ResolveOperator_*`); the access-audit write is
+pinned by `InternalControllerTests`
+(`ConversationDetail_WritesAccessAudit_WithOperator_AndNullParentActor`).
 
 **Out of scope (deferred):** operator ACTIONS (pause/bedtime/mode as
 admin, draft promote, delete) and parent/admin role unification —
