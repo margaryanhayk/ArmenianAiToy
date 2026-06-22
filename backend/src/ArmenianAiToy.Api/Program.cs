@@ -241,6 +241,18 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 }
 
+// #039 — proxy-aware client IP, opt-in. OFF by default (ForwardedHeaders:Enabled
+// false): X-Forwarded-For is NOT processed, RemoteIpAddress stays the direct TCP
+// peer, and the per-IP rate limiters are unchanged. When an operator runs behind
+// a TLS-terminating proxy they enable it and list the proxy IP(s) in
+// ForwardedHeaders:KnownProxies; this then rewrites RemoteIpAddress from XFF
+// (trusting ONLY those proxies) so every limiter keys on the real client IP with
+// no limiter-code change. Registered FIRST so all downstream middleware (CORS,
+// rate limiter, device auth, controllers) sees the corrected client IP.
+var forwardedHeaders = ForwardedHeadersConfig.TryBuild(builder.Configuration);
+if (forwardedHeaders is not null)
+    app.UseForwardedHeaders(forwardedHeaders);
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
