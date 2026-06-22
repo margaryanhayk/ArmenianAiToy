@@ -529,6 +529,35 @@ public class ParentControllerExportTests
             export.ExcludedFields);
     }
 
+    // --- #067 retention disclosure -----------------------------------
+
+    [Fact]
+    public async Task Export_DisclosesDataRetentionPolicy()
+    {
+        // #067 — the export must surface the retention policy ("deleted after
+        // N days") so a parent has storage-limitation transparency. The test
+        // config has no Retention override, so it resolves to the shipped
+        // default (enabled, 90 days).
+        var parentId = Guid.NewGuid();
+        var (controller, db, conn, _, _) = await CreateControllerAsync(parentId);
+        await using var _ = conn;
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId,
+            Email = "retention@example.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("pw12345678"),
+            RegisteredAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var export = GetExport(await controller.Export());
+
+        Assert.NotNull(export.DataRetention);
+        Assert.True(export.DataRetention.Enabled);
+        Assert.Equal(90, export.DataRetention.MessageRetentionDays);
+        Assert.False(string.IsNullOrWhiteSpace(export.DataRetention.Description));
+    }
+
     [Fact]
     public async Task Export_GoogleLinkedParent_GoogleSubjectIsSurfaced()
     {

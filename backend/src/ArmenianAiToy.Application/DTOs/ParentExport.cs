@@ -31,7 +31,20 @@ public record ParentExport(
     List<ParentExportDevice> Devices,
     List<AuditEventDto> AuditEvents,
     string[] ExcludedFields,
-    ParentExportAudioDisclosure AudioDisclosure);
+    ParentExportAudioDisclosure AudioDisclosure,
+    ParentExportRetention DataRetention);
+
+/// <summary>
+/// #067 — parent-facing disclosure of the data-retention policy. Surfaces
+/// what the background <c>RetentionPurgeService</c> actually does so a parent
+/// can see "deleted after N days" (GDPR storage-limitation transparency)
+/// rather than having to read source or terms. <see cref="MessageRetentionDays"/>
+/// is null when automatic deletion is disabled on the deployment.
+/// </summary>
+public record ParentExportRetention(
+    bool Enabled,
+    int? MessageRetentionDays,
+    string Description);
 
 /// <summary>
 /// #035 — DSAR honesty for voice recordings. Audio attachments (the child's

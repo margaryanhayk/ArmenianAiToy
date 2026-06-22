@@ -4,6 +4,7 @@ using ArmenianAiToy.Api.Observability;
 using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Api.Security;
 using ArmenianAiToy.Application.Auth;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Infrastructure;
 using ArmenianAiToy.Infrastructure.Data;
@@ -228,6 +229,20 @@ var app = builder.Build();
 // #061 — surface an unpinned Host filter in non-Development environments.
 if (hostFiltering.Warning is not null)
     app.Logger.LogWarning("{HostFilteringWarning}", hostFiltering.Warning);
+
+// #067 — alert loudly if automatic data retention is DISABLED outside
+// Development. A silent disable means a children's product keeps child
+// conversations forever with no purge — a storage-limitation / compliance
+// risk that must never pass unnoticed in prod.
+if (!app.Environment.IsDevelopment())
+{
+    var (retentionEnabled, _) = RetentionPolicy.ResolveMessages(builder.Configuration);
+    if (!retentionEnabled)
+        app.Logger.LogWarning(
+            "Data retention is DISABLED (Retention:Messages:MaxAgeDays <= 0) in a " +
+            "non-Development environment — child conversations will be retained " +
+            "indefinitely with no automatic purge. Set a positive MaxAgeDays in prod.");
+}
 
 // Apply any unapplied EF Core migrations. Replaces the previous
 // EnsureCreated() call — migrations are now the single source of truth

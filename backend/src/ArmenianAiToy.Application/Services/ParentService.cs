@@ -1428,7 +1428,21 @@ public class ParentService : IParentService
                 AssistantAudioEndpoint: "GET /api/parents/messages/{messageId}/audio",
                 ChildAudioStatus: "The child's own uploaded audio is retained under the " +
                       "configured retention policy but is not currently included in this " +
-                      "export or exposed through a per-recording download endpoint."));
+                      "export or exposed through a per-recording download endpoint."),
+            // #067 — disclose the data-retention policy so a parent can see
+            // "deleted after N days" (GDPR storage-limitation transparency).
+            DataRetention: BuildRetentionDisclosure());
+    }
+
+    // #067 — projection of the message-retention config (same source/semantics
+    // as RetentionPurgeService) into the parent-facing disclosure shape.
+    private ParentExportRetention BuildRetentionDisclosure()
+    {
+        var (enabled, days) = RetentionPolicy.ResolveMessages(_config);
+        return new ParentExportRetention(
+            Enabled: enabled,
+            MessageRetentionDays: enabled ? days : null,
+            Description: RetentionPolicy.DescribeForParent(_config));
     }
 
     public async Task<List<AuditEventDto>> GetAuditEventsForParentAsync(
