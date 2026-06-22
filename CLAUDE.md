@@ -55,6 +55,18 @@ Migration sources live in
 `dotnet-ef` is pinned to 9.0.3 via `.config/dotnet-tools.json` at the
 repo root.
 
+**SQLite concurrency PRAGMAs (#019).** `SqlitePragmaInterceptor`
+(a `DbConnectionInterceptor` wired in `AddInfrastructure` via
+`AddInterceptors`) runs `journal_mode=WAL`, `busy_timeout=5000`, and
+`synchronous=NORMAL` on every opened connection. Without these the
+shipped SQLite defaults fail a concurrent writer immediately with
+`SQLITE_BUSY` (→ 500s). This is a **stopgap** for the single-file
+deployment; moving off SQLite (a future slice) is the real fix.
+`journal_mode` is a persistent file setting (idempotent on re-issue);
+`busy_timeout`/`synchronous` are per-connection. In-memory test DBs
+ignore WAL harmlessly. The WAL sidecars (`*.db-wal` / `*.db-shm`) are
+already `.gitignore`d.
+
 ### First-time setup (fresh clone)
 
 ```bash
