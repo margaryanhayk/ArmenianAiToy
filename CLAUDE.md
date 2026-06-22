@@ -508,6 +508,16 @@ single JSON document containing the parent's own scope:
   downstream readers can evolve with the shape. **excludedFields**
   documents intentional omissions inline
   (`Parent.PasswordHash`, `Device.ApiKey`).
+- **audioDisclosure** (#035): binary voice recordings are referenced by
+  message, not embedded in the JSON (impractical to inline). Rather than
+  silently dropping them (a GDPR Art.15/20 honesty gap), the export carries
+  a top-level `audioDisclosure { note, assistantAudioEndpoint,
+  childAudioStatus }` that explains the omission + its reason, points at the
+  per-message `audioAvailable` flag and the C2.1 streamer
+  `GET /api/parents/messages/{messageId}/audio`, and honestly states that
+  child-uploaded audio is retained but not yet individually downloadable
+  (the child-audio replay slice is deferred — see § Voice chat C2.2). It is
+  additive; `excludedFields` still carries only the credential omissions.
 
 Response headers: `Content-Type: application/json` and
 `Content-Disposition: attachment; filename="areg-export-<utcts>.json"`.
