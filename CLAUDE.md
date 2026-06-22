@@ -1130,14 +1130,20 @@ requests. Please slow down." }` 429 body).
 **Invariants (do not regress)**:
 - The two policies are **separate buckets** — do not merge, do not
   let chat traffic consume the auth quota or vice versa.
-- The `auth` policy keys on `Connection.RemoteIpAddress` only.
-  **`X-Forwarded-For` is attacker-controlled today** — the repo does
-  not configure `ForwardedHeaders` middleware. Proxy-aware keying
-  is a deploy-slice concern: enabling it requires the operator to
-  wire `ForwardedHeaders` with an explicit trusted-proxy list
-  before the limiter's key is changed. A regression test
-  (`AuthRateLimiterTests.PolicyFactory_IgnoresXForwardedForHeader_InThisSlice`)
-  pins this contract.
+- The limiters key on `Connection.RemoteIpAddress` only — they NEVER
+  read `X-Forwarded-For` directly (that header is attacker-controlled).
+  **Proxy-aware keying is now an opt-in seam (#039)**: when
+  `ForwardedHeaders:Enabled=true` AND `ForwardedHeaders:KnownProxies`
+  lists at least one valid proxy, `Program.cs` registers
+  `UseForwardedHeaders` FIRST and it rewrites `RemoteIpAddress` from XFF
+  — trusting ONLY those proxies — so the limiters key on the real client
+  IP with no limiter-code change. Shipped default is OFF
+  (`ForwardedHeadersConfig.TryBuild` returns null), so XFF is not
+  processed and `RemoteIpAddress` stays the direct TCP peer. Enabled-but-
+  no-valid-proxy fails safe to OFF (never trust all upstreams). The
+  limiter-level contract that XFF is never read directly is pinned by
+  `AuthRateLimiterTests.PolicyFactory_IgnoresXForwardedForHeader_InThisSlice`;
+  the opt-in resolution is pinned by `ForwardedHeadersConfigTests`.
 - Do not apply `[EnableRateLimiting("auth")]` to read-only parent
   endpoints (device listings, conversation reads, audit history,
   export) or to control endpoints that are already JWT-gated
