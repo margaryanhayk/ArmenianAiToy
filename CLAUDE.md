@@ -1078,6 +1078,31 @@ previous key keeps working for its lifetime without a forced flush.
   `SigningSide_TokenSignedWithPrimary_FailsValidationAgainstOnlyPreviousKey`
   test fails.
 
+## Host filtering & CORS (network-origin guards)
+
+**CORS (#037).** `AddCors` default policy is permissive (`AllowAnyOrigin`)
+**only** in Development; in any other environment it allows just the
+origins listed in `Cors:AllowedOrigins` (empty ⇒ no cross-origin access).
+The parent dashboard, admin console, and device are all same-origin, so the
+strict prod policy doesn't affect them.
+
+**Host filtering (#061).** `HostFilteringConfig.Resolve(isDevelopment,
+AllowedHosts)` (pure helper in `Api/Security/`) feeds
+`HostFilteringOptions` from `Program.cs`:
+- **Development** → permissive (`*`), so a bench reached by IP keeps working.
+- **Other environment, hosts pinned** → restrict to the semicolon-separated
+  names in `AllowedHosts` (a bare `*` entry is stripped).
+- **Other environment, unpinned** → STAYS permissive but logs a loud startup
+  `LogWarning`. Failing closed (rejecting every request on a forgotten config
+  key) would be a worse outage than a permissive filter, so the warning is
+  the signal, not a hard block.
+The `Configure<HostFilteringOptions>` call runs last, so it overrides the
+framework's default `AllowedHosts`-config binding. Base `appsettings.json`
+ships `AllowedHosts: ""` (nothing pinned); `appsettings.Development.json`
+ships `"*"`. **Operators must set real hostnames in prod** to enable
+Host-header filtering and silence the warning. Pinned by
+`HostFilteringConfigTests`.
+
 ## Rate limiting
 
 Two named ASP.NET rate-limit policies, both fixed-window, both
