@@ -497,6 +497,38 @@ public class ParentControllerExportTests
             export.ExcludedFields);
     }
 
+    // --- #035 audio DSAR disclosure ----------------------------------
+
+    [Fact]
+    public async Task Export_DisclosesAudioOmission_WithAccessPath()
+    {
+        // #035 — voice recordings are not embedded in the JSON; the export
+        // must DISCLOSE that (GDPR Art.15/20 honesty) and point to the
+        // assistant-audio access path, rather than silently dropping it.
+        var parentId = Guid.NewGuid();
+        var (controller, db, conn, _, _) = await CreateControllerAsync(parentId);
+        await using var _ = conn;
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = parentId,
+            Email = "dsar@example.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("pw12345678"),
+            RegisteredAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var export = GetExport(await controller.Export());
+
+        Assert.NotNull(export.AudioDisclosure);
+        Assert.Contains("/api/parents/messages/", export.AudioDisclosure.AssistantAudioEndpoint);
+        Assert.False(string.IsNullOrWhiteSpace(export.AudioDisclosure.Note));
+        Assert.False(string.IsNullOrWhiteSpace(export.AudioDisclosure.ChildAudioStatus));
+        // The disclosure is additive — the credential-exclusion contract is intact.
+        Assert.Equal(
+            new[] { "Parent.PasswordHash", "Device.ApiKey", "Device.ApiKeyHash" },
+            export.ExcludedFields);
+    }
+
     [Fact]
     public async Task Export_GoogleLinkedParent_GoogleSubjectIsSurfaced()
     {

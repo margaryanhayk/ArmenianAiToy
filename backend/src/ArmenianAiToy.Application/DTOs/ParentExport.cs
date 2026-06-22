@@ -30,7 +30,31 @@ public record ParentExport(
     ParentExportProfile Parent,
     List<ParentExportDevice> Devices,
     List<AuditEventDto> AuditEvents,
-    string[] ExcludedFields);
+    string[] ExcludedFields,
+    ParentExportAudioDisclosure AudioDisclosure);
+
+/// <summary>
+/// #035 — DSAR honesty for voice recordings. Audio attachments (the child's
+/// spoken input and Areg's spoken replies) are stored as binary blobs
+/// referenced by each <c>Message</c>, NOT embedded in this JSON document
+/// (binary audio is omitted for format/size reasons). GDPR Art.15/20 require
+/// the data subject be told what exists and how to obtain it, so the export
+/// discloses the omission, the lawful reason, and the access path rather than
+/// silently dropping it.
+///
+/// <para>
+/// Per-message, the existing <c>MessageDto.AudioAvailable</c> flag already
+/// indicates which assistant messages have a replayable recording.
+/// <see cref="AssistantAudioEndpoint"/> is the path that streams it.
+/// <see cref="ChildAudioStatus"/> states the current limitation for the
+/// child's own uploaded audio (no per-blob download endpoint yet — the
+/// child-audio replay slice is deferred; see CLAUDE.md § Voice chat C2.2).
+/// </para>
+/// </summary>
+public record ParentExportAudioDisclosure(
+    string Note,
+    string AssistantAudioEndpoint,
+    string ChildAudioStatus);
 
 /// <summary>
 /// Safe parent fields only — no password hash. <c>GoogleSubject</c>

@@ -1415,7 +1415,20 @@ public class ParentService : IParentService
                 "Parent.PasswordHash",
                 "Device.ApiKey",
                 "Device.ApiKeyHash"
-            });
+            },
+            // #035 — disclose the audio omission + access path rather than
+            // silently dropping voice recordings (GDPR Art.15/20 honesty).
+            AudioDisclosure: new ParentExportAudioDisclosure(
+                Note: "Voice recordings (the child's spoken input and Areg's spoken " +
+                      "replies) are stored as audio attachments referenced by each " +
+                      "message, not embedded in this JSON export — binary audio is " +
+                      "omitted for format and size reasons. Each message's " +
+                      "'audioAvailable' flag indicates whether a replayable assistant " +
+                      "recording exists for it.",
+                AssistantAudioEndpoint: "GET /api/parents/messages/{messageId}/audio",
+                ChildAudioStatus: "The child's own uploaded audio is retained under the " +
+                      "configured retention policy but is not currently included in this " +
+                      "export or exposed through a per-recording download endpoint."));
     }
 
     public async Task<List<AuditEventDto>> GetAuditEventsForParentAsync(
