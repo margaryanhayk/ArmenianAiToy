@@ -40,12 +40,12 @@ public class ChildServiceTests
         var (service, db) = CreateService();
         var deviceId = Guid.NewGuid();
 
-        var child = await service.CreateChildAsync(deviceId, "Arman", Gender.Boy, new DateOnly(2021, 6, 15));
+        var child = await service.CreateChildAsync(deviceId, "Arman", Gender.Boy, 2021);
 
         Assert.NotEqual(Guid.Empty, child.Id);
         Assert.Equal("Arman", child.Name);
         Assert.Equal(Gender.Boy, child.Gender);
-        Assert.Equal(new DateOnly(2021, 6, 15), child.DateOfBirth);
+        Assert.Equal(2021, child.BirthYear);
         Assert.Equal(deviceId, child.DeviceId);
 
         var persisted = await db.Set<Child>().FindAsync(child.Id);
@@ -54,16 +54,16 @@ public class ChildServiceTests
     }
 
     [Fact]
-    public async Task CreateChildAsync_NullDateOfBirth_Accepted()
+    public async Task CreateChildAsync_NullBirthYear_Accepted()
     {
         var (service, db) = CreateService();
 
         var child = await service.CreateChildAsync(Guid.NewGuid(), "Ani", Gender.Girl, null);
 
-        Assert.Null(child.DateOfBirth);
+        Assert.Null(child.BirthYear);
         var persisted = await db.Set<Child>().FindAsync(child.Id);
         Assert.NotNull(persisted);
-        Assert.Null(persisted!.DateOfBirth);
+        Assert.Null(persisted!.BirthYear);
     }
 
     // --- GetChildAsync ---
@@ -163,7 +163,7 @@ public class ChildServiceTests
             Id = Guid.NewGuid(),
             Name = "Arman",
             Gender = Gender.Boy,
-            DateOfBirth = new DateOnly(2021, 6, 15),
+            BirthYear = 2021,
             DeviceId = Guid.NewGuid()
         };
 
@@ -183,7 +183,7 @@ public class ChildServiceTests
             Id = Guid.NewGuid(),
             Name = "Ani",
             Gender = Gender.Girl,
-            DateOfBirth = new DateOnly(2020, 3, 10),
+            BirthYear = 2020,
             DeviceId = Guid.NewGuid()
         };
 
@@ -203,7 +203,7 @@ public class ChildServiceTests
             Id = Guid.NewGuid(),
             Name = "Gor",
             Gender = Gender.Boy,
-            DateOfBirth = new DateOnly(2021, 1, 1),
+            BirthYear = 2021,
             DeviceId = Guid.NewGuid()
         };
 
@@ -214,7 +214,7 @@ public class ChildServiceTests
     }
 
     [Fact]
-    public void BuildChildContext_NoDateOfBirth_OmitsAgeSection()
+    public void BuildChildContext_NoBirthYear_OmitsAgeSection()
     {
         var (service, _) = CreateService();
         var child = new Child
@@ -222,7 +222,7 @@ public class ChildServiceTests
             Id = Guid.NewGuid(),
             Name = "Ani",
             Gender = Gender.Girl,
-            DateOfBirth = null,
+            BirthYear = null,
             DeviceId = Guid.NewGuid()
         };
 

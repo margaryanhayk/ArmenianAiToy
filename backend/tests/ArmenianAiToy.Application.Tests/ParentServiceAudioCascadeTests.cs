@@ -128,7 +128,7 @@ public class ParentServiceAudioCascadeTests
             Id = childId,
             DeviceId = deviceId,
             Name = "Areg",
-            DateOfBirth = new DateOnly(2020, 1, 1)
+            BirthYear = 2020
         });
         db.Set<Conversation>().Add(new Conversation
         {

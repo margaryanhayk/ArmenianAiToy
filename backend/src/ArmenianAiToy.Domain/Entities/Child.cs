@@ -6,7 +6,14 @@ public class Child
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
-    public DateOnly? DateOfBirth { get; set; }
+
+    /// <summary>
+    /// #066 — data minimization. We store only the child's BIRTH YEAR, never the
+    /// exact date of birth: age (±1 yr) is all the product needs (Armenian
+    /// grammar + age-appropriateness), and a minor's precise DOB is a high-value
+    /// identity field we have no reason to retain. Null when unknown.
+    /// </summary>
+    public int? BirthYear { get; set; }
     public Gender Gender { get; set; }
     public Guid DeviceId { get; set; }
     public Device Device { get; set; } = null!;
@@ -31,10 +38,10 @@ public class Child
 
     public int? GetAge()
     {
-        if (DateOfBirth == null) return null;
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var age = today.Year - DateOfBirth.Value.Year;
-        if (DateOfBirth.Value > today.AddYears(-age)) age--;
-        return age;
+        if (BirthYear == null) return null;
+        // Year-only -> age is approximate to ±1 yr (we don't know the month).
+        // Fine for grammar / age-appropriateness; clamp non-negative.
+        var age = DateTime.UtcNow.Year - BirthYear.Value;
+        return age < 0 ? 0 : age;
     }
 }

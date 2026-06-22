@@ -33,17 +33,13 @@ public class ChildController : ControllerBase
         if (!linkedDevices.Contains(request.DeviceId))
             return Forbid();
 
-        DateOnly? dob = null;
-        if (!string.IsNullOrEmpty(request.DateOfBirth))
-        {
-            if (!DateOnly.TryParseExact(request.DateOfBirth, "yyyy-MM-dd",
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.None, out var parsed))
-                return BadRequest(new { error = "DateOfBirth must be in yyyy-MM-dd format." });
-            dob = parsed;
-        }
+        // #066: collect only the birth YEAR, never the exact date of birth.
+        // Validate it's a plausible year (rejects typos; we never store a day/month).
+        if (request.BirthYear is { } by && (by < 1900 || by > DateTime.UtcNow.Year))
+            return BadRequest(new { error = "BirthYear must be a valid year (yyyy)." });
 
-        var child = await _childService.CreateChildAsync(request.DeviceId, request.Name, request.Gender, dob);
+        var child = await _childService.CreateChildAsync(
+            request.DeviceId, request.Name, request.Gender, request.BirthYear);
 
         return Created("", new
         {
@@ -51,6 +47,7 @@ public class ChildController : ControllerBase
             name = child.Name,
             gender = child.Gender.ToString(),
             age = child.GetAge(),
+            birthYear = child.BirthYear,
             deviceId = child.DeviceId
         });
     }
@@ -74,7 +71,7 @@ public class ChildController : ControllerBase
                 name = c.Name,
                 gender = c.Gender.ToString(),
                 age = c.GetAge(),
-                dateOfBirth = c.DateOfBirth?.ToString("yyyy-MM-dd")
+                birthYear = c.BirthYear
             })
         });
     }
@@ -84,4 +81,4 @@ public record CreateChildRequest(
     Guid DeviceId,
     string Name,
     Gender Gender,
-    string? DateOfBirth = null);
+    int? BirthYear = null);

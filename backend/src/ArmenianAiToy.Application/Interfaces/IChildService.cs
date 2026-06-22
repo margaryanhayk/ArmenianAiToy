@@ -5,7 +5,7 @@ namespace ArmenianAiToy.Application.Interfaces;
 
 public interface IChildService
 {
-    Task<Child> CreateChildAsync(Guid deviceId, string name, Gender gender, DateOnly? dateOfBirth);
+    Task<Child> CreateChildAsync(Guid deviceId, string name, Gender gender, int? birthYear);
     Task<Child?> GetChildAsync(Guid childId);
     Task<Child?> GetDefaultChildForDeviceAsync(Guid deviceId);
     Task<List<Child>> GetChildrenByDeviceAsync(Guid deviceId);

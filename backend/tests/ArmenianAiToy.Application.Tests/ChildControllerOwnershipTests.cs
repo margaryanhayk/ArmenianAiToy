@@ -94,43 +94,41 @@ public class ChildControllerOwnershipTests
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // CreateChild — DateOfBirth validation
+    // CreateChild — BirthYear validation (#066: year only, never exact DOB)
     // ─────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task CreateChild_WhenDobIsMalformed_ReturnsBadRequest_AndDoesNotCallService()
+    public async Task CreateChild_WhenBirthYearOutOfRange_ReturnsBadRequest_AndDoesNotCallService()
     {
-        // Malformed DOB used to throw FormatException → framework 500. The
-        // controller must now return a controlled BadRequest without reaching
+        // An implausible birth year is a controlled BadRequest without reaching
         // the service layer.
         var (controller, childService, _, ownedDeviceId, _) = CreateController();
-        var request = new CreateChildRequest(ownedDeviceId, "Ani", Gender.Girl, DateOfBirth: "15/05/2020");
+        var request = new CreateChildRequest(ownedDeviceId, "Ani", Gender.Girl, BirthYear: 1850);
 
         var result = await controller.CreateChild(request);
 
         var bad = Assert.IsType<BadRequestObjectResult>(result);
         var errorProp = bad.Value!.GetType().GetProperty("error");
-        Assert.Contains("yyyy-MM-dd", errorProp!.GetValue(bad.Value) as string);
+        Assert.Contains("BirthYear", errorProp!.GetValue(bad.Value) as string);
         await childService.DidNotReceiveWithAnyArgs()
             .CreateChildAsync(default, default!, default, default);
     }
 
     [Fact]
-    public async Task CreateChild_WhenDobIsValid_PassesParsedDateToService()
+    public async Task CreateChild_WhenBirthYearValid_PassesYearToService()
     {
-        // Contract guard: a canonical yyyy-MM-dd DOB parses to the expected
-        // DateOnly and is forwarded verbatim to IChildService.
+        // Contract guard: a plausible birth year is forwarded verbatim to
+        // IChildService (only the year — never an exact date).
         var (controller, childService, _, ownedDeviceId, _) = CreateController();
-        var expectedDob = new DateOnly(2020, 5, 15);
-        childService.CreateChildAsync(ownedDeviceId, "Ani", Gender.Girl, expectedDob)
+        childService.CreateChildAsync(ownedDeviceId, "Ani", Gender.Girl, 2020)
             .Returns(MakeChild(ownedDeviceId));
-        var request = new CreateChildRequest(ownedDeviceId, "Ani", Gender.Girl, DateOfBirth: "2020-05-15");
+        var request = new CreateChildRequest(ownedDeviceId, "Ani", Gender.Girl, BirthYear: 2020);
 
         var result = await controller.CreateChild(request);
 
         Assert.IsType<CreatedResult>(result);
         await childService.Received(1)
-            .CreateChildAsync(ownedDeviceId, "Ani", Gender.Girl, expectedDob);
+            .CreateChildAsync(ownedDeviceId, "Ani", Gender.Girl, 2020);
     }
 
     // ─────────────────────────────────────────────────────────────────────

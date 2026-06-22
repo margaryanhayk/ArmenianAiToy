@@ -1338,7 +1338,7 @@ public class ParentService : IParentService
                     c.DeviceId,
                     c.Name,
                     c.Gender,
-                    c.DateOfBirth,
+                    c.BirthYear,
                     c.GetAge(),
                     new ParentExportChildModeOverrides(
                         c.StoryEnabled, c.GameEnabled, c.RiddleEnabled, c.CuriosityEnabled)

@@ -14,14 +14,14 @@ public class ChildService : IChildService
         _db = db;
     }
 
-    public async Task<Child> CreateChildAsync(Guid deviceId, string name, Gender gender, DateOnly? dateOfBirth)
+    public async Task<Child> CreateChildAsync(Guid deviceId, string name, Gender gender, int? birthYear)
     {
         var child = new Child
         {
             Id = Guid.NewGuid(),
             Name = name,
             Gender = gender,
-            DateOfBirth = dateOfBirth,
+            BirthYear = birthYear,
             DeviceId = deviceId
         };
 

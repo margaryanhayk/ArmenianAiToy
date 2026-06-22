@@ -79,7 +79,7 @@ public class ParentServiceGetLinkedDeviceDetailsTests
             Id = Guid.NewGuid(),
             Name = "Arman",
             Gender = Gender.Boy,
-            DateOfBirth = new DateOnly(2021, 6, 15),
+            BirthYear = 2021,
             DeviceId = device.Id
         });
         db.Set<Conversation>().Add(new Conversation { Id = Guid.NewGuid(), DeviceId = device.Id, StartedAt = t0.AddMinutes(-30) });

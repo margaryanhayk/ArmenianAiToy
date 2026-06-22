@@ -89,7 +89,7 @@ public record ParentExportChild(
     Guid DeviceId,
     string Name,
     Gender Gender,
-    DateOnly? DateOfBirth,
+    int? BirthYear,
     int? Age,
     ParentExportChildModeOverrides ModeOverrides);
 
