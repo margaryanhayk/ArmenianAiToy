@@ -1260,6 +1260,26 @@ currently `1.15.3-beta.1`; the OpenTelemetry SIG keeps the
 Prometheus-side exporter in `-beta` deliberately even though it is
 mature in practice).
 
+### Health endpoint (#070)
+
+`GET /api/health` returns `{ status, service, database, openai }`.
+
+- **Liveness verdict (200 vs 503) is DB-only**, on purpose. OpenAI is a
+  SHARED downstream; failing liveness during an OpenAI outage would pull
+  every instance from the load balancer at once — a self-inflicted
+  fleet-wide outage on hosts that are otherwise fine. `status` /
+  `database` reflect only `HealthProbe.IsDatabaseReachableAsync`.
+- **`openai` is a NON-FATAL readiness field.** `"degraded"` when the
+  reliability gate's circuit breaker is currently open (recent real
+  failures), else `"ok"`. Sourced from
+  `OpenAIReliabilityGate.IsCircuitOpen()` — a **passive, zero-cost**
+  snapshot (no upstream probe call, no quota burn) that reads breaker
+  state under the gate's lock and never mutates it (cannot consume the
+  half-open probe). It does NOT change the HTTP status; it is for
+  dashboards/alerts and complements `aat_chat_openai_circuit_trip_total`.
+- No active OpenAI probe on the health tick by design — see the
+  `HealthProbe` xmldoc rationale.
+
 ### Latency histograms
 
 Two `Histogram<double>` instruments on the `ArmenianAiToy` meter,
