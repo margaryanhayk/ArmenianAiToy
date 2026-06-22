@@ -28,7 +28,11 @@ namespace ArmenianAiToy.Api.Controllers;
 [EnableRateLimiting(ChatRateLimiter.PolicyName)]
 public class StoryAudioTokenController : ControllerBase
 {
-    private const int DefaultTtlSeconds = 3600;
+    // #038 — shortened from 3600s (1h). A leaked token is usable for at most
+    // this window; 15 min comfortably covers a story + in-story Q&A session,
+    // and the device can re-mint via this device-authed endpoint if a long
+    // unattended session outlives it. Override with StoryAudio:TokenTtlSeconds.
+    private const int DefaultTtlSeconds = 900;
 
     private readonly ICuratedStoryLibrary _library;
     private readonly IConfiguration _config;
@@ -66,8 +70,20 @@ public class StoryAudioTokenController : ControllerBase
             ttlSeconds = configured;
         }
 
+        // #038 — optionally bind the token to the caller's source IP so a
+        // leaked token cannot be replayed from elsewhere. Opt-in
+        // (StoryAudio:BindTokenToIp, default off) because a client whose IP
+        // changes mid-session (NAT / mobile) would otherwise lose access; the
+        // IP is the proxy-corrected RemoteIpAddress (#039). When off, an
+        // unbound token is issued and the stream enforces no IP.
+        string? boundIp = null;
+        if (bool.TryParse(_config["StoryAudio:BindTokenToIp"], out var bind) && bind)
+        {
+            boundIp = HttpContext?.Connection?.RemoteIpAddress?.ToString();
+        }
+
         var token = StoryAudioToken.Issue(
-            storyId, DateTimeOffset.UtcNow.AddSeconds(ttlSeconds), signingKey);
+            storyId, DateTimeOffset.UtcNow.AddSeconds(ttlSeconds), signingKey, boundIp);
         return Ok(new { token, enforced = true, expiresInSeconds = ttlSeconds });
     }
 }

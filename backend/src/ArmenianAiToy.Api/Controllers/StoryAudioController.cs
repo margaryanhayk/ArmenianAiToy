@@ -251,7 +251,12 @@ public class StoryAudioController : ControllerBase
         var signingKey = _config["StoryAudio:SigningKey"];
         if (!string.IsNullOrWhiteSpace(signingKey))
         {
-            return StoryAudioToken.TryValidate(token, storyId, signingKey, DateTimeOffset.UtcNow);
+            // #038 — always supply the request IP; TryValidate enforces it
+            // ONLY when the token was issued IP-bound (self-describing), so an
+            // unbound token is unaffected.
+            return StoryAudioToken.TryValidate(
+                token, storyId, signingKey, DateTimeOffset.UtcNow,
+                requestIp: HttpContext?.Connection?.RemoteIpAddress?.ToString());
         }
         // #006: no signing key configured -> FAIL-CLOSED by default (deny),
         // matching the /metrics and /api/internal guards. An operator opts into

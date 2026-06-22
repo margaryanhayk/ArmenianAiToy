@@ -91,4 +91,48 @@ public class StoryAudioTokenTests
         var token = StoryAudioToken.Issue(StoryId, Now.AddHours(1), Key);
         Assert.False(StoryAudioToken.TryValidate(token, StoryId, "", Now));
     }
+
+    // ---------- #038 IP binding ----------
+
+    [Fact]
+    public void Unbound_IgnoresRequestIp()
+    {
+        // No boundIp at issue -> the stream's request IP is irrelevant.
+        var token = StoryAudioToken.Issue(StoryId, Now.AddHours(1), Key);
+        Assert.True(StoryAudioToken.TryValidate(token, StoryId, Key, Now, requestIp: "203.0.113.9"));
+        Assert.True(StoryAudioToken.TryValidate(token, StoryId, Key, Now, requestIp: null));
+    }
+
+    [Fact]
+    public void IpBound_SameIp_Validates()
+    {
+        var token = StoryAudioToken.Issue(StoryId, Now.AddHours(1), Key, boundIp: "198.51.100.7");
+        Assert.True(StoryAudioToken.TryValidate(token, StoryId, Key, Now, requestIp: "198.51.100.7"));
+    }
+
+    [Fact]
+    public void IpBound_DifferentIp_Fails()
+    {
+        // The core #038 win: a leaked token cannot be replayed from another IP.
+        var token = StoryAudioToken.Issue(StoryId, Now.AddHours(1), Key, boundIp: "198.51.100.7");
+        Assert.False(StoryAudioToken.TryValidate(token, StoryId, Key, Now, requestIp: "203.0.113.1"));
+    }
+
+    [Fact]
+    public void IpBound_MissingRequestIp_Fails()
+    {
+        // Can't prove same-origin without a request IP -> deny.
+        var token = StoryAudioToken.Issue(StoryId, Now.AddHours(1), Key, boundIp: "198.51.100.7");
+        Assert.False(StoryAudioToken.TryValidate(token, StoryId, Key, Now, requestIp: null));
+    }
+
+    [Fact]
+    public void IpBound_StillEnforcesStoryAndExpiry()
+    {
+        var expired = StoryAudioToken.Issue(StoryId, Now.AddSeconds(-1), Key, boundIp: "198.51.100.7");
+        Assert.False(StoryAudioToken.TryValidate(expired, StoryId, Key, Now, requestIp: "198.51.100.7"));
+
+        var wrongStory = StoryAudioToken.Issue(StoryId, Now.AddHours(1), Key, boundIp: "198.51.100.7");
+        Assert.False(StoryAudioToken.TryValidate(wrongStory, "little-cloud", Key, Now, requestIp: "198.51.100.7"));
+    }
 }
