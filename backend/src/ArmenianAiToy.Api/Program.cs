@@ -2,11 +2,13 @@ using ArmenianAiToy.Api.Health;
 using ArmenianAiToy.Api.Middleware;
 using ArmenianAiToy.Api.Observability;
 using ArmenianAiToy.Api.RateLimiting;
+using ArmenianAiToy.Api.Security;
 using ArmenianAiToy.Application.Auth;
 using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Infrastructure;
 using ArmenianAiToy.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HostFiltering;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -148,6 +150,21 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Host filtering (#061): permissive ONLY in Development. In any other
+// environment, restrict to the hostnames explicitly listed in AllowedHosts
+// (semicolon-separated). A non-Development environment left unpinned stays
+// permissive but logs a loud startup warning (see below) — failing closed on
+// a forgotten config key would be a worse outage than a permissive filter.
+// Closes the "AllowedHosts *" Host-header / cache-poisoning gap. Mirrors the
+// #037 CORS posture. Overrides the framework's default AllowedHosts-config
+// binding because this Configure runs last.
+var hostFiltering = HostFilteringConfig.Resolve(
+    builder.Environment.IsDevelopment(), builder.Configuration["AllowedHosts"]);
+builder.Services.Configure<HostFilteringOptions>(options =>
+{
+    options.AllowedHosts = hostFiltering.Hosts;
+});
+
 // Per-device rate limit for /api/chat. Cost-containment layer — sits ahead
 // of DeviceAuthMiddleware so rejected requests never hit the DB lookup or
 // the OpenAI pipeline. See ChatRateLimiter for the keying rationale.
@@ -206,6 +223,10 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+
+// #061 — surface an unpinned Host filter in non-Development environments.
+if (hostFiltering.Warning is not null)
+    app.Logger.LogWarning("{HostFilteringWarning}", hostFiltering.Warning);
 
 // Apply any unapplied EF Core migrations. Replaces the previous
 // EnsureCreated() call — migrations are now the single source of truth
