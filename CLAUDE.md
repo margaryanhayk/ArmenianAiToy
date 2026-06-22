@@ -1136,6 +1136,21 @@ served by the same `OnRejected` handler in `Program.cs` (shared
 `aat_rate_limit_rejected_total` counter and `{ error: "Too many
 requests. Please slow down." }` 429 body).
 
+**Per-account login throttle (#040)** complements the per-IP `auth`
+policy below: the IP limiter does nothing against a targeted-takeover
+attempt spread across many IPs. `LoginAttemptThrottle`
+(`Application/Auth`, DI **singleton**, process-local) tracks FAILED
+logins per account (keyed on the submitted email, across all IPs) and,
+after 10 failures within a 15-min window, locks that email out for a
+15-min cooldown (resets on success / window lapse). `LoginAsync`
+checks it BEFORE the BCrypt verify and returns the SAME uniform null
+(→ 401) as a wrong password, so a locked account is not an enumeration
+oracle and costs no BCrypt during cooldown; unknown emails are tracked
+identically. Temporary-lockout posture is a deliberate, owner-approved
+trade-off (a bounded lockout-DoS is possible); a `MaxTrackedAccounts`
+cap bounds memory. Multi-instance would need a shared store (noted).
+Pinned by `LoginAttemptThrottleTests` + `ParentServiceLoginThrottleTests`.
+
 - **`chat`** — per-device bucket keyed on the `X-Device-Id` header.
   Applied via `[EnableRateLimiting("chat")]` on `ChatController`.
   Defaults: `RateLimiting:Chat:PermitLimit = 30`,
