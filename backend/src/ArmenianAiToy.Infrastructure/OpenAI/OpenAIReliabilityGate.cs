@@ -229,6 +229,26 @@ public sealed class OpenAIReliabilityGate
         }
     }
 
+    /// <summary>
+    /// #070 — passive, zero-cost snapshot of breaker state for the
+    /// <c>/api/health</c> readiness signal. Returns true when the breaker is
+    /// currently OPEN (calls are being short-circuited), i.e. OpenAI has
+    /// failed enough recently that the chat path is failing fast. Makes NO
+    /// upstream call and NEVER mutates state — it only reads
+    /// <c>_openUntil</c> under the same lock <see cref="RunAsync"/> uses, so
+    /// it cannot affect retry/breaker behavior. The window after
+    /// <c>_openUntil</c> elapses (when the next call would half-open probe)
+    /// reports false — the gate is willing to try again, so it is not
+    /// "degraded" for health purposes.
+    /// </summary>
+    public bool IsCircuitOpen()
+    {
+        lock (_stateLock)
+        {
+            return _openUntil is not null && _clock.GetUtcNow() < _openUntil.Value;
+        }
+    }
+
     // ----- Helpers -----
 
     private static bool IsRetryable(OpenAIFailureKind kind) =>

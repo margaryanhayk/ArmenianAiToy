@@ -7,6 +7,7 @@ using ArmenianAiToy.Application.Auth;
 using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Infrastructure;
 using ArmenianAiToy.Infrastructure.Data;
+using ArmenianAiToy.Infrastructure.OpenAI;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HostFiltering;
 using Microsoft.AspNetCore.RateLimiting;
@@ -333,19 +334,31 @@ app.Use(async (ctx, next) =>
 });
 app.UseOpenTelemetryPrometheusScrapingEndpoint();
 
-// Health check — probes the one real runtime dependency (SQLite). OpenAI
-// config is validated at startup and deliberately not re-probed here; see
-// HealthProbe class comment for the rationale.
-app.MapGet("/api/health", async (AppDbContext db, CancellationToken ct) =>
+// Health check — probes the one real runtime dependency (SQLite). The
+// liveness verdict (HTTP 200 vs 503) is DB-only ON PURPOSE: OpenAI is a
+// SHARED downstream, so failing liveness during an OpenAI outage would pull
+// EVERY instance out of the load balancer at once — a self-inflicted
+// fleet-wide outage on a host that is otherwise fine. Instead (#070) we add
+// a NON-FATAL `openai` readiness field derived from the reliability gate's
+// circuit-breaker state: a passive, zero-cost signal (no probe call, no
+// quota burn) that surfaces a sustained outage to dashboards/alerts without
+// affecting the LB verdict. See HealthProbe + OpenAIReliabilityGate.IsCircuitOpen.
+app.MapGet("/api/health", async (
+    AppDbContext db, OpenAIReliabilityGate openAiGate, CancellationToken ct) =>
 {
     var dbOk = await HealthProbe.IsDatabaseReachableAsync(db, TimeSpan.FromSeconds(2), ct);
     AppMeter.HealthProbe.Add(1,
         new KeyValuePair<string, object?>("result", dbOk ? "ok" : "unhealthy"));
+    var openAiDegraded = openAiGate.IsCircuitOpen();
     var payload = new
     {
         status = dbOk ? "ok" : "unhealthy",
         service = "ArmenianAiToy API",
-        database = dbOk ? "ok" : "unreachable"
+        database = dbOk ? "ok" : "unreachable",
+        // Non-fatal: "degraded" means the breaker is currently open (recent
+        // OpenAI failures); the instance is still live and serves cached /
+        // gated paths. Does NOT flip the HTTP status.
+        openai = openAiDegraded ? "degraded" : "ok"
     };
     return dbOk ? Results.Ok(payload) : Results.Json(payload, statusCode: 503);
 });

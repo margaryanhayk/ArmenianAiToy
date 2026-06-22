@@ -205,6 +205,69 @@ public class OpenAIReliabilityGateTests
         Assert.Equal(0, calls);
     }
 
+    // ---------- #070: passive IsCircuitOpen() readiness snapshot ----------
+
+    [Fact]
+    public void IsCircuitOpen_FreshGate_ReturnsFalse()
+    {
+        var gate = CreateGate(new FakeTimeProvider());
+        Assert.False(gate.IsCircuitOpen());
+    }
+
+    [Fact]
+    public async Task IsCircuitOpen_TrueWhileOpen_FalseAfterOpenDurationElapses()
+    {
+        var clock = new FakeTimeProvider(startDateTime: new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero));
+        var gate = CreateGate(clock);
+
+        // Trip the breaker (5 final failures within the 30s window).
+        for (int i = 0; i < 5; i++)
+        {
+            await Assert.ThrowsAnyAsync<Exception>(async () =>
+                await gate.RunAsync<string>(_ => throw Http(503), CancellationToken.None));
+        }
+
+        // Open now -> degraded.
+        Assert.True(gate.IsCircuitOpen());
+
+        // Once the open duration elapses the gate is willing to half-open
+        // probe, so it no longer reports degraded (a read-only snapshot
+        // never mutates state — confirmed by the next RunAsync still probing).
+        clock.Advance(TimeSpan.FromSeconds(61));
+        Assert.False(gate.IsCircuitOpen());
+    }
+
+    [Fact]
+    public async Task IsCircuitOpen_DoesNotMutateState_RunAsyncStillProbesAfterOpen()
+    {
+        // A read accessor must not consume the half-open probe slot. After
+        // open elapses, IsCircuitOpen() reads false, and the NEXT RunAsync is
+        // still allowed to run as the probe (inner lambda executes).
+        var clock = new FakeTimeProvider(startDateTime: new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero));
+        var gate = CreateGate(clock);
+
+        for (int i = 0; i < 5; i++)
+        {
+            await Assert.ThrowsAnyAsync<Exception>(async () =>
+                await gate.RunAsync<string>(_ => throw Http(503), CancellationToken.None));
+        }
+        clock.Advance(TimeSpan.FromSeconds(61));
+
+        // Multiple reads must not burn the probe.
+        Assert.False(gate.IsCircuitOpen());
+        Assert.False(gate.IsCircuitOpen());
+
+        int innerCalls = 0;
+        var result = await gate.RunAsync<string>(_ =>
+        {
+            innerCalls++;
+            return Task.FromResult("recovered");
+        }, CancellationToken.None);
+
+        Assert.Equal("recovered", result);
+        Assert.Equal(1, innerCalls); // probe ran — the reads did not consume it
+    }
+
     // ---------- test helpers ----------
 
     private sealed class FakePipelineResponse : PipelineResponse
