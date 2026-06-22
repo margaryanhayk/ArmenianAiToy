@@ -5,13 +5,20 @@ namespace ArmenianAiToy.Api.Middleware;
 public class DeviceAuthMiddleware
 {
     private readonly RequestDelegate _next;
+    private readonly ILogger<DeviceAuthMiddleware> _logger;
 
     // Paths that require device auth (as opposed to parent JWT auth or no auth)
     private static readonly string[] DeviceAuthPaths = ["/api/chat", "/api/audio", "/api/devices/heartbeat"];
 
-    public DeviceAuthMiddleware(RequestDelegate next)
+    // #034 — LastSeen is refreshed at most once per this interval per device.
+    // Dormancy works in days, so coarse granularity is invisible to it, and a
+    // chatty device no longer contends the SQLite writer lock on every request.
+    private static readonly TimeSpan LastSeenRefreshInterval = TimeSpan.FromSeconds(60);
+
+    public DeviceAuthMiddleware(RequestDelegate next, ILogger<DeviceAuthMiddleware> logger)
     {
         _next = next;
+        _logger = logger;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -48,8 +55,26 @@ public class DeviceAuthMiddleware
         // Store device ID in HttpContext for controllers to use
         context.Items["DeviceId"] = device.Id;
 
-        // Update last seen (fire and forget)
-        _ = deviceService.UpdateLastSeenAsync(device.Id);
+        // #034 — refresh LastSeen, AWAITED (not fire-and-forget). The previous
+        // un-awaited call ran on the request-scoped DbContext concurrently with
+        // the downstream pipeline (DbContext is not thread-safe) and could
+        // outlive the scope -> ObjectDisposed / "second operation on this
+        // context" under load. Awaiting serializes it within the scope.
+        // Throttled to LastSeenRefreshInterval so it stays off the per-request
+        // writer lock for chatty devices. Best-effort: a failure here must
+        // never break an authed request, so it is swallowed and logged.
+        if (DateTime.UtcNow - device.LastSeenAt >= LastSeenRefreshInterval)
+        {
+            try
+            {
+                await deviceService.UpdateLastSeenAsync(device.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Failed to update LastSeen for device {DeviceId}", device.Id);
+            }
+        }
 
         await _next(context);
     }
