@@ -518,6 +518,13 @@ single JSON document containing the parent's own scope:
   child-uploaded audio is retained but not yet individually downloadable
   (the child-audio replay slice is deferred — see § Voice chat C2.2). It is
   additive; `excludedFields` still carries only the credential omissions.
+- **dataRetention** (#067): additive top-level
+  `{ enabled, messageRetentionDays, description }` so a parent sees the
+  storage-limitation policy ("deleted after N days", or that automatic
+  deletion is off) directly in their export. Sourced from
+  `RetentionPolicy` (same config + semantics as `RetentionPurgeService`).
+  Publishing the period in the privacy policy/terms is the remaining
+  owner/legal task (see the owner checklist).
 
 Response headers: `Content-Type: application/json` and
 `Content-Disposition: attachment; filename="areg-export-<utcts>.json"`.
@@ -611,6 +618,15 @@ Polly; no new NuGet packages.
   `appsettings.Development.json` or any other overlay. When
   disabled, the worker logs once per tick and issues no DB query —
   this covers BOTH the conversation pass and the token-cleanup pass.
+  **#067 startup alert**: additionally, `Program.cs` logs a loud
+  `LogWarning` at startup when retention is disabled in a
+  **non-Development** environment — a silent disable on a children's
+  product (conversations kept forever) must never pass unnoticed in
+  prod. The read-only projection used by this alert (and by the export
+  disclosure below) is `RetentionPolicy.ResolveMessages` in
+  `Application/Helpers`, which mirrors this same default-90 / `<=0`-
+  disabled contract; keep `RetentionPolicy.DefaultMessagesMaxAgeDays`
+  in sync with `RetentionPurgeService.DefaultMaxAgeDays`.
 
 - **Device destructive pass (`Dormancy:Devices:DeleteAfterDays`).**
   Runs LAST in the tick, immediately after the device-warn pass.
