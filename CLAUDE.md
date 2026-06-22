@@ -1855,6 +1855,10 @@ playground above are shipped.)
 ## Key Design Decisions
 
 - Devices auth via `X-Device-Id`/`X-Api-Key` headers. Parents use JWT.
+  `DeviceAuthMiddleware` refreshes `Device.LastSeenAt` **awaited** (not
+  fire-and-forget — the old un-awaited call raced the request-scoped
+  `DbContext`) and **throttled** to once per 60s per device, best-effort
+  (a failed write is logged, never breaks the request). See #034.
 - `ChildService.BuildChildContext()` appends name/gender/age to system prompt. Gender matters for Armenian grammar.
 - Conversations auto-expire after 30 min inactivity. Last 20 messages as context.
 - Story choice labels handed off across requests via in-memory `ConcurrentDictionary` with 30-min expiry.
