@@ -66,11 +66,18 @@ bool audio_play_mp3_buffer(const uint8_t *data, size_t length);
 // Returns true when interrupted (resume from *out_resume_offset, an
 // ABSOLUTE file offset); false when the story played to its natural end
 // (*out_resume_offset is left 0).
+//
+// #063 — `out_open_failed` (optional) surfaces the REAL stream-open result so
+// the caller no longer has to infer a token rejection from wall-clock latency.
+// It is set true ONLY when the HTTP GET did not open with 200 (the concealment
+// 404 a rejected/expired story-audio token produces); it stays false on a
+// natural end, a barge-in, or a post-open decode error. Pass nullptr to ignore.
 typedef bool (*audio_barge_in_fn)();
 bool audio_play_story_stream(const char *url,
                              uint32_t base_offset,
                              audio_barge_in_fn barge_in,
-                             uint32_t *out_resume_offset);
+                             uint32_t *out_resume_offset,
+                             bool *out_open_failed = nullptr);
 
 // ---------------------------------------------------------------
 // Offline story playback from the microSD content pack (Slice 2)

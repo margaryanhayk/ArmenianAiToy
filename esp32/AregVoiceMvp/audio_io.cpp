@@ -354,9 +354,13 @@ bool audio_play_mp3_buffer(const uint8_t *data, size_t length) {
 bool audio_play_story_stream(const char *url,
                              uint32_t base_offset,
                              audio_barge_in_fn barge_in,
-                             uint32_t *out_resume_offset) {
+                             uint32_t *out_resume_offset,
+                             bool *out_open_failed) {
     if (out_resume_offset != nullptr) {
         *out_resume_offset = 0;
+    }
+    if (out_open_failed != nullptr) {
+        *out_open_failed = false;
     }
 #ifdef AREG_DISABLE_MP3_PLAYBACK
     (void)url; (void)base_offset; (void)barge_in;
@@ -369,7 +373,13 @@ bool audio_play_story_stream(const char *url,
 
     AudioFileSourceHTTPStream http(url);
     if (!http.isOpen()) {
-        Serial.println("[story] http stream open failed");
+        // #063 — a non-200 GET (the concealment 404 of a rejected/expired
+        // token) lands here. Surface it as the REAL open-failure signal so the
+        // caller's token-retry no longer guesses from wall-clock latency.
+        if (out_open_failed != nullptr) {
+            *out_open_failed = true;
+        }
+        Serial.println("[story] http stream open failed (non-200)");
         Serial.flush();
         return false;  // nothing to resume
     }
@@ -380,6 +390,8 @@ bool audio_play_story_stream(const char *url,
 
     AudioGeneratorMP3 mp3;
     if (!mp3.begin(&http, &out)) {
+        // Stream opened (200) but the body would not start decoding — NOT an
+        // open failure, so out_open_failed stays false (no token retry).
         Serial.println("[story] mp3.begin (stream) failed");
         Serial.flush();
         return false;

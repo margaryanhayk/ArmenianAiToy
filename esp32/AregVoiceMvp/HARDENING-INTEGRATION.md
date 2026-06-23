@@ -46,14 +46,17 @@ sets the signing key. **Do the firmware change first, then flip the key.**
 >   (`.../api/chat/audio` → `.../api/chat/story-audio-token`), so the operator
 >   doesn't have to add a key to the now-untracked `config.h`.
 > - **Token fetched once per session** at the top of `handle_story_session`
->   (TTL ~1 h ≫ a story) and appended as `?token=` / `&token=` on the
->   from-start and `?from=` resume URLs (`url[]` bumped to 640).
-> - **404 recovery via heuristic, not HTTP status:** `audio_play_story_stream`
->   does not surface the HTTP code, so instead a near-instant
->   (< 1500 ms) non-interrupted return *while a token is in use* triggers a
->   single token re-fetch + retry of the same position. Tune the threshold on
->   the bench; a cleaner future version would have the stream report the open
->   status directly.
+>   (TTL shortened to 15 min, #038) and appended as `?token=` / `&token=` on the
+>   from-start and `?from=` resume URLs (`url[]` 640 bytes). The `snprintf`
+>   compose is now checked for truncation (#063): a clipped URL/token would
+>   silently fail to validate, so a truncated compose ends the session cleanly
+>   instead of opening a bad URL.
+> - **404 recovery via REAL HTTP status (#063, was a timing heuristic):**
+>   `audio_play_story_stream` now reports the stream-open result via an
+>   `out_open_failed` flag — set true only on a non-200 GET (the concealment
+>   404 of a rejected/expired token). The caller re-fetches the token + retries
+>   once on that explicit signal, replacing the old "near-instant non-interrupted
+>   return < 1500 ms" wall-clock guess. No threshold to tune.
 > - Minimal manual JSON parse (no ArduinoJson). `token: null` (enforcement off)
 >   → false → stream without a token.
 >
