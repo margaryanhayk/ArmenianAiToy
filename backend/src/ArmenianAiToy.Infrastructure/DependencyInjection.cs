@@ -233,6 +233,12 @@ public static class DependencyInjection
                 System.Globalization.CultureInfo.InvariantCulture,
                 out var capDefault))
             capOpts.Default = capDefault;
+        if (decimal.TryParse(
+                capSection["Global"],
+                System.Globalization.NumberStyles.Number,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var capGlobal))
+            capOpts.Global = capGlobal;
         foreach (var child in capSection.GetSection("PerDeviceOverride").GetChildren())
         {
             if (child.Value is null) continue;

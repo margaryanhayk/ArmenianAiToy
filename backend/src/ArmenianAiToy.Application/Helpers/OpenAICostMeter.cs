@@ -35,6 +35,13 @@ public sealed class OpenAICostMeter
     private readonly object _lock = new();
     private readonly Dictionary<Guid, DailyCostBucket> _buckets = new();
 
+    // #022 — fleet-wide daily accumulator (sum of EVERY device's recorded
+    // cost on the current UTC day). Backs the optional global spend ceiling,
+    // a kill-switch for runaway total spend. Same in-process / per-instance /
+    // resets-on-restart caveat as the per-device buckets (the real fix is the
+    // shared meter in #020/#021); one instance's runaway loop still self-limits.
+    private DailyCostBucket _global = new(default, 0m, false);
+
     /// <summary>
     /// True iff the accumulated cost for <paramref name="deviceId"/>
     /// on the UTC date of <paramref name="utcNow"/> is at or above
@@ -75,6 +82,46 @@ public sealed class OpenAICostMeter
             {
                 AccumulatedUsd = bucket.AccumulatedUsd + costUsd
             };
+            // #022 — also accrue to the fleet-wide daily total.
+            var g = GetOrRefreshGlobalLocked(utcNow);
+            _global = g with { AccumulatedUsd = g.AccumulatedUsd + costUsd };
+        }
+    }
+
+    // ----- #022 global daily ceiling -----
+
+    /// <summary>True iff the FLEET-wide accumulated cost on the UTC date of
+    /// <paramref name="utcNow"/> is at or above <paramref name="globalCapUsd"/>.
+    /// The caller only invokes this when a positive global cap is configured.</summary>
+    public bool IsGlobalOverCap(decimal globalCapUsd, DateTime utcNow)
+    {
+        lock (_lock)
+        {
+            return GetOrRefreshGlobalLocked(utcNow).AccumulatedUsd >= globalCapUsd;
+        }
+    }
+
+    /// <summary>The fleet-wide accumulated cost on the UTC date of
+    /// <paramref name="utcNow"/>. For log / metric emission.</summary>
+    public decimal GetGlobalTotal(DateTime utcNow)
+    {
+        lock (_lock)
+        {
+            return GetOrRefreshGlobalLocked(utcNow).AccumulatedUsd;
+        }
+    }
+
+    /// <summary>Flood-controlled global log gate — true at most once per UTC
+    /// day across the whole process, so a sustained over-ceiling state logs
+    /// exactly one warning per day rather than per request.</summary>
+    public bool ShouldLogGlobalCapTrip(DateTime utcNow)
+    {
+        lock (_lock)
+        {
+            var g = GetOrRefreshGlobalLocked(utcNow);
+            if (g.LoggedToday) return false;
+            _global = g with { LoggedToday = true };
+            return true;
         }
     }
 
@@ -105,7 +152,17 @@ public sealed class OpenAICostMeter
         lock (_lock)
         {
             _buckets.Clear();
+            _global = new DailyCostBucket(default, 0m, false);
         }
+    }
+
+    private DailyCostBucket GetOrRefreshGlobalLocked(DateTime utcNow)
+    {
+        // Caller holds _lock. Roll the fleet bucket on a UTC day boundary.
+        var todayUtc = utcNow.Date;
+        if (_global.DayUtc == todayUtc) return _global;
+        _global = new DailyCostBucket(todayUtc, 0m, false);
+        return _global;
     }
 
     private DailyCostBucket GetOrRefreshBucketLocked(Guid deviceId, DateTime utcNow)

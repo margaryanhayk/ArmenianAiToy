@@ -122,4 +122,63 @@ public class OpenAICostMeterTests
         Assert.True(meter.ShouldLogCapTrip(deviceB, Day1Noon));
         Assert.False(meter.ShouldLogCapTrip(deviceB, Day1Noon));
     }
+
+    // ---------- #022 global / fleet-wide ceiling ----------
+
+    [Fact]
+    public void Global_AccumulatesAcrossAllDevices()
+    {
+        var meter = new OpenAICostMeter();
+        meter.Record(Guid.NewGuid(), 0.40m, Day1Noon);
+        meter.Record(Guid.NewGuid(), 0.40m, Day1Noon);
+        meter.Record(Guid.NewGuid(), 0.40m, Day1Noon);
+
+        Assert.Equal(1.20m, meter.GetGlobalTotal(Day1Noon));
+        // Each device is well under its own 0.50 cap, but the FLEET total trips.
+        Assert.True(meter.IsGlobalOverCap(1.00m, Day1Noon));
+        Assert.False(meter.IsGlobalOverCap(2.00m, Day1Noon));
+    }
+
+    [Fact]
+    public void Global_FreshMeter_NotOverCap()
+    {
+        var meter = new OpenAICostMeter();
+        Assert.False(meter.IsGlobalOverCap(0.01m, Day1Noon));
+        Assert.Equal(0m, meter.GetGlobalTotal(Day1Noon));
+    }
+
+    [Fact]
+    public void Global_DayBoundary_Resets()
+    {
+        var meter = new OpenAICostMeter();
+        meter.Record(Guid.NewGuid(), 5.00m, Day1Noon);
+        Assert.True(meter.IsGlobalOverCap(1.00m, Day1Noon));
+
+        // Next UTC day → fleet bucket resets.
+        Assert.False(meter.IsGlobalOverCap(1.00m, Day2Noon));
+        Assert.Equal(0m, meter.GetGlobalTotal(Day2Noon));
+    }
+
+    [Fact]
+    public void ShouldLogGlobalCapTrip_OncePerDay_FiresAgainNextDay()
+    {
+        var meter = new OpenAICostMeter();
+        Assert.True(meter.ShouldLogGlobalCapTrip(Day1Noon));
+        Assert.False(meter.ShouldLogGlobalCapTrip(Day1Noon));
+        // Day rolled — fires again.
+        Assert.True(meter.ShouldLogGlobalCapTrip(Day2Noon));
+        Assert.False(meter.ShouldLogGlobalCapTrip(Day2Noon));
+    }
+
+    [Fact]
+    public void Global_DoesNotDisturbPerDeviceCounters()
+    {
+        var meter = new OpenAICostMeter();
+        var device = Guid.NewGuid();
+        meter.Record(device, 0.30m, Day1Noon);
+
+        // Per-device total and global total both reflect the one record.
+        Assert.Equal(0.30m, meter.GetCurrentTotal(device, Day1Noon));
+        Assert.Equal(0.30m, meter.GetGlobalTotal(Day1Noon));
+    }
 }

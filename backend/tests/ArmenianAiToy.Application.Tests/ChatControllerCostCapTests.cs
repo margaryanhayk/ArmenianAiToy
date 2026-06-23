@@ -143,6 +143,46 @@ public class ChatControllerCostCapTests
         Assert.NotEqual(ChatController.CostCapResponse, OkPayload(underResult).Response);
     }
 
+    // ---------- #022 global / fleet-wide ceiling ----------
+
+    [Fact]
+    public async Task GlobalCeiling_TripsEvenWhenDeviceIsUnderItsOwnCap()
+    {
+        // Global ceiling = 1.00; this device is well under its 0.50 per-device
+        // cap, but a DIFFERENT device pushed the fleet total over 1.00.
+        var h = Create(o => o.Global = 1.00m);
+        h.CostMeter.Record(Guid.NewGuid(), 1.50m, DateTime.UtcNow); // some other device
+
+        var result = await h.Controller.Chat(new ChatRequest("Բարև"));
+
+        var payload = OkPayload(result);
+        Assert.Equal(ChatController.CostCapResponse, payload.Response);
+        Assert.Equal(SafetyFlag.Clean, payload.SafetyFlag);
+        await h.ChatService.DidNotReceive().GetResponseAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(),
+            Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task GlobalCeiling_Zero_IsDisabled()
+    {
+        // Default Global = 0 (opt-in): even a large fleet total does NOT gate.
+        var h = Create(); // Global stays 0
+        h.CostMeter.Record(Guid.NewGuid(), 100m, DateTime.UtcNow);
+        h.ChatService.GetResponseAsync(
+                Arg.Any<Guid>(), Arg.Any<string>(),
+                Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<string?>())
+            .Returns(new ChatResponse(
+                "ok", Guid.NewGuid(), Guid.NewGuid(), SafetyFlag.Clean));
+
+        var result = await h.Controller.Chat(new ChatRequest("Բարև"));
+
+        Assert.NotEqual(ChatController.CostCapResponse, OkPayload(result).Response);
+        await h.ChatService.Received().GetResponseAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(),
+            Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<string?>());
+    }
+
     [Fact]
     public async Task PerDeviceOverride_AppliedWhenPresent()
     {

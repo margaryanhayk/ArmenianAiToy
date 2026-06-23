@@ -325,6 +325,19 @@ public class AudioChatController : ControllerBase
         if (costCapOpts.Enabled)
         {
             var nowUtc = DateTime.UtcNow;
+            // #022 — fleet-wide ceiling (kill-switch), opt-in (skipped when
+            // Global <= 0). Same canned soft-off as the per-device cap.
+            if (costCapOpts.Global > 0m && _costMeter.IsGlobalOverCap(costCapOpts.Global, nowUtc))
+            {
+                AppMeter.OpenAICostCapTrip.Add(1, new KeyValuePair<string, object?>("kind", "audio"));
+                if (_costMeter.ShouldLogGlobalCapTrip(nowUtc))
+                {
+                    _logger.LogWarning(
+                        "OpenAI GLOBAL daily cost ceiling reached (fleet kill-switch). CurrentEstimatedUsd={Current:F4} GlobalCapUsd={Cap:F4} UtcDate={Date:yyyy-MM-dd}",
+                        _costMeter.GetGlobalTotal(nowUtc), costCapOpts.Global, nowUtc.Date);
+                }
+                return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
+            }
             var cap = costCapOpts.CapForDevice(deviceId);
             if (_costMeter.IsOverCap(deviceId, cap, nowUtc))
             {

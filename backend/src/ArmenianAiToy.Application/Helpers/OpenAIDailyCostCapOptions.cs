@@ -27,6 +27,17 @@ public sealed class OpenAIDailyCostCapOptions
     public decimal Default { get; set; } = 0.50m;
 
     /// <summary>
+    /// #022 — optional FLEET-wide daily ceiling in USD: a kill-switch on
+    /// total spend across all devices on this instance for the UTC day. When
+    /// the accumulated fleet cost reaches it, the paid pipeline fails closed
+    /// for every device until the next UTC day. Default <c>0</c> = DISABLED
+    /// (opt-in), so shipped behavior is unchanged until an operator sets it.
+    /// In-process / per-instance like the per-device cap (see class remarks);
+    /// still a real backstop against one instance's runaway loop.
+    /// </summary>
+    public decimal Global { get; set; } = 0m;
+
+    /// <summary>
     /// Optional per-device override map. Keys are device id strings
     /// (parseable as <see cref="Guid"/>) and values are USD caps. When
     /// a device id is present in this map, its value overrides

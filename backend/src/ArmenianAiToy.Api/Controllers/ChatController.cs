@@ -113,6 +113,22 @@ public class ChatController : ControllerBase
         if (costCapOpts.Enabled)
         {
             var nowUtc = DateTime.UtcNow;
+            // #022 — fleet-wide ceiling (kill-switch) checked first. Opt-in:
+            // skipped when Global <= 0. Same Clean-soft-off response as the
+            // per-device cap; the GLOBAL log is flood-controlled once/day.
+            if (costCapOpts.Global > 0m && _costMeter.IsGlobalOverCap(costCapOpts.Global, nowUtc))
+            {
+                AppMeter.OpenAICostCapTrip.Add(1,
+                    new KeyValuePair<string, object?>("kind", "chat"));
+                if (_costMeter.ShouldLogGlobalCapTrip(nowUtc))
+                {
+                    _logger.LogWarning(
+                        "OpenAI GLOBAL daily cost ceiling reached (fleet kill-switch). CurrentEstimatedUsd={Current:F4} GlobalCapUsd={Cap:F4} UtcDate={Date:yyyy-MM-dd}",
+                        _costMeter.GetGlobalTotal(nowUtc), costCapOpts.Global, nowUtc.Date);
+                }
+                return Ok(new ChatResponse(
+                    CostCapResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
+            }
             var cap = costCapOpts.CapForDevice(deviceId);
             if (_costMeter.IsOverCap(deviceId, cap, nowUtc))
             {
