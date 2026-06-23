@@ -1066,6 +1066,40 @@ public class ParentService : IParentService
         return true;
     }
 
+    /// <summary>
+    /// #074 — set the server-side credential revocation flag on a linked
+    /// device. When revoked, every device-auth path fails (the device is dead
+    /// until it re-provisions a fresh key). Reversible. Same ownership +
+    /// silent-false + idempotent shape as <see cref="SetDevicePauseStateAsync"/>.
+    /// </summary>
+    public async Task<bool> SetDeviceRevocationAsync(Guid parentId, Guid deviceId, bool revoked)
+    {
+        var linked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!linked)
+            return false;
+
+        var device = await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == deviceId);
+        if (device == null)
+            return false;
+
+        if (device.IsRevoked == revoked)
+        {
+            // Idempotent: already in the requested state — no mutation, no
+            // audit row, parent still sees success.
+            return true;
+        }
+
+        device.IsRevoked = revoked;
+        TrackAndAddAudit(
+            AuditEvent.ParentDeviceRevocationChanged(parentId, deviceId, revoked));
+        await _db.SaveChangesAsync();
+        _logger.LogInformation(
+            "Parent {ParentId} set device {DeviceId} revoked={Revoked}",
+            parentId, deviceId, revoked);
+        return true;
+    }
+
     public async Task<bool> SetBedtimeWindowAsync(Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end)
     {
         // Ownership check — same silent-false shape as SetDevicePauseStateAsync.
@@ -1210,6 +1244,7 @@ public class ParentService : IParentService
                     c.StoryEnabled, c.GameEnabled, c.RiddleEnabled, c.CuriosityEnabled)).ToList()
                 : new List<LinkedDeviceChildDto>(),
             l.Device.IsPaused,
+            l.Device.IsRevoked,
             l.Device.BedtimeStart,
             l.Device.BedtimeEnd,
             l.Device.StoryEnabled,
@@ -1353,6 +1388,7 @@ public class ParentService : IParentService
             d.RegisteredAt,
             d.LastSeenAt,
             d.IsPaused,
+            d.IsRevoked,
             d.BedtimeStart,
             d.BedtimeEnd,
             d.TimeZone,

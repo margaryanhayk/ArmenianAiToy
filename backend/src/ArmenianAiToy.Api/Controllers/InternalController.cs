@@ -128,6 +128,7 @@ public class InternalController : ControllerBase
             RegisteredAt: d.RegisteredAt,
             LastSeenAt: d.LastSeenAt,
             IsPaused: d.IsPaused,
+            IsRevoked: d.IsRevoked,
             BedtimeStart: d.BedtimeStart,
             BedtimeEnd: d.BedtimeEnd,
             TimeZone: d.TimeZone,

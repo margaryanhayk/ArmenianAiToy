@@ -115,6 +115,14 @@ public class DeviceService : IDeviceService
             .FirstOrDefaultAsync(d => d.Id == deviceId);
         if (device is null) return null;
 
+        // #074 — server-side revocation kill-switch. A revoked device fails
+        // auth BEFORE the key compare (no hash work) and returns the SAME
+        // uniform null (-> 401 "Invalid device credentials") as a wrong key,
+        // so revocation is not an enumeration oracle. This single chokepoint
+        // covers every device-auth path; the device is dead until it
+        // re-provisions a fresh key (registration) or a parent restores it.
+        if (device.IsRevoked) return null;
+
         // Preferred path: hashed credential.
         if (DeviceApiKeyHasher.IsHash(device.ApiKeyHash))
         {

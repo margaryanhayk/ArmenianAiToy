@@ -100,6 +100,7 @@ public record ParentExportDevice(
     DateTime RegisteredAt,
     DateTime LastSeenAt,
     bool IsPaused,
+    bool IsRevoked,
     TimeOnly? BedtimeStart,
     TimeOnly? BedtimeEnd,
     string TimeZone,

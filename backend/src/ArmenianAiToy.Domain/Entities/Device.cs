@@ -38,6 +38,22 @@ public class Device
     public bool IsPaused { get; set; }
 
     /// <summary>
+    /// #074 server-side credential revocation kill-switch. When true,
+    /// <c>DeviceService.ValidateDeviceAsync</c> rejects the device BEFORE the
+    /// key compare, so EVERY device-auth path (chat, audio, story-qa,
+    /// heartbeat, story-audio-token) returns the uniform 401 — a leaked or
+    /// compromised device key can be killed centrally without physically
+    /// re-flashing. Default false (no existing device changes behavior). The
+    /// real cure for a compromised key is re-provisioning with a fresh key
+    /// (registration #009/#011); revocation is reversible (parent can restore)
+    /// so an accidental revoke is recoverable. Distinct from
+    /// <see cref="IsPaused"/>: pause is a soft "quiet the toy" that still
+    /// authenticates; revoke disables authentication entirely. Toggled via the
+    /// parent endpoint PUT /api/parents/devices/{deviceId}/revoke.
+    /// </summary>
+    public bool IsRevoked { get; set; }
+
+    /// <summary>
     /// B4 bedtime window — parent-configured daily quiet hours. When the
     /// current local time on the device falls inside [BedtimeStart, BedtimeEnd)
     /// (half-open, midnight-crossing supported) the chat pipeline short-

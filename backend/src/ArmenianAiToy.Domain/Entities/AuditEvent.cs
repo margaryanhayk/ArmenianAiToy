@@ -141,6 +141,22 @@ public class AuditEvent
         })
     };
 
+    /// <summary>#074 — parent revoked/restored a device's server-side
+    /// credential kill-switch. Counts-only metadata (the post-change flag).</summary>
+    public static AuditEvent ParentDeviceRevocationChanged(
+        Guid parentId, Guid deviceId, bool isRevoked) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDeviceRevocationChanged,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            is_revoked = isRevoked
+        })
+    };
+
     public static AuditEvent ParentBedtimeWindowSet(
         Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end) => new()
     {

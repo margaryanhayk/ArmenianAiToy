@@ -35,6 +35,7 @@ public interface IParentService
     Task<LinkedDevicesResponse> GetLinkedDeviceDetailsWithSummaryAsync(Guid parentId);
     Task<bool> ChangePasswordAsync(Guid parentId, string currentPassword, string newPassword);
     Task<bool> SetDevicePauseStateAsync(Guid parentId, Guid deviceId, bool paused);
+    Task<bool> SetDeviceRevocationAsync(Guid parentId, Guid deviceId, bool revoked);
     Task<bool> SetBedtimeWindowAsync(Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end);
     Task<bool> SetDeviceModeFlagsAsync(
         Guid parentId, Guid deviceId,

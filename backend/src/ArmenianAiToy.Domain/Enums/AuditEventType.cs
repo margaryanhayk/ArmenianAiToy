@@ -27,5 +27,10 @@ public enum AuditEventType
     /// conversations). System-actor-style row (ActorParentId null, so it stays
     /// out of parent-facing feeds); metadata carries the operator name + the
     /// endpoint + target id + count. No child PII.</summary>
-    InternalConsoleAccess
+    InternalConsoleAccess,
+
+    /// <summary>#074 — a parent revoked or restored a linked device's
+    /// server-side credential kill-switch. Metadata carries the post-change
+    /// state (is_revoked: bool). Written only when the flag actually flips.</summary>
+    ParentDeviceRevocationChanged
 }

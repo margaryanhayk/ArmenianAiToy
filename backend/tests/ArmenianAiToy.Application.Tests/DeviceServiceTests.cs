@@ -228,6 +228,38 @@ public class DeviceServiceTests
         Assert.Equal(device.Id, result!.Id);
     }
 
+    // #074 — KEYSTONE: a revoked device fails auth even with the CORRECT key.
+    [Fact]
+    public async Task ValidateDeviceAsync_RevokedDevice_CorrectKey_ReturnsNull()
+    {
+        var (service, db) = CreateService();
+        var plaintext = "dtk_validbutrevoked";
+        var device = new Device
+        {
+            Id = Guid.NewGuid(),
+            MacAddress = "AA:BB:CC:DD:EE:FF",
+            Name = "Test",
+            ApiKey = null,
+            ApiKeyHash = DeviceApiKeyHasher.Hash(plaintext),
+            IsRevoked = true,
+            RegisteredAt = DateTime.UtcNow,
+            LastSeenAt = DateTime.UtcNow
+        };
+        db.Set<Device>().Add(device);
+        await db.SaveChangesAsync();
+
+        // Correct key, but the device is revoked -> uniform null (401).
+        var result = await service.ValidateDeviceAsync(device.Id, plaintext);
+        Assert.Null(result);
+
+        // Restoring (IsRevoked=false) re-enables auth with the same key.
+        device.IsRevoked = false;
+        await db.SaveChangesAsync();
+        var restored = await service.ValidateDeviceAsync(device.Id, plaintext);
+        Assert.NotNull(restored);
+        Assert.Equal(device.Id, restored!.Id);
+    }
+
     [Fact]
     public async Task ValidateDeviceAsync_HashedRow_WrongKey_ReturnsNull()
     {

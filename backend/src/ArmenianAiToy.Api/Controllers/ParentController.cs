@@ -494,6 +494,30 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// #074: revoke (or restore) a linked device's server-side credential.
+    /// When revoked, EVERY device-auth path returns 401 — a leaked or
+    /// compromised device key can be killed centrally without re-flashing; the
+    /// device is dead until it re-provisions a fresh key (registration).
+    /// Reversible (restore with revoked=false). Distinct from pause, which
+    /// only quiets the toy while it still authenticates. Idempotent;
+    /// ownership-checked; silent 404 on a device not linked to this account.
+    /// </summary>
+    [HttpPut("devices/{deviceId}/revoke")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> SetDeviceRevocation(
+        Guid deviceId, [FromBody] DeviceRevocationRequest request)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ok = await _parentService.SetDeviceRevocationAsync(parentId, deviceId, request.Revoked);
+        if (!ok)
+            return NotFound(new { error = "Device not found or not linked to this account." });
+        return Ok(new { revoked = request.Revoked });
+    }
+
+    /// <summary>
     /// B4: set (or disable) the bedtime window on a linked device. While the
     /// current local time on the device is inside the window, POST /api/chat
     /// short-circuits with the same canned reply a paused device returns.

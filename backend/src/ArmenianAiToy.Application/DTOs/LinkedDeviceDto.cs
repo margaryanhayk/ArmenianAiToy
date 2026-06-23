@@ -21,6 +21,7 @@ public record LinkedDeviceDto(
     DateTime? LastConversationAt,
     List<LinkedDeviceChildDto> Children,
     bool IsPaused,
+    bool IsRevoked,
     TimeOnly? BedtimeStart,
     TimeOnly? BedtimeEnd,
     bool StoryEnabled,
