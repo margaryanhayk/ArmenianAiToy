@@ -32,6 +32,14 @@ builder.Services.AddSwaggerGen(options =>
         options.IncludeXmlComments(xmlPath);
 });
 
+// #071 — resolve the DB connection string with dev/prod discipline BEFORE
+// infrastructure wires the DbContext: fail fast in a non-Development
+// environment that is unset or still on the dev default, so prod can never
+// silently run on the dev-named SQLite file. Write the resolved value back so
+// AddInfrastructure (and everything else) reads the validated string.
+builder.Configuration["Database:ConnectionString"] = DatabaseConnectionString.Resolve(
+    builder.Environment.IsDevelopment(), builder.Configuration["Database:ConnectionString"]);
+
 // Infrastructure (DB, OpenAI, services)
 builder.Services.AddInfrastructure(builder.Configuration);
 
