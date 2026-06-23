@@ -55,6 +55,17 @@ Migration sources live in
 `dotnet-ef` is pinned to 9.0.3 via `.config/dotnet-tools.json` at the
 repo root.
 
+**Connection-string discipline (#071).** `Database:ConnectionString` ships
+EMPTY in `appsettings.json`; `appsettings.Development.json` carries the dev
+file name (`Data Source=armenian_ai_toy.db`). At startup `Program.cs` calls
+`DatabaseConnectionString.Resolve` (in `Api/Security/`) before
+`AddInfrastructure`: Development falls back to the dev default, but any
+**non-Development** environment **fails fast** when the string is unset or is
+the dev default (a tell-tale copy-paste). So prod must set
+`Database__ConnectionString` explicitly and can never silently run on the
+dev-named SQLite file. The guard throws only outside Development, so the local
+bench is unaffected. Pinned by `DatabaseConnectionStringTests`.
+
 **SQLite concurrency PRAGMAs (#019).** `SqlitePragmaInterceptor`
 (a `DbConnectionInterceptor` wired in `AddInfrastructure` via
 `AddInterceptors`) runs `journal_mode=WAL`, `busy_timeout=5000`, and
