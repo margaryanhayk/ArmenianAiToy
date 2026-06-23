@@ -179,6 +179,25 @@ bool voice_fetch_story_audio_token(const char *story_id, char *out_token, size_t
     return out_token[0] != '\0';
 }
 
+// #048 — treat the response body as UNTRUSTED before it reaches the MP3
+// decoder. The body must begin with a real MP3 signature; an accidental
+// non-audio body (a proxy/error HTML page, a JSON error, a misrouted
+// endpoint) is rejected here instead of becoming a memory-safety surface in
+// the decoder, in a child's room. Accepts the two real-world MP3 starts:
+//   - an MPEG audio frame sync (0xFF, then the top 3 sync bits set) — this is
+//     what OpenAI's tts-1 output begins with (verified: FF F3 ...), and
+//   - an ID3v2 tag ("ID3"), emitted by other encoders.
+// NOTE: over plaintext HTTP this is DEFENSE-IN-DEPTH, not an MITM defense (a
+// MITM controls the bytes AND any header); TLS (#008) is the real fix. It
+// still stops the realistic failure today — a garbage/error body reaching the
+// decoder. Pairs with the existing size cap below.
+static bool looks_like_mp3(const uint8_t *buf, size_t len) {
+    if (buf == nullptr || len < 3) return false;
+    if (buf[0] == 'I' && buf[1] == 'D' && buf[2] == '3') return true;     // ID3v2 tag
+    if (buf[0] == 0xFF && (buf[1] & 0xE0) == 0xE0) return true;           // MPEG frame sync
+    return false;
+}
+
 // Reads an already-confirmed-200 response body in full into a fresh
 // PSRAM buffer and records the X-Areg-Continue header. Leaves `http`
 // open for the caller to end(). Returns true on a fully-buffered body;
@@ -221,6 +240,14 @@ static bool read_response_into(HTTPClient &http, VoiceTurnResult &result) {
             continue;
         }
         read_total += (size_t)got;
+    }
+    // #048 — reject a non-MP3 body before it reaches the decoder.
+    if (!looks_like_mp3(buf, (size_t)body_len)) {
+        Serial.printf("[voice] http: body is not MP3 (first bytes %02X %02X %02X); rejecting\n",
+                      buf[0], body_len > 1 ? buf[1] : 0, body_len > 2 ? buf[2] : 0);
+        Serial.flush();
+        heap_caps_free(buf);
+        return false;
     }
     s_response_buffer = buf;
     result.ok = true;
