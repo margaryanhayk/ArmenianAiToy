@@ -421,6 +421,10 @@ describe.
   `ParentService.SetDevicePauseStateAsync` when the pause flag actually
   flips. No-op idempotent calls (already in the requested state) do not
   produce a row. Metadata carries `is_paused: bool`.
+- `ParentDeviceRevocationChanged` (#074) — emitted in
+  `ParentService.SetDeviceRevocationAsync` when the server-side credential
+  kill-switch (`Device.IsRevoked`) actually flips. No-op idempotent calls
+  do not produce a row. Metadata carries `is_revoked: bool`.
 - `ParentBedtimeWindowSet` — emitted in
   `ParentService.SetBedtimeWindowAsync` on every successful write.
   Metadata carries the post-normalization `start`/`end` (both null when
@@ -1929,6 +1933,15 @@ playground above are shipped.)
   fire-and-forget — the old un-awaited call raced the request-scoped
   `DbContext`) and **throttled** to once per 60s per device, best-effort
   (a failed write is logged, never breaks the request). See #034.
+  **Server-side revocation (#074):** `Device.IsRevoked` is a credential
+  kill-switch — `DeviceService.ValidateDeviceAsync` rejects a revoked device
+  with the uniform null (→ 401) *before* the key compare, so a leaked/
+  compromised key dies across every device-auth path without re-flashing
+  (device stays dead until it re-provisions a fresh key). Reversible via
+  `PUT /api/parents/devices/{deviceId}/revoke` (parent-JWT, ownership-checked,
+  audited `ParentDeviceRevocationChanged`). Distinct from pause (soft, still
+  authenticates) and unlink (removes link + cascades data). Per-device keys at
+  manufacture remain the owner/provisioning half (#043).
 - `ChildService.BuildChildContext()` appends name/gender/age to system prompt. Gender matters for Armenian grammar.
 - Conversations auto-expire after 30 min inactivity. Last 20 messages as context.
 - Story choice labels handed off across requests via in-memory `ConcurrentDictionary` with 30-min expiry.
