@@ -27,6 +27,9 @@ ArmenianAiToy_Project_Status.pdf
 *.db-shm
 *.db-wal
 
+# Startup migration advisory lock (#025)
+db-migration.lock
+
 # IDE
 .idea/
 .vscode/

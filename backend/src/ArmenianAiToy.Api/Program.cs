@@ -261,7 +261,12 @@ if (!app.Environment.IsDevelopment())
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    // #025 — serialize Migrate() across instances with a cross-process file
+    // lock so concurrent boots don't race the migration. Single-process boots
+    // (bench / pre-scale prod) acquire it instantly; behavior unchanged.
+    var migrationLockPath = Path.Combine(app.Environment.ContentRootPath, "db-migration.lock");
+    StartupMigrationLock.RunGuarded(
+        migrationLockPath, TimeSpan.FromSeconds(60), () => db.Database.Migrate(), app.Logger);
 }
 
 // #039 — proxy-aware client IP, opt-in. OFF by default (ForwardedHeaders:Enabled
