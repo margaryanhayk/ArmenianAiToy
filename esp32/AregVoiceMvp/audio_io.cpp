@@ -496,6 +496,25 @@ bool audio_sd_has_file(const char *path) {
 #endif
 }
 
+#ifndef AREG_DISABLE_MP3_PLAYBACK
+// #064 — sanity-check that an SD file actually starts like MP3 before handing
+// it to the decoder. A corrupt card or a wrong/renamed file would otherwise
+// feed arbitrary bytes to the MP3 generator. Accepts the two real MP3 starts
+// (ID3v2 tag or an MPEG frame sync — same check as the network path #048),
+// then rewinds the source to 0 for the decoder. This is an integrity/typo
+// guard, NOT tamper-proofing — a signed content manifest (operator signing
+// key) is the deferred full fix for #064.
+static bool sd_file_looks_like_mp3(AudioFileSourceSD &file) {
+    uint8_t hdr[3] = { 0, 0, 0 };
+    uint32_t n = file.read(hdr, sizeof(hdr));
+    file.seek(0, SEEK_SET);  // rewind so the decoder starts at byte 0
+    if (n < 3) return false;
+    if (hdr[0] == 'I' && hdr[1] == 'D' && hdr[2] == '3') return true;   // ID3v2 tag
+    if (hdr[0] == 0xFF && (hdr[1] & 0xE0) == 0xE0) return true;         // MPEG frame sync
+    return false;
+}
+#endif
+
 bool audio_play_story_file(const char *path,
                            uint32_t start_byte,
                            audio_barge_in_fn barge_in,
@@ -522,6 +541,14 @@ bool audio_play_story_file(const char *path,
         Serial.printf("[story] SD open failed: %s\n", path);
         Serial.flush();
         return false;  // nothing to resume; caller treats as natural end
+    }
+    // #064 — integrity precheck on a from-start play. A mid-stream resume
+    // (start_byte > 0) trusts the file already validated when it started; a
+    // frame-sync sniff at an arbitrary resume offset wouldn't be meaningful.
+    if (start_byte == 0 && !sd_file_looks_like_mp3(file)) {
+        Serial.printf("[story] SD file is not MP3 (corrupt/wrong file): %s — refusing to decode\n", path);
+        Serial.flush();
+        return false;  // caller treats as natural end / falls back to Wi-Fi
     }
     if (start_byte > 0) {
         // Seek to the resume byte; the MP3 decoder re-syncs to the next frame
