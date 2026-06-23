@@ -17,6 +17,7 @@
 #include <esp_heap_caps.h>
 #include <freertos/FreeRTOS.h>   // xTaskCreatePinnedToCore (S3 async upload, UNVERIFIED)
 #include <freertos/task.h>       // vTaskDelete, BaseType_t
+#include <freertos/semphr.h>     // #046 — mutex for the cross-core result handoff
 
 // #045 — Wi-Fi reconnect tuning. Defaulted here (not required in config.h) so
 // the build never depends on config.h carrying them; an operator may override
@@ -450,21 +451,47 @@ VoiceTurnResult voice_upload_reflection_answer(const uint8_t *payload, size_t le
 //   - s_async_result: value-type struct; result.response_bytes points into
 //     s_response_buffer when ok==true.
 
-// Shared state between the async upload task and the polling caller.
-// Written by CORE 0 task, read by CORE 1 loop. Declared volatile to
-// prevent compiler reordering; memory ordering is sufficient here
-// because the done flag is the single-writer/single-reader handoff
-// and the payload pointer is set before xTaskCreate.
-static volatile bool      s_async_done    = false;
-static volatile bool      s_async_started = false;
-static VoiceTurnResult    s_async_result;
+// Shared state between the async upload task (CORE 0) and the polling caller
+// (CORE 1 loop). #046 — the done flag + the multi-field result struct are
+// handed across cores. A bare `volatile bool` is NOT a cross-core memory
+// barrier on the Xtensa SMP cores: the reader could observe s_async_done==true
+// while the struct write to s_async_result was not yet visible -> a TORN read
+// (e.g. ok=true with a stale/null response pointer or a prior turn's length)
+// = a memory-safety crash when those bytes reach the MP3 decoder. A FreeRTOS
+// mutex around BOTH fields fixes it: xSemaphoreTake/Give are full memory
+// fences, so a reader that sees done==true UNDER the mutex is guaranteed to
+// see the fully-published result. The mutex is created in
+// voice_start_question_upload_async() before xTaskCreate, so it always exists
+// before the task or any poll runs.
+static SemaphoreHandle_t  s_async_mutex   = nullptr;
+static bool               s_async_done    = false;  // guarded by s_async_mutex
+static VoiceTurnResult    s_async_result;            // guarded by s_async_mutex
+// loop-task-only (set + read in start()); never touched by the task -> no guard.
+static bool               s_async_started = false;
 
-// Task parameters — set before xTaskCreate, read by the task.
-// payload pointer and length are caller-owned; they must remain valid
+// Task parameters — set before xTaskCreate, read by the task. xTaskCreate is
+// itself a publish barrier (the task starts after it returns), so these need
+// no mutex. payload pointer + length are caller-owned and must remain valid
 // until voice_async_upload_done() returns true.
 static const uint8_t     *s_async_payload  = nullptr;
 static size_t             s_async_length   = 0;
 static uint32_t           s_async_offset   = 0;
+
+// --- #046 cross-core handoff helpers (mutex = full memory barrier) ---
+static void async_ensure_mutex() {
+    if (s_async_mutex == nullptr) {
+        s_async_mutex = xSemaphoreCreateMutex();
+    }
+}
+// Publish the completed result + done flag atomically (called from the task
+// and the synchronous fallback). The mutex give is the barrier that makes the
+// whole struct visible to a reader that subsequently sees done==true.
+static void async_publish_result(const VoiceTurnResult &result) {
+    if (s_async_mutex != nullptr) xSemaphoreTake(s_async_mutex, portMAX_DELAY);
+    s_async_result = result;
+    s_async_done   = true;
+    if (s_async_mutex != nullptr) xSemaphoreGive(s_async_mutex);
+}
 
 // FreeRTOS task: same logic as voice_upload_question() but writes the
 // result into s_async_result and sets s_async_done on completion.
@@ -476,15 +503,13 @@ static void upload_question_task(void * /*pvParams*/) {
     if (!voice_wifi_is_connected()) {
         Serial.println("[qa-async] wifi not connected");
         result.http_status = -1001;
-        s_async_result = result;
-        s_async_done   = true;
+        async_publish_result(result);
         vTaskDelete(nullptr);
         return;
     }
     if (s_async_payload == nullptr || s_async_length == 0) {
         Serial.println("[qa-async] empty payload");
-        s_async_result = result;
-        s_async_done   = true;
+        async_publish_result(result);
         vTaskDelete(nullptr);
         return;
     }
@@ -499,8 +524,7 @@ static void upload_question_task(void * /*pvParams*/) {
     if (!http.begin(url)) {
         Serial.println("[qa-async] http.begin failed");
         Serial.flush();
-        s_async_result = result;
-        s_async_done   = true;
+        async_publish_result(result);
         vTaskDelete(nullptr);
         return;
     }
@@ -526,8 +550,7 @@ static void upload_question_task(void * /*pvParams*/) {
     if (status != 200) {
         Serial.printf("[qa-async] POST non-200: %d\n", status);
         http.end();
-        s_async_result = result;
-        s_async_done   = true;
+        async_publish_result(result);
         vTaskDelete(nullptr);
         return;
     }
@@ -541,17 +564,18 @@ static void upload_question_task(void * /*pvParams*/) {
                       (unsigned)result.response_length);
         Serial.flush();
     }
-    s_async_result = result;
-    s_async_done   = true;
+    async_publish_result(result);
     vTaskDelete(nullptr);
 }
 
 void voice_start_question_upload_async(const uint8_t *payload,
                                        size_t length,
                                        uint32_t offset) {
+    async_ensure_mutex();  // #046 — create the cross-core barrier before the task
+
     // Guard: don't start a second task if one is still running.
     // Caller must wait for voice_async_upload_done() before calling again.
-    if (s_async_started && !s_async_done) {
+    if (s_async_started && !voice_async_upload_done()) {
         Serial.println("[qa-async] WARNING: prior task still running; skipping");
         Serial.flush();
         return;
@@ -561,10 +585,13 @@ void voice_start_question_upload_async(const uint8_t *payload,
     s_async_payload  = payload;
     s_async_length   = length;
     s_async_offset   = offset;
-    s_async_done     = false;
     s_async_started  = true;
-    // Clear any leftover result from the previous call.
+    // Clear the done flag + any leftover result UNDER the mutex so the next
+    // poll can't transiently see a stale done==true from the previous turn.
+    if (s_async_mutex != nullptr) xSemaphoreTake(s_async_mutex, portMAX_DELAY);
+    s_async_done   = false;
     s_async_result = VoiceTurnResult{};
+    if (s_async_mutex != nullptr) xSemaphoreGive(s_async_mutex);
 
     // HARDWARE ASSUMPTION: stack size 8192 bytes. If stack overflow occurs
     // (monitor with uxTaskGetStackHighWaterMark), raise to 10240 or 12288.
@@ -588,18 +615,28 @@ void voice_start_question_upload_async(const uint8_t *payload,
         // Fallback: run synchronously in the caller's context.
         // This means no thinking-bed plays, but audio_play_mp3_buffer
         // will be called when voice_get_async_result() is called.
-        s_async_result = voice_upload_question(payload, length, offset);
-        s_async_done   = true;
+        async_publish_result(voice_upload_question(payload, length, offset));
     }
 }
 
 bool voice_async_upload_done() {
-    return s_async_done;
+    // #046 — read the done flag under the mutex so the barrier orders this
+    // read after the task's struct publish. Mutex null = nothing started yet.
+    if (s_async_mutex == nullptr) return false;
+    xSemaphoreTake(s_async_mutex, portMAX_DELAY);
+    const bool done = s_async_done;
+    xSemaphoreGive(s_async_mutex);
+    return done;
 }
 
 VoiceTurnResult voice_get_async_result() {
-    // MUST only be called after voice_async_upload_done() == true.
-    return s_async_result;
+    // MUST only be called after voice_async_upload_done() == true. Copy under
+    // the mutex so the whole struct is read consistently (no torn read).
+    VoiceTurnResult copy;
+    if (s_async_mutex != nullptr) xSemaphoreTake(s_async_mutex, portMAX_DELAY);
+    copy = s_async_result;
+    if (s_async_mutex != nullptr) xSemaphoreGive(s_async_mutex);
+    return copy;
 }
 
 VoiceTurnResult voice_continue_turn() {
