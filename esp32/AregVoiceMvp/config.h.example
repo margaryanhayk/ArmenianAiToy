@@ -156,6 +156,22 @@
 #define AREG_WIFI_RECONNECT_MIN_MS  3000
 #define AREG_WIFI_RECONNECT_MAX_MS  60000
 
+// --- Hang protection: watchdog + bounded waits (#047) --------
+// Optional. Code provides these same defaults via #ifndef.
+// AREG_WDT_TIMEOUT_S: task-watchdog timeout. Deliberately LARGER than any
+//   legitimate single blocking operation (<=30 s HTTP read, <=15 s record), so
+//   only a genuine stall (a loop that stops iterating, hence stops feeding)
+//   trips it -> clean reset instead of a silent freeze. The minutes-long story
+//   decode loops feed it each iteration.
+// AREG_I2S_CONSUME_TIMEOUT_MS: per-sample cap on synth_write_tone's I2S
+//   back-pressure wait; on expiry the (optional) tone is aborted, not hung.
+// AREG_ASYNC_UPLOAD_TIMEOUT_MS: cap on the async-Q&A completion wait; on expiry
+//   the device does a controlled reboot (a stuck cross-core upload task cannot
+//   be safely cancelled, so reboot is the clean recovery).
+#define AREG_WDT_TIMEOUT_S            60
+#define AREG_I2S_CONSUME_TIMEOUT_MS   1000
+#define AREG_ASYNC_UPLOAD_TIMEOUT_MS  45000
+
 // --- LED colors (GRB order for NeoPixel) ---------------------
 #define AREG_LED_IDLE_R         8
 #define AREG_LED_IDLE_G         16

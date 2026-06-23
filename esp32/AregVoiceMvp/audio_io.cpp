@@ -19,7 +19,14 @@
 
 #include <driver/i2s_std.h>
 #include <esp_err.h>
+#include <esp_task_wdt.h>   // #047 — feed the task watchdog from the long decode loops
 #include <math.h>   // sinf() for S1 earcon tone synthesis (UNVERIFIED)
+
+// #047 — per-sample cap on synth_write_tone's I2S back-pressure wait. Defaulted
+// here so the build never depends on config.h carrying it; overridable there.
+#ifndef AREG_I2S_CONSUME_TIMEOUT_MS
+#define AREG_I2S_CONSUME_TIMEOUT_MS  1000
+#endif
 // AREG_DISABLE_MP3_PLAYBACK — bench rollback switch.
 //
 // Capture has been migrated to the new i2s_std driver, so the
@@ -327,6 +334,7 @@ bool audio_play_mp3_buffer(const uint8_t *data, size_t length) {
     DIAG_MARK(4022, "play_mp3_loop_enter");
     uint32_t last_watchdog_tickle = millis();
     while (mp3.isRunning()) {
+        esp_task_wdt_reset();  // #047 — feed the WDT each decode iteration
         if (!mp3.loop()) {
             mp3.stop();
             break;
@@ -400,6 +408,7 @@ bool audio_play_story_stream(const char *url,
     bool interrupted = false;
     uint32_t last_yield = millis();
     while (mp3.isRunning()) {
+        esp_task_wdt_reset();  // #047 — feed the WDT each decode iteration
         // True barge-in: poll the button DURING decode and cut
         // instantly on a press.
         if (barge_in != nullptr && barge_in()) {
@@ -538,6 +547,7 @@ bool audio_play_story_file(const char *path,
     bool interrupted = false;
     uint32_t last_yield = millis();
     while (mp3.isRunning()) {
+        esp_task_wdt_reset();  // #047 — feed the WDT each decode iteration
         // True barge-in: poll the button DURING decode and cut instantly.
         if (barge_in != nullptr && barge_in()) {
             // getPos() on a file source is the ABSOLUTE file position — no
@@ -627,8 +637,17 @@ static void synth_write_tone(AudioOutputI2S &out,
         // array form which is consistent across ESP8266Audio versions.
         // HARDWARE ASSUMPTION: mono signal — copy left to right.
         int16_t lr[2] = { raw, raw };
-        // Back-pressure: if DMA buffers are full, yield and retry.
+        // Back-pressure: if DMA buffers are full, yield and retry — but BOUND
+        // the wait (#047). A never-clearing I2S stall (dead amp / DMA wedged)
+        // would otherwise hang here forever; on timeout we abort the tone, which
+        // is optional (earcon / thinking-bed), so the caller continues cleanly.
+        uint32_t consume_deadline = millis() + AREG_I2S_CONSUME_TIMEOUT_MS;
         while (!out.ConsumeSample(lr)) {
+            if ((int32_t)(millis() - consume_deadline) >= 0) {  // rollover-safe
+                Serial.println("[audio] synth: I2S back-pressure timeout — aborting tone");
+                Serial.flush();
+                return;
+            }
             delay(1);
         }
         phase += phase_inc;
@@ -727,6 +746,7 @@ bool audio_play_qa_stream(const char *url) {
 
     uint32_t last_yield = millis();
     while (mp3.isRunning()) {
+        esp_task_wdt_reset();  // #047 — feed the WDT each decode iteration
         if (!mp3.loop()) {
             mp3.stop();
             break;

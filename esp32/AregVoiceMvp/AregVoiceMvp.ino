@@ -15,6 +15,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <esp_heap_caps.h>
 #include <esp_system.h>
+#include <esp_task_wdt.h>   // #047 — application task watchdog
 #include <WiFi.h>
 
 #include "config.h"
@@ -22,6 +23,15 @@
 #include "voice_client.h"
 #include "canned_clip.h"
 #include "diag.h"
+
+// #047 — hang-protection tunables. Defaulted here so the build never depends
+// on config.h carrying them; overridable in config.h. See config.h.example.
+#ifndef AREG_WDT_TIMEOUT_S
+#define AREG_WDT_TIMEOUT_S            60
+#endif
+#ifndef AREG_ASYNC_UPLOAD_TIMEOUT_MS
+#define AREG_ASYNC_UPLOAD_TIMEOUT_MS  45000
+#endif
 
 // --- State machine -------------------------------------------
 enum State {
@@ -703,6 +713,7 @@ static void handle_story_session() {
                 // AREG_THINKBED_AMPLITUDE here without rebuilding AudioOutputI2S
                 // on every pulse. For now, reuse the earcon (same freq/duration)
                 // so we can verify the FreeRTOS + I2S coexistence first.
+                esp_task_wdt_reset();  // #047 — feed across the ~0.6s-per-pulse bed
                 audio_play_thinking_earcon();
                 bed_count++;
             }
@@ -713,9 +724,23 @@ static void handle_story_session() {
 
             // Wait (without playing anything) for the task to finish if it
             // outlasted our pulse cap. This is the fallback busy-wait; in
-            // practice the server should respond within AREG_THINKBED_MAX_PULSES
-            // * AREG_THINKBED_PULSE_MS ms.
+            // practice the server responds within AREG_THINKBED_MAX_PULSES *
+            // AREG_THINKBED_PULSE_MS ms, and the upload task self-caps at its
+            // own HTTP timeouts (~35 s). #047 — BOUND it: a genuinely stuck
+            // upload task cannot be safely cancelled or reaped (it owns `payload`
+            // and the response buffer across cores, see #046), so on timeout we
+            // do a CONTROLLED reboot — the clean recovery from a cross-core
+            // deadlock, vs ST_ERROR which would leave a zombie task and still
+            // need the power-cycle this is meant to eliminate. The WDT (above)
+            // is the backstop; this bound makes the recovery prompt + explicit.
+            const uint32_t async_deadline = millis() + AREG_ASYNC_UPLOAD_TIMEOUT_MS;
             while (!voice_async_upload_done()) {
+                if ((int32_t)(millis() - async_deadline) >= 0) {  // rollover-safe
+                    Serial.println("[qa] async upload wait timeout — stuck task, rebooting to recover");
+                    Serial.flush();
+                    esp_restart();
+                }
+                esp_task_wdt_reset();  // feed while we legitimately wait
                 delay(20);
             }
 
@@ -836,6 +861,30 @@ void setup() {
     led_for_state(ST_IDLE);
     DIAG_MARK(110, "led_initialised");
 
+    // #047 — application task watchdog. Subscribes the Arduino loop task; a
+    // genuine hang (a loop that stops iterating, hence stops feeding) forces a
+    // clean reset instead of a silent freeze only a power-cycle clears. The
+    // timeout is generous (> any legitimate single block: <=30 s HTTP read,
+    // <=15 s record, <=20 s Wi-Fi join), so only a real stall trips it; the
+    // minutes-long decode loops feed it each iteration (see audio_io.cpp).
+    // Core 3.x / IDF5 config-struct API; reconfigure if the core already
+    // initialised the TWDT for the idle tasks.
+    {
+        esp_task_wdt_config_t wdt_cfg = {};
+        wdt_cfg.timeout_ms = (uint32_t)AREG_WDT_TIMEOUT_S * 1000u;
+        wdt_cfg.idle_core_mask = 0;     // don't watch idle tasks — avoid fighting Arduino
+        wdt_cfg.trigger_panic = true;   // panic handler resets the chip
+        esp_err_t werr = esp_task_wdt_init(&wdt_cfg);
+        if (werr == ESP_ERR_INVALID_STATE) {
+            esp_task_wdt_reconfigure(&wdt_cfg);  // already initialised by the core
+        }
+        esp_task_wdt_add(NULL);   // subscribe THIS (the loop) task
+        esp_task_wdt_reset();
+        Serial.printf("[boot] task watchdog enabled (%ds)\n", AREG_WDT_TIMEOUT_S);
+        Serial.flush();
+    }
+    DIAG_MARK(115, "wdt_enabled");
+
     button_begin();
     DIAG_MARK(120, "button_initialised");
 
@@ -896,6 +945,11 @@ void setup() {
 }
 
 void loop() {
+    // #047 — feed the task watchdog every loop iteration. IDLE iterates at
+    // ~100 Hz (button poll + 10 ms delay), so the WDT is fed constantly when
+    // not in a handler; the long handlers feed it from their decode loops.
+    esp_task_wdt_reset();
+
     // Only IDLE accepts input. During RECORDING / UPLOADING /
     // PLAYING / ERROR the loop is blocked inside the handler.
     if (s_state == ST_IDLE) {
