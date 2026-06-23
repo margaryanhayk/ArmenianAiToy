@@ -66,6 +66,18 @@ the dev default (a tell-tale copy-paste). So prod must set
 dev-named SQLite file. The guard throws only outside Development, so the local
 bench is unaffected. Pinned by `DatabaseConnectionStringTests`.
 
+**Concurrent-`Migrate()` guard (#025).** `Program.cs` runs the startup
+`db.Database.Migrate()` through `StartupMigrationLock.RunGuarded`
+(`Api/Security/`) — an exclusive OS file lock (`db-migration.lock`, gitignored)
+so concurrent instances don't race the migration. The first booter migrates;
+others block, then their own `Migrate()` is a no-op. File lock, not a named
+mutex (those aren't cross-process on Unix in .NET); the OS frees it on crash.
+If it can't be acquired in 60s (or on an IO/permission error) it warns and
+proceeds unguarded — never blocks boot. Single-process boots acquire instantly
+(unchanged). This is the in-process form; a one-shot migration job /
+init-container is still the recommended deploy pattern once an orchestrator is
+in play. Pinned by `StartupMigrationLockTests`.
+
 **SQLite concurrency PRAGMAs (#019).** `SqlitePragmaInterceptor`
 (a `DbConnectionInterceptor` wired in `AddInfrastructure` via
 `AddInterceptors`) runs `journal_mode=WAL`, `busy_timeout=5000`, and
