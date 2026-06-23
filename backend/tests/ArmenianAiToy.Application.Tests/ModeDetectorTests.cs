@@ -15,6 +15,32 @@ public class ModeDetectorTests
     private static readonly List<(string Role, string Content)> EmptyHistory = [];
 
     // ─────────────────────────────────────────────────────────────────────
+    // #073: ContainsCalmCue — the library story-start veto signal
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("i'm sleepy")]
+    [InlineData("good night")]
+    [InlineData("bedtime")]
+    [InlineData("քնել")]   // քնել (sleep)
+    [InlineData("հոգնած")] // հոգնած (tired)
+    public void ContainsCalmCue_CalmMessages_True(string message)
+    {
+        Assert.True(ModeDetector.ContainsCalmCue(message));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("tell me a story")]
+    [InlineData("հեքիաթ պատմիր")] // հեքիաթ պատմիր
+    [InlineData("let's play a game")]
+    public void ContainsCalmCue_NonCalmMessages_False(string? message)
+    {
+        Assert.False(ModeDetector.ContainsCalmCue(message));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // Story mode
     // ─────────────────────────────────────────────────────────────────────
 

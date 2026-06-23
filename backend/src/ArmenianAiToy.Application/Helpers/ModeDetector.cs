@@ -208,6 +208,22 @@ public static class ModeDetector
         return DetectedMode.None;
     }
 
+    /// <summary>
+    /// #073 — true when the message carries a Calm/bedtime cue, using the SAME
+    /// <c>CalmTriggers</c> vocabulary as <see cref="Detect"/> (no new words, no
+    /// time-of-day or mode heuristic). Exposed so the library story-start gate
+    /// can refuse to open an interactive, question-ending story in a
+    /// bedtime-adjacent context (Calm forbids questions). Unlike Detect's Calm
+    /// branch this does NOT require the absence of a story cue: at the start
+    /// gate a bedtime cue must veto the interactive engine even when a story
+    /// word is also present, so the gate falls through to Calm handling.
+    /// </summary>
+    public static bool ContainsCalmCue(string? userMessage)
+    {
+        var lower = (userMessage ?? string.Empty).ToLowerInvariant();
+        return ContainsAny(lower, CalmTriggers);
+    }
+
     private static bool ContainsAny(string lower, string[] needles)
     {
         for (int i = 0; i < needles.Length; i++)

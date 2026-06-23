@@ -364,6 +364,44 @@ public class ChatServiceLibraryStoryLifecycleTests
         Assert.Equal(0, _tracker.GetCurrent(_conversationId)!.SegmentIndex); // not advanced
     }
 
+    // ── #073: Calm/bedtime veto on library start ────────────────────
+
+    [Theory]
+    [InlineData("i'm sleepy")]
+    [InlineData("good night")]
+    [InlineData("քնել")]   // քնել (sleep)
+    [InlineData("հոգնած")] // հոգնած (tired)
+    public async Task CalmCuedInput_DoesNotStartLibraryStory_FallsThroughToLegacy(string calmInput)
+    {
+        // Bench auto-start makes ANY input a start trigger, so this exercises
+        // the #073 calm veto on the start gate directly (it applies to EVERY
+        // start path, including bench). A bedtime/Calm-cued message must NOT
+        // open the interactive (reflection-question-ending) library engine; it
+        // falls through to the existing Calm/legacy handling.
+        var service = MakeService("library", benchAutoStory: true);
+
+        var result = await service.GetResponseAsync(Guid.NewGuid(), calmInput);
+
+        Assert.Null(_tracker.GetCurrent(_conversationId)); // no library session opened
+        Assert.True(LegacyAiCalls() > 0);                  // fell through to legacy pipeline
+        Assert.Equal(0, QaAiCalls());
+        // Crucially, the response is NOT a library story lead-in.
+        Assert.DoesNotContain(LibraryStoryCannedLines.StartLeadIn, result.Response);
+    }
+
+    [Fact]
+    public async Task CalmCuedInput_Off_PlainStartCue_StillStartsLibraryStory()
+    {
+        // Regression guard: the veto must not block a normal (non-calm)
+        // story-start cue — the library engine still opens as before.
+        var service = MakeService("library");
+
+        var result = await service.GetResponseAsync(Guid.NewGuid(), "հեքիաթ պատմիր");
+
+        Assert.NotNull(_tracker.GetCurrent(_conversationId));
+        Assert.StartsWith(LibraryStoryCannedLines.StartLeadIn, result.Response);
+    }
+
     // ── Hands-free autoplay (ContinueLibraryStoryAsync) ─────────────
 
     [Fact]

@@ -331,11 +331,20 @@ never as code, through a gated pipeline:
   broader conservative start cues, broad-«հեքիաթ»-sentence-stays-legacy
   negatives (`ChatServiceLibraryStoryLifecycleTests`,
   `LibraryStoryPlaybackServiceTests`).
-- Still pending (pre-release): Calm/bedtime-adjacent reflection-question
-  suppression (deferred — no safe signal exists in the ending branch:
-  ModeDetector does not run in Step 3.7 and bedtime is a controller-
-  level hard-block, so no Calm flag is in scope; do NOT invent a
-  time-of-day or mode heuristic); post-end repeat currently restarts
+- Calm/bedtime-adjacent reflection-question suppression — RESOLVED (#073,
+  2026-06-24) at the START gate, not the ending branch. The library
+  story-start gate now vetoes opening an interactive (question-ending)
+  story whenever the start message carries a Calm/bedtime cue
+  (`ModeDetector.ContainsCalmCue`, reusing the existing CalmTriggers
+  vocabulary — NOT a time-of-day or invented heuristic). The veto applies
+  to every start path (cue, repeat-cue, bench auto-start), so the library
+  reflection question can never fire in a bedtime-adjacent context; such
+  requests fall through to existing Calm/legacy handling. The ending
+  branch is untouched (still no signal there, by design). Per
+  armenian-story-master: an interactive branching story is itself the
+  wrong shape for a sleepy child, so keeping the engine OUT of bedtime
+  (vs. only softening the final line) is the correct fix.
+- Still pending (pre-release): post-end repeat currently restarts
   the DEFAULT story for every repeat/«ուրիշ» cue — the §1A "repeat the
   same vs. a NEW story via no-repeat" distinction is collapsed until
   no-repeat-last-N selection lands; reflection-question reply
@@ -617,12 +626,12 @@ in production is an explicit OWNER release act, never automated.
 «Անբան Հուռին» (anban-huri) remains a `draft` in
 `backend/content/story-drafts/` and is NOT runtime-served until the
 production-voice TTS listen test passes and a human promotes it to
-approved `Stories/Content/`. Remaining before release: Calm/bedtime-
-adjacent reflection-question suppression (deferred — no safe signal,
-no heuristic to be invented), the §1A repeat-same-vs-new-story
-distinction (collapsed to the default story until no-repeat-last-N
-selection lands), reflection-question reply acknowledgment, and
-real-device bench QA over the voice path.
+approved `Stories/Content/`. Remaining before release: the §1A
+repeat-same-vs-new-story distinction (collapsed to the default story
+until no-repeat-last-N selection lands), reflection-question reply
+acknowledgment, and real-device bench QA over the voice path.
+(Calm/bedtime-adjacent reflection-question suppression is now RESOLVED
+via the #073 start-gate veto — see §1A.)
 
 ---
 

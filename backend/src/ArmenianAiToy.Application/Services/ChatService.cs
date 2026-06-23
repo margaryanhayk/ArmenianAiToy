@@ -1632,7 +1632,18 @@ public class ChatService : IChatService
             // but ONLY when a library story recently ended for this
             // conversation (deterministic tracker marker) — the same
             // word with no story context stays legacy.
-            if (_libraryPlayback.IsEngineEnabled
+            //
+            // #073: a bedtime/Calm-cued message NEVER opens the interactive
+            // library engine — its ending emits a reflection QUESTION, which
+            // Calm forbids. The veto reuses the existing CalmTriggers
+            // vocabulary on the start message (the only place the signal is in
+            // scope; NOT a time-of-day or new mode heuristic) and applies to
+            // EVERY start path — including the bench auto-start — so the
+            // invariant holds structurally before Story:Engine=library is ever
+            // enabled in prod. A vetoed request falls through to the existing
+            // Calm/legacy handling (soft, no questions).
+            var calmCued = ModeDetector.ContainsCalmCue(userMessage);
+            if (_libraryPlayback.IsEngineEnabled && !calmCued
                 && (BenchAutoStory
                     || StoryStartCueDetector.IsStoryStartCue(userMessage)
                     || (RepeatCueDetector.IsRepeatCue(userMessage)
