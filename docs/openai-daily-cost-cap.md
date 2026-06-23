@@ -44,6 +44,7 @@ Configuration section: `OpenAI:DailyCostCap` (bound by
 |---|---|---|---|
 | `Enabled` | bool | `true` | Master switch. False = gate never trips, no recording. |
 | `Default` | decimal | `0.50` | Per-device daily cap in USD. |
+| `Global` | decimal | `0` | **#022** fleet-wide daily ceiling (USD) across ALL devices. `0` = disabled (opt-in). When the day's fleet total reaches it, every paid path fails closed until the next UTC day. |
 | `PerDeviceOverride` | dict<string, decimal> | empty | Optional `{ "<deviceGuid>": <capUsd> }` overrides. |
 
 `appsettings.json` example (already shipped with safe defaults):
@@ -63,7 +64,30 @@ Configuration section: `OpenAI:DailyCostCap` (bound by
 ```
 
 If the entire section is missing, defaults apply (`Enabled=true`,
-`Default=0.50`).
+`Default=0.50`, `Global=0`).
+
+## Global / fleet ceiling (#022)
+
+The per-device cap can't stop a fleet-wide spike (many devices each under
+their own cap). `Global` adds a hard daily ceiling on the SUM of all devices'
+estimated cost on the current UTC day. It is the runaway-spend kill-switch.
+
+- **Opt-in**: default `0` = disabled, so shipped behavior is unchanged.
+- Checked **first** at all four paid gate sites (`/api/chat`,
+  `/api/chat/audio`, and both `/api/story-qa` paths), inside the same
+  `Enabled` block, before any OpenAI call. Over-ceiling fails closed with the
+  SAME soft-off response as the per-device cap (Clean `ChatResponse` /
+  `CannedVoiceClips.PausedKey`).
+- Backed by a fleet-wide accumulator on `OpenAICostMeter`
+  (`IsGlobalOverCap` / `GetGlobalTotal` / `ShouldLogGlobalCapTrip`), rolling
+  on the UTC day boundary like the per-device buckets.
+- The `aat_openai_cost_cap_trip_total` metric reuses the existing per-path
+  `kind` value (no new tag values); the global trip is distinguished in a
+  once-per-day `LogWarning` (`OpenAI GLOBAL daily cost ceiling reached ...`).
+- **Same in-process / per-instance / resets-on-restart caveat** as the
+  per-device cap: with N instances the effective ceiling is N×, and a restart
+  resets it. The shared-store fix is the same future work as the per-device
+  meter. Still a real backstop — one instance's runaway loop self-limits.
 
 ## Cost estimation constants
 
@@ -167,13 +191,16 @@ traffic.
 Deterministic unit tests, no network, no OpenAI calls:
 
 - `OpenAICostMeterTests` — under-cap, over-cap, day-boundary
-  reset, per-device isolation, flood-controlled log gate.
+  reset, per-device isolation, flood-controlled log gate, and the
+  **global ceiling** (fleet accrual, day-reset, once/day global log,
+  per-device counters undisturbed).
 - `OpenAICostEstimatorTests` — non-negativity, ordering, edge
   cases, constants are documented and positive.
 - `ChatControllerCostCapTests` — end-to-end controller behavior:
   under-cap proceeds, over-cap blocks before ChatService,
   cost-cap-disabled config skips the gate, per-device isolation,
-  per-device override.
+  per-device override, and the **global ceiling** (trips while the
+  device is under its own cap; `Global=0` disables it).
 
 Run:
 
