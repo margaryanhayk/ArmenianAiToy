@@ -148,6 +148,14 @@
 #define AREG_HTTP_CONNECT_MS    5000
 #define AREG_HTTP_READ_MS       30000
 
+// --- Wi-Fi reconnect backoff (#045) --------------------------
+// Optional. voice_client.cpp provides these same defaults via #ifndef, so
+// they only need to be set here to TUNE the background reconnect. MIN is the
+// first retry delay after a drop; the backoff doubles each failed attempt up
+// to MAX, then holds, so a long outage doesn't hammer the radio.
+#define AREG_WIFI_RECONNECT_MIN_MS  3000
+#define AREG_WIFI_RECONNECT_MAX_MS  60000
+
 // --- LED colors (GRB order for NeoPixel) ---------------------
 #define AREG_LED_IDLE_R         8
 #define AREG_LED_IDLE_G         16

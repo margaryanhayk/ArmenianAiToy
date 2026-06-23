@@ -13,11 +13,20 @@
 #include <Arduino.h>
 
 // Block until Wi-Fi is associated. Returns true on success,
-// false on timeout. Called once in setup().
+// false on timeout. Called once in setup(). A false return is NOT fatal —
+// setup() proceeds to IDLE and voice_wifi_tick() recovers in the background.
 bool voice_wifi_begin();
 
 // Return true if Wi-Fi is currently up. Fast check.
 bool voice_wifi_is_connected();
+
+// #045 — non-blocking Wi-Fi maintenance. Call frequently from loop() while
+// idle. When the link is down it re-issues a join with capped exponential
+// backoff so a router blip (or a slow/absent router at power-on) recovers
+// WITHOUT a power-cycle; when up it is nearly free (a status check) and
+// resets the backoff. Never blocks. Tunable via AREG_WIFI_RECONNECT_MIN_MS /
+// AREG_WIFI_RECONNECT_MAX_MS (see config.h.example).
+void voice_wifi_tick();
 
 // Result of a single voice turn upload.
 struct VoiceTurnResult {

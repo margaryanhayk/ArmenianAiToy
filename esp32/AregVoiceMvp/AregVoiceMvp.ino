@@ -868,16 +868,18 @@ void setup() {
     WiFi.onEvent(wifi_event_handler);
 
     DIAG_MARK(140, "wifi_begin_before");
-    if (!voice_wifi_begin()) {
-        Serial.println("[boot] wifi join failed; staying in ERROR");
+    if (voice_wifi_begin()) {
+        DIAG_MARK(141, "wifi_begin_after_ok");
+    } else {
+        // #045 — a transient join failure is NOT fatal. Proceed to IDLE;
+        // loop()'s voice_wifi_tick() keeps retrying with backoff, so a router
+        // that is slow or absent at power-on recovers without a power-cycle.
+        // Voice turns attempted while still down fail gracefully to the canned
+        // clip (every upload path checks voice_wifi_is_connected()).
+        Serial.println("[boot] wifi join failed; will keep retrying in background");
         Serial.flush();
-        DIAG_MARK(142, "wifi_begin_after_fail");
-        transition_to(ST_ERROR);
-        // Device can still recover on next boot; leave LED red
-        // so an operator sees the state without opening serial.
-        return;
+        DIAG_MARK(142, "wifi_begin_after_fail_nonfatal");
     }
-    DIAG_MARK(141, "wifi_begin_after_ok");
 
     Serial.println("[boot] ready — press button to speak");
     Serial.flush();
@@ -889,6 +891,13 @@ void loop() {
     // Only IDLE accepts input. During RECORDING / UPLOADING /
     // PLAYING / ERROR the loop is blocked inside the handler.
     if (s_state == ST_IDLE) {
+        // #045 — keep the Wi-Fi link alive with a non-blocking, backed-off
+        // reconnect while idle. Cheap when connected; recovers from router
+        // blips (and a failed boot-time join) without a power-cycle. Runs only
+        // in IDLE — RECORDING/UPLOADING/PLAYING block inside their handlers, so
+        // a reconnect never disrupts an active turn.
+        voice_wifi_tick();
+
         // Diag: 5 s idle heartbeat — surfaces Wi-Fi drops and
         // proves the chip is alive between button presses, since
         // the steady state otherwise prints nothing.

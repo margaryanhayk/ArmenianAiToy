@@ -2,9 +2,11 @@
 // AregVoiceMvp / voice_client.cpp
 //
 // Wi-Fi join + POST /api/chat/audio. Intentionally small and
-// synchronous. No retry, no reconnect — a failure path plays
-// the canned clip (handled by the state machine caller) and
-// returns to idle.
+// synchronous. A per-turn upload failure plays the canned clip
+// (handled by the state machine caller) and returns to idle.
+// Wi-Fi LINK recovery, however, is handled out-of-band by
+// voice_wifi_tick() (#045): a dropped link reconnects in the
+// background with backoff rather than requiring a power-cycle.
 // -------------------------------------------------------------
 #include "voice_client.h"
 #include "config.h"
@@ -15,6 +17,17 @@
 #include <esp_heap_caps.h>
 #include <freertos/FreeRTOS.h>   // xTaskCreatePinnedToCore (S3 async upload, UNVERIFIED)
 #include <freertos/task.h>       // vTaskDelete, BaseType_t
+
+// #045 — Wi-Fi reconnect tuning. Defaulted here (not required in config.h) so
+// the build never depends on config.h carrying them; an operator may override
+// either in config.h. MIN is the first retry delay after a drop; backoff
+// doubles up to MAX so a long outage doesn't hammer the radio.
+#ifndef AREG_WIFI_RECONNECT_MIN_MS
+#define AREG_WIFI_RECONNECT_MIN_MS  3000
+#endif
+#ifndef AREG_WIFI_RECONNECT_MAX_MS
+#define AREG_WIFI_RECONNECT_MAX_MS  60000
+#endif
 
 static uint8_t *s_response_buffer = nullptr;
 
@@ -45,6 +58,42 @@ bool voice_wifi_begin() {
 
 bool voice_wifi_is_connected() {
     return WiFi.status() == WL_CONNECTED;
+}
+
+// #045 — non-blocking link maintenance. Cheap when connected; on a drop it
+// re-issues a join at most once per backoff window (capped exponential), so a
+// router blip recovers in the background without a power-cycle and without
+// blocking loop().
+void voice_wifi_tick() {
+    static uint32_t s_last_attempt_ms = 0;
+    static uint32_t s_backoff_ms = AREG_WIFI_RECONNECT_MIN_MS;
+    static bool s_attempted = false;
+
+    if (WiFi.status() == WL_CONNECTED) {
+        // Healthy — arm a prompt first retry for the NEXT drop.
+        s_backoff_ms = AREG_WIFI_RECONNECT_MIN_MS;
+        s_attempted = false;
+        return;
+    }
+
+    const uint32_t now = millis();
+    // Rollover-safe elapsed check (same idiom as the idle heartbeat).
+    if (s_attempted && (now - s_last_attempt_ms) < s_backoff_ms) {
+        return;  // still inside the current backoff window
+    }
+
+    Serial.printf("[wifi] down (status=%d); reconnect attempt (backoff=%u ms)\n",
+                  (int)WiFi.status(), (unsigned)s_backoff_ms);
+    Serial.flush();
+    WiFi.disconnect();   // clear any half-open state before a clean rejoin
+    WiFi.begin(AREG_WIFI_SSID, AREG_WIFI_PASSWORD);
+
+    s_last_attempt_ms = now;
+    s_attempted = true;
+    const uint32_t next = s_backoff_ms * 2;
+    s_backoff_ms = (next > AREG_WIFI_RECONNECT_MAX_MS)
+                       ? (uint32_t)AREG_WIFI_RECONNECT_MAX_MS
+                       : next;
 }
 
 // -------------------------------------------------------------
