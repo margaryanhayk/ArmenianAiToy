@@ -1926,6 +1926,70 @@ playground above are shipped.)
 - **Do not add folklore, audio, or hardware work.**
 - **System prompt is in English** — GPT-4o follows English instructions more reliably.
 
+## Consumer platform (pairing / presence / device management)
+
+The path that lets a parent buy a toy, pair it from their phone/app, see it
+online, and manage it. Backend + firmware are code-complete; the mobile app
+(Phase D) is specced but not built. Full design + phased plan live in
+`PLATFORM-ARCHITECTURE.txt` (Desktop). Open decisions tracked in
+`TODO/REMAINING-TODO.txt`.
+
+**Three distinct secrets — do not conflate:**
+- **Device key** (`X-Api-Key`) — the toy's backend credential. NEVER shown to a
+  parent or placed in a QR. Factory-burned to NVS (firmware reads it NVS-first,
+  `config.h` fallback — see firmware below).
+- **Claim code** — single-use, printed on the box / in the QR. Proves physical
+  possession; binds the toy to a parent account. NOT a backend credential.
+- **Wi-Fi credentials** — travel phone→toy only (BLE provisioning), never to
+  the backend.
+
+**Pairing (Phase A.2).** `POST /api/parents/devices/claim`
+`{ deviceId, claimCode }` (parent-JWT, `[EnableRateLimiting("auth")]`). On
+success links the toy + consumes the code; **one uniform 400** for every
+failure (unknown device / already claimed / wrong code) — no existence leak.
+`Device.ClaimCodeHash` (PBKDF2 via `DeviceApiKeyHasher`, same as device keys) +
+`ClaimedAt`. The mint side is the provisioning-secret-gated
+`POST /api/devices/register`, whose `DeviceRegistrationResponse` carries
+`DeviceId`, `ApiKey`, `ClaimCode`, and a `QrPayload` (`{ deviceId, claim }`
+JSON) for the factory station's QR. Audited `ParentDeviceClaimed`.
+
+**Presence.** `LinkedDeviceDto.IsOnline` is derived (reporting-only, nothing
+gated on it): `UtcNow - LastSeenAt < Presence:OnlineThresholdSeconds`
+(default 180s, floor 30s). `LastSeenAt` is refreshed by `DeviceAuthMiddleware`
+on any device-authed request AND by the dedicated idle path
+`POST /api/devices/heartbeat` (device-authed, body-less; the toy POSTs it every
+~60s while idle so the online dot reflects an idle-but-powered toy). Same single
+computation site as `IsDormant`.
+
+**Device management (parent-JWT, ownership-checked, silent 404 on miss):**
+- `PUT /api/parents/devices/{id}/name` `{ name }` — rename (1..60 chars, 400
+  otherwise). Audited `ParentDeviceRenamed`.
+- `PUT /api/parents/devices/{id}/revoke` `{ revoked }` (#074) — credential
+  kill-switch; see Key Design Decisions. Audited `ParentDeviceRevocationChanged`.
+- Existing pause / bedtime / mode-flags / unlink unchanged.
+
+**Dashboard.** `parent.html` linked-devices view now surfaces all of the above:
+a "＋ Add a toy" claim-code form (NOT the API key), an Online/Offline presence
+badge, a per-device rename row, and a confirmed Revoke/Restore control.
+
+**Firmware (ESP32, `esp32/AregVoiceMvp/`).** Onboarding so a parent sets up the
+toy with no reflash. All gated/fallback so the bench build is byte-identical.
+- **B.1** `wifi_creds.{h,cpp}` — NVS-backed Wi-Fi creds (`config.h` fallback) +
+  `voice_wifi_set_credentials()` seam. Verified (compiled+flashed).
+- **B.2** `ble_provisioning.{h,cpp}` — BLE Wi-Fi provisioning (Arduino
+  `WiFiProv`, `NETWORK_PROV_*`). Gated behind `AREG_USE_BLE_PROVISIONING`;
+  needs `PartitionScheme=huge_app` (BLE doesn't fit the 92% default partition).
+  Compile-verified (48% of 3 MB); functional test needs a phone at the bench.
+- **B.3** auto-fallback to provisioning after a long Wi-Fi outage +
+  reboot-on-reprovision; button-hold-at-boot factory-reset gesture.
+  Compile-verified.
+- **Heartbeat** `voice_send_heartbeat()` — idle `POST /api/devices/heartbeat`
+  (toy side of presence). Compile-verified.
+- **Device identity** `device_creds.{h,cpp}` (Phase C) — NVS-first device
+  id/key (`config.h` fallback), surfaced through one
+  `add_device_auth_headers()` helper across every backend call. The factory
+  station that burns the NVS is the owner process.
+
 ## Key Design Decisions
 
 - Devices auth via `X-Device-Id`/`X-Api-Key` headers. Parents use JWT.
