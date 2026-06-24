@@ -11,6 +11,7 @@
 #include "voice_client.h"
 #include "config.h"
 #include "diag.h"
+#include "wifi_creds.h"   // Phase B.1 — NVS-backed Wi-Fi credentials
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -36,13 +37,49 @@ static uint8_t *s_response_buffer = nullptr;
 // Wi-Fi
 // -------------------------------------------------------------
 
+// Phase B.1 — EFFECTIVE Wi-Fi credentials: the provisioned creds from NVS if
+// present, else the compile-time config.h fallback (bench). Loaded into module
+// state so voice_wifi_begin() and the reconnect tick use the same network.
+static char s_wifi_ssid[65] = {0};
+static char s_wifi_pass[65] = {0};
+
+static void wifi_load_effective_creds() {
+    if (wifi_creds_load(s_wifi_ssid, sizeof(s_wifi_ssid),
+                        s_wifi_pass, sizeof(s_wifi_pass))) {
+        Serial.printf("[wifi] using provisioned creds (ssid=%s)\n", s_wifi_ssid);
+    } else {
+        // Fallback: compile-time creds (config.h). Behavior-neutral for the
+        // bench, which has no NVS creds.
+        snprintf(s_wifi_ssid, sizeof(s_wifi_ssid), "%s", AREG_WIFI_SSID);
+        snprintf(s_wifi_pass, sizeof(s_wifi_pass), "%s", AREG_WIFI_PASSWORD);
+        Serial.printf("[wifi] using compile-time fallback creds (ssid=%s)\n", s_wifi_ssid);
+    }
+    Serial.flush();
+}
+
+bool voice_wifi_is_provisioned() {
+    return wifi_creds_present();
+}
+
+void voice_wifi_set_credentials(const char *ssid, const char *password) {
+    // Persist + switch to the new network (the seam the BLE provisioning layer
+    // calls). Survives reboots.
+    wifi_creds_save(ssid, password);
+    wifi_load_effective_creds();
+    WiFi.disconnect();
+    WiFi.begin(s_wifi_ssid, s_wifi_pass);
+    Serial.printf("[wifi] credentials updated; reconnecting to %s\n", s_wifi_ssid);
+    Serial.flush();
+}
+
 bool voice_wifi_begin() {
     // Arduino WiFi.begin() is asynchronous; spin with a timeout
     // so boot doesn't hang forever if credentials are wrong.
+    wifi_load_effective_creds();
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
-    WiFi.begin(AREG_WIFI_SSID, AREG_WIFI_PASSWORD);
-    Serial.printf("[wifi] connecting to %s ...\n", AREG_WIFI_SSID);
+    WiFi.begin(s_wifi_ssid, s_wifi_pass);
+    Serial.printf("[wifi] connecting to %s ...\n", s_wifi_ssid);
     const uint32_t timeout_ms = 20000;
     uint32_t started = millis();
     while (WiFi.status() != WL_CONNECTED) {
@@ -87,7 +124,7 @@ void voice_wifi_tick() {
                   (int)WiFi.status(), (unsigned)s_backoff_ms);
     Serial.flush();
     WiFi.disconnect();   // clear any half-open state before a clean rejoin
-    WiFi.begin(AREG_WIFI_SSID, AREG_WIFI_PASSWORD);
+    WiFi.begin(s_wifi_ssid, s_wifi_pass);   // effective creds (NVS or fallback)
 
     s_last_attempt_ms = now;
     s_attempted = true;

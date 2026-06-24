@@ -20,6 +20,18 @@ bool voice_wifi_begin();
 // Return true if Wi-Fi is currently up. Fast check.
 bool voice_wifi_is_connected();
 
+// Phase B.1 — true once the toy has been provisioned with a real network
+// (credentials stored in NVS). When false, the toy is running on the
+// compile-time fallback creds (bench); the BLE provisioning layer (B.2) uses
+// this at boot to decide whether to enter provisioning mode.
+bool voice_wifi_is_provisioned();
+
+// Phase B.1 — store new Wi-Fi credentials (from provisioning) in NVS and
+// reconnect to that network. Persists across reboots. This is the seam the
+// BLE provisioning layer (B.2) calls when the parent's app supplies the home
+// Wi-Fi name + password over Bluetooth.
+void voice_wifi_set_credentials(const char *ssid, const char *password);
+
 // #045 — non-blocking Wi-Fi maintenance. Call frequently from loop() while
 // idle. When the link is down it re-issues a join with capped exponential
 // backoff so a router blip (or a slow/absent router at power-on) recovers
