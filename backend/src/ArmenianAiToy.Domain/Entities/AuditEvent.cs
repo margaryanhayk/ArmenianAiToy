@@ -157,6 +157,18 @@ public class AuditEvent
         })
     };
 
+    /// <summary>Phase A.2 — parent claimed a device to their account via its
+    /// single-use claim code. No metadata (the claim code must never be
+    /// recorded); the parent + device live in the dedicated columns.</summary>
+    public static AuditEvent ParentDeviceClaimed(Guid parentId, Guid deviceId) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDeviceClaimed,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId
+    };
+
     public static AuditEvent ParentBedtimeWindowSet(
         Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end) => new()
     {

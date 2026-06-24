@@ -130,6 +130,13 @@ public class AuthRateLimiterTests
         => Assert.True(HasAuthLimiterAttribute(nameof(ParentController.DeleteAccount)));
 
     [Fact]
+    public void ClaimDevice_HasAuthRateLimitAttribute()
+        // Phase A.2: the claim code is a guessable secret (brute-force surface),
+        // so unlike the other JWT-gated device control endpoints, claim IS
+        // throttled on the per-IP auth bucket.
+        => Assert.True(HasAuthLimiterAttribute(nameof(ParentController.ClaimDevice)));
+
+    [Fact]
     public void DeviceRegister_HasAuthRateLimitAttribute()
     {
         // #010: device registration mints a credential that can drive the paid

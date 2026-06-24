@@ -32,5 +32,10 @@ public enum AuditEventType
     /// <summary>#074 — a parent revoked or restored a linked device's
     /// server-side credential kill-switch. Metadata carries the post-change
     /// state (is_revoked: bool). Written only when the flag actually flips.</summary>
-    ParentDeviceRevocationChanged
+    ParentDeviceRevocationChanged,
+
+    /// <summary>Platform pairing (Phase A.2) — a parent successfully CLAIMED a
+    /// device to their account via its single-use claim code. ActorParentId =
+    /// the claimer; TargetDeviceId = the toy. No claim code in metadata.</summary>
+    ParentDeviceClaimed
 }

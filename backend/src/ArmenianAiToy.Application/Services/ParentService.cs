@@ -326,6 +326,53 @@ public class ParentService : IParentService
         return true;
     }
 
+    /// <summary>
+    /// Phase A.2 — consumer pairing. Binds a device to the parent's account by
+    /// its single-use CLAIM CODE (from the QR), not its backend key. Returns
+    /// true ONLY on a fresh successful claim; every failure reason (unknown
+    /// device, no/already-used code, wrong code) returns false so the controller
+    /// surfaces ONE uniform error (no device-existence leak). On success the
+    /// code is CONSUMED (ClaimCodeHash cleared) so it can't be replayed.
+    /// </summary>
+    public async Task<bool> ClaimDeviceAsync(Guid parentId, Guid deviceId, string claimCode)
+    {
+        if (string.IsNullOrWhiteSpace(claimCode))
+            return false;
+
+        var device = await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == deviceId);
+        if (device == null)
+            return false;
+
+        // Claimable only if a claim code is currently set (unconsumed). A
+        // legacy/bench device or an already-claimed one has a null hash.
+        if (!DeviceApiKeyHasher.IsHash(device.ClaimCodeHash))
+            return false;
+
+        // Constant-time verify, same discipline as the device key.
+        if (!DeviceApiKeyHasher.Verify(claimCode, device.ClaimCodeHash))
+            return false;
+
+        // Valid claim. Link if not already linked (idempotent), CONSUME the
+        // code (single-use), stamp ClaimedAt, audit.
+        var alreadyLinked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!alreadyLinked)
+        {
+            _db.Set<ParentDevice>().Add(new ParentDevice
+            {
+                ParentId = parentId,
+                DeviceId = deviceId,
+                LinkedAt = DateTime.UtcNow
+            });
+        }
+        device.ClaimCodeHash = null;          // single-use: consume it
+        device.ClaimedAt = DateTime.UtcNow;
+        TrackAndAddAudit(AuditEvent.ParentDeviceClaimed(parentId, deviceId));
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Parent {ParentId} claimed device {DeviceId}", parentId, deviceId);
+        return true;
+    }
+
     public async Task<bool> UnlinkDeviceAsync(Guid parentId, Guid deviceId)
     {
         var link = await _db.Set<ParentDevice>()

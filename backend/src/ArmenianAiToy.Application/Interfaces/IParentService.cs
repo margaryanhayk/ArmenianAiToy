@@ -17,6 +17,7 @@ public interface IParentService
     Task RegisterAsync(string email, string password, bool acceptedTerms);
     Task<ParentLoginResponse?> LoginAsync(string email, string password);
     Task<bool> LinkDeviceAsync(Guid parentId, Guid deviceId, string apiKey);
+    Task<bool> ClaimDeviceAsync(Guid parentId, Guid deviceId, string claimCode);
     Task<bool> UnlinkDeviceAsync(Guid parentId, Guid deviceId);
     Task<List<Guid>> GetLinkedDeviceIdsAsync(Guid parentId);
     Task<List<LinkedDeviceDto>> GetLinkedDeviceDetailsAsync(Guid parentId);

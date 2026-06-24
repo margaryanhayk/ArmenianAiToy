@@ -357,6 +357,35 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Phase A.2 — consumer pairing: claim a device to the authenticated parent
+    /// using the single-use claim code from the toy's QR (NOT its API key). On
+    /// success the toy is linked + the code consumed. Rate-limited on the per-IP
+    /// auth bucket because the claim code is a guessable secret (brute-force
+    /// surface), and every failure reason returns ONE uniform 400 so a caller
+    /// cannot probe which devices exist or whether a code was close.
+    /// </summary>
+    [HttpPost("devices/claim")]
+    [Authorize]
+    [EnableRateLimiting(AuthRateLimiter.PolicyName)]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(429)]
+    public async Task<IActionResult> ClaimDevice([FromBody] DeviceClaimRequest request)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var claimed = await _parentService.ClaimDeviceAsync(
+            parentId, request.DeviceId, request.ClaimCode);
+
+        if (!claimed)
+            // Uniform failure for every reason (unknown device / already-claimed
+            // / wrong code) — no existence leak.
+            return BadRequest(new { error = "That code didn't work. Check the code on your toy and try again." });
+
+        return Ok(new { claimed = true });
+    }
+
+    /// <summary>
     /// Unlink a device from the authenticated parent account. Idempotent —
     /// the response is identical whether a link existed or not, so a caller
     /// cannot probe whether a given (parent, device) pair is real. Removes

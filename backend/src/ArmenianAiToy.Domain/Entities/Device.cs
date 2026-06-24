@@ -29,6 +29,23 @@ public class Device
     public DateTime LastSeenAt { get; set; }
 
     /// <summary>
+    /// Consumer pairing (Phase A.2): hash of the single-use CLAIM CODE printed
+    /// on the toy/box (QR). A parent claims the toy to their account by
+    /// presenting the code (POST /api/parents/devices/claim); on success the
+    /// code is CONSUMED (this is set back to null) so it cannot be reused.
+    /// Null = not claimable (already consumed, or a legacy/bench device that
+    /// was never minted with a claim code). Distinct from the device API key
+    /// (<see cref="ApiKeyHash"/>): the claim code only grants OWNERSHIP and is
+    /// never the device's backend credential. Set at manufacture by the mint
+    /// flow (#043). Hashed with the same hasher as the API key; never logged.
+    /// </summary>
+    public string? ClaimCodeHash { get; set; }
+
+    /// <summary>When this device was first successfully claimed by a parent
+    /// (null = never claimed). Set alongside consuming <see cref="ClaimCodeHash"/>.</summary>
+    public DateTime? ClaimedAt { get; set; }
+
+    /// <summary>
     /// Parent-controlled pause flag. When true, the chat pipeline
     /// short-circuits at the HTTP boundary in ChatController — the device
     /// gets a canned "toy is paused" reply without any OpenAI call, any
