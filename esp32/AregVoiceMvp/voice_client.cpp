@@ -11,7 +11,8 @@
 #include "voice_client.h"
 #include "config.h"
 #include "diag.h"
-#include "wifi_creds.h"   // Phase B.1 — NVS-backed Wi-Fi credentials
+#include "wifi_creds.h"     // Phase B.1 — NVS-backed Wi-Fi credentials
+#include "device_creds.h"   // Phase C   — NVS-backed device identity
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -32,6 +33,44 @@
 #endif
 
 static uint8_t *s_response_buffer = nullptr;
+
+// -------------------------------------------------------------
+// Device identity (Phase C — factory-burned, NVS-first with config.h fallback)
+// -------------------------------------------------------------
+// EFFECTIVE device creds: the factory-burned identity from NVS if present,
+// else the compile-time config.h values (bench). Loaded once, lazily, the
+// first time any backend call builds its auth headers. Device identity does
+// not change at runtime, so a one-time load is correct. With no NVS creds the
+// buffers are filled byte-for-byte from AREG_DEVICE_ID / AREG_DEVICE_API_KEY,
+// so the bench behaves exactly as before this change.
+static char s_device_id[48]      = {0};
+static char s_device_api_key[128] = {0};
+static bool s_device_creds_loaded = false;
+
+static void ensure_device_creds() {
+    if (s_device_creds_loaded) {
+        return;
+    }
+    if (device_creds_load(s_device_id, sizeof(s_device_id),
+                          s_device_api_key, sizeof(s_device_api_key))) {
+        Serial.printf("[device] using provisioned identity (id=%s)\n", s_device_id);
+    } else {
+        snprintf(s_device_id, sizeof(s_device_id), "%s", AREG_DEVICE_ID);
+        snprintf(s_device_api_key, sizeof(s_device_api_key), "%s", AREG_DEVICE_API_KEY);
+        Serial.printf("[device] using compile-time identity (id=%s)\n", s_device_id);
+    }
+    Serial.flush();
+    s_device_creds_loaded = true;
+}
+
+// Single source of truth for the device-auth headers every backend call needs.
+// Replaces the previously-duplicated addHeader pair at each call site and
+// guarantees they all use the same EFFECTIVE identity (NVS or fallback).
+static void add_device_auth_headers(HTTPClient &http) {
+    ensure_device_creds();
+    http.addHeader("X-Device-Id", s_device_id);
+    http.addHeader("X-Api-Key", s_device_api_key);
+}
 
 // -------------------------------------------------------------
 // Wi-Fi
@@ -167,8 +206,7 @@ void voice_send_heartbeat() {
     if (!http.begin(url)) {
         return;
     }
-    http.addHeader("X-Device-Id", AREG_DEVICE_ID);
-    http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+    add_device_auth_headers(http);
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
     http.setTimeout(AREG_HTTP_READ_MS);
 
@@ -222,8 +260,7 @@ bool voice_fetch_story_audio_token(const char *story_id, char *out_token, size_t
     if (!http.begin(tokenUrl)) {
         return false;
     }
-    http.addHeader("X-Device-Id", AREG_DEVICE_ID);
-    http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+    add_device_auth_headers(http);
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
     http.setTimeout(AREG_HTTP_READ_MS);
 
@@ -373,8 +410,7 @@ VoiceTurnResult voice_upload_turn(const uint8_t *payload, size_t length) {
     }
     DIAG_MARK(5002, "http_begin_after_ok");
     http.addHeader("Content-Type", "audio/wav");
-    http.addHeader("X-Device-Id", AREG_DEVICE_ID);
-    http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+    add_device_auth_headers(http);
     static const char *kCollectHeaders[] = {"X-Areg-Continue"};
     http.collectHeaders(kCollectHeaders, 1);
 
@@ -429,8 +465,7 @@ VoiceTurnResult voice_upload_question(const uint8_t *payload, size_t length,
         return result;
     }
     http.addHeader("Content-Type", "audio/wav");
-    http.addHeader("X-Device-Id", AREG_DEVICE_ID);
-    http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+    add_device_auth_headers(http);
 
     Serial.printf("[qa] POST question (%u bytes) offset=%u\n",
                   (unsigned)length, (unsigned)offset);
@@ -488,8 +523,7 @@ VoiceTurnResult voice_upload_reflection_answer(const uint8_t *payload, size_t le
         return result;
     }
     http.addHeader("Content-Type", "audio/wav");
-    http.addHeader("X-Device-Id", AREG_DEVICE_ID);
-    http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+    add_device_auth_headers(http);
 
     Serial.printf("[post] POST answer (%u bytes) qIndex=%d\n",
                   (unsigned)length, question_index);
@@ -614,8 +648,7 @@ static void upload_question_task(void * /*pvParams*/) {
         return;
     }
     http.addHeader("Content-Type", "audio/wav");
-    http.addHeader("X-Device-Id", AREG_DEVICE_ID);
-    http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+    add_device_auth_headers(http);
 
     Serial.printf("[qa-async] POST (%u bytes) offset=%u\n",
                   (unsigned)s_async_length, (unsigned)s_async_offset);
@@ -741,8 +774,7 @@ VoiceTurnResult voice_continue_turn() {
         Serial.println("[voice] continue: http.begin failed");
         return result;
     }
-    http.addHeader("X-Device-Id", AREG_DEVICE_ID);
-    http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+    add_device_auth_headers(http);
     http.addHeader("X-Areg-Continue", "1");
     static const char *kCollectHeaders[] = {"X-Areg-Continue"};
     http.collectHeaders(kCollectHeaders, 1);
