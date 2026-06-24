@@ -86,6 +86,50 @@ public class DeviceServiceTests
         Assert.NotEqual(result.ApiKey, device.ApiKeyHash);
     }
 
+    // Phase A.3 — a NEW registration also mints a single-use claim code + QR.
+    [Fact]
+    public async Task RegisterDeviceAsync_NewDevice_MintsClaimCodeAndQrPayload()
+    {
+        var (service, db) = CreateService();
+
+        var result = (await service.RegisterDeviceAsync(
+            new DeviceRegistrationRequest("AA:BB:CC:DD:EE:FF")))!;
+
+        // Claim code returned once; only its hash is stored.
+        Assert.False(string.IsNullOrWhiteSpace(result.ClaimCode));
+        var device = await db.Set<Device>().FindAsync(result.DeviceId);
+        Assert.True(DeviceApiKeyHasher.IsHash(device!.ClaimCodeHash));
+        Assert.True(DeviceApiKeyHasher.Verify(result.ClaimCode, device.ClaimCodeHash));
+        Assert.NotEqual(result.ClaimCode, device.ClaimCodeHash);     // hash, not plaintext
+        Assert.Null(device.ClaimedAt);                               // not yet claimed
+
+        // QR payload carries deviceId + claim, and NEVER the device API key.
+        Assert.False(string.IsNullOrWhiteSpace(result.QrPayload));
+        Assert.Contains(result.DeviceId.ToString(), result.QrPayload!);
+        Assert.Contains(result.ClaimCode!, result.QrPayload!);
+        Assert.DoesNotContain(result.ApiKey, result.QrPayload!);
+    }
+
+    // A re-registration (key rotation, #011) does NOT re-mint a claim code.
+    [Fact]
+    public async Task RegisterDeviceAsync_ReRegister_DoesNotMintClaimCode()
+    {
+        var (service, db) = CreateService();
+        db.Set<Device>().Add(new Device
+        {
+            Id = Guid.NewGuid(), MacAddress = "11:22:33:44:55:66", Name = "Existing",
+            ApiKey = null, ApiKeyHash = DeviceApiKeyHasher.Hash("dtk_orig"),
+            RegisteredAt = DateTime.UtcNow.AddDays(-1), LastSeenAt = DateTime.UtcNow.AddDays(-1)
+        });
+        await db.SaveChangesAsync();
+
+        var result = (await service.RegisterDeviceAsync(
+            new DeviceRegistrationRequest("11:22:33:44:55:66"), allowReRegister: true))!;
+
+        Assert.Null(result.ClaimCode);
+        Assert.Null(result.QrPayload);
+    }
+
     [Fact]
     public async Task RegisterDeviceAsync_ExistingHashedRow_RotatesKey()
     {

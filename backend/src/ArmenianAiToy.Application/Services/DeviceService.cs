@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text.Json;
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
@@ -84,6 +86,11 @@ public class DeviceService : IDeviceService
         }
 
         var plaintext = $"dtk_{Guid.NewGuid():N}";
+        // Phase A.3 — mint a single-use CLAIM CODE alongside the device key.
+        // Crypto-strong (128-bit), returned ONCE; only its hash is stored. The
+        // factory prints it (in the QR) so a parent can claim the toy; the
+        // device key (above) is never printed. The two secrets are independent.
+        var claimCode = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
         var device = new Device
         {
             Id = Guid.NewGuid(),
@@ -91,6 +98,7 @@ public class DeviceService : IDeviceService
             Name = $"Toy-{request.MacAddress[^4..]}",
             ApiKey = null,
             ApiKeyHash = DeviceApiKeyHasher.Hash(plaintext),
+            ClaimCodeHash = DeviceApiKeyHasher.Hash(claimCode),
             FirmwareVersion = request.FirmwareVersion,
             RegisteredAt = DateTime.UtcNow,
             LastSeenAt = DateTime.UtcNow
@@ -100,7 +108,10 @@ public class DeviceService : IDeviceService
         await _db.SaveChangesAsync();
 
         _logger.LogInformation("New device registered: {DeviceId} ({MacAddress})", device.Id, device.MacAddress);
-        return new DeviceRegistrationResponse(device.Id, plaintext);
+        // QR payload = the exact JSON the toy's QR should encode; the app's
+        // claim scanner parses { deviceId, claim }. Device key is NOT included.
+        var qrPayload = JsonSerializer.Serialize(new { deviceId = device.Id, claim = claimCode });
+        return new DeviceRegistrationResponse(device.Id, plaintext, claimCode, qrPayload);
     }
 
     public async Task<Device?> ValidateDeviceAsync(Guid deviceId, string apiKey)
