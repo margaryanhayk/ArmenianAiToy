@@ -826,6 +826,21 @@ public class ParentService : IParentService
         return parsed < MinDormancyNotSeenDays ? MinDormancyNotSeenDays : parsed;
     }
 
+    // Platform presence window for the derived LinkedDeviceDto.IsOnline flag.
+    // The toy heartbeats ~every 60s; the default 180s (3 missed beats) avoids
+    // flapping on a single dropped heartbeat. Overridable via
+    // Presence:OnlineThresholdSeconds; clamp floor 30s so a pathological tiny
+    // value can't mark every online device offline. Reporting-only.
+    private const int DefaultOnlineThresholdSeconds = 180;
+    private const int MinOnlineThresholdSeconds = 30;
+
+    private int ReadOnlineThresholdSeconds()
+    {
+        var raw = _config["Presence:OnlineThresholdSeconds"];
+        var parsed = int.TryParse(raw, out var n) ? n : DefaultOnlineThresholdSeconds;
+        return parsed < MinOnlineThresholdSeconds ? MinOnlineThresholdSeconds : parsed;
+    }
+
     public async Task<bool> DeleteAccountAsync(Guid parentId, string currentPassword)
     {
         // Re-authenticate: the JWT proves the caller is logged in as this
@@ -1231,6 +1246,9 @@ public class ParentService : IParentService
         // retention, or any behavior change.
         var nowUtc = DateTime.UtcNow;
         var dormancyCutoff = nowUtc.AddDays(-ReadDormancyNotSeenDays());
+        // Platform presence (online dot in the app): seen within the online
+        // window. Same snapshot-once discipline as the dormancy cutoff.
+        var onlineCutoff = nowUtc.AddSeconds(-ReadOnlineThresholdSeconds());
 
         return links.Select(l => new LinkedDeviceDto(
             l.Device.Id,
@@ -1251,7 +1269,8 @@ public class ParentService : IParentService
             l.Device.GameEnabled,
             l.Device.RiddleEnabled,
             l.Device.CuriosityEnabled,
-            IsDormant: l.Device.LastSeenAt <= dormancyCutoff
+            IsDormant: l.Device.LastSeenAt <= dormancyCutoff,
+            IsOnline: l.Device.LastSeenAt >= onlineCutoff
         )).ToList();
     }
 

@@ -340,6 +340,58 @@ public class ParentServiceGetLinkedDeviceDetailsTests
         Assert.False(dto.IsDormant);
     }
 
+    // --- Platform presence slice: derived IsOnline reporting-only flag. ---
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsAsync_RecentlySeen_ReturnsIsOnlineTrue()
+    {
+        // Seen "now" — well inside the default 180s online window.
+        var (service, db) = CreateServiceWithConfig(notSeenDays: null);
+        var parentId = Guid.NewGuid();
+        await SeedLinkedDeviceAsync(db, parentId, DateTime.UtcNow);
+
+        var dto = Assert.Single(await service.GetLinkedDeviceDetailsAsync(parentId));
+        Assert.True(dto.IsOnline);
+    }
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsAsync_SeenBeyondOnlineWindow_ReturnsIsOnlineFalse_ButNotDormant()
+    {
+        // 10 minutes silent: past the 180s online window (offline) but FAR
+        // inside the 180-day dormancy threshold — proving the two flags are
+        // independent (a toy can be momentarily offline without being dormant).
+        var (service, db) = CreateServiceWithConfig(notSeenDays: null);
+        var parentId = Guid.NewGuid();
+        await SeedLinkedDeviceAsync(db, parentId, DateTime.UtcNow.AddMinutes(-10));
+
+        var dto = Assert.Single(await service.GetLinkedDeviceDetailsAsync(parentId));
+        Assert.False(dto.IsOnline);
+        Assert.False(dto.IsDormant);
+    }
+
+    [Fact]
+    public async Task GetLinkedDeviceDetailsAsync_OnlineThresholdConfigIsHonored()
+    {
+        // A device seen 90s ago is OFFLINE under a tight 60s window but ONLINE
+        // under the default 180s — pins that Presence:OnlineThresholdSeconds
+        // flows through, not just the default constant.
+        var lastSeen = DateTime.UtcNow.AddSeconds(-90);
+
+        var tightCfg = Substitute.For<IConfiguration>();
+        tightCfg["Presence:OnlineThresholdSeconds"].Returns("60");
+        var tightDb = new TestDbContext(new DbContextOptionsBuilder<TestDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+        var tightService = new ParentService(tightDb, tightCfg, Substitute.For<ILogger<ParentService>>());
+        var tp = Guid.NewGuid();
+        await SeedLinkedDeviceAsync(tightDb, tp, lastSeen);
+        Assert.False(Assert.Single(await tightService.GetLinkedDeviceDetailsAsync(tp)).IsOnline);
+
+        var (looseService, looseDb) = CreateServiceWithConfig(notSeenDays: null);
+        var lp = Guid.NewGuid();
+        await SeedLinkedDeviceAsync(looseDb, lp, lastSeen);
+        Assert.True(Assert.Single(await looseService.GetLinkedDeviceDetailsAsync(lp)).IsOnline);
+    }
+
     // --- Dormancy summary slice: devices + lastLoginAt wrapper. --------
 
     [Fact]

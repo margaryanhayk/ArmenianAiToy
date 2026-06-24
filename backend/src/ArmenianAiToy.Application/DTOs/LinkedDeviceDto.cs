@@ -12,6 +12,14 @@ namespace ArmenianAiToy.Application.DTOs;
 /// <see cref="ArmenianAiToy.Application.Services.ParentService.GetLinkedDeviceDetailsAsync"/>
 /// for the single computation site.
 /// </para>
+/// <para>
+/// <c>IsOnline</c> (platform/presence) is derived the same way: true when
+/// <c>UtcNow - LastSeenAt &lt; Presence:OnlineThresholdSeconds</c> (default
+/// 180s, clamp floor 30s). The toy refreshes <c>LastSeenAt</c> via the
+/// throttled heartbeat (<c>POST /api/devices/heartbeat</c>) and normal chat
+/// traffic; the app shows a live online/offline dot from this flag. Also
+/// reporting-only — no behavior is gated on it. Same single computation site.
+/// </para>
 /// </summary>
 public record LinkedDeviceDto(
     Guid DeviceId,
@@ -28,7 +36,8 @@ public record LinkedDeviceDto(
     bool GameEnabled,
     bool RiddleEnabled,
     bool CuriosityEnabled,
-    bool IsDormant);
+    bool IsDormant,
+    bool IsOnline);
 
 public record LinkedDeviceChildDto(
     Guid ChildId,

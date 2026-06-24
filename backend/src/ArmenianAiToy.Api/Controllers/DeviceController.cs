@@ -58,4 +58,21 @@ public class DeviceController : ControllerBase
             });
         return Created("", result);
     }
+
+    // Platform presence (consumer app online/offline dot). The toy POSTs here
+    // periodically when idle. Device-authed: DeviceAuthMiddleware validates the
+    // X-Device-Id / X-Api-Key headers AND refreshes Device.LastSeenAt (throttled,
+    // #034) BEFORE this action runs — so this endpoint only has to acknowledge.
+    // The parent dashboard derives LinkedDeviceDto.IsOnline from LastSeenAt.
+    // Deliberately minimal (no commands/config pushed back yet) — presence only.
+    [HttpPost("heartbeat")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public IActionResult Heartbeat()
+    {
+        // DeviceId is guaranteed present: the middleware sets it for this path
+        // after a successful credential check (else the request 401s upstream).
+        var deviceId = HttpContext.Items["DeviceId"] as Guid?;
+        return Ok(new { ok = true, deviceId, serverTimeUtc = DateTime.UtcNow });
+    }
 }
