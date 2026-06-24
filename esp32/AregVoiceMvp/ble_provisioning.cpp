@@ -33,6 +33,7 @@
 #endif
 
 static volatile bool s_active = false;
+static volatile bool s_succeeded = false;  // B.3 — latched on CRED_SUCCESS
 
 // Provisioning event handler. Registered via WiFi.onEvent before
 // beginProvision. The credential-receive event is where we capture the
@@ -76,6 +77,7 @@ static void prov_event(arduino_event_t *sys_event) {
             Serial.println("[prov] credentials accepted; Wi-Fi connected");
             Serial.flush();
             s_active = false;
+            s_succeeded = true;  // B.3 — main loop reboots to load new NVS creds
             break;
 
         case ARDUINO_EVENT_PROV_END:
@@ -111,6 +113,10 @@ void ble_provisioning_begin() {
 
 bool ble_provisioning_active() {
     return s_active;
+}
+
+bool ble_provisioning_succeeded() {
+    return s_succeeded;
 }
 
 #endif  // AREG_USE_BLE_PROVISIONING

@@ -251,3 +251,8 @@
 #ifndef AREG_PROV_RESET_HOLD_MS
 #define AREG_PROV_RESET_HOLD_MS 5000
 #endif
+// B.3 — a provisioned toy that can't rejoin Wi-Fi for this long (ms) auto-opens
+// BLE provisioning (moved toy / new router; no button gesture needed). 5 min.
+#ifndef AREG_PROV_FALLBACK_AFTER_MS
+#define AREG_PROV_FALLBACK_AFTER_MS 300000UL
+#endif

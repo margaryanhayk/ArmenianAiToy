@@ -33,4 +33,10 @@ void ble_provisioning_begin();
 // wants to; not required for correctness.
 bool ble_provisioning_active();
 
+// B.3 — true once credentials were accepted and Wi-Fi connected during this
+// session (latched). The main loop reboots on this so the new NVS creds take
+// effect via the proven B.1 voice_wifi_begin() path on the next boot, instead
+// of relying on the provisioning manager's in-session connection persisting.
+bool ble_provisioning_succeeded();
+
 #endif  // AREG_USE_BLE_PROVISIONING

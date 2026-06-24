@@ -43,6 +43,11 @@ static uint8_t *s_response_buffer = nullptr;
 static char s_wifi_ssid[65] = {0};
 static char s_wifi_pass[65] = {0};
 
+// B.3 — millis() when the link was first observed down (0 = connected / not yet
+// observed down). Set/cleared by voice_wifi_tick(); read by
+// voice_wifi_down_duration_ms() to drive the auto-fallback to provisioning.
+static uint32_t s_wifi_down_since_ms = 0;
+
 static void wifi_load_effective_creds() {
     if (wifi_creds_load(s_wifi_ssid, sizeof(s_wifi_ssid),
                         s_wifi_pass, sizeof(s_wifi_pass))) {
@@ -111,10 +116,17 @@ void voice_wifi_tick() {
         // Healthy — arm a prompt first retry for the NEXT drop.
         s_backoff_ms = AREG_WIFI_RECONNECT_MIN_MS;
         s_attempted = false;
+        s_wifi_down_since_ms = 0;   // B.3 — link healthy, reset the outage clock
         return;
     }
 
     const uint32_t now = millis();
+    if (s_wifi_down_since_ms == 0) {
+        // B.3 — first tick that observed the drop; start the outage clock.
+        // (millis() is never 0 here in practice — boot spends >0 ms before the
+        // first tick — but if it were, the next tick stamps a nonzero value.)
+        s_wifi_down_since_ms = now;
+    }
     // Rollover-safe elapsed check (same idiom as the idle heartbeat).
     if (s_attempted && (now - s_last_attempt_ms) < s_backoff_ms) {
         return;  // still inside the current backoff window
@@ -132,6 +144,13 @@ void voice_wifi_tick() {
     s_backoff_ms = (next > AREG_WIFI_RECONNECT_MAX_MS)
                        ? (uint32_t)AREG_WIFI_RECONNECT_MAX_MS
                        : next;
+}
+
+uint32_t voice_wifi_down_duration_ms() {
+    if (WiFi.status() == WL_CONNECTED || s_wifi_down_since_ms == 0) {
+        return 0;
+    }
+    return millis() - s_wifi_down_since_ms;  // rollover-safe (unsigned wrap)
 }
 
 // -------------------------------------------------------------

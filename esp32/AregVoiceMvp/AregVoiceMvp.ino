@@ -39,6 +39,12 @@
 #ifndef AREG_PROV_RESET_HOLD_MS
 #define AREG_PROV_RESET_HOLD_MS       5000
 #endif
+// B.3 — a provisioned toy that cannot rejoin Wi-Fi for this long (ms) auto-opens
+// BLE provisioning so a moved toy / new router can be re-onboarded with no
+// gesture. Only consulted in the AREG_USE_BLE_PROVISIONING build. 5 min default.
+#ifndef AREG_PROV_FALLBACK_AFTER_MS
+#define AREG_PROV_FALLBACK_AFTER_MS   300000UL
+#endif
 
 // --- State machine -------------------------------------------
 enum State {
@@ -1006,7 +1012,31 @@ void loop() {
         // blips (and a failed boot-time join) without a power-cycle. Runs only
         // in IDLE — RECORDING/UPLOADING/PLAYING block inside their handlers, so
         // a reconnect never disrupts an active turn.
+#ifdef AREG_USE_BLE_PROVISIONING
+        // B.3 — auto-fallback to provisioning. While a provisioning session is
+        // running we stop the normal reconnect (it would fight the manager for
+        // the radio). On a successful re-provision we reboot so the new NVS
+        // creds load via the proven B.1 voice_wifi_begin() path.
+        if (ble_provisioning_succeeded()) {
+            Serial.println("[prov] re-provisioned — rebooting to apply new Wi-Fi");
+            Serial.flush();
+            delay(2000);  // let the phone receive the success ack first
+            esp_restart();
+        }
+        if (!ble_provisioning_active()) {
+            voice_wifi_tick();
+            // A toy that WAS provisioned but has been offline too long (moved
+            // house / router replaced) re-opens BLE provisioning on its own.
+            if (voice_wifi_is_provisioned() &&
+                voice_wifi_down_duration_ms() >= AREG_PROV_FALLBACK_AFTER_MS) {
+                Serial.println("[prov] long Wi-Fi outage — opening BLE provisioning for re-onboarding");
+                Serial.flush();
+                ble_provisioning_begin();
+            }
+        }
+#else
         voice_wifi_tick();
+#endif
 
         // Diag: 5 s idle heartbeat — surfaces Wi-Fi drops and
         // proves the chip is alive between button presses, since

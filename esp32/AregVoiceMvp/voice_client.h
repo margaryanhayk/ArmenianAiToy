@@ -40,6 +40,13 @@ void voice_wifi_set_credentials(const char *ssid, const char *password);
 // AREG_WIFI_RECONNECT_MAX_MS (see config.h.example).
 void voice_wifi_tick();
 
+// B.3 — how long the link has been CONTINUOUSLY down, in ms. Returns 0 when
+// connected (or before the first tick observed a drop). Drives the auto-
+// fallback to BLE provisioning: a toy that was provisioned but cannot rejoin
+// for a long stretch (moved house / router replaced) re-opens provisioning on
+// its own. Updated by voice_wifi_tick(); call that first each loop.
+uint32_t voice_wifi_down_duration_ms();
+
 // Result of a single voice turn upload.
 struct VoiceTurnResult {
     // true iff HTTP status was 200 AND a response body was
