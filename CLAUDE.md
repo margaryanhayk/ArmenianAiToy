@@ -1156,6 +1156,21 @@ ships `"*"`. **Operators must set real hostnames in prod** to enable
 Host-header filtering and silence the warning. Pinned by
 `HostFilteringConfigTests`.
 
+**HTTPS hardening (#007/#008).** `HttpsHardeningConfig.Resolve(requireHttps,
+hstsMaxAgeDays)` (pure helper in `Api/Security/`) gates app-side HTTP→HTTPS
+redirect + HSTS. **OFF by default in EVERY environment** — it is an explicit
+deploy switch (`Security:RequireHttps`, default `false`), not environment-
+derived, because whether the app should redirect/emit HSTS depends on the
+topology the operator picks: TLS at Kestrel (enable here) vs. TLS at a reverse
+proxy (usually let the proxy own it; if enabling here, the proxy must forward
+`X-Forwarded-Proto` and `ForwardedHeaders` #039 must be on, or the redirect
+loops). When enabled, `Program.cs` calls `app.UseHsts()` + `UseHttpsRedirection()`
+right after `UseForwardedHeaders` (so the redirect sees the real scheme), and
+`AddHsts` is registered with `Security:HstsMaxAgeDays` (default 365, floor-
+clamped to 1). Default-off means dev/bench are unaffected. Pinned by
+`HttpsHardeningConfigTests`. NOTE: this is the app-side half only — a domain +
+certificate (at Kestrel or the proxy) is the owner/infra half still pending.
+
 ## Rate limiting
 
 Two named ASP.NET rate-limit policies, both fixed-window, both

@@ -232,6 +232,14 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 
+// #007/#008 — app-side HTTPS hardening (HTTP->HTTPS redirect + HSTS), opt-in and
+// OFF by default (see HttpsHardeningConfig). Resolved once here so AddHsts gets
+// the configured max-age and the middleware below shares the same verdict.
+var httpsHardening = HttpsHardeningConfig.Resolve(
+    builder.Configuration.GetValue("Security:RequireHttps", false),
+    builder.Configuration.GetValue<int?>("Security:HstsMaxAgeDays"));
+builder.Services.AddHsts(o => o.MaxAge = TimeSpan.FromDays(httpsHardening.HstsMaxAgeDays));
+
 var app = builder.Build();
 
 // #061 — surface an unpinned Host filter in non-Development environments.
@@ -280,6 +288,17 @@ using (var scope = app.Services.CreateScope())
 var forwardedHeaders = ForwardedHeadersConfig.TryBuild(builder.Configuration);
 if (forwardedHeaders is not null)
     app.UseForwardedHeaders(forwardedHeaders);
+
+// #007/#008 — when Security:RequireHttps=true, redirect HTTP->HTTPS and emit
+// HSTS. OFF by default in every environment, so dev/bench are unaffected; an
+// operator flips it once TLS is terminated (at Kestrel, or at a proxy that
+// forwards X-Forwarded-Proto with ForwardedHeaders #039 enabled). Placed right
+// after UseForwardedHeaders so the redirect sees the real client scheme.
+if (httpsHardening.Enabled)
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
 
 if (app.Environment.IsDevelopment())
 {
