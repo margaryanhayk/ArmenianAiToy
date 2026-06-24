@@ -159,6 +159,7 @@ public class AuthRateLimiterTests
     [InlineData(nameof(ParentController.UnlinkDevice))]
     [InlineData(nameof(ParentController.PauseDevice))]
     [InlineData(nameof(ParentController.ResumeDevice))]
+    [InlineData(nameof(ParentController.SetDeviceName))]
     [InlineData(nameof(ParentController.GetDevices))]
     [InlineData(nameof(ParentController.GetDeviceDetails))]
     [InlineData(nameof(ParentController.Export))]

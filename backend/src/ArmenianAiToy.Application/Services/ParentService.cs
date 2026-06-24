@@ -1162,6 +1162,42 @@ public class ParentService : IParentService
         return true;
     }
 
+    /// <summary>
+    /// Rename a linked device so a parent can tell their toys apart (multi-toy
+    /// labeling). Trims + caps the name; returns false on a non-owned/unknown
+    /// device or an empty/over-length name (the controller maps that to 404 /
+    /// 400). Idempotent: a no-op rename writes no audit row. Same ownership +
+    /// silent-shape pattern as the other device-mutation methods.
+    /// </summary>
+    public async Task<bool> SetDeviceNameAsync(Guid parentId, Guid deviceId, string name)
+    {
+        var trimmed = (name ?? string.Empty).Trim();
+        if (trimmed.Length == 0 || trimmed.Length > SetDeviceNameRequest.MaxLength)
+            return false;
+
+        var linked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!linked)
+            return false;
+
+        var device = await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == deviceId);
+        if (device == null)
+            return false;
+
+        if (string.Equals(device.Name, trimmed, StringComparison.Ordinal))
+        {
+            // Idempotent: name unchanged — no mutation, no audit row.
+            return true;
+        }
+
+        device.Name = trimmed;
+        TrackAndAddAudit(AuditEvent.ParentDeviceRenamed(parentId, deviceId));
+        await _db.SaveChangesAsync();
+        _logger.LogInformation(
+            "Parent {ParentId} renamed device {DeviceId}", parentId, deviceId);
+        return true;
+    }
+
     public async Task<bool> SetBedtimeWindowAsync(Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end)
     {
         // Ownership check — same silent-false shape as SetDevicePauseStateAsync.

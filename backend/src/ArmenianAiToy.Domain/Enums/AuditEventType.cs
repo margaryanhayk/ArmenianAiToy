@@ -37,5 +37,11 @@ public enum AuditEventType
     /// <summary>Platform pairing (Phase A.2) — a parent successfully CLAIMED a
     /// device to their account via its single-use claim code. ActorParentId =
     /// the claimer; TargetDeviceId = the toy. No claim code in metadata.</summary>
-    ParentDeviceClaimed
+    ParentDeviceClaimed,
+
+    /// <summary>A parent renamed one of their linked devices (multi-toy
+    /// labeling). ActorParentId = the parent; TargetDeviceId = the toy. The new
+    /// name is NOT recorded (parent-chosen free text may contain a child's
+    /// name → potential PII); only that a rename happened.</summary>
+    ParentDeviceRenamed
 }

@@ -169,6 +169,18 @@ public class AuditEvent
         TargetDeviceId = deviceId
     };
 
+    /// <summary>A parent renamed a linked device. No metadata — the chosen name
+    /// is parent free-text that could carry a child's name (PII); we record
+    /// only that a rename occurred. Current name lives on the Device row.</summary>
+    public static AuditEvent ParentDeviceRenamed(Guid parentId, Guid deviceId) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDeviceRenamed,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId
+    };
+
     public static AuditEvent ParentBedtimeWindowSet(
         Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end) => new()
     {

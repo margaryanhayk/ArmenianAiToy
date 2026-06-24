@@ -547,6 +547,35 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Rename a linked device so a parent can tell their toys apart when they
+    /// own more than one ("Anna's toy", "Living room"). Parent-JWT, ownership-
+    /// checked; 400 on an empty / over-length name, silent 404 on a device not
+    /// linked to this account. Idempotent.
+    /// </summary>
+    [HttpPut("devices/{deviceId}/name")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> SetDeviceName(
+        Guid deviceId, [FromBody] SetDeviceNameRequest request)
+    {
+        var name = (request?.Name ?? string.Empty).Trim();
+        if (name.Length == 0 || name.Length > SetDeviceNameRequest.MaxLength)
+            return BadRequest(new
+            {
+                error = $"Name must be 1–{SetDeviceNameRequest.MaxLength} characters."
+            });
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ok = await _parentService.SetDeviceNameAsync(parentId, deviceId, name);
+        if (!ok)
+            return NotFound(new { error = "Device not found or not linked to this account." });
+        return Ok(new { name });
+    }
+
+    /// <summary>
     /// B4: set (or disable) the bedtime window on a linked device. While the
     /// current local time on the device is inside the window, POST /api/chat
     /// short-circuits with the same canned reply a paused device returns.
