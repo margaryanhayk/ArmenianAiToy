@@ -23,6 +23,8 @@
 #include "voice_client.h"
 #include "canned_clip.h"
 #include "diag.h"
+#include "wifi_creds.h"        // B.1 — NVS cred clear (factory reset gesture)
+#include "ble_provisioning.h"  // B.2 — BLE provisioning (gated; no-op when flag off)
 
 // #047 — hang-protection tunables. Defaulted here so the build never depends
 // on config.h carrying them; overridable in config.h. See config.h.example.
@@ -31,6 +33,11 @@
 #endif
 #ifndef AREG_ASYNC_UPLOAD_TIMEOUT_MS
 #define AREG_ASYNC_UPLOAD_TIMEOUT_MS  45000
+#endif
+// B.2 — hold the button this long at power-on to forget the saved Wi-Fi and
+// re-enter BLE provisioning. Only consulted in the AREG_USE_BLE_PROVISIONING build.
+#ifndef AREG_PROV_RESET_HOLD_MS
+#define AREG_PROV_RESET_HOLD_MS       5000
 #endif
 
 // --- State machine -------------------------------------------
@@ -925,6 +932,46 @@ void setup() {
     WiFi.onEvent(wifi_event_handler);
 
     DIAG_MARK(140, "wifi_begin_before");
+#ifdef AREG_USE_BLE_PROVISIONING
+    // B.2 — boot-time re-provision gesture: HOLD the button while powering on
+    // for AREG_PROV_RESET_HOLD_MS to forget the saved network and re-enter BLE
+    // provisioning (moved toy / new router). Evaluated ONCE here at boot, so it
+    // never conflicts with the normal in-loop press (which starts the story).
+    {
+        const uint32_t hold_ms = AREG_PROV_RESET_HOLD_MS;
+        const uint32_t held_start = millis();
+        bool held = (digitalRead(AREG_PIN_BUTTON) == LOW);
+        while (held && (millis() - held_start) < hold_ms) {
+            if (digitalRead(AREG_PIN_BUTTON) != LOW) { held = false; break; }
+            delay(10);
+        }
+        if (held) {
+            Serial.println("[prov] button held at boot — forgetting Wi-Fi, entering provisioning");
+            Serial.flush();
+            wifi_creds_clear();
+        }
+    }
+
+    if (voice_wifi_is_provisioned()) {
+        // Known network → connect normally (B.1 path reads NVS creds).
+        if (voice_wifi_begin()) {
+            DIAG_MARK(141, "wifi_begin_after_ok");
+        } else {
+            Serial.println("[boot] wifi join failed; will keep retrying in background");
+            Serial.flush();
+            DIAG_MARK(142, "wifi_begin_after_fail_nonfatal");
+        }
+    } else {
+        // No saved network → start BLE provisioning, then proceed to IDLE. The
+        // provisioning manager connects the STA once the phone delivers creds;
+        // any voice turn attempted before then fails gracefully to the canned
+        // clip (every upload path checks voice_wifi_is_connected()).
+        Serial.println("[boot] no saved Wi-Fi — starting BLE provisioning");
+        Serial.flush();
+        ble_provisioning_begin();
+        DIAG_MARK(143, "ble_provisioning_started");
+    }
+#else
     if (voice_wifi_begin()) {
         DIAG_MARK(141, "wifi_begin_after_ok");
     } else {
@@ -937,6 +984,7 @@ void setup() {
         Serial.flush();
         DIAG_MARK(142, "wifi_begin_after_fail_nonfatal");
     }
+#endif
 
     Serial.println("[boot] ready — press button to speak");
     Serial.flush();
