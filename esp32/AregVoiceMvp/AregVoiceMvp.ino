@@ -39,6 +39,12 @@
 #ifndef AREG_PROV_RESET_HOLD_MS
 #define AREG_PROV_RESET_HOLD_MS       5000
 #endif
+// Phase A.1 (toy side) — interval between idle presence heartbeats. The backend
+// presence threshold is ~180 s and LastSeenAt is throttled to 60 s, so 60 s
+// keeps the parent app's online dot fresh without chatter.
+#ifndef AREG_HEARTBEAT_INTERVAL_MS
+#define AREG_HEARTBEAT_INTERVAL_MS    60000UL
+#endif
 // B.3 — a provisioned toy that cannot rejoin Wi-Fi for this long (ms) auto-opens
 // BLE provisioning so a moved toy / new router can be re-onboarded with no
 // gesture. Only consulted in the AREG_USE_BLE_PROVISIONING build. 5 min default.
@@ -107,7 +113,8 @@ static void wifi_event_handler(WiFiEvent_t event, WiFiEventInfo_t info) {
     }
 }
 
-static uint32_t s_last_heartbeat_ms = 0;
+static uint32_t s_last_heartbeat_ms = 0;       // serial [alive] log (5 s)
+static uint32_t s_last_net_heartbeat_ms = 0;   // network presence POST (A.1)
 
 // --- LED -----------------------------------------------------
 static Adafruit_NeoPixel s_led(1, AREG_PIN_LED, NEO_GRB + NEO_KHZ800);
@@ -1053,6 +1060,15 @@ void loop() {
                 WiFi.localIP().toString().c_str(),
                 (int)WiFi.RSSI());
             Serial.flush();
+        }
+
+        // Phase A.1 (toy side) — periodic presence heartbeat so the parent
+        // app's online dot reflects an idle-but-powered toy. Best-effort and
+        // brief; runs only in IDLE (never during a turn). Chat turns already
+        // refresh LastSeenAt, so this only matters during long idle stretches.
+        if (now - s_last_net_heartbeat_ms >= AREG_HEARTBEAT_INTERVAL_MS) {
+            s_last_net_heartbeat_ms = now;
+            voice_send_heartbeat();
         }
 
         char ev = button_poll();

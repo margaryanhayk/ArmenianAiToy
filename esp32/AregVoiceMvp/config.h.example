@@ -256,3 +256,8 @@
 #ifndef AREG_PROV_FALLBACK_AFTER_MS
 #define AREG_PROV_FALLBACK_AFTER_MS 300000UL
 #endif
+// Phase A.1 (toy side) — interval (ms) between idle presence heartbeats to
+// POST /api/devices/heartbeat. Keeps the parent app's online dot fresh. 60s.
+#ifndef AREG_HEARTBEAT_INTERVAL_MS
+#define AREG_HEARTBEAT_INTERVAL_MS 60000UL
+#endif

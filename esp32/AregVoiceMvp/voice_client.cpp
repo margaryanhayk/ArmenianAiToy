@@ -153,6 +153,35 @@ uint32_t voice_wifi_down_duration_ms() {
     return millis() - s_wifi_down_since_ms;  // rollover-safe (unsigned wrap)
 }
 
+void voice_send_heartbeat() {
+    if (!voice_wifi_is_connected()) {
+        return;  // nothing to do offline; the reconnect tick owns recovery
+    }
+    // Derive the heartbeat URL from the configured backend URL (same trick as
+    // voice_fetch_story_audio_token) so there is no separate config constant to
+    // keep in sync: ".../api/chat/audio" -> ".../api/devices/heartbeat".
+    String url = AREG_BACKEND_URL;
+    url.replace("/api/chat/audio", "/api/devices/heartbeat");
+
+    HTTPClient http;
+    if (!http.begin(url)) {
+        return;
+    }
+    http.addHeader("X-Device-Id", AREG_DEVICE_ID);
+    http.addHeader("X-Api-Key", AREG_DEVICE_API_KEY);
+    http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
+    http.setTimeout(AREG_HTTP_READ_MS);
+
+    // Empty body — the backend only needs the device-auth headers; the
+    // middleware refreshes LastSeenAt before the action runs. Best-effort:
+    // any status (incl. 401 on a stale key, or a transport failure) is fine,
+    // the next interval retries.
+    const int status = http.POST("");
+    http.end();
+    Serial.printf("[heartbeat] status=%d\n", status);
+    Serial.flush();
+}
+
 // -------------------------------------------------------------
 // Upload
 // -------------------------------------------------------------

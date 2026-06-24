@@ -47,6 +47,15 @@ void voice_wifi_tick();
 // its own. Updated by voice_wifi_tick(); call that first each loop.
 uint32_t voice_wifi_down_duration_ms();
 
+// Phase A.1 (toy side) — platform presence. Fire-and-forget POST to
+// /api/devices/heartbeat with the device-auth headers so the backend refreshes
+// LastSeenAt and the parent app's online/offline dot reflects an idle-but-
+// powered toy (chat turns already bump LastSeenAt; this covers the idle gap).
+// Best-effort: returns quickly, ignores every failure (offline, stale key,
+// transient). Call on an interval from loop() while idle. No-op when the link
+// is down. The URL is derived from AREG_BACKEND_URL, so no new config constant.
+void voice_send_heartbeat();
+
 // Result of a single voice turn upload.
 struct VoiceTurnResult {
     // true iff HTTP status was 200 AND a response body was
