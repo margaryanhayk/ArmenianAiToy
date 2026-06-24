@@ -437,6 +437,32 @@
         <button id="openAuditBtn" class="link" type="button">View your activity →</button>
       </div>
       <!--
+        Consumer pairing (Phase A.2): claim a toy with the single-use code
+        from its box / setup card (or the app's QR scan), NOT the device's
+        API key. Available whether or not the parent already has devices, so
+        a second toy can be added. Posts to POST /api/parents/devices/claim.
+      -->
+      <div style="margin:0 0 12px;">
+        <button id="toggleClaimBtn" class="link" type="button">＋ Add a toy</button>
+        <div id="claimDeviceForm" hidden
+             style="margin-top:8px;padding:10px 12px;background:#f0f7f0;
+                    border:1px solid #b6d6b6;border-radius:6px;max-width:420px;">
+          <p style="margin:0 0 8px;font-size:13px;color:#3a5a3a;">
+            Enter the pairing code from your toy's box or setup card (the app can
+            scan its QR instead). This links the toy to your account.</p>
+          <label for="claimDeviceIdInput" style="display:block;font-size:12px;color:#555;">Device ID</label>
+          <input id="claimDeviceIdInput" type="text" autocomplete="off"
+                 placeholder="00000000-0000-0000-0000-000000000000"
+                 style="width:100%;padding:5px 8px;margin:2px 0 8px;box-sizing:border-box;">
+          <label for="claimCodeInput" style="display:block;font-size:12px;color:#555;">Pairing code</label>
+          <input id="claimCodeInput" type="text" autocomplete="off"
+                 placeholder="code from the toy"
+                 style="width:100%;padding:5px 8px;margin:2px 0 8px;box-sizing:border-box;">
+          <button id="claimDeviceBtn" type="button">Pair toy</button>
+          <div id="claimDeviceStatus" class="status muted" aria-live="polite"></div>
+        </div>
+      </div>
+      <!--
         Observational dormancy summary — populated by loadDevices().
         Reporting-only: no CTA, no deletion wording, no warning styling.
         Hidden while empty; shown as soon as there is at least one line
@@ -1302,6 +1328,34 @@
             btn.appendChild(sub);
           }
 
+          // Presence badge — live online/offline dot from the server-derived
+          // isOnline flag (refreshed by the toy's heartbeat + chat traffic).
+          // Reporting-only; nothing is gated on it. Older payloads without the
+          // field render no badge rather than a misleading "offline".
+          if (typeof d.isOnline === 'boolean') {
+            var onlineBadge = document.createElement('div');
+            onlineBadge.textContent = d.isOnline ? '● Online' : '○ Offline';
+            onlineBadge.style.cssText =
+              'margin:2px 6px 0 0;padding:2px 8px;display:inline-block;' +
+              'border-radius:4px;font-size:12px;' +
+              (d.isOnline
+                ? 'background:#e6f6e6;border:1px solid #5aa45a;color:#2f6b2f;'
+                : 'background:#f2f2f2;border:1px solid #bbb;color:#777;');
+            btn.appendChild(onlineBadge);
+          }
+
+          // #074 revoked badge — the credential kill-switch is active; the toy
+          // is signed out everywhere until it re-provisions a fresh key.
+          if (d.isRevoked) {
+            var revokedBadge = document.createElement('div');
+            revokedBadge.textContent = 'Revoked';
+            revokedBadge.style.cssText =
+              'margin:2px 6px 0 0;padding:2px 8px;display:inline-block;' +
+              'background:#fdecea;border:1px solid #d9534f;color:#a02622;' +
+              'border-radius:4px;font-size:12px;';
+            btn.appendChild(revokedBadge);
+          }
+
           if (d.isPaused) {
             var pausedBadge = document.createElement('div');
             pausedBadge.textContent = 'Paused by you';
@@ -1491,6 +1545,54 @@
           modesHint.style.cssText = 'color:#888;font-size:11px;';
           modesRow.appendChild(modesHint);
           listEl.appendChild(modesRow);
+
+          // Rename row — label the toy so multiple toys are distinguishable
+          // ("Anna's toy", "Living room"). Sibling row (input not nested in a
+          // button). PUT /api/parents/devices/{id}/name.
+          var renameRow = document.createElement('div');
+          renameRow.style.cssText =
+            'margin:4px 0 12px;padding:6px 10px;background:#f7f7f7;' +
+            'border-radius:6px;display:flex;flex-wrap:wrap;gap:8px;' +
+            'align-items:center;font-size:13px;';
+          var renameLabel = document.createElement('span');
+          renameLabel.textContent = 'Name:';
+          renameLabel.style.color = '#555';
+          renameRow.appendChild(renameLabel);
+          var nameInput = document.createElement('input');
+          nameInput.type = 'text';
+          nameInput.maxLength = 60;
+          nameInput.value = d.deviceName || '';
+          nameInput.placeholder = 'e.g. Anna’s toy';
+          nameInput.style.cssText = 'padding:3px 6px;font-size:13px;min-width:160px;';
+          renameRow.appendChild(nameInput);
+          var saveNameBtn = document.createElement('button');
+          saveNameBtn.type = 'button';
+          saveNameBtn.textContent = 'Save name';
+          saveNameBtn.style.cssText =
+            'padding:4px 10px;font-size:12px;background:transparent;' +
+            'border:1px solid #6a8ec9;color:#2c4a7a;border-radius:5px;cursor:pointer;';
+          saveNameBtn.addEventListener('click', function () {
+            renameDevice(d.deviceId, nameInput.value);
+          });
+          renameRow.appendChild(saveNameBtn);
+          listEl.appendChild(renameRow);
+
+          // #074 revoke / restore — the credential kill-switch for a lost or
+          // compromised toy. Reversible. Distinct from unlink (which removes
+          // the link + can cascade data) and pause (soft, still authenticates).
+          var revokeBtn = document.createElement('button');
+          revokeBtn.type = 'button';
+          revokeBtn.textContent = d.isRevoked ? 'Restore access' : 'Revoke access';
+          revokeBtn.setAttribute('data-device-id', d.deviceId);
+          revokeBtn.style.cssText =
+            'margin:4px 8px 12px 0;padding:6px 12px;font-size:13px;' +
+            'background:transparent;border:1px solid ' +
+            (d.isRevoked ? '#5aa45a;color:#2f6b2f;' : '#d9534f;color:#a02622;') +
+            'border-radius:6px;cursor:pointer;';
+          revokeBtn.addEventListener('click', function () {
+            toggleDeviceRevocation(d.deviceId, d.deviceName, d.isRevoked);
+          });
+          listEl.appendChild(revokeBtn);
 
           // Unlink control, rendered as a sibling so we don't nest a button
           // inside the clickable row. Styling is inline to keep the diff
@@ -1891,6 +1993,144 @@
         }
       }).catch(function () {
         setStatus('linkDeviceStatus', 'Link failed. Please try again.', 'err');
+      });
+    }
+
+    // Consumer pairing (Phase A.2): claim a toy with its single-use pairing
+    // code (NOT the API key). POST /api/parents/devices/claim. The server
+    // returns ONE uniform 400 for every failure reason (unknown device /
+    // already claimed / wrong code), so the UI shows that single message.
+    function claimDevice() {
+      var token = getToken();
+      if (!token) { show('loginView'); return; }
+      var idInput = document.getElementById('claimDeviceIdInput');
+      var codeInput = document.getElementById('claimCodeInput');
+      var deviceIdRaw = idInput.value.trim();
+      var codeRaw = codeInput.value.trim();
+      if (!deviceIdRaw || !codeRaw) {
+        setStatus('claimDeviceStatus', 'Device ID and pairing code are required.', 'err');
+        return;
+      }
+      setStatus('claimDeviceStatus', 'Pairing…', 'muted');
+      fetch('/api/parents/devices/claim', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ deviceId: deviceIdRaw, claimCode: codeRaw })
+      }).then(function (res) {
+        if (res.status === 401) {
+          clearToken();
+          show('loginView');
+          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          return null;
+        }
+        if (res.status === 400) {
+          setStatus('claimDeviceStatus',
+            "That code didn't work. Check the code on your toy and try again.", 'err');
+          return null;
+        }
+        if (res.status === 429) {
+          setStatus('claimDeviceStatus', 'Too many tries. Please wait a moment and retry.', 'err');
+          return null;
+        }
+        if (!res.ok) {
+          setStatus('claimDeviceStatus', 'Pairing failed (HTTP ' + res.status + ').', 'err');
+          return null;
+        }
+        return res.json();
+      }).then(function (data) {
+        if (data && data.claimed) {
+          idInput.value = '';
+          codeInput.value = '';
+          setStatus('claimDeviceStatus', 'Toy paired ✓', 'muted');
+          document.getElementById('claimDeviceForm').hidden = true;
+          loadDevices();
+        }
+      }).catch(function () {
+        setStatus('claimDeviceStatus', 'Pairing failed. Please try again.', 'err');
+      });
+    }
+
+    // Rename a linked device. PUT /api/parents/devices/{id}/name. 400 on an
+    // empty / over-length name; the input is capped at 60 to match the server.
+    function renameDevice(deviceId, rawName) {
+      var token = getToken();
+      if (!token) { show('loginView'); return; }
+      var name = (rawName || '').trim();
+      if (!name) {
+        setStatus('devicesStatus', 'A device name cannot be empty.', 'err');
+        return;
+      }
+      setStatus('devicesStatus', 'Saving name…', 'muted');
+      fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/name', {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ name: name })
+      }).then(function (res) {
+        if (res.status === 401) {
+          clearToken();
+          show('loginView');
+          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          return;
+        }
+        if (res.status === 400) {
+          setStatus('devicesStatus', 'Name must be 1–60 characters.', 'err');
+          return;
+        }
+        if (!res.ok) {
+          setStatus('devicesStatus', 'Rename failed (HTTP ' + res.status + ').', 'err');
+          return;
+        }
+        loadDevices();
+      }).catch(function () {
+        setStatus('devicesStatus', 'Network error.', 'err');
+      });
+    }
+
+    // #074 revoke / restore a device's server-side credential. Revoking signs
+    // the toy out everywhere until it re-provisions, so it is confirmed first.
+    // PUT /api/parents/devices/{id}/revoke  body { revoked: bool }.
+    function toggleDeviceRevocation(deviceId, deviceName, currentlyRevoked) {
+      var token = getToken();
+      if (!token) { show('loginView'); return; }
+      var label = deviceName || ('device ' + shortId(deviceId));
+      var next = !currentlyRevoked;
+      if (next && !window.confirm(
+            'Revoke access for ' + label + '?\n\n' +
+            'The toy will be signed out and stop working until it is set up ' +
+            'again with a fresh key. Use this if it is lost or stolen. You can ' +
+            'restore access later.')) return;
+      setStatus('devicesStatus', (next ? 'Revoking' : 'Restoring') + '…', 'muted');
+      fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/revoke', {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ revoked: next })
+      }).then(function (res) {
+        if (res.status === 401) {
+          clearToken();
+          show('loginView');
+          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          return;
+        }
+        if (!res.ok) {
+          setStatus('devicesStatus',
+            (next ? 'Revoke' : 'Restore') + ' failed (HTTP ' + res.status + ').', 'err');
+          return;
+        }
+        loadDevices();
+      }).catch(function () {
+        setStatus('devicesStatus', 'Network error.', 'err');
       });
     }
 
@@ -2706,6 +2946,12 @@
     document.getElementById('flaggedOlderBtn').addEventListener('click', pageOlderFlagged);
     document.getElementById('flaggedNewerBtn').addEventListener('click', pageNewerFlagged);
     document.getElementById('linkDeviceBtn').addEventListener('click', submitLinkDevice);
+    document.getElementById('claimDeviceBtn').addEventListener('click', claimDevice);
+    document.getElementById('toggleClaimBtn').addEventListener('click', function () {
+      var f = document.getElementById('claimDeviceForm');
+      f.hidden = !f.hidden;
+      if (!f.hidden) document.getElementById('claimDeviceIdInput').focus();
+    });
     document.getElementById('openAuditBtn').addEventListener('click', loadAudit);
     document.getElementById('backFromAudit').addEventListener('click', loadDevices);
     document.getElementById('auditOlderBtn').addEventListener('click', pageOlderAudit);
