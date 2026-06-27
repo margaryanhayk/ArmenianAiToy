@@ -1860,8 +1860,14 @@ middleware in `Program.cs` over the `/api/internal/*` path prefix, run
   `null` = 404), stashes the name in `ctx.Items["InternalOperator"]`, and
   sets `Cache-Control: no-store` on the response. `Evaluate(...)` is kept as
   a thin back-compat delegate (Allow iff `ResolveOperatorName` is non-null).
-- The `wwwroot/admin.html` page is served openly (an empty shell); it is
-  useless without a token, which all its data calls require.
+- The `wwwroot/admin.html` page is served openly but is useless without a
+  token (all its data calls require it). It is a full read-only operator
+  console: Overview (live, auto-refresh 20s, status-colored), Devices (search +
+  click-through to that device's conversations), Parents (search), Stories,
+  Flagged (prioritized triage — Blocked-first, All/Blocked/Flagged filter,
+  click a row to open the conversation in context), Conversations (+ detail),
+  Audit, and the Tuning playground. All read-only; operator ACTIONS remain a
+  separately-approved future phase (see Out of scope).
 
 **Access audit (#013).** Every cross-family content read — `GET /flagged`,
 `GET /conversations`, `GET /conversations/{id}` — writes one

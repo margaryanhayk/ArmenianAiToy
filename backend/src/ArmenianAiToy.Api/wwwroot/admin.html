@@ -113,36 +113,71 @@ function table(cols, rows, rowAttrs){
   return h+'</tbody></table>';
 }
 
+// ---- support-lookup + triage helpers (client-side, read-only) ----
+// Caches of the last-loaded lists so search/drill don't re-hit the server on
+// every keystroke. Re-fetched each time the tab is opened (no-store).
+let _devices = [], _parents = [], _flagged = [];
+let _refreshTimer = null;
+function matchq(q, parts){
+  if(!q) return true; const s=q.toLowerCase();
+  return parts.some(p => (p==null?'':String(p)).toLowerCase().includes(s));
+}
+function searchBar(id, ph){
+  return `<div class="row"><input id="${id}" type="text" placeholder="${esc(ph)}" style="min-width:320px" autocomplete="off">`
+    + `<span id="${id}_c" class="mut"></span></div>`;
+}
+
 const tabs = {
   async overview(){
+    clearInterval(_refreshTimer); // avoid stacking timers across re-renders
     const o = await api('/overview');
-    const cards = [
-      ['Devices',o.devices],['Parents',o.parents],['Children',o.children],
-      ['Conversations',o.conversations],['Messages',o.messages],['Flagged',o.flaggedMessages],
-      ['Msgs today',o.messagesToday],['Flagged today',o.flaggedToday],['Paused devices',o.pausedDevices],
-      ['Cost today (USD)','$'+(o.costTodayUsd||0).toFixed(4)],
-      ['Database', o.databaseReachable?'OK':'DOWN'],
-    ];
-    main.innerHTML = `<div class="cards">`+cards.map(([l,n])=>`<div class="card"><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></div>`).join('')+`</div>`
-      + `<p class="mut">Generated ${dt(o.generatedAtUtc)} · cost is in-process (resets on backend restart).</p>`;
+    const card = (l,n,cls)=>`<div class="card"><div class="n"${cls?` style="color:var(--${cls})"`:''}>${esc(n)}</div><div class="l">${esc(l)}</div></div>`;
+    main.innerHTML = `<div class="cards">`
+      + card('Devices',o.devices)
+      + card('Parents',o.parents)
+      + card('Children',o.children)
+      + card('Conversations',o.conversations)
+      + card('Messages',o.messages)
+      + card('Flagged total',o.flaggedMessages, o.flaggedMessages>0?'warn':null)
+      + card('Msgs today',o.messagesToday)
+      + card('Flagged today',o.flaggedToday, o.flaggedToday>0?'warn':null)
+      + card('Paused devices',o.pausedDevices)
+      + card('Cost today (USD)','$'+(o.costTodayUsd||0).toFixed(4), (o.costTodayUsd||0)>1?'warn':null)
+      + card('Database', o.databaseReachable?'OK':'DOWN', o.databaseReachable?'ok':'bad')
+      + `</div>`
+      + `<p class="mut">Updated ${dt(o.generatedAtUtc)} · live (auto-refresh 20s) · cost is in-process (resets on backend restart). `
+      + `<a class="mono" style="cursor:pointer;color:var(--acc)" onclick="show('overview')">refresh now</a></p>`;
+    // Live ops view: keep the overview current while it's the active tab.
+    _refreshTimer = setInterval(()=>{ if(current==='overview') tabs.overview().catch(()=>{}); }, 20000);
   },
   async devices(){
-    const d = (await api('/devices')).devices;
-    main.innerHTML = table([
+    _devices = (await api('/devices')).devices;
+    main.innerHTML = `<div class="row mut">Search to find a toy; click a row to investigate its conversations.</div>`
+      + searchBar('devQ','Search devices — name, MAC, id') + '<div id="devList"></div>';
+    const cols = [
       {h:'Name',f:r=>esc(r.name)+`<div class="mono mut">${esc(r.macAddress)}</div>`},
+      {h:'Status',f:r=> (r.isRevoked?'<span class="pill blk">revoked</span> ':'')
+        + (r.isPaused?'<span class="pill blk">paused</span>':'<span class="pill on">active</span>')},
       {h:'Last seen',f:r=>dt(r.lastSeenAt)},
-      {h:'Paused',f:r=>r.isPaused?'<span class="pill blk">paused</span>':'<span class="mut">no</span>'},
       {h:'Bedtime',f:r=>r.bedtimeStart?`${esc(r.bedtimeStart)}–${esc(r.bedtimeEnd)}`:'<span class="mut">—</span>'},
       {h:'Modes (S/G/R/C)',f:r=>[r.storyEnabled,r.gameEnabled,r.riddleEnabled,r.curiosityEnabled].map(onoff).join(' ')},
       {h:'Parents',f:r=>r.linkedParents},
       {h:'Children',f:r=>r.childrenList.length?r.childrenList.map(c=>esc(c.name)+(c.age!=null?` (${c.age})`:'')).join(', '):'<span class="mut">—</span>'},
       {h:'Cost today',f:r=>'$'+(r.costTodayUsd||0).toFixed(4)},
-      {h:'TZ',f:r=>`<span class="mono">${esc(r.timeZone)}</span>`},
-    ], d);
+    ];
+    const draw = q => {
+      const rows = _devices.filter(d=>matchq(q,[d.name,d.macAddress,d.id]));
+      $('#devQ_c').textContent = `${rows.length} of ${_devices.length}`;
+      $('#devList').innerHTML = table(cols, rows, r=>`class="click" onclick="openDevice('${r.id}')"`);
+    };
+    $('#devQ').addEventListener('input', e=>draw(e.target.value));
+    draw('');
   },
   async parents(){
-    const p = (await api('/parents')).parents;
-    main.innerHTML = table([
+    _parents = (await api('/parents')).parents;
+    main.innerHTML = `<div class="row mut">Search for a parent account (support lookup).</div>`
+      + searchBar('parQ','Search parents — email, id') + '<div id="parList"></div>';
+    const cols = [
       {h:'Email',f:r=>esc(r.email)},
       {h:'Verified',f:r=>r.emailVerifiedAt?'<span class="pill on">yes</span>':'<span class="pill off">no</span>'},
       {h:'Google',f:r=>r.googleLinked?'<span class="pill on">linked</span>':'<span class="mut">—</span>'},
@@ -151,7 +186,14 @@ const tabs = {
       {h:'Devices',f:r=>r.linkedDevices},
       {h:'Audit',f:r=>r.auditEvents},
       {h:'Anonymized',f:r=>r.anonymizedAt?'<span class="pill blk">yes</span>':'<span class="mut">—</span>'},
-    ], p);
+    ];
+    const draw = q => {
+      const rows = _parents.filter(p=>matchq(q,[p.email,p.id]));
+      $('#parQ_c').textContent = `${rows.length} of ${_parents.length}`;
+      $('#parList').innerHTML = table(cols, rows);
+    };
+    $('#parQ').addEventListener('input', e=>draw(e.target.value));
+    draw('');
   },
   async stories(){
     const s = (await api('/stories')).stories;
@@ -170,14 +212,39 @@ const tabs = {
     ], s);
   },
   async flagged(){
-    const m = (await api('/flagged?limit=100')).messages;
-    main.innerHTML = table([
+    _flagged = (await api('/flagged?limit=100')).messages;
+    // Prioritized triage: Blocked outranks other non-clean flags, then newest
+    // first — a credible block should never sit below older soft flags.
+    _flagged.sort((a,b)=>{
+      const pa=a.safetyFlag==='Blocked'?0:1, pb=b.safetyFlag==='Blocked'?0:1;
+      if(pa!==pb) return pa-pb;
+      return new Date(b.timestamp)-new Date(a.timestamp);
+    });
+    const nBlk = _flagged.filter(m=>m.safetyFlag==='Blocked').length;
+    const nFlag = _flagged.length - nBlk;
+    main.innerHTML = `<div class="row">
+        <button class="ghost" id="fAll">All (${_flagged.length})</button>
+        <button class="ghost" id="fBlk">Blocked (${nBlk})</button>
+        <button class="ghost" id="fFlag">Flagged (${nFlag})</button>
+        <span class="mut">click a row to open the full conversation in context</span>
+      </div><div id="flagList"></div>`;
+    const cols = [
       {h:'When',f:r=>dt(r.timestamp)},
       {h:'Flag',f:r=>`<span class="pill ${r.safetyFlag==='Blocked'?'blk':'flag'}">${esc(r.safetyFlag)}</span>`},
       {h:'Role',f:r=>esc(r.role)},
       {h:'Snippet',f:r=>esc(r.snippet)},
       {h:'Device',f:r=>`<span class="mono mut">${esc(r.deviceId.slice(0,8))}</span>`},
-    ], m);
+    ];
+    const draw = mode => {
+      const rows = _flagged.filter(m=> mode==='all' || (mode==='blk'?m.safetyFlag==='Blocked':m.safetyFlag!=='Blocked'));
+      $('#flagList').innerHTML = rows.length
+        ? table(cols, rows, r=>`class="click" onclick="openConv('${r.conversationId}')"`)
+        : `<div class="msg info">✓ Nothing here — no ${mode==='blk'?'blocked':mode==='flag'?'flagged':'flagged or blocked'} messages.</div>`;
+    };
+    $('#fAll').addEventListener('click', ()=>draw('all'));
+    $('#fBlk').addEventListener('click', ()=>draw('blk'));
+    $('#fFlag').addEventListener('click', ()=>draw('flag'));
+    draw('all');
   },
   async conversations(){
     const c = (await api('/conversations?limit=100')).conversations;
@@ -244,6 +311,30 @@ async function askTuning(){
   finally{ btn.disabled=false; }
 }
 
+window.openDevice = async function(id){
+  const d = _devices.find(x=>x.id===id);
+  info('Loading device…');
+  try {
+    const convs = (await api('/conversations?deviceId='+encodeURIComponent(id)+'&limit=100')).conversations;
+    const head = d ? `<div class="cards" style="margin-bottom:12px">
+        <div class="card"><div class="n" style="color:var(--${d.isRevoked||d.isPaused?'warn':'ok'})">${d.isRevoked?'Revoked':d.isPaused?'Paused':'Active'}</div><div class="l">status</div></div>
+        <div class="card"><div class="n" style="font-size:15px">${esc(dt(d.lastSeenAt))}</div><div class="l">last seen</div></div>
+        <div class="card"><div class="n">$${(d.costTodayUsd||0).toFixed(4)}</div><div class="l">cost today</div></div>
+        <div class="card"><div class="n">${d.linkedParents}</div><div class="l">parents</div></div>
+      </div>` : '';
+    main.innerHTML = `<div class="row"><button class="ghost" onclick="show('devices')">← devices</button>
+        <span class="mut">${d?esc(d.name):''} <span class="mono">${esc(id.slice(0,8))}</span>${d?' · '+esc(d.macAddress):''}</span></div>`
+      + head
+      + `<div class="row mut">Conversations on this device — click to open in context.</div>`
+      + table([
+        {h:'Started',f:r=>dt(r.startedAt)},
+        {h:'Msgs',f:r=>r.messageCount},
+        {h:'Flagged',f:r=>r.flaggedCount?`<span class="pill flag">${r.flaggedCount}</span>`:'<span class="mut">0</span>'},
+        {h:'Snippet',f:r=>esc(r.snippet)},
+      ], convs, r=>`class="click" onclick="openConv('${r.id}')"`);
+  } catch(e){ err(e.message); }
+};
+
 window.openConv = async function(id){
   try {
     const c = await api('/conversations/'+id);
@@ -260,6 +351,7 @@ window.openConv = async function(id){
 
 let current = 'overview';
 window.show = async function(tab){
+  clearInterval(_refreshTimer); // stop overview auto-refresh when leaving it
   current = tab;
   [...nav.children].forEach(a=>a.classList.toggle('active', a.dataset.tab===tab));
   info('Loading…');
