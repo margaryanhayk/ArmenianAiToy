@@ -418,6 +418,14 @@ public class InternalController : ControllerBase
         }
     }
 
+    /// <summary>Resolved console operator identity (from the auth gate) so the
+    /// UI can show who is signed in — accountability. No data exposure; the
+    /// name is whatever <c>InternalAdminAuth</c> resolved (a named operator, the
+    /// shared-token sentinel, or the dev-bypass sentinel).</summary>
+    [HttpGet("whoami")]
+    public IActionResult WhoAmI()
+        => Ok(new { @operator = HttpContext?.Items["InternalOperator"] as string ?? "unknown" });
+
     // ── Phase 3: reversible operator ACTIONS ───────────────────────
     // Operator-scoped (NO parent ownership check — the console is superuser).
     // Reversible only: revoke/restore the credential kill-switch, and

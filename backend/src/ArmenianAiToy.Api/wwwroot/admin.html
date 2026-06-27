@@ -50,6 +50,7 @@
 <body>
 <header>
   <h1>Areg Console <small>— superuser</small></h1>
+  <span id="who" class="pill flag hide" title="resolved console operator"></span>
   <input id="token" type="password" placeholder="Admin token (Internal:AdminToken)" autocomplete="off" />
   <button id="connect">Connect</button>
   <button id="disconnect" class="ghost hide">Disconnect</button>
@@ -116,7 +117,7 @@ function table(cols, rows, rowAttrs){
 // ---- support-lookup + triage helpers (client-side, read-only) ----
 // Caches of the last-loaded lists so search/drill don't re-hit the server on
 // every keystroke. Re-fetched each time the tab is opened (no-store).
-let _devices = [], _parents = [], _flagged = [];
+let _devices = [], _parents = [], _flagged = [], _audit = [];
 let _refreshTimer = null;
 function matchq(q, parts){
   if(!q) return true; const s=q.toLowerCase();
@@ -257,14 +258,46 @@ const tabs = {
     ], c, r=>`class="click" onclick="openConv('${r.id}')"`);
   },
   async audit(){
-    const e = (await api('/audit?limit=100')).events;
-    main.innerHTML = table([
+    _audit = (await api('/audit?limit=100')).events;
+    const nAct = _audit.filter(x=>x.eventType==='InternalConsoleAction').length;
+    main.innerHTML = `<div class="row">
+        <button class="ghost" id="aAll">All (${_audit.length})</button>
+        <button class="ghost" id="aAct">Operator actions (${nAct})</button>
+        <button class="ghost" id="aAcc">Console access</button>
+        <button class="ghost" id="aSys">System / other</button>
+        <span class="mut">operator actions are highlighted — the accountability record</span>
+      </div><div id="audList"></div>`;
+    const actorCell = r => {
+      if (r.actorParentId) return `<span class="mono mut">${esc(r.actorParentId.slice(0,8))}</span>`;
+      const op = r.metadata && r.metadata.operator;
+      return op ? `<span class="pill flag">${esc(op)}</span>` : '<span class="pill flag">system</span>';
+    };
+    const detailCell = r => {
+      const m = r.metadata;
+      if (!m) return '<span class="mut">—</span>';
+      if (r.eventType==='InternalConsoleAction')
+        return `<b>${esc(m.action)}</b> = ${esc(String(m.value))} <span class="mut">·</span> ${esc(m.reason||'')}`;
+      return `<code class="mono">${esc(JSON.stringify(m))}</code>`;
+    };
+    const cols = [
       {h:'When',f:r=>dt(r.timestamp)},
       {h:'Event',f:r=>esc(r.eventType)},
-      {h:'Actor',f:r=>r.actorParentId?`<span class="mono mut">${esc(r.actorParentId.slice(0,8))}</span>`:'<span class="pill flag">system</span>'},
-      {h:'Target dev',f:r=>r.targetDeviceId?`<span class="mono mut">${esc(r.targetDeviceId.slice(0,8))}</span>`:'<span class="mut">—</span>'},
-      {h:'Metadata',f:r=>r.metadata?`<code class="mono">${esc(JSON.stringify(r.metadata))}</code>`:'<span class="mut">—</span>'},
-    ], e);
+      {h:'Actor',f:actorCell},
+      {h:'Target',f:r=>r.targetDeviceId?`<span class="mono mut">${esc(r.targetDeviceId.slice(0,8))}</span>`:'<span class="mut">—</span>'},
+      {h:'Detail',f:detailCell},
+    ];
+    const draw = mode => {
+      const rows = _audit.filter(r =>
+        mode==='all' ? true :
+        mode==='act' ? r.eventType==='InternalConsoleAction' :
+        mode==='acc' ? r.eventType==='InternalConsoleAccess' :
+        (r.eventType!=='InternalConsoleAction' && r.eventType!=='InternalConsoleAccess'));
+      $('#audList').innerHTML = table(cols, rows,
+        r => r.eventType==='InternalConsoleAction' ? 'style="background:#2a1f12"' : '');
+    };
+    $('#aAll').onclick=()=>draw('all'); $('#aAct').onclick=()=>draw('act');
+    $('#aAcc').onclick=()=>draw('acc'); $('#aSys').onclick=()=>draw('sys');
+    draw('all');
   },
   async tuning(){
     const s = (await api('/stories')).stories;
@@ -385,11 +418,17 @@ window.show = async function(tab){
 
 nav.addEventListener('click', e=>{ if(e.target.dataset.tab) show(e.target.dataset.tab); });
 
+async function showWho(){
+  try { const w = await api('/whoami'); $('#who').textContent = 'operator: '+w.operator; $('#who').classList.remove('hide'); }
+  catch { $('#who').classList.add('hide'); }
+}
 function setConnected(on){
   nav.classList.toggle('hide', !on);
   $('#disconnect').classList.toggle('hide', !on);
   $('#connect').classList.toggle('hide', on);
   $('#token').classList.toggle('hide', on);
+  $('#who').classList.toggle('hide', !on);
+  if (on) showWho();
 }
 
 $('#connect').addEventListener('click', async ()=>{

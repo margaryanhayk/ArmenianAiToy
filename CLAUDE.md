@@ -1900,6 +1900,8 @@ phase. Endpoints under `/api/internal/`:
   (any/all devices) and full detail with messages.
 - `GET /audit?limit=&offset=` — GLOBAL feed including system-actor rows
   (`ActorParentId == null`) that parents can never see.
+- `GET /whoami` — the resolved console operator identity (accountability; the
+  dashboard shows "operator: …" in the header). No data exposure.
 
 Pagination guard mirrors the parent endpoints (`offset < 0` / `limit < 1`
 → 400; `limit` clamped to 100).

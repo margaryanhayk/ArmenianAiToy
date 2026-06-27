@@ -333,6 +333,13 @@ public class InternalControllerTests
     }
 
     [Fact]
+    public void WhoAmI_ReturnsResolvedOperatorIdentity()
+    {
+        var ok = Assert.IsType<OkObjectResult>(OpController(NewDb(), "carol-ops").WhoAmI());
+        Assert.Contains("carol-ops", JsonSerializer.Serialize(ok.Value));
+    }
+
+    [Fact]
     public async Task RevokeDevice_FlipsFlag_AndWritesActionAudit_WithOperatorAndReason()
     {
         var db = NewDb();
