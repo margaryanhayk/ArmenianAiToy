@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -53,6 +54,11 @@ export default function LoginScreen({ onLoggedIn }: Props) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <Image
+        source={require('../../assets/splash-icon.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
       <Text style={styles.brand}>Areg</Text>
       <Text style={styles.subtitle}>
         {mode === 'login' ? 'Parent sign in' : 'Create a parent account'}
@@ -114,6 +120,7 @@ export default function LoginScreen({ onLoggedIn }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, justifyContent: 'center', backgroundColor: '#fff' },
+  logo: { width: 88, height: 88, alignSelf: 'center', marginBottom: 4 },
   brand: { fontSize: 40, fontWeight: '700', textAlign: 'center', color: '#2c4a7a' },
   subtitle: { fontSize: 16, textAlign: 'center', marginBottom: 24, color: '#555' },
   input: {
