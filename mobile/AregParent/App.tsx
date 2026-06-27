@@ -8,12 +8,16 @@ import DevicesScreen from './src/screens/DevicesScreen';
 import ConversationsScreen from './src/screens/ConversationsScreen';
 import ConversationDetailScreen from './src/screens/ConversationDetailScreen';
 import DeviceSettingsScreen from './src/screens/DeviceSettingsScreen';
+import FlaggedScreen from './src/screens/FlaggedScreen';
+import AccountScreen from './src/screens/AccountScreen';
 
 type Screen =
   | { name: 'devices' }
   | { name: 'conversations'; deviceId: string; deviceName: string }
   | { name: 'conversationDetail'; conversationId: string; deviceId: string; deviceName: string }
-  | { name: 'settings'; device: LinkedDevice };
+  | { name: 'flagged'; deviceId: string; deviceName: string }
+  | { name: 'settings'; device: LinkedDevice }
+  | { name: 'account' };
 
 function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
   const [screen, setScreen] = useState<Screen>({ name: 'devices' });
@@ -30,8 +34,13 @@ function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
           setScreen({ name: 'conversations', deviceId: d.deviceId, deviceName: d.deviceName })
         }
         onOpenSettings={(d: LinkedDevice) => setScreen({ name: 'settings', device: d })}
+        onOpenAccount={() => setScreen({ name: 'account' })}
       />
     );
+  }
+
+  if (screen.name === 'account') {
+    return <AccountScreen onBack={() => setScreen({ name: 'devices' })} onLogout={onLogout} />;
   }
 
   if (screen.name === 'settings') {
@@ -54,6 +63,30 @@ function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
         deviceId={screen.deviceId}
         deviceName={screen.deviceName}
         onBack={() => setScreen({ name: 'devices' })}
+        onOpenConversation={(conversationId: string) =>
+          setScreen({
+            name: 'conversationDetail',
+            conversationId,
+            deviceId: screen.deviceId,
+            deviceName: screen.deviceName,
+          })
+        }
+        onOpenFlagged={() =>
+          setScreen({ name: 'flagged', deviceId: screen.deviceId, deviceName: screen.deviceName })
+        }
+        onLogout={onLogout}
+      />
+    );
+  }
+
+  if (screen.name === 'flagged') {
+    return (
+      <FlaggedScreen
+        deviceId={screen.deviceId}
+        deviceName={screen.deviceName}
+        onBack={() =>
+          setScreen({ name: 'conversations', deviceId: screen.deviceId, deviceName: screen.deviceName })
+        }
         onOpenConversation={(conversationId: string) =>
           setScreen({
             name: 'conversationDetail',

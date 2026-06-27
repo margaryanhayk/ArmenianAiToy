@@ -21,6 +21,7 @@ type Props = {
   deviceName: string;
   onBack: () => void;
   onOpenConversation: (conversationId: string) => void;
+  onOpenFlagged: () => void;
   onLogout: () => void;
 };
 
@@ -34,6 +35,7 @@ export default function ConversationsScreen({
   deviceName,
   onBack,
   onOpenConversation,
+  onOpenFlagged,
   onLogout,
 }: Props) {
   const [today, setToday] = useState<TodaySummary | null>(null);
@@ -70,9 +72,14 @@ export default function ConversationsScreen({
 
   return (
     <View style={styles.container}>
-      <Pressable onPress={onBack}>
-        <Text style={styles.back}>‹ Toys</Text>
-      </Pressable>
+      <View style={styles.headerRow}>
+        <Pressable onPress={onBack}>
+          <Text style={styles.back}>‹ Toys</Text>
+        </Pressable>
+        <Pressable onPress={onOpenFlagged}>
+          <Text style={styles.flaggedLink}>⚑ Flagged</Text>
+        </Pressable>
+      </View>
       <Text style={styles.title}>{deviceName || 'Toy'}</Text>
 
       {loading ? (
@@ -141,7 +148,9 @@ function Stat({ label, value, warn }: { label: string; value: number; warn?: boo
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: '#fff' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   back: { color: '#2c4a7a', fontSize: 15, marginBottom: 4 },
+  flaggedLink: { color: '#a02622', fontSize: 15, fontWeight: '600' },
   title: { fontSize: 24, fontWeight: '700', color: '#2c4a7a', marginBottom: 12 },
   todayCard: {
     backgroundColor: '#f0f4fb',

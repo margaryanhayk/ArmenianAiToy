@@ -235,3 +235,87 @@ export function setBedtime(
     end,
   });
 }
+
+// ----- Safety (flagged) -----
+
+export type FlaggedMessage = {
+  id: string;
+  conversationId: string;
+  conversationStartedAt: string;
+  role: string;
+  content: string;
+  timestamp: string;
+  safetyFlag: number;
+};
+
+/** GET /api/conversations/flagged?deviceId= — non-clean messages, newest first. */
+export async function getFlagged(deviceId: string): Promise<FlaggedMessage[]> {
+  const data = await getJson<{ flaggedMessages?: FlaggedMessage[] }>(
+    `/api/conversations/flagged?deviceId=${encodeURIComponent(deviceId)}&limit=50&offset=0`,
+  );
+  return data.flaggedMessages ?? [];
+}
+
+// ----- Account -----
+
+export type Me = { email: string; emailVerifiedAt: string | null };
+
+/** GET /api/parents/me — profile + verification status. */
+export function getMe(): Promise<Me> {
+  return getJson<Me>('/api/parents/me');
+}
+
+/** POST /api/parents/verify-request — anti-enum 202 regardless. */
+export function requestVerification(email: string): Promise<void> {
+  return mutate('/api/parents/verify-request', 'POST', { email });
+}
+
+/** GET /api/parents/export — returns the full export document as text. */
+export async function fetchExport(): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(url('/api/parents/export'), { headers: await authHeader() });
+  } catch {
+    throw new Error(`Can't reach the server at ${API_BASE_URL}.`);
+  }
+  if (res.status === 401) throw new UnauthorizedError();
+  if (res.status === 429) throw new Error('Please wait a minute before exporting again.');
+  if (!res.ok) throw new Error(`Export failed (HTTP ${res.status}).`);
+  return res.text();
+}
+
+/** POST /api/parents/password — change password. */
+export async function changePassword(current: string, next: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(url('/api/parents/password'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+      body: JSON.stringify({ currentPassword: current, newPassword: next }),
+    });
+  } catch {
+    throw new Error(`Can't reach the server at ${API_BASE_URL}.`);
+  }
+  if (res.status === 401) throw new UnauthorizedError();
+  if (res.status === 400) {
+    throw new Error('Current password is wrong, or the new one is under 8 characters / unchanged.');
+  }
+  if (!res.ok) throw new Error(`Change failed (HTTP ${res.status}).`);
+}
+
+/** DELETE /api/parents/account — permanent; requires the current password. */
+export async function deleteAccount(currentPassword: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(url('/api/parents/account'), {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+      body: JSON.stringify({ currentPassword }),
+    });
+  } catch {
+    throw new Error(`Can't reach the server at ${API_BASE_URL}.`);
+  }
+  if (res.status === 401) throw new UnauthorizedError();
+  if (res.status === 400) throw new Error('Password is incorrect.');
+  if (!res.ok) throw new Error(`Delete failed (HTTP ${res.status}).`);
+}

@@ -4,17 +4,24 @@ React Native + Expo (TypeScript) parent app for the Areg toy. It consumes the
 existing parent-facing backend API — the same endpoints proven end-to-end on
 real hardware during the bench session (see `../../PLATFORM-ARCHITECTURE.txt`).
 
-## What works in this first slice
+## What works
 
 - **Sign in / create account** — `POST /api/parents/login` + `/register`.
-- **Your toys** — `GET /api/parents/devices/details`, with a live
-  **Online/Offline** dot (from the toy heartbeat), plus Paused/Revoked tags.
-- **Add a toy** — pair by its single-use code: `POST /api/parents/devices/claim`.
-- **Rename** a toy — `PUT /api/parents/devices/{id}/name`.
-- **Revoke / restore** a toy (kill-switch) — `PUT /api/parents/devices/{id}/revoke`.
-- JWT kept in the OS secure store; session restored on launch.
+- **Your toys** — `GET /api/parents/devices/details`, live **Online/Offline**
+  dot (toy heartbeat), Paused/Revoked tags; pair by code
+  (`/devices/claim`), rename (`/name`), revoke/restore (`/revoke`).
+- **Activity** — per toy: Today summary (`/conversations/today-summary`),
+  conversation list (`/conversations/summary`), full transcript as chat
+  bubbles (`/conversations/{id}`).
+- **Safety** — Flagged view (`/conversations/flagged`) with an "all clear"
+  state; tap through to the conversation.
+- **Controls** — pause/resume, the four mode toggles
+  (`/mode-flags`), and bedtime quiet-hours (`/bedtime-window`).
+- **Account** — profile + verification status, send verification, **export my
+  data** (downloads JSON on web), change password, log out, delete account.
+- JWT in the OS secure store (localStorage on web); session restored on launch.
 
-Source: `App.tsx` (login ↔ devices), `src/api.ts` (typed client),
+Source: `App.tsx` (state navigator), `src/api.ts` (typed client),
 `src/auth.ts` (token), `src/config.ts` (backend URL), `src/screens/*`.
 
 ## Run it
@@ -42,10 +49,11 @@ The phone and the backend must be on the same Wi-Fi for the dev LAN IP to work.
   (not Expo Go) and on-device testing. The toy side is already done + verified
   (firmware B.2/B.3). Until then, set up Wi-Fi with the **ESP BLE Provisioning**
   app (PoP `areg-pair`).
-- Activity / monitoring screens (conversations, today summary, flagged,
-  assistant-audio replay) — all endpoints already exist.
-- Per-child profiles + mode overrides; bedtime; pause; account/export.
-- Navigation library (React Navigation) once there are more than two screens.
+- Per-child profiles + per-child mode overrides (endpoints exist; needs a
+  child to exist on the device first).
+- Assistant-audio replay in the transcript (`/messages/{id}/audio`).
+- Navigation library (React Navigation) to replace the hand-rolled state
+  navigator as screens grow.
 - App icon / splash / store metadata.
 
 ## Notes

@@ -23,9 +23,15 @@ type Props = {
   onLogout: () => void;
   onOpenDevice: (device: LinkedDevice) => void;
   onOpenSettings: (device: LinkedDevice) => void;
+  onOpenAccount: () => void;
 };
 
-export default function DevicesScreen({ onLogout, onOpenDevice, onOpenSettings }: Props) {
+export default function DevicesScreen({
+  onLogout,
+  onOpenDevice,
+  onOpenSettings,
+  onOpenAccount,
+}: Props) {
   const [devices, setDevices] = useState<LinkedDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -124,8 +130,8 @@ export default function DevicesScreen({ onLogout, onOpenDevice, onOpenSettings }
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Your toys</Text>
-        <Pressable onPress={onLogout}>
-          <Text style={styles.link}>Log out</Text>
+        <Pressable onPress={onOpenAccount}>
+          <Text style={styles.link}>Account</Text>
         </Pressable>
       </View>
 
