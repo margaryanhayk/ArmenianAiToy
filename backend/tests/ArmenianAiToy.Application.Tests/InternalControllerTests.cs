@@ -321,4 +321,92 @@ public class InternalControllerTests
         Assert.Contains("alice-ops", audit.Metadata!);     // identity is traceable / revocable (#012)
         Assert.Contains("conversation-detail", audit.Metadata!);
     }
+
+    // ── Phase 3: reversible operator device actions ─────────────────
+
+    private static InternalController OpController(AppDbContext db, string op = "alice-ops")
+    {
+        var c = NewController(db);
+        c.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        c.HttpContext.Items["InternalOperator"] = op;
+        return c;
+    }
+
+    [Fact]
+    public async Task RevokeDevice_FlipsFlag_AndWritesActionAudit_WithOperatorAndReason()
+    {
+        var db = NewDb();
+        var d = Dev();
+        db.Devices.Add(d);
+        await db.SaveChangesAsync();
+
+        var res = await OpController(db).RevokeDevice(
+            d.Id, new InternalDeviceActionRequest(true, "lost toy reported"), default);
+
+        Assert.IsType<OkObjectResult>(res);
+        Assert.True((await db.Devices.FindAsync(d.Id))!.IsRevoked);
+        var audit = await db.AuditEvents.SingleAsync(a => a.EventType == AuditEventType.InternalConsoleAction);
+        Assert.Null(audit.ActorParentId);            // operator -> invisible to parent feeds
+        Assert.Equal(d.Id, audit.TargetDeviceId);    // but the device IS queryable
+        Assert.Contains("alice-ops", audit.Metadata!);
+        Assert.Contains("lost toy reported", audit.Metadata!);
+        Assert.Contains("device_revoke", audit.Metadata!);
+    }
+
+    [Fact]
+    public async Task RevokeDevice_MissingReason_Returns400_NoChange_NoAudit()
+    {
+        var db = NewDb();
+        var d = Dev();
+        db.Devices.Add(d);
+        await db.SaveChangesAsync();
+
+        var res = await OpController(db).RevokeDevice(
+            d.Id, new InternalDeviceActionRequest(true, "   "), default);
+
+        Assert.IsType<BadRequestObjectResult>(res);
+        Assert.False((await db.Devices.FindAsync(d.Id))!.IsRevoked);
+        Assert.False(await db.AuditEvents.AnyAsync());
+    }
+
+    [Fact]
+    public async Task RevokeDevice_UnknownDevice_Returns404()
+    {
+        var db = NewDb();
+        var res = await OpController(db).RevokeDevice(
+            Guid.NewGuid(), new InternalDeviceActionRequest(true, "x"), default);
+        Assert.IsType<NotFoundObjectResult>(res);
+    }
+
+    [Fact]
+    public async Task RevokeDevice_Idempotent_AlreadyRevoked_WritesNoAudit()
+    {
+        var db = NewDb();
+        var d = Dev();
+        d.IsRevoked = true;
+        db.Devices.Add(d);
+        await db.SaveChangesAsync();
+
+        await OpController(db).RevokeDevice(
+            d.Id, new InternalDeviceActionRequest(true, "again"), default);
+
+        Assert.False(await db.AuditEvents.AnyAsync()); // no flip -> no audit
+    }
+
+    [Fact]
+    public async Task PauseDeviceAction_FlipsFlag_AndWritesAudit()
+    {
+        var db = NewDb();
+        var d = Dev();
+        db.Devices.Add(d);
+        await db.SaveChangesAsync();
+
+        await OpController(db, "bob-ops").PauseDeviceAction(
+            d.Id, new InternalDeviceActionRequest(true, "parent asked"), default);
+
+        Assert.True((await db.Devices.FindAsync(d.Id))!.IsPaused);
+        var audit = await db.AuditEvents.SingleAsync(a => a.EventType == AuditEventType.InternalConsoleAction);
+        Assert.Contains("device_pause", audit.Metadata!);
+        Assert.Contains("bob-ops", audit.Metadata!);
+    }
 }

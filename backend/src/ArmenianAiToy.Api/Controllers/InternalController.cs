@@ -418,6 +418,62 @@ public class InternalController : ControllerBase
         }
     }
 
+    // ── Phase 3: reversible operator ACTIONS ───────────────────────
+    // Operator-scoped (NO parent ownership check — the console is superuser).
+    // Reversible only: revoke/restore the credential kill-switch, and
+    // pause/resume. A reason is required; every change writes a system-actor
+    // audit row carrying the operator identity + reason. Idempotent.
+
+    /// <summary>Operator kill-switch: revoke (true) or restore (false) a
+    /// device's server-side credential. When revoked, every device-auth path
+    /// 401s until the device re-provisions. Reversible.</summary>
+    [HttpPost("devices/{deviceId:guid}/revoke")]
+    public Task<IActionResult> RevokeDevice(
+        Guid deviceId, [FromBody] InternalDeviceActionRequest req, CancellationToken ct)
+        => DeviceFlagActionAsync(deviceId, req, "device_revoke", ct);
+
+    /// <summary>Operator pause (true) or resume (false) of a device — soft
+    /// override; the device still authenticates but chat short-circuits.</summary>
+    [HttpPost("devices/{deviceId:guid}/pause")]
+    public Task<IActionResult> PauseDeviceAction(
+        Guid deviceId, [FromBody] InternalDeviceActionRequest req, CancellationToken ct)
+        => DeviceFlagActionAsync(deviceId, req, "device_pause", ct);
+
+    private async Task<IActionResult> DeviceFlagActionAsync(
+        Guid deviceId, InternalDeviceActionRequest? req, string action, CancellationToken ct)
+    {
+        if (req is null || string.IsNullOrWhiteSpace(req.Reason))
+            return BadRequest(new { error = "A reason is required for operator actions." });
+
+        var device = await _db.Devices.FirstOrDefaultAsync(d => d.Id == deviceId, ct);
+        if (device is null)
+            return NotFound(new { error = "Device not found." });
+
+        bool changed;
+        if (action == "device_revoke")
+        {
+            changed = device.IsRevoked != req.Value;
+            device.IsRevoked = req.Value;
+        }
+        else
+        {
+            changed = device.IsPaused != req.Value;
+            device.IsPaused = req.Value;
+        }
+
+        if (changed)
+        {
+            var op = HttpContext?.Items["InternalOperator"] as string ?? "unknown";
+            _db.AuditEvents.Add(AuditEvent.InternalConsoleAction(op, action, deviceId, req.Value, req.Reason.Trim()));
+            await _db.SaveChangesAsync(ct);
+            // Loud log: an operator overrode a device — worth a line even on success.
+            _logger.LogWarning("Operator {Operator} performed {Action} value={Value} on device {DeviceId}",
+                op, action, req.Value, deviceId);
+        }
+
+        return Ok(new { deviceId, action, value = req.Value, changed });
+    }
+
     // #013: record WHO (the resolved console operator) read child-bearing data,
     // so an access can be traced in an incident. Best-effort — an audit-write
     // failure must never break the read. ActorParentId is null on the row, so it

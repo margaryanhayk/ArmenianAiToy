@@ -682,4 +682,30 @@ public class AuditEvent
             count = count
         })
     };
+
+    /// <summary>
+    /// Phase 3 — a superuser-console operator performed a reversible device
+    /// action (revoke/restore, pause/resume). <see cref="ActorParentId"/> is
+    /// null (operator, not a parent) so it stays out of parent-facing feeds,
+    /// but <see cref="TargetDeviceId"/> IS set so the affected device is
+    /// queryable. Metadata carries the operator identity, the action, the new
+    /// value, and the required operator reason — operational data, no child PII.
+    /// </summary>
+    public static AuditEvent InternalConsoleAction(
+        string operatorName, string action, Guid targetDeviceId, bool value, string reason) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.InternalConsoleAction,
+        ActorParentId = null,
+        TargetDeviceId = targetDeviceId,
+        TargetChildId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            @operator = operatorName,
+            action = action,
+            value = value,
+            reason = reason
+        })
+    };
 }

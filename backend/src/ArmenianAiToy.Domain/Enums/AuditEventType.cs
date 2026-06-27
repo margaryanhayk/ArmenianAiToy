@@ -29,6 +29,13 @@ public enum AuditEventType
     /// endpoint + target id + count. No child PII.</summary>
     InternalConsoleAccess,
 
+    /// <summary>Phase 3 — a superuser console operator performed a reversible
+    /// device ACTION (revoke/restore or pause/resume). System-actor-style row
+    /// (ActorParentId null, console-only) but TargetDeviceId IS set; metadata
+    /// carries the operator name, the action, the new value, and the required
+    /// reason. Written only when the flag actually changed.</summary>
+    InternalConsoleAction,
+
     /// <summary>#074 — a parent revoked or restored a linked device's
     /// server-side credential kill-switch. Metadata carries the post-change
     /// state (is_revoked: bool). Written only when the flag actually flips.</summary>

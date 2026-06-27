@@ -322,9 +322,16 @@ window.openDevice = async function(id){
         <div class="card"><div class="n">$${(d.costTodayUsd||0).toFixed(4)}</div><div class="l">cost today</div></div>
         <div class="card"><div class="n">${d.linkedParents}</div><div class="l">parents</div></div>
       </div>` : '';
+    const revokeDanger = d && !d.isRevoked ? 'style="background:var(--bad);color:#fff"' : '';
+    const actions = d ? `<div class="row">
+        <button ${revokeDanger} onclick="opAction('revoke','${id}',${!d.isRevoked})">${d.isRevoked?'Restore access':'Revoke (kill switch)'}</button>
+        <button class="ghost" onclick="opAction('pause','${id}',${!d.isPaused})">${d.isPaused?'Resume':'Pause'}</button>
+        <span class="mut">operator action — a reason is required and audit-logged</span>
+      </div>` : '';
     main.innerHTML = `<div class="row"><button class="ghost" onclick="show('devices')">← devices</button>
         <span class="mut">${d?esc(d.name):''} <span class="mono">${esc(id.slice(0,8))}</span>${d?' · '+esc(d.macAddress):''}</span></div>`
       + head
+      + actions
       + `<div class="row mut">Conversations on this device — click to open in context.</div>`
       + table([
         {h:'Started',f:r=>dt(r.startedAt)},
@@ -332,6 +339,24 @@ window.openDevice = async function(id){
         {h:'Flagged',f:r=>r.flaggedCount?`<span class="pill flag">${r.flaggedCount}</span>`:'<span class="mut">0</span>'},
         {h:'Snippet',f:r=>esc(r.snippet)},
       ], convs, r=>`class="click" onclick="openConv('${r.id}')"`);
+  } catch(e){ err(e.message); }
+};
+
+// Phase 3 — reversible operator action (revoke/restore, pause/resume).
+// Requires a typed reason (sent to the audit log) and a confirm for revoke.
+window.opAction = async function(kind, id, value){
+  const label = kind==='revoke'
+    ? (value ? 'REVOKE this toy (it stops working until re-provisioned)' : 'restore access')
+    : (value ? 'pause this toy' : 'resume this toy');
+  const reason = prompt('Reason to '+label+'\n(required — recorded in the audit log):', '');
+  if (reason === null) return;                 // cancelled
+  if (!reason.trim()){ alert('A reason is required.'); return; }
+  if (kind==='revoke' && value &&
+      !confirm('Revoke kills the toy’s login everywhere until it re-provisions. Continue?')) return;
+  try {
+    await apiPost('/devices/'+id+'/'+kind, { value: value, reason: reason.trim() });
+    _devices = (await api('/devices')).devices; // refresh cached flags
+    openDevice(id);                             // re-render with the new state
   } catch(e){ err(e.message); }
 };
 

@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1653 tests)
+dotnet test                                     # Run all tests (1926 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -1919,6 +1919,26 @@ Pagination guard mirrors the parent endpoints (`offset < 0` / `limit < 1`
   same (story, segment, question). Pinned by `InternalControllerTests`
   (`StoryQaTest_*`).
 
+**Reversible operator actions (Phase 3).** Two mutating, operator-scoped
+endpoints (NO parent ownership check — the console is superuser), each
+requiring a `reason` and writing one system-actor `InternalConsoleAction`
+audit row (`ActorParentId` null so it's console-only, but `TargetDeviceId` IS
+set; metadata = operator name + action + new value + reason). Idempotent — a
+no-op (flag already at the requested value) changes nothing and writes no row.
+
+- `POST /api/internal/devices/{deviceId}/revoke` body `{ value, reason }` —
+  operator kill-switch: `value=true` sets `Device.IsRevoked` (every device-auth
+  path then 401s until re-provision); `value=false` restores. The admin analogue
+  of the parent #074 revoke, minus the ownership gate.
+- `POST /api/internal/devices/{deviceId}/pause` body `{ value, reason }` —
+  operator pause/resume (soft; device still authenticates, chat short-circuits).
+
+400 on a missing/blank reason; 404 on unknown device. Pinned by
+`InternalControllerTests` (`RevokeDevice_*`, `PauseDeviceAction_*`). The
+`admin.html` device drill-down surfaces Revoke/Restore + Pause/Resume buttons
+(typed reason + confirm). **Only reversible actions** — destructive ones
+(data deletion, story-draft promotion) remain deferred (see Out of scope).
+
 **Secret invariants (do not regress):** the response DTOs in
 `Controllers/InternalDtos.cs` never carry `Device.ApiKey` /
 `Device.ApiKeyHash` or `Parent.PasswordHash` — excluded by construction.
@@ -1930,10 +1950,12 @@ The fail-closed gate and per-operator resolution are pinned by
 pinned by `InternalControllerTests`
 (`ConversationDetail_WritesAccessAudit_WithOperator_AndNullParentActor`).
 
-**Out of scope (deferred):** operator ACTIONS (pause/bedtime/mode as
-admin, draft promote, delete) and parent/admin role unification —
-separate approval. (The read-only god view and the story-QA tuning
-playground above are shipped.)
+**Out of scope (still deferred):** DESTRUCTIVE operator actions (data
+deletion / GDPR-erase as admin, story-draft promotion), bedtime/mode-as-admin,
+just-in-time / time-boxed operator tokens + MFA, and parent/admin role
+unification — separate approval each. (Shipped: the read-only god view, the
+story-QA tuning playground, and the Phase 3 REVERSIBLE device actions —
+revoke/restore + pause/resume — above.)
 
 ## Engineering Guardrails
 

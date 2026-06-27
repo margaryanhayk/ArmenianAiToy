@@ -122,6 +122,10 @@ public sealed record AdminAuditDto(
     Guid? TargetChildId,
     JsonElement? Metadata);
 
+// Phase 3 — operator device action (reversible). Value = the new flag state
+// (revoked/paused); Reason is required and recorded in the audit row.
+public sealed record InternalDeviceActionRequest(bool Value, string Reason);
+
 // Story-QA tuning playground (Phase 2). Operator-only; text-only; calls
 // OpenAI (cost) but mutates nothing and persists nothing.
 public sealed record AdminStoryQaTestRequest(
