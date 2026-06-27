@@ -64,8 +64,23 @@ public static class InternalAdminAuth
     /// request may reach the console controller or must be short-circuited
     /// with a 404.
     /// </summary>
-    /// <summary>A named operator credential (from <c>Internal:Operators</c>).</summary>
-    public sealed record OperatorCredential(string Name, string Token);
+    /// <summary>A named operator credential (from <c>Internal:Operators</c>).
+    /// <paramref name="TotpSecret"/> (base32) is optional — when present, the
+    /// JIT session exchange (<c>POST /api/internal/session</c>) requires a valid
+    /// TOTP code for this operator (MFA). Absent ⇒ no second factor.</summary>
+    public sealed record OperatorCredential(string Name, string Token, string? TotpSecret = null);
+
+    /// <summary>Extracts the raw bearer token from the Authorization header,
+    /// or null when absent / not a Bearer scheme. Used by the session-aware
+    /// gate to look a presented token up in the session store.</summary>
+    public static string? ExtractBearer(HttpContext ctx)
+    {
+        var header = ctx.Request.Headers[AuthorizationHeader].ToString();
+        if (string.IsNullOrEmpty(header)
+            || !header.StartsWith(BearerPrefix, StringComparison.OrdinalIgnoreCase))
+            return null;
+        return header[BearerPrefix.Length..];
+    }
 
     /// <summary>Back-compat single-token decision. Delegates to
     /// <see cref="ResolveOperatorName"/> with no named operators — Allow iff the

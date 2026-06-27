@@ -51,7 +51,8 @@
 <header>
   <h1>Areg Console <small>— superuser</small></h1>
   <span id="who" class="pill flag hide" title="resolved console operator"></span>
-  <input id="token" type="password" placeholder="Admin token (Internal:AdminToken)" autocomplete="off" />
+  <input id="token" type="password" placeholder="Admin token" autocomplete="off" />
+  <input id="totp" type="text" placeholder="2FA code (if set)" inputmode="numeric" autocomplete="off" style="min-width:120px" />
   <button id="connect">Connect</button>
   <button id="disconnect" class="ghost hide">Disconnect</button>
 </header>
@@ -413,7 +414,15 @@ window.show = async function(tab){
   current = tab;
   [...nav.children].forEach(a=>a.classList.toggle('active', a.dataset.tab===tab));
   info('Loading…');
-  try { await tabs[tab](); } catch(e){ err(e.message); }
+  try { await tabs[tab](); }
+  catch(e){
+    // A 404 while signed in almost always means the time-boxed session expired
+    // (or access was revoked) — drop cleanly back to sign-in.
+    if (TOKEN && String(e.message||'').startsWith('404')){
+      TOKEN=''; sessionStorage.removeItem('aregAdminToken');
+      setConnected(false); info('Session expired — sign in again.');
+    } else err(e.message);
+  }
 };
 
 nav.addEventListener('click', e=>{ if(e.target.dataset.tab) show(e.target.dataset.tab); });
@@ -427,28 +436,46 @@ function setConnected(on){
   $('#disconnect').classList.toggle('hide', !on);
   $('#connect').classList.toggle('hide', on);
   $('#token').classList.toggle('hide', on);
+  $('#totp').classList.toggle('hide', on);
   $('#who').classList.toggle('hide', !on);
   if (on) showWho();
 }
 
+// Sign in = exchange the static admin token (+ a 2FA code if the operator has
+// one) for a short-lived SESSION token via POST /session. Only the session
+// token is kept (in sessionStorage) and used for every subsequent call — the
+// static token is used once and never stored. Works whether or not the backend
+// requires sessions (the endpoint always issues one).
 $('#connect').addEventListener('click', async ()=>{
-  TOKEN = $('#token').value.trim();
-  if (!TOKEN){ err('Enter the admin token.'); return; }
-  info('Connecting…');
+  const staticToken = $('#token').value.trim();
+  const totp = $('#totp').value.trim();
+  if (!staticToken){ err('Enter the admin token.'); return; }
+  info('Signing in…');
   try {
-    await api('/overview');                       // probe
+    const r = await fetch('/api/internal/session', {
+      method:'POST', cache:'no-store',
+      headers:{ 'Authorization':'Bearer '+staticToken, 'Content-Type':'application/json' },
+      body: JSON.stringify({ totp: totp || null })
+    });
+    if (r.status === 404) throw new Error('Invalid token, or the console is not enabled.');
+    if (r.status === 401) throw new Error('Invalid 2FA code.');
+    if (!r.ok) throw new Error('Sign-in failed (HTTP '+r.status+').');
+    const j = await r.json();
+    TOKEN = j.sessionToken;                          // session token, not the static one
     sessionStorage.setItem('aregAdminToken', TOKEN);
+    $('#totp').value = '';
     setConnected(true);
     show('overview');
   } catch(e){ err(e.message); }
 });
 $('#disconnect').addEventListener('click', ()=>{
   TOKEN=''; sessionStorage.removeItem('aregAdminToken');
-  setConnected(false); info('Disconnected.');
+  setConnected(false); info('Signed out.');
 });
 
-// Auto-reconnect if a token is already in this session.
-if (TOKEN){ $('#token').value = TOKEN; setConnected(true); show('overview'); }
+// Auto-reconnect if a (still-valid) session token is in this browser session.
+// An expired one will 404 on the first data call and drop back to sign-in.
+if (TOKEN){ setConnected(true); show('overview'); }
 </script>
 </body>
 </html>

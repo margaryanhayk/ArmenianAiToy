@@ -52,11 +52,13 @@ public class InternalController : ControllerBase
     private readonly IModerationService _moderation;
     private readonly IConfiguration _config;
     private readonly ILogger<InternalController> _logger;
+    private readonly Application.Auth.OperatorSessionStore _sessions;
 
     public InternalController(
         AppDbContext db, ICuratedStoryLibrary library, OpenAICostMeter costMeter,
         LibraryStoryQuestionService questions, IModerationService moderation,
-        IConfiguration config, ILogger<InternalController> logger)
+        IConfiguration config, ILogger<InternalController> logger,
+        Application.Auth.OperatorSessionStore? sessions = null)
     {
         _db = db;
         _library = library;
@@ -65,6 +67,7 @@ public class InternalController : ControllerBase
         _moderation = moderation;
         _config = config;
         _logger = logger;
+        _sessions = sessions ?? new Application.Auth.OperatorSessionStore();
     }
 
     /// <summary>System-wide counts + today's activity + total in-process
@@ -425,6 +428,39 @@ public class InternalController : ControllerBase
     [HttpGet("whoami")]
     public IActionResult WhoAmI()
         => Ok(new { @operator = HttpContext?.Items["InternalOperator"] as string ?? "unknown" });
+
+    /// <summary>JIT session exchange (MFA). The operator's static token is the
+    /// FIRST factor (validated by the gate to reach this path); a TOTP code is
+    /// the SECOND factor when a secret is configured for this operator. On
+    /// success, mints a short-lived session token used for every other console
+    /// call — so the static token alone grants no standing data access. The
+    /// gate enforces "session required for data endpoints" only when
+    /// <c>Internal:RequireSession</c> is on; this endpoint always works so the
+    /// console uses one flow in both modes. See OperatorSessionStore / Totp.</summary>
+    [HttpPost("session")]
+    public IActionResult CreateSession([FromBody] InternalSessionRequest? req)
+    {
+        var op = HttpContext?.Items["InternalOperator"] as string ?? "unknown";
+
+        // MFA: a named operator with a configured TOTP secret must present a code.
+        var operators = _config.GetSection("Internal:Operators")
+            .Get<List<Observability.InternalAdminAuth.OperatorCredential>>() ?? new();
+        var secret = operators.FirstOrDefault(o => o.Name == op)?.TotpSecret;
+        if (!string.IsNullOrWhiteSpace(secret))
+        {
+            if (string.IsNullOrWhiteSpace(req?.Totp)
+                || !Application.Auth.Totp.Verify(secret, req!.Totp!, DateTime.UtcNow))
+                return Unauthorized(new { error = "Invalid authentication code." });
+        }
+
+        var ttlMin = Math.Clamp(_config.GetValue("Internal:SessionTtlMinutes", 15), 1, 240);
+        var ttl = TimeSpan.FromMinutes(ttlMin);
+        var token = _sessions.Issue(op, ttl);
+        _logger.LogInformation(
+            "Operator {Operator} opened a console session (ttl {Ttl}m, mfa={Mfa})",
+            op, ttlMin, !string.IsNullOrWhiteSpace(secret));
+        return Ok(new { sessionToken = token, @operator = op, expiresInSeconds = (int)ttl.TotalSeconds });
+    }
 
     // ── Phase 3: reversible operator ACTIONS ───────────────────────
     // Operator-scoped (NO parent ownership check — the console is superuser).

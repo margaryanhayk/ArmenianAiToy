@@ -240,6 +240,10 @@ var httpsHardening = HttpsHardeningConfig.Resolve(
     builder.Configuration.GetValue<int?>("Security:HstsMaxAgeDays"));
 builder.Services.AddHsts(o => o.MaxAge = TimeSpan.FromDays(httpsHardening.HstsMaxAgeDays));
 
+// JIT operator-console sessions (process-local; shared by the gate middleware
+// and the /api/internal/session endpoint). Opt-in hardening — see the gate.
+builder.Services.AddSingleton<ArmenianAiToy.Application.Auth.OperatorSessionStore>();
+
 var app = builder.Build();
 
 // #061 — surface an unpinned Host filter in non-Development environments.
@@ -338,14 +342,49 @@ app.UseStaticFiles();
 var internalAdminToken = builder.Configuration["Internal:AdminToken"];
 var internalAllowAnon = builder.Configuration
     .GetValue<bool>("Internal:AllowUnauthenticated");
+// JIT/MFA hardening, opt-in (default false → today's behavior unchanged). When
+// true, DATA endpoints require a short-lived SESSION token (obtained from
+// POST /api/internal/session with the static token + a TOTP code if the
+// operator has one); the static token alone reaches only the session endpoint.
+var internalRequireSession = builder.Configuration
+    .GetValue<bool>("Internal:RequireSession");
 var internalOperators = builder.Configuration.GetSection("Internal:Operators")
     .Get<List<InternalAdminAuth.OperatorCredential>>() ?? new();
+var internalSessions = app.Services
+    .GetRequiredService<ArmenianAiToy.Application.Auth.OperatorSessionStore>();
 app.Use(async (ctx, next) =>
 {
     if (InternalAdminAuth.IsInternalPath(ctx.Request.Path))
     {
-        var operatorName = InternalAdminAuth.ResolveOperatorName(
-            ctx, internalOperators, internalAdminToken, internalAllowAnon);
+        string? operatorName;
+        if (internalAllowAnon)
+        {
+            operatorName = "dev-bypass"; // explicit dev/bench switch — unchanged
+        }
+        else
+        {
+            operatorName = null;
+            var presented = InternalAdminAuth.ExtractBearer(ctx);
+            // 1) A live session token always grants access (JIT, time-boxed).
+            if (presented is not null)
+                operatorName = internalSessions.Resolve(presented);
+            // 2) Otherwise the static operator token. It always reaches the
+            //    session-exchange endpoint (first factor); it reaches DATA
+            //    endpoints directly only when sessions are not required.
+            if (operatorName is null)
+            {
+                var staticName = InternalAdminAuth.ResolveOperatorName(
+                    ctx, internalOperators, internalAdminToken, allowUnauthenticated: false);
+                if (staticName is not null)
+                {
+                    var isSessionExchange = ctx.Request.Path.Equals(
+                        InternalAdminAuth.PathPrefix + "/session", StringComparison.OrdinalIgnoreCase);
+                    if (!internalRequireSession || isSessionExchange)
+                        operatorName = staticName;
+                }
+            }
+        }
+
         if (operatorName is null)
         {
             ctx.Response.StatusCode = StatusCodes.Status404NotFound;

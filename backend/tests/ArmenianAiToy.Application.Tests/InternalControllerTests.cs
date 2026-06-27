@@ -340,6 +340,31 @@ public class InternalControllerTests
     }
 
     [Fact]
+    public void CreateSession_NoMfaConfigured_IssuesSessionToken()
+    {
+        var ok = Assert.IsType<OkObjectResult>(
+            OpController(NewDb(), "no-mfa-op").CreateSession(new InternalSessionRequest(null)));
+        Assert.Contains("sessionToken", JsonSerializer.Serialize(ok.Value));
+    }
+
+    [Fact]
+    public void CreateSession_MfaConfigured_WrongCode_Returns401()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Internal:Operators:0:Name"] = "alice-ops",
+            ["Internal:Operators:0:Token"] = "tok",
+            ["Internal:Operators:0:TotpSecret"] = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+        }).Build();
+        var c = NewController(NewDb(), config: config);
+        c.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        c.HttpContext.Items["InternalOperator"] = "alice-ops";
+
+        var res = c.CreateSession(new InternalSessionRequest("000000")); // wrong code
+        Assert.IsType<UnauthorizedObjectResult>(res);
+    }
+
+    [Fact]
     public async Task RevokeDevice_FlipsFlag_AndWritesActionAudit_WithOperatorAndReason()
     {
         var db = NewDb();

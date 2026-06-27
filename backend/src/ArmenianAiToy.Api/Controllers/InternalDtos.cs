@@ -122,6 +122,11 @@ public sealed record AdminAuditDto(
     Guid? TargetChildId,
     JsonElement? Metadata);
 
+// JIT session exchange: the operator presents their static token (first factor,
+// in the Authorization header) and — when MFA is configured for them — a TOTP
+// code (second factor) to mint a short-lived session token.
+public sealed record InternalSessionRequest(string? Totp);
+
 // Phase 3 — operator device action (reversible). Value = the new flag state
 // (revoked/paused); Reason is required and recorded in the audit row.
 public sealed record InternalDeviceActionRequest(bool Value, string Reason);

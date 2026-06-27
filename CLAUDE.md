@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1926 tests)
+dotnet test                                     # Run all tests (1940 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -1860,6 +1860,27 @@ middleware in `Program.cs` over the `/api/internal/*` path prefix, run
   `null` = 404), stashes the name in `ctx.Items["InternalOperator"]`, and
   sets `Cache-Control: no-store` on the response. `Evaluate(...)` is kept as
   a thin back-compat delegate (Allow iff `ResolveOperatorName` is non-null).
+
+**JIT sessions + MFA (opt-in hardening).** Standing access from a static token
+is the weak spot the security research flags. Opt-in via `Internal:RequireSession`
+(default `false` → behavior unchanged):
+- `POST /api/internal/session` exchanges the static token (first factor; the
+  gate lets it reach ONLY this path when sessions are required) — plus a TOTP
+  code (second factor) when the operator has an `Internal:Operators[].TotpSecret`
+  — for a short-lived session token (`Internal:SessionTtlMinutes`, default 15,
+  clamp 1–240). Wrong/absent code → 401; the endpoint always works so the
+  console uses one sign-in flow in both modes.
+- When `RequireSession` is on, the gate accepts ONLY a live session token for
+  data endpoints (resolved via the process-local `OperatorSessionStore`); the
+  static token alone reaches nothing but `/session`. So a leaked static token
+  confers no standing data access (just-in-time, time-boxed). `GET /whoami`
+  reports the resolved operator; `admin.html` exchanges token+2FA → session and
+  uses the session token for every call (only the session token is persisted).
+- `Totp` (RFC 6238, HMAC-SHA1, BCL-only — no new dependency) and
+  `OperatorSessionStore` live in `Application/Auth`. Process-local store
+  (multi-instance would need a shared one — noted). Pinned by `TotpTests`,
+  `OperatorSessionStoreTests`, and `InternalControllerTests` (`CreateSession_*`,
+  `WhoAmI_*`).
 - The `wwwroot/admin.html` page is served openly but is useless without a
   token (all its data calls require it). It is a full read-only operator
   console: Overview (live, auto-refresh 20s, status-colored), Devices (search +
@@ -1954,10 +1975,10 @@ pinned by `InternalControllerTests`
 
 **Out of scope (still deferred):** DESTRUCTIVE operator actions (data
 deletion / GDPR-erase as admin, story-draft promotion), bedtime/mode-as-admin,
-just-in-time / time-boxed operator tokens + MFA, and parent/admin role
-unification — separate approval each. (Shipped: the read-only god view, the
-story-QA tuning playground, and the Phase 3 REVERSIBLE device actions —
-revoke/restore + pause/resume — above.)
+and parent/admin role unification — separate approval each. (Shipped: the
+read-only god view, the story-QA tuning playground, the Phase 3 REVERSIBLE
+device actions — revoke/restore + pause/resume — and the opt-in JIT
+sessions + TOTP MFA above.)
 
 ## Engineering Guardrails
 
