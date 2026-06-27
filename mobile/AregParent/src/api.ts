@@ -24,7 +24,20 @@ export type LinkedDevice = {
   isOnline: boolean;
   isRevoked: boolean;
   isPaused: boolean;
+  storyEnabled: boolean;
+  gameEnabled: boolean;
+  riddleEnabled: boolean;
+  curiosityEnabled: boolean;
+  bedtimeStart: string | null; // "HH:mm:ss" or null
+  bedtimeEnd: string | null;
   children: LinkedDeviceChild[];
+};
+
+export type ModeFlags = {
+  story: boolean;
+  game: boolean;
+  riddle: boolean;
+  curiosity: boolean;
 };
 
 async function authHeader(): Promise<Record<string, string>> {
@@ -183,4 +196,42 @@ export async function getConversation(conversationId: string): Promise<Conversat
     `/api/conversations/${encodeURIComponent(conversationId)}`,
   );
   return data.conversation;
+}
+
+async function mutate(path: string, method: 'POST' | 'PUT', body?: unknown): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(url(path), {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new Error(`Can't reach the server at ${API_BASE_URL}.`);
+  }
+  if (res.status === 401) throw new UnauthorizedError();
+  if (!res.ok) throw new Error(`Request failed (HTTP ${res.status}).`);
+}
+
+/** POST /api/parents/devices/{id}/pause | /resume — instant quiet override. */
+export function setPaused(deviceId: string, paused: boolean): Promise<void> {
+  const action = paused ? 'pause' : 'resume';
+  return mutate(`/api/parents/devices/${encodeURIComponent(deviceId)}/${action}`, 'POST');
+}
+
+/** PUT /api/parents/devices/{id}/mode-flags — enable/disable the four modes. */
+export function setModeFlags(deviceId: string, flags: ModeFlags): Promise<void> {
+  return mutate(`/api/parents/devices/${encodeURIComponent(deviceId)}/mode-flags`, 'PUT', flags);
+}
+
+/** PUT /api/parents/devices/{id}/bedtime-window — "HH:mm:ss" or null to clear. */
+export function setBedtime(
+  deviceId: string,
+  start: string | null,
+  end: string | null,
+): Promise<void> {
+  return mutate(`/api/parents/devices/${encodeURIComponent(deviceId)}/bedtime-window`, 'PUT', {
+    start,
+    end,
+  });
 }

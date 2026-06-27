@@ -22,9 +22,10 @@ import {
 type Props = {
   onLogout: () => void;
   onOpenDevice: (device: LinkedDevice) => void;
+  onOpenSettings: (device: LinkedDevice) => void;
 };
 
-export default function DevicesScreen({ onLogout, onOpenDevice }: Props) {
+export default function DevicesScreen({ onLogout, onOpenDevice, onOpenSettings }: Props) {
   const [devices, setDevices] = useState<LinkedDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -186,6 +187,7 @@ export default function DevicesScreen({ onLogout, onOpenDevice }: Props) {
             onRenamed={load}
             onLogout={onLogout}
             onOpen={() => onOpenDevice(item)}
+            onSettings={() => onOpenSettings(item)}
           />
         )}
         contentContainerStyle={devices.length === 0 ? styles.flexGrow : undefined}
@@ -200,12 +202,14 @@ function DeviceCard({
   onRenamed,
   onLogout,
   onOpen,
+  onSettings,
 }: {
   device: LinkedDevice;
   onRevoke: (d: LinkedDevice) => void;
   onRenamed: () => Promise<void> | void;
   onLogout: () => void;
   onOpen: () => void;
+  onSettings: () => void;
 }) {
   const [name, setName] = useState(device.deviceName ?? '');
   const [saving, setSaving] = useState(false);
@@ -239,9 +243,14 @@ function DeviceCard({
 
       {childLine ? <Text style={styles.children}>{childLine}</Text> : null}
 
-      <Pressable style={styles.activityBtn} onPress={onOpen}>
-        <Text style={styles.activityText}>See activity →</Text>
-      </Pressable>
+      <View style={styles.actionRow}>
+        <Pressable style={styles.activityBtn} onPress={onOpen}>
+          <Text style={styles.activityText}>See activity →</Text>
+        </Pressable>
+        <Pressable style={styles.settingsBtn} onPress={onSettings}>
+          <Text style={styles.activityText}>Settings →</Text>
+        </Pressable>
+      </View>
 
       <View style={styles.nameRow}>
         <TextInput
@@ -321,9 +330,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   children: { color: '#444', marginTop: 6 },
+  actionRow: { flexDirection: 'row', marginTop: 10, gap: 8 },
   activityBtn: {
-    marginTop: 10,
+    flex: 1,
     backgroundColor: '#eef3fb',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  settingsBtn: {
+    flex: 1,
+    backgroundColor: '#f0f0f0',
     borderRadius: 8,
     paddingVertical: 10,
     alignItems: 'center',

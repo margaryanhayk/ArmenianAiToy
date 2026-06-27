@@ -7,22 +7,43 @@ import LoginScreen from './src/screens/LoginScreen';
 import DevicesScreen from './src/screens/DevicesScreen';
 import ConversationsScreen from './src/screens/ConversationsScreen';
 import ConversationDetailScreen from './src/screens/ConversationDetailScreen';
+import DeviceSettingsScreen from './src/screens/DeviceSettingsScreen';
 
 type Screen =
   | { name: 'devices' }
   | { name: 'conversations'; deviceId: string; deviceName: string }
-  | { name: 'conversationDetail'; conversationId: string; deviceId: string; deviceName: string };
+  | { name: 'conversationDetail'; conversationId: string; deviceId: string; deviceName: string }
+  | { name: 'settings'; device: LinkedDevice };
 
 function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
   const [screen, setScreen] = useState<Screen>({ name: 'devices' });
+  // Bumping this key remounts DevicesScreen so it re-fetches (e.g. after a
+  // settings change) when we navigate back to it.
+  const [devicesKey, setDevicesKey] = useState(0);
 
   if (screen.name === 'devices') {
     return (
       <DevicesScreen
+        key={devicesKey}
         onLogout={onLogout}
         onOpenDevice={(d: LinkedDevice) =>
           setScreen({ name: 'conversations', deviceId: d.deviceId, deviceName: d.deviceName })
         }
+        onOpenSettings={(d: LinkedDevice) => setScreen({ name: 'settings', device: d })}
+      />
+    );
+  }
+
+  if (screen.name === 'settings') {
+    return (
+      <DeviceSettingsScreen
+        device={screen.device}
+        onBack={() => {
+          setDevicesKey((k) => k + 1);
+          setScreen({ name: 'devices' });
+        }}
+        onChanged={() => setDevicesKey((k) => k + 1)}
+        onLogout={onLogout}
       />
     );
   }
