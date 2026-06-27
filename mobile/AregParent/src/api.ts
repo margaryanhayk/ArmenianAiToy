@@ -36,16 +36,20 @@ function url(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
 
-/** POST /api/parents/login → JWT. Throws on bad credentials. */
+/** POST /api/parents/login → JWT. Distinguishes network vs 401 vs other. */
 export async function login(email: string, password: string): Promise<string> {
-  const res = await fetch(url('/api/parents/login'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!res.ok) {
-    throw new Error('That email or password is incorrect.');
+  let res: Response;
+  try {
+    res = await fetch(url('/api/parents/login'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+  } catch {
+    throw new Error(`Can't reach the server at ${API_BASE_URL}. Check Wi-Fi.`);
   }
+  if (res.status === 401) throw new Error('That email or password is incorrect.');
+  if (!res.ok) throw new Error(`Server said HTTP ${res.status} (not a password problem).`);
   const data = (await res.json()) as { token: string };
   return data.token;
 }
@@ -114,4 +118,69 @@ export async function setRevoked(deviceId: string, revoked: boolean): Promise<vo
   });
   if (res.status === 401) throw new UnauthorizedError();
   if (!res.ok) throw new Error(`${revoked ? 'Revoke' : 'Restore'} failed (HTTP ${res.status}).`);
+}
+
+async function getJson<T>(path: string): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(url(path), { headers: await authHeader() });
+  } catch {
+    throw new Error(`Can't reach the server at ${API_BASE_URL}.`);
+  }
+  if (res.status === 401) throw new UnauthorizedError();
+  if (!res.ok) throw new Error(`Request failed (HTTP ${res.status}).`);
+  return (await res.json()) as T;
+}
+
+export type TodaySummary = {
+  conversationsCount: number;
+  messagesCount: number;
+  flaggedMessagesCount: number;
+  assistantMessagesWithAudio: number;
+};
+
+export type ConversationSummary = {
+  id: string;
+  startedAt: string;
+  messageCount: number;
+  flaggedMessageCount: number;
+  firstUserSnippet: string | null;
+  lastAssistantSnippet: string | null;
+};
+
+export type ConversationMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  safetyFlag: number;
+  audioAvailable: boolean;
+};
+
+export type ConversationDetail = {
+  id: string;
+  startedAt: string;
+  messageCount: number;
+  messages: ConversationMessage[];
+};
+
+/** GET /api/conversations/today-summary?deviceId= — exact per-message counts. */
+export function getTodaySummary(deviceId: string): Promise<TodaySummary> {
+  return getJson<TodaySummary>(`/api/conversations/today-summary?deviceId=${encodeURIComponent(deviceId)}`);
+}
+
+/** GET /api/conversations/summary?deviceId= — newest-first conversation rows. */
+export async function getConversations(deviceId: string): Promise<ConversationSummary[]> {
+  const data = await getJson<{ conversations?: ConversationSummary[] }>(
+    `/api/conversations/summary?deviceId=${encodeURIComponent(deviceId)}&limit=50&offset=0`,
+  );
+  return data.conversations ?? [];
+}
+
+/** GET /api/conversations/{id} — full message transcript. */
+export async function getConversation(conversationId: string): Promise<ConversationDetail> {
+  const data = await getJson<{ conversation: ConversationDetail }>(
+    `/api/conversations/${encodeURIComponent(conversationId)}`,
+  );
+  return data.conversation;
 }
