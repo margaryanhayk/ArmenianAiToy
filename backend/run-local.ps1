@@ -15,6 +15,16 @@
 $ErrorActionPreference = "Stop"
 $env:ASPNETCORE_ENVIRONMENT = "Development"
 
+# Story serving for the bench:
+#  - side-load the «Անբան Հուռին» DRAFT verbatim (it's not promoted to the
+#    runtime library; requireApproved:false serves it locally without changing
+#    its text/status). This is what the toy's AREG_STORY_ID = "anban-huri" needs.
+#  - open the audio stream locally (no signing key on a home bench). The stream
+#    is fail-closed by default; this flag is the explicit dev/bench opt-in.
+$env:Story__DefaultStoryId = "anban-huri"
+$env:Story__ExtraStoryFiles__0 = (Join-Path $PSScriptRoot "content\story-drafts\anban-huri.story.json")
+$env:StoryAudio__AllowUnauthenticated = "true"
+
 Write-Host "Your LAN addresses (point the toy/app at one of these:5000):" -ForegroundColor Cyan
 Get-NetIPAddress -AddressFamily IPv4 |
   Where-Object { $_.IPAddress -like "192.168.*" -or $_.IPAddress -like "10.*" } |
