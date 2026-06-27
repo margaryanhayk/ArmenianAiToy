@@ -22,6 +22,7 @@ type Props = {
   onBack: () => void;
   onChanged: () => Promise<void> | void;
   onLogout: () => void;
+  onOpenProvisioning: () => void;
 };
 
 // "HH:mm:ss" | null  ->  "HH:mm"
@@ -29,7 +30,13 @@ function toHHmm(v: string | null): string {
   return v ? v.substring(0, 5) : '';
 }
 
-export default function DeviceSettingsScreen({ device, onBack, onChanged, onLogout }: Props) {
+export default function DeviceSettingsScreen({
+  device,
+  onBack,
+  onChanged,
+  onLogout,
+  onOpenProvisioning,
+}: Props) {
   const [paused, setPausedState] = useState(device.isPaused);
   const [modes, setModes] = useState<ModeFlags>({
     story: device.storyEnabled,
@@ -114,6 +121,11 @@ export default function DeviceSettingsScreen({ device, onBack, onChanged, onLogo
       </Pressable>
       <Text style={styles.title}>{device.deviceName || 'Toy'} · Settings</Text>
 
+      {/* Wi-Fi setup over Bluetooth */}
+      <Pressable style={styles.wifiBtn} onPress={onOpenProvisioning}>
+        <Text style={styles.wifiBtnText}>📶 Connect to Wi-Fi (Bluetooth)</Text>
+      </Pressable>
+
       {/* Pause */}
       <View style={styles.card}>
         <View style={styles.rowBetween}>
@@ -194,6 +206,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#fafafa',
   },
   cardTitle: { fontSize: 16, fontWeight: '600', color: '#2c4a7a', marginBottom: 8 },
+  wifiBtn: {
+    backgroundColor: '#eef3fb',
+    borderColor: '#cdddf2',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  wifiBtnText: { color: '#2c4a7a', fontWeight: '700', fontSize: 15 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
   rowTitle: { fontSize: 16, color: '#222' },
   rowHint: { fontSize: 12, color: '#888', marginTop: 4 },

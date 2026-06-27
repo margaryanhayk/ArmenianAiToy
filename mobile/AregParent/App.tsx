@@ -10,6 +10,7 @@ import ConversationDetailScreen from './src/screens/ConversationDetailScreen';
 import DeviceSettingsScreen from './src/screens/DeviceSettingsScreen';
 import FlaggedScreen from './src/screens/FlaggedScreen';
 import AccountScreen from './src/screens/AccountScreen';
+import ProvisioningScreen from './src/screens/ProvisioningScreen';
 
 type Screen =
   | { name: 'devices' }
@@ -17,6 +18,7 @@ type Screen =
   | { name: 'conversationDetail'; conversationId: string; deviceId: string; deviceName: string }
   | { name: 'flagged'; deviceId: string; deviceName: string }
   | { name: 'settings'; device: LinkedDevice }
+  | { name: 'provisioning'; device: LinkedDevice }
   | { name: 'account' };
 
 function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
@@ -53,6 +55,16 @@ function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
         }}
         onChanged={() => setDevicesKey((k) => k + 1)}
         onLogout={onLogout}
+        onOpenProvisioning={() => setScreen({ name: 'provisioning', device: screen.device })}
+      />
+    );
+  }
+
+  if (screen.name === 'provisioning') {
+    return (
+      <ProvisioningScreen
+        device={screen.device}
+        onBack={() => setScreen({ name: 'settings', device: screen.device })}
       />
     );
   }

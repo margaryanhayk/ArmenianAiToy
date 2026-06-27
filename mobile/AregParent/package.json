@@ -4,7 +4,9 @@
   "main": "index.ts",
   "dependencies": {
     "@expo/metro-runtime": "~56.0.15",
+    "@orbital-systems/react-native-esp-idf-provisioning": "^0.5.5",
     "expo": "~56.0.12",
+    "expo-dev-client": "~56.0.20",
     "expo-secure-store": "~56.0.4",
     "expo-status-bar": "~56.0.4",
     "react": "19.2.3",

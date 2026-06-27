@@ -41,14 +41,35 @@ $env:EXPO_PUBLIC_API_BASE_URL = "http://192.168.1.4:5000"; npx expo start
 
 The phone and the backend must be on the same Wi-Fi for the dev LAN IP to work.
 
+## Bluetooth Wi-Fi setup (needs a dev build)
+
+The "Connect to Wi-Fi" screen (Settings → 📶) drives BLE provisioning via
+`@orbital-systems/react-native-esp-idf-provisioning`. That's a **native module**,
+so it does NOT run in Expo Go or the web preview — it needs an **Expo dev build**.
+The code is written (`ProvisioningScreen.tsx`) but **UNVERIFIED on a device**.
+
+- In Expo Go / web it shows a graceful fallback ("use the ESP BLE Provisioning
+  app, PoP `areg-pair`"); only a dev build activates the real flow. The toy/
+  firmware side is already done + verified (B.2/B.3).
+- Constants match the firmware: device prefix `Areg`, PoP `areg-pair`, security 1.
+
+Make + run the dev build (Android, on this Windows machine):
+
+```bash
+cd mobile/AregParent
+# Local build (needs Android Studio + SDK + a device/emulator):
+npx expo run:android
+#   — or cloud build, no toolchain needed:  eas build --profile development -p android
+# then, with the dev build installed on the phone:
+npx expo start --dev-client
+```
+
+iOS needs a Mac or EAS (`eas build --profile development -p ios`). After it
+launches: put the toy in setup mode (hold its button ~5s at power-on), then
+Settings → 📶 Connect to Wi-Fi → Search → pick your network → password → Send.
+
 ## Still TODO (next slices)
 
-- **Bluetooth Wi-Fi setup screen** — the "connect the toy to Wi-Fi" flow. This
-  needs a native module (Espressif provisioning, e.g.
-  `react-native-esp-idf-provisioning`), so it requires an **Expo dev build**
-  (not Expo Go) and on-device testing. The toy side is already done + verified
-  (firmware B.2/B.3). Until then, set up Wi-Fi with the **ESP BLE Provisioning**
-  app (PoP `areg-pair`).
 - Per-child profiles + per-child mode overrides (endpoints exist; needs a
   child to exist on the device first).
 - Assistant-audio replay in the transcript (`/messages/{id}/audio`).
