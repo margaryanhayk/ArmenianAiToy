@@ -41,6 +41,36 @@ $env:EXPO_PUBLIC_API_BASE_URL = "http://192.168.1.4:5000"; npx expo start
 
 The phone and the backend must be on the same Wi-Fi for the dev LAN IP to work.
 
+## Build a real app on your phone (EAS — no Mac needed for Android)
+
+The browser/Expo Go preview can't run native modules (Bluetooth) and Expo Go
+can hit SDK-version mismatches. The real way to get the app on a phone is an
+**EAS cloud build** (`eas.json` is configured here). Runs from Windows.
+
+```bash
+cd mobile/AregParent
+npx eas-cli login          # free Expo account (sign up at expo.dev)
+npx eas-cli init           # links this app to your Expo project (writes projectId)
+
+# Android — easiest, builds in the cloud, gives you an installable .apk:
+npx eas-cli build --profile preview --platform android
+#   → ~10–15 min → install the .apk on an Android phone → open it. Bluetooth works.
+
+# iPhone — needs an Apple Developer account ($99/yr, Apple's rule). No Mac needed:
+npx eas-cli build --profile development --platform ios
+#   → EAS walks you through Apple credentials + registering your device.
+```
+
+Profiles (`eas.json`):
+- **preview** — standalone APK: install and run (includes the Bluetooth module). Best for "just put it on my phone."
+- **development** — dev client + live reload (`npx expo start --dev-client`). Best for iterating + Bluetooth testing.
+- **production** — store build; set its `EXPO_PUBLIC_API_BASE_URL` to your HTTPS backend.
+
+The backend URL is baked in at build time from `eas.json` → `env.EXPO_PUBLIC_API_BASE_URL`
+(currently the dev LAN IP `http://192.168.1.4:5000`). The phone must be on the
+same Wi-Fi as that backend for it to connect; switch to your public HTTPS URL
+for a real release.
+
 ## Bluetooth Wi-Fi setup (needs a dev build)
 
 The "Connect to Wi-Fi" screen (Settings → 📶) drives BLE provisioning via
