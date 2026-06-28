@@ -277,18 +277,42 @@ public class StoryQaControllerModerationTests
             .Returns(new ModerationResult(IsSafe: false, FlaggedCategories: new List<string> { "violence" }));
         h.AiChatClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns(ModelAnswer);
+        // Distinct bytes per synthesized text so we can prove the FLAGGED
+        // answer's audio never reaches the returned MP3 — even though, with
+        // output-moderation now overlapped with speculative TTS, the flagged
+        // answer MAY be synthesized and then discarded. The real safety
+        // invariant is "never RETURNED to the child", not "never synthesized".
+        h.Synthesis.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ci => new AudioSynthesisResult(
+                Encoding.UTF8.GetBytes("TTS::" + ci.ArgAt<string>(0)), "audio/mpeg"));
 
         var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
 
-        // Still a normal (streamed) audio turn — never a 502/silence.
-        Assert.IsType<FileContentResult>(result);
+        // Still a normal audio turn — never a 502/silence.
+        var file = Assert.IsType<FileContentResult>(result);
         // The answer WAS run through output moderation...
         await h.Moderation.Received(1).CheckContentAsync(ModelAnswer);
-        // ...and the child hears the safe fallback, NOT the flagged answer.
+        // ...the child hears the safe fallback...
         await h.Synthesis.Received().SynthesizeArmenianAsync(
             StoryAnswerFilter.SafeFallback, Arg.Any<CancellationToken>());
-        await h.Synthesis.DidNotReceive().SynthesizeArmenianAsync(
-            ModelAnswer, Arg.Any<CancellationToken>());
+        var fallbackAudio = Encoding.UTF8.GetBytes("TTS::" + StoryAnswerFilter.SafeFallback);
+        Assert.True(file.FileContents.AsSpan().StartsWith(fallbackAudio),
+            "the returned audio must start with the safe-fallback synthesis");
+        // ...and the FLAGGED answer's audio is NOT present anywhere in the body.
+        var flaggedAudio = Encoding.UTF8.GetBytes("TTS::" + ModelAnswer);
+        Assert.DoesNotContain(
+            SlidingWindows(file.FileContents, flaggedAudio.Length),
+            w => w.AsSpan().SequenceEqual(flaggedAudio));
+    }
+
+    /// <summary>Yields every length-<paramref name="window"/> contiguous slice
+    /// of <paramref name="data"/> as a byte[], so an <c>Assert.DoesNotContain</c>
+    /// with a default equality comparer can prove a byte subsequence is absent.</summary>
+    private static IEnumerable<byte[]> SlidingWindows(byte[] data, int window)
+    {
+        if (window <= 0 || data.Length < window) yield break;
+        for (var i = 0; i + window <= data.Length; i++)
+            yield return data[i..(i + window)];
     }
 
     // --- Gates + daily cost cap (parent-trust + unbounded-cost fix) --

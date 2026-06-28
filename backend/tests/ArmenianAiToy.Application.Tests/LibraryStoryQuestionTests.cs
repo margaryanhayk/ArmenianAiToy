@@ -57,7 +57,7 @@ public class LibraryStoryQuestionTests
         Assert.Contains(question, prompt.SystemPrompt);
         Assert.Contains("ANSWER RULES", prompt.SystemPrompt);
         Assert.Contains("Answer in Armenian only", prompt.SystemPrompt);
-        Assert.Contains("1 to 3 short sentences", prompt.SystemPrompt);
+        Assert.Contains("1 to 2 short sentences", prompt.SystemPrompt);
         Assert.Contains("Answer ONLY from the story context", prompt.SystemPrompt);
         Assert.Equal(question, prompt.UserMessage);
     }

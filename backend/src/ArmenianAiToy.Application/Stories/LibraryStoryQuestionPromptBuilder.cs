@@ -30,7 +30,7 @@ internal static class LibraryStoryQuestionPromptBuilder
         """
         ANSWER RULES (follow every rule exactly):
         - Answer in Armenian only. Use very simple words a 4-7 year old child understands.
-        - 1 to 3 short sentences. No lists, no headings, nothing else.
+        - 1 to 2 short sentences. Prefer ONE sentence whenever it fully answers — a small child is listening, so shorter is better. No lists, no headings, nothing else.
         - Warm and calm. Never scary.
         - DECIDE THE QUESTION TYPE FIRST, then answer accordingly:
         - (A) WORD-MEANING question ("... ի՞նչ է", "... ո՞րն է", "ի՞նչ է նշանակում"): answer with ONLY a simple, correct, child-friendly definition of that word — ONE short sentence is best, like a kind grown-up explaining to a small child. Do NOT pad with a second sentence; a second sentence is allowed ONLY if it is also a plain, correct, common-word fact about the word itself. Do NOT add any story-plot details, do NOT say "in our story/tale", do NOT mention what any character did with it. JUST explain the word. This is the one case you answer from real-world meaning, not from the story. Every word you use must be a real, common Armenian word; if you are genuinely unsure of the word's meaning, say so gently and NEVER invent or misuse a word.
@@ -58,7 +58,7 @@ internal static class LibraryStoryQuestionPromptBuilder
         Produce a NEW answer that follows every rule above exactly:
         Armenian letters only (no Latin, no digits), every word a REAL
         common Armenian word (no invented, rare, or dialectal words),
-        1 to 3 short warm sentences, only facts already present in the
+        1 to 2 short warm sentences, only facts already present in the
         story context, no question or meta comment at the end, no
         insults, no encouragement of lying or laziness, no mention of
         rules or systems.
