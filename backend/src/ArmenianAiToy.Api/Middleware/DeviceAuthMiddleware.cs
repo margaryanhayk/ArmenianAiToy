@@ -37,6 +37,13 @@ public class DeviceAuthMiddleware
         if (string.IsNullOrEmpty(deviceIdHeader) || string.IsNullOrEmpty(apiKeyHeader)
             || !Guid.TryParse(deviceIdHeader, out var deviceId))
         {
+            // Diagnostic: surface a malformed/missing-header auth attempt.
+            // Never log key material — only whether the key header was present.
+            _logger.LogWarning(
+                "Device auth 401 (bad headers). Path={Path} DeviceIdHeader={DeviceId} ApiKeyPresent={KeyPresent}",
+                context.Request.Path,
+                string.IsNullOrEmpty(deviceIdHeader) ? "(none)" : deviceIdHeader,
+                !string.IsNullOrEmpty(apiKeyHeader));
             context.Response.StatusCode = 401;
             await context.Response.WriteAsJsonAsync(new { error = "Missing or invalid X-Device-Id / X-Api-Key headers" });
             return;
@@ -47,6 +54,11 @@ public class DeviceAuthMiddleware
 
         if (device == null)
         {
+            // Diagnostic: which device-id was rejected. Never log key material —
+            // the device-id alone is enough to spot an unregistered / fallback id.
+            _logger.LogWarning(
+                "Device auth 401 (rejected credentials). Path={Path} DeviceId={DeviceId}",
+                context.Request.Path, deviceId);
             context.Response.StatusCode = 401;
             await context.Response.WriteAsJsonAsync(new { error = "Invalid device credentials" });
             return;

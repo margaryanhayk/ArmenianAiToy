@@ -218,8 +218,15 @@ public class StoryQaController : ControllerBase
 
         using var audioBuffer = new MemoryStream();
         await Request.Body.CopyToAsync(audioBuffer, cancellationToken);
+        // Diagnostic: record the inbound upload size so an empty/short body
+        // from the device is unambiguous in the logs (no child PII — size only).
+        _logger.LogInformation(
+            "Story-QA inbound body: {Bytes} bytes, contentType={ContentType}, storyId={StoryId}, offset={Offset}",
+            audioBuffer.Length, inboundContentType, storyId, offset);
         if (audioBuffer.Length == 0)
         {
+            _logger.LogWarning(
+                "Story-QA EMPTY body — returning 400. The device uploaded no audio. StoryId={StoryId}", storyId);
             return BadRequest(new { error = "Audio body is required" });
         }
         var audioBytes = audioBuffer.ToArray();
