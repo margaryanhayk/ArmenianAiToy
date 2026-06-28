@@ -1,3 +1,7 @@
+using System;
+using System.ClientModel;
+using System.ClientModel.Primitives;
+using System.Net.Http;
 using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.Auth;
 using ArmenianAiToy.Application.Helpers;
@@ -44,7 +48,30 @@ public static class DependencyInjection
 
         var moderationModel = config["OpenAI:ModerationModel"] ?? "omni-moderation-latest";
 
-        var openAiClient = new OpenAIClient(apiKey);
+        // Keep the OpenAI connection WARM between the toy's spaced-out questions.
+        // A child asks every few minutes; .NET's default 1-minute pooled-connection
+        // idle timeout means each question pays a full TLS reconnect (~2-3s of
+        // "reconnect tax" measured on the voice Q&A path — cold inMod/stt/gpt). A
+        // longer idle timeout plus HTTP/2 keep-alive PINGs hold the connection open
+        // with NO extra API requests (zero quota burn). Shared by every OpenAI call
+        // (chat, STT, TTS, moderation) since all flow through this one pooled client.
+        var openAiHandler = new SocketsHttpHandler
+        {
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(10),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(30),
+            KeepAlivePingDelay = TimeSpan.FromSeconds(30),
+            KeepAlivePingTimeout = TimeSpan.FromSeconds(10),
+            KeepAlivePingPolicy = HttpKeepAlivePingPolicy.Always,
+            EnableMultipleHttp2Connections = true,
+        };
+        // Generous ceiling; the STT/TTS/chat adapters impose their own 30s
+        // CancellationToken timeouts, which fire first. Must stay >= those.
+        var openAiHttpClient = new HttpClient(openAiHandler) { Timeout = TimeSpan.FromSeconds(100) };
+        var openAiOptions = new OpenAIClientOptions
+        {
+            Transport = new HttpClientPipelineTransport(openAiHttpClient),
+        };
+        var openAiClient = new OpenAIClient(new ApiKeyCredential(apiKey), openAiOptions);
         services.AddSingleton(openAiClient.GetChatClient(chatModel));
         services.AddSingleton(openAiClient.GetModerationClient(moderationModel));
 
