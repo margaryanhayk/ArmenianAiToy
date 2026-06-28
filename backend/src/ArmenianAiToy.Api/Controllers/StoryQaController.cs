@@ -230,11 +230,32 @@ public class StoryQaController : ControllerBase
         // metered — only real turns that reach transcription. RecordTurn is
         // called exactly once on every return path below.
         var turnStopwatch = Stopwatch.StartNew();
+        // Per-stage latency instrumentation. Each is the wall-clock of one
+        // sequential OpenAI round-trip; 0 means that stage didn't run this turn.
+        // Surfaced as X-Qa-*-Ms response headers + one log line so the bottleneck
+        // is measurable without guessing. Additive — no behavior change.
+        long sttMs = 0, inModMs = 0, gptMs = 0, outModMs = 0, ttsMs = 0;
+        var stage = new Stopwatch();
         void RecordTurn(string outcome)
         {
             turnStopwatch.Stop();
             AppMeter.StoryQaDuration.Record(turnStopwatch.Elapsed.TotalSeconds);
             AppMeter.StoryQaTurn.Add(1, new KeyValuePair<string, object?>("outcome", outcome));
+            // Dev/bench only: expose the per-stage timing as headers for latency
+            // measurement. Off in prod (the structured log line below is the
+            // permanent record) so internal timing isn't leaked on every reply.
+            if (_env.IsDevelopment() && !Response.HasStarted)
+            {
+                Response.Headers["X-Qa-Stt-Ms"] = sttMs.ToString();
+                Response.Headers["X-Qa-InMod-Ms"] = inModMs.ToString();
+                Response.Headers["X-Qa-Gpt-Ms"] = gptMs.ToString();
+                Response.Headers["X-Qa-OutMod-Ms"] = outModMs.ToString();
+                Response.Headers["X-Qa-Tts-Ms"] = ttsMs.ToString();
+                Response.Headers["X-Qa-Total-Ms"] = turnStopwatch.ElapsedMilliseconds.ToString();
+            }
+            _logger.LogInformation(
+                "Story-QA timing ms: stt={Stt} inMod={InMod} gpt={Gpt} outMod={OutMod} tts={Tts} total={Total} outcome={Outcome}",
+                sttMs, inModMs, gptMs, outModMs, ttsMs, turnStopwatch.ElapsedMilliseconds, outcome);
         }
 
         // Voice → text (Whisper, Armenian). Bias decoding with the current
@@ -252,9 +273,11 @@ public class StoryQaController : ControllerBase
         try
         {
             using var sttStream = new MemoryStream(audioBytes, writable: false);
+            stage.Restart();
             question = await _transcription.TranscribeArmenianAsync(
                 sttStream, inboundContentType!, transcriptionBias, cancellationToken,
                 model: string.IsNullOrWhiteSpace(qaTranscriptionModel) ? null : qaTranscriptionModel);
+            sttMs = stage.ElapsedMilliseconds;
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
@@ -295,7 +318,9 @@ public class StoryQaController : ControllerBase
             // path). The "moderation_unavailable" distinction is logged so an
             // infra hiccup is separable from a genuine content flag, but the
             // child hears the same in-story fallback either way.
+            stage.Restart();
             var inputModeration = await _moderation.CheckContentAsync(question);
+            inModMs = stage.ElapsedMilliseconds;
             if (!inputModeration.IsSafe)
             {
                 var moderationUnavailable =
@@ -326,7 +351,9 @@ public class StoryQaController : ControllerBase
             {
                 try
                 {
+                    stage.Restart();
                     var answer = await _questions.AnswerAsync(story, segmentIndex, question);
+                    gptMs = stage.ElapsedMilliseconds;
                     answerText = answer.Text;
                     answerIsModelAuthored = !answer.UsedFallback;
                     turnOutcome = answer.UsedFallback ? "answer_fallback" : "answered";
@@ -356,7 +383,9 @@ public class StoryQaController : ControllerBase
         // is pre-reviewed and re-checking it only adds latency.
         if (answerIsModelAuthored)
         {
+            stage.Restart();
             var outputModeration = await _moderation.CheckContentAsync(answerText);
+            outModMs = stage.ElapsedMilliseconds;
             if (!outputModeration.IsSafe)
             {
                 _logger.LogWarning(
@@ -396,7 +425,9 @@ public class StoryQaController : ControllerBase
         AudioSynthesisResult answerTts;
         try
         {
+            stage.Restart();
             answerTts = await _synthesis.SynthesizeArmenianAsync(answerText.TrimEnd(), cancellationToken);
+            ttsMs = stage.ElapsedMilliseconds;
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
