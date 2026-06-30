@@ -29,4 +29,15 @@ public interface IConversationService
     /// </para>
     /// </summary>
     Task<TodaySummaryDto> GetTodaySummaryAsync(Guid deviceId, DateTime asOfUtc, string? tz = null);
+
+    /// <summary>
+    /// Parent dashboard "This week" overview: a 7-day (including today)
+    /// server-aggregated activity snapshot with a per-day breakdown for
+    /// the given device. Same ownership expectation, time-zone resolution
+    /// chain, and fail-soft-to-UTC + privacy contract as
+    /// <see cref="GetTodaySummaryAsync"/> — the caller enforces ownership
+    /// BEFORE calling; the response exposes counts only (no ChildId, no
+    /// AudioBlobPath, no content).
+    /// </summary>
+    Task<WeekSummaryDto> GetWeekSummaryAsync(Guid deviceId, DateTime asOfUtc, string? tz = null);
 }

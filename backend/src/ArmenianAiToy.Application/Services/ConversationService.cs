@@ -357,6 +357,89 @@ public class ConversationService : IConversationService
             Flagged: flagged);
     }
 
+    public async Task<WeekSummaryDto> GetWeekSummaryAsync(
+        Guid deviceId, DateTime asOfUtc, string? tz = null)
+    {
+        var normalizedAsOf = asOfUtc.Kind == DateTimeKind.Utc
+            ? asOfUtc
+            : DateTime.SpecifyKind(asOfUtc, DateTimeKind.Utc);
+
+        // Same resolution chain + fail-soft-to-UTC contract as the Today
+        // panel (explicit tz > Device.TimeZone > UTC).
+        var (resolvedTz, timeZoneId, timeZoneResolved) =
+            await ResolveTodayTimezoneAsync(deviceId, tz);
+
+        // 7-day window INCLUDING today: midnight local 6 days ago. Each
+        // day's boundary is converted local→UTC independently so a DST
+        // shift inside the window does not skew any single day's bucket.
+        var localAsOf = TimeZoneInfo.ConvertTimeFromUtc(normalizedAsOf, resolvedTz);
+        var todayStartLocal = new DateTime(
+            localAsOf.Year, localAsOf.Month, localAsOf.Day,
+            0, 0, 0, DateTimeKind.Unspecified);
+        var windowStartLocal = todayStartLocal.AddDays(-6);
+        var windowStartUtc = TimeZoneInfo.ConvertTimeToUtc(windowStartLocal, resolvedTz);
+
+        var conversationsCount = await _db.Set<Conversation>()
+            .CountAsync(c => c.DeviceId == deviceId
+                          && c.Messages.Any(m => m.Timestamp >= windowStartUtc));
+
+        // Light projection (NO content, NO AudioBlobPath, NO ChildId) so
+        // per-local-day bucketing can run in memory without leaking any of
+        // the privacy-gated fields. Window-bounded, so the set is small.
+        var windowRows = await _db.Set<Message>()
+            .Join(
+                _db.Set<Conversation>().Where(c => c.DeviceId == deviceId),
+                m => m.ConversationId,
+                c => c.Id,
+                (m, c) => m)
+            .Where(m => m.Timestamp >= windowStartUtc)
+            .Select(m => new
+            {
+                m.Timestamp,
+                m.SafetyFlag,
+                m.Role,
+                HasAudio = m.AudioBlobPath != null,
+            })
+            .ToListAsync();
+
+        var messagesCount = windowRows.Count;
+        var flaggedCount = windowRows.Count(r => r.SafetyFlag != SafetyFlag.Clean);
+        var assistantAudioCount = windowRows.Count(r =>
+            r.Role == MessageRole.Assistant && r.HasAudio);
+
+        // 7 buckets oldest-first, including zero-activity days, so the
+        // dashboard renders a stable strip. Day boundaries come from the
+        // local calendar date converted back to UTC instants.
+        var days = new List<WeekDaySummary>(7);
+        for (var i = 0; i < 7; i++)
+        {
+            var dayLocal = windowStartLocal.AddDays(i);
+            var dayStartUtc = TimeZoneInfo.ConvertTimeToUtc(dayLocal, resolvedTz);
+            var dayEndUtc = TimeZoneInfo.ConvertTimeToUtc(dayLocal.AddDays(1), resolvedTz);
+            var dayMsgs = windowRows.Count(r =>
+                r.Timestamp >= dayStartUtc && r.Timestamp < dayEndUtc);
+            var dayFlagged = windowRows.Count(r =>
+                r.Timestamp >= dayStartUtc && r.Timestamp < dayEndUtc
+                && r.SafetyFlag != SafetyFlag.Clean);
+            days.Add(new WeekDaySummary(dayLocal, dayMsgs, dayFlagged));
+        }
+        var activeDays = days.Count(d => d.MessagesCount > 0);
+
+        return new WeekSummaryDto(
+            DeviceId: deviceId,
+            AsOfUtc: normalizedAsOf,
+            WindowStartUtc: windowStartUtc,
+            WindowStartLocal: windowStartLocal,
+            TimeZoneId: timeZoneId,
+            TimeZoneResolved: timeZoneResolved,
+            ConversationsCount: conversationsCount,
+            MessagesCount: messagesCount,
+            FlaggedMessagesCount: flaggedCount,
+            AssistantMessagesWithAudio: assistantAudioCount,
+            ActiveDays: activeDays,
+            Days: days);
+    }
+
     // E2.1 — resolution chain for the Today panel's effective timezone.
     // Returns (TimeZoneInfo, echoed id, resolved). On any failure path the
     // resolved TimeZoneInfo is UTC, and the echoed id is the requested or

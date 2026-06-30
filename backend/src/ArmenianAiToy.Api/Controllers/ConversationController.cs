@@ -157,6 +157,39 @@ public class ConversationController : ControllerBase
     }
 
     /// <summary>
+    /// Parent dashboard "This week" overview: a 7-day (including today)
+    /// server-aggregated activity snapshot with a per-day breakdown for an
+    /// owned device. Read-only; no schema or behavioral side effects.
+    /// Ownership, the optional <c>asOfUtc</c> ISO8601 instant, and the
+    /// optional <c>tz</c> IANA override behave exactly as on
+    /// <c>today-summary</c>: an unowned <c>deviceId</c> returns 403 Forbid,
+    /// and an unresolvable time zone fails soft to UTC
+    /// (<c>TimeZoneResolved=false</c>).
+    /// </summary>
+    [HttpGet("week-summary")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    public async Task<IActionResult> GetWeekSummary(
+        [FromQuery] Guid deviceId,
+        [FromQuery] DateTimeOffset? asOfUtc = null,
+        [FromQuery] string? tz = null)
+    {
+        var asOf = asOfUtc?.UtcDateTime ?? DateTime.UtcNow;
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var linkedDevices = await _parentService.GetLinkedDeviceIdsAsync(parentId);
+
+        if (!linkedDevices.Contains(deviceId))
+            return Forbid();
+
+        var summary = await _conversationService.GetWeekSummaryAsync(deviceId, asOf, tz);
+        return Ok(summary);
+    }
+
+    /// <summary>
     /// Get a single conversation with full message list.
     /// </summary>
     [HttpGet("{conversationId}")]

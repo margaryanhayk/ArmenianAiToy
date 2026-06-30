@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1955 tests)
+dotnet test                                     # Run all tests (1968 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -210,6 +210,7 @@ no editing, no deletion, no child-facing features.
 - `GET  /api/conversations?deviceId=&limit=&offset=` — full conversation history
 - `GET  /api/conversations/summary?deviceId=&limit=&offset=` — lightweight summary rows with snippets
 - `GET  /api/conversations/flagged?deviceId=&limit=&offset=` — flat newest-first list of non-Clean messages
+- `GET  /api/conversations/week-summary?deviceId=[&asOfUtc=][&tz=]` — "This week" overview: a 7-day (incl. today) server-aggregated activity snapshot with a per-day breakdown (`days[]` always 7, oldest-first), plus `activeDays` and the same counts as today-summary. Same parent-JWT + `GetLinkedDeviceIdsAsync` ownership gate (403 Forbid on unowned), same timezone resolution chain + fail-soft-to-UTC, and same privacy contract as today-summary (counts only — no `ChildId`, no `AudioBlobPath`, no content). Drives the parent dashboard's "This week" panel. Pinned by `ConversationServiceWeekSummaryTests` / `ConversationControllerWeekSummaryTests`.
 - `GET  /api/conversations/{conversationId}` — full conversation detail (404 on not-yours, no existence leak)
 - `DELETE /api/conversations/{conversationId}` — hard-delete a single conversation the parent owns. Messages cascade via the existing schema FK. 404 on not-yours or unknown id (same silent-404 phrasing as `DeleteChild`; no existence leak). Writes exactly one `ParentConversationDeleted` audit row on success; failure paths write nothing.
 - `POST /api/parents/password/reset-request` — begin a password-reset flow. Anti-enumeration: returns 202 with identical body `{ resetRequested: true }` for known and unknown emails, with BCrypt timing normalization on both paths. See § Password reset.

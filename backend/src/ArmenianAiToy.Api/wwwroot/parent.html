@@ -149,6 +149,37 @@
       color: #9a8ab5;
       margin-top: 6px;
     }
+    /* "This week" 7-day strip — a row of equal-width day cells with a
+       proportional fill bar. Counts only; purely presentational. */
+    .week-strip {
+      display: flex;
+      gap: 4px;
+      align-items: flex-end;
+      margin: 4px 0 2px;
+    }
+    .week-day {
+      flex: 1 1 0;
+      text-align: center;
+      font-size: 10px;
+      color: #9a8ab5;
+    }
+    .week-day .week-bar-track {
+      height: 34px;
+      display: flex;
+      align-items: flex-end;
+      background: #ece4f8;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .week-day .week-bar {
+      width: 100%;
+      background: #8a6fd0;
+      border-radius: 3px 3px 0 0;
+      min-height: 2px;
+    }
+    .week-day.has-flag .week-bar { background: #c62828; }
+    .week-day .week-daynum { margin-top: 3px; }
+    .week-day .week-count { font-weight: 600; color: #5b3e8a; }
     .today-error {
       font-size: 12px;
       color: #c62828;
@@ -530,6 +561,16 @@
         <div id="todayNewest"></div>
         <div id="todayFlagged"></div>
         <div id="todayFootnote" class="today-footnote"></div>
+      </section>
+      <!-- "This week" panel — 7-day server-aggregated overview
+           (GET /api/conversations/week-summary). Counts only; never
+           exposes childId or audio paths. Hidden until loadWeekPanel
+           populates it; independent of the Today panel and the list. -->
+      <section id="weekPanel" class="today-panel" hidden aria-live="polite">
+        <h3>This week</h3>
+        <div id="weekCounts" class="today-counts"></div>
+        <div id="weekStrip" class="week-strip"></div>
+        <div id="weekFootnote" class="today-footnote"></div>
       </section>
       <div id="summariesList"></div>
       <div id="summariesStatus" class="status muted" aria-live="polite"></div>
@@ -2155,6 +2196,7 @@
       // conversation list. The two are independent — a Today fetch
       // failure does NOT block or affect the paginated list below.
       loadTodayPanel(state.currentDeviceId);
+      loadWeekPanel(state.currentDeviceId);
 
       var url = '/api/conversations/summary'
         + '?deviceId=' + encodeURIComponent(state.currentDeviceId)
@@ -2404,6 +2446,135 @@
         return 'Today (UTC fallback) — server-aggregated.';
       }
       return 'Today — server-aggregated.';
+    }
+
+    // ---------- "This week" panel ----------
+    // Read-only 7-day overview from GET /api/conversations/week-summary.
+    // Counts only — the endpoint exposes no childId and no audio path, so
+    // this panel cannot either. Independent of the Today panel and the
+    // paginated list: its failure renders a quiet line and nothing else
+    // is affected.
+    function loadWeekPanel(deviceId) {
+      var panel = document.getElementById('weekPanel');
+      if (!panel || !deviceId) return;
+      panel.hidden = false;
+      var counts = document.getElementById('weekCounts');
+      var strip = document.getElementById('weekStrip');
+      var footnote = document.getElementById('weekFootnote');
+      clearChildren(counts);
+      clearChildren(strip);
+      if (footnote) footnote.textContent = '';
+
+      var url = '/api/conversations/week-summary'
+        + '?deviceId=' + encodeURIComponent(deviceId);
+      authedFetch(url).then(function (data) {
+        if (state.currentDeviceId !== deviceId) return;
+        renderWeekPanel(data || {});
+      }).catch(function (err) {
+        if (err && err.status === 401) return;
+        if (state.currentDeviceId !== deviceId) return;
+        var msg = document.createElement('div');
+        msg.className = 'today-error';
+        msg.textContent = 'Weekly summary unavailable.';
+        counts.appendChild(msg);
+      });
+    }
+
+    function renderWeekPanel(dto) {
+      var counts = document.getElementById('weekCounts');
+      var strip = document.getElementById('weekStrip');
+      var footnote = document.getElementById('weekFootnote');
+      clearChildren(counts);
+      clearChildren(strip);
+
+      var activeDays = (typeof dto.activeDays === 'number') ? dto.activeDays : 0;
+      var conversations = (typeof dto.conversationsCount === 'number') ? dto.conversationsCount : 0;
+      var messages = (typeof dto.messagesCount === 'number') ? dto.messagesCount : 0;
+      var flaggedWeek = (typeof dto.flaggedMessagesCount === 'number') ? dto.flaggedMessagesCount : 0;
+      var audioWeek = (typeof dto.assistantMessagesWithAudio === 'number') ? dto.assistantMessagesWithAudio : 0;
+      var days = Array.isArray(dto.days) ? dto.days : [];
+
+      var countsLine = document.createElement('div');
+      countsLine.textContent =
+        activeDays + ' active day' + (activeDays === 1 ? '' : 's')
+        + ' · ' + conversations + ' conversation' + (conversations === 1 ? '' : 's')
+        + ' · ' + messages + ' message' + (messages === 1 ? '' : 's');
+      counts.appendChild(countsLine);
+
+      if (flaggedWeek > 0) {
+        var flagBadge = document.createElement('span');
+        flagBadge.className = 'badge';
+        flagBadge.textContent = '⚠ ' + flaggedWeek + ' flagged message'
+          + (flaggedWeek === 1 ? '' : 's');
+        countsLine.appendChild(document.createTextNode(' '));
+        countsLine.appendChild(flagBadge);
+      }
+      if (audioWeek > 0) {
+        var audioBadge = document.createElement('span');
+        audioBadge.className = 'badge';
+        audioBadge.title = 'Assistant messages with replayable audio this week.';
+        audioBadge.textContent = '🔊 ' + audioWeek + ' replayable';
+        countsLine.appendChild(document.createTextNode(' '));
+        countsLine.appendChild(audioBadge);
+      }
+
+      // 7-day bar strip, oldest-first (server order). Bars scale to the
+      // busiest day in the window; a flagged day tints red.
+      var maxMsgs = 0;
+      days.forEach(function (d) {
+        var n = (typeof d.messagesCount === 'number') ? d.messagesCount : 0;
+        if (n > maxMsgs) maxMsgs = n;
+      });
+      var weekdayLetters = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+      days.forEach(function (d) {
+        var n = (typeof d.messagesCount === 'number') ? d.messagesCount : 0;
+        var f = (typeof d.flaggedMessagesCount === 'number') ? d.flaggedMessagesCount : 0;
+        var dt = d.dateLocal ? new Date(d.dateLocal) : null;
+
+        var cell = document.createElement('div');
+        cell.className = 'week-day' + (f > 0 ? ' has-flag' : '');
+
+        var track = document.createElement('div');
+        track.className = 'week-bar-track';
+        var bar = document.createElement('div');
+        bar.className = 'week-bar';
+        var pct = maxMsgs > 0 ? Math.round((n / maxMsgs) * 100) : 0;
+        bar.style.height = (n > 0 ? Math.max(pct, 8) : 0) + '%';
+        if (dt) {
+          bar.title = dt.toDateString() + ': ' + n + ' message' + (n === 1 ? '' : 's')
+            + (f > 0 ? ', ' + f + ' flagged' : '');
+        }
+        track.appendChild(bar);
+        cell.appendChild(track);
+
+        var countEl = document.createElement('div');
+        countEl.className = 'week-count';
+        countEl.textContent = n;
+        cell.appendChild(countEl);
+
+        var dayNum = document.createElement('div');
+        dayNum.className = 'week-daynum';
+        dayNum.textContent = dt ? (weekdayLetters[dt.getDay()] + dt.getDate()) : '';
+        cell.appendChild(dayNum);
+
+        strip.appendChild(cell);
+      });
+
+      if (footnote) {
+        footnote.textContent = weekFooterLabel(dto);
+      }
+    }
+
+    function weekFooterLabel(dto) {
+      if (dto && dto.timeZoneResolved === true
+          && typeof dto.timeZoneId === 'string'
+          && dto.timeZoneId.length > 0) {
+        return 'Last 7 days (' + dto.timeZoneId + ') — server-aggregated.';
+      }
+      if (dto && dto.timeZoneResolved === false) {
+        return 'Last 7 days (UTC fallback) — server-aggregated.';
+      }
+      return 'Last 7 days — server-aggregated.';
     }
 
     // Build a single → Open button row inside the Today panel. Reuses
