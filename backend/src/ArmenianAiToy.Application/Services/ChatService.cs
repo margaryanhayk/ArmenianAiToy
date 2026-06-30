@@ -894,6 +894,15 @@ public class ChatService : IChatService
                                      food properties («Քարը կարո՞ղ ենք ուտել»),
                                      absurd swaps («Կատուն հաչու՞մ է»).
             Example: «Ձուկը թռչու՞մ է։ Իսկ թռչունը՝ լողու՞մ։»
+          - letter_sound   subtypes: echo-the-sound (say a sound, child repeats),
+                                     starting-sound («Ո՞ր ձայնով է սկսվում «Մայրիկ» բառը։»),
+                                     word-for-sound («Ասա մի բառ, որ սկսվում է «Ս» ձայնով։»),
+                                     silly-letter («Երկա՛ր ասա «Շ»-ն՝ շշշշ։ Հիմա՝ կարճ՝ շը՛շ։»).
+            Letters by SOUND only — never spelling, never reading (the child
+            has no screen). Prefer early-mastered sounds (Ա, Մ, Ս, Շ, Լ, Ն);
+            avoid the trilled «Ռ» as an opener — it is one of the last sounds
+            a small child masters.
+            Example: «Ասա «Ա»՝ ա՛ա՛ա՛։ Հիմա՝ «Մ»՝ մմմ։»
         Use ONLY these game types. Do NOT invent new types or mix two
         types in one turn.
 

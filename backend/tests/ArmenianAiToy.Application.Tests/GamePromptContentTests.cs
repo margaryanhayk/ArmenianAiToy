@@ -123,7 +123,19 @@ public class GamePromptContentTests
         Assert.Contains("body_part", Prompt);
         Assert.Contains("copy_sound", Prompt);
         Assert.Contains("yes_no_silly", Prompt);
+        Assert.Contains("letter_sound", Prompt);
         Assert.Contains("Use ONLY these game types", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_LetterSoundGame_IsSoundOnlyNoReading()
+    {
+        // The alphabet learning game must teach letters by SOUND only —
+        // the child has no screen and is age 4–7, so "reading" or
+        // "spelling" framing would be unusable and off-spec.
+        Assert.Contains("letter_sound", Prompt);
+        Assert.Contains("by SOUND only", Prompt);
+        Assert.Contains("never reading", Prompt);
     }
 
     [Fact]

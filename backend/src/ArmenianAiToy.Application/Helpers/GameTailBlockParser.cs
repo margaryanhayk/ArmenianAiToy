@@ -9,7 +9,7 @@ namespace ArmenianAiToy.Application.Helpers;
 /// Expected format on a NEW_GAME or SWITCH_GAME turn:
 ///
 ///   ---
-///   GAME_TYPE:[animal_sound|color_find|clap_along|count_to|body_part|copy_sound|yes_no_silly]
+///   GAME_TYPE:[animal_sound|color_find|clap_along|count_to|body_part|copy_sound|yes_no_silly|letter_sound]
 ///   GAME_DIFFICULTY:[1|2|3]
 ///
 /// On Continue / Stop turns the model is told NOT to emit the block;
