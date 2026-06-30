@@ -26,6 +26,11 @@ namespace ArmenianAiToy.Application.Stories;
 /// <param name="BedtimeSafe">True when every segment is free of
 /// startles/spikes and the story may surface near the bedtime
 /// window.</param>
+/// <param name="Conclusions">Optional pool of 1–4 pre-written closing
+/// "meaning" lines for the story's end. When null/empty the single
+/// <see cref="ReflectionText"/> is used, so old story files (and every
+/// caller that does not pass this) keep their existing one-line
+/// ending.</param>
 public sealed record CuratedStory(
     string Id,
     string Title,
@@ -35,4 +40,26 @@ public sealed record CuratedStory(
     IReadOnlyList<CuratedStorySegment> Segments,
     string ReflectionText,
     IReadOnlyList<string> ReflectionQuestions,
-    bool BedtimeSafe);
+    bool BedtimeSafe,
+    IReadOnlyList<string>? Conclusions = null)
+{
+    /// <summary>The conclusion pool to pick the story's ending from.
+    /// Uses the authored <see cref="Conclusions"/> list when present,
+    /// otherwise falls back to the single <see cref="ReflectionText"/> —
+    /// so every story always has at least one ending and pre-existing
+    /// story files are unaffected.</summary>
+    public IReadOnlyList<string> EffectiveConclusions =>
+        Conclusions is { Count: > 0 } ? Conclusions : [ReflectionText];
+
+    /// <summary>Deterministically picks ONE conclusion from
+    /// <see cref="EffectiveConclusions"/> for the given variant seed, so
+    /// the ending varies across plays without randomness. Pure: the same
+    /// seed always yields the same conclusion (testable). Negative seeds
+    /// are handled via a safe positive modulo.</summary>
+    public string SelectConclusion(int variant)
+    {
+        var pool = EffectiveConclusions;
+        var index = ((variant % pool.Count) + pool.Count) % pool.Count;
+        return pool[index];
+    }
+}

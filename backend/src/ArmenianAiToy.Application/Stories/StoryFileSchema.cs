@@ -27,6 +27,13 @@ internal sealed class StoryFileDto
     public required string[] Segments { get; init; }
     public required string ReflectionText { get; init; }
     public required string[] ReflectionQuestions { get; init; }
+
+    /// <summary>Optional pool of 1–4 pre-written closing "meaning" lines.
+    /// Omit it entirely and the single <see cref="ReflectionText"/> is
+    /// used (back-compat). When present it must be 1–4 non-blank
+    /// strings.</summary>
+    public string[]? Conclusions { get; init; }
+
     public required StoryFileReviewDto Review { get; init; }
 }
 
@@ -150,6 +157,13 @@ internal static class StoryFileParser
         {
             throw Fail(sourceName, "reflectionQuestions must be a non-empty array of non-blank strings");
         }
+        if (dto.Conclusions is not null
+            && (dto.Conclusions.Length == 0
+                || dto.Conclusions.Length > 4
+                || dto.Conclusions.Any(string.IsNullOrWhiteSpace)))
+        {
+            throw Fail(sourceName, "conclusions, when present, must be 1–4 non-blank strings");
+        }
         if (!AllowedStatuses.Contains(dto.Review.Status, StringComparer.Ordinal))
         {
             throw Fail(sourceName, $"review.status '{dto.Review.Status}' is not one of: {string.Join(", ", AllowedStatuses)}");
@@ -178,7 +192,8 @@ internal static class StoryFileParser
             segments,
             dto.ReflectionText,
             dto.ReflectionQuestions,
-            dto.BedtimeSafe);
+            dto.BedtimeSafe,
+            dto.Conclusions);
     }
 
     private static InvalidDataException Fail(string sourceName, string message) =>

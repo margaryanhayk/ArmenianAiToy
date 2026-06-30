@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1940 tests)
+dotnet test                                     # Run all tests (1955 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -178,6 +178,18 @@ Two resolution paths:
 - `ModeDetector.cs` — 5-mode detection (Story/Game/Riddle/Curiosity/Calm) with priority rules
 - `ModeDetectorTests.cs`, `ModeDetectorIntegrationTests.cs` — mode detection and ChatService integration tests
 - `ChoiceNormalizerTests.cs`, `ChoiceHandoffTests.cs` — story choice pipeline tests
+
+**Story conclusions (closing-line variety).** A curated story may
+carry an optional `conclusions` array (1–4 pre-written Armenian closing
+"meaning" lines) in its `*.story.json`. At a library story's end,
+`ChatService` speaks ONE conclusion chosen deterministically per
+conversation via `CuratedStory.SelectConclusion(ConclusionVariant(convId))`,
+followed by the existing `reflectionQuestions[0]`. When a story has no
+`conclusions` (every story today), the single `reflectionText` is used —
+so the change is additive and behavior is unchanged until conclusions are
+authored. Schema (`StoryFileSchema.cs`) rejects >4 or blank entries; the
+pick is mechanical in backend code, never LLM-chosen, so reviewed lines
+stay byte-exact. Pinned by `CuratedStoryConclusionTests`.
 
 **ESP32 Firmware** — Thin client. Proxies to .NET backend. No AI on device.
 

@@ -1384,12 +1384,15 @@ public class ChatService : IChatService
                 _logger.LogInformation(
                     "Library story ended. ConversationId: {ConversationId}, Story: {StoryId}",
                     conversationId, playback.StoryId);
-                // Authored, reviewed ending data: reflection sentence +
-                // exactly one reflection question (the serving site
-                // selects the first — MODES.md §1A Endings).
+                // Authored, reviewed ending data: ONE conclusion picked
+                // from the story's pool (varies per conversation; falls
+                // back to the single ReflectionText when no pool was
+                // authored) + exactly one reflection question (the serving
+                // site selects the first — MODES.md §1A Endings).
                 return await RespondWithLibraryTextAsync(
                     conversationId,
-                    endedStory.ReflectionText + "\n" + endedStory.ReflectionQuestions[0]);
+                    endedStory.SelectConclusion(ConclusionVariant(conversationId))
+                        + "\n" + endedStory.ReflectionQuestions[0]);
             }
             if (advance.Next is not null)
             {
@@ -1479,14 +1482,17 @@ public class ChatService : IChatService
         {
             // Final turn: authored reflection (session already cleared by
             // Advance, so RespondWithLibraryTextAsync reports
-            // LibraryAutoContinue = false → device stops after this).
+            // LibraryAutoContinue = false → device stops after this). ONE
+            // conclusion picked from the story's pool (falls back to the
+            // single ReflectionText when no pool was authored).
             var endedStory = _storyLibrary.GetById(playback.StoryId)!;
             _logger.LogInformation(
                 "Library autoplay ended. ConversationId: {ConversationId}, Story: {StoryId}",
                 conversation.Id, playback.StoryId);
             return await RespondWithLibraryTextAsync(
                 conversation.Id,
-                endedStory.ReflectionText + "\n" + endedStory.ReflectionQuestions[0]);
+                endedStory.SelectConclusion(ConclusionVariant(conversation.Id))
+                    + "\n" + endedStory.ReflectionQuestions[0]);
         }
         if (advance.Next is not null)
         {
@@ -1505,6 +1511,20 @@ public class ChatService : IChatService
     /// transport to end the autoplay loop and return to idle.</summary>
     private static ChatResponse StopAutoplay(Guid conversationId) =>
         new(string.Empty, conversationId, Guid.Empty, SafetyFlag.Clean, LibraryAutoContinue: false);
+
+    /// <summary>Deterministic, cross-run-stable variant seed for picking
+    /// a story's closing conclusion, derived from the conversation id so
+    /// the ending varies across conversations but is stable within one
+    /// (the same conversation always hears the same ending).</summary>
+    private static int ConclusionVariant(Guid conversationId)
+    {
+        var sum = 0;
+        foreach (var b in conversationId.ToByteArray())
+        {
+            sum += b;
+        }
+        return sum;
+    }
 
     public async Task<ChatResponse> GetResponseAsync(Guid deviceId, string userMessage, Guid? childId = null,
         Guid? storySessionId = null, string? selectedChoice = null)
