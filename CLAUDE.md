@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1972 tests)
+dotnet test                                     # Run all tests (1990 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -190,6 +190,22 @@ so the change is additive and behavior is unchanged until conclusions are
 authored. Schema (`StoryFileSchema.cs`) rejects >4 or blank entries; the
 pick is mechanical in backend code, never LLM-chosen, so reviewed lines
 stay byte-exact. Pinned by `CuratedStoryConclusionTests`.
+
+**Story of the day (daily rotation).** `GET /api/stories/of-the-day[?tz=][&asOf=]`
+(device-facing, deliberately OUTSIDE the device-auth prefixes like
+`/api/story-audio`) returns the deterministic story pick for the caller's
+local date + time-of-day so the toy can open each day on a fresh story. The
+pure picker `StoryOfTheDaySelector` rotates by local date and is stable
+within a (date, part-of-day) window. Time-of-day reuses the existing
+`CuratedStory.BedtimeSafe` flag rather than any new per-story tagging:
+**evening** (18:00–04:59) draws only from bedtime-safe stories (falls back
+to the whole library when none are flagged); **morning** (05:00–10:59) and
+**daytime** (11:00–17:59) draw from the whole library, with a per-bucket
+offset so the three windows aren't forced to the same story. `tz` defaults
+to `Asia/Yerevan` and fails soft to UTC (`timeZoneResolved=false`). The DTO
+carries metadata only (id/title/counts) — the audio still streams via the
+token-gated `/api/story-audio/{id}`. Pinned by `StoryOfTheDaySelectorTests`
+and `StoryControllerTests`.
 
 **ESP32 Firmware** — Thin client. Proxies to .NET backend. No AI on device.
 
