@@ -288,6 +288,11 @@ public static class DependencyInjection
         // RetentionPurgeService and CLAUDE.md § Retention.
         services.AddHostedService<RetentionPurgeService>();
 
+        // Opt-in weekly parent digest (off unless Digest:Weekly:Enabled).
+        // Emails a counts-only 7-day activity summary per verified parent;
+        // process-local dedup. See WeeklyDigestService + CLAUDE.md.
+        services.AddHostedService<WeeklyDigestService>();
+
         return services;
     }
 }

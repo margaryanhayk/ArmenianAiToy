@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1990 tests)
+dotnet test                                     # Run all tests (1999 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -738,6 +738,40 @@ reference. When the audio workstream lands, it owns the
 conversation-delete → blob-delete hook; the retention purge here
 will need to be extended at that point so deletions do not leave
 orphaned audio.
+
+## Weekly parent digest
+
+Opt-in background worker (`Infrastructure/Background/WeeklyDigestService.cs`,
+registered via `AddHostedService`) that emails each verified parent a
+**counts-only** summary of the last 7 days across their linked devices,
+nudging them back to the dashboard.
+
+- **Off by default.** The whole worker short-circuits unless
+  `Digest:Weekly:Enabled=true` (it sends real email — same opt-in posture
+  as the dormancy passes). Loop cadence `Digest:Weekly:CheckIntervalHours`
+  (default 24, floor 1); it wakes daily and only sends to a parent whose
+  last send was ≥ 7 days ago AND who had activity in the window.
+- **Privacy.** `WeeklyDigestSummary` carries only counts (devices,
+  conversations, messages, active days) — no child names, no message
+  content, no device names. The query projects only `Message.Timestamp`;
+  content is never materialized. Same discipline as the week-summary read
+  path.
+- **New notifier method.** `INotifier.SendWeeklyDigestAsync(email, summary)`
+  is added as a **default interface method** returning `false` ("not
+  delivered") so the many existing hand-rolled `INotifier` test doubles
+  compile unchanged and a future custom notifier that forgets to override
+  it never falsely records a send. `LoggingNotifier` (logs, returns true)
+  and `SmtpNotifier` (Armenian body, real send, swallow-and-log → bool)
+  both override it. Worker-consumer bool contract mirrors
+  `SendDormancyWarningAsync`.
+- **Dedup is process-local (v1).** "Last sent per parent" is an in-memory
+  dictionary — a restart can re-send early. A persistent
+  `Parent.LastWeeklyDigestAt` column (schema change) is the follow-up if
+  exact once-per-week delivery is ever required. No per-parent opt-out /
+  unsubscribe yet (safe because the feature is off by default).
+- Pinned by `WeeklyDigestServiceTests` (disabled/enabled, counts, dedup,
+  no-activity, unverified, failed-delivery-retry, own-devices-only) and
+  `SmtpNotifierTests` (success→true+counts, throw→false).
 
 ## Bedtime window (B4)
 

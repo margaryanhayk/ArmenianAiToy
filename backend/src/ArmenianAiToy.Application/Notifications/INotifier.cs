@@ -139,4 +139,26 @@ public interface INotifier
         DateTime lastSeenAtUtc,
         DateTime? deleteAtUtc,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deliver a weekly activity digest (counts only — see
+    /// <see cref="WeeklyDigestSummary"/>) to a verified parent. Called by
+    /// the opt-in <c>WeeklyDigestService</c> worker once per ~7 days per
+    /// parent that had activity. Returns <c>true</c> on successful
+    /// delivery, <c>false</c> on a swallowed send failure — the worker
+    /// records "last sent" only on <c>true</c> so a failed send retries
+    /// on the next tick (worker-consumer contract, same as
+    /// <see cref="SendDormancyWarningAsync"/>).
+    /// <para>
+    /// <b>Default interface method — safe "not delivered".</b> Unlike the
+    /// other four notifications this ships a default body returning
+    /// <c>false</c> so the many existing hand-rolled test doubles compile
+    /// unchanged, AND a future custom <see cref="INotifier"/> that forgets
+    /// to override it never falsely records a send. The shipped
+    /// <c>LoggingNotifier</c> and <c>SmtpNotifier</c> both override it.
+    /// </para>
+    /// </summary>
+    Task<bool> SendWeeklyDigestAsync(
+        string email, WeeklyDigestSummary summary, CancellationToken cancellationToken = default)
+        => Task.FromResult(false);
 }
