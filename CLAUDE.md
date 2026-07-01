@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1999 tests)
+dotnet test                                     # Run all tests (2010 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -813,6 +813,47 @@ Endpoint: `PUT /api/parents/devices/{deviceId}/bedtime-window` with body
 authenticated, ownership-checked against linked devices, silent 404 on
 miss (same shape as pause/resume).
 
+## Daily AI-question quota (Curiosity Window)
+
+A friendly per-day cap on how many live AI **questions** (Curiosity-Window
+turns) a child may ask. Cost containment + the lever a future Free/Plus
+tier drives. Enforced at the HTTP boundary in `ChatController.Chat`,
+AFTER the pause/bedtime/mode and cost-cap gates.
+
+- **Counts QUESTIONS only, not stories.** Only turns whose
+  `ModeDetector.Detect` (conservative single-message call, same as the
+  mode gate) resolves to `Curiosity` are counted; Story / Game / Riddle /
+  Calm are never counted, so story playback stays unlimited. (Detection
+  here is the boundary approximation — the authoritative mode lives in
+  `ChatService` — so an active-story turn read as Curiosity may
+  occasionally be counted; acceptable for an opt-in, generous allowance
+  whose over-limit reply is on-theme.)
+- **Keyed per child, else per device.** The quota key is `request.ChildId`
+  when supplied, else the device id — so an identified child gets their
+  own allowance and siblings on an unidentified device share one.
+- **Opt-in / off by default.** Whole gate is skipped unless
+  `AI:QuestionQuota:Enabled=true` (a PRODUCT feature, not a safety net —
+  shipped behavior is unchanged until the tier layer turns it on).
+  `AI:QuestionQuota:DailyQuestionLimit` (default 20) sets the allowance;
+  `AI:QuestionQuota:PerKeyOverride` (child-id/device-id → limit) is the
+  seam a tier system uses to grant Plus/Premium a higher limit without
+  code changes.
+- **Over-quota reply** is the deterministic canned line
+  `ChatController.DailyQuestionLimitResponse` («Օ՜, այսօր շատ բան
+  հարցրիր։ Հիմա արի մի հեքիաթ լսենք։» — reviewed by
+  armenian-story-master): warm, praises curiosity, redirects to an
+  unlimited story, never scolds. `SafetyFlag.Clean`, no GPT call.
+- **Counted only on success.** The question is recorded AFTER a
+  successful `ChatService` answer, so a failed (502) turn never burns the
+  child's allowance.
+- **In-memory (v1).** `AiQuotaMeter` (singleton, per-key per-UTC-day
+  count) mirrors `OpenAICostMeter`; process restart resets counters
+  (worst case one extra allowance per restart). A persistent counter and
+  a parent-facing "questions today: N/limit" surface are follow-ups. The
+  voice path is Story-only today, so the quota lives on the text
+  `/api/chat` path only. Metric: `aat_chat_gate_trip_total{gate=ai_quota}`.
+  Pinned by `AiQuotaMeterTests` + `ChatControllerQuotaTests`.
+
 ## Mode enable/disable (B5)
 
 Parents can toggle availability of the four configurable modes — **Story,
@@ -1377,7 +1418,7 @@ about access control, not about cardinality.
 
 | Counter | Tag(s) | Tag value space | Increment site |
 |---|---|---|---|
-| `aat_chat_gate_trip_total` | `gate` | `paused` / `bedtime` / `mode_disabled` | `ChatController.Chat` short-circuit branches |
+| `aat_chat_gate_trip_total` | `gate` | `paused` / `bedtime` / `mode_disabled` / `ai_quota` | `ChatController.Chat` short-circuit branches |
 | `aat_chat_openai_failure_total` | `kind` | `rate_limited` / `timeout` / `upstream_5xx` / `auth_failure` / `other` | `OpenAIReliabilityGate` (after classification) |
 | `aat_chat_openai_retry_total` | — | — | `OpenAIReliabilityGate` (before each retry attempt) |
 | `aat_chat_openai_circuit_trip_total` | — | — | `OpenAIReliabilityGate` on each closed→open transition |

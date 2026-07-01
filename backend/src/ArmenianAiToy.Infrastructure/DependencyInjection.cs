@@ -280,6 +280,25 @@ public static class DependencyInjection
             Microsoft.Extensions.Options.Options.Create(capOpts));
         services.AddSingleton<OpenAICostMeter>();
 
+        // Daily AI-question quota (Curiosity-Window "questions per day").
+        // Opt-in PRODUCT feature — ships Enabled=false so shipped behavior
+        // is unchanged. Same manual-binding style as the cost cap above.
+        var quotaOpts = new AiQuotaOptions();
+        var quotaSection = config.GetSection("AI:QuestionQuota");
+        if (bool.TryParse(quotaSection["Enabled"], out var quotaEnabled))
+            quotaOpts.Enabled = quotaEnabled;
+        if (int.TryParse(quotaSection["DailyQuestionLimit"], out var quotaLimit))
+            quotaOpts.DailyQuestionLimit = quotaLimit;
+        foreach (var child in quotaSection.GetSection("PerKeyOverride").GetChildren())
+        {
+            if (child.Value is null) continue;
+            if (int.TryParse(child.Value, out var perKey))
+                quotaOpts.PerKeyOverride[child.Key] = perKey;
+        }
+        services.AddSingleton(
+            Microsoft.Extensions.Options.Options.Create(quotaOpts));
+        services.AddSingleton<AiQuotaMeter>();
+
         // First scheduled-delete worker in the repo. Hard-deletes
         // conversations (and their cascaded messages) older than
         // Retention:Messages:MaxAgeDays (default 90). Missing config

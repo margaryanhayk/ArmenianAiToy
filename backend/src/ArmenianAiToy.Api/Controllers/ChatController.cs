@@ -23,6 +23,8 @@ public class ChatController : ControllerBase
     private readonly IDeviceService _deviceService;
     private readonly OpenAICostMeter _costMeter;
     private readonly IOptions<OpenAIDailyCostCapOptions> _costCapOptions;
+    private readonly AiQuotaMeter _quotaMeter;
+    private readonly IOptions<AiQuotaOptions> _quotaOptions;
     private readonly ILogger<ChatController> _logger;
 
     // Child-facing canned reply when a parent has paused the device. Kept
@@ -48,17 +50,30 @@ public class ChatController : ControllerBase
         "Հիմա մի փոքր դադար տանք։ Քիչ հետո նորից կշարունակենք։";
         // «Հիմա մի փոքր դադար տանք։ Քիչ հետո նորից կշարունակենք։»
 
+    // Daily AI-question quota (Curiosity Window) soft-off. Warm — praises
+    // the child's curiosity and redirects to an (unlimited) story rather
+    // than scolding. Reviewed by armenian-story-master. Deterministic
+    // canned line, no GPT call; SafetyFlag.Clean (a friendly daily
+    // allowance, not a safety event).
+    internal const string DailyQuestionLimitResponse =
+        "Օ՜, այսօր շատ բան հարցրիր։ Հիմա արի մի հեքիաթ լսենք։";
+        // «Օ՜, այսօր շատ բան հարցրիր։ Հիմա արի մի հեքիաթ լսենք։»
+
     public ChatController(
         IChatService chatService,
         IDeviceService deviceService,
         OpenAICostMeter costMeter,
         IOptions<OpenAIDailyCostCapOptions> costCapOptions,
+        AiQuotaMeter quotaMeter,
+        IOptions<AiQuotaOptions> quotaOptions,
         ILogger<ChatController> logger)
     {
         _chatService = chatService;
         _deviceService = deviceService;
         _costMeter = costMeter;
         _costCapOptions = costCapOptions;
+        _quotaMeter = quotaMeter;
+        _quotaOptions = quotaOptions;
         _logger = logger;
     }
 
@@ -146,10 +161,54 @@ public class ChatController : ControllerBase
             }
         }
 
+        // Daily AI-question quota (Curiosity Window). Opt-in PRODUCT gate,
+        // AFTER the cost cap. Counts only Curiosity turns so stories /
+        // games / riddles / calm stay unlimited. Keyed per child when a
+        // child id is supplied, else per device. Detection here is the
+        // same conservative single-message call the mode gate uses; the
+        // authoritative mode lives in ChatService, so an active-story turn
+        // read as Curiosity may occasionally be counted — acceptable for
+        // an opt-in, generous daily allowance (the reply is on-theme).
+        var quotaOpts = _quotaOptions.Value;
+        var quotaKey = request.ChildId ?? deviceId;
+        var isCuriosityTurn = false;
+        if (quotaOpts.Enabled)
+        {
+            isCuriosityTurn = ModeDetector.Detect(
+                request.Message, history: null, hasActiveStorySession: false)
+                == DetectedMode.Curiosity;
+            if (isCuriosityTurn)
+            {
+                var nowUtc = DateTime.UtcNow;
+                var limit = quotaOpts.LimitForKey(quotaKey);
+                if (_quotaMeter.IsOverQuota(quotaKey, limit, nowUtc))
+                {
+                    AppMeter.ChatGateTrip.Add(1,
+                        new KeyValuePair<string, object?>("gate", "ai_quota"));
+                    if (_quotaMeter.ShouldLogQuotaTrip(quotaKey, nowUtc))
+                    {
+                        _logger.LogInformation(
+                            "AI question quota reached. Key={QuotaKey} Limit={Limit} UtcDate={Date:yyyy-MM-dd}",
+                            quotaKey, limit, nowUtc.Date);
+                    }
+                    return Ok(new ChatResponse(
+                        DailyQuestionLimitResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
+                }
+            }
+        }
+
         try
         {
             var response = await _chatService.GetResponseAsync(deviceId, request.Message, request.ChildId,
                 request.StorySessionId, request.SelectedChoice);
+
+            // Count this question against the daily quota only AFTER a
+            // successful answer, so a failed turn never burns the child's
+            // allowance. Only Curiosity turns are recorded.
+            if (quotaOpts.Enabled && isCuriosityTurn)
+            {
+                _quotaMeter.Record(quotaKey, DateTime.UtcNow);
+            }
 
             // Cost-recording is best-effort and runs after a successful
             // ChatService completion. Wrapped in its own try/catch so a
