@@ -1,0 +1,18 @@
+# Areg 8 MB dual-OTA partition table (Proof 1).
+# Target: ESP32-S3, 8 MB (N8) flash. Two 3 MB app slots so the BLE-enabled
+# firmware fits with margin AND remote OTA (A/B slot swap) is possible.
+# Replaces the 4 MB "default" (1.25 MB slots) and the OTA-incapable "huge_app".
+#
+# Arithmetic (8 MB = 0x800000):
+#   app0 = app1 = 0x300000 (3,145,728 B = 3.0 MB each)
+#   app1 end = 0x310000 + 0x300000 = 0x610000
+#   spiffs   = 0x610000 .. 0x7F0000  (0x1E0000 = 1.875 MB)
+#   coredump = 0x7F0000 .. 0x800000  (0x10000  = 64 KB)  -> exactly 8 MB
+#
+# Name,     Type, SubType,  Offset,   Size,     Flags
+nvs,        data, nvs,      0x9000,   0x5000,
+otadata,    data, ota,      0xe000,   0x2000,
+app0,       app,  ota_0,    0x10000,  0x300000,
+app1,       app,  ota_1,    0x310000, 0x300000,
+spiffs,     data, spiffs,   0x610000, 0x1E0000,
+coredump,   data, coredump, 0x7F0000, 0x10000,
