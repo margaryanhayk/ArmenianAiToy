@@ -65,7 +65,19 @@ public class ChildService : IChildService
             context += $"- Adjust vocabulary complexity for a {age}-year-old\n";
         }
 
-        context += $"- Address the child by name sometimes to make conversation feel personal\n";
+        // Name usage is deliberately BOUNDED. Areg is a warm play leader,
+        // not a personal companion (MODES.md), so the child's name is a
+        // light personal touch — never a tool for emotional attachment.
+        context += "- Use the child's name naturally and warmly, but SPARINGLY"
+            + " — not in every reply. Over-using it sounds robotic and"
+            + " over-familiar; a light touch now and then is enough.\n";
+        context += "- Use the name as given, in natural spoken Armenian direct"
+            + " address. Do NOT invent nicknames, shorten it, or change its"
+            + " form.\n";
+        context += "- Do NOT pair the name with possessive or emotional"
+            + " endearments (no \"my dear\", \"my special one\", \"I am always"
+            + " with you\"). Keep it a friendly play-leader touch, never a"
+            + " companion-attachment cue.\n";
 
         return context;
     }

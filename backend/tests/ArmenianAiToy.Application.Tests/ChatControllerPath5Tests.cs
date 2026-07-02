@@ -37,7 +37,8 @@ public class ChatControllerPath5Tests
         var costCapOptions = Options.Create(new OpenAIDailyCostCapOptions { Enabled = false });
         var logger = Substitute.For<ILogger<ChatController>>();
         var controller = new ChatController(
-            chatService, deviceService, costMeter, costCapOptions, logger);
+            chatService, deviceService, costMeter, costCapOptions,
+            new AiQuotaMeter(), Options.Create(new AiQuotaOptions()), logger);
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = Guid.NewGuid();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
@@ -112,6 +113,7 @@ public class ChatControllerPath5Tests
             chatService, deviceService,
             new OpenAICostMeter(),
             Options.Create(new OpenAIDailyCostCapOptions { Enabled = false }),
+            new AiQuotaMeter(), Options.Create(new AiQuotaOptions()),
             Substitute.For<ILogger<ChatController>>());
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = Guid.NewGuid();
@@ -149,6 +151,7 @@ public class ChatControllerPath5Tests
             chatService, deviceService,
             new OpenAICostMeter(),
             Options.Create(new OpenAIDailyCostCapOptions { Enabled = false }),
+            new AiQuotaMeter(), Options.Create(new AiQuotaOptions()),
             Substitute.For<ILogger<ChatController>>());
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = Guid.NewGuid();
@@ -191,6 +194,7 @@ public class ChatControllerPath5Tests
             chatService, deviceService,
             new OpenAICostMeter(),
             Options.Create(new OpenAIDailyCostCapOptions { Enabled = false }),
+            new AiQuotaMeter(), Options.Create(new AiQuotaOptions()),
             Substitute.For<ILogger<ChatController>>());
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = Guid.NewGuid();
@@ -264,6 +268,7 @@ public class ChatControllerPath5Tests
             chatService, deviceService,
             new OpenAICostMeter(),
             Options.Create(new OpenAIDailyCostCapOptions { Enabled = false }),
+            new AiQuotaMeter(), Options.Create(new AiQuotaOptions()),
             Substitute.For<ILogger<ChatController>>());
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = Guid.NewGuid();
@@ -299,6 +304,7 @@ public class ChatControllerPath5Tests
             chatService, deviceService,
             new OpenAICostMeter(),
             Options.Create(new OpenAIDailyCostCapOptions { Enabled = false }),
+            new AiQuotaMeter(), Options.Create(new AiQuotaOptions()),
             Substitute.For<ILogger<ChatController>>());
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = Guid.NewGuid();

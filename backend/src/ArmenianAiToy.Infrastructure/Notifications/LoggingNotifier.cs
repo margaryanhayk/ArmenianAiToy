@@ -103,4 +103,23 @@ public sealed class LoggingNotifier : INotifier
             false);
         return Task.FromResult(true);
     }
+
+    /// <summary>
+    /// Log-only weekly digest. Carries only counts (no PII, no content).
+    /// Returns true so the worker records "last sent" and does not re-log
+    /// every tick; on a log-transport deployment the digest simply isn't
+    /// emailed (harmless — it's an activity nudge, not account-critical).
+    /// </summary>
+    public Task<bool> SendWeeklyDigestAsync(
+        string email, WeeklyDigestSummary summary, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Notification send-attempt: type={NotificationType}, email={Email}, message_count={MessageCount}, active_days={ActiveDays}, delivered={Delivered}",
+            "weekly_digest",
+            email,
+            summary.MessageCount,
+            summary.ActiveDays,
+            false);
+        return Task.FromResult(true);
+    }
 }

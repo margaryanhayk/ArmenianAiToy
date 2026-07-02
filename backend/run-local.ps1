@@ -25,6 +25,13 @@ $env:Story__DefaultStoryId = "anban-huri"
 $env:Story__ExtraStoryFiles__0 = (Join-Path $PSScriptRoot "content\story-drafts\anban-huri.story.json")
 $env:StoryAudio__AllowUnauthenticated = "true"
 
+# Latency tuning (faster OpenAI models for the in-story Q&A round-trip):
+#  - gpt-4o-mini-transcribe: faster STT than whisper-1 for the Q&A path only
+#    (the C1 voice path keeps the default whisper-1 unless OpenAI:TranscriptionModel is set).
+#  - gpt-4o-mini-tts: faster speech synthesis than tts-1, same Nova voice.
+$env:StoryQa__TranscriptionModel = "gpt-4o-mini-transcribe"
+$env:OpenAI__TtsModel = "gpt-4o-mini-tts"
+
 Write-Host "Your LAN addresses (point the toy/app at one of these:5000):" -ForegroundColor Cyan
 Get-NetIPAddress -AddressFamily IPv4 |
   Where-Object { $_.IPAddress -like "192.168.*" -or $_.IPAddress -like "10.*" } |

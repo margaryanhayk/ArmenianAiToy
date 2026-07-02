@@ -218,8 +218,15 @@ public class StoryQaController : ControllerBase
 
         using var audioBuffer = new MemoryStream();
         await Request.Body.CopyToAsync(audioBuffer, cancellationToken);
+        // Diagnostic: record the inbound upload size so an empty/short body
+        // from the device is unambiguous in the logs (no child PII — size only).
+        _logger.LogInformation(
+            "Story-QA inbound body: {Bytes} bytes, contentType={ContentType}, storyId={StoryId}, offset={Offset}",
+            audioBuffer.Length, inboundContentType, storyId, offset);
         if (audioBuffer.Length == 0)
         {
+            _logger.LogWarning(
+                "Story-QA EMPTY body — returning 400. The device uploaded no audio. StoryId={StoryId}", storyId);
             return BadRequest(new { error = "Audio body is required" });
         }
         var audioBytes = audioBuffer.ToArray();
@@ -381,8 +388,28 @@ public class StoryQaController : ControllerBase
         // ChatService does. Skipped when the answer is already the canned
         // fallback (empty / input-blocked / filter-fallback paths): that text
         // is pre-reviewed and re-checking it only adds latency.
+        // Latency: overlap the answer-TTS with OUTPUT moderation. Start
+        // synthesizing the model answer speculatively and run the safety
+        // classifier concurrently — two OpenAI round-trips collapse into one
+        // wall-clock wait. Safety invariant is intact: if moderation BLOCKS,
+        // the speculative audio is discarded and the canned fallback is spoken
+        // instead, so unmoderated content is never returned to the child.
+        Task<AudioSynthesisResult>? speculativeTts = null;
         if (answerIsModelAuthored)
         {
+            try
+            {
+                speculativeTts = _synthesis.SynthesizeArmenianAsync(answerText.TrimEnd(), cancellationToken);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                // A synchronous failure kicking off the speculative synthesis is
+                // not fatal: leave it null and let the guarded TTS step below
+                // synthesize (and sanitize any failure) normally.
+                _logger.LogWarning(ex, "Story-QA: speculative answer-TTS kickoff failed; retried in TTS step");
+                speculativeTts = null;
+            }
             stage.Restart();
             var outputModeration = await _moderation.CheckContentAsync(answerText);
             outModMs = stage.ElapsedMilliseconds;
@@ -391,6 +418,10 @@ public class StoryQaController : ControllerBase
                 _logger.LogWarning(
                     "Story-QA OUTPUT blocked. StoryId: {StoryId}, Segment: {Segment}, Categories: {Categories}",
                     storyId, segmentIndex, string.Join(", ", outputModeration.FlaggedCategories));
+                // Never speak unmoderated content — drop the speculative audio
+                // (observe its exception so a faulted discard can't go unhandled).
+                _ = speculativeTts?.ContinueWith(t => { _ = t.Exception; }, TaskScheduler.Default);
+                speculativeTts = null;
                 answerText = StoryAnswerFilter.SafeFallback;
                 assistantFlag = SafetyFlag.Flagged;
                 turnOutcome = "answer_blocked";
@@ -426,7 +457,12 @@ public class StoryQaController : ControllerBase
         try
         {
             stage.Restart();
-            answerTts = await _synthesis.SynthesizeArmenianAsync(answerText.TrimEnd(), cancellationToken);
+            // Use the speculative synthesis started during output moderation
+            // when the answer passed; otherwise synthesize the final (fallback
+            // or canned) text now.
+            answerTts = speculativeTts is not null
+                ? await speculativeTts
+                : await _synthesis.SynthesizeArmenianAsync(answerText.TrimEnd(), cancellationToken);
             ttsMs = stage.ElapsedMilliseconds;
         }
         catch (OperationCanceledException) { throw; }

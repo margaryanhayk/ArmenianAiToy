@@ -334,6 +334,68 @@ public sealed class SmtpNotifier : INotifier
         }
     }
 
+    /// <summary>
+    /// Weekly activity digest email (counts only — no PII, no content).
+    /// Returns <c>true</c> on delivery, <c>false</c> on a swallowed send
+    /// failure so the worker retries next tick. Same swallow-and-log
+    /// posture as the dormancy warnings; OperationCanceledException
+    /// propagates for clean worker shutdown.
+    /// </summary>
+    public async Task<bool> SendWeeklyDigestAsync(
+        string email, WeeklyDigestSummary summary, CancellationToken cancellationToken = default)
+    {
+        var fromAddress = _config["Notifications:Smtp:FromAddress"] ?? "";
+
+        using var message = new MailMessage
+        {
+            From = new MailAddress(fromAddress),
+            Subject = "Այս շաբաթ Areg-ի հետ",
+            Body = BuildWeeklyDigestBody(summary),
+            BodyEncoding = Encoding.UTF8,
+            SubjectEncoding = Encoding.UTF8,
+            IsBodyHtml = false
+        };
+        message.To.Add(email);
+
+        try
+        {
+            await _sendMail(message, cancellationToken);
+            _logger.LogInformation(
+                "Notification send-attempt: type={NotificationType}, email={Email}, transport={Transport}, delivered={Delivered}",
+                "weekly_digest", email, "smtp", true);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Notification send-attempt: type={NotificationType}, email={Email}, transport={Transport}, delivered={Delivered}, error_category={ErrorCategory}",
+                "weekly_digest", email, "smtp", false, ex.GetType().Name);
+            return false;
+        }
+    }
+
+    private static string BuildWeeklyDigestBody(WeeklyDigestSummary s)
+    {
+        // Eastern Armenian, warm and factual. Counts only — the digest
+        // never restates child content; it points back to the dashboard.
+        // Plain yyyy-MM-dd dates (no locale/time) so a shape-assert test
+        // can pin the body.
+        var start = s.WindowStartUtc.ToString("yyyy-MM-dd");
+        var end = s.WindowEndUtc.ToString("yyyy-MM-dd");
+        return string.Join("\n\n",
+            "Բարև։ Ահա Ձեր Areg-ի այս շաբաթվա համառոտ ամփոփումը։",
+            $"Ժամանակահատված: {start} – {end}",
+            $"Զրույցներ: {s.ConversationCount}",
+            $"Հաղորդագրություններ: {s.MessageCount}",
+            $"Ակտիվ օրեր: {s.ActiveDays} / 7",
+            "Ավելի մանրամասն տեսնելու համար մուտք գործեք ծնողի վահանակ։",
+            "Սա Ձեր հաշվի ակտիվության ավտոմատ ամփոփումն է։");
+    }
+
     // Default wire call. Pulls credentials / host / port off
     // IConfiguration on every send so a config reload (via a restart)
     // is picked up without recycling the singleton. Scoped registration

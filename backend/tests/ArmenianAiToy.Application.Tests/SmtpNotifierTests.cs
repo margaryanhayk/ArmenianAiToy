@@ -598,4 +598,45 @@ public class SmtpNotifierTests
         Assert.True(loggedTrue,
             "expected a structured log carrying delivered=true on the success path");
     }
+
+    // --- Weekly digest (worker consumer, returns bool, counts only) ---
+
+    private static ArmenianAiToy.Application.Notifications.WeeklyDigestSummary DigestSummary() =>
+        new(
+            WindowStartUtc: new DateTime(2026, 6, 24, 0, 0, 0, DateTimeKind.Utc),
+            WindowEndUtc: new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc),
+            DeviceCount: 1,
+            ConversationCount: 3,
+            MessageCount: 12,
+            ActiveDays: 4);
+
+    [Fact]
+    public async Task SendWeeklyDigestAsync_Success_ReturnsTrue_AndBodyCarriesCounts()
+    {
+        MailMessage? captured = null;
+        var notifier = new SmtpNotifier(
+            Substitute.For<ILogger<SmtpNotifier>>(), BuildConfig(),
+            sendMail: (msg, _) => { captured = msg; return Task.CompletedTask; });
+
+        var ok = await notifier.SendWeeklyDigestAsync("parent@example.com", DigestSummary());
+
+        Assert.True(ok);
+        Assert.NotNull(captured);
+        Assert.Equal("parent@example.com", captured!.To[0].Address);
+        Assert.False(captured.IsBodyHtml);
+        Assert.Contains("12", captured.Body); // message count
+        Assert.Contains("3", captured.Body);  // conversation count
+    }
+
+    [Fact]
+    public async Task SendWeeklyDigestAsync_SendThrows_ReturnsFalse_Swallowed()
+    {
+        var notifier = new SmtpNotifier(
+            Substitute.For<ILogger<SmtpNotifier>>(), BuildConfig(),
+            sendMail: (_, _) => throw new SmtpException("relay down"));
+
+        var ok = await notifier.SendWeeklyDigestAsync("parent@example.com", DigestSummary());
+
+        Assert.False(ok); // failure swallowed, reported as not-delivered
+    }
 }

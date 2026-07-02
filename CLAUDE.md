@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1940 tests)
+dotnet test                                     # Run all tests (2010 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -179,6 +179,34 @@ Two resolution paths:
 - `ModeDetectorTests.cs`, `ModeDetectorIntegrationTests.cs` — mode detection and ChatService integration tests
 - `ChoiceNormalizerTests.cs`, `ChoiceHandoffTests.cs` — story choice pipeline tests
 
+**Story conclusions (closing-line variety).** A curated story may
+carry an optional `conclusions` array (1–4 pre-written Armenian closing
+"meaning" lines) in its `*.story.json`. At a library story's end,
+`ChatService` speaks ONE conclusion chosen deterministically per
+conversation via `CuratedStory.SelectConclusion(ConclusionVariant(convId))`,
+followed by the existing `reflectionQuestions[0]`. When a story has no
+`conclusions` (every story today), the single `reflectionText` is used —
+so the change is additive and behavior is unchanged until conclusions are
+authored. Schema (`StoryFileSchema.cs`) rejects >4 or blank entries; the
+pick is mechanical in backend code, never LLM-chosen, so reviewed lines
+stay byte-exact. Pinned by `CuratedStoryConclusionTests`.
+
+**Story of the day (daily rotation).** `GET /api/stories/of-the-day[?tz=][&asOf=]`
+(device-facing, deliberately OUTSIDE the device-auth prefixes like
+`/api/story-audio`) returns the deterministic story pick for the caller's
+local date + time-of-day so the toy can open each day on a fresh story. The
+pure picker `StoryOfTheDaySelector` rotates by local date and is stable
+within a (date, part-of-day) window. Time-of-day reuses the existing
+`CuratedStory.BedtimeSafe` flag rather than any new per-story tagging:
+**evening** (18:00–04:59) draws only from bedtime-safe stories (falls back
+to the whole library when none are flagged); **morning** (05:00–10:59) and
+**daytime** (11:00–17:59) draw from the whole library, with a per-bucket
+offset so the three windows aren't forced to the same story. `tz` defaults
+to `Asia/Yerevan` and fails soft to UTC (`timeZoneResolved=false`). The DTO
+carries metadata only (id/title/counts) — the audio still streams via the
+token-gated `/api/story-audio/{id}`. Pinned by `StoryOfTheDaySelectorTests`
+and `StoryControllerTests`.
+
 **ESP32 Firmware** — Thin client. Proxies to .NET backend. No AI on device.
 
 ## Parent-Facing Read-Only Monitoring Surface
@@ -198,6 +226,7 @@ no editing, no deletion, no child-facing features.
 - `GET  /api/conversations?deviceId=&limit=&offset=` — full conversation history
 - `GET  /api/conversations/summary?deviceId=&limit=&offset=` — lightweight summary rows with snippets
 - `GET  /api/conversations/flagged?deviceId=&limit=&offset=` — flat newest-first list of non-Clean messages
+- `GET  /api/conversations/week-summary?deviceId=[&asOfUtc=][&tz=]` — "This week" overview: a 7-day (incl. today) server-aggregated activity snapshot with a per-day breakdown (`days[]` always 7, oldest-first), plus `activeDays` and the same counts as today-summary. Same parent-JWT + `GetLinkedDeviceIdsAsync` ownership gate (403 Forbid on unowned), same timezone resolution chain + fail-soft-to-UTC, and same privacy contract as today-summary (counts only — no `ChildId`, no `AudioBlobPath`, no content). Drives the parent dashboard's "This week" panel. Pinned by `ConversationServiceWeekSummaryTests` / `ConversationControllerWeekSummaryTests`.
 - `GET  /api/conversations/{conversationId}` — full conversation detail (404 on not-yours, no existence leak)
 - `DELETE /api/conversations/{conversationId}` — hard-delete a single conversation the parent owns. Messages cascade via the existing schema FK. 404 on not-yours or unknown id (same silent-404 phrasing as `DeleteChild`; no existence leak). Writes exactly one `ParentConversationDeleted` audit row on success; failure paths write nothing.
 - `POST /api/parents/password/reset-request` — begin a password-reset flow. Anti-enumeration: returns 202 with identical body `{ resetRequested: true }` for known and unknown emails, with BCrypt timing normalization on both paths. See § Password reset.
@@ -710,6 +739,40 @@ conversation-delete → blob-delete hook; the retention purge here
 will need to be extended at that point so deletions do not leave
 orphaned audio.
 
+## Weekly parent digest
+
+Opt-in background worker (`Infrastructure/Background/WeeklyDigestService.cs`,
+registered via `AddHostedService`) that emails each verified parent a
+**counts-only** summary of the last 7 days across their linked devices,
+nudging them back to the dashboard.
+
+- **Off by default.** The whole worker short-circuits unless
+  `Digest:Weekly:Enabled=true` (it sends real email — same opt-in posture
+  as the dormancy passes). Loop cadence `Digest:Weekly:CheckIntervalHours`
+  (default 24, floor 1); it wakes daily and only sends to a parent whose
+  last send was ≥ 7 days ago AND who had activity in the window.
+- **Privacy.** `WeeklyDigestSummary` carries only counts (devices,
+  conversations, messages, active days) — no child names, no message
+  content, no device names. The query projects only `Message.Timestamp`;
+  content is never materialized. Same discipline as the week-summary read
+  path.
+- **New notifier method.** `INotifier.SendWeeklyDigestAsync(email, summary)`
+  is added as a **default interface method** returning `false` ("not
+  delivered") so the many existing hand-rolled `INotifier` test doubles
+  compile unchanged and a future custom notifier that forgets to override
+  it never falsely records a send. `LoggingNotifier` (logs, returns true)
+  and `SmtpNotifier` (Armenian body, real send, swallow-and-log → bool)
+  both override it. Worker-consumer bool contract mirrors
+  `SendDormancyWarningAsync`.
+- **Dedup is process-local (v1).** "Last sent per parent" is an in-memory
+  dictionary — a restart can re-send early. A persistent
+  `Parent.LastWeeklyDigestAt` column (schema change) is the follow-up if
+  exact once-per-week delivery is ever required. No per-parent opt-out /
+  unsubscribe yet (safe because the feature is off by default).
+- Pinned by `WeeklyDigestServiceTests` (disabled/enabled, counts, dedup,
+  no-activity, unverified, failed-delivery-retry, own-devices-only) and
+  `SmtpNotifierTests` (success→true+counts, throw→false).
+
 ## Bedtime window (B4)
 
 Parent-configured daily quiet hours on a device. Scheduled analogue of
@@ -749,6 +812,47 @@ Endpoint: `PUT /api/parents/devices/{deviceId}/bedtime-window` with body
 `{ "start": "HH:mm:ss" | null, "end": "HH:mm:ss" | null }`. Parent-JWT
 authenticated, ownership-checked against linked devices, silent 404 on
 miss (same shape as pause/resume).
+
+## Daily AI-question quota (Curiosity Window)
+
+A friendly per-day cap on how many live AI **questions** (Curiosity-Window
+turns) a child may ask. Cost containment + the lever a future Free/Plus
+tier drives. Enforced at the HTTP boundary in `ChatController.Chat`,
+AFTER the pause/bedtime/mode and cost-cap gates.
+
+- **Counts QUESTIONS only, not stories.** Only turns whose
+  `ModeDetector.Detect` (conservative single-message call, same as the
+  mode gate) resolves to `Curiosity` are counted; Story / Game / Riddle /
+  Calm are never counted, so story playback stays unlimited. (Detection
+  here is the boundary approximation — the authoritative mode lives in
+  `ChatService` — so an active-story turn read as Curiosity may
+  occasionally be counted; acceptable for an opt-in, generous allowance
+  whose over-limit reply is on-theme.)
+- **Keyed per child, else per device.** The quota key is `request.ChildId`
+  when supplied, else the device id — so an identified child gets their
+  own allowance and siblings on an unidentified device share one.
+- **Opt-in / off by default.** Whole gate is skipped unless
+  `AI:QuestionQuota:Enabled=true` (a PRODUCT feature, not a safety net —
+  shipped behavior is unchanged until the tier layer turns it on).
+  `AI:QuestionQuota:DailyQuestionLimit` (default 20) sets the allowance;
+  `AI:QuestionQuota:PerKeyOverride` (child-id/device-id → limit) is the
+  seam a tier system uses to grant Plus/Premium a higher limit without
+  code changes.
+- **Over-quota reply** is the deterministic canned line
+  `ChatController.DailyQuestionLimitResponse` («Օ՜, այսօր շատ բան
+  հարցրիր։ Հիմա արի մի հեքիաթ լսենք։» — reviewed by
+  armenian-story-master): warm, praises curiosity, redirects to an
+  unlimited story, never scolds. `SafetyFlag.Clean`, no GPT call.
+- **Counted only on success.** The question is recorded AFTER a
+  successful `ChatService` answer, so a failed (502) turn never burns the
+  child's allowance.
+- **In-memory (v1).** `AiQuotaMeter` (singleton, per-key per-UTC-day
+  count) mirrors `OpenAICostMeter`; process restart resets counters
+  (worst case one extra allowance per restart). A persistent counter and
+  a parent-facing "questions today: N/limit" surface are follow-ups. The
+  voice path is Story-only today, so the quota lives on the text
+  `/api/chat` path only. Metric: `aat_chat_gate_trip_total{gate=ai_quota}`.
+  Pinned by `AiQuotaMeterTests` + `ChatControllerQuotaTests`.
 
 ## Mode enable/disable (B5)
 
@@ -1314,7 +1418,7 @@ about access control, not about cardinality.
 
 | Counter | Tag(s) | Tag value space | Increment site |
 |---|---|---|---|
-| `aat_chat_gate_trip_total` | `gate` | `paused` / `bedtime` / `mode_disabled` | `ChatController.Chat` short-circuit branches |
+| `aat_chat_gate_trip_total` | `gate` | `paused` / `bedtime` / `mode_disabled` / `ai_quota` | `ChatController.Chat` short-circuit branches |
 | `aat_chat_openai_failure_total` | `kind` | `rate_limited` / `timeout` / `upstream_5xx` / `auth_failure` / `other` | `OpenAIReliabilityGate` (after classification) |
 | `aat_chat_openai_retry_total` | — | — | `OpenAIReliabilityGate` (before each retry attempt) |
 | `aat_chat_openai_circuit_trip_total` | — | — | `OpenAIReliabilityGate` on each closed→open transition |

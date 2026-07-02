@@ -42,7 +42,8 @@ public class ChatControllerCostCapTests
         var costCapOptions = Options.Create(opts);
         var logger = Substitute.For<ILogger<ChatController>>();
         var controller = new ChatController(
-            chatService, deviceService, costMeter, costCapOptions, logger);
+            chatService, deviceService, costMeter, costCapOptions,
+            new AiQuotaMeter(), Options.Create(new AiQuotaOptions()), logger);
         var httpContext = new DefaultHttpContext();
         var deviceId = Guid.NewGuid();
         httpContext.Items["DeviceId"] = deviceId;

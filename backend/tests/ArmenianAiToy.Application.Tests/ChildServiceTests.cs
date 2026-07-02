@@ -248,7 +248,55 @@ public class ChildServiceTests
 
         var context = service.BuildChildContext(child);
 
-        Assert.Contains("Address the child by name", context);
+        Assert.Contains("name", context);
         Assert.Contains("CHILD PROFILE", context);
+    }
+
+    [Fact]
+    public void BuildChildContext_NameUsageIsBoundedToSparing()
+    {
+        var (service, _) = CreateService();
+        var child = new Child
+        {
+            Id = Guid.NewGuid(), Name = "Ani", Gender = Gender.Girl,
+            DeviceId = Guid.NewGuid()
+        };
+
+        var context = service.BuildChildContext(child);
+
+        // Sparing usage is explicit — the toy must not over-use the name.
+        Assert.Contains("SPARINGLY", context);
+    }
+
+    [Fact]
+    public void BuildChildContext_NameUsage_ForbidsCompanionAttachment()
+    {
+        var (service, _) = CreateService();
+        var child = new Child
+        {
+            Id = Guid.NewGuid(), Name = "Gor", Gender = Gender.Boy,
+            DeviceId = Guid.NewGuid()
+        };
+
+        var context = service.BuildChildContext(child);
+
+        // The play-leader / no-companion product rule is reinforced at the
+        // name-usage seam: name must not become an attachment cue.
+        Assert.Contains("companion-attachment", context);
+    }
+
+    [Fact]
+    public void BuildChildContext_NameUsage_ForbidsNicknameInvention()
+    {
+        var (service, _) = CreateService();
+        var child = new Child
+        {
+            Id = Guid.NewGuid(), Name = "Tigran", Gender = Gender.Boy,
+            DeviceId = Guid.NewGuid()
+        };
+
+        var context = service.BuildChildContext(child);
+
+        Assert.Contains("Do NOT invent nicknames", context);
     }
 }
