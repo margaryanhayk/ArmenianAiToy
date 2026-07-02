@@ -13,6 +13,7 @@
 #include "diag.h"
 #include "wifi_creds.h"     // Phase B.1 — NVS-backed Wi-Fi credentials
 #include "device_creds.h"   // Phase C   — NVS-backed device identity
+#include "ota_foundation.h" // Proof 2 — AREG_FW_* identity + running-partition label
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -70,6 +71,12 @@ static void add_device_auth_headers(HTTPClient &http) {
     ensure_device_creds();
     http.addHeader("X-Device-Id", s_device_id);
     http.addHeader("X-Api-Key", s_device_api_key);
+}
+
+// Public seam for other modules (ota_foundation.cpp) — same identity,
+// same headers, one source of truth.
+void voice_add_device_auth_headers(HTTPClient &http) {
+    add_device_auth_headers(http);
 }
 
 // -------------------------------------------------------------
@@ -210,13 +217,26 @@ void voice_send_heartbeat() {
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
     http.setTimeout(AREG_HTTP_READ_MS);
 
-    // Empty body — the backend only needs the device-auth headers; the
-    // middleware refreshes LastSeenAt before the action runs. Best-effort:
-    // any status (incl. 401 on a stale key, or a transport failure) is fine,
-    // the next interval retries.
-    const int status = http.POST("");
+    // OTA foundation: report the firmware identity alongside presence. The
+    // heartbeat body is OPTIONAL on the backend (EmptyBodyBehavior.Allow),
+    // so a legacy build's body-less POST keeps working — and this build's
+    // body additionally stamps FirmwareVersion / Build / BoardModel /
+    // PartitionName / LastOtaStatus onto the device row (the fields the
+    // firmware-manifest offer gate reads). Values are compile-time
+    // constants + the running partition label — no JSON escaping needed.
+    // Best-effort exactly like before: any status (incl. 401 on a stale
+    // key, or a transport failure) is fine, the next interval retries.
+    char body[224];
+    snprintf(body, sizeof(body),
+             "{\"firmwareVersion\":\"%s\",\"firmwareBuild\":\"%s\","
+             "\"boardModel\":\"%s\",\"partitionName\":\"%s\","
+             "\"lastOtaStatus\":\"%s\"}",
+             AREG_FW_VERSION, AREG_FW_BUILD, AREG_BOARD_MODEL,
+             ota_running_partition_label(), "none");
+    http.addHeader("Content-Type", "application/json");
+    const int status = http.POST(body);
     http.end();
-    Serial.printf("[heartbeat] status=%d\n", status);
+    Serial.printf("[heartbeat] status=%d (fw=%s)\n", status, AREG_FW_VERSION);
     Serial.flush();
 }
 

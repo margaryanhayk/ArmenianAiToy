@@ -25,6 +25,7 @@
 #include "diag.h"
 #include "wifi_creds.h"        // B.1 — NVS cred clear (factory reset gesture)
 #include "ble_provisioning.h"  // B.2 — BLE provisioning (gated; no-op when flag off)
+#include "ota_foundation.h"    // Proof 2 — phone-home command poll (no OTA apply)
 
 // #047 — hang-protection tunables. Defaulted here so the build never depends
 // on config.h carrying them; overridable in config.h. See config.h.example.
@@ -1070,6 +1071,13 @@ void loop() {
             s_last_net_heartbeat_ms = now;
             voice_send_heartbeat();
         }
+
+        // OTA foundation (Proof 2 skeleton) — phone-home command poll +
+        // manifest check. Boot-polls once when Wi-Fi is first up, then
+        // re-polls on its own AREG_HEARTBEAT_INTERVAL_MS cadence. IDLE-only
+        // (this branch), same as the heartbeat, so a poll can never stall a
+        // voice turn. NO firmware download/apply in this slice.
+        ota_foundation_tick();
 
         char ev = button_poll();
         if (ev == 'P') {

@@ -12,6 +12,14 @@
 
 #include <Arduino.h>
 
+class HTTPClient;  // fwd-decl — keeps HTTPClient.h out of this header
+
+// OTA foundation — the shared device-auth header seam for OTHER modules'
+// backend calls (ota_foundation.cpp). Attaches the same effective
+// X-Device-Id / X-Api-Key identity (NVS-first, config.h fallback) every
+// voice_client call uses, so all backend traffic authenticates identically.
+void voice_add_device_auth_headers(HTTPClient &http);
+
 // Block until Wi-Fi is associated. Returns true on success,
 // false on timeout. Called once in setup(). A false return is NOT fatal —
 // setup() proceeds to IDLE and voice_wifi_tick() recovers in the background.

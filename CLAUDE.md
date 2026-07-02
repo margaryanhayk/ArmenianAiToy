@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1967 tests)
+dotnet test                                     # Run all tests (1972 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2106,6 +2106,40 @@ toy.
   device). `/api/devices/register` stays provisioning-secret gated.
 - Pinned by `DeviceCommandServiceTests`, `FirmwareManifestServiceTests`,
   `DeviceServiceOtaTests`, `DeviceControllerOtaTests`.
+- **Bench enqueue** `POST /api/internal/devices/{deviceId}/commands`
+  (`{ type, payload?, ttlSeconds? }` → `{ commandId, … }`) — operator-gated
+  like every `/api/internal/*` action (fail-closed 404 when unconfigured),
+  known `DeviceCommandTypes` only (400 otherwise), 404 on unknown device,
+  TTL clamped 60..86400 s (default 3600). Bench/test-only: NOT parent-facing,
+  not in admin.html; one loud structured log (operator + type + command id)
+  instead of an audit row until it becomes a real console surface. Pinned by
+  `InternalControllerEnqueueCommandTests`.
+
+### Firmware skeleton (device half — no OTA apply)
+
+`esp32/AregVoiceMvp/ota_foundation.{h,cpp}` implements the device half of
+the contract, SKELETON-scoped: **no firmware download, no flash write, no
+Secure Boot, no SD sync**. Outbound-only polling.
+
+- **Identity**: `AREG_FW_VERSION` / `AREG_FW_BUILD` / `AREG_BOARD_MODEL`
+  (defaults in `ota_foundation.h`, overridable via `config.h` — documented
+  in `config.h.example`); running partition label via
+  `esp_ota_get_running_partition()`.
+- **Heartbeat report**: `voice_send_heartbeat()` now POSTs the JSON identity
+  body (backend body is optional, so legacy body-less builds keep working).
+- **Poll loop**: `ota_foundation_tick()` from the `.ino` IDLE branch —
+  boot-polls once when Wi-Fi is first up, then re-polls every
+  `AREG_HEARTBEAT_INTERVAL_MS`. Never runs during a voice turn.
+- **Dedup**: RAM ring of handled command ids; a re-delivered command
+  (at-least-once transport) is never re-run, only re-acked (duplicate acks
+  are server-side no-ops). Expiry is enforced server-side (the device has
+  no synced wall clock; it logs `expiresAt` only).
+- **`firmware_update` handling**: fetches `/api/devices/firmware-manifest`,
+  logs the offered manifest (version/url/size/sha256/signature), acks
+  `ok` + `{"status":"manifest_checked"}` — and explicitly does NOT apply.
+  Unknown command types ack `failed`/`unsupported_type`.
+- `voice_add_device_auth_headers()` is the shared device-auth seam other
+  firmware modules use, so all backend traffic authenticates identically.
 
 ## Key Design Decisions
 

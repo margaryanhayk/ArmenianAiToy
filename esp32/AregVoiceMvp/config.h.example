@@ -261,3 +261,20 @@
 #ifndef AREG_HEARTBEAT_INTERVAL_MS
 #define AREG_HEARTBEAT_INTERVAL_MS 60000UL
 #endif
+
+// --- OTA foundation (Proof 2) — firmware identity ---------------
+// Reported on every heartbeat and compared by the backend's firmware-
+// manifest offer gate. Defaults live in ota_foundation.h; override here
+// (or via build flags) per release. AREG_FW_VERSION is plain
+// MAJOR.MINOR.PATCH — bump on every release build. AREG_BOARD_MODEL must
+// match the backend's FirmwareUpdate:BoardModel for a board-gated release
+// to be offered.
+#ifndef AREG_FW_VERSION
+#define AREG_FW_VERSION   "1.0.0"
+#endif
+#ifndef AREG_FW_BUILD
+#define AREG_FW_BUILD     "dev"
+#endif
+#ifndef AREG_BOARD_MODEL
+#define AREG_BOARD_MODEL  "areg-s3-n8"
+#endif

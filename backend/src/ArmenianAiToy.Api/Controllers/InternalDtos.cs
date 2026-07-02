@@ -131,6 +131,15 @@ public sealed record InternalSessionRequest(string? Totp);
 // (revoked/paused); Reason is required and recorded in the audit row.
 public sealed record InternalDeviceActionRequest(bool Value, string Reason);
 
+// OTA foundation — bench/test enqueue of a device command. Type must be a
+// known DeviceCommandTypes value; Payload is an optional JSON object stored
+// verbatim; TtlSeconds bounds how long the command stays deliverable
+// (default 3600, clamped 60..86400).
+public sealed record InternalEnqueueCommandRequest(
+    string? Type,
+    System.Text.Json.JsonElement? Payload = null,
+    int? TtlSeconds = null);
+
 // Story-QA tuning playground (Phase 2). Operator-only; text-only; calls
 // OpenAI (cost) but mutates nothing and persists nothing.
 public sealed record AdminStoryQaTestRequest(

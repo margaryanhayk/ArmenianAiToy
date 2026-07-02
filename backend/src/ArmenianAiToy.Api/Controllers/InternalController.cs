@@ -483,6 +483,47 @@ public class InternalController : ControllerBase
         Guid deviceId, [FromBody] InternalDeviceActionRequest req, CancellationToken ct)
         => DeviceFlagActionAsync(deviceId, req, "device_pause", ct);
 
+    /// <summary>OTA foundation — BENCH/TEST enqueue of a device command so an
+    /// operator can push e.g. <c>firmware_update</c> without editing the DB.
+    /// Behind the same internal gate as every other <c>/api/internal/*</c>
+    /// action (fail-closed 404 when unconfigured). Only known
+    /// <see cref="DeviceCommandTypes"/> values are accepted; the device picks
+    /// the command up on its next poll of <c>GET /api/devices/commands</c>.
+    /// Deliberately NOT parent-facing and NOT in the admin.html UI yet; when
+    /// this becomes a real operator surface it gains the reason + audit-row
+    /// discipline of the Phase 3 actions (today: one loud structured log).</summary>
+    [HttpPost("devices/{deviceId:guid}/commands")]
+    public async Task<IActionResult> EnqueueDeviceCommand(
+        Guid deviceId,
+        [FromBody] InternalEnqueueCommandRequest? req,
+        [FromServices] IDeviceCommandService commands,
+        CancellationToken ct)
+    {
+        if (req is null || string.IsNullOrWhiteSpace(req.Type))
+            return BadRequest(new { error = "A command type is required." });
+
+        var deviceExists = await _db.Devices.AnyAsync(d => d.Id == deviceId, ct);
+        if (!deviceExists)
+            return NotFound(new { error = "Device not found." });
+
+        var now = DateTime.UtcNow;
+        var ttlSeconds = Math.Clamp(req.TtlSeconds ?? 3600, 60, 86400);
+        var cmd = await commands.EnqueueAsync(
+            deviceId,
+            req.Type.Trim(),
+            req.Payload?.GetRawText(),
+            now.AddSeconds(ttlSeconds),
+            now);
+        if (cmd is null)
+            return BadRequest(new { error = "Unknown command type." });
+
+        var op = HttpContext?.Items["InternalOperator"] as string ?? "unknown";
+        _logger.LogWarning(
+            "Operator {Operator} enqueued device command {CommandType} ({CommandId}) for device {DeviceId} (ttl {Ttl}s)",
+            op, cmd.Type, cmd.Id, deviceId, ttlSeconds);
+        return Ok(new { commandId = cmd.Id, deviceId, type = cmd.Type, expiresAt = cmd.ExpiresAt });
+    }
+
     private async Task<IActionResult> DeviceFlagActionAsync(
         Guid deviceId, InternalDeviceActionRequest? req, string action, CancellationToken ct)
     {
