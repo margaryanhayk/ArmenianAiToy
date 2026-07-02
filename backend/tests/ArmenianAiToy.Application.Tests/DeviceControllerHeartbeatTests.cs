@@ -28,10 +28,10 @@ public class DeviceControllerHeartbeatTests
     }
 
     [Fact]
-    public void Heartbeat_AuthedDevice_Returns200WithDeviceId()
+    public async Task Heartbeat_AuthedDevice_Returns200WithDeviceId()
     {
         var deviceId = Guid.NewGuid();
-        var result = NewController(deviceId).Heartbeat();
+        var result = await NewController(deviceId).Heartbeat();
 
         var ok = Assert.IsType<OkObjectResult>(result);
         // Shape: { ok = true, deviceId, serverTimeUtc } — anonymously typed, so

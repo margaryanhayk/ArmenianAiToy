@@ -191,6 +191,9 @@ public static class DependencyInjection
         services.AddScoped<IChatService, ChatService>();
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<IDeviceService, DeviceService>();
+        // OTA foundation (Proof 2): the device command queue (scoped — uses the
+        // request DbContext) and the config-driven firmware manifest (singleton).
+        services.AddScoped<IDeviceCommandService, DeviceCommandService>();
         // #040 — per-account login throttle. SINGLETON so the failed-attempt
         // counters persist across scoped requests / parents; injected into the
         // scoped ParentService.
@@ -279,6 +282,23 @@ public static class DependencyInjection
         services.AddSingleton(
             Microsoft.Extensions.Options.Options.Create(capOpts));
         services.AddSingleton<OpenAICostMeter>();
+
+        // OTA foundation (Proof 2): the CURRENT firmware release the manifest
+        // endpoint offers. Same manual-binding style as the cost cap above.
+        // Ships Enabled=false → the endpoint returns no-update until configured.
+        var fwOpts = new FirmwareUpdateOptions();
+        var fwSection = config.GetSection("FirmwareUpdate");
+        if (bool.TryParse(fwSection["Enabled"], out var fwEnabled)) fwOpts.Enabled = fwEnabled;
+        fwOpts.LatestVersion = fwSection["LatestVersion"] ?? "";
+        fwOpts.MinVersion = fwSection["MinVersion"] ?? "";
+        fwOpts.BoardModel = fwSection["BoardModel"] ?? "";
+        fwOpts.Url = fwSection["Url"] ?? "";
+        if (long.TryParse(fwSection["SizeBytes"], out var fwSize)) fwOpts.SizeBytes = fwSize;
+        fwOpts.Sha256 = fwSection["Sha256"] ?? "";
+        fwOpts.SigningKey = fwSection["SigningKey"] ?? "";
+        if (int.TryParse(fwSection["TtlSeconds"], out var fwTtl)) fwOpts.TtlSeconds = fwTtl;
+        services.AddSingleton(fwOpts);
+        services.AddSingleton<IFirmwareManifestService, FirmwareManifestService>();
 
         // First scheduled-delete worker in the repo. Hard-deletes
         // conversations (and their cascaded messages) older than

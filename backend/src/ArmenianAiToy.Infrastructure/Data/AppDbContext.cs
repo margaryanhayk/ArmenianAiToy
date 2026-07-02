@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<ParentPasswordResetToken> ParentPasswordResetTokens => Set<ParentPasswordResetToken>();
     public DbSet<ParentEmailVerificationToken> ParentEmailVerificationTokens => Set<ParentEmailVerificationToken>();
+    public DbSet<DeviceCommand> DeviceCommands => Set<DeviceCommand>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -132,6 +133,21 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(t => t.TokenHash).IsUnique();
             e.HasIndex(t => t.ParentId);
+        });
+
+        // DeviceCommand — the OTA-foundation / device command queue. FK cascade
+        // to Device: a deleted device takes its queued commands with it (they
+        // are not audit material). Status stored as string, consistent with the
+        // other enums. Composite (DeviceId, Status) index backs the poll query.
+        modelBuilder.Entity<DeviceCommand>(e =>
+        {
+            e.HasKey(c => c.Id);
+            e.HasOne(c => c.Device)
+                .WithMany()
+                .HasForeignKey(c => c.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(c => new { c.DeviceId, c.Status });
+            e.Property(c => c.Status).HasConversion<string>();
         });
     }
 }

@@ -184,6 +184,28 @@ public class DeviceService : IDeviceService
         }
     }
 
+    public async Task<Device?> GetDeviceAsync(Guid deviceId)
+        => await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == deviceId);
+
+    public async Task UpdateFirmwareReportAsync(
+        Guid deviceId, DeviceHeartbeatRequest report, DateTime nowUtc)
+    {
+        var device = await _db.Set<Device>().FindAsync(deviceId);
+        if (device is null)
+        {
+            return;
+        }
+        // Only overwrite fields the device actually sent; a partial report
+        // never blanks a previously-reported value.
+        if (report.FirmwareVersion is not null) device.FirmwareVersion = report.FirmwareVersion;
+        if (report.FirmwareBuild is not null) device.FirmwareBuild = report.FirmwareBuild;
+        if (report.BoardModel is not null) device.BoardModel = report.BoardModel;
+        if (report.PartitionName is not null) device.PartitionName = report.PartitionName;
+        if (report.LastOtaStatus is not null) device.LastOtaStatus = report.LastOtaStatus;
+        device.FirmwareReportedAt = nowUtc;
+        await _db.SaveChangesAsync();
+    }
+
     public async Task<bool> IsDevicePausedAsync(Guid deviceId)
     {
         // Single-field read — avoids materializing the full Device row

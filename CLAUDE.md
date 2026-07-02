@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1940 tests)
+dotnet test                                     # Run all tests (1967 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2055,6 +2055,57 @@ toy with no reflash. All gated/fallback so the bench build is byte-identical.
   id/key (`config.h` fallback), surfaced through one
   `add_device_auth_headers()` helper across every backend call. The factory
   station that burns the NVS is the owner process.
+
+## Device OTA foundation (Proof 2 — backend contract)
+
+The backend contract the firmware OTA foundation targets. **Backend-only in
+this slice** — no on-device OTA, no Secure Boot/eFuse, no Feature-1 SD sync.
+The device connects OUTBOUND only (polls); there is no inbound server on the
+toy.
+
+- **Firmware reporting on heartbeat.** `POST /api/devices/heartbeat` now
+  accepts an OPTIONAL JSON body (`DeviceHeartbeatRequest`:
+  `firmwareVersion`/`firmwareBuild`/`boardModel`/`partitionName`/`lastOtaStatus`).
+  `EmptyBodyBehavior.Allow` keeps the legacy body-less presence heartbeat
+  working. Only the non-null fields are stamped onto new `Device` columns
+  (`FirmwareBuild`/`BoardModel`/`PartitionName`/`LastOtaStatus`/`FirmwareReportedAt`;
+  `FirmwareVersion` already existed) plus `FirmwareReportedAt`. A partial
+  report never blanks a previously-reported value.
+- **Device command queue** (`DeviceCommand` entity + migration
+  `AddDeviceOtaFoundation`). Columns: `Id`, `DeviceId` (FK cascade),
+  `Type`, `PayloadJson`, `Status` (string enum
+  `Pending/Sent/Acked/Failed/Expired`), `CreatedAt`, `ExpiresAt`, `SentAt`,
+  `AckedAt`, `Result`, `Error`, `AckFirmwareVersion`, `AckDiagnosticsJson`.
+  Index `(DeviceId, Status)`. The only wire type this slice enqueues is
+  `firmware_update` (`DeviceCommandTypes`); an unknown type is rejected at
+  enqueue (never delivered).
+- **Poll** `GET /api/devices/commands` (device-authed): returns only THIS
+  device's deliverable commands (`Pending`/`Sent`, not expired), marks
+  `Pending → Sent`, and lazily marks overdue ones `Expired` (never
+  delivered). At-least-once: a `Sent` command is re-delivered until acked or
+  expired, so the device dedups by `Id`.
+- **Ack** `POST /api/devices/commands/{id}/ack` (device-authed): idempotent
+  (a terminal command is never re-applied — a duplicate ack is a safe
+  no-op), ownership-checked (a command owned by another device returns a
+  uniform **404**, no cross-device existence leak). Stores
+  `Result`/`Error`/`AckFirmwareVersion`/`AckDiagnosticsJson`.
+- **Firmware manifest** `GET /api/devices/firmware-manifest` (device-authed):
+  compares the device's reported version/board against the config-driven
+  current release (`FirmwareUpdate` section → `FirmwareUpdateOptions`,
+  ships `Enabled=false`). Returns `{ updateAvailable: false }` or a manifest
+  `{ version, boardModel, minVersion, url, sizeBytes, sha256, signature,
+  expiresAt }`. Offer gate: enabled AND device strictly OLDER than
+  `LatestVersion` AND (no `BoardModel` configured OR it matches). A null/
+  unparseable device version is treated as oldest (offered). `signature` is
+  an HMAC-SHA256 over the manifest's load-bearing fields when `SigningKey`
+  is set, else an empty placeholder. **This signs the MANIFEST, not the
+  image** — image signing (Secure Boot v2) is a separate, later step.
+- **Auth.** The three new endpoints are added to `DeviceAuthMiddleware`'s
+  device-auth path set, so a **revoked device is rejected (401) before it
+  can poll or ack** (`ValidateDeviceAsync` returns null for a revoked
+  device). `/api/devices/register` stays provisioning-secret gated.
+- Pinned by `DeviceCommandServiceTests`, `FirmwareManifestServiceTests`,
+  `DeviceServiceOtaTests`, `DeviceControllerOtaTests`.
 
 ## Key Design Decisions
 

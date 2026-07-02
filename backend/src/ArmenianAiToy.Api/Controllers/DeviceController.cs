@@ -3,6 +3,7 @@ using ArmenianAiToy.Api.Security;
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace ArmenianAiToy.Api.Controllers;
@@ -68,11 +69,70 @@ public class DeviceController : ControllerBase
     [HttpPost("heartbeat")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
-    public IActionResult Heartbeat()
+    public async Task<IActionResult> Heartbeat(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] DeviceHeartbeatRequest? request = null)
     {
         // DeviceId is guaranteed present: the middleware sets it for this path
         // after a successful credential check (else the request 401s upstream).
-        var deviceId = HttpContext.Items["DeviceId"] as Guid?;
+        var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
+
+        // Body is optional (EmptyBodyBehavior.Allow) — the legacy presence-only
+        // heartbeat still works. Only a body carrying firmware fields writes.
+        if (request is not null && request.HasAnyFirmwareField)
+        {
+            await _deviceService.UpdateFirmwareReportAsync(deviceId, request, DateTime.UtcNow);
+        }
         return Ok(new { ok = true, deviceId, serverTimeUtc = DateTime.UtcNow });
+    }
+
+    // Device polls its command queue. Device-authed (middleware). Returns only
+    // this device's deliverable commands (Pending/Sent, not expired) and marks
+    // Pending → Sent. The toy connects OUTBOUND only — there is no inbound
+    // server on the device.
+    [HttpGet("commands")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetCommands(
+        [FromServices] IDeviceCommandService commands)
+    {
+        var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
+        var list = await commands.PollAsync(deviceId, DateTime.UtcNow);
+        return Ok(new { commands = list });
+    }
+
+    // Device acknowledges a command's outcome. Idempotent; a command owned by
+    // another device returns 404 (no cross-device existence leak).
+    [HttpPost("commands/{id:guid}/ack")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> AckCommand(
+        Guid id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] DeviceCommandAckRequest? request,
+        [FromServices] IDeviceCommandService commands)
+    {
+        var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
+        var outcome = await commands.AckAsync(
+            deviceId, id, request ?? new DeviceCommandAckRequest(), DateTime.UtcNow);
+        if (outcome == DeviceCommandAckOutcome.NotFound)
+        {
+            return NotFound(new { error = "Command not found." });
+        }
+        return Ok(new { acked = true });
+    }
+
+    // Device asks whether a firmware update is available for it. Compares the
+    // device's reported version/board (from heartbeat) against the configured
+    // current release. Returns { updateAvailable: false } or the signed manifest.
+    [HttpGet("firmware-manifest")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetFirmwareManifest(
+        [FromServices] IFirmwareManifestService manifest)
+    {
+        var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
+        var device = await _deviceService.GetDeviceAsync(deviceId);
+        var result = manifest.Build(device?.FirmwareVersion, device?.BoardModel, DateTime.UtcNow);
+        return Ok(result);
     }
 }

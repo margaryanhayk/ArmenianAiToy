@@ -8,7 +8,18 @@ public class DeviceAuthMiddleware
     private readonly ILogger<DeviceAuthMiddleware> _logger;
 
     // Paths that require device auth (as opposed to parent JWT auth or no auth)
-    private static readonly string[] DeviceAuthPaths = ["/api/chat", "/api/audio", "/api/devices/heartbeat"];
+    // The OTA-foundation device endpoints (commands, firmware-manifest) are
+    // device-authed too, so a revoked device is rejected here
+    // (ValidateDeviceAsync returns null for a revoked device) BEFORE it can
+    // poll or ack. /api/devices/register stays out (provisioning-secret gated).
+    private static readonly string[] DeviceAuthPaths =
+    [
+        "/api/chat",
+        "/api/audio",
+        "/api/devices/heartbeat",
+        "/api/devices/commands",
+        "/api/devices/firmware-manifest",
+    ];
 
     // #034 — LastSeen is refreshed at most once per this interval per device.
     // Dormancy works in days, so coarse granularity is invisible to it, and a

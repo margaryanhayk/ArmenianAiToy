@@ -25,6 +25,21 @@ public class Device
     public string? ApiKeyHash { get; set; }
 
     public string? FirmwareVersion { get; set; }
+
+    /// <summary>
+    /// OTA-foundation firmware reporting, stamped from the device heartbeat.
+    /// All nullable — a legacy/bench device that never reports leaves these
+    /// null. <see cref="BoardModel"/> gates board-specific firmware offers;
+    /// <see cref="PartitionName"/> is reserved for the OTA slot the device is
+    /// running from; <see cref="LastOtaStatus"/> is the device's own summary of
+    /// its last update attempt.
+    /// </summary>
+    public string? FirmwareBuild { get; set; }
+    public string? BoardModel { get; set; }
+    public string? PartitionName { get; set; }
+    public string? LastOtaStatus { get; set; }
+    public DateTime? FirmwareReportedAt { get; set; }
+
     public DateTime RegisteredAt { get; set; }
     public DateTime LastSeenAt { get; set; }
 

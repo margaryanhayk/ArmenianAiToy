@@ -18,6 +18,15 @@ public interface IDeviceService
         DeviceRegistrationRequest request, bool allowReRegister = false);
     Task<Device?> ValidateDeviceAsync(Guid deviceId, string apiKey);
     Task UpdateLastSeenAsync(Guid deviceId);
+
+    /// <summary>Load a device by id (or null). Used by the firmware-manifest
+    /// endpoint to read the device's reported version/board.</summary>
+    Task<Device?> GetDeviceAsync(Guid deviceId);
+
+    /// <summary>Stamp the device's reported firmware/board fields (only the
+    /// non-null ones) plus <c>FirmwareReportedAt</c>, from a heartbeat body.
+    /// No-op when the device row is missing.</summary>
+    Task UpdateFirmwareReportAsync(Guid deviceId, DeviceHeartbeatRequest report, DateTime nowUtc);
     Task<bool> IsDevicePausedAsync(Guid deviceId);
     Task<bool> IsDeviceInBedtimeWindowAsync(Guid deviceId, DateTime nowUtc);
     Task<bool> IsDeviceModeEnabledAsync(Guid deviceId, DetectedMode mode);
