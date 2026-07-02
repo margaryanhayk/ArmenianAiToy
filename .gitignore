@@ -15,6 +15,16 @@ backend/.vs/
 
 # Local Claude agent state
 backend/.claude/agent-memory/
+/.claude/agent-memory/
+esp32/AregVoiceMvp/.claude/
+
+# Local-only Claude settings (may contain secrets/API keys — never commit)
+.claude/settings.local.json
+
+# Claude scratch / logs / backups (not source)
+.claude/monitor.log
+*.bak-*
+*.db.bak*
 
 # Local project status export
 ArmenianAiToy_Project_Status.pdf
