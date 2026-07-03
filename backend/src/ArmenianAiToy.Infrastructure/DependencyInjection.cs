@@ -293,6 +293,7 @@ public static class DependencyInjection
         fwOpts.MinVersion = fwSection["MinVersion"] ?? "";
         fwOpts.BoardModel = fwSection["BoardModel"] ?? "";
         fwOpts.Url = fwSection["Url"] ?? "";
+        fwOpts.ImagePath = fwSection["ImagePath"] ?? "";
         if (long.TryParse(fwSection["SizeBytes"], out var fwSize)) fwOpts.SizeBytes = fwSize;
         fwOpts.Sha256 = fwSection["Sha256"] ?? "";
         fwOpts.SigningKey = fwSection["SigningKey"] ?? "";

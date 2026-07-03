@@ -31,8 +31,18 @@ public sealed class FirmwareUpdateOptions
     /// exact board model — a hardware-specific image never lands on the wrong board.</summary>
     public string BoardModel { get; set; } = string.Empty;
 
-    /// <summary>HTTPS URL of the firmware .bin.</summary>
+    /// <summary>URL of the firmware .bin the device downloads. May be the
+    /// backend's own device-authed streamer (<c>/api/devices/firmware-image</c>,
+    /// absolute or path form) or an external host. HTTPS in production;
+    /// Stage-A bench runs it over the HTTP LAN (integrity comes from the
+    /// signed manifest + sha256, not the transport).</summary>
     public string Url { get; set; } = string.Empty;
+
+    /// <summary>Server-side filesystem path of the firmware image that
+    /// <c>GET /api/devices/firmware-image</c> streams. Deliberately OUTSIDE
+    /// wwwroot — the image is served only through the device-authed endpoint,
+    /// never as a public static file. Empty → the endpoint 404s.</summary>
+    public string ImagePath { get; set; } = string.Empty;
 
     public long SizeBytes { get; set; }
 

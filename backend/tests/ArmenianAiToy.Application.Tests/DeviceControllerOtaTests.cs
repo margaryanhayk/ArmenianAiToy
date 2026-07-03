@@ -92,6 +92,91 @@ public class DeviceControllerOtaTests
         Assert.IsType<OkObjectResult>(result);
     }
 
+    // ---- firmware-image streaming endpoint (OTA apply slice) ----
+
+    private static ArmenianAiToy.Application.Helpers.FirmwareUpdateOptions ImageOptions(
+        bool enabled, string imagePath) => new()
+    {
+        Enabled = enabled,
+        LatestVersion = "1.0.1",
+        Url = "http://backend/api/devices/firmware-image",
+        ImagePath = imagePath,
+    };
+
+    [Fact]
+    public void GetFirmwareImage_DisabledRelease_Returns404()
+    {
+        var (controller, _, _) = Create();
+        var opts = ImageOptions(enabled: false, imagePath: Path.GetTempFileName());
+
+        var result = controller.GetFirmwareImage(
+            opts, Substitute.For<Microsoft.Extensions.Logging.ILogger<DeviceController>>());
+
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    [Fact]
+    public void GetFirmwareImage_NoImagePathConfigured_Returns404()
+    {
+        var (controller, _, _) = Create();
+        var opts = ImageOptions(enabled: true, imagePath: "");
+
+        var result = controller.GetFirmwareImage(
+            opts, Substitute.For<Microsoft.Extensions.Logging.ILogger<DeviceController>>());
+
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    [Fact]
+    public void GetFirmwareImage_MissingFile_Returns404()
+    {
+        var (controller, _, _) = Create();
+        var opts = ImageOptions(
+            enabled: true,
+            imagePath: Path.Combine(Path.GetTempPath(), $"no-such-{Guid.NewGuid():N}.bin"));
+
+        var result = controller.GetFirmwareImage(
+            opts, Substitute.For<Microsoft.Extensions.Logging.ILogger<DeviceController>>());
+
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    [Fact]
+    public void GetFirmwareImage_RelativePath_Returns404()
+    {
+        var (controller, _, _) = Create();
+        var opts = ImageOptions(enabled: true, imagePath: "relative/areg.bin");
+
+        var result = controller.GetFirmwareImage(
+            opts, Substitute.For<Microsoft.Extensions.Logging.ILogger<DeviceController>>());
+
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    [Fact]
+    public void GetFirmwareImage_ConfiguredAndPresent_StreamsWithRangeSupport()
+    {
+        var (controller, _, _) = Create();
+        var file = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllBytes(file, new byte[] { 0xE9, 1, 2, 3 }); // fake image bytes
+            var opts = ImageOptions(enabled: true, imagePath: file);
+
+            var result = controller.GetFirmwareImage(
+                opts, Substitute.For<Microsoft.Extensions.Logging.ILogger<DeviceController>>());
+
+            var physical = Assert.IsType<PhysicalFileResult>(result);
+            Assert.Equal(file, physical.FileName);
+            Assert.Equal("application/octet-stream", physical.ContentType);
+            Assert.True(physical.EnableRangeProcessing); // resume-ready
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
     [Fact]
     public async Task GetFirmwareManifest_ReturnsManifestForDeviceVersion()
     {

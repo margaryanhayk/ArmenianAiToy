@@ -278,3 +278,20 @@
 #ifndef AREG_BOARD_MODEL
 #define AREG_BOARD_MODEL  "areg-s3-n8"
 #endif
+
+// --- OTA apply (real update) -------------------------------------
+// Shared HMAC key for MANIFEST signature verification — must equal the
+// backend's FirmwareUpdate:SigningKey. Empty = verification SKIPPED with a
+// loud serial warning (Stage-A bench only; release builds MUST set it).
+#ifndef AREG_MANIFEST_HMAC_KEY
+#define AREG_MANIFEST_HMAC_KEY ""
+#endif
+// How long the NEW image may retry its backend check-in (the final ack)
+// before it self-invalidates and the bootloader rolls back to the old image.
+#ifndef AREG_OTA_CHECKIN_DEADLINE_MS
+#define AREG_OTA_CHECKIN_DEADLINE_MS 300000UL
+#endif
+// Retry cadence for that post-reboot check-in ack.
+#ifndef AREG_OTA_ACK_RETRY_MS
+#define AREG_OTA_ACK_RETRY_MS 10000UL
+#endif

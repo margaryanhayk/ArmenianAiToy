@@ -103,4 +103,40 @@ public class FirmwareManifestServiceTests
         Assert.Equal(64, a!.Length);   // hex of SHA-256
         Assert.Equal(a, b);            // same inputs → same signature
     }
+
+    [Fact]
+    public void Signature_VerifiesAgainstJsonWireForm()
+    {
+        // KEYSTONE for device-side verification: the device can only rebuild
+        // the canonical string from the raw JSON text it received, so the
+        // signature MUST verify against the JSON WIRE FORM of every field —
+        // especially expiresAt, where "O"-format vs System.Text.Json rendering
+        // differ (trailing fractional-second zeros). This test does exactly
+        // what the firmware does: serialize the response the way ASP.NET
+        // would, re-extract raw field strings, recompute the HMAC.
+        const string Key = "bench-manifest-hmac-key-1";
+        var svc = WithRelease(signingKey: Key);
+        var manifest = svc.Build("1.0.0", null, Now);
+        Assert.True(manifest.UpdateAvailable);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(manifest,
+            new System.Text.Json.JsonSerializerOptions
+            { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        var canonical =
+            root.GetProperty("version").GetString() + "\n" +
+            root.GetProperty("url").GetString() + "\n" +
+            root.GetProperty("sha256").GetString() + "\n" +
+            root.GetProperty("sizeBytes").GetInt64() + "\n" +
+            root.GetProperty("expiresAt").GetRawText().Trim('"');
+
+        using var h = new System.Security.Cryptography.HMACSHA256(
+            System.Text.Encoding.UTF8.GetBytes(Key));
+        var recomputed = Convert.ToHexString(
+            h.ComputeHash(System.Text.Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
+
+        Assert.Equal(recomputed, root.GetProperty("signature").GetString());
+    }
 }

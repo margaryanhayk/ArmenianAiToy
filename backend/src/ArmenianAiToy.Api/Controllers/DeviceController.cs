@@ -1,6 +1,7 @@
 using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Api.Security;
 using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -134,5 +135,38 @@ public class DeviceController : ControllerBase
         var device = await _deviceService.GetDeviceAsync(deviceId);
         var result = manifest.Build(device?.FirmwareVersion, device?.BoardModel, DateTime.UtcNow);
         return Ok(result);
+    }
+
+    // Streams the configured firmware .bin to the device. Device-authed via
+    // DeviceAuthMiddleware (a revoked device 401s before reaching here) —
+    // deliberately NOT a public wwwroot file. Fail-closed 404 whenever the
+    // release is disabled, no ImagePath is configured, the path is not
+    // absolute, or the file is missing — the device treats any non-200 as
+    // download_failed and keeps its current firmware. Range processing is on
+    // so a future resume slice works without changes. Integrity is carried by
+    // the SIGNED MANIFEST's sha256/sizeBytes, which the device verifies while
+    // streaming — this endpoint just moves bytes.
+    [HttpGet("firmware-image")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public IActionResult GetFirmwareImage(
+        [FromServices] FirmwareUpdateOptions options,
+        [FromServices] ILogger<DeviceController> logger)
+    {
+        if (!options.Enabled || string.IsNullOrWhiteSpace(options.ImagePath))
+        {
+            return NotFound(new { error = "No firmware image available." });
+        }
+        if (!Path.IsPathRooted(options.ImagePath) || !System.IO.File.Exists(options.ImagePath))
+        {
+            // Misconfiguration is an operator problem, not a device problem —
+            // log loudly, answer with the same safe 404.
+            logger.LogWarning(
+                "Firmware image path missing or not absolute: {ImagePath}", options.ImagePath);
+            return NotFound(new { error = "No firmware image available." });
+        }
+        return PhysicalFile(options.ImagePath, "application/octet-stream",
+            enableRangeProcessing: true);
     }
 }

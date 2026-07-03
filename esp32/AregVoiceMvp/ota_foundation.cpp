@@ -14,6 +14,8 @@
 
 #include "config.h"
 #include "voice_client.h"
+#include "ota_apply.h"   // real apply pipeline (reboots on success)
+#include "ota_state.h"   // persisted cross-reboot OTA state (NVS)
 
 // Fallbacks mirrored from config.h.example so this module compiles even on
 // a config.h that predates them.
@@ -33,6 +35,12 @@
 
 static bool     s_boot_poll_done = false;
 static uint32_t s_last_poll_ms   = 0;
+
+// Persisted OTA state, loaded once at boot (save-through on every change).
+static OtaPersist s_ota;
+static bool       s_ota_loaded = false;
+// Post-reboot check-in throttle (see ota_checkin_tick).
+static uint32_t   s_last_checkin_ms = 0;
 
 // Dedup ring of recently HANDLED command ids (at-least-once transport: a
 // Sent command is re-delivered until acked, so a lost ack re-delivers it).
@@ -118,70 +126,175 @@ static bool ack_command(const char *command_id, const char *result,
 }
 
 // -------------------------------------------------------------
-// firmware_update handler — MANIFEST CHECK ONLY (no download/apply)
+// firmware_update handler — REAL APPLY (via ota_apply.cpp)
 // -------------------------------------------------------------
 
+// Persistent idempotency: the same command id must never re-trigger a
+// download/reboot loop across reboots or rollbacks. Terminal outcomes are
+// stamped into NVS (applied_cmd) — a re-delivered id is only RE-ACKED.
 static void handle_firmware_update(const char *command_id) {
-    HTTPClient http;
-    if (!http.begin(api_url("/api/devices/firmware-manifest"))) {
-        ack_command(command_id, "failed", "manifest_begin_failed", nullptr);
+    if (s_ota.applied_cmd[0] != '\0' && strcmp(command_id, s_ota.applied_cmd) == 0) {
+        // Already reached a terminal outcome for THIS command → re-ack it.
+        if (s_ota.state == OTA_STATE_CONFIRMED) {
+            char diag[128];
+            snprintf(diag, sizeof(diag),
+                     "{\"status\":\"ota_applied\",\"version\":\"%.15s\","
+                     "\"partition\":\"%s\",\"rerun\":true}",
+                     s_ota.pending_ver, ota_running_partition_label());
+            ack_command(command_id, "ok", nullptr, diag);
+        } else {
+            ack_command(command_id, "failed",
+                        s_ota.last_error[0] ? s_ota.last_error : "previously_failed",
+                        "{\"status\":\"previously_terminal\"}");
+        }
         return;
     }
-    voice_add_device_auth_headers(http);
-    http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
-    http.setTimeout(AREG_HTTP_READ_MS);
-
-    const int status = http.GET();
-    if (status != 200) {
-        http.end();
-        Serial.printf("[ota] manifest fetch failed status=%d\n", status);
-        Serial.flush();
-        ack_command(command_id, "failed", "manifest_fetch_failed", nullptr);
-        return;
-    }
-
-    JsonDocument doc;
-    const DeserializationError err = deserializeJson(doc, http.getString());
-    http.end();
-    if (err != DeserializationError::Ok) {
-        ack_command(command_id, "failed", "manifest_parse_failed", nullptr);
+    if (s_ota.state == OTA_STATE_REBOOTING || s_ota.state == OTA_STATE_DOWNLOADING) {
+        // A different command while an attempt is in flight — refuse loudly.
+        ack_command(command_id, "failed", "ota_busy", nullptr);
         return;
     }
 
-    const bool available = doc["updateAvailable"] | false;
-    if (!available) {
-        Serial.printf("[ota] manifest: no update (running %s)\n", AREG_FW_VERSION);
-        Serial.flush();
-        ack_command(command_id, "ok", nullptr,
-                    "{\"status\":\"manifest_checked\",\"updateAvailable\":false}");
-        return;
+    char err[32] = {0};
+    const OtaApplyOutcome outcome = ota_apply_run(command_id, err, sizeof(err));
+    // (Success never returns — the device reboots into pending-verify.)
+    switch (outcome) {
+        case OTA_APPLY_NO_UPDATE:
+            ack_command(command_id, "ok", nullptr,
+                        "{\"status\":\"manifest_checked\",\"updateAvailable\":false}");
+            break;
+        case OTA_APPLY_REFUSED:
+            ack_command(command_id, "failed", err, "{\"status\":\"refused\"}");
+            break;
+        case OTA_APPLY_FAILED:
+        default:
+            // ota_apply persisted OTA_STATE_FAILED + applied_cmd; reload so the
+            // in-RAM view matches and re-deliveries re-ack instead of re-run.
+            ota_state_load(s_ota);
+            ack_command(command_id, "failed", err, "{\"status\":\"apply_failed\"}");
+            break;
+    }
+}
+
+// -------------------------------------------------------------
+// Boot-state normalization + post-reboot check-in
+// -------------------------------------------------------------
+
+// Runs once, on the first tick after boot (works without Wi-Fi).
+static void ota_boot_init() {
+    ota_state_load(s_ota);
+
+    // Crash mid-download: the boot slot never switched, so the attempt is
+    // simply FAILED — stamp it terminal so the re-delivered command re-acks
+    // instead of re-downloading forever on a crashy link.
+    if (s_ota.state == OTA_STATE_DOWNLOADING) {
+        s_ota.state = OTA_STATE_FAILED;
+        snprintf(s_ota.last_error, sizeof(s_ota.last_error), "interrupted");
+        snprintf(s_ota.applied_cmd, sizeof(s_ota.applied_cmd), "%s", s_ota.cmd_id);
+        ota_state_save(s_ota);
+    }
+    if (s_ota.state == OTA_STATE_REBOOTING) {
+        s_ota.boot_attempts++;
+        ota_state_save(s_ota);
     }
 
-    // Update offered — log EVERYTHING the apply step would need, then stop.
-    // SKELETON: no download, no sha256 run, no flash write, no reboot.
-    const char *version   = doc["version"]    | "?";
-    const char *board     = doc["boardModel"] | "";
-    const char *minVer    = doc["minVersion"] | "";
-    const char *url       = doc["url"]        | "";
-    const long  sizeBytes = doc["sizeBytes"]  | 0L;
-    const char *sha256    = doc["sha256"]     | "";
-    const char *signature = doc["signature"]  | "";
-    const char *expiresAt = doc["expiresAt"]  | "";
-    Serial.printf("[ota] UPDATE OFFERED %s -> %s (board=%s min=%s)\n",
-                  AREG_FW_VERSION, version, board, minVer);
-    Serial.printf("[ota]   url=%s size=%ld\n", url, sizeBytes);
-    Serial.printf("[ota]   sha256=%s\n", sha256);
-    Serial.printf("[ota]   signature=%s expiresAt=%s\n",
-                  signature[0] ? signature : "(placeholder)", expiresAt);
-    Serial.printf("[ota]   WOULD download to inactive slot + verify sha256 + "
-                  "set boot + reboot — SKELETON: not applying.\n");
+    // Bench-visible proof of the native rollback capability: on the first
+    // boot after an OTA this must print pending_verify.
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t img_state = ESP_OTA_IMG_UNDEFINED;
+    esp_ota_get_state_partition(running, &img_state);
+    const char *img_state_name =
+        (img_state == ESP_OTA_IMG_PENDING_VERIFY) ? "pending_verify"
+        : (img_state == ESP_OTA_IMG_VALID)        ? "valid"
+        : (img_state == ESP_OTA_IMG_NEW)          ? "new"
+        : (img_state == ESP_OTA_IMG_ABORTED)      ? "aborted"
+                                                  : "undefined";
+    Serial.printf("[ota] running fw=%s partition=%s img_state=%s ota_state=%s "
+                  "(pending_ver=%s cmd=%s boots=%u)\n",
+                  AREG_FW_VERSION, ota_running_partition_label(), img_state_name,
+                  ota_state_name(s_ota.state),
+                  s_ota.pending_ver[0] ? s_ota.pending_ver : "-",
+                  s_ota.cmd_id[0] ? s_ota.cmd_id : "-",
+                  (unsigned)s_ota.boot_attempts);
     Serial.flush();
+}
 
-    char diag[160];
+// While OTA_STATE_REBOOTING, this owns the tick (command polling is paused):
+//  * NEW image (pending_ver == ours): ack the original command from NVS; ONLY
+//    a 2xx ack marks the app valid (backend check-in IS the health gate). If
+//    the deadline passes without a successful ack, self-invalidate so the
+//    bootloader rolls back.
+//  * OLD image (version mismatch → the bootloader rolled us back): record the
+//    rollback terminally and ack failed.
+static void ota_checkin_tick() {
+    const bool is_new_image =
+        (strcmp(s_ota.pending_ver, AREG_FW_VERSION) == 0);
+
+    if (!is_new_image) {
+        // Rollback happened — we are the OLD image again.
+        Serial.printf("[ota] ROLLBACK detected (attempted %s, running %s)\n",
+                      s_ota.pending_ver, AREG_FW_VERSION);
+        s_ota.state = OTA_STATE_ROLLED_BACK;
+        snprintf(s_ota.last_error, sizeof(s_ota.last_error), "rollback_no_checkin");
+        snprintf(s_ota.applied_cmd, sizeof(s_ota.applied_cmd), "%s", s_ota.cmd_id);
+        ota_state_save(s_ota);
+        char diag[128];
+        snprintf(diag, sizeof(diag),
+                 "{\"status\":\"rolled_back\",\"attemptedVersion\":\"%.15s\"}",
+                 s_ota.pending_ver);
+        // Best-effort: if this ack is lost, the re-delivered command re-acks
+        // via the applied_cmd guard in handle_firmware_update.
+        ack_command(s_ota.cmd_id, "failed", "rollback_no_checkin", diag);
+        return;
+    }
+
+    // NEW image: throttle check-in attempts.
+    const uint32_t now = millis();
+    if (s_last_checkin_ms != 0 && (now - s_last_checkin_ms) < AREG_OTA_ACK_RETRY_MS) {
+        // Between attempts — enforce the rollback deadline meanwhile.
+        if (now > (uint32_t)AREG_OTA_CHECKIN_DEADLINE_MS) {
+            Serial.println("[ota] check-in DEADLINE passed — self-invalidating "
+                           "so the bootloader rolls back");
+            Serial.flush();
+            if (esp_ota_mark_app_invalid_rollback_and_reboot() != ESP_OK) {
+                ESP.restart();  // a reset while pending-verify also rolls back
+            }
+        }
+        return;
+    }
+    s_last_checkin_ms = now;
+
+    // Refresh presence + firmware report first (best-effort), then the ack
+    // that decides validity.
+    voice_send_heartbeat();
+    char diag[128];
     snprintf(diag, sizeof(diag),
-             "{\"status\":\"manifest_checked\",\"updateAvailable\":true,"
-             "\"offeredVersion\":\"%.32s\"}", version);
-    ack_command(command_id, "ok", nullptr, diag);
+             "{\"status\":\"ota_applied\",\"version\":\"%.15s\",\"partition\":\"%s\"}",
+             AREG_FW_VERSION, ota_running_partition_label());
+    if (ack_command(s_ota.cmd_id, "ok", nullptr, diag)) {
+        if (esp_ota_mark_app_valid_cancel_rollback() == ESP_OK) {
+            Serial.println("[ota] image marked VALID (confirmed)");
+        } else {
+            // Already valid (e.g. re-run after a crash post-confirm) — fine.
+            Serial.println("[ota] mark-valid returned non-OK (already valid?)");
+        }
+        s_ota.state = OTA_STATE_CONFIRMED;
+        snprintf(s_ota.applied_cmd, sizeof(s_ota.applied_cmd), "%s", s_ota.cmd_id);
+        ota_state_save(s_ota);
+    } else {
+        Serial.printf("[ota] check-in ack failed (deadline in %lu s)\n",
+                      (unsigned long)((AREG_OTA_CHECKIN_DEADLINE_MS > now)
+                                          ? (AREG_OTA_CHECKIN_DEADLINE_MS - now) / 1000
+                                          : 0));
+        if (now > (uint32_t)AREG_OTA_CHECKIN_DEADLINE_MS) {
+            Serial.println("[ota] check-in DEADLINE passed — self-invalidating "
+                           "so the bootloader rolls back");
+            Serial.flush();
+            if (esp_ota_mark_app_invalid_rollback_and_reboot() != ESP_OK) {
+                ESP.restart();
+            }
+        }
+    }
 }
 
 // -------------------------------------------------------------
@@ -235,20 +348,22 @@ static void poll_commands() {
                       id, type, expiresAt[0] ? expiresAt : "(none)");
         Serial.flush();
 
-        // At-least-once dedup: a re-delivered command we already handled
-        // (lost/failed ack) is NOT re-run — it is only re-acked so the
-        // backend queue converges. Duplicate acks are server-side no-ops.
-        if (dedup_contains(id)) {
+        if (strcmp(type, "firmware_update") == 0) {
+            // firmware_update idempotency lives in NVS (survives the reboot the
+            // apply performs and any rollback) — the RAM ring below would both
+            // be wiped by the reboot AND wrongly re-ack "ok" for a failed
+            // apply, so this type deliberately bypasses it.
+            handle_firmware_update(id);
+        } else if (dedup_contains(id)) {
+            // At-least-once dedup for NON-firmware commands: a re-delivered
+            // command we already handled (lost/failed ack) is NOT re-run — it
+            // is only re-acked so the backend queue converges. Duplicate acks
+            // are server-side no-ops.
             Serial.printf("[ota] duplicate delivery of %s — re-ack only\n", id);
             Serial.flush();
             ack_command(id, "ok", nullptr, "{\"status\":\"deduped\"}");
-            continue;
-        }
-        dedup_add(id);  // BEFORE handling: the dangerous-logic re-run guard
-
-        if (strcmp(type, "firmware_update") == 0) {
-            handle_firmware_update(id);
         } else {
+            dedup_add(id);  // BEFORE handling: the dangerous-logic re-run guard
             // Unknown type: ack failed so the queue clears loudly instead of
             // re-delivering forever. (The backend also rejects unknown types
             // at enqueue, so this is a forward-compat safety net.)
@@ -264,9 +379,24 @@ static void poll_commands() {
 // -------------------------------------------------------------
 
 void ota_foundation_tick() {
+    // Boot-state load + normalization first — needs no network, and the
+    // rollback-detection log must appear even if Wi-Fi is still joining.
+    if (!s_ota_loaded) {
+        s_ota_loaded = true;
+        ota_boot_init();
+    }
     if (!voice_wifi_is_connected()) {
         return;  // the Wi-Fi reconnect tick owns recovery
     }
+
+    // An OTA outcome is pending (we just rebooted into a new image, or the
+    // bootloader rolled us back): the check-in owns the tick until resolved.
+    // Command polling stays paused so nothing else can start mid-verdict.
+    if (s_ota.state == OTA_STATE_REBOOTING) {
+        ota_checkin_tick();
+        return;
+    }
+
     const uint32_t now = millis();
     if (!s_boot_poll_done) {
         // First tick with the link up — boot poll, so a command enqueued

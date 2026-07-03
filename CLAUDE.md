@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1972 tests)
+dotnet test                                     # Run all tests (1978 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2140,6 +2140,58 @@ Secure Boot, no SD sync**. Outbound-only polling.
   Unknown command types ack `failed`/`unsupported_type`.
 - `voice_add_device_auth_headers()` is the shared device-auth seam other
   firmware modules use, so all backend traffic authenticates identically.
+
+### Real OTA apply (Proof 3 slice)
+
+The `firmware_update` handler now REALLY applies (the skeleton's
+manifest-check-only behavior is the `updateAvailable=false` path). Still
+NOT in scope: Secure Boot/eFuse, SD story sync, staged rollout, production
+TLS (Stage A runs over the HTTP LAN bench; `ota_http_begin()` in
+`ota_apply.cpp` is the single transport seam where Stage B swaps in
+`WiFiClientSecure` + pinned CA).
+
+- **Backend image hosting**: `GET /api/devices/firmware-image` (device-authed
+  via the middleware path list, so revoked devices 401) streams the file at
+  `FirmwareUpdate:ImagePath` — deliberately NOT a public wwwroot file.
+  Fail-closed 404 when disabled / unset / relative path / missing file.
+  Range processing on (resume-ready). Pinned by `DeviceControllerOtaTests`
+  (`GetFirmwareImage_*`).
+- **Manifest signature canonical contract**: the HMAC signs
+  `version\nurl\nsha256\nsizeBytes\nexpiresAtWire` where `expiresAtWire` is
+  the JSON WIRE FORM of expiresAt (System.Text.Json rendering, NOT "O"
+  format — fractional-second trailing zeros differ). The device rebuilds the
+  canonical string from the raw JSON text it received. Pinned by
+  `FirmwareManifestServiceTests.Signature_VerifiesAgainstJsonWireForm` —
+  do not change either side without the other.
+- **Firmware apply pipeline** (`ota_apply.{h,cpp}`): fetch manifest at
+  execution time → gates in order: HMAC signature (`AREG_MANIFEST_HMAC_KEY`;
+  empty key = skip with loud warning, Stage-A bench only) → boardModel →
+  minVersion → strict upgrade only (`no_downgrade`; explicit allowDowngrade
+  is a later addition) → sizeBytes bounds → persist NVS `downloading` →
+  stream download with incremental SHA-256 + `Update` into the INACTIVE slot
+  (watchdog fed per chunk) → sha256 verify (constant-time) BEFORE finalize →
+  `Update.end()` (native image validation + boot-partition switch) → persist
+  NVS `rebooting` → `ESP.restart()`. Device-side expiresAt is skipped
+  (no RTC) and logged; expiry is server-enforced.
+- **NO ACK BEFORE REBOOT** (invariant): the command stays `Sent` through the
+  reboot. The NEW image acks the original command id from NVS after boot,
+  and ONLY a 2xx ack triggers `esp_ota_mark_app_valid_cancel_rollback()` —
+  the backend check-in IS the health gate. If the check-in can't succeed
+  within `AREG_OTA_CHECKIN_DEADLINE_MS` (default 5 min), the image
+  self-invalidates and the bootloader rolls back (native pending-verify:
+  `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` verified in core 3.3.8).
+  After rollback, the OLD image detects the version mismatch, persists
+  `rolled_back`, and acks `failed/rollback_no_checkin`.
+- **Persistent idempotency** (`ota_state.{h,cpp}`, NVS namespace `aregota`):
+  state/cmd_id/pending_ver/last_error/applied_cmd/boot_attempts. RAM dedup
+  is insufficient because the apply REBOOTS (wiping RAM) and a failed/rolled-
+  back attempt would otherwise re-apply on every re-delivery — an infinite
+  download/reboot/rollback loop. A command id matching `applied_cmd` is only
+  RE-ACKED (stored outcome), never re-run. Crash mid-download normalizes to
+  `failed/interrupted` at boot. Heartbeat `lastOtaStatus` reports
+  `ota_state_status_cstr()` (e.g. `confirmed`, `failed:sha256_mismatch`).
+- While an OTA outcome is pending (`rebooting`), command polling is paused —
+  the check-in owns the tick until confirm or rollback.
 
 ## Key Design Decisions
 

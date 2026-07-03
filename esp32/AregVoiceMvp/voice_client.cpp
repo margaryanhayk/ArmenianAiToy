@@ -14,6 +14,7 @@
 #include "wifi_creds.h"     // Phase B.1 — NVS-backed Wi-Fi credentials
 #include "device_creds.h"   // Phase C   — NVS-backed device identity
 #include "ota_foundation.h" // Proof 2 — AREG_FW_* identity + running-partition label
+#include "ota_state.h"      // OTA apply — lastOtaStatus for the heartbeat report
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -226,13 +227,13 @@ void voice_send_heartbeat() {
     // constants + the running partition label — no JSON escaping needed.
     // Best-effort exactly like before: any status (incl. 401 on a stale
     // key, or a transport failure) is fine, the next interval retries.
-    char body[224];
+    char body[256];
     snprintf(body, sizeof(body),
              "{\"firmwareVersion\":\"%s\",\"firmwareBuild\":\"%s\","
              "\"boardModel\":\"%s\",\"partitionName\":\"%s\","
              "\"lastOtaStatus\":\"%s\"}",
              AREG_FW_VERSION, AREG_FW_BUILD, AREG_BOARD_MODEL,
-             ota_running_partition_label(), "none");
+             ota_running_partition_label(), ota_state_status_cstr());
     http.addHeader("Content-Type", "application/json");
     const int status = http.POST(body);
     http.end();

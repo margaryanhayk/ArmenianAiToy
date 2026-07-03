@@ -54,13 +54,22 @@ public sealed class FirmwareManifestService : IFirmwareManifestService
     // reject a tampered manifest. Empty key → an empty placeholder (contract
     // present, signing key not yet provisioned). NOTE: this signs the MANIFEST,
     // not the firmware image — image signing (Secure Boot) is a separate step.
+    //
+    // CANONICAL-STRING CONTRACT (device must match byte-for-byte):
+    //   version \n url \n sha256 \n sizeBytes \n expiresAtWireString
+    // expiresAt is signed in its JSON WIRE FORM (System.Text.Json rendering,
+    // e.g. "2026-07-03T12:00:00.123Z" — fractional-second digits trimmed),
+    // NOT the "O" round-trip format, because the device can only rebuild the
+    // canonical string from the raw JSON field text it received. Pinned by
+    // FirmwareManifestServiceTests.Signature_VerifiesAgainstJsonWireForm.
     private string Sign(string version, string url, string sha256, long size, DateTime expiresAt)
     {
         if (string.IsNullOrEmpty(_options.SigningKey))
         {
             return string.Empty;
         }
-        var canonical = $"{version}\n{url}\n{sha256}\n{size}\n{expiresAt:O}";
+        var expiresAtWire = System.Text.Json.JsonSerializer.Serialize(expiresAt).Trim('"');
+        var canonical = $"{version}\n{url}\n{sha256}\n{size}\n{expiresAtWire}";
         using var h = new HMACSHA256(Encoding.UTF8.GetBytes(_options.SigningKey));
         var mac = h.ComputeHash(Encoding.UTF8.GetBytes(canonical));
         return Convert.ToHexString(mac).ToLowerInvariant();
