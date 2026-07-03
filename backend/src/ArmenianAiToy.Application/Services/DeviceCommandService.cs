@@ -47,6 +47,7 @@ public sealed class DeviceCommandService : IDeviceCommandService
                      && (c.Status == DeviceCommandStatus.Pending
                          || c.Status == DeviceCommandStatus.Sent))
             .OrderBy(c => c.CreatedAt)
+            .Take(200) // defensive cap: bound memory if a device's queue grows large
             .ToListAsync();
 
         var deliver = new List<DeviceCommand>();

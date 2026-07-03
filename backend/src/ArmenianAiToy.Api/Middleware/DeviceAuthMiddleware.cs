@@ -19,6 +19,7 @@ public class DeviceAuthMiddleware
         "/api/devices/heartbeat",
         "/api/devices/commands",
         "/api/devices/firmware-manifest",
+        "/api/devices/firmware-image",
     ];
 
     // #034 — LastSeen is refreshed at most once per this interval per device.
@@ -34,9 +35,12 @@ public class DeviceAuthMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        var path = context.Request.Path.Value?.ToLower() ?? "";
-
-        if (!DeviceAuthPaths.Any(p => path.StartsWith(p)))
+        // Segment-aware prefix match: "/api/devices/commands" covers the poll GET
+        // and the ".../{id}/ack" POST, but must NOT over-match a sibling route
+        // like "/api/devices/commandsX". The previous check (String.StartsWith on
+        // a lowercased path) matched any path that merely began with the string.
+        if (!DeviceAuthPaths.Any(p =>
+                context.Request.Path.StartsWithSegments(p, StringComparison.OrdinalIgnoreCase)))
         {
             await _next(context);
             return;
