@@ -19,6 +19,12 @@
 #pragma once
 
 #include <Arduino.h>
+// config.h MUST be consumed before the #ifndef defaults below, or a
+// translation unit that includes this header first (e.g. ota_foundation.cpp,
+// whose own-header-first include order is idiomatic) would silently compile
+// with the DEFAULT version while other units use the config.h override —
+// and the post-OTA check-in compares versions across those units.
+#include "config.h"
 
 // --- Firmware identity (override from config.h / build flags) ---
 // AREG_FW_VERSION is the plain MAJOR.MINOR.PATCH the backend's

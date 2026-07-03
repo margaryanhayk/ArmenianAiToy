@@ -19,6 +19,9 @@
 #pragma once
 
 #include <Arduino.h>
+// Same include-order guard as ota_foundation.h: config.h overrides must be
+// visible before the #ifndef defaults below in EVERY translation unit.
+#include "config.h"
 
 // Shared HMAC key for MANIFEST verification (must equal the backend's
 // FirmwareUpdate:SigningKey). Empty (default) = verification SKIPPED with a
