@@ -87,7 +87,18 @@ DB: command `9500A9C2…` = `Acked / ok / 1.0.1 /
 through the real backend — both gates read the same field; it stays
 covered by code review, not a network bench.)
 
-## Known caveat + TODO (dashboard honesty)
+## Known caveat + TODO (dashboard honesty) — RESOLVED 2026-07-05
+
+> **Resolution (option b was chosen):** attempt-vs-health split at the API
+> layer. `Device.LastOtaStatus` remains the verbatim sticky last-attempt
+> string (the device NVS re-reports it every heartbeat, so server-side
+> clearing — option a — would be overwritten within ~60 s and was
+> rejected). New pure resolver `DeviceOtaHealth.Resolve` derives current
+> health (`ok`/`updating`/`offline`, 180 s presence window) and
+> `AdminDeviceDto` now carries both `lastOtaStatus` and `otaHealth`.
+> Firmware and DeviceCommands audit history untouched. Pinned by
+> `DeviceOtaHealthTests` + `Devices_*OtaHealth*` endpoint tests.
+> Original caveat kept below for the record.
 
 **Caveat observed on the bench:** after the bad-sha test, the device's
 `LastOtaStatus` stays `failed:sha256_mismatch` even though a LATER

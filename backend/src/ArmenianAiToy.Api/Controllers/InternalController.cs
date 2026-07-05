@@ -128,6 +128,8 @@ public class InternalController : ControllerBase
             Name: d.Name,
             MacAddress: d.MacAddress,
             FirmwareVersion: d.FirmwareVersion,
+            LastOtaStatus: d.LastOtaStatus,
+            OtaHealth: DeviceOtaHealth.Resolve(d.LastOtaStatus, d.LastSeenAt, now),
             RegisteredAt: d.RegisteredAt,
             LastSeenAt: d.LastSeenAt,
             IsPaused: d.IsPaused,

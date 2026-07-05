@@ -128,6 +128,58 @@ public class InternalControllerTests
         Assert.Contains(d.Name, json); // safe identity field present
     }
 
+    // ── OTA attempt-vs-health split (bench caveat fix) ─────────────
+
+    [Fact]
+    public async Task Devices_FailedLastOtaAttempt_ButCheckingIn_ReportsHealthOk()
+    {
+        // The exact bench scenario: device is healthy, up to date, and
+        // heartbeating, but its last OTA attempt failed (sticky NVS report).
+        // The wire must carry BOTH: the diagnostic attempt string verbatim
+        // AND otaHealth "ok" — never painting the healthy device broken.
+        var db = NewDb();
+        var d = Dev();
+        d.LastOtaStatus = "failed:sha256_mismatch";
+        d.LastSeenAt = DateTime.UtcNow; // checking in right now
+        db.Devices.Add(d);
+        await db.SaveChangesAsync();
+
+        var json = Json(await NewController(db).Devices(default));
+
+        Assert.Contains("\"lastOtaStatus\":\"failed:sha256_mismatch\"", json);
+        Assert.Contains("\"otaHealth\":\"ok\"", json);
+    }
+
+    [Fact]
+    public async Task Devices_MidUpdate_ReportsHealthUpdating()
+    {
+        var db = NewDb();
+        var d = Dev();
+        d.LastOtaStatus = "rebooting";
+        d.LastSeenAt = DateTime.UtcNow;
+        db.Devices.Add(d);
+        await db.SaveChangesAsync();
+
+        var json = Json(await NewController(db).Devices(default));
+
+        Assert.Contains("\"otaHealth\":\"updating\"", json);
+    }
+
+    [Fact]
+    public async Task Devices_NotCheckingIn_ReportsHealthOffline()
+    {
+        var db = NewDb();
+        var d = Dev();
+        d.LastOtaStatus = "confirmed";
+        d.LastSeenAt = DateTime.UtcNow.AddMinutes(-30); // silent for 30 min
+        db.Devices.Add(d);
+        await db.SaveChangesAsync();
+
+        var json = Json(await NewController(db).Devices(default));
+
+        Assert.Contains("\"otaHealth\":\"offline\"", json);
+    }
+
     // ── Flagged spans all devices ──────────────────────────────────
 
     [Fact]

@@ -38,6 +38,13 @@ public sealed record AdminDeviceDto(
     string Name,
     string MacAddress,
     string? FirmwareVersion,
+    // OTA status split (bench caveat fix): LastOtaStatus is the device-
+    // reported LAST-ATTEMPT outcome (sticky diagnostic, e.g.
+    // "failed:sha256_mismatch"); OtaHealth is the DERIVED current health
+    // ("ok"/"updating"/"offline" via DeviceOtaHealth) so a healthy,
+    // checking-in device is never painted broken by an old failed attempt.
+    string? LastOtaStatus,
+    string OtaHealth,
     DateTime RegisteredAt,
     DateTime LastSeenAt,
     bool IsPaused,

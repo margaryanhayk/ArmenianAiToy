@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1978 tests)
+dotnet test                                     # Run all tests (1996 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2198,11 +2198,20 @@ TLS (Stage A runs over the HTTP LAN bench; `ota_http_begin()` in
   gating. Full evidence + serial/DB captures:
   `backend/docs/ota-bench-evidence.md`. Poison/dead-backend rollback test,
   corrupted-image test, and Stage-B TLS are deliberately NOT yet run.
-- **Known caveat (TODO)**: heartbeat `lastOtaStatus` reports the last
-  ATTEMPT outcome — a stale `failed:sha256_mismatch` persists on a healthy,
-  up-to-date device even after a later successful no-update check. Future
-  slice: clear stale failures on a successful check/apply, or split
-  last-attempt vs current-health on the wire (see the evidence doc's TODO).
+- **Attempt-vs-health split (caveat RESOLVED at the API layer)**:
+  `Device.LastOtaStatus` stays the verbatim device-reported LAST-ATTEMPT
+  outcome (sticky by design — the device's NVS re-reports it every
+  heartbeat, so a server-side clear would be overwritten within ~60 s;
+  that's why the "clear stale status" option was rejected). Current health
+  is DERIVED at read time by `DeviceOtaHealth.Resolve(lastOtaStatus,
+  lastSeenAt, nowUtc)` → `ok` / `updating` (downloading/rebooting) /
+  `offline` (same 180 s presence window as `LinkedDeviceDto.IsOnline`).
+  `AdminDeviceDto` carries BOTH (`lastOtaStatus` + `otaHealth`) so the
+  operator console shows the failed attempt as a diagnostic without
+  painting a healthy, checking-in device broken. Firmware unchanged;
+  `DeviceCommands` audit history unchanged. Pinned by
+  `DeviceOtaHealthTests` (keystone: `failed:sha256_mismatch` + fresh
+  heartbeat → `ok`) and the `Devices_*OtaHealth*` endpoint tests.
 
 ## Key Design Decisions
 
