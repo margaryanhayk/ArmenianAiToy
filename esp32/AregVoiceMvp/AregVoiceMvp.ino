@@ -26,6 +26,7 @@
 #include "wifi_creds.h"        // B.1 — NVS cred clear (factory reset gesture)
 #include "ble_provisioning.h"  // B.2 — BLE provisioning (gated; no-op when flag off)
 #include "ota_foundation.h"    // Proof 2 — phone-home command poll (no OTA apply)
+#include "sd_bench.h"          // microSD hardware proof (AREG_SD_BENCH_TEST builds only)
 
 // #047 — hang-protection tunables. Defaulted here so the build never depends
 // on config.h carrying them; overridable in config.h. See config.h.example.
@@ -937,6 +938,12 @@ void setup() {
     } else {
         Serial.println("[boot] SD not mounted — Wi-Fi streaming only");
     }
+#ifdef AREG_SD_BENCH_TEST
+    // microSD HARDWARE PROOF (bench builds only): write + read-back on the
+    // just-mounted card — the precondition for the future Cloud→SD story
+    // sync. Zero bytes of this exist in production builds.
+    sd_bench_run();
+#endif
     Serial.flush();
     DIAG_MARK(135, "sd_mount_done");
 
