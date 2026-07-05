@@ -2192,6 +2192,17 @@ TLS (Stage A runs over the HTTP LAN bench; `ota_http_begin()` in
   `ota_state_status_cstr()` (e.g. `confirmed`, `failed:sha256_mismatch`).
 - While an OTA outcome is pending (`rebooting`), command polling is paused —
   the check-in owns the tick until confirm or rollback.
+- **Bench-verified on real hardware** (2026-07-03..05): happy path
+  1.0.0→1.0.1 (incl. observed `img_state=pending_verify`), bad-sha256
+  refusal (full download, no reboot, no brick), wrong-board server-side
+  gating. Full evidence + serial/DB captures:
+  `backend/docs/ota-bench-evidence.md`. Poison/dead-backend rollback test,
+  corrupted-image test, and Stage-B TLS are deliberately NOT yet run.
+- **Known caveat (TODO)**: heartbeat `lastOtaStatus` reports the last
+  ATTEMPT outcome — a stale `failed:sha256_mismatch` persists on a healthy,
+  up-to-date device even after a later successful no-update check. Future
+  slice: clear stale failures on a successful check/apply, or split
+  last-attempt vs current-health on the wire (see the evidence doc's TODO).
 
 ## Key Design Decisions
 
