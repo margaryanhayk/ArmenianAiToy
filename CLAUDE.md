@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1996 tests)
+dotnet test                                     # Run all tests (2013 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2140,6 +2140,33 @@ Secure Boot, no SD sync**. Outbound-only polling.
   Unknown command types ack `failed`/`unsupported_type`.
 - `voice_add_device_auth_headers()` is the shared device-auth seam other
   firmware modules use, so all backend traffic authenticates identically.
+
+### Cloud→SD content sync (backend half, minimal slice)
+
+The story-audio counterpart of the firmware-manifest/image pair — the
+backend contract the ESP32 SD-download firmware targets. ONE configured
+MP3 item, config-driven (`ContentSync` section → `ContentSyncOptions`,
+ships `Enabled=false`); a later slice makes it per-device/per-tier on the
+same wire shape.
+
+- `GET /api/devices/content-manifest` (device-authed): `{ stories: [...] }`
+  with zero or one item `{ storyId, version, title, audioUrl, sha256
+  (lowercased 64-hex), sizeBytes, enabled }`. Fail-closed empty on
+  disabled / missing storyId / bad sha length / non-positive size.
+  `enabled:false` is on the wire from day one for future retirement.
+- `GET /api/devices/content-file` (device-authed): streams the MP3 at
+  `ContentSync:AudioPath` — NOT wwwroot; same fail-closed 404 matrix as
+  firmware-image (disabled / unset / relative / missing); `audio/mpeg`
+  with Range processing (resume-ready).
+- Both paths are in `DeviceAuthMiddleware`'s device-auth list — unauth
+  callers 401 before any controller runs (pinned by a middleware test),
+  and revoked devices are rejected by `ValidateDeviceAsync`.
+- Integrity = manifest sha256/sizeBytes, verified by the device while
+  streaming to SD. Manifest HMAC signing (as firmware-manifest has) is a
+  deliberate follow-up when multi-story/tiers land.
+- PC/API bench verified 2026-07-05: manifest + authed download round-trip
+  (sha256 `d3a6fbdb…` / 4,654,560 B matched), 401 without headers.
+- Pinned by `ContentManifestServiceTests` + `DeviceControllerContentSyncTests`.
 
 ### Real OTA apply (Proof 3 slice)
 

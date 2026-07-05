@@ -169,4 +169,44 @@ public class DeviceController : ControllerBase
         return PhysicalFile(options.ImagePath, "application/octet-stream",
             enableRangeProcessing: true);
     }
+
+    // Cloud→SD content sync (minimal slice): the story-audio set this device
+    // should hold on its SD card. Device-authed (middleware) — a revoked
+    // device 401s before reaching here. Static single-item config today; a
+    // later slice makes it per-device/per-tier on the same contract.
+    [HttpGet("content-manifest")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public IActionResult GetContentManifest(
+        [FromServices] IContentManifestService manifest)
+    {
+        return Ok(manifest.Build());
+    }
+
+    // Streams the configured story MP3 to the device. Same fail-closed
+    // posture as firmware-image: 404 whenever sync is disabled, no path is
+    // configured, the path is not absolute, or the file is missing. NOT a
+    // public wwwroot file. Integrity is carried by the manifest's
+    // sha256/sizeBytes, which the device verifies while streaming to SD.
+    [HttpGet("content-file")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public IActionResult GetContentFile(
+        [FromServices] ContentSyncOptions options,
+        [FromServices] ILogger<DeviceController> logger)
+    {
+        if (!options.Enabled || string.IsNullOrWhiteSpace(options.AudioPath))
+        {
+            return NotFound(new { error = "No content available." });
+        }
+        if (!Path.IsPathRooted(options.AudioPath) || !System.IO.File.Exists(options.AudioPath))
+        {
+            logger.LogWarning(
+                "Content audio path missing or not absolute: {AudioPath}", options.AudioPath);
+            return NotFound(new { error = "No content available." });
+        }
+        return PhysicalFile(options.AudioPath, "audio/mpeg",
+            enableRangeProcessing: true);
+    }
 }

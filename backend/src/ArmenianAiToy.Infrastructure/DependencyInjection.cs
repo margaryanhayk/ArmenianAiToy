@@ -301,6 +301,23 @@ public static class DependencyInjection
         services.AddSingleton(fwOpts);
         services.AddSingleton<IFirmwareManifestService, FirmwareManifestService>();
 
+        // Cloud→SD content sync (minimal slice): the ONE configured story
+        // audio the device content-manifest offers. Same manual-binding
+        // style; ships Enabled=false → empty manifest until configured.
+        var csOpts = new ContentSyncOptions();
+        var csSection = config.GetSection("ContentSync");
+        if (bool.TryParse(csSection["Enabled"], out var csEnabled)) csOpts.Enabled = csEnabled;
+        csOpts.StoryId = csSection["StoryId"] ?? "";
+        if (int.TryParse(csSection["Version"], out var csVersion)) csOpts.Version = csVersion;
+        csOpts.Title = csSection["Title"] ?? "";
+        csOpts.AudioUrl = string.IsNullOrWhiteSpace(csSection["AudioUrl"])
+            ? csOpts.AudioUrl : csSection["AudioUrl"]!;
+        csOpts.AudioPath = csSection["AudioPath"] ?? "";
+        csOpts.Sha256 = csSection["Sha256"] ?? "";
+        if (long.TryParse(csSection["SizeBytes"], out var csSize)) csOpts.SizeBytes = csSize;
+        services.AddSingleton(csOpts);
+        services.AddSingleton<IContentManifestService, ContentManifestService>();
+
         // First scheduled-delete worker in the repo. Hard-deletes
         // conversations (and their cascaded messages) older than
         // Retention:Messages:MaxAgeDays (default 90). Missing config

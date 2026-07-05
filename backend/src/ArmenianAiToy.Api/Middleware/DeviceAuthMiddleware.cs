@@ -20,6 +20,8 @@ public class DeviceAuthMiddleware
         "/api/devices/commands",
         "/api/devices/firmware-manifest",
         "/api/devices/firmware-image",
+        "/api/devices/content-manifest",
+        "/api/devices/content-file",
     ];
 
     // #034 — LastSeen is refreshed at most once per this interval per device.
