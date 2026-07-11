@@ -2168,6 +2168,58 @@ same wire shape.
   (sha256 `d3a6fbdb…` / 4,654,560 B matched), 401 without headers.
 - Pinned by `ContentManifestServiceTests` + `DeviceControllerContentSyncTests`.
 
+### Cloud→SD content sync (firmware half — bench-verified on real hardware)
+
+The ESP32 counterpart to the backend half above. Two bench-only firmware
+modules, each gated behind its own build flag so **production builds compile
+ZERO bytes of either** and stay byte-identical:
+
+- `content_sync.{h,cpp}` (`-DAREG_CONTENT_SYNC_BENCH`) — one sync attempt per
+  boot from the IDLE loop once Wi-Fi + SD are both up:
+  `GET /api/devices/content-manifest` (device-authed) → already-cached check
+  (stream the final file through SHA-256; match ⇒ `already cached PASS`, no
+  re-download) → else chunked download to `/tmp/<storyId>.mp3.part` with
+  streaming SHA-256 + size check → verify SHA **before** touching the final
+  path → atomic `rename` to `/stories/<storyId>-v<version>.mp3` →
+  `/content_index.json` written LAST. Any failure deletes the `.part` and
+  never touches a previously-good final file. No playback, eviction,
+  multi-story, resume, or backend/OTA changes in this slice.
+- `sd_diag.{h,cpp}` (`-DAREG_SD_DIAG_BENCH`) — standalone SD isolator used to
+  diagnose the mount failure below. First run 20 s after boot, then **re-runs
+  every 30 s until one attempt mounts** (then prints `PASS` and stops), so a
+  monitor attached late still catches the next attempt. Tests
+  `audio_sd_begin()` then raw `SD.begin` at 400 kHz/1/4/10 MHz, then
+  read/write/verify/delete.
+
+**HARDWARE NOTE — the SD module must be powered from ESP 5V, not 3V3.** The
+bench SD module (WWZMDiB blue microSD board: onboard AMS1117 regulator +
+level shifter) browns out on 3.3 V — `SD.begin` fails at *every* SPI speed,
+which masquerades as a wiring/card fault. Moving its VCC to the board's 5V
+rail fixed it. Note the bench dev board (a USB-C ESP32-S3-DevKitC-1 clone)
+does **not** expose USB 5 V on any header pin (`5VIN` / J1-21 is input-only,
+reads ~0.14 V), so the module VCC was fed from an external 5 V source with a
+**shared ground** to the ESP. Final SD wiring:
+
+| SD pin | ESP32-S3 |
+|--------|----------|
+| VCC    | **5V** (external 5 V, shared GND — never 3V3) |
+| GND    | GND |
+| CS     | GPIO10 |
+| SCK    | GPIO12 |
+| DI (MOSI) | GPIO11 |
+| DO (MISO) | GPIO13 |
+
+**Bench evidence (real ESP32-S3 hardware, 2026-07-11):**
+- SD diag on 5 V: `audio_sd_begin ok`, card `SDHC/SDXC` 7680 MB, root list +
+  `readwrite PASS` → `[sd-diag] PASS`.
+- Content-sync first run: manifest `status=200 stories=1`, item
+  `anban-huri v1 "Anban Huri" 4654560 bytes`, download 10→100 %,
+  `sha256 ok` (`d3a6fbdb…b103b85`), moved
+  `/tmp/anban-huri.mp3.part → /stories/anban-huri-v1.mp3`, `index written`,
+  `[content-sync] PASS`, heartbeat `status=200`.
+- Second boot idempotence: `already cached PASS` (no re-download).
+- Matches the backend-half manifest (`sha256 d3a6fbdb…`, 4,654,560 B).
+
 ### Real OTA apply (Proof 3 slice)
 
 The `firmware_update` handler now REALLY applies (the skeleton's

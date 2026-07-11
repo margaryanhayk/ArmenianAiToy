@@ -27,6 +27,8 @@
 #include "ble_provisioning.h"  // B.2 — BLE provisioning (gated; no-op when flag off)
 #include "ota_foundation.h"    // Proof 2 — phone-home command poll (no OTA apply)
 #include "sd_bench.h"          // microSD hardware proof (AREG_SD_BENCH_TEST builds only)
+#include "content_sync.h"      // Cloud→SD story sync (AREG_CONTENT_SYNC_BENCH builds only)
+#include "sd_diag.h"           // standalone SD diagnostic (AREG_SD_DIAG_BENCH builds only)
 
 // #047 — hang-protection tunables. Defaulted here so the build never depends
 // on config.h carrying them; overridable in config.h. See config.h.example.
@@ -1085,6 +1087,21 @@ void loop() {
         // (this branch), same as the heartbeat, so a poll can never stall a
         // voice turn. NO firmware download/apply in this slice.
         ota_foundation_tick();
+
+#ifdef AREG_CONTENT_SYNC_BENCH
+        // Cloud→SD story sync (bench builds only): one attempt per boot,
+        // once Wi-Fi + SD are both up. IDLE-only — a 4.6 MB download can
+        // never stall a voice turn. Zero bytes of this in production.
+        content_sync_tick();
+#endif
+
+#ifdef AREG_SD_DIAG_BENCH
+        // Standalone SD diagnostic (bench builds only): isolates the
+        // content-sync "SD.begin failed" into hardware-vs-integration.
+        // First run 20 s after boot, then every 30 s until a pass. No
+        // backend, no network needed.
+        sd_diag_tick();
+#endif
 
         char ev = button_poll();
         if (ev == 'P') {
