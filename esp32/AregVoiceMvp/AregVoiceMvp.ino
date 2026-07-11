@@ -31,6 +31,11 @@
 #include "sd_diag.h"           // standalone SD diagnostic (AREG_SD_DIAG_BENCH builds only)
 #include "sd_playback.h"       // cached-MP3 SD playback (AREG_SD_PLAYBACK_BENCH builds only)
 
+#ifdef AREG_STORY_SD_CACHE_FIRST
+#include <SD.h>            // FS.h + SD — read /content_index.json (already linked)
+#include <ArduinoJson.h>   // JsonDocument/deserializeJson (already a project dep)
+#endif
+
 // #047 — hang-protection tunables. Defaulted here so the build never depends
 // on config.h carrying them; overridable in config.h. See config.h.example.
 #ifndef AREG_WDT_TIMEOUT_S
@@ -536,6 +541,56 @@ static void handle_post_story_flow() {
 //   - quick TAP     → sticky pause: leave the session, the saved offset
 //                     stays, and the next button press resumes it.
 // Reaching the natural end resets to the beginning.
+#ifdef AREG_STORY_SD_CACHE_FIRST
+// SD-first-from-cache resolver (opt-in). Consults the content-sync cache
+// written by content_sync.cpp (/content_index.json → "file", the flat
+// /stories/<id>-v<ver>.mp3 file), NOT the ContentPackBuilder layout that
+// AREG_SD_STORY_NARRATION points at. Returns true and fills `out` with the
+// cached MP3 path ONLY when a valid, present cache exists for THIS story;
+// false to fall through to the pack/Wi-Fi chain. Hardened over
+// sd_playback.cpp's bench resolver: verifies the file exists on SD and the
+// storyId matches AREG_STORY_ID (single-story safety), no hard fallback.
+static bool story_resolve_cache_path(char *out, size_t out_len) {
+    if (!audio_sd_has_file("/content_index.json")) {
+        return false;  // no synced content (self-guards on the boot mount)
+    }
+    File idx = SD.open("/content_index.json", FILE_READ);
+    if (!idx) {
+        return false;
+    }
+    JsonDocument doc;
+    const DeserializationError err = deserializeJson(doc, idx);
+    idx.close();
+    if (err != DeserializationError::Ok) {
+        Serial.println("[story] cache index parse failed — trying pack");
+        Serial.flush();
+        return false;
+    }
+    const char *file = doc["file"]    | "";
+    const char *sid  = doc["storyId"] | "";
+    if (file[0] != '/') {
+        Serial.println("[story] cache index has no usable 'file' — trying pack");
+        Serial.flush();
+        return false;
+    }
+    if (strcmp(sid, AREG_STORY_ID) != 0) {
+        Serial.printf("[story] cache storyId mismatch (idx=%s cfg=%s) — trying pack\n",
+                      sid, AREG_STORY_ID);
+        Serial.flush();
+        return false;
+    }
+    if (!audio_sd_has_file(file)) {
+        Serial.printf("[story] cache file missing on SD (%s) — trying pack\n", file);
+        Serial.flush();
+        return false;
+    }
+    snprintf(out, out_len, "%s", file);
+    Serial.printf("[story] cache index file=%s storyId=%s\n", out, sid);
+    Serial.flush();
+    return true;
+}
+#endif  // AREG_STORY_SD_CACHE_FIRST
+
 static void handle_story_session() {
     // Story-audio access token (gap 1). UNVERIFIED — not compiled/flashed.
     // When the backend has StoryAudio:SigningKey set, the header-less
@@ -545,8 +600,23 @@ static void handle_story_session() {
     // OFFLINE-FIRST source (Slice 2). If the content pack's narration MP3 is on
     // the SD card, play it from the card (no Wi-Fi, no token); otherwise fall
     // back to the Wi-Fi story stream. Decided once per session.
-    const bool use_sd = audio_sd_has_file(AREG_SD_STORY_NARRATION);
+    // Which on-SD narration file to play (if any). Default is the content-pack
+    // layout; the content-sync cache (opt-in) takes priority when present.
+    const char *sd_narration_path = AREG_SD_STORY_NARRATION;
+#ifdef AREG_STORY_SD_CACHE_FIRST
+    char sd_cache_path[96];
+    const bool cache_hit = story_resolve_cache_path(sd_cache_path, sizeof(sd_cache_path));
+    if (cache_hit) {
+        sd_narration_path = sd_cache_path;  // prefer the content-sync cache
+    }
+#endif
+    const bool use_sd = audio_sd_has_file(sd_narration_path);
+#ifdef AREG_STORY_SD_CACHE_FIRST
+    Serial.printf("[story] source = %s\n",
+                  use_sd ? (cache_hit ? "SD (cache)" : "SD (pack)") : "Wi-Fi stream");
+#else
     Serial.printf("[story] source = %s\n", use_sd ? "SD (offline)" : "Wi-Fi stream");
+#endif
     Serial.flush();
 
     // Story-audio access token (gap 1) — only the Wi-Fi stream needs it.
@@ -568,7 +638,7 @@ static void handle_story_session() {
             Serial.printf("[story] SD play from byte %u\n", (unsigned)s_story_offset);
             Serial.flush();
             interrupted = audio_play_story_file(
-                AREG_SD_STORY_NARRATION, s_story_offset, story_barge_in_poll, &resume_offset);
+                sd_narration_path, s_story_offset, story_barge_in_poll, &resume_offset);
         } else {
             // Room for the base URL + ?from=<u32> + &token=<opaque>.
             char url[640];

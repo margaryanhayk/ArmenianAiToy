@@ -2265,6 +2265,42 @@ is byte-identical (verified: flag-off image = 1,264,539 B, unchanged).
   Confirms the cached MP3 opens from SD, the existing MP3 decoder path
   works, and the I2S/MAX98357A speaker path works end-to-end.
 
+### SD-first story playback from the content-sync cache
+
+Wires the content-sync cache into the **real** story flow: when a story MP3
+is cached on SD, `handle_story_session()` plays it from the card (offline, no
+Wi-Fi, no token) instead of streaming from the backend. Gated behind
+`-DAREG_STORY_SD_CACHE_FIRST`; production compiles **byte-identical**
+(flag-off image = 1,264,539 B, unchanged — every new line is `#ifdef`-guarded).
+
+- **One production file** touched (`AregVoiceMvp.ino`) — no `audio_io.*`,
+  `content_sync.*`, `sd_playback.*`, OTA, backend, or partition change.
+- **Resolver** `story_resolve_cache_path()` (above `handle_story_session`):
+  reads `/content_index.json`, returns the cached `file` path **only if** it
+  starts with `/`, `storyId == AREG_STORY_ID` (single-story safety), and the
+  file exists on SD (`audio_sd_has_file`); else logs a reason and returns
+  false. Hardened over `sd_playback.cpp`'s bench resolver (which has no
+  storyId/existence guard and a hard fallback).
+- **Priority: content-sync cache → content-pack narration
+  (`AREG_SD_STORY_NARRATION`) → Wi-Fi stream.** The decision computes
+  `sd_narration_path` once; `use_sd = audio_sd_has_file(sd_narration_path)`;
+  the resolved path feeds the existing `audio_play_story_file(...)` call.
+  Barge-in/resume (`s_story_offset`), token logic, and `handle_post_story_flow`
+  (self-gates on pack clips → no-ops on a cache hit) are unchanged.
+- **When the flag is OFF** the block reduces to the original
+  `audio_sd_has_file(AREG_SD_STORY_NARRATION)` + log line — no behavior or
+  code change (verified byte-identical build).
+- **Bench evidence — Test A, real ESP32-S3 hardware (2026-07-12):** button
+  press ran the live story flow; serial showed `[story] cache index
+  file=/stories/anban-huri-v1.mp3 storyId=anban-huri` → `[story] source = SD
+  (cache)` → `[story] SD open: /stories/anban-huri-v1.mp3 @ 0` → `[story] SD
+  end interrupted=false` → `[story] finished`, and the operator heard the
+  story from the speaker. Confirms the real session reads `/content_index.json`,
+  selects the cached MP3, prefers the cache over the Wi-Fi stream, reuses the
+  `audio_play_story_file` decoder path, and returns cleanly to idle. Fallback
+  paths (pack / Wi-Fi / storyId-mismatch) are covered by the resolver guards
+  but not yet separately hardware-run.
+
 ### Real OTA apply (Proof 3 slice)
 
 The `firmware_update` handler now REALLY applies (the skeleton's
