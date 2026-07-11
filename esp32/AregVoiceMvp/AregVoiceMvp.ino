@@ -29,6 +29,7 @@
 #include "sd_bench.h"          // microSD hardware proof (AREG_SD_BENCH_TEST builds only)
 #include "content_sync.h"      // Cloud→SD story sync (AREG_CONTENT_SYNC_BENCH builds only)
 #include "sd_diag.h"           // standalone SD diagnostic (AREG_SD_DIAG_BENCH builds only)
+#include "sd_playback.h"       // cached-MP3 SD playback (AREG_SD_PLAYBACK_BENCH builds only)
 
 // #047 — hang-protection tunables. Defaulted here so the build never depends
 // on config.h carrying them; overridable in config.h. See config.h.example.
@@ -1101,6 +1102,15 @@ void loop() {
         // First run 20 s after boot, then every 30 s until a pass. No
         // backend, no network needed.
         sd_diag_tick();
+#endif
+
+#ifdef AREG_SD_PLAYBACK_BENCH
+        // Cached-MP3 SD playback (bench builds only): plays the story MP3
+        // already cached on SD (by content-sync) through the EXISTING
+        // audio_play_story_file() decoder path. One shot, 30 s after boot,
+        // IDLE-only. No backend download, no recording, no content-sync.
+        // Playback blocks the idle loop for the clip's duration by design.
+        sd_playback_tick();
 #endif
 
         char ev = button_poll();

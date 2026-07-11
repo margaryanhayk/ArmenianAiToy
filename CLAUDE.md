@@ -2236,6 +2236,35 @@ compile/upload commands (production + both bench flags) are in
 - Second boot idempotence: `already cached PASS` (no re-download).
 - Matches the backend-half manifest (`sha256 d3a6fbdb…`, 4,654,560 B).
 
+### Cached-MP3 SD playback (firmware bench — hardware-verified)
+
+Closes the Cloud→SD→speaker loop: plays a story MP3 **already cached on the
+SD card** (by the content-sync slice) out the MAX98357A speaker. Gated
+behind `-DAREG_SD_PLAYBACK_BENCH`; production compiles **zero bytes** and
+is byte-identical (verified: flag-off image = 1,264,539 B, unchanged).
+
+- `sd_playback.{h,cpp}` — one shot per boot, 30 s after boot (armed
+  heartbeat until then). Ensures SD via `audio_sd_begin()`/
+  `audio_sd_available()`, resolves the file from `/content_index.json`
+  (`"file"` field; falls back to `/stories/anban-huri-v1.mp3` with a logged
+  reason), verifies existence + size, then plays.
+- **Reuses the existing decoder verbatim — NO second decoder.** It calls
+  `audio_speaker_begin()` then `audio_play_story_file(path, 0, nullptr,
+  nullptr)` (`audio_io.cpp`), the same `AudioFileSourceSD` →
+  `AudioGeneratorMP3` → `AudioOutputI2S` path the offline-story flow uses,
+  on amp pins `AREG_PIN_AMP_BCK=15 / LRC=16 / DATA=7`. `barge_in=nullptr`
+  ⇒ plays to natural end; the decoder feeds the task watchdog per frame.
+  Success is `!interrupted` plus an elapsed-time plausibility check (a real
+  ~4.6 MB story runs minutes; a decode/open bail returns instantly).
+- The MP3 is opened read-only — never modified or deleted. No backend
+  download, no content-sync, no recording/chat turn in this bench.
+- **Bench evidence (real ESP32-S3 hardware, 2026-07-12):** operator heard
+  the cached Anban Huri story from the speaker; serial showed `[story] SD
+  end interrupted=false` then `[sd-playback] done ok=true (232745ms)` — a
+  clean ~3.9-minute play from SD with no backend call, file left cached.
+  Confirms the cached MP3 opens from SD, the existing MP3 decoder path
+  works, and the I2S/MAX98357A speaker path works end-to-end.
+
 ### Real OTA apply (Proof 3 slice)
 
 The `firmware_update` handler now REALLY applies (the skeleton's
