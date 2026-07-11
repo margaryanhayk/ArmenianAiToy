@@ -164,6 +164,51 @@ You should see (matches `setup()` output in `AregVoiceMvp.ino`):
 [state] 0 -> 0
 ```
 
+### arduino-cli — correct FQBN (avoids the false 96–97% flash alarm)
+
+This sketch ships a custom **8 MB dual-OTA `partitions.csv`** with **3 MB
+OTA app slots**. Always build/upload with `FlashSize=8M` and
+`PartitionScheme=custom` so the flash-size check matches the real
+partition table:
+
+```
+esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc
+```
+
+**⚠️ Do NOT use `PartitionScheme=default` for this project.** The default
+scheme reports a **1.25 MB** app slot (0x140000) and makes the toolchain
+measure firmware against the wrong ceiling — that is the sole source of
+the false "96–97% of program storage" alarm. Built correctly, the
+production image is ~**1,264,539 bytes ≈ 40%** of the real **3 MB** slot,
+with ~1.88 MB free per slot.
+
+Production compile (flag-off):
+```
+arduino-cli compile --fqbn "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc" ".\esp32\AregVoiceMvp"
+```
+
+Upload:
+```
+arduino-cli upload -p COM7 --fqbn "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc" ".\esp32\AregVoiceMvp"
+```
+
+Content-sync bench (compile + upload, `-DAREG_CONTENT_SYNC_BENCH`):
+```
+arduino-cli compile --upload -p COM7 --fqbn "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc" --build-property "compiler.cpp.extra_flags=-DAREG_CONTENT_SYNC_BENCH" ".\esp32\AregVoiceMvp"
+```
+
+SD diagnostic bench (compile + upload, `-DAREG_SD_DIAG_BENCH`):
+```
+arduino-cli compile --upload -p COM7 --fqbn "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc" --build-property "compiler.cpp.extra_flags=-DAREG_SD_DIAG_BENCH" ".\esp32\AregVoiceMvp"
+```
+
+> Adjust `-p COM7` to your serial port. Production builds must define
+> **neither** bench flag — each `-DAREG_*_BENCH` module compiles to zero
+> bytes without its flag.
+>
+> The custom partition table has **3 MB OTA app slots**, so SD MP3
+> playback can proceed **without any partition migration**.
+
 ## Bench demo
 
 1. Press and hold the BOOT button. LED turns red.

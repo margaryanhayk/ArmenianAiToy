@@ -2209,6 +2209,22 @@ reads ~0.14 V), so the module VCC was fed from an external 5 V source with a
 | DI (MOSI) | GPIO11 |
 | DO (MISO) | GPIO13 |
 
+**BUILD NOTE — always build with `FlashSize=8M,PartitionScheme=custom`.**
+The sketch ships a custom 8 MB dual-OTA `partitions.csv` with **3 MB OTA
+app slots**. The correct FQBN is:
+
+```
+esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc
+```
+
+**Do NOT use `PartitionScheme=default`.** It measures firmware against the
+default 1.25 MB (0x140000) app slot, which is the sole cause of the false
+"96–97% of program storage" flash alarm. Built correctly, the production
+image is ~1,264,539 B ≈ **40%** of the real **3 MB** slot (~1.88 MB free per
+slot). No partition redesign is needed before SD MP3 playback. Full
+compile/upload commands (production + both bench flags) are in
+`esp32/AregVoiceMvp/README.md` → "arduino-cli — correct FQBN".
+
 **Bench evidence (real ESP32-S3 hardware, 2026-07-11):**
 - SD diag on 5 V: `audio_sd_begin ok`, card `SDHC/SDXC` 7680 MB, root list +
   `readwrite PASS` → `[sd-diag] PASS`.
