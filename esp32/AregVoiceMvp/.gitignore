@@ -4,7 +4,11 @@
 canned_clip.mp3
 
 # Arduino / PlatformIO build artifacts.
+# build/ is the default output dir; build_* are the per-flag bench build
+# dirs (build_sddiag, build_contentsync, build_sdplayback, ...). Ignore all
+# of them so local Arduino build folders never get staged.
 build/
+build_*/
 *.elf
 *.bin
 *.map
