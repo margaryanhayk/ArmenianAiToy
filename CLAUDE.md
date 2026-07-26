@@ -2297,9 +2297,90 @@ Wi-Fi, no token) instead of streaming from the backend. Gated behind
   end interrupted=false` → `[story] finished`, and the operator heard the
   story from the speaker. Confirms the real session reads `/content_index.json`,
   selects the cached MP3, prefers the cache over the Wi-Fi stream, reuses the
-  `audio_play_story_file` decoder path, and returns cleanly to idle. Fallback
-  paths (pack / Wi-Fi / storyId-mismatch) are covered by the resolver guards
-  but not yet separately hardware-run.
+  `audio_play_story_file` decoder path, and returns cleanly to idle.
+- **Fallback paths are now hardware-verified too** — see the fallback test
+  harness below (Tests B / E / C, 2026-07-26).
+
+#### SD-first fallback test harness (bench-only)
+
+Automates the three fallback paths Test A did not cover, on real hardware.
+Gated behind `-DAREG_STORY_SD_FALLBACK_TEST_BENCH`, which **requires**
+`AREG_STORY_SD_CACHE_FIRST` (enforced by an `#error`, since the harness
+exercises `story_resolve_cache_path`). Production compiles **zero bytes** of
+it — every added line, including the `loop()` hook, is inside the `#ifdef`.
+
+- **One file** (`AregVoiceMvp.ino`, +188 lines). No `audio_io.*`,
+  `content_sync.*`, `sd_playback.*`, OTA, backend, or partition change.
+- **One shot per boot**, 30 s after boot from the IDLE branch (armed status
+  line every 5 s until then), so a monitor attached late still sees it.
+- **Exercises the REAL resolver**, not a copy: `fbtest_log_source()`
+  replicates the production source decision from `handle_story_session()` and
+  calls `story_resolve_cache_path()` / `audio_sd_has_file()` directly, so a
+  PASS is evidence about the shipping code path.
+- **Manipulates then restores SD state**: renames `/content_index.json` (Test
+  B), writes a temp index with a wrong `storyId` (Test E), moves both the
+  index and the pack narration aside (Test C). Every path restores, and a
+  final `restore check:` line asserts no leftovers.
+- **Test C plays for real but is time-boxed** — it calls the existing
+  `audio_play_story_stream()` and cuts at ~8 s through the barge-in seam, so
+  the backend GET and real decode are proven without a 4-minute stream.
+
+**Bench evidence — real ESP32-S3 hardware (2026-07-26):**
+
+```
+[fallback-test] Test B resolved source = Wi-Fi stream
+[fallback-test] Test B PASS (SD-cache NOT selected)
+
+[story] cache storyId mismatch (idx=wrong-story-id cfg=anban-huri) — trying pack
+[fallback-test] Test E resolved source = Wi-Fi stream
+[fallback-test] Test E PASS (mismatch rejected, SD-cache NOT selected)
+
+[fallback-test] Test C resolved source = Wi-Fi stream
+[story] stream open: http://192.168.1.11:5000/api/story-audio/anban-huri
+[story] stream end interrupted=true
+[fallback-test] Test C stream: open_failed=0 interrupted=1 resume=120064
+[fallback-test] Test C PASS (Wi-Fi stream opened + played)
+
+[fallback-test] restore check: index=1 mp3=1 leftover_bak=0 leftover_orig=0
+```
+
+Test B proves a missing index falls back rather than guessing; Test E proves
+the `storyId` guard rejects a cached MP3 belonging to a different story
+(the failure mode `sd_playback.cpp`'s bench resolver would NOT catch); Test C
+proves the Wi-Fi stream still opens, decodes, and yields a resume offset when
+no SD source exists.
+
+**Compile check (2026-07-26), canonical FQBN
+`esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc`:**
+
+| Build | Size | Note |
+|---|---|---|
+| flag-OFF (production) | **1,264,539 B** | byte-identical to the documented baseline |
+| `-DAREG_STORY_SD_CACHE_FIRST -DAREG_STORY_SD_FALLBACK_TEST_BENCH` | 1,272,999 B | +8,460 B, zero warnings |
+
+**`AREG_STORY_SD_CACHE_FIRST` is still NOT the default** — both it and the
+harness flag remain opt-in bench flags. Promoting cache-first to default is a
+separate, later decision.
+
+**Backend bench posture for Test C — set up and reverted.** Test C needs the
+backend to actually serve `/api/story-audio/anban-huri`, which the deployed
+`C:\AregDeploy` binary (2026-05-19) cannot: it predates the story-audio
+feature (2026-06-14, commit `b8e1119`) and contains no `StoryAudioController`,
+so the route 404s in routing with an EMPTY body — distinguishable from the
+controller's own 26-byte `{"error":"Unknown story."}` 404. A temporary
+current-source backend served :5000 for the test against an isolated copy of
+the prod DB, then was torn down. Post-test revert verified:
+
+```
+health      HTTP=200 bytes=61
+story-audio HTTP=404 bytes=0     <- original posture restored
+```
+
+No backend source, deployed binary, prod DB, or service config was changed by
+this slice. Two operational traps worth remembering: `appsettings.json` pins
+`"Urls": "http://0.0.0.0:5000"`, which **outranks** the `ASPNETCORE_URLS` env
+var (use `--urls` to override), and the PC's LAN IP is DHCP — the firmware's
+hardcoded `192.168.1.11` in `config.h` breaks silently whenever it moves.
 
 ### Real OTA apply (Proof 3 slice)
 

@@ -916,6 +916,187 @@ static void handle_story_session() {
     transition_to(ST_IDLE);
 }
 
+// ---------------------------------------------------------------
+// SD-first fallback test harness (bench-only, temporary)
+// Gated behind AREG_STORY_SD_FALLBACK_TEST_BENCH; requires
+// AREG_STORY_SD_CACHE_FIRST (it exercises story_resolve_cache_path).
+// Automates fallback Tests B/E/C on-device: it manipulates the SD files,
+// runs the REAL source resolver / playback path, restores the files, and
+// prints PASS/FAIL. Compiles to ZERO bytes without the flag; no production
+// or AREG_STORY_SD_CACHE_FIRST behavior change unless this flag is also set.
+// ---------------------------------------------------------------
+#ifdef AREG_STORY_SD_FALLBACK_TEST_BENCH
+#ifndef AREG_STORY_SD_CACHE_FIRST
+#error "AREG_STORY_SD_FALLBACK_TEST_BENCH requires AREG_STORY_SD_CACHE_FIRST"
+#endif
+
+// Replicates the production source decision (handle_story_session, the
+// sd_narration_path/use_sd block) using the REAL resolver, so a test proves
+// which source the story flow WOULD pick without playing 3-4 min of audio.
+static void fbtest_log_source(const char *label, bool *out_is_cache, bool *out_use_sd) {
+    const char *path = AREG_SD_STORY_NARRATION;
+    char cache_path[96];
+    const bool cache_hit = story_resolve_cache_path(cache_path, sizeof(cache_path));
+    if (cache_hit) path = cache_path;
+    const bool use_sd = audio_sd_has_file(path);
+    Serial.printf("[fallback-test] %s resolved source = %s\n", label,
+                  use_sd ? (cache_hit ? "SD (cache)" : "SD (pack)") : "Wi-Fi stream");
+    Serial.flush();
+    if (out_is_cache) *out_is_cache = (cache_hit && use_sd);
+    if (out_use_sd)   *out_use_sd   = use_sd;
+}
+
+// Time-boxed auto-stop for Test C's Wi-Fi stream — the barge-in seam lets us
+// trigger the real backend GET + a few seconds of playback, then cut cleanly
+// (no button, no Q&A cascade).
+static uint32_t g_fbtest_autostop_ms = 0;
+static bool fbtest_autostop_barge_in() { return millis() >= g_fbtest_autostop_ms; }
+
+static const char *kFbIndex     = "/content_index.json";
+static const char *kFbIndexBak  = "/content_index.json.bak";
+static const char *kFbIndexOrig = "/content_index.json.orig";
+static const char *kFbPackBak   = "/stories/pack_narration.bak";
+
+static void story_fallback_test_run() {
+    Serial.println("[fallback-test] ===== SD-first fallback Tests B/E/C =====");
+    Serial.flush();
+    if (!audio_sd_available()) {
+        Serial.println("[fallback-test] FAIL sd unavailable — cannot run");
+        Serial.flush();
+        return;
+    }
+
+    // ---------- Test B: /content_index.json missing ----------
+    Serial.println("[fallback-test] --- Test B: content index missing ---");
+    Serial.flush();
+    if (SD.rename(kFbIndex, kFbIndexBak)) {
+        bool is_cache = false;
+        fbtest_log_source("Test B", &is_cache, nullptr);
+        Serial.printf("[fallback-test] Test B %s (SD-cache NOT selected)\n",
+                      !is_cache ? "PASS" : "FAIL");
+        if (!SD.rename(kFbIndexBak, kFbIndex)) {
+            Serial.println("[fallback-test] WARN Test B restore failed");
+        }
+    } else {
+        Serial.println("[fallback-test] Test B SETUP-FAIL: could not rename index");
+    }
+    Serial.flush();
+
+    // ---------- Test E: storyId mismatch ----------
+    Serial.println("[fallback-test] --- Test E: storyId mismatch ---");
+    Serial.flush();
+    if (SD.rename(kFbIndex, kFbIndexOrig)) {
+        // Write a temporary index that points at the real MP3 but a WRONG story.
+        File f = SD.open(kFbIndex, FILE_WRITE);
+        bool wrote = false;
+        if (f) {
+            JsonDocument idx;
+            idx["storyId"]   = "wrong-story-id";
+            idx["version"]   = 1;
+            idx["file"]      = "/stories/anban-huri-v1.mp3";
+            idx["sizeBytes"] = 4654560;
+            wrote = (serializeJson(idx, f) > 0);
+            f.close();
+        }
+        if (wrote) {
+            bool is_cache = false;
+            // story_resolve_cache_path prints "[story] cache storyId mismatch ..."
+            fbtest_log_source("Test E", &is_cache, nullptr);
+            Serial.printf("[fallback-test] Test E %s (mismatch rejected, SD-cache NOT selected)\n",
+                          !is_cache ? "PASS" : "FAIL");
+        } else {
+            Serial.println("[fallback-test] Test E SETUP-FAIL: could not write temp index");
+        }
+        SD.remove(kFbIndex);  // drop the temp index
+        if (!SD.rename(kFbIndexOrig, kFbIndex)) {
+            Serial.println("[fallback-test] WARN Test E restore failed");
+        }
+    } else {
+        Serial.println("[fallback-test] Test E SETUP-FAIL: could not rename index");
+    }
+    Serial.flush();
+
+    // ---------- Test C: no SD source -> Wi-Fi stream + backend GET ----------
+    Serial.println("[fallback-test] --- Test C: Wi-Fi fallback ---");
+    Serial.flush();
+    const bool moved_index = SD.rename(kFbIndex, kFbIndexBak);
+    const bool had_pack = audio_sd_has_file(AREG_SD_STORY_NARRATION);
+    const bool moved_pack = had_pack ? SD.rename(AREG_SD_STORY_NARRATION, kFbPackBak) : false;
+    if (!moved_index) {
+        Serial.println("[fallback-test] Test C SETUP-FAIL: could not rename index");
+    } else {
+        bool use_sd = true;
+        fbtest_log_source("Test C", nullptr, &use_sd);
+        if (use_sd) {
+            Serial.println("[fallback-test] Test C FAIL (SD source still selected)");
+        } else if (!voice_wifi_is_connected()) {
+            Serial.println("[fallback-test] Test C source=Wi-Fi OK, but Wi-Fi down — skipping stream GET");
+        } else {
+            // Invoke the EXISTING stream path (same fn handle_story_session
+            // calls); base URL only, since StoryAudio enforcement is a dev/bench
+            // knob. Auto-stop after ~8 s so we prove the GET + real playback
+            // without a full 4-minute stream.
+            Serial.printf("[fallback-test] Test C streaming %s (auto-stop ~8s)\n",
+                          AREG_STORY_AUDIO_URL);
+            Serial.flush();
+            audio_speaker_begin();
+            g_fbtest_autostop_ms = millis() + 8000;
+            uint32_t resume = 0;
+            bool open_failed = false;
+            const bool interrupted = audio_play_story_stream(
+                AREG_STORY_AUDIO_URL, 0, fbtest_autostop_barge_in, &resume, &open_failed);
+            Serial.printf("[fallback-test] Test C stream: open_failed=%d interrupted=%d resume=%u\n",
+                          open_failed ? 1 : 0, interrupted ? 1 : 0, (unsigned)resume);
+            Serial.printf("[fallback-test] Test C %s (Wi-Fi stream %s)\n",
+                          open_failed ? "FAIL" : "PASS",
+                          open_failed ? "did not open (backend 404?)" : "opened + played");
+        }
+    }
+    // Restore both moved files.
+    if (moved_pack && !SD.rename(kFbPackBak, AREG_SD_STORY_NARRATION)) {
+        Serial.println("[fallback-test] WARN Test C pack restore failed");
+    }
+    if (moved_index && !SD.rename(kFbIndexBak, kFbIndex)) {
+        Serial.println("[fallback-test] WARN Test C index restore failed");
+    }
+    Serial.flush();
+
+    // ---------- Final SD-state verification ----------
+    Serial.printf("[fallback-test] restore check: index=%d mp3=%d leftover_bak=%d leftover_orig=%d\n",
+                  SD.exists(kFbIndex) ? 1 : 0,
+                  SD.exists("/stories/anban-huri-v1.mp3") ? 1 : 0,
+                  SD.exists(kFbIndexBak) ? 1 : 0,
+                  SD.exists(kFbIndexOrig) ? 1 : 0);
+    Serial.println("[fallback-test] ===== done =====");
+    Serial.flush();
+}
+
+void story_fallback_test_tick() {
+    static bool s_done = false;
+    static bool s_stamped = false;
+    static uint32_t s_last_status_ms = 0;
+    if (s_done) {
+        return;
+    }
+    if (!s_stamped) {
+        s_stamped = true;
+        Serial.println("[fallback-test] bench fw built " __DATE__ " " __TIME__);
+        Serial.flush();
+    }
+    const uint32_t now = millis();
+    if (now < 30000UL) {
+        if (s_last_status_ms == 0 || now - s_last_status_ms >= 5000UL) {
+            s_last_status_ms = now;
+            Serial.println("[fallback-test] armed; will start at ms>=30000");
+            Serial.flush();
+        }
+        return;
+    }
+    s_done = true;  // one run per boot
+    story_fallback_test_run();
+}
+#endif  // AREG_STORY_SD_FALLBACK_TEST_BENCH
+
 // --- Arduino entry points -----------------------------------
 
 void setup() {
@@ -1181,6 +1362,13 @@ void loop() {
         // IDLE-only. No backend download, no recording, no content-sync.
         // Playback blocks the idle loop for the clip's duration by design.
         sd_playback_tick();
+#endif
+
+#ifdef AREG_STORY_SD_FALLBACK_TEST_BENCH
+        // SD-first fallback test harness (bench builds only): auto-runs
+        // fallback Tests B/E/C by manipulating SD files + exercising the real
+        // resolver/stream path, then restores. One shot, 30 s after boot.
+        story_fallback_test_tick();
 #endif
 
         char ev = button_poll();
