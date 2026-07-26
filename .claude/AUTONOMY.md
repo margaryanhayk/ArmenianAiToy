@@ -80,7 +80,7 @@ Before marking any task complete:
 | `armenian-linguistic-reviewer` | Armenian text naturalness check            | Sonnet |
 | `prompt-reviewer`              | Pre-execution scope/risk/safety review     | Opus   |
 
-Files: `backend/.claude/agents/*.md`.
+Files: `.claude/agents/*.md`.
 
 ## Skill roster
 

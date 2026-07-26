@@ -2399,7 +2399,7 @@ TLS (Stage A runs over the HTTP LAN bench; `ota_http_begin()` in
 
 ## Autonomous Workflow
 
-Claude CLI operates on this project using a multi-agent pipeline. The agents and skills are defined in `backend/.claude/agents/` and `.claude/skills/`.
+Claude CLI operates on this project using a multi-agent pipeline. The agents and skills are defined in `.claude/agents/` and `.claude/skills/`.
 
 **Before every task:**
 1. Classify: workstream (story-core / safety / parent-surface / tests / hardening / tooling), mode (review-only / minimal-code-change / test-only / no-change-needed), risk (low / medium / high).
@@ -2407,7 +2407,7 @@ Claude CLI operates on this project using a multi-agent pipeline. The agents and
 3. MEDIUM risk (new endpoint, helper, DTO) → produce plan, pause for approval.
 4. LOW risk (test, doc, UI polish) → brief plan, proceed.
 
-**Available agents** (`backend/.claude/agents/`):
+**Available agents** (`.claude/agents/`):
 - `repo-scout` — read-only reconnaissance (first step of every session)
 - `plan-proposer` — generates implementation plans with exact files/lines
 - `backend-implementer` — executes approved plans, writes code and tests
