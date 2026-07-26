@@ -28,6 +28,7 @@
 #include "ota_foundation.h"    // Proof 2 — phone-home command poll (no OTA apply)
 #include "sd_bench.h"          // microSD hardware proof (AREG_SD_BENCH_TEST builds only)
 #include "content_sync.h"      // Cloud→SD story sync (AREG_CONTENT_SYNC_BENCH builds only)
+#include "content_sync_test.h" // content-sync decision-logic tests (AREG_CONTENT_SYNC_TEST_BENCH only)
 #include "sd_diag.h"           // standalone SD diagnostic (AREG_SD_DIAG_BENCH builds only)
 #include "sd_playback.h"       // cached-MP3 SD playback (AREG_SD_PLAYBACK_BENCH builds only)
 
@@ -1345,6 +1346,13 @@ void loop() {
         // once Wi-Fi + SD are both up. IDLE-only — a 4.6 MB download can
         // never stall a voice turn. Zero bytes of this in production.
         content_sync_tick();
+#endif
+
+#ifdef AREG_CONTENT_SYNC_TEST_BENCH
+        // Content-sync decision-logic tests (bench builds only): pure
+        // validation / manifest / index checks, no SD, no Wi-Fi, no
+        // backend. IDLE-only. Zero bytes of this in production.
+        content_sync_test_tick();
 #endif
 
 #ifdef AREG_SD_DIAG_BENCH

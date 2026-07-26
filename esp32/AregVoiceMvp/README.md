@@ -202,6 +202,13 @@ SD diagnostic bench (compile + upload, `-DAREG_SD_DIAG_BENCH`):
 arduino-cli compile --upload -p COM7 --fqbn "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc" --build-property "compiler.cpp.extra_flags=-DAREG_SD_DIAG_BENCH" ".\esp32\AregVoiceMvp"
 ```
 
+Content-sync decision-logic tests (`-DAREG_CONTENT_SYNC_TEST_BENCH`) — no
+SD card, no Wi-Fi, no backend needed; prints `[cs-test] RESULT PASS/FAIL`
+about 20 s after boot:
+```
+arduino-cli compile --upload -p COM7 --fqbn "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc" --build-property "compiler.cpp.extra_flags=-DAREG_CONTENT_SYNC_TEST_BENCH" ".\esp32\AregVoiceMvp"
+```
+
 > Adjust `-p COM7` to your serial port. Production builds must define
 > **neither** bench flag — each `-DAREG_*_BENCH` module compiles to zero
 > bytes without its flag.
@@ -238,6 +245,100 @@ Every turn emits:
 C1 latency target: **≤ 7 s perceptual**. Good: **≤ 4 s**. If
 you are consistently above 7 s, stop adding features and
 profile the longest stage.
+
+## Cloud→SD content sync — multi-story
+
+`content_sync.cpp` (bench flag `AREG_CONTENT_SYNC_BENCH`) syncs **N**
+stories from `GET /api/devices/content-manifest`, not just the first.
+Decision logic lives in two dependency-light layers so it can be tested
+without hardware: `content_sync_rules.h` (pure) and
+`content_sync_model.cpp` (JSON ↔ struct, no SD/HTTP).
+
+| Property | Value |
+|---|---|
+| Max stories per sync | **8** (`CS_MAX_STORIES`) — 8 × ~4.6 MB ≈ 37 MB on a 7.5 GB card; tables cost ~10 KB `.bss`; the real ceiling is download wall-clock, not storage |
+| Max story-id length | 48 (`CS_MAX_STORY_ID_LEN`) |
+| Max story size | 32 MB (`CS_MAX_STORY_BYTES`) |
+| Max stored audioUrl | 128 (`CS_MAX_URL_LEN`) |
+| Cache file | `/stories/<storyId>-v<version>.mp3` |
+| Temp file | `/tmp/<storyId>-v<version>.mp3.part` (unique per story **and** version) |
+| Index | `/content_index.json`, schema **v2** |
+
+**Story-id allowlist:** `a-z`, `0-9`, `-`, `_` only. Uppercase, `.`, `/`,
+`\`, `:`, spaces and control characters are rejected, so `..`, absolute
+paths and traversal segments are *unrepresentable* rather than filtered.
+Lowercase-only matters because the backend dedupes case-insensitively —
+accepting mixed case would let one backend story become two filenames.
+Duplicate ids keep the **first**, matching the backend.
+
+**Per-item independence.** A bad item (empty/unsafe id, malformed
+sha256, zero or oversized size, empty audioUrl, over-long path) is
+dropped and counted; its valid siblings still sync. A failed download
+leaves the previously-good file untouched and never enters the index.
+Manifests longer than `CS_MAX_STORIES` are truncated with a log line,
+never a crash.
+
+**`audioUrl` is used exactly as supplied** — bare
+`/api/devices/content-file` (legacy config) or
+`?storyId=<id>` (multi-story). Nothing is appended or duplicated.
+
+**Already-current decision.** After a download, a full SHA-256 is always
+verified before promotion. On later boots a story is skipped when the
+index entry matches (id/version/sha/size + `verified`) **and** the file
+exists at exactly the recorded size — index metadata alone is never
+enough, because the file can vanish independently of the index. With no
+usable index entry the file is streamed through SHA-256 instead, which is
+what the single-story build did on *every* boot; keeping that only for
+the no-entry case avoids tens of seconds of SPI reads per boot at 8
+stories.
+
+**Index schema v2** — plus a *legacy compatibility mirror*:
+
+```json
+{
+  "schemaVersion": 2,
+  "stories": [
+    { "storyId": "anban-huri", "version": 1, "title": "Անբան Հուռին",
+      "sha256": "4ba096…", "sizeBytes": 4654560,
+      "cachePath": "/stories/anban-huri-v1.mp3", "verified": true }
+  ],
+  "storyId": "anban-huri", "version": 1, "sha256": "4ba096…",
+  "file": "/stories/anban-huri-v1.mp3", "sizeBytes": 4654560
+}
+```
+
+The four flat fields are **not** a second source of truth. Three readers
+still parse the pre-multi-story flat shape — `story_resolve_cache_path()`
+in the sketch (the hardware-verified SD-first playback path),
+`resolve_path()` in `sd_playback.cpp`, and the Test-E fallback harness —
+and this slice deliberately does not change playback. The mirror points
+at the entry whose id equals `AREG_STORY_ID`, else the first, which
+reproduces single-story behavior exactly. `story-select-from-index`
+migrates those readers and drops the mirror.
+
+**Legacy (v1) index migration.** A flat single-object index is detected
+and migrated in memory; its cached MP3 is preserved. The only field v1
+never wrote is `verified`, inferred `true` because v1 only wrote its
+index after a full SHA-256 — and existence + size are re-checked anyway,
+so a wrong inference costs a re-download, never a bad file. **A card
+never has to be erased.**
+
+**Non-destructive by default.** An empty manifest leaves the index and
+every cached file untouched (absence is not a retirement instruction). A
+story absent from the manifest but still verified on the card is carried
+forward into the index. `enabled:false` skips the story without deleting
+its file. Retirement deletion and an orphan sweeper are **deferred**.
+
+**Index replacement is atomic**: written to `/content_index.json.new`,
+then swapped in. A crash before the swap leaves the previous known-good
+index; a crash inside the remove/rename window leaves the `.new` file and
+the next boot rebuilds from the manifest. No MP3 is at risk either way.
+
+**Playback still does not select among index entries.** The toy plays the
+configured `AREG_STORY_ID` exactly as before. SHIP A6 stays incomplete
+until `story-select-from-index` lands, no-repeat exists, three approved
+MP3 stories are available, and a real three-story hardware run is
+recorded.
 
 ## Known C1 limitations (deliberate, deferred)
 

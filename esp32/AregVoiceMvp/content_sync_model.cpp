@@ -1,0 +1,219 @@
+// -------------------------------------------------------------
+// AregVoiceMvp / content_sync_model.cpp — see content_sync_model.h.
+//
+// Compiled only for builds that actually sync or test content sync;
+// production defines neither flag and emits zero bytes of this file.
+// -------------------------------------------------------------
+#if defined(AREG_CONTENT_SYNC_BENCH) || defined(AREG_CONTENT_SYNC_TEST_BENCH)
+
+#include "content_sync_model.h"
+
+#include <Arduino.h>
+
+int cs_manifest_parse(JsonArrayConst stories, CsStory *out, int max_out,
+                      CsManifestStats *stats) {
+    CsManifestStats local{};
+    if (stats == nullptr) {
+        stats = &local;
+    }
+    *stats = CsManifestStats{};
+
+    if (out == nullptr || max_out <= 0) {
+        return 0;
+    }
+
+    const int offered = stories.isNull() ? 0 : (int)stories.size();
+    stats->offered = offered;
+
+    const int cap_by_rule = cs_accepted_count(offered);
+    const int cap = cap_by_rule < max_out ? cap_by_rule : max_out;
+    stats->truncated = offered > cap ? offered - cap : 0;
+
+    int count = 0;
+    int examined = 0;
+    for (JsonObjectConst item : stories) {
+        if (examined >= cap) {
+            break;   // truncation is reported, never fatal
+        }
+        examined++;
+
+        const char *story_id  = item["storyId"]  | "";
+        const int   version   = item["version"]  | 1;
+        const char *title     = item["title"]    | "";
+        const char *audio_url = item["audioUrl"] | "";
+        const char *sha256    = item["sha256"]   | "";
+        const long  size      = item["sizeBytes"] | 0L;
+        const bool  enabled   = item["enabled"]  | false;
+
+        if (!enabled) {
+            // Retirement (deleting a cached copy) is deliberately NOT
+            // implemented: the file stays, the story just does not enter
+            // the active index.
+            stats->disabled++;
+            Serial.printf("[content-sync] item #%d disabled — skip\n", examined - 1);
+            continue;
+        }
+        if (!cs_is_valid_story_id(story_id)) {
+            stats->invalid++;
+            Serial.printf("[content-sync] item #%d rejected (bad_story_id)\n", examined - 1);
+            continue;
+        }
+        if (audio_url[0] == '\0' || strlen(audio_url) >= CS_MAX_URL_LEN) {
+            stats->invalid++;
+            Serial.printf("[content-sync] item %s rejected (bad_audio_url)\n", story_id);
+            continue;
+        }
+        if (!cs_is_sha256_hex(sha256)) {
+            stats->invalid++;
+            Serial.printf("[content-sync] item %s rejected (bad_sha256)\n", story_id);
+            continue;
+        }
+        if (!cs_is_valid_size(size)) {
+            stats->invalid++;
+            Serial.printf("[content-sync] item %s rejected (bad_size)\n", story_id);
+            continue;
+        }
+
+        bool dup = false;
+        for (int i = 0; i < count; i++) {
+            if (cs_story_ids_equal(out[i].story_id, story_id)) {
+                dup = true;
+                break;
+            }
+        }
+        if (dup) {
+            stats->duplicate++;
+            Serial.printf("[content-sync] item %s duplicate — keeping first\n", story_id);
+            continue;
+        }
+
+        CsStory *dst = &out[count];
+        memset(dst, 0, sizeof(*dst));
+        // A truncated id or hash would silently address the WRONG file,
+        // so truncation is rejected rather than stored.
+        if (!cs_copy_bounded(dst->story_id, sizeof(dst->story_id), story_id)
+            || !cs_copy_bounded(dst->sha256, sizeof(dst->sha256), sha256)
+            || !cs_copy_bounded(dst->audio_url, sizeof(dst->audio_url), audio_url)) {
+            stats->invalid++;
+            continue;
+        }
+        cs_copy_bounded(dst->title, sizeof(dst->title), title);  // truncation OK
+        dst->version    = cs_normalize_version(version);
+        dst->size_bytes = size;
+        dst->verified   = false;
+        if (!cs_build_cache_path(dst->cache_path, sizeof(dst->cache_path),
+                                 dst->story_id, dst->version)) {
+            stats->invalid++;
+            Serial.printf("[content-sync] item %s rejected (path_too_long)\n", story_id);
+            continue;
+        }
+        count++;
+    }
+
+    stats->accepted = count;
+    return count;
+}
+
+int cs_index_parse(JsonDocument &doc, CsStory *out, int max_out, int *out_schema) {
+    if (out == nullptr || max_out <= 0) {
+        if (out_schema != nullptr) *out_schema = 0;
+        return 0;
+    }
+
+    const int schema = doc["schemaVersion"] | 1;
+    if (out_schema != nullptr) {
+        *out_schema = schema;
+    }
+
+    int count = 0;
+
+    if (schema >= 2 && doc["stories"].is<JsonArrayConst>()) {
+        for (JsonObjectConst e : doc["stories"].as<JsonArrayConst>()) {
+            if (count >= max_out) break;
+            const char *sid  = e["storyId"]   | "";
+            const char *sha  = e["sha256"]    | "";
+            const char *path = e["cachePath"] | "";
+            if (!cs_is_valid_story_id(sid) || !cs_is_sha256_hex(sha) || path[0] != '/') {
+                continue;
+            }
+            CsStory *dst = &out[count];
+            memset(dst, 0, sizeof(*dst));
+            if (!cs_copy_bounded(dst->story_id, sizeof(dst->story_id), sid)
+                || !cs_copy_bounded(dst->sha256, sizeof(dst->sha256), sha)
+                || !cs_copy_bounded(dst->cache_path, sizeof(dst->cache_path), path)) {
+                continue;
+            }
+            cs_copy_bounded(dst->title, sizeof(dst->title), e["title"] | "");
+            dst->version    = cs_normalize_version(e["version"] | 1);
+            dst->size_bytes = e["sizeBytes"] | 0L;
+            dst->verified   = e["verified"] | false;
+            count++;
+        }
+        return count;
+    }
+
+    // ---- v1 migration: the flat single-object index -----------------
+    // Everything needed is present (storyId/version/sha256/file/
+    // sizeBytes); the only absent field is "verified", which the v1
+    // writer never wrote. It is inferred TRUE because v1 wrote its index
+    // only after a full SHA-256 verification — and the caller still
+    // re-checks existence and size before trusting it, so an inferred
+    // true that turns out wrong costs a re-download, never a bad file.
+    const char *sid  = doc["storyId"] | "";
+    const char *sha  = doc["sha256"]  | "";
+    const char *path = doc["file"]    | "";
+    if (cs_is_valid_story_id(sid) && cs_is_sha256_hex(sha) && path[0] == '/') {
+        CsStory *dst = &out[0];
+        memset(dst, 0, sizeof(*dst));
+        if (cs_copy_bounded(dst->story_id, sizeof(dst->story_id), sid)
+            && cs_copy_bounded(dst->sha256, sizeof(dst->sha256), sha)
+            && cs_copy_bounded(dst->cache_path, sizeof(dst->cache_path), path)) {
+            dst->version    = cs_normalize_version(doc["version"] | 1);
+            dst->size_bytes = doc["sizeBytes"] | 0L;
+            dst->verified   = true;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void cs_index_build(JsonDocument &doc, const CsStory *active, int count,
+                    const char *mirror_story_id) {
+    doc.clear();
+    doc["schemaVersion"] = CS_INDEX_SCHEMA_VERSION;
+    JsonArray arr = doc["stories"].to<JsonArray>();
+    if (active == nullptr || count < 0) {
+        count = 0;
+    }
+    for (int i = 0; i < count; i++) {
+        JsonObject e = arr.add<JsonObject>();
+        e["storyId"]   = active[i].story_id;
+        e["version"]   = active[i].version;
+        e["title"]     = active[i].title;
+        e["sha256"]    = active[i].sha256;
+        e["sizeBytes"] = active[i].size_bytes;
+        e["cachePath"] = active[i].cache_path;
+        e["verified"]  = active[i].verified;
+    }
+
+    if (mirror_story_id == nullptr || count == 0) {
+        return;
+    }
+    int mirror = -1;
+    for (int i = 0; i < count; i++) {
+        if (cs_story_ids_equal(active[i].story_id, mirror_story_id)) {
+            mirror = i;
+            break;
+        }
+    }
+    if (mirror < 0) {
+        mirror = 0;   // configured story absent → first entry, as before
+    }
+    doc["storyId"]   = active[mirror].story_id;
+    doc["version"]   = active[mirror].version;
+    doc["sha256"]    = active[mirror].sha256;
+    doc["file"]      = active[mirror].cache_path;
+    doc["sizeBytes"] = active[mirror].size_bytes;
+}
+
+#endif  // AREG_CONTENT_SYNC_BENCH || AREG_CONTENT_SYNC_TEST_BENCH

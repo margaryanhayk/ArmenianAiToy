@@ -2249,15 +2249,55 @@ modules, each gated behind its own build flag so **production builds compile
 ZERO bytes of either** and stay byte-identical:
 
 - `content_sync.{h,cpp}` (`-DAREG_CONTENT_SYNC_BENCH`) — one sync attempt per
-  boot from the IDLE loop once Wi-Fi + SD are both up:
-  `GET /api/devices/content-manifest` (device-authed) → already-cached check
-  (stream the final file through SHA-256; match ⇒ `already cached PASS`, no
-  re-download) → else chunked download to `/tmp/<storyId>.mp3.part` with
-  streaming SHA-256 + size check → verify SHA **before** touching the final
-  path → atomic `rename` to `/stories/<storyId>-v<version>.mp3` →
-  `/content_index.json` written LAST. Any failure deletes the `.part` and
-  never touches a previously-good final file. No playback, eviction,
-  multi-story, resume, or backend/OTA changes in this slice.
+  boot from the IDLE loop once Wi-Fi + SD are both up. **Multi-story as of
+  the `content-sync-multi-item` slice**: every valid item in
+  `GET /api/devices/content-manifest` is synced, up to `CS_MAX_STORIES` (8),
+  each to `/stories/<storyId>-v<version>.mp3` via its own
+  `/tmp/<storyId>-v<version>.mp3.part`, each independently SHA-256-verified
+  **before** the atomic rename. `/content_index.json` is written LAST, once,
+  in schema **v2**. Any per-story failure deletes only that `.part` and never
+  touches a previously-good final file. See the firmware README
+  (§ "Cloud→SD content sync — multi-story") for the full contract.
+  - Decision logic is split into `content_sync_rules.h` (pure — id/sha/size
+    validation, path construction, bounds; **no** Arduino/SD/HTTP deps) and
+    `content_sync_model.{h,cpp}` (JSON ↔ `CsStory`, manifest parse + index
+    parse/build/migrate, no IO), so both are testable without hardware.
+  - **Story ids are allowlisted** to `a-z0-9-_` (lowercase only, ≤48). `..`,
+    `/`, `\`, `:`, spaces and control characters are unrepresentable, not
+    merely filtered — the id reaches an SD filename. Lowercase-only mirrors
+    the backend's case-insensitive dedupe so one backend story can never
+    become two files. Duplicates keep the first.
+  - **Per-item fail-closed**: one bad item never denies the device its valid
+    siblings; a manifest longer than the max is truncated with a log line.
+  - **Index v2 carries a legacy compatibility mirror** (flat
+    `storyId`/`version`/`sha256`/`file`/`sizeBytes`) pointing at
+    `AREG_STORY_ID` when present, else the first entry. Three readers still
+    parse the flat shape — `story_resolve_cache_path()` in the `.ino` (the
+    hardware-verified SD-first playback path), `resolve_path()` in
+    `sd_playback.cpp`, and the Test-E harness — and this slice must not
+    change playback. `story-select-from-index` migrates them and drops the
+    mirror.
+  - **A v1 (flat) index is migrated in memory, never erased**; a card never
+    has to be wiped. `verified` is inferred true (v1 only wrote its index
+    after a full SHA-256) and existence + size are re-checked anyway.
+  - **Already-current**: index match (id/version/sha/size + `verified`) AND
+    file exists at the recorded size ⇒ skip. Without a usable index entry the
+    file is re-hashed, which is what the single-story build did every boot;
+    restricting that to the no-entry case avoids tens of seconds of SPI reads
+    per boot at 8 stories.
+  - **Non-destructive**: an empty manifest leaves the index and every cached
+    file untouched; a story absent from the manifest but still verified on
+    the card is carried forward; `enabled:false` skips without deleting.
+    Retirement deletion, orphan sweeping, eviction and download resume remain
+    deferred. **Playback still does not select among index entries.**
+- `content_sync_test.{h,cpp}` (`-DAREG_CONTENT_SYNC_TEST_BENCH`) — on-device
+  assertions over the rules + model layers (no SD, no Wi-Fi, no backend;
+  prints `[cs-test] RESULT PASS/FAIL`). This repo has **no host C/C++
+  toolchain** — only the xtensa cross-compilers from the Arduino ESP32 core —
+  so a host-run unit test is not buildable here; this follows the existing
+  bench-harness pattern (`AREG_STORY_SD_FALLBACK_TEST_BENCH`). It does NOT
+  cover real SD atomicity, real/failed HTTP downloads, the file-exists+size
+  half of already-current, or reboot-after-partial-sync.
 - `sd_diag.{h,cpp}` (`-DAREG_SD_DIAG_BENCH`) — standalone SD isolator used to
   diagnose the mount failure below. First run 20 s after boot, then **re-runs
   every 30 s until one attempt mounts** (then prints `PASS` and stops), so a
