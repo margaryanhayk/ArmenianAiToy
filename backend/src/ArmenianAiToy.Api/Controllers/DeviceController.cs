@@ -170,10 +170,11 @@ public class DeviceController : ControllerBase
             enableRangeProcessing: true);
     }
 
-    // Cloud→SD content sync (minimal slice): the story-audio set this device
-    // should hold on its SD card. Device-authed (middleware) — a revoked
-    // device 401s before reaching here. Static single-item config today; a
-    // later slice makes it per-device/per-tier on the same contract.
+    // Cloud→SD content sync: the story-audio set this device should hold on
+    // its SD card. Device-authed (middleware) — a revoked device 401s before
+    // reaching here. Static config for every device today (N stories, in
+    // configured order); per-device/per-tier entitlement is a later slice on
+    // the same contract.
     [HttpGet("content-manifest")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
@@ -183,30 +184,57 @@ public class DeviceController : ControllerBase
         return Ok(manifest.Build());
     }
 
-    // Streams the configured story MP3 to the device. Same fail-closed
+    // Streams a configured story MP3 to the device. Same fail-closed
     // posture as firmware-image: 404 whenever sync is disabled, no path is
     // configured, the path is not absolute, or the file is missing. NOT a
     // public wwwroot file. Integrity is carried by the manifest's
     // sha256/sizeBytes, which the device verifies while streaming to SD.
+    //
+    // storyId selects among the configured stories. It is omitted by
+    // pre-multi-story firmware (and by a legacy single-item config, whose
+    // manifest still advertises the bare route), so an absent storyId
+    // resolves to the only configured story — and 404s when there is more
+    // than one, because guessing which story the device meant is worse than
+    // refusing. storyId is ONLY a lookup key against configured items; it
+    // never reaches the filesystem, so it carries no traversal risk.
     [HttpGet("content-file")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
     public IActionResult GetContentFile(
         [FromServices] ContentSyncOptions options,
-        [FromServices] ILogger<DeviceController> logger)
+        [FromServices] ILogger<DeviceController> logger,
+        [FromQuery] string? storyId = null)
     {
-        if (!options.Enabled || string.IsNullOrWhiteSpace(options.AudioPath))
+        if (!options.Enabled)
         {
             return NotFound(new { error = "No content available." });
         }
-        if (!Path.IsPathRooted(options.AudioPath) || !System.IO.File.Exists(options.AudioPath))
+
+        var stories = options.ResolveStories();
+        ContentSyncStoryOptions? story;
+        if (!string.IsNullOrWhiteSpace(storyId))
+        {
+            story = stories.FirstOrDefault(s =>
+                string.Equals(s.StoryId, storyId, StringComparison.OrdinalIgnoreCase));
+        }
+        else
+        {
+            story = stories.Count == 1 ? stories[0] : null;
+        }
+
+        if (story is null || string.IsNullOrWhiteSpace(story.AudioPath))
+        {
+            return NotFound(new { error = "No content available." });
+        }
+        if (!Path.IsPathRooted(story.AudioPath) || !System.IO.File.Exists(story.AudioPath))
         {
             logger.LogWarning(
-                "Content audio path missing or not absolute: {AudioPath}", options.AudioPath);
+                "Content audio path missing or not absolute for {StoryId}: {AudioPath}",
+                story.StoryId, story.AudioPath);
             return NotFound(new { error = "No content available." });
         }
-        return PhysicalFile(options.AudioPath, "audio/mpeg",
+        return PhysicalFile(story.AudioPath, "audio/mpeg",
             enableRangeProcessing: true);
     }
 }

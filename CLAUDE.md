@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2022 tests)
+dotnet test                                     # Run all tests (2054 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2176,32 +2176,71 @@ Secure Boot, no SD sync**. Outbound-only polling.
 - `voice_add_device_auth_headers()` is the shared device-auth seam other
   firmware modules use, so all backend traffic authenticates identically.
 
-### Cloud→SD content sync (backend half, minimal slice)
+### Cloud→SD content sync (backend half — multi-story)
 
 The story-audio counterpart of the firmware-manifest/image pair — the
-backend contract the ESP32 SD-download firmware targets. ONE configured
-MP3 item, config-driven (`ContentSync` section → `ContentSyncOptions`,
-ships `Enabled=false`); a later slice makes it per-device/per-tier on the
-same wire shape.
+backend contract the ESP32 SD-download firmware targets. **N configured
+MP3 items**, config-driven (`ContentSync` section → `ContentSyncOptions`,
+ships `Enabled=false`). Static config for every device; per-device /
+per-tier entitlement is still a later slice on the same wire shape.
+
+**Two config shapes, mirroring `Jwt:Keys` / `Jwt:Key`:**
+- **Preferred** — `ContentSync:Stories`, an ordered array of
+  `{ storyId, version, title, audioUrl, audioPath, sha256, sizeBytes }`.
+  The manifest returns them in configured order.
+- **Legacy** — the flat scalars (`ContentSync:StoryId`, `:Sha256`, …)
+  describing ONE item, still honored so overlays written before
+  multi-story keep working untouched.
+- `Stories` wins when non-empty. `ContentSyncOptions.ResolveStories()` is
+  the single place that decides, so the manifest service and the
+  content-file endpoint can never disagree. Binding lives in the pure
+  helper `ContentSyncOptions.Resolve(IConfiguration)` (same pattern as
+  `RetentionPolicy.ResolveMessages`) rather than inline in DI, so the
+  array binding is reachable by tests — a silent binding bug would
+  otherwise leave every unit test green while devices got empty manifests.
 
 - `GET /api/devices/content-manifest` (device-authed): `{ stories: [...] }`
-  with zero or one item `{ storyId, version, title, audioUrl, sha256
-  (lowercased 64-hex), sizeBytes, enabled }`. Fail-closed empty on
-  disabled / missing storyId / bad sha length / non-positive size.
-  `enabled:false` is on the wire from day one for future retirement.
-- `GET /api/devices/content-file` (device-authed): streams the MP3 at
-  `ContentSync:AudioPath` — NOT wwwroot; same fail-closed 404 matrix as
+  with N items `{ storyId, version, title, audioUrl, sha256
+  (lowercased 64-hex), sizeBytes, enabled }`. `enabled:false` is on the
+  wire from day one for future retirement (still hardcoded `true` — the
+  retirement slice owns that knob).
+  **Validation is PER ITEM**: a story missing its id, with a non-positive
+  size, or with a sha that is not exactly 64 hex chars is dropped and the
+  remaining stories are still served. (Before multi-story a single bad
+  field emptied the whole manifest; with one configured story the observable
+  behavior is unchanged, which is why the older fail-closed tests still
+  pass.) Duplicate `storyId` keeps the FIRST and drops the rest — the id is
+  the content-file lookup key, so a duplicate would make it ambiguous.
+  The master switch still short-circuits everything: `Enabled=false` ⇒ empty.
+- `GET /api/devices/content-file?storyId=<id>` (device-authed): streams
+  that story's `AudioPath` — NOT wwwroot; same fail-closed 404 matrix as
   firmware-image (disabled / unset / relative / missing); `audio/mpeg`
-  with Range processing (resume-ready).
+  with Range processing (resume-ready). **`storyId` is only ever a lookup
+  key against configured items — it never reaches the filesystem**, so it
+  carries no traversal risk (pinned by traversal-shaped-input tests).
+  **Omitting `storyId` resolves to the only configured story**, and 404s
+  when more than one is configured rather than guessing. That is what keeps
+  already-flashed firmware working: a legacy single-item config still
+  advertises the bare `/api/devices/content-file` with no query string,
+  and an item that configures no explicit `audioUrl` gets
+  `/api/devices/content-file?storyId=<id>` filled in.
 - Both paths are in `DeviceAuthMiddleware`'s device-auth list — unauth
   callers 401 before any controller runs (pinned by a middleware test),
   and revoked devices are rejected by `ValidateDeviceAsync`.
 - Integrity = manifest sha256/sizeBytes, verified by the device while
   streaming to SD. Manifest HMAC signing (as firmware-manifest has) is a
   deliberate follow-up when multi-story/tiers land.
-- PC/API bench verified 2026-07-05: manifest + authed download round-trip
-  (sha256 `d3a6fbdb…` / 4,654,560 B matched), 401 without headers.
-- Pinned by `ContentManifestServiceTests` + `DeviceControllerContentSyncTests`.
+- PC/API bench verified 2026-07-05 (single-story config): manifest +
+  authed download round-trip (sha256 `d3a6fbdb…` / 4,654,560 B matched),
+  401 without headers. **The multi-story path has NOT been bench-verified
+  against real hardware** — it is covered by tests only. The firmware still
+  reads `stories[0]` and writes a single-object `/content_index.json`, so
+  a 3-story manifest changes nothing on the device until the
+  `content-sync-multi-item` firmware slice lands.
+- Pinned by `ContentManifestServiceTests` (per-item validity, ordering,
+  dedupe, legacy back-compat), `ContentSyncOptionsResolveTests` (config
+  binding, both shapes), and `DeviceControllerContentSyncTests`
+  (per-story addressing, traversal-shaped ids, no-storyId fallback).
 
 ### Cloud→SD content sync (firmware half — bench-verified on real hardware)
 

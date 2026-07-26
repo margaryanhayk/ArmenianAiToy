@@ -301,21 +301,14 @@ public static class DependencyInjection
         services.AddSingleton(fwOpts);
         services.AddSingleton<IFirmwareManifestService, FirmwareManifestService>();
 
-        // Cloud→SD content sync (minimal slice): the ONE configured story
-        // audio the device content-manifest offers. Same manual-binding
-        // style; ships Enabled=false → empty manifest until configured.
-        var csOpts = new ContentSyncOptions();
-        var csSection = config.GetSection("ContentSync");
-        if (bool.TryParse(csSection["Enabled"], out var csEnabled)) csOpts.Enabled = csEnabled;
-        csOpts.StoryId = csSection["StoryId"] ?? "";
-        if (int.TryParse(csSection["Version"], out var csVersion)) csOpts.Version = csVersion;
-        csOpts.Title = csSection["Title"] ?? "";
-        csOpts.AudioUrl = string.IsNullOrWhiteSpace(csSection["AudioUrl"])
-            ? csOpts.AudioUrl : csSection["AudioUrl"]!;
-        csOpts.AudioPath = csSection["AudioPath"] ?? "";
-        csOpts.Sha256 = csSection["Sha256"] ?? "";
-        if (long.TryParse(csSection["SizeBytes"], out var csSize)) csOpts.SizeBytes = csSize;
-        services.AddSingleton(csOpts);
+        // Cloud→SD content sync: the story audio set the device
+        // content-manifest offers. Ships Enabled=false → empty manifest until
+        // configured. Binding lives in ContentSyncOptions.Resolve rather than
+        // inline here so the hand-rolled Stories[] array binding is reachable
+        // by tests; it reads BOTH shapes (the ordered Stories list and the
+        // legacy single-item scalars) and ResolveStories picks between them,
+        // so an overlay written before multi-story still works untouched.
+        services.AddSingleton(ContentSyncOptions.Resolve(config));
         services.AddSingleton<IContentManifestService, ContentManifestService>();
 
         // First scheduled-delete worker in the repo. Hard-deletes

@@ -131,6 +131,174 @@ public class DeviceControllerContentSyncTests
         }
     }
 
+    // ---- content-file: per-story addressing (multi-story) ----------
+
+    private static ContentSyncOptions MultiFileOptions(params (string Id, string Path)[] stories) =>
+        new()
+        {
+            Enabled = true,
+            Stories = stories.Select(s => new ContentSyncStoryOptions
+            {
+                StoryId = s.Id,
+                AudioPath = s.Path,
+                Sha256 = new string('a', 64),
+                SizeBytes = 4,
+            }).ToList(),
+        };
+
+    private static string TempMp3()
+    {
+        var file = Path.GetTempFileName();
+        File.WriteAllBytes(file, new byte[] { 0xFF, 0xFB, 0x90, 0x00 });
+        return file;
+    }
+
+    [Fact]
+    public void ContentFile_ByStoryId_ServesThatStorysFile()
+    {
+        var first = TempMp3();
+        var second = TempMp3();
+        try
+        {
+            var result = Controller().GetContentFile(
+                MultiFileOptions(("anban-huri", first), ("little-cloud", second)),
+                Substitute.For<ILogger<DeviceController>>(),
+                storyId: "little-cloud");
+
+            var physical = Assert.IsType<PhysicalFileResult>(result);
+            Assert.Equal(second, physical.FileName);   // NOT the first item
+            Assert.Equal("audio/mpeg", physical.ContentType);
+            Assert.True(physical.EnableRangeProcessing);
+        }
+        finally
+        {
+            File.Delete(first);
+            File.Delete(second);
+        }
+    }
+
+    [Fact]
+    public void ContentFile_UnknownStoryId_Returns404()
+    {
+        var file = TempMp3();
+        try
+        {
+            var result = Controller().GetContentFile(
+                MultiFileOptions(("anban-huri", file)),
+                Substitute.For<ILogger<DeviceController>>(),
+                storyId: "not-a-story");
+            Assert.IsType<NotFoundObjectResult>(result);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    /// <summary>With several stories configured and no storyId supplied,
+    /// guessing which one the device meant would be worse than refusing.</summary>
+    [Fact]
+    public void ContentFile_NoStoryId_MultipleConfigured_Returns404()
+    {
+        var first = TempMp3();
+        var second = TempMp3();
+        try
+        {
+            var result = Controller().GetContentFile(
+                MultiFileOptions(("anban-huri", first), ("little-cloud", second)),
+                Substitute.For<ILogger<DeviceController>>());
+            Assert.IsType<NotFoundObjectResult>(result);
+        }
+        finally
+        {
+            File.Delete(first);
+            File.Delete(second);
+        }
+    }
+
+    /// <summary>BACK-COMPAT KEYSTONE: firmware flashed before multi-story
+    /// requests the bare route with no storyId. A legacy single-item config
+    /// must still stream, or the bench breaks.</summary>
+    [Fact]
+    public void ContentFile_NoStoryId_LegacySingleItem_StillStreams()
+    {
+        var file = TempMp3();
+        try
+        {
+            var result = Controller().GetContentFile(
+                FileOptions(enabled: true, audioPath: file),
+                Substitute.For<ILogger<DeviceController>>());
+
+            var physical = Assert.IsType<PhysicalFileResult>(result);
+            Assert.Equal(file, physical.FileName);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public void ContentFile_StoryId_IsCaseInsensitive()
+    {
+        var file = TempMp3();
+        try
+        {
+            var result = Controller().GetContentFile(
+                MultiFileOptions(("anban-huri", file)),
+                Substitute.For<ILogger<DeviceController>>(),
+                storyId: "ANBAN-HURI");
+            Assert.IsType<PhysicalFileResult>(result);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    /// <summary>storyId is only ever a lookup key against configured items;
+    /// it must never reach the filesystem. A traversal-shaped value simply
+    /// matches nothing.</summary>
+    [Theory]
+    [InlineData("../../../../etc/passwd")]
+    [InlineData("..\\..\\windows\\system32\\config\\sam")]
+    [InlineData("/etc/shadow")]
+    public void ContentFile_TraversalShapedStoryId_Returns404(string storyId)
+    {
+        var file = TempMp3();
+        try
+        {
+            var result = Controller().GetContentFile(
+                MultiFileOptions(("anban-huri", file)),
+                Substitute.For<ILogger<DeviceController>>(),
+                storyId: storyId);
+            Assert.IsType<NotFoundObjectResult>(result);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public void ContentFile_Disabled_WithStoriesConfigured_Returns404()
+    {
+        var file = TempMp3();
+        try
+        {
+            var options = MultiFileOptions(("anban-huri", file));
+            options.Enabled = false;
+
+            var result = Controller().GetContentFile(
+                options, Substitute.For<ILogger<DeviceController>>(), storyId: "anban-huri");
+            Assert.IsType<NotFoundObjectResult>(result);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
     // ---- middleware auth gate: the new paths REQUIRE device auth ----
 
     [Theory]
