@@ -95,6 +95,24 @@ static char s_wifi_pass[65] = {0};
 // voice_wifi_down_duration_ms() to drive the auto-fallback to provisioning.
 static uint32_t s_wifi_down_since_ms = 0;
 
+// The story every in-story backend call is grounded in. Empty means "use the
+// compile-time configured story", which is the pre-selection behavior. Once
+// story-select-from-index picks a cached story, the .ino sets this so a
+// question asked during story B is not answered about story A.
+static char s_active_story_id[64] = {0};
+
+void voice_set_active_story_id(const char *story_id) {
+    if (story_id == nullptr || story_id[0] == '\0') {
+        s_active_story_id[0] = '\0';
+        return;
+    }
+    snprintf(s_active_story_id, sizeof(s_active_story_id), "%s", story_id);
+}
+
+const char *voice_active_story_id() {
+    return s_active_story_id[0] ? s_active_story_id : AREG_STORY_ID;
+}
+
 static void wifi_load_effective_creds() {
     if (wifi_creds_load(s_wifi_ssid, sizeof(s_wifi_ssid),
                         s_wifi_pass, sizeof(s_wifi_pass))) {
@@ -475,7 +493,7 @@ VoiceTurnResult voice_upload_question(const uint8_t *payload, size_t length,
 
     char url[384];
     snprintf(url, sizeof(url), "%s?storyId=%s&offset=%u",
-             AREG_STORY_QA_URL, AREG_STORY_ID, (unsigned)offset);
+             AREG_STORY_QA_URL, voice_active_story_id(), (unsigned)offset);
 
     HTTPClient http;
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
@@ -533,7 +551,7 @@ VoiceTurnResult voice_upload_reflection_answer(const uint8_t *payload, size_t le
 
     char url[384];
     snprintf(url, sizeof(url), "%s?storyId=%s&questionIndex=%d",
-             AREG_STORY_REFLECTION_URL, AREG_STORY_ID, question_index);
+             AREG_STORY_REFLECTION_URL, voice_active_story_id(), question_index);
 
     HTTPClient http;
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
@@ -656,7 +674,7 @@ static void upload_question_task(void * /*pvParams*/) {
 
     char url[384];
     snprintf(url, sizeof(url), "%s?storyId=%s&offset=%u",
-             AREG_STORY_QA_URL, AREG_STORY_ID, (unsigned)s_async_offset);
+             AREG_STORY_QA_URL, voice_active_story_id(), (unsigned)s_async_offset);
 
     HTTPClient http;
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);

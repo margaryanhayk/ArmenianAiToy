@@ -209,6 +209,12 @@ about 20 s after boot:
 arduino-cli compile --upload -p COM7 --fqbn "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc" --build-property "compiler.cpp.extra_flags=-DAREG_CONTENT_SYNC_TEST_BENCH" ".\esp32\AregVoiceMvp"
 ```
 
+Story-selection tests (`-DAREG_STORY_SELECT_TEST_BENCH`) — no SD, no NVS,
+no Wi-Fi; prints `[sel-test] RESULT PASS/FAIL` about 20 s after boot:
+```
+arduino-cli compile --upload -p COM7 --fqbn "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc" --build-property "compiler.cpp.extra_flags=-DAREG_STORY_SELECT_TEST_BENCH" ".\esp32\AregVoiceMvp"
+```
+
 > Adjust `-p COM7` to your serial port. Production builds must define
 > **neither** bench flag — each `-DAREG_*_BENCH` module compiles to zero
 > bytes without its flag.
@@ -307,11 +313,10 @@ stories.
 }
 ```
 
-The four flat fields are **not** a second source of truth. Three readers
-still parse the pre-multi-story flat shape — `story_resolve_cache_path()`
-in the sketch (the hardware-verified SD-first playback path),
-`resolve_path()` in `sd_playback.cpp`, and the Test-E fallback harness —
-and this slice deliberately does not change playback. The mirror points
+The four flat fields are **not** a second source of truth. Active playback
+no longer reads them (see "Story selection" below); they are retained only
+for two bench harnesses — `resolve_path()` in `sd_playback.cpp` and the
+Test-E fallback harness. The mirror points
 at the entry whose id equals `AREG_STORY_ID`, else the first, which
 reproduces single-story behavior exactly. `story-select-from-index`
 migrates those readers and drops the mirror.
@@ -334,11 +339,150 @@ then swapped in. A crash before the swap leaves the previous known-good
 index; a crash inside the remove/rename window leaves the `.new` file and
 the next boot rebuilds from the manifest. No MP3 is at risk either way.
 
-**Playback still does not select among index entries.** The toy plays the
-configured `AREG_STORY_ID` exactly as before. SHIP A6 stays incomplete
-until `story-select-from-index` lands, no-repeat exists, three approved
-MP3 stories are available, and a real three-story hardware run is
-recorded.
+## Story selection (`story_select.{h,cpp}`)
+
+As of the `story-select-from-index` slice the toy **chooses** which cached
+story to play instead of always playing the compile-time `AREG_STORY_ID`.
+This is normal playback, not a bench path — it is compiled into every
+build.
+
+**Deterministic round-robin, no-repeat by construction.**
+`story_select_next()` is pure and allocation-free:
+
+| Situation | Result |
+|---|---|
+| 0 eligible | no selection → fall through the chain below |
+| 1 eligible | that story (a one-story card must keep working, so no-repeat cannot apply) |
+| previous id unknown/empty | the **first** eligible entry |
+| otherwise | the entry **after** the previous one, wrapping at the end |
+
+So three stories rotate `A → B → C → A → B → C`. With two or more
+eligible stories the result is never the previous one, so **no
+back-to-back repeat holds by construction**, not by retry. Random
+selection was rejected for v1: it makes the bench unreproducible, can
+repeat by chance, and leans on boot-time RNG the device does not have.
+Previous-id matching is case-insensitive, as the backend and index are.
+
+**Eligible** requires ALL of: valid id, `verified == true`, `version >= 1`,
+positive recorded `sizeBytes`, a bounded safe `cachePath` (absolute, under
+`/stories/`, no `..`, no `\`), the file present on the card, and its
+**actual size equal to** `sizeBytes`. Index metadata alone is never
+enough — a file can vanish independently of the index. Duplicate ids keep
+the first; index order is preserved.
+
+**Session stability.** The selected id is held in `s_current_story_id` for
+the whole session. The new-story boundary is entering
+`handle_story_session()` with `s_story_offset == 0`; a resume (offset > 0)
+re-resolves the *same* story and never re-selects. So pause/resume, a Q&A
+barge-in, and a stream-token retry all stay on one story. A natural end
+resets the offset to 0, so the next press advances the rotation.
+
+**Last-played persistence.** NVS namespace `aregstory`, key `last_id`
+(Arduino `Preferences`, the same idiom as `wifi_creds` / `device_creds` /
+`ota_state`). Only the id is stored — no secrets, no index. It is written
+**only when the value changes**, so pause/resume does not burn flash. A
+stored id that no longer validates is ignored rather than trusted, and a
+persistence failure is logged and swallowed: it can never block playback.
+
+**The cursor advances only after playback GENUINELY STARTED** — never at
+resolve time. `audio_play_story_file()` reports this through its
+`out_started` flag, set once `mp3.begin()` has succeeded *and* the first
+`mp3.loop()` decode iteration completed, i.e. the decoder is initialized
+and the first frame reached I2S. Every earlier bail-out (SD not mounted,
+open failed, the #064 not-an-MP3 precheck, `mp3.begin()` failure) returns
+with it false and makes no sound. A story that resolved but never played
+must not become `last_id`, or the next press would skip a story the child
+never heard.
+
+**Failed-start exclusion (boot-scoped).** A story that resolved but did
+not start is remembered in bounded RAM and skipped by the next *new-story*
+selection, so a corrupt-but-right-sized file cannot trap the rotation on
+itself. It is deliberately **not** persisted — a reboot retries it, which
+is safer than skipping it forever after one bad start. The whole
+exclusion set is cleared as soon as another story genuinely starts.
+
+The exclusion is **best-effort**: if applying it would leave nothing to
+play it is ignored, so a one-story card whose only story failed still gets
+a retry on the next press rather than silence, and there is no loop
+because each press is a single attempt. Consequence worth knowing: with
+exactly two stories where one is broken, the good one replays
+back-to-back — availability beats strict no-repeat when the library is
+effectively one playable story.
+
+Worked example (the policy in one line each):
+
+```
+A played successfully        -> last_id = A
+selector picks B             -> B resolves, decoder start fails, no audio
+                             -> last_id STAYS A, B excluded (RAM only)
+next new-story request       -> picks C  (not B, not A)
+C starts successfully        -> last_id = C, exclusion set cleared
+```
+
+Pause, resume, a Q&A barge-in and the stream-token retry never touch the
+cursor: the bookkeeping runs at most once per session, guarded by
+`selection_settled`.
+
+**Story-aware resolution.** `story_select_resolve_path(story_id, out, len)`
+replaces the old `story_resolve_cache_path(out, len)`. It resolves **only**
+the requested id and returns false — never another story's path — when the
+id is invalid, absent, unverified, unsafe, missing on the card, or
+size-mismatched. Callers cannot push an arbitrary filesystem path through
+it. `AREG_STORY_ID` is no longer consulted anywhere in resolution.
+
+**Fallback order** (decided once per session):
+1. the selected verified story from the schema-v2 index;
+2. the content-pack narration `AREG_SD_STORY_NARRATION`;
+3. the Wi-Fi story stream.
+
+A selected story that fails to resolve falls through to 2/3 rather than
+silently playing a *different* cached story.
+
+**In-story Q&A follows the selected story.** `voice_set_active_story_id()`
+grounds `/api/chat/story-qa` and the reflection endpoint in whatever is
+playing, so a question asked during story B is not answered about story A.
+Empty restores the configured-story default.
+
+### Feature flag: `AREG_STORY_SD_CACHE_FIRST` is GONE
+
+It previously gated the whole cache-first block, was **off by default**,
+and was listed in `docs/v2-backlog.md` as "promote to default — deferred".
+This slice **removes it**: index-backed selection is the normal playback
+source. Compatibility is preserved by the fallback chain rather than by
+the flag — a card with no v2 index yields zero eligible stories and
+behaves exactly like the old flag-off build. `AREG_STORY_SD_FALLBACK_TEST_BENCH`
+no longer requires it (its `#error` is removed).
+
+### Legacy index mirror: RETAINED, deliberately
+
+Active playback no longer reads the flat root fields — selection and
+resolution use `stories[]` only, so a stale mirror can never override a
+valid v2 selection. The mirror is **not** removed, because two readers
+still depend on it, both verified by repo search:
+
+- `sd_playback.cpp:41` — `doc["file"]`, the `AREG_SD_PLAYBACK_BENCH`
+  cached-MP3 playback harness;
+- `AregVoiceMvp.ino` Test-E in `AREG_STORY_SD_FALLBACK_TEST_BENCH`, which
+  writes a flat index on purpose.
+
+Both are hardware-verification tools. Removing the mirror for tidiness
+would break them, so it stays until those harnesses are migrated.
+
+### What still blocks SHIP A6
+
+Selection exists, but A6 is **not** DONE. Still required, on real
+hardware:
+
+- **three approved MP3 stories** (today: 2 approved stories, and only
+  `anban-huri` has an SD-wired MP3; `anban-huri` itself is still a
+  `draft` pending its TTS listen test);
+- a real **three-item sync** onto the card;
+- selection **observed across repeated new-story requests**;
+- **no back-to-back repeats** observed;
+- **reboot persistence** of the rotation;
+- **pause/resume staying on the same story**.
+
+None of that has been run. Do not mark A6 DONE without recorded evidence.
 
 ## Known C1 limitations (deliberate, deferred)
 

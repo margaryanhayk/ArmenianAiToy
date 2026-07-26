@@ -91,8 +91,17 @@ struct VoiceTurnResult {
 // on ok == false, it is a no-op in that case).
 VoiceTurnResult voice_upload_turn(const uint8_t *payload, size_t length);
 
+// Which story the in-story Q&A / reflection endpoints are grounded in.
+// Set by the story session once it has selected a cached story, so a
+// question asked during story B is answered about story B rather than
+// about the compile-time AREG_STORY_ID. Passing nullptr or "" restores
+// the configured-story default. voice_active_story_id() never returns
+// null — it falls back to AREG_STORY_ID.
+void voice_set_active_story_id(const char *story_id);
+const char *voice_active_story_id();
+
 // In-story Q&A upload. POSTs the WAV `payload` (the recorded question)
-// to AREG_STORY_QA_URL with "?storyId=AREG_STORY_ID&offset=<offset>" and
+// to AREG_STORY_QA_URL with "?storyId=<active story>&offset=<offset>" and
 // the device-auth headers. The response body (on HTTP 200) is the spoken
 // answer MP3, returned via the result's PSRAM buffer exactly like
 // voice_upload_turn. `offset` is the story byte position at the

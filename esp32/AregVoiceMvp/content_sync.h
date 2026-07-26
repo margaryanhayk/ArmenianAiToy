@@ -36,15 +36,18 @@
 //   "file": "/stories/...", "sizeBytes": 123
 // }
 // The four flat fields after "stories" are a LEGACY COMPATIBILITY MIRROR
-// of one entry, not a second source of truth. Three readers still parse
-// the pre-multi-story flat shape — story_resolve_cache_path() in the
-// .ino (the hardware-verified SD-first playback path), resolve_path() in
-// sd_playback.cpp, and the Test-E fallback harness — and this slice is
-// explicitly not allowed to change playback selection. The mirror points
-// at the entry whose storyId equals AREG_STORY_ID when present, else the
-// first verified entry, which reproduces the old single-story behavior
-// exactly. story-select-from-index owns migrating those readers to
-// "stories" and dropping the mirror.
+// of one entry, not a second source of truth.
+//
+// As of story-select-from-index, ACTIVE PLAYBACK no longer reads them:
+// story_select.cpp uses "stories" only, so a stale mirror can never
+// override a valid v2 selection. It is RETAINED because two BENCH
+// harnesses still parse the flat shape — resolve_path() in
+// sd_playback.cpp (AREG_SD_PLAYBACK_BENCH) and Test-E in
+// AREG_STORY_SD_FALLBACK_TEST_BENCH, which writes a flat index on
+// purpose. Both are hardware-verification tools; dropping the mirror for
+// tidiness would break them. The mirror points at the entry whose
+// storyId equals AREG_STORY_ID when present, else the first verified
+// entry.
 //
 // A v1 (flat, no "schemaVersion") index on the card is MIGRATED in
 // memory, not erased: its entry is carried forward when the MP3 it names

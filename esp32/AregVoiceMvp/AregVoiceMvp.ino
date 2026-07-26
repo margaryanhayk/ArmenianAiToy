@@ -32,10 +32,10 @@
 #include "sd_diag.h"           // standalone SD diagnostic (AREG_SD_DIAG_BENCH builds only)
 #include "sd_playback.h"       // cached-MP3 SD playback (AREG_SD_PLAYBACK_BENCH builds only)
 
-#ifdef AREG_STORY_SD_CACHE_FIRST
+#include "story_select.h"      // which cached story to play (index v2 + no-repeat)
+#include "story_select_test.h" // selection tests (AREG_STORY_SELECT_TEST_BENCH only)
 #include <SD.h>            // FS.h + SD — read /content_index.json (already linked)
 #include <ArduinoJson.h>   // JsonDocument/deserializeJson (already a project dep)
-#endif
 
 // #047 — hang-protection tunables. Defaulted here so the build never depends
 // on config.h carrying them; overridable in config.h. See config.h.example.
@@ -212,6 +212,18 @@ static bool s_awaiting_first_play_ms = false;
 // 0 = play from the beginning; >0 = the byte offset saved at the
 // last barge-in. Encodes "paused, resume here" without a new state.
 static uint32_t s_story_offset = 0;
+
+// --- Which story this session is playing ---------------------
+// Set ONCE at a new-story boundary and held for the whole session, so
+// pause/resume, a Q&A barge-in, and a stream retry all stay on the SAME
+// story. Empty means "no index selection" — the pack/Wi-Fi fallback
+// chain then behaves exactly as it did before selection existed.
+//
+// s_story_offset is what distinguishes the two entry cases: 0 means a
+// fresh story (select), >0 means resuming the one that was paused (do
+// NOT re-select). That is the existing sticky-pause mechanism, reused
+// rather than a new state flag.
+static char s_current_story_id[CS_MAX_STORY_ID_LEN + 1] = "";
 
 // --- Failure clip playback ----------------------------------
 static void play_canned_failure_clip() {
@@ -542,55 +554,50 @@ static void handle_post_story_flow() {
 //   - quick TAP     → sticky pause: leave the session, the saved offset
 //                     stays, and the next button press resumes it.
 // Reaching the natural end resets to the beginning.
-#ifdef AREG_STORY_SD_CACHE_FIRST
-// SD-first-from-cache resolver (opt-in). Consults the content-sync cache
-// written by content_sync.cpp (/content_index.json → "file", the flat
-// /stories/<id>-v<ver>.mp3 file), NOT the ContentPackBuilder layout that
-// AREG_SD_STORY_NARRATION points at. Returns true and fills `out` with the
-// cached MP3 path ONLY when a valid, present cache exists for THIS story;
-// false to fall through to the pack/Wi-Fi chain. Hardened over
-// sd_playback.cpp's bench resolver: verifies the file exists on SD and the
-// storyId matches AREG_STORY_ID (single-story safety), no hard fallback.
-static bool story_resolve_cache_path(char *out, size_t out_len) {
-    if (!audio_sd_has_file("/content_index.json")) {
-        return false;  // no synced content (self-guards on the boot mount)
-    }
-    File idx = SD.open("/content_index.json", FILE_READ);
-    if (!idx) {
-        return false;
-    }
-    JsonDocument doc;
-    const DeserializationError err = deserializeJson(doc, idx);
-    idx.close();
-    if (err != DeserializationError::Ok) {
-        Serial.println("[story] cache index parse failed — trying pack");
+// Chooses the story for a NEW session and resolves its cached MP3.
+//
+// New-story boundary = entering handle_story_session with
+// s_story_offset == 0. A resume (offset > 0) keeps s_current_story_id
+// untouched, so pause/resume, a Q&A barge-in and a stream retry can
+// never land on a different story mid-session.
+//
+// Returns true and fills `out` when a verified cached story was chosen;
+// false leaves s_current_story_id empty and the caller falls back to the
+// content pack, then the Wi-Fi stream — exactly the pre-selection chain.
+static bool story_pick_for_session(char *out, size_t out_len) {
+    static CsStory eligible[CS_MAX_STORIES];   // static: ~3.4 KB, not stack
+    const int count = story_select_load_eligible(eligible, CS_MAX_STORIES);
+    if (count <= 0) {
+        Serial.println("[story] no eligible cached stories — using fallback chain");
         Serial.flush();
         return false;
     }
-    const char *file = doc["file"]    | "";
-    const char *sid  = doc["storyId"] | "";
-    if (file[0] != '/') {
-        Serial.println("[story] cache index has no usable 'file' — trying pack");
+
+    char chosen[CS_MAX_STORY_ID_LEN + 1];
+    if (!story_select_pick(eligible, count, chosen, sizeof(chosen))) {
+        return false;
+    }
+    if (!story_select_resolve_path(chosen, out, out_len)) {
+        // Selected but unusable: refuse rather than quietly play a
+        // different story than the one chosen.
+        Serial.printf("[story] selected %s but it did not resolve — using fallback chain\n",
+                      chosen);
         Serial.flush();
         return false;
     }
-    if (strcmp(sid, AREG_STORY_ID) != 0) {
-        Serial.printf("[story] cache storyId mismatch (idx=%s cfg=%s) — trying pack\n",
-                      sid, AREG_STORY_ID);
-        Serial.flush();
-        return false;
-    }
-    if (!audio_sd_has_file(file)) {
-        Serial.printf("[story] cache file missing on SD (%s) — trying pack\n", file);
-        Serial.flush();
-        return false;
-    }
-    snprintf(out, out_len, "%s", file);
-    Serial.printf("[story] cache index file=%s storyId=%s\n", out, sid);
+
+    cs_copy_bounded(s_current_story_id, sizeof(s_current_story_id), chosen);
+    Serial.printf("[story] selected %s (%d eligible)\n", chosen, count);
     Serial.flush();
+
+    // NOTE: the rotation cursor is deliberately NOT advanced here. A story
+    // that merely RESOLVED has not been heard — SD, I2S or decoder startup
+    // can still fail silently. Persisting now would make the next press
+    // skip a story the child never heard. The cursor moves only once
+    // audio_play_story_file reports it genuinely started (see the
+    // playback loop below).
     return true;
 }
-#endif  // AREG_STORY_SD_CACHE_FIRST
 
 static void handle_story_session() {
     // Story-audio access token (gap 1). UNVERIFIED — not compiled/flashed.
@@ -598,35 +605,64 @@ static void handle_story_session() {
     // /api/story-audio stream requires ?token=. Fetch it once per session
     // (TTL ~1 h >> a story). Empty/false when enforcement is OFF → we stream
     // without a token, which is correct in that case.
-    // OFFLINE-FIRST source (Slice 2). If the content pack's narration MP3 is on
-    // the SD card, play it from the card (no Wi-Fi, no token); otherwise fall
-    // back to the Wi-Fi story stream. Decided once per session.
-    // Which on-SD narration file to play (if any). Default is the content-pack
-    // layout; the content-sync cache (opt-in) takes priority when present.
-    const char *sd_narration_path = AREG_SD_STORY_NARRATION;
-#ifdef AREG_STORY_SD_CACHE_FIRST
-    char sd_cache_path[96];
-    const bool cache_hit = story_resolve_cache_path(sd_cache_path, sizeof(sd_cache_path));
-    if (cache_hit) {
-        sd_narration_path = sd_cache_path;  // prefer the content-sync cache
+    //
+    // SOURCE PRIORITY (decided once per session):
+    //   1. the selected verified story from the schema-v2 index;
+    //   2. the content-pack narration for the configured story;
+    //   3. the Wi-Fi story stream.
+    char sd_cache_path[CS_MAX_PATH_LEN];
+    bool cache_hit = false;
+
+    if (s_story_offset == 0) {
+        // NEW story.
+        s_current_story_id[0] = '\0';
+        cache_hit = story_pick_for_session(sd_cache_path, sizeof(sd_cache_path));
+    } else if (s_current_story_id[0] != '\0') {
+        // RESUME: re-resolve the SAME story, never re-select.
+        cache_hit = story_select_resolve_path(
+            s_current_story_id, sd_cache_path, sizeof(sd_cache_path));
+        if (cache_hit) {
+            Serial.printf("[story] resuming %s at byte %u\n",
+                          s_current_story_id, (unsigned)s_story_offset);
+        } else {
+            // The cached story vanished mid-session (card pulled, file
+            // deleted). We are about to play the PACK narration instead, so
+            // the selected id must be dropped — leaving it set would ground
+            // the in-story Q&A in a story that is no longer the one playing,
+            // and would let the rotation bookkeeping below attribute the
+            // pack playback to it.
+            Serial.printf("[story] resume: %s no longer resolvable — fallback chain\n",
+                          s_current_story_id);
+            s_current_story_id[0] = '\0';
+            s_story_offset = 0;   // a different audio file: byte offset is meaningless
+        }
+        Serial.flush();
     }
-#endif
+
+    const char *sd_narration_path = cache_hit ? sd_cache_path : AREG_SD_STORY_NARRATION;
     const bool use_sd = audio_sd_has_file(sd_narration_path);
-#ifdef AREG_STORY_SD_CACHE_FIRST
     Serial.printf("[story] source = %s\n",
                   use_sd ? (cache_hit ? "SD (cache)" : "SD (pack)") : "Wi-Fi stream");
-#else
-    Serial.printf("[story] source = %s\n", use_sd ? "SD (offline)" : "Wi-Fi stream");
-#endif
     Serial.flush();
+
+    // The story id every backend call for THIS session must use. Falls back
+    // to the configured id when nothing was selected, which is the
+    // pre-selection behavior. Set before the token fetch so the in-story
+    // Q&A and reflection endpoints are grounded in the story actually
+    // playing, not in AREG_STORY_ID.
+    const char *active_story_id =
+        s_current_story_id[0] ? s_current_story_id : AREG_STORY_ID;
+    voice_set_active_story_id(active_story_id);
 
     // Story-audio access token (gap 1) — only the Wi-Fi stream needs it.
     static char story_token[256];
     bool have_token = use_sd
         ? false
-        : voice_fetch_story_audio_token(AREG_STORY_ID, story_token, sizeof(story_token));
+        : voice_fetch_story_audio_token(active_story_id, story_token, sizeof(story_token));
     bool token_retry_used = false;
-
+    // The rotation cursor advances at most once per session, and ONLY after
+    // playback genuinely started.
+    bool selection_settled = false;
     bool active = true;
     while (active) {
         transition_to(ST_PLAYING);
@@ -634,12 +670,14 @@ static void handle_story_session() {
         uint32_t resume_offset = 0;
 
         bool interrupted;
+        bool started = false;
         bool stream_open_failed = false;
         if (use_sd) {
             Serial.printf("[story] SD play from byte %u\n", (unsigned)s_story_offset);
             Serial.flush();
             interrupted = audio_play_story_file(
-                sd_narration_path, s_story_offset, story_barge_in_poll, &resume_offset);
+                sd_narration_path, s_story_offset, story_barge_in_poll, &resume_offset,
+                &started);
         } else {
             // Room for the base URL + ?from=<u32> + &token=<opaque>.
             char url[640];
@@ -668,6 +706,30 @@ static void handle_story_session() {
             }
             interrupted = audio_play_story_stream(
                 url, s_story_offset, story_barge_in_poll, &resume_offset, &stream_open_failed);
+            started = !stream_open_failed;
+        }
+
+        // Rotation bookkeeping — the ONLY place the cursor moves.
+        //
+        // `started` is true only once the decoder produced its first frame,
+        // so a story that resolved but died in SD/I2S/decoder startup is
+        // never recorded as played: last_id keeps pointing at whatever the
+        // child last actually heard, and the next press does not skip a
+        // story they never got.
+        //
+        // Guarded by selection_settled so a Q&A barge-in, a resume, or the
+        // token retry cannot re-run it mid-session; and it does nothing at
+        // all unless THIS session selected a story from the index.
+        if (!selection_settled && s_current_story_id[0] != '\0') {
+            if (started) {
+                selection_settled = true;
+                story_select_save_last(s_current_story_id);   // failure is logged + ignored
+                story_select_clear_failed();
+            } else {
+                // Boot-scoped only: a reboot retries this story, which is
+                // safer than skipping it forever on one bad start.
+                story_select_mark_failed(s_current_story_id);
+            }
         }
 
         // #063 — token-rejection recovery now driven by the REAL stream-open
@@ -680,7 +742,7 @@ static void handle_story_session() {
             Serial.flush();
             token_retry_used = true;
             have_token = voice_fetch_story_audio_token(
-                AREG_STORY_ID, story_token, sizeof(story_token));
+                active_story_id, story_token, sizeof(story_token));
             continue;  // retry from the same s_story_offset
         }
 
@@ -920,24 +982,31 @@ static void handle_story_session() {
 // ---------------------------------------------------------------
 // SD-first fallback test harness (bench-only, temporary)
 // Gated behind AREG_STORY_SD_FALLBACK_TEST_BENCH; requires
-// AREG_STORY_SD_CACHE_FIRST (it exercises story_resolve_cache_path).
+// nothing else (the selection path it exercises is now always compiled).
 // Automates fallback Tests B/E/C on-device: it manipulates the SD files,
 // runs the REAL source resolver / playback path, restores the files, and
 // prints PASS/FAIL. Compiles to ZERO bytes without the flag; no production
-// or AREG_STORY_SD_CACHE_FIRST behavior change unless this flag is also set.
+// behavior change unless this flag is also set.
 // ---------------------------------------------------------------
 #ifdef AREG_STORY_SD_FALLBACK_TEST_BENCH
-#ifndef AREG_STORY_SD_CACHE_FIRST
-#error "AREG_STORY_SD_FALLBACK_TEST_BENCH requires AREG_STORY_SD_CACHE_FIRST"
-#endif
 
 // Replicates the production source decision (handle_story_session, the
-// sd_narration_path/use_sd block) using the REAL resolver, so a test proves
-// which source the story flow WOULD pick without playing 3-4 min of audio.
+// sd_narration_path/use_sd block) using the REAL selector + resolver, so a
+// test proves which source the story flow WOULD pick without playing 3-4 min
+// of audio. Mirrors story_pick_for_session WITHOUT persisting the rotation
+// cursor — a diagnostic must not move the child's place in the rotation.
 static void fbtest_log_source(const char *label, bool *out_is_cache, bool *out_use_sd) {
     const char *path = AREG_SD_STORY_NARRATION;
-    char cache_path[96];
-    const bool cache_hit = story_resolve_cache_path(cache_path, sizeof(cache_path));
+    char cache_path[CS_MAX_PATH_LEN];
+    bool cache_hit = false;
+    static CsStory eligible[CS_MAX_STORIES];
+    const int count = story_select_load_eligible(eligible, CS_MAX_STORIES);
+    if (count > 0) {
+        char chosen[CS_MAX_STORY_ID_LEN + 1];
+        if (story_select_pick(eligible, count, chosen, sizeof(chosen))) {
+            cache_hit = story_select_resolve_path(chosen, cache_path, sizeof(cache_path));
+        }
+    }
     if (cache_hit) path = cache_path;
     const bool use_sd = audio_sd_has_file(path);
     Serial.printf("[fallback-test] %s resolved source = %s\n", label,
@@ -1001,9 +1070,14 @@ static void story_fallback_test_run() {
         }
         if (wrote) {
             bool is_cache = false;
-            // story_resolve_cache_path prints "[story] cache storyId mismatch ..."
+            // Since story-select-from-index the rejection reason CHANGED: a
+            // foreign storyId is no longer "not my story" (selection has no
+            // configured story to compare against). This temp index is a
+            // LEGACY flat object with no sha256, so cs_index_parse cannot
+            // migrate it and it yields zero eligible entries. Either way the
+            // SD cache must not be selected, which is what the test asserts.
             fbtest_log_source("Test E", &is_cache, nullptr);
-            Serial.printf("[fallback-test] Test E %s (mismatch rejected, SD-cache NOT selected)\n",
+            Serial.printf("[fallback-test] Test E %s (unusable index rejected, SD-cache NOT selected)\n",
                           !is_cache ? "PASS" : "FAIL");
         } else {
             Serial.println("[fallback-test] Test E SETUP-FAIL: could not write temp index");
@@ -1353,6 +1427,13 @@ void loop() {
         // validation / manifest / index checks, no SD, no Wi-Fi, no
         // backend. IDLE-only. Zero bytes of this in production.
         content_sync_test_tick();
+#endif
+
+#ifdef AREG_STORY_SELECT_TEST_BENCH
+        // Story-selection tests (bench builds only): pure round-robin +
+        // eligibility checks, no SD, no NVS, no Wi-Fi. IDLE-only.
+        // Zero bytes of this in production.
+        story_select_test_tick();
 #endif
 
 #ifdef AREG_SD_DIAG_BENCH

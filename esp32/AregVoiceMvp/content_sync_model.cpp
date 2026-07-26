@@ -1,11 +1,15 @@
 // -------------------------------------------------------------
 // AregVoiceMvp / content_sync_model.cpp — see content_sync_model.h.
 //
-// Compiled only for builds that actually sync or test content sync;
-// production defines neither flag and emits zero bytes of this file.
+// Compiled into EVERY build. It used to be gated behind the content-sync
+// bench flags, but as of story-select-from-index, production playback
+// reads the same index through cs_index_parse — one owner of the schema
+// rather than a second reader that could drift from it.
+//
+// cs_manifest_parse stays unreferenced in production builds; the ESP32
+// core compiles with -ffunction-sections/-fdata-sections and links with
+// --gc-sections, so it is dropped from the image.
 // -------------------------------------------------------------
-#if defined(AREG_CONTENT_SYNC_BENCH) || defined(AREG_CONTENT_SYNC_TEST_BENCH)
-
 #include "content_sync_model.h"
 
 #include <Arduino.h>
@@ -215,5 +219,3 @@ void cs_index_build(JsonDocument &doc, const CsStory *active, int count,
     doc["file"]      = active[mirror].cache_path;
     doc["sizeBytes"] = active[mirror].size_bytes;
 }
-
-#endif  // AREG_CONTENT_SYNC_BENCH || AREG_CONTENT_SYNC_TEST_BENCH

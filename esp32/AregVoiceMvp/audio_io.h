@@ -114,10 +114,22 @@ bool audio_sd_has_file(const char *path);
 // the story played to its natural end (*out_resume_offset = 0) OR the file
 // could not be opened. Callers should audio_sd_has_file() first, so a false
 // return reliably means "natural end".
+// `out_started` (optional) reports whether playback GENUINELY BEGAN: it is
+// set true only after mp3.begin() succeeded AND the first mp3.loop() decode
+// iteration completed, i.e. the decoder was initialized and the first frame
+// was handed to I2S. Every earlier bail-out (SD not mounted, open failed,
+// the #064 not-an-MP3 precheck, mp3.begin() failure) leaves it false, and
+// all of those produce NO audible output. It is written on entry, so a
+// caller may pass it uninitialized.
+//
+// This is what lets story selection distinguish "the child heard this
+// story" from "it never started" — the rotation cursor must only advance
+// on the former.
 bool audio_play_story_file(const char *path,
                            uint32_t start_byte,
                            audio_barge_in_fn barge_in,
-                           uint32_t *out_resume_offset);
+                           uint32_t *out_resume_offset,
+                           bool *out_started = nullptr);
 
 // ---------------------------------------------------------------
 // Dead-air mitigation (S1 + S3)

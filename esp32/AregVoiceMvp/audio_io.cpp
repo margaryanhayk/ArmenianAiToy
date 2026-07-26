@@ -518,9 +518,15 @@ static bool sd_file_looks_like_mp3(AudioFileSourceSD &file) {
 bool audio_play_story_file(const char *path,
                            uint32_t start_byte,
                            audio_barge_in_fn barge_in,
-                           uint32_t *out_resume_offset) {
+                           uint32_t *out_resume_offset,
+                           bool *out_started) {
     if (out_resume_offset != nullptr) {
         *out_resume_offset = 0;
+    }
+    // False until the decoder has actually produced a frame. Every bail-out
+    // below returns with this still false, and none of them make a sound.
+    if (out_started != nullptr) {
+        *out_started = false;
     }
 #ifdef AREG_DISABLE_MP3_PLAYBACK
     (void)path; (void)start_byte; (void)barge_in;
@@ -594,6 +600,12 @@ bool audio_play_story_file(const char *path,
         if (!mp3.loop()) {
             mp3.stop();
             break;
+        }
+        // First completed decode iteration = decoder initialized and the
+        // first frame handed to I2S. This is the earliest point at which
+        // the child can actually have heard something.
+        if (out_started != nullptr && !*out_started) {
+            *out_started = true;
         }
         // Yield to FreeRTOS so watchdog / housekeeping are not starved.
         if (millis() - last_yield > 50) {
