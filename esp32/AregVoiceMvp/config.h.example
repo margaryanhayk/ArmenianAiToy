@@ -10,7 +10,9 @@
 //
 // Secrets to fill in:
 //   - WIFI_SSID / WIFI_PASSWORD  — your dev Wi-Fi
-//   - BACKEND_URL host           — your dev laptop's LAN address + port
+//   - BACKEND_BASE_URL           — your dev laptop's LAN address + port.
+//                                  ONE place; every backend URL derives
+//                                  from it. Do not edit the others.
 //   - DEVICE_ID / DEVICE_API_KEY — returned from POST /api/devices/register
 // -------------------------------------------------------------
 #pragma once
@@ -25,17 +27,36 @@
 #define AREG_WIFI_PASSWORD      "YOUR_WIFI_PASSWORD"
 #endif
 
-// --- Backend endpoint (set host to your dev laptop's LAN IP) --
+// --- Backend base URL (SINGLE SOURCE OF TRUTH — edit host here) ---
+// Every backend URL below is built from this by string-literal
+// concatenation, so changing your dev laptop's LAN address is a ONE-LINE
+// edit. Set host + port only — NO trailing slash, NO path.
+//
+// This exists because the host used to be repeated in four separate
+// defines. When DHCP moved the dev laptop's address, three of them were
+// updated and the rest silently kept pointing at the old IP, so backend
+// calls failed with no obvious cause. Keep it that way: never paste a
+// literal host into a URL define below.
+//
 // Plain HTTP is fine on a bench LAN; TLS is a later-phase concern.
+#ifndef AREG_BACKEND_BASE_URL
+#define AREG_BACKEND_BASE_URL   "http://YOUR_LAN_IP:5000"
+#endif
+
+// Chat audio POST. NOTE: several modules derive their own endpoint at
+// runtime by string-replacing the "/api/chat/audio" suffix of this value
+// (heartbeat, story-audio-token, OTA command poll/ack, firmware manifest,
+// content manifest/file). That suffix is therefore load-bearing — keep it
+// exactly as-is unless you also update those call sites.
 #ifndef AREG_BACKEND_URL
-#define AREG_BACKEND_URL        "http://YOUR_LAN_IP:5000/api/chat/audio"
+#define AREG_BACKEND_URL        AREG_BACKEND_BASE_URL "/api/chat/audio"
 #endif
 
 // Continuous story narration (pre-rendered, streamed). The device
 // streams this MP3 and decodes it on the fly; resume appends
-// "?from=<byteOffset>". Same host/port as the backend above.
+// "?from=<byteOffset>".
 #ifndef AREG_STORY_AUDIO_URL
-#define AREG_STORY_AUDIO_URL    "http://YOUR_LAN_IP:5000/api/story-audio/anban-huri"
+#define AREG_STORY_AUDIO_URL    AREG_BACKEND_BASE_URL "/api/story-audio/anban-huri"
 #endif
 
 // Library story id (matches the path in AREG_STORY_AUDIO_URL); sent to
@@ -48,7 +69,7 @@
 // the WAV here as "?storyId=<id>&offset=<byteOffset>"; the response is
 // the spoken answer MP3. Device-auth headers ARE sent on this POST.
 #ifndef AREG_STORY_QA_URL
-#define AREG_STORY_QA_URL       "http://YOUR_LAN_IP:5000/api/chat/story-qa"
+#define AREG_STORY_QA_URL       AREG_BACKEND_BASE_URL "/api/chat/story-qa"
 #endif
 
 // Post-story reflection answer (Slice 3). After the story + conclusion +
@@ -56,7 +77,7 @@
 // "?storyId=<id>&questionIndex=<n>"; the response is the spoken warm
 // acknowledgement MP3. Device-auth headers ARE sent. Sub-route of story-qa.
 #ifndef AREG_STORY_REFLECTION_URL
-#define AREG_STORY_REFLECTION_URL "http://YOUR_LAN_IP:5000/api/chat/story-qa/reflection-answer"
+#define AREG_STORY_REFLECTION_URL AREG_BACKEND_BASE_URL "/api/chat/story-qa/reflection-answer"
 #endif
 
 // Resume-offset correction. getPos() reports bytes the decoder has
