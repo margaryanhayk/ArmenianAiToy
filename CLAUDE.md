@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2013 tests)
+dotnet test                                     # Run all tests (2022 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -1825,6 +1825,41 @@ no DB match older than a configurable grace window (default
 24 h). Per-tick directory cap, path-traversal hardening, system-
 actor audit row on tick-with-deletions only, counts-only
 metadata. No content inspection, no parent-/user-facing endpoint.
+
+## Story Q&A text harness (`POST /api/story-qa-text`)
+
+Unauthenticated TEXT-only harness for checking in-story Q&A answer
+quality from a plain HTTP client — no STT, no TTS, no device, no
+persistence. Distinct from `POST /api/internal/story-qa-test` (operator
+console, admin-token gated, richer diagnostics) and from
+`POST /api/chat/story-qa` (the device voice path).
+
+**Development-only.** Outside Development every request is a **404**
+before validation — same fail-closed concealment posture as `/metrics`
+and `/api/internal/*`. An unauthenticated route that reaches GPT must not
+exist in a deployed image: it would be an open relay against the
+deployment's own OpenAI key, and it is outside the per-device daily cost
+cap (which keys on `X-Device-Id`). The bench is unaffected —
+`run-local.ps1` sets `ASPNETCORE_ENVIRONMENT=Development`, while every
+deploy runbook sets `Production`.
+
+**Dual moderation, mirroring the voice path.** `LibraryStoryQuestionService`
+has no moderation of its own (it takes only `IAiChatClient`), and
+`StoryAnswerFilter` validates story fidelity and format — it is **not** a
+safety classifier. So the controller owns both checks:
+- **Input** moderated BEFORE any model call. Unsafe ⇒ 200 with
+  `Answer = StoryAnswerFilter.SafeFallback`, `UsedFallback = true`,
+  `FirstRejection = "moderation_blocked"`, and GPT is never called.
+- **Output** moderated only when the answer is model-authored
+  (`!UsedFallback`). Unsafe ⇒ same fallback shape with
+  `FirstRejection = "output_blocked"`. The canned fallback is
+  pre-reviewed text and deliberately skips the second classifier call.
+- `moderation_unavailable` is fail-closed to unsafe, same as everywhere
+  else. Wire shape is unchanged — no new fields.
+
+Pinned by `StoryQaTextControllerModerationTests` (keystones:
+`UnsafeQuestion_NeverCallsGpt_ReturnsSafeFallback`,
+`UnsafeAnswer_IsOutputModerated_ReturnsFallback_NotTheAnswer`).
 
 ## Internal console (superuser)
 
