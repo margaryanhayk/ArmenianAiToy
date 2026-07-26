@@ -32,6 +32,15 @@ comparison, and future adaptation work.
   pipeline. Owner designation is a recorded product decision, never
   an editorial judgment made in this repo. (Designated so far:
   `anban-huri`, owner decision 2026-06-12 — now in story-drafts.)
+  - **Cautionary precedent:** `anban-huri` never actually satisfied
+    the byte-frozen half of that promise. Its text was already
+    partially normalized when it was designated, and the gap was only
+    found on 2026-07-27, after the audio had been rendered and the
+    listen test passed. **Verify a title's transcription against its
+    published edition BEFORE designating it** — "byte-frozen" is a
+    claim about provenance, and this folder had none recorded for
+    `anban-huri` (the file was never even committed here). See
+    `tools/quality-evidence/anban-huri-source-verification-20260727.md`.
 - **`review.status` MUST be `"source"`.** A `"draft"` or `"approved"`
   file in this folder fails `SourceStoryFolderTests` on the next
   `dotnet test`. (`"source"` also structurally fails the runtime

@@ -11,10 +11,17 @@ not fill in the verdicts, and must not stamp `listenTestAt` /
 `backend/content/story-drafts/anban-huri.story.json` — «Անբան Հուռին»,
 9 segments, `review.status: "draft"`, `bedtimeSafe: false`.
 
-Story segments are **byte-frozen** by owner decision (2026-06-12). A word
-the voice mangles is fixed by re-rendering or by changing spoken
-*metadata*, never by editing the tale text. If the frozen text itself
-turns out to be unspeakable, that is an owner decision, not a fix.
+Story segments are **not to be edited during a listen test**. A word the
+voice mangles is fixed by re-rendering or by changing spoken *metadata*,
+never by editing the tale text. If the text itself turns out to be
+unspeakable, that is an owner decision, not a fix.
+
+> **Note on `anban-huri` specifically** (corrected 2026-07-27): its text
+> is **adapted, not byte-frozen**. Source verification found mixed
+> dialect/standard forms against Թումանյան, *Երկերի լիակատար ժողովածու*
+> հ.5, pp. 226–228; the owner accepted them as the v1 product text. Do
+> not repeat the "byte-frozen" description for this story. See
+> `anban-huri-source-verification-20260727.md`.
 
 ## Audio (already rendered — no new OpenAI spend needed)
 

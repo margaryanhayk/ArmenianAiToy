@@ -267,12 +267,19 @@ answer content and its tone.
   story. Designated so far: `anban-huri` («Անբան Հուռին»), owner
   decision 2026-06-12. A designated title lives in
   `backend/content/story-drafts/` as an exact-text draft whose story
-  segments are **byte-frozen** — linguistic review, the TTS listen
-  test, and human promotion apply to the spoken reflection metadata
-  and the approval state only, never to rewriting, modernizing, or
-  re-segmenting the story text. A designated title is NOT
+  segments are **intended to be byte-frozen** — linguistic review, the
+  TTS listen test, and human promotion apply to the spoken reflection
+  metadata and the approval state only, never to rewriting, modernizing,
+  or re-segmenting the story text. A designated title is NOT
   runtime-served until it passes the production-voice TTS listen test
   and a human promotes it to approved `Stories/Content/`.
+  **Known exception — `anban-huri` did not achieve this** (verified
+  2026-07-27): its text was partially normalized before it reached the
+  drafts folder and carries mixed dialect/standard forms, so it is an
+  ADAPTED product text, not a byte-frozen one. The owner accepted that
+  for v1 rather than re-rendering the audio. Do not cite `anban-huri`
+  as an example of a byte-frozen title; see
+  `tools/quality-evidence/anban-huri-source-verification-20260727.md`.
 - No Russian calques, no English idiom calques, no translated-sounding
   rhythm — reviewer rejects on sight.
 

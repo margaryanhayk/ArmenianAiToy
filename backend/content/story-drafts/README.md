@@ -41,9 +41,19 @@ This folder holds **draft** curated-story JSON files
   owner has explicitly designated as a product story enters this
   pipeline as an exact-text draft. Current owner-designated titles:
   `anban-huri` («Անբան Հուռին», owner decision 2026-06-12). For
-  these, the story segments are byte-frozen — the normal review
-  pipeline applies to the listen test, the reflection metadata, and
-  the promotion act, never to rewriting the text.
+  these, the story segments are *intended* to be byte-frozen — the
+  normal review pipeline applies to the listen test, the reflection
+  metadata, and the promotion act, never to rewriting the text.
+  - **`anban-huri` is a known exception, not a model.** Source
+    verification on 2026-07-27 showed its text had already been
+    partially normalized before it arrived here: it carries mixed
+    dialect/standard forms (`էս`/`այս`, `կնիկ`/`կին`, `ետը`/`հետո`,
+    `աղչի`/`աղջի`) against Թումանյան, *Երկերի լիակատար ժողովածու* հ.5,
+    pp. 226–228. The owner accepted it as an ADAPTED v1 product text
+    rather than re-render the audio. Treat it as adapted, and verify
+    provenance BEFORE freezing any future designated title — the
+    freeze claim is only as good as the transcription it started from.
+    See `tools/quality-evidence/anban-huri-source-verification-20260727.md`.
 - **Un-designated exact source imports do NOT belong here.**
   Verbatim reference/research imports of existing stories that the
   owner has NOT designated as product stories live in

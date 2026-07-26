@@ -2,6 +2,19 @@
 
 **Human verdict: PASS.**
 
+> **Still valid after the 2026-07-27 provenance correction.** Source
+> verification later that day found the text is adapted rather than
+> byte-frozen, and the owner accepted the current wording as the v1
+> product text (option 2b). **No audible story text changed**, and the
+> audio files this PASS was recorded against are byte-identical
+> (`anban-huri.mp3` sha256 `d3a6fbdb…`), so this verdict stands
+> unaltered.
+>
+> It would be invalidated only by a future change to the story text or a
+> re-render. If the deferred source-fidelity cleanup is ever applied, a
+> **fresh listen test is required** and must supersede this record rather
+> than amend it. See `anban-huri-source-verification-20260727.md`.
+
 This is the completed record of the human listen-test gate for
 `backend/content/story-drafts/anban-huri.story.json` («Անբան Հուռին»).
 It is derived from the blank checklist

@@ -26,10 +26,17 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
   **Single recorded exception (owner decision 2026-06-12):** the
   owner-designated exact classic title `anban-huri` («Անբան Հուռին»)
   is a real product story draft in `backend/content/story-drafts/`.
-  Its story segments are byte-frozen — review, TTS listen test, and
-  promotion affect spoken-reflection metadata and approval state only,
-  never the story text. It is NOT runtime-served until the TTS listen
-  test passes and a human promotes it to approved `Stories/Content/`.
+  **Its text is ADAPTED, not byte-frozen** (corrected 2026-07-27):
+  derived from Թումանյան, *Երկերի լիակատար ժողովածու* հ.5, pp. 226–228,
+  it carries mixed dialect/standard forms from an earlier partial
+  normalization. Those are accepted as the v1 product text (owner
+  decision 2026-07-27) so the existing audio and the 2026-07-27
+  listen-test PASS stay valid; source-fidelity cleanup is an open TODO.
+  See `tools/quality-evidence/anban-huri-source-verification-20260727.md`.
+  Review, TTS listen test, and promotion still affect spoken-reflection
+  metadata and approval state only — they never rewrite the story text,
+  and any text edit now costs a re-render + fresh listen test. It is NOT
+  runtime-served until a human promotes it to approved `Stories/Content/`.
   No other folklore titles may be added without a new owner decision.
 
 ## Build & Test
