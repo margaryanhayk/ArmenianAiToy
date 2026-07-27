@@ -71,11 +71,13 @@ WORKDIR /app
 COPY --from=build --chown=$APP_UID:$APP_UID /app/publish .
 
 # Bind on 0.0.0.0:8080 (container-internal; the host port is the
-# operator's choice via `docker run -p <host>:8080`). ASPNETCORE_URLS
-# overrides the `Urls` key in appsettings.json without us having to
-# patch the file. The base aspnet:10 image already defaults to
-# 8080 in recent revisions, but we set it explicitly so the
-# behavior is the same on older base-image patch levels.
+# operator's choice via `docker run -p <host>:8080`). NOTE:
+# ASPNETCORE_URLS alone does NOT win here — appsettings.json pins
+# `Urls: http://0.0.0.0:5000`, and app-config (appsettings) outranks
+# host-config (ASPNETCORE_*). The authoritative override is the
+# `--urls` command-line arg in ENTRYPOINT below (highest-precedence
+# config source). ASPNETCORE_URLS is kept as documentation of intent
+# and as a fallback should the appsettings pin ever be removed.
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080 \
     DOTNET_RUNNING_IN_CONTAINER=true \
     DOTNET_USE_POLLING_FILE_WATCHER=false \
@@ -91,4 +93,4 @@ VOLUME ["/data"]
 # operator concern (Docker, k8s, an external monitor); the image
 # stays neutral.
 
-ENTRYPOINT ["dotnet", "ArmenianAiToy.Api.dll"]
+ENTRYPOINT ["dotnet", "ArmenianAiToy.Api.dll", "--urls", "http://0.0.0.0:8080"]
