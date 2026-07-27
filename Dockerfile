@@ -85,7 +85,12 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:8080 \
     Audio__BlobStoreRoot=/data/audio-blobs
 
 EXPOSE 8080
-VOLUME ["/data"]
+
+# No VOLUME directive on purpose: Railway's builder rejects it
+# ("docker VOLUME is not supported, use Railway Volumes"), and for
+# plain Docker it was only ever a hint — the operator mounts /data
+# explicitly (`docker run -v <host>:/data`, or a Railway Volume with
+# mount path /data). /data is still the single persistent-state root.
 
 # Note on healthchecks: the API exposes GET /api/health (200 ok /
 # 503 unhealthy). We deliberately do NOT bake a HEALTHCHECK
