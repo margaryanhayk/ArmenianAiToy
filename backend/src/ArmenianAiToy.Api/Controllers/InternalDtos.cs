@@ -131,6 +131,11 @@ public sealed record InternalSessionRequest(string? Totp);
 // (revoked/paused); Reason is required and recorded in the audit row.
 public sealed record InternalDeviceActionRequest(bool Value, string Reason);
 
+// Owner recovery — set a locked-out parent's password. Console-gated
+// (fail-closed 404 unless the admin token is configured). Reason required;
+// the new password is never logged or echoed.
+public sealed record InternalParentPasswordResetRequest(string Email, string NewPassword, string Reason);
+
 // Story-QA tuning playground (Phase 2). Operator-only; text-only; calls
 // OpenAI (cost) but mutates nothing and persists nothing.
 public sealed record AdminStoryQaTestRequest(

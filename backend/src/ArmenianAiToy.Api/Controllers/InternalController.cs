@@ -483,6 +483,38 @@ public class InternalController : ControllerBase
         Guid deviceId, [FromBody] InternalDeviceActionRequest req, CancellationToken ct)
         => DeviceFlagActionAsync(deviceId, req, "device_pause", ct);
 
+    /// <summary>Owner recovery: set a parent's password (for a locked-out
+    /// account when the reset-by-email flow isn't wired). Console-gated
+    /// (fail-closed 404 unless an admin token is configured). Requires a
+    /// reason; matches the account by normalized email so legacy casing/
+    /// whitespace still resolves; never logs or echoes the new password.
+    /// Writes only a loud structured log (no PII in an audit row).</summary>
+    [HttpPost("parents/reset-password")]
+    public async Task<IActionResult> ResetParentPassword(
+        [FromBody] InternalParentPasswordResetRequest? req, CancellationToken ct)
+    {
+        if (req is null || string.IsNullOrWhiteSpace(req.Email)
+            || string.IsNullOrWhiteSpace(req.NewPassword) || string.IsNullOrWhiteSpace(req.Reason))
+            return BadRequest(new { error = "email, newPassword and reason are required." });
+        if (req.NewPassword.Length < 8)
+            return BadRequest(new { error = "New password must be at least 8 characters." });
+
+        var email = ArmenianAiToy.Application.Helpers.EmailNormalizer.Normalize(req.Email);
+        var parent = await _db.Parents.FirstOrDefaultAsync(
+            p => (p.Email ?? "").Trim().ToLower() == email && p.AnonymizedAt == null, ct);
+        if (parent is null)
+            return NotFound(new { error = "No account found for that email." });
+
+        parent.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+        await _db.SaveChangesAsync(ct);
+
+        var op = HttpContext?.Items["InternalOperator"] as string ?? "unknown";
+        _logger.LogWarning(
+            "Operator {Operator} reset the password for parent {ParentId} (reason: {Reason})",
+            op, parent.Id, req.Reason.Trim());
+        return Ok(new { reset = true });
+    }
+
     private async Task<IActionResult> DeviceFlagActionAsync(
         Guid deviceId, InternalDeviceActionRequest? req, string action, CancellationToken ct)
     {
