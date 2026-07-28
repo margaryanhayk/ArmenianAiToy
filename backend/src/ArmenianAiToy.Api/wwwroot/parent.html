@@ -617,7 +617,7 @@
         <div id="claimDeviceForm" hidden
              style="margin-top:8px;padding:10px 12px;background:#f0f7f0;
                     border:1px solid #b6d6b6;border-radius:6px;max-width:420px;">
-          <p style="margin:0 0 8px;font-size:13px;color:#3a5a3a;">
+          <p style="margin:0 0 8px;font-size:13px;color:#3a5a3a;" data-i18n="claim_help">
             Enter the pairing code from your toy's box or setup card (the app can
             scan its QR instead). This links the toy to your account.</p>
           <label for="claimDeviceIdInput" style="display:block;font-size:12px;color:#555;" data-i18n="device_id">Device ID</label>
@@ -646,7 +646,7 @@
       <div id="devicesList"></div>
       <div id="devicesStatus" class="status muted" aria-live="polite"></div>
       <div id="linkDeviceEmptyState" class="link-device-empty" hidden>
-        <p class="link-device-help">To link a toy to this account, enter the Device ID and API key shown on the toy's setup card.</p>
+        <p class="link-device-help" data-i18n="link_help">To link a toy to this account, enter the Device ID and API key shown on the toy's setup card.</p>
         <label for="linkDeviceIdInput">Device ID</label>
         <input id="linkDeviceIdInput" type="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
         <label for="linkApiKeyInput">API key</label>
@@ -844,7 +844,26 @@
       new_password: { en: 'New password', ru: 'Новый пароль', hy: 'Նոր գաղտնաբառ' },
       confirm_new_password: { en: 'Confirm new password', ru: 'Повторите пароль', hy: 'Կրկնեք գաղտնաբառը' },
       current_password: { en: 'Current password', ru: 'Текущий пароль', hy: 'Ընթացիկ գաղտնաբառ' },
-      confirm_verify: { en: 'Click below to confirm your email address.', ru: 'Нажмите ниже, чтобы подтвердить эл. почту.', hy: 'Սեղմեք ներքևում՝ էլ. փոստը հաստատելու համար։' }
+      confirm_verify: { en: 'Click below to confirm your email address.', ru: 'Нажмите ниже, чтобы подтвердить эл. почту.', hy: 'Սեղմեք ներքևում՝ էլ. փոստը հաստատելու համար։' },
+      m_story: { en: 'Story', ru: 'Сказка', hy: 'Հեքիաթ' },
+      m_game: { en: 'Game', ru: 'Игра', hy: 'Խաղ' },
+      m_riddle: { en: 'Riddle', ru: 'Загадка', hy: 'Հանելուկ' },
+      m_curiosity: { en: 'Curiosity', ru: 'Любопытство', hy: 'Հետաքրքրություն' },
+      view_conversations: { en: 'View conversations →', ru: 'Смотреть разговоры →', hy: 'Դիտել զրույցները →' },
+      last_seen: { en: 'last seen', ru: 'был(а) в сети', hy: 'վերջին անգամ' },
+      bedtime_hint: { en: 'clear both to disable · pause overrides', ru: 'очистите оба поля, чтобы выключить · пауза важнее', hy: 'մաքրեք երկուսն էլ՝ անջատելու համար · դադարը գերակա է' },
+      modes_hint: { en: 'Calm stays on always · pause & bedtime override', ru: 'Спокойствие всегда включено · пауза и сон важнее', hy: 'Հանգիստը միշտ միացած է · դադարը և քնի ժամը գերակա են' },
+      child_override_hint: { en: 'child override wins over device · Calm always on', ru: 'настройка ребёнка важнее устройства · Спокойствие всегда', hy: 'երեխայի կարգավորումը գերակա է · Հանգիստը միշտ' },
+      email_not_verified: { en: 'Email not verified yet.', ru: 'Эл. почта ещё не подтверждена.', hy: 'Էլ. փոստը դեռ հաստատված չէ։' },
+      inherit_on: { en: 'Inherit (on)', ru: 'Наследовать (вкл)', hy: 'Ժառանգել (միաց)' },
+      inherit_off: { en: 'Inherit (off)', ru: 'Наследовать (выкл)', hy: 'Ժառանգել (անջ)' },
+      on_word: { en: 'On', ru: 'Вкл', hy: 'Միաց' },
+      off_word: { en: 'Off', ru: 'Выкл', hy: 'Անջ' },
+      modes_for: { en: 'Modes for', ru: 'Режимы для', hy: 'Ռեժիմները' },
+      last_login: { en: 'Last login:', ru: 'Последний вход:', hy: 'Վերջին մուտք․' },
+      not_available: { en: 'not available yet', ru: 'пока недоступно', hy: 'դեռ հասանելի չէ' },
+      dormant_devices: { en: 'Inactive toys:', ru: 'Неактивные игрушки:', hy: 'Անգործ խաղալիքներ․' },
+      link_help: { en: "To link a toy, enter the Device ID and API key shown on the toy's setup card.", ru: 'Чтобы привязать игрушку, введите ID устройства и API-ключ с карточки настройки игрушки.', hy: 'Խաղալիքը կապելու համար մուտքագրեք Սարքի ID-ն և API-բանալին խաղալիքի քարտից։' }
     };
     function getLang() {
       var l = null;
@@ -1504,12 +1523,12 @@
       }
       var lines = [];
       var loginLabel = summary.lastLoginAt
-        ? 'Last login: ' + fmtTime(summary.lastLoginAt)
-        : 'Last login: not available yet';
+        ? t('last_login') + ' ' + fmtTime(summary.lastLoginAt)
+        : t('last_login') + ' ' + t('not_available');
       lines.push(loginLabel);
       if (totalDevices > 0) {
-        lines.push('Dormant devices: ' +
-          (summary.dormantDevices || 0) + ' of ' + totalDevices);
+        lines.push(t('dormant_devices') + ' ' +
+          (summary.dormantDevices || 0) + ' / ' + totalDevices);
       }
       lines.forEach(function (text) {
         var row = document.createElement('div');
@@ -1525,13 +1544,13 @@
         verifyRow.style.cssText = 'margin-top:4px;';
         var verifyText = document.createElement('span');
         verifyText.id = 'dashVerifyText';
-        verifyText.textContent = 'Email not verified yet.';
+        verifyText.textContent = t('email_not_verified');
         verifyRow.appendChild(verifyText);
         var verifyBtn = document.createElement('button');
         verifyBtn.id = 'dashVerifySendBtn';
         verifyBtn.type = 'button';
         verifyBtn.className = 'link';
-        verifyBtn.textContent = 'Send verification email';
+        verifyBtn.textContent = t('send_verif_btn');
         verifyBtn.style.cssText = 'margin-left:8px;';
         verifyBtn.addEventListener('click', sendDashboardVerifyRequest);
         verifyRow.appendChild(verifyBtn);
@@ -1626,7 +1645,7 @@
           var label = document.createElement('span');
           label.textContent = '🧸 ' + (d.deviceName || ('Device ' + shortId(d.deviceId)));
           var hint = document.createElement('span');
-          hint.textContent = 'View conversations →';
+          hint.textContent = t('view_conversations');
           top.appendChild(label);
           top.appendChild(hint);
           btn.appendChild(top);
@@ -1639,7 +1658,7 @@
               return parts.join(', ');
             }).join(' · '));
           }
-          if (d.lastSeenAt) details.push('last seen ' + fmtTime(d.lastSeenAt));
+          if (d.lastSeenAt) details.push(t('last_seen') + ' ' + fmtTime(d.lastSeenAt));
           if (details.length > 0) {
             var sub = document.createElement('div');
             sub.className = 'snippet';
@@ -1781,7 +1800,7 @@
           });
           bedtimeRow.appendChild(saveBedtimeBtn);
           var bedtimeHint = document.createElement('span');
-          bedtimeHint.textContent = 'clear both to disable · pause overrides';
+          bedtimeHint.textContent = t('bedtime_hint');
           bedtimeHint.className = 'ctl-hint';
           bedtimeRow.appendChild(bedtimeHint);
           listEl.appendChild(bedtimeRow);
@@ -1796,10 +1815,10 @@
           modesLabel.className = 'ctl-label';
           modesRow.appendChild(modesLabel);
           var modeDefs = [
-            { key: 'story',     label: 'Story',     flag: d.storyEnabled },
-            { key: 'game',      label: 'Game',      flag: d.gameEnabled },
-            { key: 'riddle',    label: 'Riddle',    flag: d.riddleEnabled },
-            { key: 'curiosity', label: 'Curiosity', flag: d.curiosityEnabled }
+            { key: 'story',     label: t('m_story'),     flag: d.storyEnabled },
+            { key: 'game',      label: t('m_game'),      flag: d.gameEnabled },
+            { key: 'riddle',    label: t('m_riddle'),    flag: d.riddleEnabled },
+            { key: 'curiosity', label: t('m_curiosity'), flag: d.curiosityEnabled }
           ];
           var modeInputs = {};
           modeDefs.forEach(function (m) {
@@ -1830,7 +1849,7 @@
           });
           modesRow.appendChild(saveModesBtn);
           var modesHint = document.createElement('span');
-          modesHint.textContent = 'Calm stays on always · pause & bedtime override';
+          modesHint.textContent = t('modes_hint');
           modesHint.className = 'ctl-hint';
           modesRow.appendChild(modesHint);
           listEl.appendChild(modesRow);
@@ -1983,15 +2002,15 @@
       row.style.fontSize = '12px';
 
       var prefix = document.createElement('span');
-      prefix.textContent = 'Modes for ' + child.name + ':';
+      prefix.textContent = t('modes_for') + ' ' + child.name + ':';
       prefix.className = 'ctl-label';
       row.appendChild(prefix);
 
       var modeDefs = [
-        { key: 'story', label: 'Story', override: child.storyEnabled, device: device.storyEnabled },
-        { key: 'game', label: 'Game', override: child.gameEnabled, device: device.gameEnabled },
-        { key: 'riddle', label: 'Riddle', override: child.riddleEnabled, device: device.riddleEnabled },
-        { key: 'curiosity', label: 'Curiosity', override: child.curiosityEnabled, device: device.curiosityEnabled }
+        { key: 'story', label: t('m_story'), override: child.storyEnabled, device: device.storyEnabled },
+        { key: 'game', label: t('m_game'), override: child.gameEnabled, device: device.gameEnabled },
+        { key: 'riddle', label: t('m_riddle'), override: child.riddleEnabled, device: device.riddleEnabled },
+        { key: 'curiosity', label: t('m_curiosity'), override: child.curiosityEnabled, device: device.curiosityEnabled }
       ];
       var selects = {};
       modeDefs.forEach(function (m) {
@@ -2005,11 +2024,11 @@
           'padding:4px 6px;font-size:12px;color:#2b1f47;background:#fff;' +
           'border:1px solid #e0d6f0;border-radius:8px;';
         sel.setAttribute('data-role', 'child-override-' + m.key);
-        var inheritLabel = 'Inherit (' + (m.device ? 'on' : 'off') + ')';
+        var inheritLabel = m.device ? t('inherit_on') : t('inherit_off');
         [
           { v: 'inherit', t: inheritLabel },
-          { v: 'on', t: 'On' },
-          { v: 'off', t: 'Off' }
+          { v: 'on', t: t('on_word') },
+          { v: 'off', t: t('off_word') }
         ].forEach(function (opt) {
           var o = document.createElement('option');
           o.value = opt.v;
@@ -2038,7 +2057,7 @@
       row.appendChild(saveBtn);
 
       var hint = document.createElement('span');
-      hint.textContent = 'child override wins over device · Calm always on';
+      hint.textContent = t('child_override_hint');
       hint.className = 'ctl-hint';
       row.appendChild(hint);
       return row;
