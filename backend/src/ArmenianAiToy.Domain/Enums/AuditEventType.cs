@@ -50,5 +50,12 @@ public enum AuditEventType
     /// labeling). ActorParentId = the parent; TargetDeviceId = the toy. The new
     /// name is NOT recorded (parent-chosen free text may contain a child's
     /// name → potential PII); only that a rename happened.</summary>
-    ParentDeviceRenamed
+    ParentDeviceRenamed,
+
+    /// <summary>A parent attached to a device via the legacy API-key link path
+    /// (POST /api/parents/devices/link) — distinct from the single-use claim-code
+    /// path (ParentDeviceClaimed). ActorParentId = the linker; TargetDeviceId =
+    /// the toy. Gives the durable record the link path previously lacked so a
+    /// second-parent attach on an already-claimed toy is not invisible.</summary>
+    ParentDeviceLinked
 }

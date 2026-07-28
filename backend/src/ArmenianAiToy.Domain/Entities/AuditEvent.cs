@@ -181,6 +181,15 @@ public class AuditEvent
         TargetDeviceId = deviceId
     };
 
+    public static AuditEvent ParentDeviceLinked(Guid parentId, Guid deviceId) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDeviceLinked,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId
+    };
+
     public static AuditEvent ParentBedtimeWindowSet(
         Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end) => new()
     {

@@ -208,7 +208,14 @@ public class ConversationService : IConversationService
         var trimmed = content.Trim();
         if (trimmed.Length <= SnippetMaxLength)
             return trimmed;
-        return trimmed.Substring(0, SnippetMaxLength) + "…";
+        // Don't cut through a UTF-16 surrogate pair (e.g. an emoji landing
+        // on the boundary) — that would emit a lone surrogate that renders
+        // as U+FFFD "�" in the dashboard. Back off one unit so the pair
+        // stays whole.
+        var cut = SnippetMaxLength;
+        if (char.IsHighSurrogate(trimmed[cut - 1]))
+            cut--;
+        return trimmed.Substring(0, cut) + "…";
     }
 
     public async Task<ConversationDto?> GetConversationByIdAsync(Guid conversationId)
@@ -263,12 +270,19 @@ public class ConversationService : IConversationService
             localAsOf.Year, localAsOf.Month, localAsOf.Day,
             0, 0, 0, DateTimeKind.Unspecified);
         var dayStartUtc = TimeZoneInfo.ConvertTimeToUtc(dayStartLocal, resolvedTz);
+        // Upper bound: the day is the half-open interval [dayStart, dayEnd).
+        // Without it every count was "that day AND everything after it", so
+        // a past `asOfUtc` (e.g. yesterday) reported all of today's activity
+        // and the endpoint could never mean a specific past day. Computed
+        // from the next local midnight so it survives a DST-length day.
+        var dayEndUtc = TimeZoneInfo.ConvertTimeToUtc(
+            dayStartLocal.AddDays(1), resolvedTz);
 
         // Distinct conversation count: any conversation on this device
-        // that has at least one message timestamped on or after today.
+        // that has at least one message timestamped within today.
         var conversationsCount = await _db.Set<Conversation>()
             .CountAsync(c => c.DeviceId == deviceId
-                          && c.Messages.Any(m => m.Timestamp >= dayStartUtc));
+                          && c.Messages.Any(m => m.Timestamp >= dayStartUtc && m.Timestamp < dayEndUtc));
 
         // Per-message aggregate counts. The Join scopes Messages by the
         // owning device without depending on Message.Conversation
@@ -279,7 +293,7 @@ public class ConversationService : IConversationService
                 m => m.ConversationId,
                 c => c.Id,
                 (m, c) => m)
-            .Where(m => m.Timestamp >= dayStartUtc);
+            .Where(m => m.Timestamp >= dayStartUtc && m.Timestamp < dayEndUtc);
 
         var messagesCount = await todayMessages.CountAsync();
         var flaggedCount = await todayMessages
@@ -295,7 +309,7 @@ public class ConversationService : IConversationService
         // messages to the rollup.
         var newestRows = await _db.Set<Conversation>()
             .Where(c => c.DeviceId == deviceId
-                     && c.Messages.Any(m => m.Timestamp >= dayStartUtc))
+                     && c.Messages.Any(m => m.Timestamp >= dayStartUtc && m.Timestamp < dayEndUtc))
             .OrderByDescending(c => c.StartedAt)
             .Take(3)
             .Select(c => new
@@ -307,9 +321,9 @@ public class ConversationService : IConversationService
                     .OrderBy(m => m.Timestamp)
                     .Select(m => m.Content)
                     .FirstOrDefault(),
-                MessageCountToday = c.Messages.Count(m => m.Timestamp >= dayStartUtc),
+                MessageCountToday = c.Messages.Count(m => m.Timestamp >= dayStartUtc && m.Timestamp < dayEndUtc),
                 FlaggedMessageCountToday = c.Messages.Count(m =>
-                    m.Timestamp >= dayStartUtc && m.SafetyFlag != SafetyFlag.Clean),
+                    m.Timestamp >= dayStartUtc && m.Timestamp < dayEndUtc && m.SafetyFlag != SafetyFlag.Clean),
             })
             .ToListAsync();
 
@@ -329,7 +343,7 @@ public class ConversationService : IConversationService
         // does not throw.
         var flaggedRows = await _db.Set<Conversation>()
             .Where(c => c.DeviceId == deviceId
-                     && c.Messages.Any(m => m.Timestamp >= dayStartUtc
+                     && c.Messages.Any(m => m.Timestamp >= dayStartUtc && m.Timestamp < dayEndUtc
                                           && m.SafetyFlag != SafetyFlag.Clean))
             .Select(c => new
             {
@@ -340,11 +354,11 @@ public class ConversationService : IConversationService
                     .OrderBy(m => m.Timestamp)
                     .Select(m => m.Content)
                     .FirstOrDefault(),
-                MessageCountToday = c.Messages.Count(m => m.Timestamp >= dayStartUtc),
+                MessageCountToday = c.Messages.Count(m => m.Timestamp >= dayStartUtc && m.Timestamp < dayEndUtc),
                 FlaggedMessageCountToday = c.Messages.Count(m =>
-                    m.Timestamp >= dayStartUtc && m.SafetyFlag != SafetyFlag.Clean),
+                    m.Timestamp >= dayStartUtc && m.Timestamp < dayEndUtc && m.SafetyFlag != SafetyFlag.Clean),
                 LatestFlaggedToday = c.Messages
-                    .Where(m => m.Timestamp >= dayStartUtc
+                    .Where(m => m.Timestamp >= dayStartUtc && m.Timestamp < dayEndUtc
                              && m.SafetyFlag != SafetyFlag.Clean)
                     .OrderByDescending(m => m.Timestamp)
                     .Select(m => m.Timestamp)

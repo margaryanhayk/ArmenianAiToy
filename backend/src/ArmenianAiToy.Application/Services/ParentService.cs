@@ -29,6 +29,14 @@ public class ParentService : IParentService
     /// </summary>
     public const string CurrentTermsVersion = "1.0";
 
+    // A fixed, valid BCrypt hash (work factor 11, matching the default the
+    // register/reset paths use) of an unknowable value. Verified against on
+    // the unknown-email login path so that path pays the same ~180 ms BCrypt
+    // cost as a wrong-password attempt (see LoginAsync). It never matches any
+    // real password; its only purpose is timing normalization.
+    private const string DummyBcryptHash =
+        "$2a$11$WcfSqboiTcdYZesSec9TnOEiBLiZGhmLIQ9wg5NK9l.qwDRN06Ofe";
+
     private readonly DbContext _db;
     private readonly IConfiguration _config;
     private readonly ILogger<ParentService> _logger;
@@ -169,6 +177,10 @@ public class ParentService : IParentService
         if (!acceptedTerms)
             throw new InvalidOperationException("Terms must be accepted to register.");
 
+        // Canonicalize so one mailbox is one account regardless of casing
+        // or surrounding whitespace (matches the login throttle key).
+        email = EmailNormalizer.Normalize(email);
+
         // Mandatory timing normalization — BCrypt runs on both paths.
         // Computing the hash BEFORE the email-existence check means the
         // collision path pays the same latency as the new-email path.
@@ -235,6 +247,9 @@ public class ParentService : IParentService
 
     public async Task<ParentLoginResponse?> LoginAsync(string email, string password)
     {
+        // Canonicalize to match how the account was stored at register.
+        email = EmailNormalizer.Normalize(email);
+
         // #040 — per-account lockout. After repeated failed logins for this
         // email (across all IPs), reject for a cooldown with the SAME uniform
         // null the wrong-password path returns (no enumeration oracle), and
@@ -253,6 +268,17 @@ public class ParentService : IParentService
         // scrubbed row is simply invisible to the login lookup.
         var parent = await _db.Set<Parent>()
             .FirstOrDefaultAsync(p => p.Email == email && p.AnonymizedAt == null);
+        // Timing normalization (#040 sibling): run BCrypt on the
+        // unknown-email path too, against a fixed dummy hash, so an
+        // unknown email costs the same ~ms as a wrong password. Without
+        // this, `parent == null` short-circuits the verify and the ~180 ms
+        // gap is a working account-enumeration oracle despite the uniform
+        // 401 body. Register / reset-request already normalize timing this
+        // way; login was the gap.
+        if (parent == null)
+        {
+            BCrypt.Net.BCrypt.Verify(password, DummyBcryptHash);
+        }
         if (parent == null || !BCrypt.Net.BCrypt.Verify(password, parent.PasswordHash))
         {
             // #040 — count the failure; log once on the lockout transition
@@ -321,6 +347,11 @@ public class ParentService : IParentService
             LinkedAt = DateTime.UtcNow
         });
 
+        // Durable record of the attach. Previously the link path only
+        // LogInformation'd, so a second parent attaching to an already-claimed
+        // toy left no audit trail the owner could see. Written in the same
+        // SaveChanges as the link.
+        TrackAndAddAudit(AuditEvent.ParentDeviceLinked(parentId, deviceId));
         await _db.SaveChangesAsync();
         _logger.LogInformation("Parent {ParentId} linked device {DeviceId}", parentId, deviceId);
         return true;
@@ -484,6 +515,7 @@ public class ParentService : IParentService
         // unknown-email path pays the same latency as the known-email
         // path. Mirrors the RegisterAsync anti-enumeration slice. The
         // value is discarded in both branches below.
+        email = EmailNormalizer.Normalize(email);
         _ = _hashPassword(email);
 
         var parent = await _db.Set<Parent>()
@@ -623,6 +655,7 @@ public class ParentService : IParentService
         // branch. Value is discarded; it exists only to make the
         // response time invariant across the three eligibility
         // outcomes below.
+        email = EmailNormalizer.Normalize(email);
         _ = _hashPassword(email);
 
         var parent = await _db.Set<Parent>()
@@ -1210,18 +1243,13 @@ public class ParentService : IParentService
         if (device == null)
             return false;
 
-        // Half-null is normalized to disabled; we do not reject with 400.
-        // Keeps the endpoint idempotent for "clear the window".
-        if (start is null || end is null)
-        {
-            device.BedtimeStart = null;
-            device.BedtimeEnd = null;
-        }
-        else
-        {
-            device.BedtimeStart = start;
-            device.BedtimeEnd = end;
-        }
+        // Half-null OR a zero-length (start == end) window normalizes to
+        // disabled; we do not reject with 400. Keeps the endpoint idempotent
+        // for "clear the window" and stops a no-op window from being badged
+        // as active. Single source of truth so the API echo matches.
+        var (normStart, normEnd) = BedtimeWindowNormalizer.Normalize(start, end);
+        device.BedtimeStart = normStart;
+        device.BedtimeEnd = normEnd;
 
         // Audit the post-normalization state so the record matches what is
         // actually persisted on the Device row — half-null inputs become

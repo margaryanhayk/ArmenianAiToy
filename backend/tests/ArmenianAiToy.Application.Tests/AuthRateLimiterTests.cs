@@ -154,8 +154,21 @@ public class AuthRateLimiterTests
     // that share the /api/parents prefix but are NOT auth-sensitive in
     // the sense this slice is protecting (they are already parent-JWT
     // gated and are not brute-force surfaces).
+    [Fact]
+    public void LinkDevice_HasAuthRateLimitAttribute()
+    {
+        // QA hardening: the legacy API-key link path presents a device
+        // credential, so it IS a brute-force / denial-of-wallet surface and
+        // is throttled on the per-IP auth bucket (like register/login and
+        // the claim path). Moved out of the negative spot-check below.
+        var method = typeof(ParentController).GetMethod(nameof(ParentController.LinkDevice));
+        Assert.NotNull(method);
+        var attrs = method!.GetCustomAttributes(typeof(EnableRateLimitingAttribute), inherit: true)
+            .Cast<EnableRateLimitingAttribute>().ToArray();
+        Assert.Contains(attrs, a => a.PolicyName == AuthRateLimiter.PolicyName);
+    }
+
     [Theory]
-    [InlineData(nameof(ParentController.LinkDevice))]
     [InlineData(nameof(ParentController.UnlinkDevice))]
     [InlineData(nameof(ParentController.PauseDevice))]
     [InlineData(nameof(ParentController.ResumeDevice))]

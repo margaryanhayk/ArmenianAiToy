@@ -177,6 +177,10 @@ public class ConversationController : ControllerBase
         if (!linkedDevices.Contains(conversation.DeviceId))
             return NotFound();
 
+        // Child transcript — keep it out of the browser disk cache so it
+        // isn't recoverable on a shared family computer after logout (the
+        // internal operator console already sets this on its reads).
+        Response.Headers["Cache-Control"] = "no-store";
         return Ok(new { conversation });
     }
 

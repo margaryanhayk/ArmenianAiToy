@@ -21,8 +21,18 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add controllers + Swagger
-builder.Services.AddControllers();
+// Add controllers + Swagger. The UTC DateTime converters stamp every
+// wire timestamp with an explicit Z so the browser parses them as UTC
+// (SQLite round-trips DateTimes as Kind=Unspecified, which otherwise
+// serialize without an offset and render in the viewer's local zone).
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(
+            new ArmenianAiToy.Api.Serialization.UtcDateTimeConverter());
+        options.JsonSerializerOptions.Converters.Add(
+            new ArmenianAiToy.Api.Serialization.NullableUtcDateTimeConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -129,6 +139,35 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             // still signed by a previous key keeps working for its lifetime
             // during rotation. Replaces the old single-key IssuerSigningKey.
             IssuerSigningKeys = jwtSigningKeys
+        };
+
+        // Reject a token whose parent row no longer exists (hard-deleted or
+        // anonymized). Tokens are otherwise valid for 30 days with no
+        // server-side revocation, so a DELETED account's token could still
+        // read parent-scoped endpoints (e.g. its retained audit history)
+        // for up to 30 days. This existence check runs once per authenticated
+        // request against the request-scoped DbContext and closes that leak.
+        // (Password-change invalidation would need a per-parent security
+        // stamp — a separate, larger change; this covers the deletion case.)
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async ctx =>
+            {
+                var sub = ctx.Principal?.FindFirst(
+                    System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (!Guid.TryParse(sub, out var parentId))
+                {
+                    ctx.Fail("Invalid subject.");
+                    return;
+                }
+                var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                var exists = await db.Set<ArmenianAiToy.Domain.Entities.Parent>()
+                    .AnyAsync(p => p.Id == parentId && p.AnonymizedAt == null);
+                if (!exists)
+                {
+                    ctx.Fail("Account no longer exists.");
+                }
+            }
         };
     });
 
