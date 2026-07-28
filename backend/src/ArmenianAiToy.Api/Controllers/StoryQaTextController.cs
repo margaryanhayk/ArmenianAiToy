@@ -1,5 +1,7 @@
 using ArmenianAiToy.Application.Stories;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 
 namespace ArmenianAiToy.Api.Controllers;
 
@@ -24,15 +26,18 @@ public class StoryQaTextController : ControllerBase
     private readonly ICuratedStoryLibrary _library;
     private readonly LibraryStoryQuestionService _questions;
     private readonly ILogger<StoryQaTextController> _logger;
+    private readonly IWebHostEnvironment _env;
 
     public StoryQaTextController(
         ICuratedStoryLibrary library,
         LibraryStoryQuestionService questions,
-        ILogger<StoryQaTextController> logger)
+        ILogger<StoryQaTextController> logger,
+        IWebHostEnvironment env)
     {
         _library = library;
         _questions = questions;
         _logger = logger;
+        _env = env;
     }
 
     public sealed record QaTextRequest(string StoryId, int Segment, string Question);
@@ -52,6 +57,19 @@ public class StoryQaTextController : ControllerBase
     public async Task<IActionResult> Ask(
         [FromBody] QaTextRequest request, CancellationToken cancellationToken = default)
     {
+        // HOTFIX (deploy-branch): fail-closed outside Development. This
+        // unauthenticated route reaches GPT on the deployment's OpenAI key
+        // and is outside the per-device daily cost cap — an open relay +
+        // (on this stale branch) an unmoderated child-facing pipeline. The
+        // fuller fix (dev-gate + dual moderation, commit 15fbbe6) lives on
+        // feat/ota-apply; this dev-gate alone removes the prod exposure by
+        // making the endpoint 404 in any non-Development environment, same
+        // concealment posture as /metrics and /api/internal.
+        if (!_env.IsDevelopment())
+        {
+            return NotFound();
+        }
+
         if (request is null || string.IsNullOrWhiteSpace(request.Question))
         {
             return BadRequest(new { error = "storyId and question are required." });
