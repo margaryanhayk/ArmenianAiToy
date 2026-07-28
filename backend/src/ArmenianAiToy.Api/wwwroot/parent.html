@@ -797,7 +797,11 @@
       ParentDataExported: 'Data export downloaded',
       ParentPasswordResetRequested: 'Password reset requested',
       ParentPasswordResetCompleted: 'Password reset completed',
-      ParentEmailVerified: 'Email verified'
+      ParentEmailVerified: 'Email verified',
+      ParentDeviceRenamed: 'Device renamed',
+      ParentDeviceClaimed: 'Toy added',
+      ParentDeviceLinked: 'Toy linked',
+      ParentDeviceRevocationChanged: 'Toy access revoked/restored'
     };
 
     // ---------- helpers ----------
@@ -3313,37 +3317,38 @@
         // Reload-survival: restore the view recorded in the URL hash
         // (written by setViewHash) instead of always bouncing to the
         // devices list. Anything malformed falls back to the list.
-        var restored = false;
+        var v = null, d = null, c = null;
         try {
           var hp = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
-          var v = hp.get('v');
-          var d = hp.get('d');
-          var c = hp.get('c');
-          if (v === 'summaries' && d) {
-            state.currentDeviceId = d;
-            state.offset = 0;
-            state.flaggedOffset = 0;
-            loadSummaries();
-            restored = true;
-          } else if (v === 'flagged' && d) {
-            state.currentDeviceId = d;
-            state.offset = 0;
-            state.flaggedOffset = 0;
-            loadFlagged();
-            restored = true;
-          } else if (v === 'detail' && d && c) {
-            state.currentDeviceId = d;
-            state.offset = 0;
-            state.flaggedOffset = 0;
-            state.backFromDetail = loadSummaries;
-            openConversation(c);
-            restored = true;
-          } else if (v === 'activity') {
-            loadAudit();
-            restored = true;
-          }
+          v = hp.get('v'); d = hp.get('d'); c = hp.get('c');
         } catch (e) { /* fall back to the devices list */ }
-        if (!restored) loadDevices();
+
+        // A device-scoped view restored on a cold reload has no cached
+        // device list yet, so the toy's NAME can't resolve and the header
+        // shows "Toy <shortid>". Prime state.lastDevicesResponse first,
+        // then render — so the name is right on the very first paint.
+        function primeDevicesThen(cb) {
+          authedFetch('/api/parents/devices/details').then(function (data) {
+            state.lastDevicesResponse = (data && data.devices) || [];
+          }).catch(function () { /* name just falls back to short id */ })
+            .finally(function () { cb(); });
+        }
+
+        if (v === 'summaries' && d) {
+          state.currentDeviceId = d; state.offset = 0; state.flaggedOffset = 0;
+          primeDevicesThen(loadSummaries);
+        } else if (v === 'flagged' && d) {
+          state.currentDeviceId = d; state.offset = 0; state.flaggedOffset = 0;
+          primeDevicesThen(loadFlagged);
+        } else if (v === 'detail' && d && c) {
+          state.currentDeviceId = d; state.offset = 0; state.flaggedOffset = 0;
+          state.backFromDetail = loadSummaries;
+          primeDevicesThen(function () { openConversation(c); });
+        } else if (v === 'activity') {
+          loadAudit();
+        } else {
+          loadDevices();
+        }
       } else {
         show('loginView');
       }
