@@ -150,6 +150,39 @@
       cursor: pointer;
     }
     .btn-ghost-danger:hover { background: #fdf0ef; }
+
+    /* Grouped-settings vocabulary (Family-Link/Yoto-style): quiet
+       uppercase captions between control groups, and a visually
+       separated "careful zone" for destructive actions. */
+    .section-cap {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #9a8ab5;
+      margin: 16px 2px 6px;
+    }
+    .danger-zone {
+      border-top: 1px dashed #e8cfcf;
+      margin-top: 14px;
+      padding-top: 10px;
+    }
+
+    /* Today panel stat tiles */
+    .stat-tiles { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .stat-tile {
+      background: #ffffff;
+      border: 1px solid #e4d9f7;
+      border-radius: 12px;
+      padding: 8px 10px;
+      min-width: 80px;
+      flex: 1;
+      text-align: center;
+    }
+    .stat-value { font-size: 16px; font-weight: 700; color: #4b2e83; }
+    .stat-label { font-size: 11px; color: #9a8ab5; }
+    .stat-tile.stat-warn { background: #fff8ee; border-color: #e7c66a; }
+    .stat-tile.stat-warn .stat-value { color: #92400e; }
     button {
       padding: 11px 16px;
       background: #7c5cbf;
@@ -431,8 +464,10 @@
     .pager {
       display: flex;
       justify-content: space-between;
+      gap: 8px;
       margin-top: 10px;
     }
+    .pager button { flex: 1; }
 
     [hidden] { display: none !important; }
   </style>
@@ -1434,7 +1469,7 @@
           var top = document.createElement('div');
           top.className = 'top';
           var label = document.createElement('span');
-          label.textContent = d.deviceName || ('Device ' + shortId(d.deviceId));
+          label.textContent = '🧸 ' + (d.deviceName || ('Device ' + shortId(d.deviceId)));
           var hint = document.createElement('span');
           hint.textContent = 'View conversations →';
           top.appendChild(label);
@@ -1543,6 +1578,11 @@
           // Pause/Resume control, sibling to the row (not nested in the
           // clickable button). Label flips based on current state. Same
           // inline-style pattern used by the unlink button below.
+          var settingsCap = document.createElement('div');
+          settingsCap.className = 'section-cap';
+          settingsCap.textContent = 'Toy settings';
+          listEl.appendChild(settingsCap);
+
           var pauseBtn = document.createElement('button');
           pauseBtn.type = 'button';
           pauseBtn.textContent = d.isPaused ? 'Resume' : 'Pause';
@@ -1680,7 +1720,15 @@
           revokeBtn.addEventListener('click', function () {
             toggleDeviceRevocation(d.deviceId, d.deviceName, d.isRevoked);
           });
-          listEl.appendChild(revokeBtn);
+          var dangerWrap = document.createElement('div');
+          dangerWrap.className = 'danger-zone';
+          var dangerCap = document.createElement('div');
+          dangerCap.className = 'section-cap';
+          dangerCap.textContent = 'Careful zone';
+          dangerCap.style.margin = '0 2px 8px';
+          dangerWrap.appendChild(dangerCap);
+          dangerWrap.appendChild(revokeBtn);
+          listEl.appendChild(dangerWrap);
 
           // Unlink control, rendered as a sibling so we don't nest a button
           // inside the clickable row. Styling is inline to keep the diff
@@ -1694,7 +1742,7 @@
           unlink.addEventListener('click', function () {
             unlinkDevice(d.deviceId, d.deviceName);
           });
-          listEl.appendChild(unlink);
+          dangerWrap.appendChild(unlink);
         });
       }).catch(function (err) {
         if (err && err.status === 401) return;
@@ -2412,32 +2460,39 @@
         return;
       }
 
-      var countsLine = document.createElement('div');
-      countsLine.textContent =
-        conversationsToday + ' conversation' + (conversationsToday === 1 ? '' : 's')
-        + ' · ' + messagesToday + ' message' + (messagesToday === 1 ? '' : 's');
-      counts.appendChild(countsLine);
-
+      // Stat tiles — same aggregates the old counts line carried, as
+      // scannable tiles. Flagged tile only appears when nonzero (calm
+      // by default); audio tile keeps the C2.1 count-only contract.
+      var tiles = document.createElement('div');
+      tiles.className = 'stat-tiles';
+      function statTile(icon, value, label) {
+        var t = document.createElement('div');
+        t.className = 'stat-tile';
+        var v = document.createElement('div');
+        v.className = 'stat-value';
+        v.textContent = icon + ' ' + value;
+        var l = document.createElement('div');
+        l.className = 'stat-label';
+        l.textContent = label;
+        t.appendChild(v);
+        t.appendChild(l);
+        return t;
+      }
+      tiles.appendChild(statTile('💬', conversationsToday,
+        conversationsToday === 1 ? 'conversation' : 'conversations'));
+      tiles.appendChild(statTile('✉️', messagesToday,
+        messagesToday === 1 ? 'message' : 'messages'));
       if (flaggedToday > 0) {
-        var flagBadge = document.createElement('span');
-        flagBadge.className = 'badge';
-        flagBadge.textContent = '⚠ ' + flaggedToday + ' flagged message'
-          + (flaggedToday === 1 ? '' : 's');
-        countsLine.appendChild(document.createTextNode(' '));
-        countsLine.appendChild(flagBadge);
+        var warnTile = statTile('⚠️', flaggedToday, 'flagged');
+        warnTile.classList.add('stat-warn');
+        tiles.appendChild(warnTile);
       }
-
-      // E1.2.ui: count-only badge — playback stays in the detail view
-      // per the C2.1 ▶ Listen contract. The badge does not surface any
-      // path / id; it is a deterministic per-day aggregate.
       if (audioToday > 0) {
-        var audioBadge = document.createElement('span');
-        audioBadge.className = 'badge';
-        audioBadge.title = 'Assistant messages with replayable audio today.';
-        audioBadge.textContent = '🔊 ' + audioToday + ' replayable';
-        countsLine.appendChild(document.createTextNode(' '));
-        countsLine.appendChild(audioBadge);
+        var audioTile = statTile('🔊', audioToday, 'replayable');
+        audioTile.title = 'Assistant messages with replayable audio today.';
+        tiles.appendChild(audioTile);
       }
+      counts.appendChild(tiles);
 
       // Newest — server pre-orders by startedAt desc and caps at 3.
       var newestLabel = document.createElement('div');
