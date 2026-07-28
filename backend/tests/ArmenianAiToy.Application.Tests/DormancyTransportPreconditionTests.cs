@@ -238,6 +238,44 @@ public class DormancyTransportPreconditionTests
             typeof(SmtpNotifier));
     }
 
+    // --- Resend is a real-delivery transport (parallel to SMTP) ------
+
+    [Fact]
+    public void Enforce_WarnEnabled_ResendTransport_DoesNotThrow()
+    {
+        // Resend delivers to real inboxes exactly like SMTP does, so
+        // every guard that accepts SmtpNotifier must accept
+        // ResendNotifier too.
+        DormancyTransportPrecondition.Enforce(
+            Config(warnAfterDays: "180"), typeof(ResendNotifier));
+    }
+
+    [Fact]
+    public void Enforce_AnonymizeEnabled_WarnEnabled_ResendTransport_DoesNotThrow()
+    {
+        DormancyTransportPrecondition.Enforce(
+            Config(warnAfterDays: "180", anonymizeAfterDays: "60"),
+            typeof(ResendNotifier));
+    }
+
+    [Fact]
+    public void Enforce_DevicesWarnEnabled_ResendTransport_DoesNotThrow()
+    {
+        DormancyTransportPrecondition.Enforce(
+            Config(warnAfterDays: "0", devicesWarnAfterDays: "365"),
+            typeof(ResendNotifier));
+    }
+
+    [Fact]
+    public void Enforce_DevicesDeleteEnabled_WarnEnabled_ResendTransport_DoesNotThrow()
+    {
+        DormancyTransportPrecondition.Enforce(
+            Config(warnAfterDays: "0",
+                   devicesWarnAfterDays: "365",
+                   devicesDeleteAfterDays: "30"),
+            typeof(ResendNotifier));
+    }
+
     // --- Guard 4: device-delete enabled requires warn + SMTP ---------
 
     [Fact]

@@ -11,7 +11,8 @@ namespace ArmenianAiToy.Infrastructure.Notifications;
 /// been contacted. Fail-fast at process start is the right tier for
 /// this guard: an operator who sets <c>Dormancy:Parent:WarnAfterDays</c>
 /// to a positive value without flipping <c>Notifications:Transport</c>
-/// to <c>smtp</c> sees the error once, fixes one config, and moves on.
+/// to a real-delivery transport (<c>smtp</c> or <c>resend</c>) sees the
+/// error once, fixes one config, and moves on.
 ///
 /// <para>
 /// Sits in <c>Infrastructure/Notifications/</c> alongside
@@ -33,14 +34,15 @@ public static class DormancyTransportPrecondition
     /// time. Two guards:
     /// <list type="number">
     ///   <item><description>If <c>Dormancy:Parent:WarnAfterDays &gt; 0</c>
-    ///   then the notifier must resolve to <see cref="SmtpNotifier"/>.
+    ///   then the notifier must resolve to a real-delivery transport
+    ///   (<see cref="SmtpNotifier"/> or <see cref="ResendNotifier"/>).
     ///   <see cref="LoggingNotifier"/> "delivers" to stdout without
     ///   reaching real parents, and the worker would stamp
     ///   <c>DormancyWarnedAt</c> on every parent on every tick.</description></item>
     ///   <item><description>If
     ///   <c>Dormancy:Parent:AnonymizeAfterDays &gt; 0</c> then
     ///   <c>Dormancy:Parent:WarnAfterDays &gt; 0</c> AND the notifier
-    ///   must resolve to <see cref="SmtpNotifier"/>. Destructive
+    ///   must resolve to a real-delivery transport. Destructive
     ///   action without a warn channel is a policy error; destructive
     ///   action on a log transport would silently anonymize parents
     ///   who never received the warning email.</description></item>
@@ -58,22 +60,28 @@ public static class DormancyTransportPrecondition
 
         var resolvedName = notifierImpl == typeof(LoggingNotifier)
             ? NotifierTransport.Log
-            : (notifierImpl == typeof(SmtpNotifier) ? NotifierTransport.Smtp : notifierImpl.Name);
+            : (notifierImpl == typeof(SmtpNotifier)
+                ? NotifierTransport.Smtp
+                : (notifierImpl == typeof(ResendNotifier)
+                    ? NotifierTransport.Resend
+                    : notifierImpl.Name));
 
-        // Guard 1: warn enabled requires SMTP.
-        if (warnAfterDays > 0 && notifierImpl != typeof(SmtpNotifier))
+        // Guard 1: warn enabled requires a real-delivery transport.
+        if (warnAfterDays > 0 && !IsRealDeliveryTransport(notifierImpl))
         {
             throw new System.InvalidOperationException(
                 $"{WarnAfterDaysKey} is enabled ({warnAfterDays} > 0) but " +
                 $"Notifications:Transport does not resolve to '{NotifierTransport.Smtp}' " +
-                $"(currently: '{resolvedName}'). A dormant-parent warning email " +
+                $"or '{NotifierTransport.Resend}' (currently: '{resolvedName}'). " +
+                "A dormant-parent warning email " +
                 "cannot go to stdout — the worker would mark parents as warned " +
                 "without reaching them. Either disable the warn pass by setting " +
-                $"{WarnAfterDaysKey} to 0, or configure SMTP via " +
-                "Notifications:Transport=smtp and the required SMTP keys.");
+                $"{WarnAfterDaysKey} to 0, or configure a real email transport via " +
+                "Notifications:Transport=smtp (or =resend) and the required keys.");
         }
 
-        // Guard 2: anonymize enabled requires warn enabled AND SMTP.
+        // Guard 2: anonymize enabled requires warn enabled AND a
+        // real-delivery transport.
         if (anonymizeAfterDays > 0)
         {
             if (warnAfterDays <= 0)
@@ -87,45 +95,50 @@ public static class DormancyTransportPrecondition
                     $"by setting {AnonymizeAfterDaysKey} to 0, or enable warn by " +
                     $"setting {WarnAfterDaysKey} to a positive value.");
             }
-            if (notifierImpl != typeof(SmtpNotifier))
+            if (!IsRealDeliveryTransport(notifierImpl))
             {
                 throw new System.InvalidOperationException(
                     $"{AnonymizeAfterDaysKey} is enabled ({anonymizeAfterDays} > 0) but " +
                     $"Notifications:Transport does not resolve to '{NotifierTransport.Smtp}' " +
-                    $"(currently: '{resolvedName}'). A destructive dormancy action " +
+                    $"or '{NotifierTransport.Resend}' (currently: '{resolvedName}'). " +
+                    "A destructive dormancy action " +
                     "cannot run against a log transport — the warning email would " +
                     "never reach the parent, and the action would fire without notice. " +
                     $"Either disable destructive action by setting {AnonymizeAfterDaysKey} " +
-                    "to 0, or configure SMTP via Notifications:Transport=smtp and the " +
-                    "required SMTP keys.");
+                    "to 0, or configure a real email transport via " +
+                    "Notifications:Transport=smtp (or =resend) and the required keys.");
             }
         }
 
-        // Guard 3: device-warn enabled requires SMTP. Same posture as
-        // Guard 1 — LoggingNotifier always returns "delivered" to the
-        // worker without a real send, and the dormant-device worker
-        // pass would silently advance Device.DormancyWarnedAt for
-        // every dormant device on every tick while no parent received
-        // anything. Fail-fast at process start.
+        // Guard 3: device-warn enabled requires a real-delivery
+        // transport. Same posture as Guard 1 — LoggingNotifier always
+        // returns "delivered" to the worker without a real send, and
+        // the dormant-device worker pass would silently advance
+        // Device.DormancyWarnedAt for every dormant device on every
+        // tick while no parent received anything. Fail-fast at
+        // process start.
         var devicesWarnRaw = config[DevicesWarnAfterDaysKey];
         var devicesWarnAfterDays = int.TryParse(devicesWarnRaw, out var dw) ? dw : 0;
-        if (devicesWarnAfterDays > 0 && notifierImpl != typeof(SmtpNotifier))
+        if (devicesWarnAfterDays > 0 && !IsRealDeliveryTransport(notifierImpl))
         {
             throw new System.InvalidOperationException(
                 $"{DevicesWarnAfterDaysKey} is enabled ({devicesWarnAfterDays} > 0) but " +
                 $"Notifications:Transport does not resolve to '{NotifierTransport.Smtp}' " +
-                $"(currently: '{resolvedName}'). A dormant-device warning email " +
+                $"or '{NotifierTransport.Resend}' (currently: '{resolvedName}'). " +
+                "A dormant-device warning email " +
                 "cannot go to stdout — the worker would mark devices as warned " +
                 "without reaching their linked parents. Either disable the device-warn " +
-                $"pass by setting {DevicesWarnAfterDaysKey} to 0, or configure SMTP " +
-                "via Notifications:Transport=smtp and the required SMTP keys.");
+                $"pass by setting {DevicesWarnAfterDaysKey} to 0, or configure a real " +
+                "email transport via Notifications:Transport=smtp (or =resend) and " +
+                "the required keys.");
         }
 
         // Guard 4: device-delete enabled requires (a) device-warn also
         // enabled — destructive action without a warn channel is a
         // policy error (parents must receive the warning email carrying
         // the delete date before any irreversible device removal fires)
-        // — and (b) SMTP. Same pairing as Guard 2 for parent anonymize.
+        // — and (b) a real-delivery transport. Same pairing as Guard 2
+        // for parent anonymize.
         var devicesDeleteRaw = config[DevicesDeleteAfterDaysKey];
         if (int.TryParse(devicesDeleteRaw, out var devicesDeleteAfterDays)
             && devicesDeleteAfterDays > 0)
@@ -142,18 +155,29 @@ public static class DormancyTransportPrecondition
                     $"to 0, or enable device-warn by setting {DevicesWarnAfterDaysKey} " +
                     "to a positive value.");
             }
-            if (notifierImpl != typeof(SmtpNotifier))
+            if (!IsRealDeliveryTransport(notifierImpl))
             {
                 throw new System.InvalidOperationException(
                     $"{DevicesDeleteAfterDaysKey} is enabled ({devicesDeleteAfterDays} > 0) but " +
                     $"Notifications:Transport does not resolve to '{NotifierTransport.Smtp}' " +
-                    $"(currently: '{resolvedName}'). A destructive dormant-device action " +
+                    $"or '{NotifierTransport.Resend}' (currently: '{resolvedName}'). " +
+                    "A destructive dormant-device action " +
                     "cannot run against a log transport — the warning email would never " +
                     "reach linked parents, and the delete would fire without notice. " +
                     $"Either disable destructive device action by setting {DevicesDeleteAfterDaysKey} " +
-                    "to 0, or configure SMTP via Notifications:Transport=smtp and the " +
-                    "required SMTP keys.");
+                    "to 0, or configure a real email transport via " +
+                    "Notifications:Transport=smtp (or =resend) and the required keys.");
             }
         }
     }
+
+    /// <summary>
+    /// A transport that actually reaches parents' inboxes. Explicit
+    /// allow-list — a future notifier type must be added here
+    /// deliberately, so the guard stays fail-closed for
+    /// <see cref="LoggingNotifier"/> and any unknown implementation.
+    /// </summary>
+    private static bool IsRealDeliveryTransport(System.Type notifierImpl)
+        => notifierImpl == typeof(SmtpNotifier)
+           || notifierImpl == typeof(ResendNotifier);
 }

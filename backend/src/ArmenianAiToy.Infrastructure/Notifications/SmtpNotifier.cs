@@ -89,16 +89,18 @@ public sealed class SmtpNotifier : INotifier
     {
         // Compose the message inside the notifier — no external
         // templating, no extra seam. MailMessage is disposable; a
-        // single `using` keeps cleanup obvious.
-        var link = BuildResetLink(
+        // single `using` keeps cleanup obvious. Subjects / bodies /
+        // links come from NotificationEmailContent, shared with the
+        // Resend transport so the two can never drift.
+        var link = NotificationEmailContent.BuildResetLink(
             _config["Notifications:PasswordResetLinkBase"] ?? "", resetToken);
         var fromAddress = _config["Notifications:Smtp:FromAddress"] ?? "";
 
         using var message = new MailMessage
         {
             From = new MailAddress(fromAddress),
-            Subject = "Գաղտնաբառի վերականգնում",
-            Body = BuildPlainTextBody(link),
+            Subject = NotificationEmailContent.PasswordResetSubject,
+            Body = NotificationEmailContent.BuildPasswordResetBody(link),
             BodyEncoding = Encoding.UTF8,
             SubjectEncoding = Encoding.UTF8,
             IsBodyHtml = false
@@ -176,8 +178,8 @@ public sealed class SmtpNotifier : INotifier
         using var message = new MailMessage
         {
             From = new MailAddress(fromAddress),
-            Subject = "Ձեր հաշիվը երկար ժամանակ անգործուն է",
-            Body = BuildDormancyWarningBody(deleteAtUtc),
+            Subject = NotificationEmailContent.DormancyWarningSubject,
+            Body = NotificationEmailContent.BuildDormancyWarningBody(deleteAtUtc),
             BodyEncoding = Encoding.UTF8,
             SubjectEncoding = Encoding.UTF8,
             IsBodyHtml = false
@@ -236,15 +238,15 @@ public sealed class SmtpNotifier : INotifier
     public async Task SendEmailVerificationAsync(
         string email, string verificationToken, CancellationToken cancellationToken = default)
     {
-        var link = BuildVerificationLink(
+        var link = NotificationEmailContent.BuildVerificationLink(
             _config["Notifications:PasswordResetLinkBase"] ?? "", verificationToken);
         var fromAddress = _config["Notifications:Smtp:FromAddress"] ?? "";
 
         using var message = new MailMessage
         {
             From = new MailAddress(fromAddress),
-            Subject = "Հաստատեք Ձեր էլ. փոստը",
-            Body = BuildEmailVerificationBody(link),
+            Subject = NotificationEmailContent.EmailVerificationSubject,
+            Body = NotificationEmailContent.BuildEmailVerificationBody(link),
             BodyEncoding = Encoding.UTF8,
             SubjectEncoding = Encoding.UTF8,
             IsBodyHtml = false
@@ -304,8 +306,9 @@ public sealed class SmtpNotifier : INotifier
         using var message = new MailMessage
         {
             From = new MailAddress(fromAddress),
-            Subject = "Ձեր երեխայի խաղալիքը վերջերս չի օգտագործվել",
-            Body = BuildDormantDeviceWarningBody(deviceName, lastSeenAtUtc, deleteAtUtc),
+            Subject = NotificationEmailContent.DormantDeviceWarningSubject,
+            Body = NotificationEmailContent.BuildDormantDeviceWarningBody(
+                deviceName, lastSeenAtUtc, deleteAtUtc),
             BodyEncoding = Encoding.UTF8,
             SubjectEncoding = Encoding.UTF8,
             IsBodyHtml = false
@@ -359,114 +362,5 @@ public sealed class SmtpNotifier : INotifier
             client.Credentials = new NetworkCredential(username, password);
 
         await client.SendMailAsync(message, cancellationToken);
-    }
-
-    private static string BuildResetLink(string linkBase, string rawToken)
-    {
-        // NotifierTransport.ResolveImplementation already validated that
-        // linkBase is non-empty when transport=smtp; we still guard
-        // here defensively so a reconfigured process never constructs
-        // a bare-token "link". Token is URL-encoded even though the
-        // current token charset is URL-safe, because that's the
-        // behaviour a future caller would expect.
-        var prefix = string.IsNullOrWhiteSpace(linkBase) ? "" : linkBase.Trim();
-        var separator = prefix.Contains('?') ? '&' : '?';
-        return $"{prefix}{separator}token={Uri.EscapeDataString(rawToken)}";
-    }
-
-    private static string BuildPlainTextBody(string resetLink)
-    {
-        // Eastern Armenian, natural tone — matches the product's
-        // Armenian-first posture. Keeps the copy short and honest:
-        // what this is, how long it is valid, and what to do if the
-        // recipient did not request it. No marketing surface, no
-        // unsubscribe footer (this is a transactional / account-
-        // recovery mail, not bulk).
-        return string.Join("\n\n",
-            "Գաղտնաբառի վերականգնման հղումը ստորև է։",
-            "Այս հղումը վավեր է սահմանափակ ժամանակ։",
-            "Եթե Դուք այս խնդրանքը չեք արել, անտեսեք այս նամակը։",
-            resetLink);
-    }
-
-    private static string BuildVerificationLink(string linkBase, string rawToken)
-    {
-        // Parallel to BuildResetLink — uses `verifyToken` instead of
-        // `token` so the dashboard boot router can distinguish the
-        // two flows by query-param name. URL-encoded even though the
-        // current token charset is URL-safe, for caller-expected
-        // behavior.
-        var prefix = string.IsNullOrWhiteSpace(linkBase) ? "" : linkBase.Trim();
-        var separator = prefix.Contains('?') ? '&' : '?';
-        return $"{prefix}{separator}verifyToken={Uri.EscapeDataString(rawToken)}";
-    }
-
-    private static string BuildDormantDeviceWarningBody(
-        string deviceName, DateTime lastSeenAtUtc, DateTime? deleteAtUtc)
-    {
-        // Eastern Armenian, warm but neutral in the warn-only case;
-        // factual-without-panic when a destructive date is attached.
-        // Mirrors BuildDormancyWarningBody's shape. When deleteAtUtc
-        // is non-null the body swaps in an explicit delete-date line
-        // so the parent is forewarned before the destructive pass
-        // fires on a later tick. No time component, no locale-
-        // specific format — plain yyyy-MM-dd so a regex-assert test
-        // can pin the shape.
-        var lastSeenStr = lastSeenAtUtc.ToString("yyyy-MM-dd");
-        var lines = new System.Collections.Generic.List<string>
-        {
-            $"Բարև։ Ձեր Areg հաշվին կապված սարք-ը — {deviceName} — վերջերս չի օգտագործվել։",
-            $"Վերջին ակտիվությունը: {lastSeenStr}.",
-            "Եթե դեռ ցանկանում եք պահպանել այս սարքը ակտիվ, պարզապես կրկին օգտագործեք այն։"
-        };
-        if (deleteAtUtc.HasValue)
-        {
-            var deleteStr = deleteAtUtc.Value.ToString("yyyy-MM-dd");
-            lines.Add(
-                $"Եթե մինչև {deleteStr} սարքը չօգտագործվի, այն և իր տվյալները ինքնաբար կհեռացվեն։");
-        }
-        lines.Add("Եթե այլևս չեք օգտագործում այս սարքը, այս նամակը կարող եք անտեսել։");
-        return string.Join("\n\n", lines);
-    }
-
-    private static string BuildEmailVerificationBody(string verificationLink)
-    {
-        // Eastern Armenian, warm and neutral. Lead: what happened
-        // (someone registered with this email). Middle: what to do
-        // (click the link). Footer: how long the link lives, and
-        // what to do if they didn't register (ignore). No urgency
-        // copy — verification isn't time-critical.
-        return string.Join("\n\n",
-            "Բարև, Ձեր էլ. փոստի հասցեն օգտագործվել է Areg-ի հաշիվ ստեղծելու համար։",
-            "Խնդրում ենք հաստատել, որ այս հասցեն Ձերն է՝ սեղմելով ստորև դրված հղման վրա։",
-            "Հղումը վավեր է 7 օրվա ընթացքում։",
-            "Եթե Դուք հաշիվ չեք ստեղծել, այս նամակը կարող եք անտեսել։",
-            verificationLink);
-    }
-
-    private static string BuildDormancyWarningBody(DateTime? deleteAtUtc)
-    {
-        // Eastern Armenian, warm but neutral in the warn-only case;
-        // factual-without-panic when a destructive date is attached.
-        // The ordering is: what happened → what to do → (optional)
-        // when it will be acted upon → opt-out note. The extra
-        // middle sentence only appears when the destructive pass is
-        // enabled (deleteAtUtc non-null).
-        var lines = new System.Collections.Generic.List<string>
-        {
-            "Ձեր հաշիվը վերջերս չի օգտագործվել։",
-            "Եթե դեռ ցանկանում եք պահպանել Ձեր հաշիվը և տվյալները, խնդրում ենք կրկին մուտք գործել։"
-        };
-        if (deleteAtUtc.HasValue)
-        {
-            // Plain yyyy-MM-dd — no locale-specific formatting, no
-            // time component. The parent sees a bounded calendar
-            // date they can verify against their calendar.
-            var dateStr = deleteAtUtc.Value.ToString("yyyy-MM-dd");
-            lines.Add(
-                $"Եթե մինչև {dateStr} չմտնեք, Ձեր անձնական տվյալները ինքնաբար կհեռացվեն։");
-        }
-        lines.Add("Եթե Դուք այլևս չեք օգտագործում այս հաշիվը, այս նամակը կարող եք անտեսել։");
-        return string.Join("\n\n", lines);
     }
 }

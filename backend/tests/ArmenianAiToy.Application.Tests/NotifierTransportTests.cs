@@ -26,13 +26,17 @@ public class NotifierTransportTests
         string? transport = null,
         string? host = null,
         string? fromAddress = null,
-        string? linkBase = null)
+        string? linkBase = null,
+        string? resendApiKey = null,
+        string? resendFromAddress = null)
     {
         var config = Substitute.For<IConfiguration>();
         config["Notifications:Transport"].Returns(transport);
         config["Notifications:Smtp:Host"].Returns(host);
         config["Notifications:Smtp:FromAddress"].Returns(fromAddress);
         config["Notifications:PasswordResetLinkBase"].Returns(linkBase);
+        config["Notifications:Resend:ApiKey"].Returns(resendApiKey);
+        config["Notifications:Resend:FromAddress"].Returns(resendFromAddress);
         return config;
     }
 
@@ -118,6 +122,7 @@ public class NotifierTransportTests
         Assert.Contains("sendgrid", ex.Message);
         Assert.Contains("log", ex.Message);
         Assert.Contains("smtp", ex.Message);
+        Assert.Contains("resend", ex.Message);
     }
 
     [Fact]
@@ -177,6 +182,70 @@ public class NotifierTransportTests
             () => NotifierTransport.ResolveImplementation(config));
         Assert.Contains("Notifications:Smtp:Host", ex.Message);
         Assert.Contains("Notifications:Smtp:FromAddress", ex.Message);
+        Assert.Contains("Notifications:PasswordResetLinkBase", ex.Message);
+    }
+
+    // --- Resend transport ---
+
+    [Fact]
+    public void ResolveImplementation_ResendTransport_WithValidConfig_ReturnsResendNotifier()
+    {
+        var config = Config(
+            transport: "resend",
+            linkBase: "https://example.com/reset",
+            resendApiKey: "re_test_key",
+            resendFromAddress: "noreply@example.com");
+
+        var impl = NotifierTransport.ResolveImplementation(config);
+
+        Assert.Equal(typeof(ResendNotifier), impl);
+    }
+
+    [Theory]
+    [InlineData("RESEND")]
+    [InlineData("Resend")]
+    [InlineData("  resend  ")]
+    public void ResolveImplementation_ResendTransport_IsCaseAndTrimInsensitive(string variant)
+    {
+        var config = Config(
+            transport: variant,
+            linkBase: "https://example.com/reset",
+            resendApiKey: "re_test_key",
+            resendFromAddress: "noreply@example.com");
+
+        var impl = NotifierTransport.ResolveImplementation(config);
+
+        Assert.Equal(typeof(ResendNotifier), impl);
+    }
+
+    [Fact]
+    public void ResolveImplementation_ResendTransport_MissingApiKey_ThrowsWithKeyName()
+    {
+        // Operator-visible fail-fast: the error message must name the
+        // missing key(s) so the fix is obvious from stdout alone.
+        var config = Config(
+            transport: "resend",
+            linkBase: "https://example.com/reset",
+            resendApiKey: null,
+            resendFromAddress: "noreply@example.com");
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => NotifierTransport.ResolveImplementation(config));
+        Assert.Contains("Notifications:Resend:ApiKey", ex.Message);
+    }
+
+    [Fact]
+    public void ResolveImplementation_ResendTransport_AllRequiredMissing_NamesAllKeys()
+    {
+        // One shot: every missing key named in a single throw.
+        var config = Config(
+            transport: "resend", linkBase: null,
+            resendApiKey: null, resendFromAddress: "   ");
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => NotifierTransport.ResolveImplementation(config));
+        Assert.Contains("Notifications:Resend:ApiKey", ex.Message);
+        Assert.Contains("Notifications:Resend:FromAddress", ex.Message);
         Assert.Contains("Notifications:PasswordResetLinkBase", ex.Message);
     }
 }

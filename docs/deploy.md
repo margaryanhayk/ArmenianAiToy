@@ -80,7 +80,10 @@ image.
 | `GoogleAuth__ClientId`                | empty       | Enables `POST /api/parents/google-login`. Empty → endpoint returns 404.  |
 | `Metrics__ScrapeToken`                | empty       | Bearer token required on `GET /metrics`. With both this and `AllowUnauthenticatedScrape=false`, `/metrics` returns 404 to unauthenticated callers (fail-closed concealment). |
 | `Metrics__AllowUnauthenticatedScrape` | `false`     | `true` opens `/metrics` to any caller. Use ONLY behind a private network. |
-| `Notifications__Transport`            | `log`       | `log` → emails are written to stdout via `LoggingNotifier`. `smtp` requires the full `Notifications__Smtp__*` block. |
+| `Notifications__Transport`            | `log`       | `log` → emails are written to stdout via `LoggingNotifier`. `smtp` requires the full `Notifications__Smtp__*` block. `resend` requires `Notifications__Resend__ApiKey`, `Notifications__Resend__FromAddress`, and `Notifications__PasswordResetLinkBase`. |
+| `Notifications__Resend__ApiKey`       | empty       | Resend API key (`re_...`). Required when `Transport=resend`.             |
+| `Notifications__Resend__FromAddress`  | empty       | Sender for Resend mail, e.g. `Areg <noreply@yourdomain>`. The domain must be verified in Resend (SPF/DKIM) to deliver beyond the account owner's own inbox. |
+| `Notifications__PasswordResetLinkBase`| empty       | Public URL of the parent dashboard page (e.g. `https://<host>/parent.html`). Reset / verification links are built from it. Required for `smtp` and `resend`. |
 | `OpenAI__DailyCostCap__Enabled`       | `true`      | Whole-day per-device chat cost cap.                                      |
 | `OpenAI__DailyCostCap__Default`       | `0.50`      | USD/day per device.                                                      |
 | `Retention__Messages__MaxAgeDays`     | `90`        | Message/conversation TTL. Set `<= 0` to disable the retention worker.    |
@@ -179,8 +182,22 @@ curl -sf -H "Authorization: Bearer <token>" \
   are accepted for validation during rotation.
 - Send email. The default `Notifications__Transport=log` writes
   password-reset / verification mail to stdout. Switch to
-  `smtp` and configure the full `Notifications__Smtp__*` block
-  to actually deliver mail.
+  `smtp` (full `Notifications__Smtp__*` block) or `resend`
+  (Resend HTTP API) to actually deliver mail. The minimal
+  Resend shape:
+
+  ```
+  Notifications__Transport=resend
+  Notifications__Resend__ApiKey=re_...
+  Notifications__Resend__FromAddress=Areg <noreply@yourdomain>
+  Notifications__PasswordResetLinkBase=https://<host>/parent.html
+  ```
+
+  Resend prerequisite: verify your sending domain in the Resend
+  dashboard (SPF/DKIM DNS records). Without a verified domain,
+  Resend only delivers to the account owner's own address from
+  `onboarding@resend.dev` — fine for smoke-testing, not for
+  real parents.
 
 ## Live build / run verification
 
