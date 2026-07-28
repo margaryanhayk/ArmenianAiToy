@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Parent Dashboard</title>
+  <title>Areg — Parent Dashboard</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -19,29 +19,52 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 4px 20px;
+      gap: 10px;
+      background: linear-gradient(135deg, #fff6e3, #ffeccb);
+      border: 1px solid #f3e2bd;
+      border-radius: 18px;
+      padding: 14px 16px;
+      margin: 4px 0 16px;
+      box-shadow: 0 2px 12px rgba(91,62,138,0.07);
     }
-    .header h1 { font-size: 22px; color: #5b3e8a; }
-    .header .sub { font-size: 12px; color: #9a8ab5; }
+    .header .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .header .logo {
+      width: 46px;
+      height: 46px;
+      flex: none;
+      border-radius: 50%;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      box-shadow: inset 0 0 0 2px #f3e2bd;
+    }
+    .header h1 { font-size: 22px; color: #4b2e83; letter-spacing: 0.2px; }
+    .header .sub { font-size: 12px; color: #8a7554; }
     .header .right { display: flex; gap: 8px; align-items: center; }
 
     .card {
       background: white;
-      border-radius: 14px;
+      border-radius: 16px;
       padding: 20px;
-      box-shadow: 0 2px 12px rgba(91,62,138,0.08);
+      box-shadow: 0 4px 18px rgba(91,62,138,0.07);
       margin-bottom: 14px;
     }
-    .card h2 { font-size: 15px; color: #5b3e8a; margin-bottom: 12px; }
+    .card h2 { font-size: 16px; color: #5b3e8a; margin-bottom: 12px; }
 
     label { display: block; font-size: 12px; color: #6b5b8a; margin-bottom: 4px; }
     input {
       width: 100%;
-      padding: 10px 12px;
+      padding: 12px 14px;
       border: 2px solid #e0d6f0;
-      border-radius: 10px;
-      font-size: 14px;
+      border-radius: 12px;
+      font-size: 15px;
       margin-bottom: 12px;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #7c5cbf;
     }
     /* The generic input rule above is meant for text fields; without
        these overrides it inflates checkboxes and time pickers into
@@ -83,10 +106,10 @@
 
     .ctl-row {
       margin: 6px 0 10px;
-      padding: 10px 12px;
+      padding: 12px 14px;
       background: #faf8ff;
       border: 1px solid #e4d9f7;
-      border-radius: 10px;
+      border-radius: 12px;
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
@@ -128,13 +151,14 @@
     }
     .btn-ghost-danger:hover { background: #fdf0ef; }
     button {
-      padding: 9px 14px;
+      padding: 11px 16px;
       background: #7c5cbf;
       color: white;
       border: none;
-      border-radius: 10px;
+      border-radius: 12px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 14px;
+      font-weight: 600;
     }
     button:hover { background: #6b4aad; }
     button.secondary { background: #e0d6f0; color: #5b3e8a; }
@@ -144,6 +168,7 @@
       color: #7c5cbf;
       padding: 0;
       font-size: 13px;
+      font-weight: 500;
       text-decoration: underline;
     }
     button.link:hover { background: none; color: #5b3e8a; }
@@ -289,16 +314,18 @@
       width: 100%;
       text-align: left;
       background: #faf7ff;
-      border: 1px solid #ece4f8;
-      border-radius: 10px;
-      padding: 12px 14px;
-      margin-bottom: 8px;
+      border: 1px solid #e4d9f7;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
       cursor: pointer;
       font-size: 14px;
       color: #2b1f47;
     }
     .row:hover { background: #f0e8fc; }
 
+    .row .top span:first-child { font-weight: 600; font-size: 15px; color: #2b1f47; }
+    .row .top span:last-child:not(:first-child) { color: #7c5cbf; font-size: 13px; }
     .row .top {
       display: flex;
       justify-content: space-between;
@@ -398,9 +425,12 @@
 <body>
   <div class="app">
     <div class="header">
-      <div>
-        <h1>Parent Dashboard</h1>
-        <div class="sub">Read-only conversation viewer</div>
+      <div class="brand">
+        <div class="logo">🧸</div>
+        <div>
+          <h1>Areg</h1>
+          <div class="sub">Parent dashboard — your child's play at a glance</div>
+        </div>
       </div>
       <div class="right">
         <button id="logoutBtn" class="secondary" hidden>Log out</button>
@@ -516,7 +546,7 @@
 
     <!-- Devices view -->
     <section id="devicesView" class="card" hidden>
-      <h2>Linked devices</h2>
+      <h2>🧸 Linked devices</h2>
       <div style="margin:0 0 8px;">
         <button id="openAuditBtn" class="link" type="button">View your activity →</button>
       </div>
@@ -1515,7 +1545,7 @@
           var bedtimeRow = document.createElement('div');
           bedtimeRow.className = 'ctl-row';
           var bedtimeLabel = document.createElement('span');
-          bedtimeLabel.textContent = 'Bedtime:';
+          bedtimeLabel.textContent = '🌙 Bedtime:';
           bedtimeLabel.className = 'ctl-label';
           bedtimeRow.appendChild(bedtimeLabel);
           var bedStart = document.createElement('input');
@@ -1552,7 +1582,7 @@
           var modesRow = document.createElement('div');
           modesRow.className = 'ctl-row';
           var modesLabel = document.createElement('span');
-          modesLabel.textContent = 'Modes:';
+          modesLabel.textContent = '🎮 Modes:';
           modesLabel.className = 'ctl-label';
           modesRow.appendChild(modesLabel);
           var modeDefs = [
@@ -1601,7 +1631,7 @@
           var renameRow = document.createElement('div');
           renameRow.className = 'ctl-row';
           var renameLabel = document.createElement('span');
-          renameLabel.textContent = 'Name:';
+          renameLabel.textContent = '✏️ Name:';
           renameLabel.className = 'ctl-label';
           renameRow.appendChild(renameLabel);
           var nameInput = document.createElement('input');
