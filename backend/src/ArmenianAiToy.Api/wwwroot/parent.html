@@ -214,10 +214,10 @@
     .today-panel {
       font-size: 13px;
       color: #5b3e8a;
-      background: #f5f0ff;
+      background: linear-gradient(135deg, #f5f0ff, #fdfbff);
       border: 1px solid #e4d9f7;
-      border-radius: 6px;
-      padding: 10px 12px;
+      border-radius: 12px;
+      padding: 12px 14px;
       margin: 0 0 10px;
     }
     .today-panel h3 {
@@ -295,8 +295,8 @@
       vertical-align: middle;
     }
     .tabs button {
-      padding: 5px 12px;
-      font-size: 12px;
+      padding: 7px 14px;
+      font-size: 13px;
       background: #ece4f8;
       color: #5b3e8a;
       border-radius: 999px;
@@ -379,14 +379,29 @@
     }
 
     .msg {
-      border-left: 3px solid #e0d6f0;
-      padding: 8px 12px;
+      border: 1px solid #e0d6f0;
+      padding: 10px 14px;
       margin-bottom: 10px;
       background: #faf7ff;
-      border-radius: 0 8px 8px 0;
+      border-radius: 14px;
+      max-width: 88%;
     }
-    .msg.flagged { border-left-color: #c62828; background: #fff5f6; }
-    .msg.flagged.warn { border-left-color: #e65100; background: #fff8f0; }
+    /* Chat-bubble layout: child speaks from the left (warm cream),
+       Areg answers from the right (soft lavender). */
+    .msg.from-child {
+      background: #fff6e3;
+      border-color: #f3e2bd;
+      margin-right: auto;
+      border-bottom-left-radius: 4px;
+    }
+    .msg.from-toy {
+      background: #f3edfc;
+      border-color: #e4d9f7;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+    .msg.flagged { border-left: 3px solid #c62828; background: #fff5f6; }
+    .msg.flagged.warn { border-left: 3px solid #e65100; background: #fff8f0; }
     /* Transient highlight when the parent jumps to a specific message
        from the Flagged tab. JS adds the class on arrival and removes
        it after ~1.8s. The box-shadow transition fades the outline out
@@ -439,7 +454,7 @@
 
     <!-- Login view -->
     <section id="loginView" class="card" hidden>
-      <h2>Log in</h2>
+      <h2>👋 Welcome back</h2>
       <label for="emailInput">Email</label>
       <input id="emailInput" type="email" autocomplete="username">
       <label for="passwordInput">Password</label>
@@ -639,7 +654,7 @@
            paginated conversation list. Hidden until loadTodayPanel
            populates it. -->
       <section id="todayPanel" class="today-panel" hidden aria-live="polite">
-        <h3>Today (UTC)</h3>
+        <h3>☀️ Today</h3>
         <div id="todayCounts" class="today-counts"></div>
         <div id="todayNewest"></div>
         <div id="todayFlagged"></div>
@@ -796,8 +811,8 @@
       // Parent-facing speaker label. Matches the toy-name "Areg" used
       // on the main app home page (index.html) so the parent dashboard
       // and the device home screen speak consistently.
-      if (role === 'user') return 'Child';
-      if (role === 'assistant') return 'Areg';
+      if (role === 'user') return '🧒 Child';
+      if (role === 'assistant') return '🧸 Areg';
       return String(role || '');
     }
 
@@ -2681,7 +2696,8 @@
 
     function buildMessage(m) {
       var div = document.createElement('div');
-      div.className = 'msg';
+      div.className = 'msg' +
+        (m.role === 'assistant' ? ' from-toy' : (m.role === 'user' ? ' from-child' : ''));
       // Stable per-message id — used by jump-to-message from Flagged
       // tab. Guarded in case m.id is missing on older payloads.
       if (m.id) div.id = 'msg-' + m.id;
