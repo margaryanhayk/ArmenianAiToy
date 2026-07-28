@@ -62,6 +62,71 @@
       padding: 6px 8px;
       margin: 0;
     }
+
+    /* Design-system pass — shared visual vocabulary for the device
+       panel (chips, control sections, ghost buttons). Matches the
+       Areg Design System kit: purple family, pill status chips,
+       outlined destructive actions. */
+    .chip {
+      display: inline-block;
+      margin: 4px 6px 0 0;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid transparent;
+    }
+    .chip-ok     { background: #e6f6ec; border-color: #b9e4c9; color: #1e7a45; }
+    .chip-muted  { background: #f2f2f2; border-color: #dddddd; color: #666666; }
+    .chip-warn   { background: #fef3c7; border-color: #e7c66a; color: #92400e; }
+    .chip-danger { background: #fee2e2; border-color: #e8a7a7; color: #991b1b; }
+    .chip-info   { background: #f5f0ff; border-color: #e4d9f7; color: #5b3e8a; }
+
+    .ctl-row {
+      margin: 6px 0 10px;
+      padding: 10px 12px;
+      background: #faf8ff;
+      border: 1px solid #e4d9f7;
+      border-radius: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+      color: #2b1f47;
+    }
+    .ctl-label { color: #6b5b8a; font-weight: 600; }
+    .ctl-hint  { color: #9a8ab5; font-size: 11px; flex-basis: 100%; }
+
+    .btn-ghost {
+      padding: 6px 12px;
+      font-size: 12px;
+      background: #ffffff;
+      border: 1px solid #cbb8ec;
+      color: #5b3e8a;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-ghost:hover { background: #f5f0ff; }
+    .btn-ghost-ok {
+      padding: 6px 12px;
+      font-size: 13px;
+      background: #ffffff;
+      border: 1px solid #b9e4c9;
+      color: #1e7a45;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-ghost-ok:hover { background: #e6f6ec; }
+    .btn-ghost-danger {
+      padding: 6px 12px;
+      font-size: 13px;
+      background: #ffffff;
+      border: 1px solid #d9a19e;
+      color: #b3403a;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-ghost-danger:hover { background: #fdf0ef; }
     button {
       padding: 9px 14px;
       background: #7c5cbf;
@@ -1354,12 +1419,7 @@
           if (typeof d.isOnline === 'boolean') {
             var onlineBadge = document.createElement('div');
             onlineBadge.textContent = d.isOnline ? '● Online' : '○ Offline';
-            onlineBadge.style.cssText =
-              'margin:2px 6px 0 0;padding:2px 8px;display:inline-block;' +
-              'border-radius:4px;font-size:12px;' +
-              (d.isOnline
-                ? 'background:#e6f6e6;border:1px solid #5aa45a;color:#2f6b2f;'
-                : 'background:#f2f2f2;border:1px solid #bbb;color:#777;');
+            onlineBadge.className = 'chip ' + (d.isOnline ? 'chip-ok' : 'chip-muted');
             btn.appendChild(onlineBadge);
           }
 
@@ -1368,20 +1428,14 @@
           if (d.isRevoked) {
             var revokedBadge = document.createElement('div');
             revokedBadge.textContent = 'Revoked';
-            revokedBadge.style.cssText =
-              'margin:2px 6px 0 0;padding:2px 8px;display:inline-block;' +
-              'background:#fdecea;border:1px solid #d9534f;color:#a02622;' +
-              'border-radius:4px;font-size:12px;';
+            revokedBadge.className = 'chip chip-danger';
             btn.appendChild(revokedBadge);
           }
 
           if (d.isPaused) {
             var pausedBadge = document.createElement('div');
             pausedBadge.textContent = 'Paused by you';
-            pausedBadge.style.cssText =
-              'margin:2px 0 0;padding:2px 8px;display:inline-block;' +
-              'background:#fff3cd;border:1px solid #e0a800;color:#856404;' +
-              'border-radius:4px;font-size:12px;';
+            pausedBadge.className = 'chip chip-warn';
             btn.appendChild(pausedBadge);
           }
 
@@ -1392,10 +1446,7 @@
             bedtimeBadge.textContent =
               'Bedtime ' + d.bedtimeStart.substring(0, 5) +
               '–' + d.bedtimeEnd.substring(0, 5);
-            bedtimeBadge.style.cssText =
-              'margin:2px 0 0 6px;padding:2px 8px;display:inline-block;' +
-              'background:#e7f0ff;border:1px solid #6a8ec9;color:#2c4a7a;' +
-              'border-radius:4px;font-size:12px;';
+            bedtimeBadge.className = 'chip chip-info';
             btn.appendChild(bedtimeBadge);
           }
 
@@ -1408,10 +1459,7 @@
           if (d.isDormant) {
             var dormantBadge = document.createElement('div');
             dormantBadge.textContent = 'Not seen recently';
-            dormantBadge.style.cssText =
-              'margin:2px 0 0 6px;padding:2px 8px;display:inline-block;' +
-              'background:#f2f2f2;border:1px solid #bbb;color:#555;' +
-              'border-radius:4px;font-size:12px;';
+            dormantBadge.className = 'chip chip-muted';
             btn.appendChild(dormantBadge);
           }
 
@@ -1425,19 +1473,15 @@
           if (d.children && d.children.length > 0) {
             d.children.forEach(function (c) {
               var childRow = document.createElement('div');
-              childRow.style.cssText =
-                'margin:2px 0;padding:6px 10px;background:#f7f7f7;' +
-                'border-radius:6px;display:flex;justify-content:space-between;' +
-                'align-items:center;font-size:13px;';
+              childRow.className = 'ctl-row';
+              childRow.style.justifyContent = 'space-between';
               var childLabel = document.createElement('span');
               childLabel.textContent = c.name + (c.age != null ? ' (age ' + c.age + ')' : '');
               childRow.appendChild(childLabel);
               var removeChildBtn = document.createElement('button');
               removeChildBtn.type = 'button';
               removeChildBtn.textContent = 'Remove';
-              removeChildBtn.style.cssText =
-                'padding:4px 10px;font-size:12px;background:transparent;' +
-                'border:1px solid #c66;color:#c66;border-radius:5px;cursor:pointer;';
+              removeChildBtn.className = 'btn-ghost-danger';
               removeChildBtn.addEventListener('click', function () {
                 deleteChild(c.childId, c.name);
               });
@@ -1458,10 +1502,8 @@
           pauseBtn.type = 'button';
           pauseBtn.textContent = d.isPaused ? 'Resume' : 'Pause';
           pauseBtn.setAttribute('data-device-id', d.deviceId);
-          pauseBtn.style.cssText =
-            'margin:4px 8px 12px 0;padding:6px 12px;font-size:13px;' +
-            'background:transparent;border:1px solid #999;color:#555;' +
-            'border-radius:6px;cursor:pointer;';
+          pauseBtn.className = 'btn-ghost';
+          pauseBtn.style.cssText = 'margin:4px 8px 12px 0;font-size:13px;';
           pauseBtn.addEventListener('click', function () {
             toggleDevicePause(d.deviceId, d.deviceName, d.isPaused);
           });
@@ -1471,19 +1513,15 @@
           // the clickable device row so inputs aren't nested in a button.
           // Pause is an immediate override; bedtime is a scheduled analogue.
           var bedtimeRow = document.createElement('div');
-          bedtimeRow.style.cssText =
-            'margin:4px 0 12px;padding:6px 10px;background:#f7f7f7;' +
-            'border-radius:6px;display:flex;flex-wrap:wrap;gap:8px;' +
-            'align-items:center;font-size:13px;';
+          bedtimeRow.className = 'ctl-row';
           var bedtimeLabel = document.createElement('span');
           bedtimeLabel.textContent = 'Bedtime:';
-          bedtimeLabel.style.color = '#555';
+          bedtimeLabel.className = 'ctl-label';
           bedtimeRow.appendChild(bedtimeLabel);
           var bedStart = document.createElement('input');
           bedStart.type = 'time';
           bedStart.setAttribute('data-role', 'bedtime-start');
           if (d.bedtimeStart) bedStart.value = d.bedtimeStart.substring(0, 5);
-          bedStart.style.cssText = 'padding:3px 6px;font-size:13px;';
           bedtimeRow.appendChild(bedStart);
           var dash = document.createElement('span');
           dash.textContent = '–';
@@ -1493,21 +1531,18 @@
           bedEnd.type = 'time';
           bedEnd.setAttribute('data-role', 'bedtime-end');
           if (d.bedtimeEnd) bedEnd.value = d.bedtimeEnd.substring(0, 5);
-          bedEnd.style.cssText = 'padding:3px 6px;font-size:13px;';
           bedtimeRow.appendChild(bedEnd);
           var saveBedtimeBtn = document.createElement('button');
           saveBedtimeBtn.type = 'button';
           saveBedtimeBtn.textContent = 'Save';
-          saveBedtimeBtn.style.cssText =
-            'padding:4px 10px;font-size:12px;background:transparent;' +
-            'border:1px solid #6a8ec9;color:#2c4a7a;border-radius:5px;cursor:pointer;';
+          saveBedtimeBtn.className = 'btn-ghost';
           saveBedtimeBtn.addEventListener('click', function () {
             saveBedtimeWindow(d.deviceId, bedStart.value, bedEnd.value);
           });
           bedtimeRow.appendChild(saveBedtimeBtn);
           var bedtimeHint = document.createElement('span');
           bedtimeHint.textContent = 'clear both to disable · pause overrides';
-          bedtimeHint.style.cssText = 'color:#888;font-size:11px;';
+          bedtimeHint.className = 'ctl-hint';
           bedtimeRow.appendChild(bedtimeHint);
           listEl.appendChild(bedtimeRow);
 
@@ -1515,13 +1550,10 @@
           // never represented here (safety invariant: bedtime cues always
           // reach Calm handling regardless of parent config).
           var modesRow = document.createElement('div');
-          modesRow.style.cssText =
-            'margin:4px 0 12px;padding:6px 10px;background:#f7f7f7;' +
-            'border-radius:6px;display:flex;flex-wrap:wrap;gap:10px;' +
-            'align-items:center;font-size:13px;';
+          modesRow.className = 'ctl-row';
           var modesLabel = document.createElement('span');
           modesLabel.textContent = 'Modes:';
-          modesLabel.style.color = '#555';
+          modesLabel.className = 'ctl-label';
           modesRow.appendChild(modesLabel);
           var modeDefs = [
             { key: 'story',     label: 'Story',     flag: d.storyEnabled },
@@ -1547,9 +1579,7 @@
           var saveModesBtn = document.createElement('button');
           saveModesBtn.type = 'button';
           saveModesBtn.textContent = 'Save modes';
-          saveModesBtn.style.cssText =
-            'padding:4px 10px;font-size:12px;background:transparent;' +
-            'border:1px solid #6a8ec9;color:#2c4a7a;border-radius:5px;cursor:pointer;';
+          saveModesBtn.className = 'btn-ghost';
           saveModesBtn.addEventListener('click', function () {
             saveDeviceModeFlags(
               d.deviceId,
@@ -1561,7 +1591,7 @@
           modesRow.appendChild(saveModesBtn);
           var modesHint = document.createElement('span');
           modesHint.textContent = 'Calm stays on always · pause & bedtime override';
-          modesHint.style.cssText = 'color:#888;font-size:11px;';
+          modesHint.className = 'ctl-hint';
           modesRow.appendChild(modesHint);
           listEl.appendChild(modesRow);
 
@@ -1569,27 +1599,24 @@
           // ("Anna's toy", "Living room"). Sibling row (input not nested in a
           // button). PUT /api/parents/devices/{id}/name.
           var renameRow = document.createElement('div');
-          renameRow.style.cssText =
-            'margin:4px 0 12px;padding:6px 10px;background:#f7f7f7;' +
-            'border-radius:6px;display:flex;flex-wrap:wrap;gap:8px;' +
-            'align-items:center;font-size:13px;';
+          renameRow.className = 'ctl-row';
           var renameLabel = document.createElement('span');
           renameLabel.textContent = 'Name:';
-          renameLabel.style.color = '#555';
+          renameLabel.className = 'ctl-label';
           renameRow.appendChild(renameLabel);
           var nameInput = document.createElement('input');
           nameInput.type = 'text';
           nameInput.maxLength = 60;
           nameInput.value = d.deviceName || '';
           nameInput.placeholder = 'e.g. Anna’s toy';
-          nameInput.style.cssText = 'padding:3px 6px;font-size:13px;min-width:160px;';
+          nameInput.style.cssText =
+            'flex:1;width:auto;min-width:160px;margin:0;' +
+            'padding:8px 10px;font-size:14px;border-radius:8px;';
           renameRow.appendChild(nameInput);
           var saveNameBtn = document.createElement('button');
           saveNameBtn.type = 'button';
           saveNameBtn.textContent = 'Save name';
-          saveNameBtn.style.cssText =
-            'padding:4px 10px;font-size:12px;background:transparent;' +
-            'border:1px solid #6a8ec9;color:#2c4a7a;border-radius:5px;cursor:pointer;';
+          saveNameBtn.className = 'btn-ghost';
           saveNameBtn.addEventListener('click', function () {
             renameDevice(d.deviceId, nameInput.value);
           });
@@ -1603,11 +1630,8 @@
           revokeBtn.type = 'button';
           revokeBtn.textContent = d.isRevoked ? 'Restore access' : 'Revoke access';
           revokeBtn.setAttribute('data-device-id', d.deviceId);
-          revokeBtn.style.cssText =
-            'margin:4px 8px 12px 0;padding:6px 12px;font-size:13px;' +
-            'background:transparent;border:1px solid ' +
-            (d.isRevoked ? '#5aa45a;color:#2f6b2f;' : '#d9534f;color:#a02622;') +
-            'border-radius:6px;cursor:pointer;';
+          revokeBtn.className = d.isRevoked ? 'btn-ghost-ok' : 'btn-ghost-danger';
+          revokeBtn.style.cssText = 'margin:4px 8px 12px 0;';
           revokeBtn.addEventListener('click', function () {
             toggleDeviceRevocation(d.deviceId, d.deviceName, d.isRevoked);
           });
@@ -1619,12 +1643,9 @@
           var unlink = document.createElement('button');
           unlink.type = 'button';
           unlink.textContent = 'Unlink';
-          unlink.className = 'unlink-btn';
+          unlink.className = 'unlink-btn btn-ghost-danger';
           unlink.setAttribute('data-device-id', d.deviceId);
-          unlink.style.cssText =
-            'margin:4px 0 12px;padding:6px 12px;font-size:13px;' +
-            'background:transparent;border:1px solid #c66;color:#c66;' +
-            'border-radius:6px;cursor:pointer;';
+          unlink.style.cssText = 'margin:4px 0 12px;';
           unlink.addEventListener('click', function () {
             unlinkDevice(d.deviceId, d.deviceName);
           });
@@ -1710,14 +1731,12 @@
     // the device's current flag is, so "Inherit" is never a silent mystery.
     function renderChildOverridesRow(device, child) {
       var row = document.createElement('div');
-      row.style.cssText =
-        'margin:2px 0 8px;padding:6px 10px;background:#f7f7f7;' +
-        'border-radius:6px;display:flex;flex-wrap:wrap;gap:10px;' +
-        'align-items:center;font-size:12px;color:#555;';
+      row.className = 'ctl-row';
+      row.style.fontSize = '12px';
 
       var prefix = document.createElement('span');
       prefix.textContent = 'Modes for ' + child.name + ':';
-      prefix.style.fontWeight = '500';
+      prefix.className = 'ctl-label';
       row.appendChild(prefix);
 
       var modeDefs = [
@@ -1734,7 +1753,9 @@
         lbl.textContent = m.label + ':';
         wrap.appendChild(lbl);
         var sel = document.createElement('select');
-        sel.style.cssText = 'padding:2px 4px;font-size:12px;';
+        sel.style.cssText =
+          'padding:4px 6px;font-size:12px;color:#2b1f47;background:#fff;' +
+          'border:1px solid #e0d6f0;border-radius:8px;';
         sel.setAttribute('data-role', 'child-override-' + m.key);
         var inheritLabel = 'Inherit (' + (m.device ? 'on' : 'off') + ')';
         [
@@ -1756,9 +1777,7 @@
       var saveBtn = document.createElement('button');
       saveBtn.type = 'button';
       saveBtn.textContent = 'Save';
-      saveBtn.style.cssText =
-        'padding:3px 10px;font-size:12px;background:transparent;' +
-        'border:1px solid #6a8ec9;color:#2c4a7a;border-radius:5px;cursor:pointer;';
+      saveBtn.className = 'btn-ghost';
       saveBtn.addEventListener('click', function () {
         saveChildModeOverrides(
           child.childId,
@@ -1772,7 +1791,7 @@
 
       var hint = document.createElement('span');
       hint.textContent = 'child override wins over device · Calm always on';
-      hint.style.cssText = 'color:#888;font-size:11px;';
+      hint.className = 'ctl-hint';
       row.appendChild(hint);
       return row;
     }
