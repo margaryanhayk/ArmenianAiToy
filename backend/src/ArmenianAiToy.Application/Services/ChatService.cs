@@ -2409,14 +2409,18 @@ public class ChatService : IChatService
             aiResponse = aiResponse.Replace("\u0589\u0589", "\u0589");
         }
 
-        // Step 11: Store AI response
+        // Step 11: Store AI response. The runtime-resolved mode is then
+        // stamped onto the assistant row (E1.3) — the same value the wire
+        // response carries — so parent-facing views can group conversations
+        // by mode without re-running detection against history.
         var responseMsg = await _conversations.AddMessageAsync(
             conversation.Id, MessageRole.Assistant, aiResponse, safetyFlag);
+        var modeName = detectedMode == DetectedMode.None ? null : detectedMode.ToString().ToLowerInvariant();
+        if (modeName != null)
+            await _conversations.StampMessageModeAsync(responseMsg.Id, modeName);
 
         // Set storySessionId when story choices are present (active story mode)
         Guid? activeStorySession = (choiceA != null || choiceB != null) ? conversation.Id : null;
-
-        var modeName = detectedMode == DetectedMode.None ? null : detectedMode.ToString().ToLowerInvariant();
         return new ChatResponse(aiResponse, conversation.Id, responseMsg.Id, safetyFlag, choiceA, choiceB, activeStorySession, modeName);
     }
 

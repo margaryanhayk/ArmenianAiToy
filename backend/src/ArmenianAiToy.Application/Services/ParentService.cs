@@ -1524,7 +1524,8 @@ public class ParentService : IParentService
                         m.Content,
                         m.Timestamp,
                         m.SafetyFlag,
-                        AudioAvailable: m.Role == MessageRole.Assistant && m.AudioBlobPath != null
+                        AudioAvailable: m.Role == MessageRole.Assistant && m.AudioBlobPath != null,
+                        Mode: m.Mode
                     )).ToList()
                 )).ToList()
                 : new List<ConversationDto>()

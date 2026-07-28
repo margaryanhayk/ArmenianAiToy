@@ -69,6 +69,15 @@ public class ConversationService : IConversationService
         return message;
     }
 
+    public async Task StampMessageModeAsync(Guid messageId, string? mode)
+    {
+        var message = await _db.Set<Message>().FirstOrDefaultAsync(m => m.Id == messageId);
+        if (message is null)
+            return;
+        message.Mode = mode;
+        await _db.SaveChangesAsync();
+    }
+
     public async Task<List<(string Role, string Content)>> GetRecentMessagesAsync(Guid conversationId, int count = 20)
     {
         var messages = await _db.Set<Message>()
@@ -105,7 +114,8 @@ public class ConversationService : IConversationService
                 m.Content,
                 m.Timestamp,
                 m.SafetyFlag,
-                AudioAvailable: m.Role == MessageRole.Assistant && m.AudioBlobPath != null
+                AudioAvailable: m.Role == MessageRole.Assistant && m.AudioBlobPath != null,
+                Mode: m.Mode
             )).ToList()
         )).ToList();
     }
@@ -139,7 +149,12 @@ public class ConversationService : IConversationService
                     .Where(m => m.Role == MessageRole.Assistant)
                     .OrderByDescending(m => m.Timestamp)
                     .Select(m => (SafetyFlag?)m.SafetyFlag)
-                    .FirstOrDefault()
+                    .FirstOrDefault(),
+                Modes = c.Messages
+                    .Where(m => m.Mode != null)
+                    .Select(m => m.Mode!)
+                    .Distinct()
+                    .ToList()
             })
             .ToListAsync();
 
@@ -152,7 +167,8 @@ public class ConversationService : IConversationService
             MakeSnippet(c.FirstUserContent),
             MakeSnippet(c.LastAssistantContent),
             c.LastAssistantSafetyFlag,
-            c.FlaggedMessageCount
+            c.FlaggedMessageCount,
+            c.Modes
         )).ToList();
     }
 
@@ -214,7 +230,8 @@ public class ConversationService : IConversationService
                 m.Content,
                 m.Timestamp,
                 m.SafetyFlag,
-                AudioAvailable: m.Role == MessageRole.Assistant && m.AudioBlobPath != null
+                AudioAvailable: m.Role == MessageRole.Assistant && m.AudioBlobPath != null,
+                Mode: m.Mode
             )).ToList()
         );
     }

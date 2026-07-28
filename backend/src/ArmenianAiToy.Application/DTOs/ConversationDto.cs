@@ -24,4 +24,9 @@ public record MessageDto(
     // lives at every projection site (ConversationService, ParentService
     // export) so the wire shape can never expose a child-WAV "playable"
     // signal regardless of where the DTO was built.
-    bool AudioAvailable);
+    bool AudioAvailable,
+    // E1.3: runtime-stamped conversation mode of this message ("story",
+    // "game", "riddle", "curiosity", "calm"). Null on rows written
+    // before the Mode column existed, on guard/fallback replies, and on
+    // child rows. Additive — older consumers ignore it.
+    string? Mode = null);

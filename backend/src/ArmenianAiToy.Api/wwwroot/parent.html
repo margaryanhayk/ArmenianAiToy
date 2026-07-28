@@ -851,6 +851,19 @@
       return String(role || '');
     }
 
+    // E1.3: friendly label for a runtime-stamped conversation mode.
+    // Unknown / future mode strings fall through verbatim.
+    function modeChipLabel(mode) {
+      var map = {
+        story: '📖 Story',
+        game: '🎮 Game',
+        riddle: '❓ Riddle',
+        curiosity: '💡 Curiosity',
+        calm: '🌙 Calm'
+      };
+      return map[mode] || mode;
+    }
+
     function setActiveTab(name) {
       var tabs = document.querySelectorAll('.tabs button');
       for (var i = 0; i < tabs.length; i++) {
@@ -2363,6 +2376,22 @@
       top.appendChild(countSpan);
       btn.appendChild(top);
 
+      // E1.3: mode chips — which of the five modes this conversation
+      // visited. Conversations recorded before mode stamping existed
+      // send an empty list and render no chips.
+      var rowModes = Array.isArray(row.modes) ? row.modes : [];
+      if (rowModes.length > 0) {
+        var modesLine = document.createElement('div');
+        rowModes.forEach(function (mo) {
+          var chip = document.createElement('span');
+          chip.className = 'chip chip-info';
+          chip.style.margin = '2px 6px 4px 0';
+          chip.textContent = modeChipLabel(mo);
+          modesLine.appendChild(chip);
+        });
+        btn.appendChild(modesLine);
+      }
+
       if (row.firstUserSnippet) {
         var u = document.createElement('div');
         u.className = 'snippet';
@@ -2783,6 +2812,12 @@
       ts.textContent = fmtTime(m.timestamp);
       meta.appendChild(role);
       meta.appendChild(ts);
+      // E1.3: per-message mode tag (assistant rows stamped at chat time).
+      if (m.mode) {
+        var modeTag = document.createElement('span');
+        modeTag.textContent = ' · ' + modeChipLabel(m.mode);
+        meta.appendChild(modeTag);
+      }
 
       var body = document.createElement('div');
       body.className = 'body';
