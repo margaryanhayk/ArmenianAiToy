@@ -479,26 +479,32 @@
         <div class="logo">🧸</div>
         <div>
           <h1>Areg</h1>
-          <div class="sub">Parent dashboard — your child's play at a glance</div>
+          <div class="sub" data-i18n="tagline">Parent dashboard — your child's play at a glance</div>
         </div>
       </div>
       <div class="right">
-        <button id="logoutBtn" class="secondary" hidden>Log out</button>
+        <select id="langSelect" aria-label="Language"
+                style="padding:6px 8px;border:1px solid #e0d6f0;border-radius:8px;background:#fff;color:#5b3e8a;font-size:13px;cursor:pointer;">
+          <option value="en">English</option>
+          <option value="ru">Русский</option>
+          <option value="hy">Հայերեն</option>
+        </select>
+        <button id="logoutBtn" class="secondary" hidden data-i18n="logout">Log out</button>
       </div>
     </div>
 
     <!-- Login view -->
     <section id="loginView" class="card" hidden>
-      <h2>👋 Welcome back</h2>
-      <label for="emailInput">Email</label>
+      <h2 data-i18n="login_title">👋 Welcome back</h2>
+      <label for="emailInput" data-i18n="email">Email</label>
       <input id="emailInput" type="email" autocomplete="username">
-      <label for="passwordInput">Password</label>
+      <label for="passwordInput" data-i18n="password">Password</label>
       <input id="passwordInput" type="password" autocomplete="current-password">
-      <button id="loginBtn">Log in</button>
+      <button id="loginBtn" data-i18n="login_btn">Log in</button>
       <button id="forgotPasswordBtn" class="link" type="button"
-              style="margin-left:8px;">Forgot password?</button>
+              style="margin-left:8px;" data-i18n="forgot">Forgot password?</button>
       <button id="verifyEmailRequestBtn" class="link" type="button"
-              style="margin-left:8px;">Didn't get a verification email?</button>
+              style="margin-left:8px;" data-i18n="no_verif">Didn't get a verification email?</button>
       <div id="loginStatus" class="status" aria-live="polite"></div>
       <!--
         Google sign-in block. Hidden by default; unhidden by the boot
@@ -526,12 +532,12 @@
       response body.
     -->
     <section id="resetRequestView" class="card" hidden>
-      <h2>Reset your password</h2>
+      <h2 data-i18n="reset_title">Reset your password</h2>
       <label for="resetRequestEmailInput">Email</label>
       <input id="resetRequestEmailInput" type="email" autocomplete="username">
-      <button id="resetRequestBtn">Send reset link</button>
+      <button id="resetRequestBtn" data-i18n="send_reset">Send reset link</button>
       <button id="resetRequestBackBtn" class="link" type="button"
-              style="margin-left:8px;">Back to login</button>
+              style="margin-left:8px;" data-i18n="back_to_login">Back to login</button>
       <div id="resetRequestStatus" class="status" aria-live="polite"></div>
     </section>
 
@@ -544,12 +550,12 @@
       body.
     -->
     <section id="verifyEmailRequestView" class="card" hidden>
-      <h2>Send verification email</h2>
+      <h2 data-i18n="send_verif_title">Send verification email</h2>
       <label for="verifyEmailInput">Email</label>
       <input id="verifyEmailInput" type="email" autocomplete="username">
-      <button id="verifyEmailRequestSubmitBtn">Send verification email</button>
+      <button id="verifyEmailRequestSubmitBtn" data-i18n="send_verif_btn">Send verification email</button>
       <button id="verifyEmailRequestBackBtn" class="link" type="button"
-              style="margin-left:8px;">Back to login</button>
+              style="margin-left:8px;" data-i18n="back_to_login">Back to login</button>
       <div id="verifyEmailRequestStatus" class="status" aria-live="polite"></div>
     </section>
 
@@ -563,13 +569,13 @@
       for any failure reason; this UI surfaces that message verbatim.
     -->
     <section id="verifyEmailCompleteView" class="card" hidden>
-      <h2>Verify your email</h2>
+      <h2 data-i18n="verify_title">Verify your email</h2>
       <p style="margin:0 0 12px;color:#6b5b8a;font-size:13px;">
-        Click below to confirm your email address.
+        <span data-i18n="confirm_verify">Click below to confirm your email address.</span>
       </p>
-      <button id="verifyEmailCompleteBtn">Verify email</button>
+      <button id="verifyEmailCompleteBtn" data-i18n="verify_btn">Verify email</button>
       <button id="verifyEmailCompleteBackBtn" class="link" type="button"
-              style="margin-left:8px;">Back to login</button>
+              style="margin-left:8px;" data-i18n="back_to_login">Back to login</button>
       <div id="verifyEmailCompleteStatus" class="status" aria-live="polite"></div>
     </section>
 
@@ -583,22 +589,22 @@
       this UI surfaces that message verbatim.
     -->
     <section id="resetPasswordView" class="card" hidden>
-      <h2>Choose a new password</h2>
-      <label for="resetPasswordNewInput">New password</label>
+      <h2 data-i18n="new_pw_title">Choose a new password</h2>
+      <label for="resetPasswordNewInput" data-i18n="new_password">New password</label>
       <input id="resetPasswordNewInput" type="password" autocomplete="new-password">
-      <label for="resetPasswordConfirmInput">Confirm new password</label>
+      <label for="resetPasswordConfirmInput" data-i18n="confirm_new_password">Confirm new password</label>
       <input id="resetPasswordConfirmInput" type="password" autocomplete="new-password">
-      <button id="resetPasswordSubmitBtn">Set new password</button>
+      <button id="resetPasswordSubmitBtn" data-i18n="set_new_pw">Set new password</button>
       <button id="resetPasswordBackBtn" class="link" type="button"
-              style="margin-left:8px;">Back to login</button>
+              style="margin-left:8px;" data-i18n="back_to_login">Back to login</button>
       <div id="resetPasswordStatus" class="status" aria-live="polite"></div>
     </section>
 
     <!-- Devices view -->
     <section id="devicesView" class="card" hidden>
-      <h2>🧸 Linked devices</h2>
+      <h2 data-i18n="linked_devices">🧸 Linked devices</h2>
       <div style="margin:0 0 8px;">
-        <button id="openAuditBtn" class="link" type="button">View your activity →</button>
+        <button id="openAuditBtn" class="link" type="button" data-i18n="view_activity">View your activity →</button>
       </div>
       <!--
         Consumer pairing (Phase A.2): claim a toy with the single-use code
@@ -607,22 +613,22 @@
         a second toy can be added. Posts to POST /api/parents/devices/claim.
       -->
       <div style="margin:0 0 12px;">
-        <button id="toggleClaimBtn" class="link" type="button">＋ Add a toy</button>
+        <button id="toggleClaimBtn" class="link" type="button" data-i18n="add_toy">＋ Add a toy</button>
         <div id="claimDeviceForm" hidden
              style="margin-top:8px;padding:10px 12px;background:#f0f7f0;
                     border:1px solid #b6d6b6;border-radius:6px;max-width:420px;">
           <p style="margin:0 0 8px;font-size:13px;color:#3a5a3a;">
             Enter the pairing code from your toy's box or setup card (the app can
             scan its QR instead). This links the toy to your account.</p>
-          <label for="claimDeviceIdInput" style="display:block;font-size:12px;color:#555;">Device ID</label>
+          <label for="claimDeviceIdInput" style="display:block;font-size:12px;color:#555;" data-i18n="device_id">Device ID</label>
           <input id="claimDeviceIdInput" type="text" autocomplete="off"
                  placeholder="00000000-0000-0000-0000-000000000000"
                  style="width:100%;padding:5px 8px;margin:2px 0 8px;box-sizing:border-box;">
-          <label for="claimCodeInput" style="display:block;font-size:12px;color:#555;">Pairing code</label>
+          <label for="claimCodeInput" style="display:block;font-size:12px;color:#555;" data-i18n="pairing_code">Pairing code</label>
           <input id="claimCodeInput" type="text" autocomplete="off"
-                 placeholder="code from the toy"
+                 placeholder="code from the toy" data-i18n-ph="ph_pairing"
                  style="width:100%;padding:5px 8px;margin:2px 0 8px;box-sizing:border-box;">
-          <button id="claimDeviceBtn" type="button">Pair toy</button>
+          <button id="claimDeviceBtn" type="button" data-i18n="pair_toy">Pair toy</button>
           <div id="claimDeviceStatus" class="status muted" aria-live="polite"></div>
         </div>
       </div>
@@ -645,22 +651,22 @@
         <input id="linkDeviceIdInput" type="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
         <label for="linkApiKeyInput">API key</label>
         <input id="linkApiKeyInput" type="text" autocomplete="off" placeholder="dtk_…">
-        <button id="linkDeviceBtn" type="button">Link device</button>
+        <button id="linkDeviceBtn" type="button" data-i18n="link_device">Link device</button>
         <div id="linkDeviceStatus" class="status muted" aria-live="polite"></div>
       </div>
       <div class="account-panel">
-        <button id="togglePasswordBtn" class="link" type="button" aria-expanded="false" aria-controls="changePasswordForm">Change password</button>
+        <button id="togglePasswordBtn" class="link" type="button" aria-expanded="false" aria-controls="changePasswordForm" data-i18n="change_password">Change password</button>
         <div id="changePasswordForm" hidden>
-          <label for="currentPasswordInput">Current password</label>
+          <label for="currentPasswordInput" data-i18n="current_password">Current password</label>
           <input id="currentPasswordInput" type="password" autocomplete="current-password">
           <label for="newPasswordInput">New password (min 8 characters)</label>
           <input id="newPasswordInput" type="password" autocomplete="new-password">
           <label for="confirmPasswordInput">Confirm new password</label>
           <input id="confirmPasswordInput" type="password" autocomplete="new-password">
-          <button id="changePasswordBtn" type="button">Update password</button>
+          <button id="changePasswordBtn" type="button" data-i18n="update_password">Update password</button>
           <div id="changePasswordStatus" class="status muted" aria-live="polite"></div>
         </div>
-        <button id="toggleDeleteAccountBtn" class="link" type="button" aria-expanded="false" aria-controls="deleteAccountForm" style="color:#c66;margin-left:12px">Delete account</button>
+        <button id="toggleDeleteAccountBtn" class="link" type="button" aria-expanded="false" aria-controls="deleteAccountForm" style="color:#c66;margin-left:12px" data-i18n="delete_account">Delete account</button>
         <div id="deleteAccountForm" hidden>
           <div style="background:#fee2e2;border:1px solid #c66;padding:10px;border-radius:6px;margin:8px 0;font-size:13px;color:#933">
             <strong>This cannot be undone.</strong> Your account will be deleted. Any devices only you have linked — along with their children, conversations, and messages — will also be permanently deleted. Devices shared with another parent will remain for them.
@@ -669,7 +675,7 @@
           <input id="deleteAccountPasswordInput" type="password" autocomplete="current-password">
           <label for="deleteAccountConfirmInput">Type DELETE to confirm</label>
           <input id="deleteAccountConfirmInput" type="text" autocomplete="off">
-          <button id="deleteAccountBtn" type="button" style="background:#c66;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:4px">Permanently delete account</button>
+          <button id="deleteAccountBtn" type="button" style="background:#c66;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:4px" data-i18n="delete_account_confirm">Permanently delete account</button>
           <div id="deleteAccountStatus" class="status muted" aria-live="polite"></div>
         </div>
       </div>
@@ -678,10 +684,10 @@
     <!-- Summaries view -->
     <section id="summariesView" class="card" hidden>
       <h2>
-        <button class="link" id="backToDevices" aria-label="Back to devices">← Devices</button>
+        <button class="link" id="backToDevices" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button>
         <span class="tabs" role="tablist" aria-label="Device views">
-          <button data-tab="summaries" role="tab" aria-selected="false">Conversations</button>
-          <button data-tab="flagged" role="tab" aria-selected="false">Flagged</button>
+          <button data-tab="summaries" role="tab" aria-selected="false" data-i18n="tab_conversations">Conversations</button>
+          <button data-tab="flagged" role="tab" aria-selected="false" data-i18n="tab_flagged">Flagged</button>
         </span>
       </h2>
       <div id="summariesDeviceContext" class="device-context"></div>
@@ -689,7 +695,7 @@
            paginated conversation list. Hidden until loadTodayPanel
            populates it. -->
       <section id="todayPanel" class="today-panel" hidden aria-live="polite">
-        <h3>☀️ Today</h3>
+        <h3 data-i18n="today">☀️ Today</h3>
         <div id="todayCounts" class="today-counts"></div>
         <div id="todayNewest"></div>
         <div id="todayFlagged"></div>
@@ -698,8 +704,8 @@
       <div id="summariesList"></div>
       <div id="summariesStatus" class="status muted" aria-live="polite"></div>
       <div class="pager">
-        <button id="newerBtn" class="secondary" aria-label="Newer page">← Newer</button>
-        <button id="olderBtn" class="secondary" aria-label="Older page">Older →</button>
+        <button id="newerBtn" class="secondary" aria-label="Newer page" data-i18n="newer">← Newer</button>
+        <button id="olderBtn" class="secondary" aria-label="Older page" data-i18n="older">Older →</button>
       </div>
       <div id="summariesPagerInfo" class="pager-info"></div>
     </section>
@@ -707,10 +713,10 @@
     <!-- Flagged view -->
     <section id="flaggedView" class="card" hidden>
       <h2>
-        <button class="link" id="flaggedBackToDevices" aria-label="Back to devices">← Devices</button>
+        <button class="link" id="flaggedBackToDevices" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button>
         <span class="tabs" role="tablist" aria-label="Device views">
-          <button data-tab="summaries" role="tab" aria-selected="false">Conversations</button>
-          <button data-tab="flagged" role="tab" aria-selected="false">Flagged</button>
+          <button data-tab="summaries" role="tab" aria-selected="false" data-i18n="tab_conversations">Conversations</button>
+          <button data-tab="flagged" role="tab" aria-selected="false" data-i18n="tab_flagged">Flagged</button>
         </span>
       </h2>
       <div id="flaggedDeviceContext" class="device-context"></div>
@@ -721,8 +727,8 @@
       <div id="flaggedList"></div>
       <div id="flaggedStatus" class="status muted" aria-live="polite"></div>
       <div class="pager">
-        <button id="flaggedNewerBtn" class="secondary" aria-label="Newer page">← Newer</button>
-        <button id="flaggedOlderBtn" class="secondary" aria-label="Older page">Older →</button>
+        <button id="flaggedNewerBtn" class="secondary" aria-label="Newer page" data-i18n="newer">← Newer</button>
+        <button id="flaggedOlderBtn" class="secondary" aria-label="Older page" data-i18n="older">Older →</button>
       </div>
       <div id="flaggedPagerInfo" class="pager-info"></div>
     </section>
@@ -730,8 +736,8 @@
     <!-- Detail view -->
     <section id="detailView" class="card" hidden>
       <h2>
-        <button class="link" id="backFromDetailBtn" aria-label="Back to list">← Back</button>
-        <button id="deleteConversationBtn" type="button" style="color:#c66;margin-left:12px;background:none;border:none;cursor:pointer;font-size:13px" hidden>Delete conversation</button>
+        <button class="link" id="backFromDetailBtn" aria-label="Back to list" data-i18n="nav_back">← Back</button>
+        <button id="deleteConversationBtn" type="button" style="color:#c66;margin-left:12px;background:none;border:none;cursor:pointer;font-size:13px" hidden data-i18n="delete_conversation">Delete conversation</button>
       </h2>
       <div id="detailMeta" class="status muted" aria-live="polite"></div>
       <div id="detailMessages"></div>
@@ -742,7 +748,7 @@
          parent*, not per device: a device shared with another parent
          does not leak that parent's actions into this feed. -->
     <section id="auditView" class="card" hidden>
-      <h2><button class="link" id="backFromAudit" aria-label="Back to devices">← Devices</button> Your activity</h2>
+      <h2><button class="link" id="backFromAudit" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button> <span data-i18n="your_activity">Your activity</span></h2>
       <p style="color:#555;font-size:13px;margin:4px 0 12px;">
         Actions you have taken on this account. Per-device activity
         (conversations, flagged messages) is shown under each device.
@@ -750,8 +756,8 @@
       <div id="auditList"></div>
       <div id="auditStatus" class="status muted" aria-live="polite"></div>
       <div class="pager">
-        <button id="auditNewerBtn" class="secondary" aria-label="Newer page">← Newer</button>
-        <button id="auditOlderBtn" class="secondary" aria-label="Older page">Older →</button>
+        <button id="auditNewerBtn" class="secondary" aria-label="Newer page" data-i18n="newer">← Newer</button>
+        <button id="auditOlderBtn" class="secondary" aria-label="Older page" data-i18n="older">Older →</button>
       </div>
       <div id="auditPagerInfo" class="pager-info"></div>
     </section>
@@ -760,6 +766,112 @@
   <script>
   (function () {
     'use strict';
+
+    // ---------- i18n (page chrome only — NOT stories/conversations) ----------
+    // Three UI languages: English, Русский, Հայերեն. The child-facing content
+    // (story text, chat) is unaffected; only dashboard labels/buttons/headings
+    // are translated. Choice persists in localStorage. t(key) returns the
+    // string for the active language (English fallback for any missing key).
+    var LANG_KEY = 'areg_parent_lang';
+    var SUPPORTED_LANGS = ['en', 'ru', 'hy'];
+    var I18N = {
+      tagline: { en: "Parent dashboard — your child's play at a glance", ru: 'Родительская панель — занятия ребёнка с первого взгляда', hy: 'Ծնողական վահանակ — ձեր երեխայի խաղը մեկ հայացքով' },
+      logout: { en: 'Log out', ru: 'Выйти', hy: 'Դուրս գալ' },
+      login_title: { en: '👋 Welcome back', ru: '👋 С возвращением', hy: '👋 Բարի վերադարձ' },
+      email: { en: 'Email', ru: 'Эл. почта', hy: 'Էլ. փոստ' },
+      password: { en: 'Password', ru: 'Пароль', hy: 'Գաղտնաբառ' },
+      login_btn: { en: 'Log in', ru: 'Войти', hy: 'Մուտք' },
+      forgot: { en: 'Forgot password?', ru: 'Забыли пароль?', hy: 'Մոռացե՞լ եք գաղտնաբառը' },
+      no_verif: { en: "Didn't get a verification email?", ru: 'Не пришло письмо-подтверждение?', hy: 'Չստացա՞ք հաստատման նամակը' },
+      reset_title: { en: 'Reset your password', ru: 'Сброс пароля', hy: 'Վերականգնել գաղտնաբառը' },
+      send_reset: { en: 'Send reset link', ru: 'Отправить ссылку', hy: 'Ուղարկել հղումը' },
+      back: { en: '← Back', ru: '← Назад', hy: '← Հետ' },
+      send_verif_title: { en: 'Send verification email', ru: 'Отправить письмо-подтверждение', hy: 'Ուղարկել հաստատման նամակ' },
+      send_verif_btn: { en: 'Send verification email', ru: 'Отправить письмо', hy: 'Ուղարկել նամակը' },
+      verify_title: { en: 'Verify your email', ru: 'Подтвердите эл. почту', hy: 'Հաստատեք էլ. փոստը' },
+      verify_btn: { en: 'Verify email', ru: 'Подтвердить', hy: 'Հաստատել' },
+      new_pw_title: { en: 'Choose a new password', ru: 'Новый пароль', hy: 'Ընտրեք նոր գաղտնաբառ' },
+      set_new_pw: { en: 'Set new password', ru: 'Установить пароль', hy: 'Սահմանել գաղտնաբառը' },
+      linked_devices: { en: '🧸 Linked devices', ru: '🧸 Привязанные игрушки', hy: '🧸 Կապակցված խաղալիքներ' },
+      view_activity: { en: 'View your activity →', ru: 'Моя активность →', hy: 'Իմ գործողությունները →' },
+      add_toy: { en: '＋ Add a toy', ru: '＋ Добавить игрушку', hy: '＋ Ավելացնել խաղալիք' },
+      pair_toy: { en: 'Pair toy', ru: 'Привязать', hy: 'Կապակցել' },
+      link_device: { en: 'Link device', ru: 'Привязать устройство', hy: 'Կապակցել սարքը' },
+      change_password: { en: 'Change password', ru: 'Сменить пароль', hy: 'Փոխել գաղտնաբառը' },
+      update_password: { en: 'Update password', ru: 'Обновить пароль', hy: 'Թարմացնել գաղտնաբառը' },
+      delete_account: { en: 'Delete account', ru: 'Удалить аккаунт', hy: 'Ջնջել հաշիվը' },
+      delete_account_confirm: { en: 'Permanently delete account', ru: 'Удалить аккаунт навсегда', hy: 'Ընդմիշտ ջնջել հաշիվը' },
+      nav_devices: { en: '← Devices', ru: '← Игрушки', hy: '← Խաղալիքներ' },
+      tab_conversations: { en: 'Conversations', ru: 'Разговоры', hy: 'Զրույցներ' },
+      tab_flagged: { en: 'Flagged', ru: 'Отмеченные', hy: 'Նշվածներ' },
+      today: { en: '☀️ Today', ru: '☀️ Сегодня', hy: '☀️ Այսօր' },
+      newer: { en: '← Newer', ru: '← Новее', hy: '← Ավելի նոր' },
+      older: { en: 'Older →', ru: 'Старее →', hy: 'Ավելի հին →' },
+      nav_back: { en: '← Back', ru: '← Назад', hy: '← Հետ' },
+      delete_conversation: { en: 'Delete conversation', ru: 'Удалить разговор', hy: 'Ջնջել զրույցը' },
+      your_activity: { en: 'Your activity', ru: 'Моя активность', hy: 'Իմ գործողությունները' },
+      toy_settings: { en: 'Toy settings', ru: 'Настройки игрушки', hy: 'Խաղալիքի կարգավորումներ' },
+      careful_zone: { en: 'Careful zone', ru: 'Осторожная зона', hy: 'Զգույշ գոտի' },
+      pause: { en: 'Pause', ru: 'Пауза', hy: 'Դադար' },
+      resume: { en: 'Resume', ru: 'Продолжить', hy: 'Շարունակել' },
+      bedtime_label: { en: '🌙 Bedtime:', ru: '🌙 Сон:', hy: '🌙 Քնելու ժամ:' },
+      modes_label: { en: '🎮 Modes:', ru: '🎮 Режимы:', hy: '🎮 Ռեժիմներ:' },
+      name_label: { en: '✏️ Name:', ru: '✏️ Имя:', hy: '✏️ Անուն:' },
+      save: { en: 'Save', ru: 'Сохранить', hy: 'Պահպանել' },
+      save_name: { en: 'Save name', ru: 'Сохранить имя', hy: 'Պահպանել անունը' },
+      save_modes: { en: 'Save modes', ru: 'Сохранить режимы', hy: 'Պահպանել ռեժիմները' },
+      revoke: { en: 'Revoke access', ru: 'Отозвать доступ', hy: 'Հետ կանչել մուտքը' },
+      restore: { en: 'Restore access', ru: 'Восстановить доступ', hy: 'Վերականգնել մուտքը' },
+      unlink: { en: 'Unlink', ru: 'Отвязать', hy: 'Անջատել' },
+      remove: { en: 'Remove', ru: 'Удалить', hy: 'Հեռացնել' },
+      online: { en: '● Online', ru: '● В сети', hy: '● Առցանց' },
+      offline: { en: '○ Offline', ru: '○ Не в сети', hy: '○ Անցանց' },
+      newest: { en: 'Newest:', ru: 'Новейшие:', hy: 'Նորագույն:' },
+      flagged_today: { en: 'Flagged today:', ru: 'Отмечено сегодня:', hy: 'Այսօր նշված:' },
+      no_flagged_today: { en: 'No conversations flagged today.', ru: 'Сегодня нет отмеченных разговоров.', hy: 'Այսօր նշված զրույցներ չկան։' },
+      child: { en: '🧒 Child', ru: '🧒 Ребёнок', hy: '🧒 Երեխա' },
+      mode_story: { en: '📖 Story', ru: '📖 Сказка', hy: '📖 Հեքիաթ' },
+      mode_game: { en: '🎮 Game', ru: '🎮 Игра', hy: '🎮 Խաղ' },
+      mode_riddle: { en: '❓ Riddle', ru: '❓ Загадка', hy: '❓ Հանելուկ' },
+      mode_curiosity: { en: '💡 Curiosity', ru: '💡 Любопытство', hy: '💡 Հետաքրքրություն' },
+      mode_calm: { en: '🌙 Calm', ru: '🌙 Спокойствие', hy: '🌙 Հանգիստ' },
+      ph_email: { en: 'you@example.com', ru: 'you@example.com', hy: 'you@example.com' },
+      ph_pairing: { en: 'code from the toy', ru: 'код с игрушки', hy: 'կոդ խաղալիքից' },
+      back_to_login: { en: 'Back to login', ru: 'Вернуться ко входу', hy: 'Վերադառնալ մուտք' },
+      device_id: { en: 'Device ID', ru: 'ID устройства', hy: 'Սարքի ID' },
+      pairing_code: { en: 'Pairing code', ru: 'Код привязки', hy: 'Կապակցման կոդ' },
+      claim_help: { en: "Enter the pairing code from your toy's box or setup card. This links the toy to your account.", ru: 'Введите код привязки с коробки или карточки игрушки. Это привяжет игрушку к вашему аккаунту.', hy: 'Մուտքագրեք կապակցման կոդը խաղալիքի տուփից կամ քարտից։ Սա կկապի խաղալիքը ձեր հաշվին։' },
+      new_password: { en: 'New password', ru: 'Новый пароль', hy: 'Նոր գաղտնաբառ' },
+      confirm_new_password: { en: 'Confirm new password', ru: 'Повторите пароль', hy: 'Կրկնեք գաղտնաբառը' },
+      current_password: { en: 'Current password', ru: 'Текущий пароль', hy: 'Ընթացիկ գաղտնաբառ' },
+      confirm_verify: { en: 'Click below to confirm your email address.', ru: 'Нажмите ниже, чтобы подтвердить эл. почту.', hy: 'Սեղմեք ներքևում՝ էլ. փոստը հաստատելու համար։' }
+    };
+    function getLang() {
+      var l = null;
+      try { l = localStorage.getItem(LANG_KEY); } catch (e) {}
+      return SUPPORTED_LANGS.indexOf(l) >= 0 ? l : 'en';
+    }
+    function setLang(l) {
+      if (SUPPORTED_LANGS.indexOf(l) < 0) l = 'en';
+      try { localStorage.setItem(LANG_KEY, l); } catch (e) {}
+    }
+    function t(key) {
+      var entry = I18N[key];
+      if (!entry) return key;
+      return entry[getLang()] || entry.en || key;
+    }
+    // Translate every static element tagged with data-i18n / data-i18n-ph.
+    function applyStaticI18n() {
+      document.documentElement.lang = getLang();
+      var nodes = document.querySelectorAll('[data-i18n]');
+      for (var i = 0; i < nodes.length; i++) {
+        nodes[i].textContent = t(nodes[i].getAttribute('data-i18n'));
+      }
+      var phs = document.querySelectorAll('[data-i18n-ph]');
+      for (var j = 0; j < phs.length; j++) {
+        phs[j].setAttribute('placeholder', t(phs[j].getAttribute('data-i18n-ph')));
+      }
+    }
 
     // ---------- state ----------
     var TOKEN_KEY = 'areg_parent_token';
@@ -850,7 +962,7 @@
       // Parent-facing speaker label. Matches the toy-name "Areg" used
       // on the main app home page (index.html) so the parent dashboard
       // and the device home screen speak consistently.
-      if (role === 'user') return '🧒 Child';
+      if (role === 'user') return t('child');
       if (role === 'assistant') return '🧸 Areg';
       return String(role || '');
     }
@@ -878,13 +990,10 @@
     // Unknown / future mode strings fall through verbatim.
     function modeChipLabel(mode) {
       var map = {
-        story: '📖 Story',
-        game: '🎮 Game',
-        riddle: '❓ Riddle',
-        curiosity: '💡 Curiosity',
-        calm: '🌙 Calm'
+        story: 'mode_story', game: 'mode_game', riddle: 'mode_riddle',
+        curiosity: 'mode_curiosity', calm: 'mode_calm'
       };
-      return map[mode] || mode;
+      return map[mode] ? t(map[mode]) : mode;
     }
 
     function setActiveTab(name) {
@@ -1544,7 +1653,7 @@
           // field render no badge rather than a misleading "offline".
           if (typeof d.isOnline === 'boolean') {
             var onlineBadge = document.createElement('div');
-            onlineBadge.textContent = d.isOnline ? '● Online' : '○ Offline';
+            onlineBadge.textContent = d.isOnline ? t('online') : t('offline');
             onlineBadge.className = 'chip ' + (d.isOnline ? 'chip-ok' : 'chip-muted');
             btn.appendChild(onlineBadge);
           }
@@ -1606,7 +1715,7 @@
               childRow.appendChild(childLabel);
               var removeChildBtn = document.createElement('button');
               removeChildBtn.type = 'button';
-              removeChildBtn.textContent = 'Remove';
+              removeChildBtn.textContent = t('remove');
               removeChildBtn.className = 'btn-ghost-danger';
               removeChildBtn.addEventListener('click', function () {
                 deleteChild(c.childId, c.name);
@@ -1626,12 +1735,12 @@
           // inline-style pattern used by the unlink button below.
           var settingsCap = document.createElement('div');
           settingsCap.className = 'section-cap';
-          settingsCap.textContent = 'Toy settings';
+          settingsCap.textContent = t('toy_settings');
           listEl.appendChild(settingsCap);
 
           var pauseBtn = document.createElement('button');
           pauseBtn.type = 'button';
-          pauseBtn.textContent = d.isPaused ? 'Resume' : 'Pause';
+          pauseBtn.textContent = d.isPaused ? t('resume') : t('pause');
           pauseBtn.setAttribute('data-device-id', d.deviceId);
           pauseBtn.className = 'btn-ghost';
           pauseBtn.style.cssText = 'margin:4px 8px 12px 0;font-size:13px;';
@@ -1646,7 +1755,7 @@
           var bedtimeRow = document.createElement('div');
           bedtimeRow.className = 'ctl-row';
           var bedtimeLabel = document.createElement('span');
-          bedtimeLabel.textContent = '🌙 Bedtime:';
+          bedtimeLabel.textContent = t('bedtime_label');
           bedtimeLabel.className = 'ctl-label';
           bedtimeRow.appendChild(bedtimeLabel);
           var bedStart = document.createElement('input');
@@ -1665,7 +1774,7 @@
           bedtimeRow.appendChild(bedEnd);
           var saveBedtimeBtn = document.createElement('button');
           saveBedtimeBtn.type = 'button';
-          saveBedtimeBtn.textContent = 'Save';
+          saveBedtimeBtn.textContent = t('save');
           saveBedtimeBtn.className = 'btn-ghost';
           saveBedtimeBtn.addEventListener('click', function () {
             saveBedtimeWindow(d.deviceId, bedStart.value, bedEnd.value);
@@ -1683,7 +1792,7 @@
           var modesRow = document.createElement('div');
           modesRow.className = 'ctl-row';
           var modesLabel = document.createElement('span');
-          modesLabel.textContent = '🎮 Modes:';
+          modesLabel.textContent = t('modes_label');
           modesLabel.className = 'ctl-label';
           modesRow.appendChild(modesLabel);
           var modeDefs = [
@@ -1709,7 +1818,7 @@
           });
           var saveModesBtn = document.createElement('button');
           saveModesBtn.type = 'button';
-          saveModesBtn.textContent = 'Save modes';
+          saveModesBtn.textContent = t('save_modes');
           saveModesBtn.className = 'btn-ghost';
           saveModesBtn.addEventListener('click', function () {
             saveDeviceModeFlags(
@@ -1732,7 +1841,7 @@
           var renameRow = document.createElement('div');
           renameRow.className = 'ctl-row';
           var renameLabel = document.createElement('span');
-          renameLabel.textContent = '✏️ Name:';
+          renameLabel.textContent = t('name_label');
           renameLabel.className = 'ctl-label';
           renameRow.appendChild(renameLabel);
           var nameInput = document.createElement('input');
@@ -1746,7 +1855,7 @@
           renameRow.appendChild(nameInput);
           var saveNameBtn = document.createElement('button');
           saveNameBtn.type = 'button';
-          saveNameBtn.textContent = 'Save name';
+          saveNameBtn.textContent = t('save_name');
           saveNameBtn.className = 'btn-ghost';
           saveNameBtn.addEventListener('click', function () {
             renameDevice(d.deviceId, nameInput.value);
@@ -1759,7 +1868,7 @@
           // the link + can cascade data) and pause (soft, still authenticates).
           var revokeBtn = document.createElement('button');
           revokeBtn.type = 'button';
-          revokeBtn.textContent = d.isRevoked ? 'Restore access' : 'Revoke access';
+          revokeBtn.textContent = d.isRevoked ? t('restore') : t('revoke');
           revokeBtn.setAttribute('data-device-id', d.deviceId);
           revokeBtn.className = d.isRevoked ? 'btn-ghost-ok' : 'btn-ghost-danger';
           revokeBtn.style.cssText = 'margin:4px 8px 12px 0;';
@@ -1770,7 +1879,7 @@
           dangerWrap.className = 'danger-zone';
           var dangerCap = document.createElement('div');
           dangerCap.className = 'section-cap';
-          dangerCap.textContent = 'Careful zone';
+          dangerCap.textContent = t('careful_zone');
           dangerCap.style.margin = '0 2px 8px';
           dangerWrap.appendChild(dangerCap);
           dangerWrap.appendChild(revokeBtn);
@@ -1781,7 +1890,7 @@
           // narrow and avoid touching the page's CSS block.
           var unlink = document.createElement('button');
           unlink.type = 'button';
-          unlink.textContent = 'Unlink';
+          unlink.textContent = t('unlink');
           unlink.className = 'unlink-btn btn-ghost-danger';
           unlink.setAttribute('data-device-id', d.deviceId);
           unlink.style.cssText = 'margin:4px 0 12px;';
@@ -2560,7 +2669,7 @@
       // Newest — server pre-orders by startedAt desc and caps at 3.
       var newestLabel = document.createElement('div');
       newestLabel.className = 'today-section-label';
-      newestLabel.textContent = 'Newest:';
+      newestLabel.textContent = t('newest');
       newest.appendChild(newestLabel);
       newestRows.forEach(function (r) {
         newest.appendChild(buildTodayLink(r, false));
@@ -2571,7 +2680,7 @@
       if (flaggedRows.length > 0) {
         var flaggedLabel = document.createElement('div');
         flaggedLabel.className = 'today-section-label';
-        flaggedLabel.textContent = 'Flagged today:';
+        flaggedLabel.textContent = t('flagged_today');
         flagged.appendChild(flaggedLabel);
         flaggedRows.forEach(function (r) {
           flagged.appendChild(buildTodayLink(r, true));
@@ -2579,7 +2688,7 @@
       } else {
         var none = document.createElement('div');
         none.className = 'today-empty';
-        none.textContent = 'No flagged conversations today.';
+        none.textContent = t('no_flagged_today');
         flagged.appendChild(none);
       }
 
@@ -3297,6 +3406,38 @@
     // without overlap. URLSearchParams is available on every browser
     // this dashboard targets; the try/catch is defensive for
     // environments where window.location is unusable.
+    // ---------- language switcher init ----------
+    (function initLang() {
+      var sel = document.getElementById('langSelect');
+      if (sel) {
+        sel.value = getLang();
+        sel.addEventListener('change', function () {
+          setLang(sel.value);
+          applyStaticI18n();
+          // Re-render whichever view is active so JS-built labels (mode
+          // chips, buttons, Today panel, speaker names) pick up the new
+          // language. Falls back to a no-op if no view is loaded yet.
+          try { if (typeof rerenderActiveView === 'function') rerenderActiveView(); } catch (e) {}
+        });
+      }
+      applyStaticI18n();
+    })();
+
+    // Re-run the loader for the currently-visible view so dynamically
+    // built strings are retranslated after a language switch.
+    function rerenderActiveView() {
+      var views = {
+        devicesView: loadDevices,
+        summariesView: loadSummaries,
+        flaggedView: loadFlagged,
+        auditView: loadAudit
+      };
+      for (var id in views) {
+        var el = document.getElementById(id);
+        if (el && !el.hidden) { views[id](); return; }
+      }
+    }
+
     (function bootRouter() {
       var resetToken = null;
       var verifyToken = null;
