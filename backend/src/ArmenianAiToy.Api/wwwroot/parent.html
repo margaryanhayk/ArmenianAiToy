@@ -341,6 +341,7 @@
     .status { font-size: 13px; padding: 8px 0; min-height: 20px; }
     .status.err { color: #c62828; }
     .status.muted { color: #9a8ab5; }
+    .status.ok { color: #1e7a45; font-weight: 600; }
 
     .row {
       display: block;
@@ -846,6 +847,7 @@
       bedtime_same: { en: 'Start and end time cannot be the same.', ru: 'Начало и конец не могут совпадать.', hy: 'Սկիզբը և վերջը չեն կարող նույնը լինել։' },
       bedtime_off_ok: { en: 'Bedtime turned off.', ru: 'Тихие часы выключены.', hy: 'Քնելու ժամն անջատվեց։' },
       bedtime_overnight: { en: '(this window runs overnight)', ru: '(это ночной интервал)', hy: '(այս միջակայքը գիշերվա ընթացքում է)' },
+      saved_ok: { en: '✓ Saved', ru: '✓ Сохранено', hy: '✓ Պահպանվեց' },
       newest: { en: 'Newest:', ru: 'Новейшие:', hy: 'Նորագույն:' },
       flagged_today: { en: 'Flagged today:', ru: 'Отмечено сегодня:', hy: 'Այսօր նշված:' },
       no_flagged_today: { en: 'No conversations flagged today.', ru: 'Сегодня нет отмеченных разговоров.', hy: 'Այսօր նշված զրույցներ չկան։' },
@@ -1671,6 +1673,7 @@
           return;
         }
         deviceStatus('', '');
+        window.__toyFlash = null;
         emptyState.hidden = true;
         devices.forEach(function (d) {
           listEl.appendChild(buildToyCard(d));
@@ -1752,9 +1755,14 @@
       renderToySettings(d, settings);
       // Surface a one-shot confirmation from the last action (e.g. bedtime
       // turned off / overnight note), else clear the status line.
-      if (window.__bedtimeMsg) {
-        deviceStatus(window.__bedtimeMsg, 'muted');
-        window.__bedtimeMsg = '';
+      if (window.__toyFlash && window.__toyFlash.msg) {
+        var fmsg = window.__toyFlash.msg, fkind = window.__toyFlash.kind || 'ok';
+        window.__toyFlash = null;
+        deviceStatus(fmsg, fkind);
+        setTimeout(function () {
+          var el = document.getElementById('toyStatus');
+          if (el && el.textContent === fmsg) setStatus('toyStatus', '', '');
+        }, 3500);
       } else {
         deviceStatus('', '');
       }
@@ -2090,6 +2098,7 @@
           deviceStatus((currentlyPaused ? 'Resume' : 'Pause') + ' failed (HTTP ' + res.status + ').', 'err');
           return;
         }
+        window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
         deviceStatus('Network error.', 'err');
@@ -2149,11 +2158,11 @@
         // overnight window (start >= end, wraps past midnight) note it so a
         // parent isn't confused that "22:00 to 07:00" looks backwards.
         if (turningOff) {
-          window.__bedtimeMsg = t('bedtime_off_ok');
+          window.__toyFlash = { msg: t('bedtime_off_ok'), kind: 'ok' };
         } else if (startHHMM >= endHHMM) {
-          window.__bedtimeMsg = t('bedtime_overnight');
+          window.__toyFlash = { msg: t('saved_ok') + ' ' + t('bedtime_overnight'), kind: 'ok' };
         } else {
-          window.__bedtimeMsg = '';
+          window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         }
         loadDevices();
       }).catch(function () {
@@ -2267,6 +2276,7 @@
           deviceStatus('Save failed (HTTP ' + res.status + ').', 'err');
           return;
         }
+        window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
         deviceStatus('Network error.', 'err');
@@ -2303,6 +2313,7 @@
           deviceStatus('Mode save failed (HTTP ' + res.status + ').', 'err');
           return;
         }
+        window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
         deviceStatus('Network error.', 'err');
@@ -2561,6 +2572,7 @@
           deviceStatus('Rename failed (HTTP ' + res.status + ').', 'err');
           return;
         }
+        window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
         deviceStatus('Network error.', 'err');
@@ -2601,6 +2613,7 @@
             (next ? 'Revoke' : 'Restore') + ' failed (HTTP ' + res.status + ').', 'err');
           return;
         }
+        window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
         deviceStatus('Network error.', 'err');
