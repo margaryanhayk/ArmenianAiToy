@@ -187,7 +187,7 @@ public class ParentService : IParentService
         // The value is discarded on the collision branch below.
         var hash = _hashPassword(password);
 
-        var existing = await _db.Set<Parent>().AnyAsync(p => p.Email == email);
+        var existing = await _db.Set<Parent>().AnyAsync(p => (p.Email ?? "").Trim().ToLower() == email);
         if (existing)
         {
             // Anti-enumeration: silent no-op on collision. The hash
@@ -267,7 +267,7 @@ public class ParentService : IParentService
         // false. No login-side "IsDisabled" flag is required: the
         // scrubbed row is simply invisible to the login lookup.
         var parent = await _db.Set<Parent>()
-            .FirstOrDefaultAsync(p => p.Email == email && p.AnonymizedAt == null);
+            .FirstOrDefaultAsync(p => (p.Email ?? "").Trim().ToLower() == email && p.AnonymizedAt == null);
         // Timing normalization (#040 sibling): run BCrypt on the
         // unknown-email path too, against a fixed dummy hash, so an
         // unknown email costs the same ~ms as a wrong password. Without
@@ -519,7 +519,7 @@ public class ParentService : IParentService
         _ = _hashPassword(email);
 
         var parent = await _db.Set<Parent>()
-            .FirstOrDefaultAsync(p => p.Email == email, cancellationToken);
+            .FirstOrDefaultAsync(p => (p.Email ?? "").Trim().ToLower() == email, cancellationToken);
         if (parent == null)
         {
             // Silent no-op on unknown email — part of the
@@ -659,7 +659,7 @@ public class ParentService : IParentService
         _ = _hashPassword(email);
 
         var parent = await _db.Set<Parent>()
-            .FirstOrDefaultAsync(p => p.Email == email, cancellationToken);
+            .FirstOrDefaultAsync(p => (p.Email ?? "").Trim().ToLower() == email, cancellationToken);
         if (parent == null)
         {
             // Unknown-email path — silent. No token, no notifier call,
@@ -814,7 +814,7 @@ public class ParentService : IParentService
         // Rule 5: existing row with matching email — link or reject.
         var byEmail = await _db.Set<Parent>()
             .FirstOrDefaultAsync(
-                p => p.Email == email && p.AnonymizedAt == null,
+                p => (p.Email ?? "").Trim().ToLower() == email && p.AnonymizedAt == null,
                 cancellationToken);
         if (byEmail is not null)
         {
