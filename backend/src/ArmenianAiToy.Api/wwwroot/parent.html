@@ -534,7 +534,7 @@
     -->
     <section id="resetRequestView" class="card" hidden>
       <h2 data-i18n="reset_title">Reset your password</h2>
-      <label for="resetRequestEmailInput">Email</label>
+      <label for="resetRequestEmailInput" data-i18n="email">Email</label>
       <input id="resetRequestEmailInput" type="email" autocomplete="username">
       <button id="resetRequestBtn" data-i18n="send_reset">Send reset link</button>
       <button id="resetRequestBackBtn" class="link" type="button"
@@ -552,7 +552,7 @@
     -->
     <section id="verifyEmailRequestView" class="card" hidden>
       <h2 data-i18n="send_verif_title">Send verification email</h2>
-      <label for="verifyEmailInput">Email</label>
+      <label for="verifyEmailInput" data-i18n="email">Email</label>
       <input id="verifyEmailInput" type="email" autocomplete="username">
       <button id="verifyEmailRequestSubmitBtn" data-i18n="send_verif_btn">Send verification email</button>
       <button id="verifyEmailRequestBackBtn" class="link" type="button"
@@ -889,7 +889,11 @@
       nav_toys: { en: '← Toys', ru: '← Игрушки', hy: '← Խաղալիքներ' },
       child_label: { en: 'Child:', ru: 'Ребёнок:', hy: 'Երեխա․' },
       no_child: { en: 'No child profile yet', ru: 'Профиль ребёнка ещё не создан', hy: 'Երեխայի պրոֆիլ դեռ չկա' },
-      tap_to_open: { en: 'Tap to open →', ru: 'Открыть →', hy: 'Բացել →' }
+      tap_to_open: { en: 'Tap to open →', ru: 'Открыть →', hy: 'Բացել →' },
+      session_expired: { en: 'Session expired. Please log in again.', ru: 'Сессия истекла. Войдите снова.', hy: 'Աշխատաշրջանն ավարտվեց։ Խնդրում ենք նորից մուտք գործել։' },
+      invalid_login: { en: 'Invalid email or password.', ru: 'Неверная почта или пароль.', hy: 'Սխալ էլ. փոստ կամ գաղտնաբառ։' },
+      reset_sent: { en: 'If an account exists for that email, a reset link has been sent. Check your inbox.', ru: 'Если аккаунт с такой почтой существует, ссылка для сброса отправлена. Проверьте почту.', hy: 'Եթե այդ փոստով հաշիվ կա, վերականգնման հղումն ուղարկվել է։ Ստուգեք ձեր փոստը։' },
+      verify_sent: { en: 'If that email is registered and not yet verified, a verification email has been sent. Check your inbox.', ru: 'Если почта зарегистрирована и не подтверждена, письмо-подтверждение отправлено. Проверьте почту.', hy: 'Եթե այդ փոստը գրանցված է և դեռ հաստատված չէ, հաստատման նամակն ուղարկվել է։ Ստուգեք ձեր փոստը։' }
     };
     function getLang() {
       var l = null;
@@ -1095,7 +1099,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return Promise.reject({ status: 401, message: 'Unauthorized' });
         }
         if (!res.ok) {
@@ -1120,7 +1124,7 @@
         body: JSON.stringify({ email: email, password: password })
       }).then(function (res) {
         if (res.status === 401) {
-          setStatus('loginStatus', 'Invalid email or password.', 'err');
+          setStatus('loginStatus', t('invalid_login'), 'err');
           return null;
         }
         if (!res.ok) {
@@ -1173,9 +1177,7 @@
         // message either way so the UI does not become an
         // account-existence oracle. Do not inspect the response body.
         if (res.status === 202) {
-          setStatus('resetRequestStatus',
-            'If an account exists for that email, a reset link has been sent. ' +
-            'Check your inbox.', 'ok');
+          setStatus('resetRequestStatus', t('reset_sent'), 'ok');
           document.getElementById('resetRequestEmailInput').value = '';
           return;
         }
@@ -1310,9 +1312,7 @@
         // — do not branch on response body. Matches the password-
         // reset-request UI posture.
         if (res.status === 202) {
-          setStatus('verifyEmailRequestStatus',
-            'If that email is registered and not yet verified, a verification ' +
-            'email has been sent. Check your inbox.', 'ok');
+          setStatus('verifyEmailRequestStatus', t('verify_sent'), 'ok');
           document.getElementById('verifyEmailInput').value = '';
           return;
         }
@@ -1436,7 +1436,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         return res.json().then(function (data) {
@@ -1496,7 +1496,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         return res.json().then(function (data) {
@@ -2091,7 +2091,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
@@ -2147,7 +2147,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
@@ -2269,7 +2269,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
@@ -2306,7 +2306,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
@@ -2343,7 +2343,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
@@ -2383,7 +2383,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
@@ -2416,7 +2416,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
@@ -2456,7 +2456,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return null;
         }
         if (res.status === 400) {
@@ -2508,7 +2508,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return null;
         }
         if (res.status === 400) {
@@ -2561,7 +2561,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (res.status === 400) {
@@ -2605,7 +2605,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
@@ -3202,7 +3202,7 @@
 
         var token = getToken();
         if (!token) {
-          status.textContent = 'Session expired.';
+          status.textContent = t('session_expired');
           status.style.color = '#c62828';
           btn.disabled = false;
           return;
@@ -3213,7 +3213,7 @@
           if (res.status === 401) {
             clearToken();
             show('loginView');
-            setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+            setStatus('loginStatus', t('session_expired'), 'err');
             return null;
           }
           if (res.status === 404) {
