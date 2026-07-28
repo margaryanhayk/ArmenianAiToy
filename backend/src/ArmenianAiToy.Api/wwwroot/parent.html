@@ -840,7 +840,12 @@
       unlink: { en: 'Unlink', ru: 'Отвязать', hy: 'Անջատել' },
       remove: { en: 'Remove', ru: 'Удалить', hy: 'Հեռացնել' },
       online: { en: '● Online', ru: '● В сети', hy: '● Առցանց' },
-      offline: { en: '○ Offline', ru: '○ Не в сети', hy: '○ Անցանց' },
+      offline: { en: '○ Offline', ru: '○ Не в сети', hy: '○ Անջատված' },
+      modes_need_one: { en: 'Keep at least one mode on — otherwise the toy has nothing to do.', ru: 'Оставьте хотя бы один режим включённым — иначе игрушке нечем заняться.', hy: 'Թողեք գոնե մեկ ռեժիմ միացած, այլապես խաղալիքը անելիք չի ունենա։' },
+      bedtime_need_both: { en: 'Set both a start and an end time (or clear both to turn bedtime off).', ru: 'Укажите и начало, и конец (или очистите оба, чтобы выключить).', hy: 'Նշեք և՛ սկիզբը, և՛ վերջը (կամ մաքրեք երկուսն էլ՝ անջատելու համար)։' },
+      bedtime_same: { en: 'Start and end time cannot be the same.', ru: 'Начало и конец не могут совпадать.', hy: 'Սկիզբը և վերջը չեն կարող նույնը լինել։' },
+      bedtime_off_ok: { en: 'Bedtime turned off.', ru: 'Тихие часы выключены.', hy: 'Քնելու ժամն անջատվեց։' },
+      bedtime_overnight: { en: '(this window runs overnight)', ru: '(это ночной интервал)', hy: '(այս միջակայքը գիշերվա ընթացքում է)' },
       newest: { en: 'Newest:', ru: 'Новейшие:', hy: 'Նորագույն:' },
       flagged_today: { en: 'Flagged today:', ru: 'Отмечено сегодня:', hy: 'Այսօր նշված:' },
       no_flagged_today: { en: 'No conversations flagged today.', ru: 'Сегодня нет отмеченных разговоров.', hy: 'Այսօր նշված զրույցներ չկան։' },
@@ -1745,7 +1750,14 @@
       var settings = document.getElementById('toySettings');
       clearChildren(settings);
       renderToySettings(d, settings);
-      deviceStatus('', '');
+      // Surface a one-shot confirmation from the last action (e.g. bedtime
+      // turned off / overnight note), else clear the status line.
+      if (window.__bedtimeMsg) {
+        deviceStatus(window.__bedtimeMsg, 'muted');
+        window.__bedtimeMsg = '';
+      } else {
+        deviceStatus('', '');
+      }
     }
 
     // Refresh whichever device surface is open after a settings change.
@@ -1963,6 +1975,16 @@
           saveModesBtn.textContent = t('save_modes');
           saveModesBtn.className = 'btn-ghost';
           saveModesBtn.addEventListener('click', function () {
+            var anyOn = modeInputs.story.checked || modeInputs.game.checked
+              || modeInputs.riddle.checked || modeInputs.curiosity.checked;
+            // Guard: never let a parent disable ALL play modes — the toy
+            // would refuse every request (only bedtime/calm would work),
+            // which is almost always an accident. (Calm has no toggle and
+            // stays on regardless, but that's not a play mode.)
+            if (!anyOn) {
+              deviceStatus(t('modes_need_one'), 'err');
+              return;
+            }
             saveDeviceModeFlags(
               d.deviceId,
               modeInputs.story.checked,
@@ -2081,10 +2103,28 @@
     function saveBedtimeWindow(deviceId, startHHMM, endHHMM) {
       var token = getToken();
       if (!token) { show('loginView'); return; }
+
+      // Client-side logic checks (clear feedback instead of silent no-ops):
+      var hasStart = !!startHHMM, hasEnd = !!endHHMM;
+      // Both empty → intentional "turn off". Confirmed with a message.
+      if (!hasStart && !hasEnd) {
+        // fall through: sends null/null = disabled, then reports it off.
+      } else if (hasStart !== hasEnd) {
+        // Exactly one filled — previously silently disabled. Now explained.
+        deviceStatus(t('bedtime_need_both'), 'err');
+        return;
+      } else if (startHHMM === endHHMM) {
+        // Zero-length window — the server disables it; warn instead of a
+        // silent no-op so the parent isn't misled that quiet hours are on.
+        deviceStatus(t('bedtime_same'), 'err');
+        return;
+      }
+
       var body = {
         start: startHHMM ? startHHMM + ':00' : null,
         end:   endHHMM   ? endHHMM   + ':00' : null
       };
+      var turningOff = !hasStart && !hasEnd;
       deviceStatus('Saving bedtime…', 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/bedtime-window', {
         method: 'PUT',
@@ -2104,6 +2144,16 @@
         if (!res.ok) {
           deviceStatus('Bedtime save failed (HTTP ' + res.status + ').', 'err');
           return;
+        }
+        // Confirm what actually happened. When turned off, say so; for an
+        // overnight window (start >= end, wraps past midnight) note it so a
+        // parent isn't confused that "22:00 to 07:00" looks backwards.
+        if (turningOff) {
+          window.__bedtimeMsg = t('bedtime_off_ok');
+        } else if (startHHMM >= endHHMM) {
+          window.__bedtimeMsg = t('bedtime_overnight');
+        } else {
+          window.__bedtimeMsg = '';
         }
         loadDevices();
       }).catch(function () {
