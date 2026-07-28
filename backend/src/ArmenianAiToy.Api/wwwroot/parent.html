@@ -864,12 +864,21 @@
       var el = document.getElementById(elId);
       clearChildren(el);
       if (!state.currentDeviceId) return;
+      // Parents think in toy names, not UUIDs. Resolve the name from
+      // the cached device list; the raw id stays available on
+      // long-press / hover via the title attribute for support cases.
+      var name = null;
+      var devices = state.lastDevicesResponse || [];
+      for (var i = 0; i < devices.length; i++) {
+        if (devices[i].deviceId === state.currentDeviceId) {
+          name = devices[i].deviceName;
+          break;
+        }
+      }
       var label = document.createElement('strong');
-      label.textContent = 'Device ' + shortId(state.currentDeviceId);
-      var full = document.createElement('span');
-      full.textContent = ' · ' + state.currentDeviceId;
+      label.textContent = '🧸 ' + (name || ('Toy ' + shortId(state.currentDeviceId)));
+      label.title = state.currentDeviceId;
       el.appendChild(label);
-      el.appendChild(full);
     }
 
     function updatePager(newerBtnId, olderBtnId, infoId, offset, lastPageSize) {
