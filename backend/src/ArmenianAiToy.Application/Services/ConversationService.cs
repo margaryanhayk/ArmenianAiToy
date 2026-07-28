@@ -150,10 +150,14 @@ public class ConversationService : IConversationService
                     .OrderByDescending(m => m.Timestamp)
                     .Select(m => (SafetyFlag?)m.SafetyFlag)
                     .FirstOrDefault(),
+                // NOTE: no .Distinct() here — a distinct correlated subquery
+                // inside this paged projection requires SQL APPLY, which
+                // SQLite cannot translate (production 500; pinned by
+                // ConversationServiceSummariesSqliteTests). Dedupe happens
+                // in memory below on the handful of rows per page.
                 Modes = c.Messages
                     .Where(m => m.Mode != null)
                     .Select(m => m.Mode!)
-                    .Distinct()
                     .ToList()
             })
             .ToListAsync();
@@ -168,7 +172,7 @@ public class ConversationService : IConversationService
             MakeSnippet(c.LastAssistantContent),
             c.LastAssistantSafetyFlag,
             c.FlaggedMessageCount,
-            c.Modes
+            c.Modes.Distinct().ToList()
         )).ToList();
     }
 

@@ -851,6 +851,25 @@
       return String(role || '');
     }
 
+    // Reload-survival: mirror the current view into the URL hash so a
+    // page refresh restores the parent's place instead of bouncing to
+    // the devices list. replaceState only — no history-stack spam, the
+    // in-page Back affordances keep working exactly as before. The
+    // hash carries only ids the page already displays; the JWT stays
+    // in sessionStorage and never appears in the URL.
+    function setViewHash(view, deviceId, conversationId) {
+      try {
+        var h = '';
+        if (view && view !== 'devices') {
+          h = '#v=' + encodeURIComponent(view);
+          if (deviceId) h += '&d=' + encodeURIComponent(deviceId);
+          if (conversationId) h += '&c=' + encodeURIComponent(conversationId);
+        }
+        history.replaceState(null, '',
+          window.location.pathname + window.location.search + h);
+      } catch (e) { /* cosmetic only — never block a view change */ }
+    }
+
     // E1.3: friendly label for a runtime-stamped conversation mode.
     // Unknown / future mode strings fall through verbatim.
     function modeChipLabel(mode) {
@@ -1461,6 +1480,7 @@
 
     function loadDevices() {
       show('devicesView');
+      setViewHash('devices');
       setStatus('devicesStatus', 'Loading…', 'muted');
       var listEl = document.getElementById('devicesList');
       var emptyState = document.getElementById('linkDeviceEmptyState');
@@ -2297,6 +2317,7 @@
 
     function loadSummaries() {
       show('summariesView');
+      setViewHash('summaries', state.currentDeviceId);
       setActiveTab('summaries');
       state.backFromDetail = loadSummaries;
       renderDeviceContext('summariesDeviceContext');
@@ -2614,6 +2635,7 @@
     // ---------- flagged ----------
     function loadFlagged() {
       show('flaggedView');
+      setViewHash('flagged', state.currentDeviceId);
       setActiveTab('flagged');
       state.backFromDetail = loadFlagged;
       renderDeviceContext('flaggedDeviceContext');
@@ -2721,6 +2743,7 @@
     // and briefly highlights it so the parent does not have to hunt.
     function openConversation(conversationId, targetMessageId) {
       show('detailView');
+      setViewHash('detail', state.currentDeviceId, conversationId);
       var metaEl = document.getElementById('detailMeta');
       var msgsEl = document.getElementById('detailMessages');
       var deleteBtn = document.getElementById('deleteConversationBtn');
@@ -2924,6 +2947,7 @@
     function loadAudit() {
       state.auditOffset = 0;
       show('auditView');
+      setViewHash('activity');
       fetchAuditPage();
     }
     function pageOlderAudit() {
@@ -3286,7 +3310,40 @@
         return;
       }
       if (getToken()) {
-        loadDevices();
+        // Reload-survival: restore the view recorded in the URL hash
+        // (written by setViewHash) instead of always bouncing to the
+        // devices list. Anything malformed falls back to the list.
+        var restored = false;
+        try {
+          var hp = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+          var v = hp.get('v');
+          var d = hp.get('d');
+          var c = hp.get('c');
+          if (v === 'summaries' && d) {
+            state.currentDeviceId = d;
+            state.offset = 0;
+            state.flaggedOffset = 0;
+            loadSummaries();
+            restored = true;
+          } else if (v === 'flagged' && d) {
+            state.currentDeviceId = d;
+            state.offset = 0;
+            state.flaggedOffset = 0;
+            loadFlagged();
+            restored = true;
+          } else if (v === 'detail' && d && c) {
+            state.currentDeviceId = d;
+            state.offset = 0;
+            state.flaggedOffset = 0;
+            state.backFromDetail = loadSummaries;
+            openConversation(c);
+            restored = true;
+          } else if (v === 'activity') {
+            loadAudit();
+            restored = true;
+          }
+        } catch (e) { /* fall back to the devices list */ }
+        if (!restored) loadDevices();
       } else {
         show('loginView');
       }
