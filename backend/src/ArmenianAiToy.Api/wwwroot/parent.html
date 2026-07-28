@@ -1702,6 +1702,11 @@
       }
       if (!d) { state.currentToyId = null; loadDevices(); return; }
       show('toyView');
+      // Always stamp the hash as the toy page whenever it is shown — not
+      // just from openToy. Without this, returning to the toy from its
+      // conversations left the hash at '#v=summaries', so a refresh
+      // restored conversations instead of the toy page.
+      setViewHash('toy', state.currentToyId);
 
       var header = document.getElementById('toyHeader');
       clearChildren(header);
