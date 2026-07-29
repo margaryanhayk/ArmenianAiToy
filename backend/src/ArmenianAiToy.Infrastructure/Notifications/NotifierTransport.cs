@@ -33,6 +33,7 @@ public static class NotifierTransport
 {
     public const string Log = "log";
     public const string Smtp = "smtp";
+    public const string Resend = "resend";
 
     /// <summary>
     /// Returns the concrete <see cref="ArmenianAiToy.Application.Notifications.INotifier"/>
@@ -55,9 +56,36 @@ public static class NotifierTransport
             return typeof(SmtpNotifier);
         }
 
+        if (transport == Resend)
+        {
+            ValidateResendConfig(config);
+            return typeof(ResendNotifier);
+        }
+
         throw new System.InvalidOperationException(
             $"Notifications:Transport value '{raw}' is not recognised. " +
-            $"Expected '{Log}' or '{Smtp}'.");
+            $"Expected '{Log}', '{Smtp}' or '{Resend}'.");
+    }
+
+    private static void ValidateResendConfig(IConfiguration config)
+    {
+        // Fail fast at startup if resend is selected without the keys a real
+        // send needs — same posture as the SMTP validator, so a misconfig is
+        // a loud boot failure, not a silent non-delivery.
+        string[] requiredKeys =
+        {
+            "Resend:ApiKey",
+            "Resend:FromAddress",
+            "Notifications:PasswordResetLinkBase"
+        };
+        var missing = new System.Collections.Generic.List<string>();
+        foreach (var key in requiredKeys)
+            if (string.IsNullOrWhiteSpace(config[key]))
+                missing.Add(key);
+        if (missing.Count > 0)
+            throw new System.InvalidOperationException(
+                "Notifications:Transport=resend requires non-empty values for: " +
+                string.Join(", ", missing) + ".");
     }
 
     private static void ValidateSmtpConfig(IConfiguration config)

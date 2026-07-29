@@ -179,4 +179,26 @@ public class NotifierTransportTests
         Assert.Contains("Notifications:Smtp:FromAddress", ex.Message);
         Assert.Contains("Notifications:PasswordResetLinkBase", ex.Message);
     }
+
+    [Fact]
+    public void ResolveImplementation_Resend_WithRequiredKeys_ResolvesResendNotifier()
+    {
+        var config = Substitute.For<IConfiguration>();
+        config["Notifications:Transport"].Returns("resend");
+        config["Resend:ApiKey"].Returns("re_test_key");
+        config["Resend:FromAddress"].Returns("Areg <noreply@example.com>");
+        config["Notifications:PasswordResetLinkBase"].Returns("https://x/parent.html");
+        Assert.Equal(typeof(ResendNotifier), NotifierTransport.ResolveImplementation(config));
+    }
+
+    [Fact]
+    public void ResolveImplementation_Resend_MissingKeys_ThrowsAtStartup()
+    {
+        var config = Substitute.For<IConfiguration>();
+        config["Notifications:Transport"].Returns("resend");
+        // ApiKey / FromAddress / LinkBase all null
+        Assert.Throws<System.InvalidOperationException>(
+            () => NotifierTransport.ResolveImplementation(config));
+    }
+
 }
