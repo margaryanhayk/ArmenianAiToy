@@ -37,7 +37,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (1940 tests)
+dotnet test                                     # Run all tests (1969 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -896,11 +896,38 @@ configurable via `Auth:PasswordResetTokenTtlMinutes`.
 `LoggingNotifier` implementation in
 `Infrastructure/Notifications/LoggingNotifier.cs` writes one
 structured log line per call and does not actually deliver
-anything. A future deploy slice can register a second
-implementation (SMTP / webhook / provider SDK) without changing
-any caller. **Typed methods, not a generic envelope** — future
+anything. **Typed methods, not a generic envelope** — future
 consumers (dormant-purge warnings, register-collision mail, etc.)
 extend the interface with their own method when they land.
+
+Two real-delivery transports exist, selected by
+`Notifications:Transport` via `NotifierTransport.ResolveImplementation`
+(bounded value space `log` / `smtp` / `resend`; unknown values throw at
+startup):
+- `smtp` → `SmtpNotifier` (BCL `System.Net.Mail`). Requires
+  `Notifications:Smtp:Host`, `Notifications:Smtp:FromAddress`,
+  `Notifications:PasswordResetLinkBase`.
+- `resend` → `ResendNotifier` (Resend HTTP API,
+  `POST https://api.resend.com/emails`, plain BCL `HttpClient` — no new
+  NuGet). Requires `Notifications:Resend:ApiKey`,
+  `Notifications:Resend:FromAddress`,
+  `Notifications:PasswordResetLinkBase`.
+
+Both share subjects / Armenian plain-text bodies / link builders via
+`Infrastructure/Notifications/NotificationEmailContent.cs` so
+parent-facing copy and the `?token=` / `?verifyToken=` wire contract
+with `parent.html` cannot drift between transports. Both mirror the
+same failure posture: non-cancellation failures are swallowed into a
+structured warning (preserving the 202 anti-enum contract), OCE
+propagates, worker-facing `Task<bool>` methods return `false` on
+failure, and the raw token is never logged (a non-2xx Resend response
+logs the status code only, never the response body). The
+`DormancyTransportPrecondition` guards accept either real-delivery
+transport (explicit allow-list; still fail-closed for `LoggingNotifier`
+and unknown types). Pinned by `ResendNotifierTests`, the extended
+`NotifierTransportTests` / `DormancyTransportPreconditionTests`, and the
+unchanged `SmtpNotifierTests` (which also pin that the content
+extraction kept SMTP output byte-identical).
 
 **Dashboard UI.** `parent.html` closes the browser-visible loop for
 this flow. The login view carries a subtle **Forgot password?**

@@ -5,10 +5,10 @@ namespace ArmenianAiToy.Infrastructure.Notifications;
 /// <summary>
 /// Resolves which <see cref="ArmenianAiToy.Application.Notifications.INotifier"/>
 /// implementation to register, based on the <c>Notifications:Transport</c>
-/// config key. The selector is bounded to exactly two values today —
-/// <see cref="Log"/> and <see cref="Smtp"/> — so any unknown value fails
-/// fast at startup rather than silently falling back to the log-only
-/// transport.
+/// config key. The selector is bounded to exactly three values today —
+/// <see cref="Log"/>, <see cref="Smtp"/>, and <see cref="Resend"/> — so
+/// any unknown value fails fast at startup rather than silently falling
+/// back to the log-only transport.
 ///
 /// <para>
 /// <b>Log is the shipped default.</b> Missing or empty
@@ -18,21 +18,21 @@ namespace ArmenianAiToy.Infrastructure.Notifications;
 /// </para>
 ///
 /// <para>
-/// <b>SMTP config is validated here, not inside
-/// <see cref="SmtpNotifier"/>.</b> Missing host / from / reset-link-base
-/// keys are a configuration error the operator should see at process
-/// start, not a first-email-send-time surprise. The shipped
-/// <c>appsettings.json</c> carries the Notifications block with empty
-/// placeholder values — selecting <c>smtp</c> without filling them in
+/// <b>Transport config is validated here, not inside the notifiers.</b>
+/// Missing host / from / api-key / reset-link-base keys are a
+/// configuration error the operator should see at process start, not a
+/// first-email-send-time surprise. The shipped <c>appsettings.json</c>
+/// carries the Notifications block with empty placeholder values —
+/// selecting <c>smtp</c> or <c>resend</c> without filling them in
 /// throws a clear <see cref="System.InvalidOperationException"/>
-/// before the service provider can hand out a broken
-/// <see cref="SmtpNotifier"/> instance.
+/// before the service provider can hand out a broken notifier instance.
 /// </para>
 /// </summary>
 public static class NotifierTransport
 {
     public const string Log = "log";
     public const string Smtp = "smtp";
+    public const string Resend = "resend";
 
     /// <summary>
     /// Returns the concrete <see cref="ArmenianAiToy.Application.Notifications.INotifier"/>
@@ -55,9 +55,15 @@ public static class NotifierTransport
             return typeof(SmtpNotifier);
         }
 
+        if (transport == Resend)
+        {
+            ValidateResendConfig(config);
+            return typeof(ResendNotifier);
+        }
+
         throw new System.InvalidOperationException(
             $"Notifications:Transport value '{raw}' is not recognised. " +
-            $"Expected '{Log}' or '{Smtp}'.");
+            $"Expected '{Log}', '{Smtp}' or '{Resend}'.");
     }
 
     private static void ValidateSmtpConfig(IConfiguration config)
@@ -82,6 +88,32 @@ public static class NotifierTransport
         {
             throw new System.InvalidOperationException(
                 "Notifications:Transport=smtp requires non-empty values for: " +
+                string.Join(", ", missing) + ".");
+        }
+    }
+
+    private static void ValidateResendConfig(IConfiguration config)
+    {
+        // ApiKey and FromAddress are what a real send cannot do without;
+        // PasswordResetLinkBase is shared with SMTP — a reset email whose
+        // "link" is a bare token would be a broken product experience,
+        // so it is required at startup, same as the smtp path.
+        string[] requiredKeys =
+        {
+            "Notifications:Resend:ApiKey",
+            "Notifications:Resend:FromAddress",
+            "Notifications:PasswordResetLinkBase"
+        };
+        var missing = new System.Collections.Generic.List<string>();
+        foreach (var key in requiredKeys)
+        {
+            if (string.IsNullOrWhiteSpace(config[key]))
+                missing.Add(key);
+        }
+        if (missing.Count > 0)
+        {
+            throw new System.InvalidOperationException(
+                "Notifications:Transport=resend requires non-empty values for: " +
                 string.Join(", ", missing) + ".");
         }
     }
