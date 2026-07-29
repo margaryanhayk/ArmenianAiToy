@@ -98,11 +98,32 @@ public sealed class ResendNotifier : INotifier
         }
     }
 
+    // Config aliases: accept the app-style key AND the names Resend's own
+    // docs/dashboard use (RESEND_API_KEY / RESEND_FROM), because those are
+    // what an operator copies from the provider. Avoids a silent misconfig
+    // from a name mismatch typed on a phone.
+    internal static string ResolveApiKey(IConfiguration c) =>
+        FirstNonEmpty(c["Resend:ApiKey"], c["RESEND_API_KEY"], c["Resend:Key"]);
+
+    internal static string ResolveFrom(IConfiguration c) =>
+        FirstNonEmpty(c["Resend:FromAddress"], c["RESEND_FROM"], c["RESEND_FROM_ADDRESS"],
+                      // Resend's shared test sender — only delivers to the
+                      // account owner's own address, which is exactly the
+                      // first-run case. Better than failing to send at all.
+                      "onboarding@resend.dev");
+
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        foreach (var v in values)
+            if (!string.IsNullOrWhiteSpace(v)) return v!.Trim();
+        return "";
+    }
+
     private async Task<bool> TrySendAsync(
         string email, string subject, string body, string type, CancellationToken ct)
     {
-        var apiKey = _config["Resend:ApiKey"] ?? "";
-        var from = _config["Resend:FromAddress"] ?? "";
+        var apiKey = ResolveApiKey(_config);
+        var from = ResolveFrom(_config);
         var payload = new
         {
             from,
@@ -140,7 +161,11 @@ public sealed class ResendNotifier : INotifier
 
     private string BuildLink(string param, string rawToken)
     {
-        var prefix = (_config["Notifications:PasswordResetLinkBase"] ?? "").Trim();
+        var prefix = FirstNonEmpty(
+            _config["Notifications:PasswordResetLinkBase"],
+            _config["PUBLIC_BASE_URL"],
+            // Last-resort default so a link is never emitted bare.
+            "https://armenianaitoy-production.up.railway.app/parent.html");
         var sep = prefix.Contains('?') ? '&' : '?';
         return $"{prefix}{sep}{param}={Uri.EscapeDataString(rawToken)}";
     }

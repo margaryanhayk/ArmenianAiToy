@@ -192,13 +192,34 @@ public class NotifierTransportTests
     }
 
     [Fact]
-    public void ResolveImplementation_Resend_MissingKeys_ThrowsAtStartup()
+    public void ResolveImplementation_Resend_MissingApiKey_ThrowsAtStartup()
     {
         var config = Substitute.For<IConfiguration>();
         config["Notifications:Transport"].Returns("resend");
-        // ApiKey / FromAddress / LinkBase all null
+        // No api key under any accepted alias.
         Assert.Throws<System.InvalidOperationException>(
             () => NotifierTransport.ResolveImplementation(config));
+    }
+
+    [Fact]
+    public void ResolveImplementation_Resend_AcceptsProviderStyleEnvName()
+    {
+        // Operators copy RESEND_API_KEY from Resend's own docs; accept it.
+        var config = Substitute.For<IConfiguration>();
+        config["Notifications:Transport"].Returns("resend");
+        config["RESEND_API_KEY"].Returns("re_alias_key");
+        Assert.Equal(typeof(ResendNotifier), NotifierTransport.ResolveImplementation(config));
+    }
+
+    [Fact]
+    public void ResolveImplementation_Resend_ApiKeyOnly_IsEnough()
+    {
+        // FromAddress + link base fall back to working defaults, so a
+        // missing optional key must NOT take the whole site down.
+        var config = Substitute.For<IConfiguration>();
+        config["Notifications:Transport"].Returns("resend");
+        config["Resend:ApiKey"].Returns("re_only_key");
+        Assert.Equal(typeof(ResendNotifier), NotifierTransport.ResolveImplementation(config));
     }
 
 }

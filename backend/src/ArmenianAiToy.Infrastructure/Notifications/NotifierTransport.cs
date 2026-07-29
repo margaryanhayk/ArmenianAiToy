@@ -69,23 +69,18 @@ public static class NotifierTransport
 
     private static void ValidateResendConfig(IConfiguration config)
     {
-        // Fail fast at startup if resend is selected without the keys a real
-        // send needs — same posture as the SMTP validator, so a misconfig is
-        // a loud boot failure, not a silent non-delivery.
-        string[] requiredKeys =
-        {
-            "Resend:ApiKey",
-            "Resend:FromAddress",
-            "Notifications:PasswordResetLinkBase"
-        };
-        var missing = new System.Collections.Generic.List<string>();
-        foreach (var key in requiredKeys)
-            if (string.IsNullOrWhiteSpace(config[key]))
-                missing.Add(key);
-        if (missing.Count > 0)
+        // Only the API key is genuinely required — without it no send can
+        // ever succeed. FromAddress falls back to Resend's shared test
+        // sender and the link base to the public dashboard URL (see
+        // ResendNotifier), so a missing optional key degrades to a working
+        // default instead of refusing to boot. Deliberately narrower than
+        // the SMTP validator: a boot failure here takes the whole site down
+        // for a NON-critical email setting, which is the worse outcome.
+        var apiKey = ResendNotifier.ResolveApiKey(config);
+        if (string.IsNullOrWhiteSpace(apiKey))
             throw new System.InvalidOperationException(
-                "Notifications:Transport=resend requires non-empty values for: " +
-                string.Join(", ", missing) + ".");
+                "Notifications:Transport=resend requires an API key. Set " +
+                "Resend__ApiKey (or RESEND_API_KEY) to your re_... key.");
     }
 
     private static void ValidateSmtpConfig(IConfiguration config)
