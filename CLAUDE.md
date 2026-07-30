@@ -44,7 +44,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2054 tests)
+dotnet test                                     # Run all tests (2086 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -355,15 +355,28 @@ stays in the detail view per C2.1). See the "Today summary panel
 (E1.1)" → "E1.2.ui addendum" subsection above for the full UI
 contract and manual QA additions.
 
-**Modes-used-today — DEFERRED to E1.3.** `DetectedMode` is not
-persisted in the schema today (it lives only in
-`ChatService.ActiveModes`, an in-memory `ConcurrentDictionary` that
-clears on backend restart). Re-running `ModeDetector` against
-historical messages would diverge from runtime resolution because the
-pure-function detector has no access to the runtime active-story
-session or history-priority state. A future E1.3 slice would add a
-persistent `Message.Mode` (or equivalent) column and migration
-before exposing this aggregate.
+**Modes — SHIPPED as E1.3 (per-message `Message.Mode`).** The
+runtime-resolved `DetectedMode` used to live only in
+`ChatService.ActiveModes` (in-memory, cleared on restart), so parent
+views could not show which mode a conversation happened in. E1.3 adds
+an additive nullable `Message.Mode` column (migration
+`AddMessageMode`), stamped at chat time from the **runtime**
+resolution — never re-derived from history, because the pure-function
+`ModeDetector` has no access to the runtime active-story session or
+history-priority state and would diverge.
+
+- Stamped via `IConversationService.StampMessageModeAsync(messageId,
+  mode)` — a separate method rather than a new `AddMessageAsync`
+  parameter, so existing call sites and 4-arg test doubles stay
+  untouched. `ChatService` stamps the assistant row with the same
+  mode name the wire response already carried; guard / fallback
+  replies stay null.
+- Additive DTO fields: `MessageDto.Mode` and
+  `ConversationSummaryDto.Modes` (distinct per conversation),
+  projected in history / summary / detail and in the parent export.
+- The **Today panel's** modes-used aggregate is still not wired to
+  `today-summary`; only the per-message / per-conversation fields
+  above are exposed.
 
 ### E2.1 addendum — timezone-aware day boundary
 
@@ -903,11 +916,30 @@ configurable via `Auth:PasswordResetTokenTtlMinutes`.
 `LoggingNotifier` implementation in
 `Infrastructure/Notifications/LoggingNotifier.cs` writes one
 structured log line per call and does not actually deliver
-anything. A future deploy slice can register a second
-implementation (SMTP / webhook / provider SDK) without changing
-any caller. **Typed methods, not a generic envelope** — future
+anything. **Typed methods, not a generic envelope** — future
 consumers (dormant-purge warnings, register-collision mail, etc.)
 extend the interface with their own method when they land.
+
+**Transports.** `NotifierTransport.ResolveImplementation(config)`
+picks the registered implementation from `Notifications:Transport`:
+`log` (shipped default — `LoggingNotifier`, delivers nothing),
+`smtp` (`SmtpNotifier`), or `resend` (`ResendNotifier`, HTTP API).
+An unknown value throws at startup rather than silently falling
+back to log-only.
+
+- **`resend` is the go-live transport** because the managed host
+  (Railway) blocks outbound SMTP ports, so `smtp` cannot deliver
+  there. `ResendNotifier` posts to the Resend HTTP API.
+- Config: `Resend:ApiKey` (also accepted as the provider-style
+  `RESEND_API_KEY` / `Resend:Key`), `Resend:FromAddress`
+  (`RESEND_FROM` / `RESEND_FROM_ADDRESS`), and
+  `Notifications:PasswordResetLinkBase`.
+- **Validation is deliberately narrower than SMTP's**: only the API
+  key is required to boot. A missing from-address falls back to
+  Resend's shared test sender and the link base to the public
+  dashboard URL — a boot failure over a non-critical email setting
+  would take the whole site down, which is the worse outcome.
+  `smtp` still hard-requires host / from / link-base.
 
 **Dashboard UI.** `parent.html` closes the browser-visible loop for
 this flow. The login view carries a subtle **Forgot password?**
@@ -1997,6 +2029,20 @@ no-op (flag already at the requested value) changes nothing and writes no row.
   of the parent #074 revoke, minus the ownership gate.
 - `POST /api/internal/devices/{deviceId}/pause` body `{ value, reason }` —
   operator pause/resume (soft; device still authenticates, chat short-circuits).
+
+A third mutating console endpoint covers owner **account recovery**,
+for the case where a parent (in practice: the owner) is locked out and
+the reset-by-email flow is not yet wired on that deployment:
+
+- `POST /api/internal/parents/reset-password` body
+  `{ email, newPassword, reason }` — sets the parent's password
+  directly. Same fail-closed console gate. Matches the account by
+  **normalized** email so legacy casing / whitespace still resolves;
+  400 on missing fields or a password under 8 chars; 404 when no
+  live (non-anonymized) account matches. The new password is never
+  logged or echoed — only a loud structured log with the operator
+  name, the parent id and the reason. No audit row (the row would
+  carry no PII-free signal the log doesn't already have).
 
 400 on a missing/blank reason; 404 on unknown device. Pinned by
 `InternalControllerTests` (`RevokeDevice_*`, `PauseDeviceAction_*`). The
