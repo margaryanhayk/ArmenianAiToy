@@ -1,4 +1,3 @@
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -9,164 +8,301 @@ using Microsoft.Extensions.Logging;
 namespace ArmenianAiToy.Infrastructure.Notifications;
 
 /// <summary>
-/// <see cref="INotifier"/> that sends over the Resend HTTP API
-/// (https://api.resend.com/emails) instead of SMTP.
+/// Resend (resend.com) HTTP-API <see cref="INotifier"/> implementation.
+/// One HTTPS POST per email to <c>https://api.resend.com/emails</c> with a
+/// bearer API key — plain BCL <see cref="HttpClient"/>, no new NuGet
+/// (same no-new-NuGet discipline <see cref="SmtpNotifier"/> follows with
+/// <c>System.Net.Mail</c>). Armenian-first plain-text copy, shared with
+/// the SMTP transport via <see cref="NotificationEmailContent"/>.
 ///
-/// <para><b>Why:</b> most PaaS hosts (Railway included) block outbound SMTP
-/// ports (25/465/587) to fight spam, so the SMTP notifier's send just times
-/// out. Resend sends over HTTPS (443), which is not blocked, and gives better
-/// deliverability than a personal Gmail relay. Same anti-enumeration posture
-/// as the SMTP path: a send failure is swallowed-and-logged (never thrown to
-/// the HTTP handler) so the reset-request stays a uniform 202; a bounded
-/// HTTP timeout means a slow/blocked network never hangs the request.</para>
+/// <para>
+/// <b>Failure containment (hard invariant).</b> Identical posture to
+/// <see cref="SmtpNotifier"/>: the forgot-password request endpoint
+/// returns <c>202 Accepted</c> with an enumeration-resistant body; a
+/// broken Resend API must not convert that contract into a 500. Any
+/// non-cancellation exception from the send path is caught, converted to
+/// a structured warning log, and swallowed (or surfaced as
+/// <c>false</c> to the worker-facing <c>Task&lt;bool&gt;</c> methods).
+/// <see cref="OperationCanceledException"/> is deliberately NOT caught.
+/// A non-2xx API response is a delivery failure, not an exception —
+/// logged with the status code only, never the response body (it can
+/// echo the recipient address).
+/// </para>
 ///
-/// <para>Config: <c>Resend:ApiKey</c>, <c>Resend:FromAddress</c> (e.g.
-/// "Areg &lt;noreply@yourdomain&gt;"), and <c>Notifications:PasswordResetLinkBase</c>
-/// for the dashboard URL the token links back to. Selected via
-/// <c>Notifications:Transport=resend</c>.</para>
+/// <para>
+/// <b>No-raw-token invariant.</b> The raw reset / verification token is
+/// placed into the outgoing email body (that's the point of the email).
+/// It is NEVER logged — not even a prefix. Pinned by
+/// <c>ResendNotifierTests</c>, mirroring the SMTP and logging pins.
+/// </para>
+///
+/// <para>
+/// <b>Internal send seam.</b> The actual wire call is behind a
+/// <see cref="SendHttpDelegate"/> seam so unit tests can substitute a
+/// capturing / throwing fake without real network access — same pattern
+/// as <see cref="SmtpNotifier"/>'s <c>SendMailDelegate</c>.
+/// </para>
 /// </summary>
 public sealed class ResendNotifier : INotifier
 {
-    private const string Endpoint = "https://api.resend.com/emails";
-    // One shared client; Resend volume for account mail is tiny.
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
+    /// <summary>
+    /// Test-facing seam for the actual HTTP wire call. Default
+    /// implementation posts via a process-shared <see cref="HttpClient"/>.
+    /// </summary>
+    internal delegate Task<HttpResponseMessage> SendHttpDelegate(
+        HttpRequestMessage request, CancellationToken cancellationToken);
 
-    private readonly IConfiguration _config;
+    private const string ApiEndpoint = "https://api.resend.com/emails";
+
+    // One shared client for the process — sockets are pooled, DNS
+    // refresh is a non-issue for a single fixed API host, and the
+    // notifier itself stays scoped-registered without churning
+    // connections per request scope. 10s ceiling: an email API that
+    // hasn't answered in 10 seconds is down, and the HTTP-synchronous
+    // callers (forgot-password / verify-request) shouldn't hold their
+    // 202 hostage longer than that.
+    private static readonly HttpClient SharedClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(10)
+    };
+
     private readonly ILogger<ResendNotifier> _logger;
+    private readonly IConfiguration _config;
+    private readonly SendHttpDelegate _sendHttp;
 
-    public ResendNotifier(IConfiguration config, ILogger<ResendNotifier> logger)
+    // Standard DI constructor.
+    public ResendNotifier(ILogger<ResendNotifier> logger, IConfiguration config)
+        : this(logger, config, sendHttp: null)
     {
-        _config = config;
+    }
+
+    // Test-only constructor — internal + optional so the DI path cannot
+    // accidentally pick the wrong overload (same shape as SmtpNotifier).
+    internal ResendNotifier(
+        ILogger<ResendNotifier> logger,
+        IConfiguration config,
+        SendHttpDelegate? sendHttp)
+    {
         _logger = logger;
+        _config = config;
+        _sendHttp = sendHttp ?? DefaultSendAsync;
     }
 
-    public Task SendPasswordResetAsync(string email, string resetToken, CancellationToken cancellationToken = default)
+    public async Task SendPasswordResetAsync(
+        string email, string resetToken, CancellationToken cancellationToken = default)
     {
-        var link = BuildLink("token", resetToken);
-        var body = string.Join("\n\n",
-            "Գաղտնաբառի վերականգնման հղումը ստորև է։",
-            "Այս հղումը վավեր է սահմանափակ ժամանակ։",
-            "Եթե Դուք այս խնդրանքը չեք արել, անտեսեք այս նամակը։",
-            link);
-        return SendFireAndForgetAsync(email, "Գաղտնաբառի վերականգնում", body, "password_reset", cancellationToken);
+        var link = NotificationEmailContent.BuildResetLink(
+            ResolveLinkBase(_config),resetToken);
+
+        // Fire-and-log: the HTTP-synchronous caller's anti-enum 202
+        // contract must hold regardless of delivery outcome, so the
+        // delivered-bool is observed only by the log line.
+        await SendCoreAsync(
+            "password_reset", email, deviceName: null,
+            NotificationEmailContent.PasswordResetSubject,
+            NotificationEmailContent.BuildPasswordResetBody(link),
+            cancellationToken);
     }
 
-    public Task SendEmailVerificationAsync(string email, string verificationToken, CancellationToken cancellationToken = default)
+    public async Task<bool> SendDormancyWarningAsync(
+        string email, DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
     {
-        var link = BuildLink("verifyToken", verificationToken);
-        var body = string.Join("\n\n",
-            "Ձեր էլ. փոստը հաստատելու հղումը ստորև է։",
-            "Այս հղումը վավեր է սահմանափակ ժամանակ։",
-            "Եթե Դուք հաշիվ չեք ստեղծել, անտեսեք այս նամակը։",
-            link);
-        return SendFireAndForgetAsync(email, "Էլ. փոստի հաստատում", body, "email_verification", cancellationToken);
+        // Worker consumer — the bool is load-bearing: false means "do
+        // NOT stamp DormancyWarnedAt, retry next tick." See the
+        // SmtpNotifier xmldoc for the full contract; semantics here are
+        // identical, only the wire transport differs.
+        return await SendCoreAsync(
+            "dormancy_warning", email, deviceName: null,
+            NotificationEmailContent.DormancyWarningSubject,
+            NotificationEmailContent.BuildDormancyWarningBody(deleteAtUtc),
+            cancellationToken);
     }
 
-    public async Task<bool> SendDormancyWarningAsync(string email, DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
+    public async Task SendEmailVerificationAsync(
+        string email, string verificationToken, CancellationToken cancellationToken = default)
     {
-        var body = deleteAtUtc is null
-            ? "Բարև։ Ձեր Areg հաշիվը վերջերս ակտիվ չի եղել։ Մուտք գործեք՝ այն ակտիվ պահելու համար։"
-            : $"Բարև։ Ձեր Areg հաշիվը վերջերս ակտիվ չի եղել և կարող է ջնջվել {deleteAtUtc:yyyy-MM-dd}-ից հետո։ Մուտք գործեք՝ այն պահպանելու համար։";
-        return await TrySendAsync(email, "Ձեր Areg հաշիվը", body, "dormancy_warning", cancellationToken);
+        var link = NotificationEmailContent.BuildVerificationLink(
+            ResolveLinkBase(_config),verificationToken);
+
+        await SendCoreAsync(
+            "email_verification", email, deviceName: null,
+            NotificationEmailContent.EmailVerificationSubject,
+            NotificationEmailContent.BuildEmailVerificationBody(link),
+            cancellationToken);
     }
 
     public async Task<bool> SendDormantDeviceWarningAsync(
-        string parentEmail, string deviceName, DateTime lastSeenAtUtc, DateTime? deleteAtUtc,
+        string parentEmail,
+        string deviceName,
+        DateTime lastSeenAtUtc,
+        DateTime? deleteAtUtc,
         CancellationToken cancellationToken = default)
     {
-        var lastSeen = lastSeenAtUtc.ToString("yyyy-MM-dd");
-        var body = deleteAtUtc is null
-            ? $"Բարև։ Ձեր Areg հաշվին կապված սարքը — {deviceName} — վերջերս չի օգտագործվել (վերջին ակտիվությունը {lastSeen})։"
-            : $"Բարև։ Ձեր Areg հաշվին կապված սարքը — {deviceName} — վերջերս չի օգտագործվել (վերջին ակտիվությունը {lastSeen}), և կարող է ջնջվել {deleteAtUtc:yyyy-MM-dd}-ից հետո։";
-        return await TrySendAsync(parentEmail, "Ձեր Areg սարքը", body, "dormant_device_warning", cancellationToken);
+        return await SendCoreAsync(
+            "dormant_device_warning", parentEmail, deviceName,
+            NotificationEmailContent.DormantDeviceWarningSubject,
+            NotificationEmailContent.BuildDormantDeviceWarningBody(
+                deviceName, lastSeenAtUtc, deleteAtUtc),
+            cancellationToken);
     }
 
-    // Password-reset / verification are called from HTTP handlers that MUST
-    // return a uniform 202 regardless of delivery — swallow and log, and
-    // never rethrow (except cooperative cancellation, which is the request
-    // going away, not a delivery failure).
-    private async Task SendFireAndForgetAsync(
-        string email, string subject, string body, string type, CancellationToken ct)
+    /// <summary>
+    /// Shared send path for all four notification types. Returns
+    /// <c>true</c> on a 2xx API response, <c>false</c> on a non-2xx
+    /// response or a swallowed exception. Cancellation propagates.
+    /// The log line shape matches <see cref="SmtpNotifier"/> exactly
+    /// (with <c>transport=resend</c>) so downstream log queries keyed
+    /// on <c>delivered</c> work across both transports; the
+    /// <c>device_name</c> hole appears only for the dormant-device
+    /// type, mirroring the SMTP lines.
+    /// </summary>
+    private async Task<bool> SendCoreAsync(
+        string notificationType,
+        string email,
+        string? deviceName,
+        string subject,
+        string textBody,
+        CancellationToken cancellationToken)
     {
-        try { await TrySendAsync(email, subject, body, type, ct); }
-        catch (OperationCanceledException) { throw; }
+        try
+        {
+            using var request = BuildRequest(email, subject, textBody);
+            using var response = await _sendHttp(request, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                LogOutcome(notificationType, email, deviceName, delivered: true,
+                    exception: null, errorCategory: null);
+                return true;
+            }
+
+            // Non-2xx is a delivery failure, not an exception. Only the
+            // status code lands in the log — the response body can echo
+            // the recipient address and stays off the log stream.
+            LogOutcome(notificationType, email, deviceName, delivered: false,
+                exception: null, errorCategory: $"http_{(int)response.StatusCode}");
+            return false;
+        }
+        catch (OperationCanceledException)
+        {
+            // Caller cancellation propagates — HTTP request going away
+            // or worker shutting down; not a Resend failure.
+            throw;
+        }
         catch (Exception ex)
         {
-            _logger.LogWarning(
-                "Notification send-attempt failed: type={NotificationType}, email={Email}, transport=resend, error={Error}",
-                type, email, ex.GetType().Name);
+            // Swallow-and-log. Exception type name is the only "what
+            // failed" signal in the template; the full stack trace
+            // travels as the LogWarning exception argument. Token never
+            // appears in any hole.
+            LogOutcome(notificationType, email, deviceName, delivered: false,
+                exception: ex, errorCategory: ex.GetType().Name);
+            return false;
         }
     }
 
-    // Config aliases: accept the app-style key AND the names Resend's own
-    // docs/dashboard use (RESEND_API_KEY / RESEND_FROM), because those are
-    // what an operator copies from the provider. Avoids a silent misconfig
-    // from a name mismatch typed on a phone.
+    private HttpRequestMessage BuildRequest(string toEmail, string subject, string textBody)
+    {
+        // Resend's create-email shape: https://resend.com/docs/api-reference/emails/send-email
+        // Plain-text only (`text`), matching the SMTP transport's
+        // IsBodyHtml=false posture.
+        var payload = JsonSerializer.Serialize(new
+        {
+            from = ResolveFrom(_config),
+            to = new[] { toEmail },
+            subject,
+            text = textBody
+        });
+
+        var request = new HttpRequestMessage(HttpMethod.Post, ApiEndpoint)
+        {
+            Content = new StringContent(payload, Encoding.UTF8, "application/json")
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue(
+            "Bearer", ResolveApiKey(_config));
+        return request;
+    }
+
+    private void LogOutcome(
+        string notificationType,
+        string email,
+        string? deviceName,
+        bool delivered,
+        Exception? exception,
+        string? errorCategory)
+    {
+        // Same template families as SmtpNotifier — keep hole names and
+        // ordering identical so structured-log queries span transports.
+        if (delivered)
+        {
+            if (deviceName is null)
+            {
+                _logger.LogInformation(
+                    "Notification send-attempt: type={NotificationType}, email={Email}, transport={Transport}, delivered={Delivered}",
+                    notificationType, email, "resend", true);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Notification send-attempt: type={NotificationType}, email={Email}, device_name={DeviceName}, transport={Transport}, delivered={Delivered}",
+                    notificationType, email, deviceName, "resend", true);
+            }
+            return;
+        }
+
+        if (deviceName is null)
+        {
+            _logger.LogWarning(exception,
+                "Notification send-attempt: type={NotificationType}, email={Email}, transport={Transport}, delivered={Delivered}, error_category={ErrorCategory}",
+                notificationType, email, "resend", false, errorCategory);
+        }
+        else
+        {
+            _logger.LogWarning(exception,
+                "Notification send-attempt: type={NotificationType}, email={Email}, device_name={DeviceName}, transport={Transport}, delivered={Delivered}, error_category={ErrorCategory}",
+                notificationType, email, deviceName, "resend", false, errorCategory);
+        }
+    }
+
+    // Default wire call — process-shared client, per-request message.
+    private static Task<HttpResponseMessage> DefaultSendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+        => SharedClient.SendAsync(request, cancellationToken);
+
+    // ── Config resolution ──────────────────────────────────────────────
+    // Config ALIASES, learned the hard way on the first real deploy: an
+    // operator copies the key out of Resend's own dashboard, where it is
+    // called RESEND_API_KEY / RESEND_FROM, and pastes that name into the
+    // host's env vars. Accepting only the app-style
+    // Notifications:Resend:* names turned that into a silent misconfig
+    // (and, with the strict validator, a refused boot). Both name
+    // families resolve; the app-style key wins when both are present.
+
     internal static string ResolveApiKey(IConfiguration c) =>
-        FirstNonEmpty(c["Resend:ApiKey"], c["RESEND_API_KEY"], c["Resend:Key"]);
+        FirstNonEmpty(
+            c["Notifications:Resend:ApiKey"],
+            c["Resend:ApiKey"], c["RESEND_API_KEY"], c["Resend:Key"]);
 
     internal static string ResolveFrom(IConfiguration c) =>
-        FirstNonEmpty(c["Resend:FromAddress"], c["RESEND_FROM"], c["RESEND_FROM_ADDRESS"],
-                      // Resend's shared test sender — only delivers to the
-                      // account owner's own address, which is exactly the
-                      // first-run case. Better than failing to send at all.
-                      "onboarding@resend.dev");
+        FirstNonEmpty(
+            c["Notifications:Resend:FromAddress"],
+            c["Resend:FromAddress"], c["RESEND_FROM"], c["RESEND_FROM_ADDRESS"],
+            // Resend's shared test sender — it only delivers to the
+            // account owner's own address, which is exactly the first-run
+            // case. Better than not sending at all.
+            "onboarding@resend.dev");
+
+    internal static string ResolveLinkBase(IConfiguration c) =>
+        FirstNonEmpty(
+            c["Notifications:PasswordResetLinkBase"],
+            c["PUBLIC_BASE_URL"],
+            // Last-resort default so a reset link is never emitted bare.
+            "https://armenianaitoy-production.up.railway.app/parent.html");
 
     private static string FirstNonEmpty(params string?[] values)
     {
         foreach (var v in values)
             if (!string.IsNullOrWhiteSpace(v)) return v!.Trim();
         return "";
-    }
-
-    private async Task<bool> TrySendAsync(
-        string email, string subject, string body, string type, CancellationToken ct)
-    {
-        var apiKey = ResolveApiKey(_config);
-        var from = ResolveFrom(_config);
-        var payload = new
-        {
-            from,
-            to = new[] { email },
-            subject,
-            text = body
-        };
-        using var req = new HttpRequestMessage(HttpMethod.Post, Endpoint)
-        {
-            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
-        };
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-
-        HttpResponseMessage res;
-        try
-        {
-            res = await Http.SendAsync(req, ct);
-        }
-        catch (OperationCanceledException) { throw; }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(
-                "Notification send-attempt failed: type={NotificationType}, email={Email}, transport=resend, error={Error}",
-                type, email, ex.GetType().Name);
-            return false;
-        }
-
-        var ok = res.IsSuccessStatusCode;
-        _logger.LogInformation(
-            "Notification send-attempt: type={NotificationType}, email={Email}, transport=resend, delivered={Delivered}, status={Status}",
-            type, email, ok, (int)res.StatusCode);
-        res.Dispose();
-        return ok;
-    }
-
-    private string BuildLink(string param, string rawToken)
-    {
-        var prefix = FirstNonEmpty(
-            _config["Notifications:PasswordResetLinkBase"],
-            _config["PUBLIC_BASE_URL"],
-            // Last-resort default so a link is never emitted bare.
-            "https://armenianaitoy-production.up.railway.app/parent.html");
-        var sep = prefix.Contains('?') ? '&' : '?';
-        return $"{prefix}{sep}{param}={Uri.EscapeDataString(rawToken)}";
     }
 }

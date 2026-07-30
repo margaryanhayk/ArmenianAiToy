@@ -5,10 +5,10 @@ namespace ArmenianAiToy.Infrastructure.Notifications;
 /// <summary>
 /// Resolves which <see cref="ArmenianAiToy.Application.Notifications.INotifier"/>
 /// implementation to register, based on the <c>Notifications:Transport</c>
-/// config key. The selector is bounded to exactly two values today —
-/// <see cref="Log"/> and <see cref="Smtp"/> — so any unknown value fails
-/// fast at startup rather than silently falling back to the log-only
-/// transport.
+/// config key. The selector is bounded to exactly three values today —
+/// <see cref="Log"/>, <see cref="Smtp"/>, and <see cref="Resend"/> — so
+/// any unknown value fails fast at startup rather than silently falling
+/// back to the log-only transport.
 ///
 /// <para>
 /// <b>Log is the shipped default.</b> Missing or empty
@@ -18,15 +18,14 @@ namespace ArmenianAiToy.Infrastructure.Notifications;
 /// </para>
 ///
 /// <para>
-/// <b>SMTP config is validated here, not inside
-/// <see cref="SmtpNotifier"/>.</b> Missing host / from / reset-link-base
-/// keys are a configuration error the operator should see at process
-/// start, not a first-email-send-time surprise. The shipped
-/// <c>appsettings.json</c> carries the Notifications block with empty
-/// placeholder values — selecting <c>smtp</c> without filling them in
+/// <b>Transport config is validated here, not inside the notifiers.</b>
+/// Missing host / from / api-key / reset-link-base keys are a
+/// configuration error the operator should see at process start, not a
+/// first-email-send-time surprise. The shipped <c>appsettings.json</c>
+/// carries the Notifications block with empty placeholder values —
+/// selecting <c>smtp</c> or <c>resend</c> without filling them in
 /// throws a clear <see cref="System.InvalidOperationException"/>
-/// before the service provider can hand out a broken
-/// <see cref="SmtpNotifier"/> instance.
+/// before the service provider can hand out a broken notifier instance.
 /// </para>
 /// </summary>
 public static class NotifierTransport
@@ -67,22 +66,6 @@ public static class NotifierTransport
             $"Expected '{Log}', '{Smtp}' or '{Resend}'.");
     }
 
-    private static void ValidateResendConfig(IConfiguration config)
-    {
-        // Only the API key is genuinely required — without it no send can
-        // ever succeed. FromAddress falls back to Resend's shared test
-        // sender and the link base to the public dashboard URL (see
-        // ResendNotifier), so a missing optional key degrades to a working
-        // default instead of refusing to boot. Deliberately narrower than
-        // the SMTP validator: a boot failure here takes the whole site down
-        // for a NON-critical email setting, which is the worse outcome.
-        var apiKey = ResendNotifier.ResolveApiKey(config);
-        if (string.IsNullOrWhiteSpace(apiKey))
-            throw new System.InvalidOperationException(
-                "Notifications:Transport=resend requires an API key. Set " +
-                "Resend__ApiKey (or RESEND_API_KEY) to your re_... key.");
-    }
-
     private static void ValidateSmtpConfig(IConfiguration config)
     {
         // Only the keys that would break a real send are required.
@@ -106,6 +89,29 @@ public static class NotifierTransport
             throw new System.InvalidOperationException(
                 "Notifications:Transport=smtp requires non-empty values for: " +
                 string.Join(", ", missing) + ".");
+        }
+    }
+
+    private static void ValidateResendConfig(IConfiguration config)
+    {
+        // DELIBERATELY NARROWER than the SMTP validator: only the API key
+        // is genuinely required, because without it no send can ever
+        // succeed. FromAddress falls back to Resend's shared test sender
+        // and the link base to the public dashboard URL (see
+        // ResendNotifier's Resolve* helpers), so a missing optional key
+        // degrades to a working default instead of refusing to boot.
+        // Learned on the first real deploy: throwing here takes the WHOLE
+        // site down over a non-critical email setting, which is the worse
+        // outcome. The key lookup goes through ResendNotifier.ResolveApiKey
+        // so the provider-style RESEND_API_KEY name an operator copies out
+        // of the Resend dashboard satisfies the check too.
+        var apiKey = ResendNotifier.ResolveApiKey(config);
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            throw new System.InvalidOperationException(
+                "Notifications:Transport=resend requires an API key. Set " +
+                "Notifications:Resend:ApiKey (env Notifications__Resend__ApiKey) " +
+                "or RESEND_API_KEY to your re_... key.");
         }
     }
 }

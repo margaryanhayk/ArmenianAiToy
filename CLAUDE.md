@@ -44,7 +44,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2086 tests)
+dotnet test                                     # Run all tests (2115 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -920,26 +920,51 @@ anything. **Typed methods, not a generic envelope** — future
 consumers (dormant-purge warnings, register-collision mail, etc.)
 extend the interface with their own method when they land.
 
-**Transports.** `NotifierTransport.ResolveImplementation(config)`
-picks the registered implementation from `Notifications:Transport`:
-`log` (shipped default — `LoggingNotifier`, delivers nothing),
-`smtp` (`SmtpNotifier`), or `resend` (`ResendNotifier`, HTTP API).
-An unknown value throws at startup rather than silently falling
-back to log-only.
-
-- **`resend` is the go-live transport** because the managed host
-  (Railway) blocks outbound SMTP ports, so `smtp` cannot deliver
-  there. `ResendNotifier` posts to the Resend HTTP API.
-- Config: `Resend:ApiKey` (also accepted as the provider-style
-  `RESEND_API_KEY` / `Resend:Key`), `Resend:FromAddress`
-  (`RESEND_FROM` / `RESEND_FROM_ADDRESS`), and
+Two real-delivery transports exist, selected by
+`Notifications:Transport` via `NotifierTransport.ResolveImplementation`
+(bounded value space `log` / `smtp` / `resend`; unknown values throw at
+startup):
+- `smtp` → `SmtpNotifier` (BCL `System.Net.Mail`). Requires
+  `Notifications:Smtp:Host`, `Notifications:Smtp:FromAddress`,
   `Notifications:PasswordResetLinkBase`.
-- **Validation is deliberately narrower than SMTP's**: only the API
-  key is required to boot. A missing from-address falls back to
-  Resend's shared test sender and the link base to the public
-  dashboard URL — a boot failure over a non-critical email setting
-  would take the whole site down, which is the worse outcome.
+- `resend` → `ResendNotifier` (Resend HTTP API,
+  `POST https://api.resend.com/emails`, plain BCL `HttpClient` — no new
+  NuGet). **This is the go-live transport**: the managed host (Railway)
+  blocks outbound SMTP ports, so `smtp` cannot deliver there.
+
+**Resend config resolution is deliberately forgiving** — both lessons
+below come from the first real deploy, and both are pinned by
+`NotifierTransportTests`:
+- **Name aliases.** `ResendNotifier.ResolveApiKey` / `ResolveFrom`
+  accept the app-style `Notifications:Resend:ApiKey` /
+  `:FromAddress` first, then the provider-style names an operator
+  copies straight out of the Resend dashboard (`RESEND_API_KEY`,
+  `RESEND_FROM`, `RESEND_FROM_ADDRESS`, `Resend:ApiKey`,
+  `Resend:Key`, `Resend:FromAddress`). A name mismatch typed on a
+  phone must not become a silent misconfig.
+- **Only the API key is required to boot.** Unlike the smtp
+  validator, a missing from-address falls back to Resend's shared
+  test sender (`onboarding@resend.dev`, which delivers to the account
+  owner — exactly the first-run case) and a missing link base to the
+  public dashboard URL. Throwing at startup over a non-critical email
+  setting would take the whole site down, which is the worse outcome.
   `smtp` still hard-requires host / from / link-base.
+
+Both share subjects / Armenian plain-text bodies / link builders via
+`Infrastructure/Notifications/NotificationEmailContent.cs` so
+parent-facing copy and the `?token=` / `?verifyToken=` wire contract
+with `parent.html` cannot drift between transports. Both mirror the
+same failure posture: non-cancellation failures are swallowed into a
+structured warning (preserving the 202 anti-enum contract), OCE
+propagates, worker-facing `Task<bool>` methods return `false` on
+failure, and the raw token is never logged (a non-2xx Resend response
+logs the status code only, never the response body). The
+`DormancyTransportPrecondition` guards accept either real-delivery
+transport (explicit allow-list; still fail-closed for `LoggingNotifier`
+and unknown types). Pinned by `ResendNotifierTests`, the extended
+`NotifierTransportTests` / `DormancyTransportPreconditionTests`, and the
+unchanged `SmtpNotifierTests` (which also pin that the content
+extraction kept SMTP output byte-identical).
 
 **Dashboard UI.** `parent.html` closes the browser-visible loop for
 this flow. The login view carries a subtle **Forgot password?**

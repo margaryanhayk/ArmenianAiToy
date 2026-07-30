@@ -26,13 +26,17 @@ public class NotifierTransportTests
         string? transport = null,
         string? host = null,
         string? fromAddress = null,
-        string? linkBase = null)
+        string? linkBase = null,
+        string? resendApiKey = null,
+        string? resendFromAddress = null)
     {
         var config = Substitute.For<IConfiguration>();
         config["Notifications:Transport"].Returns(transport);
         config["Notifications:Smtp:Host"].Returns(host);
         config["Notifications:Smtp:FromAddress"].Returns(fromAddress);
         config["Notifications:PasswordResetLinkBase"].Returns(linkBase);
+        config["Notifications:Resend:ApiKey"].Returns(resendApiKey);
+        config["Notifications:Resend:FromAddress"].Returns(resendFromAddress);
         return config;
     }
 
@@ -118,6 +122,7 @@ public class NotifierTransportTests
         Assert.Contains("sendgrid", ex.Message);
         Assert.Contains("log", ex.Message);
         Assert.Contains("smtp", ex.Message);
+        Assert.Contains("resend", ex.Message);
     }
 
     [Fact]
@@ -180,46 +185,121 @@ public class NotifierTransportTests
         Assert.Contains("Notifications:PasswordResetLinkBase", ex.Message);
     }
 
+    // --- Resend transport ---
+
     [Fact]
-    public void ResolveImplementation_Resend_WithRequiredKeys_ResolvesResendNotifier()
+    public void ResolveImplementation_ResendTransport_WithValidConfig_ReturnsResendNotifier()
     {
-        var config = Substitute.For<IConfiguration>();
-        config["Notifications:Transport"].Returns("resend");
-        config["Resend:ApiKey"].Returns("re_test_key");
-        config["Resend:FromAddress"].Returns("Areg <noreply@example.com>");
-        config["Notifications:PasswordResetLinkBase"].Returns("https://x/parent.html");
-        Assert.Equal(typeof(ResendNotifier), NotifierTransport.ResolveImplementation(config));
+        var config = Config(
+            transport: "resend",
+            linkBase: "https://example.com/reset",
+            resendApiKey: "re_test_key",
+            resendFromAddress: "noreply@example.com");
+
+        var impl = NotifierTransport.ResolveImplementation(config);
+
+        Assert.Equal(typeof(ResendNotifier), impl);
+    }
+
+    [Theory]
+    [InlineData("RESEND")]
+    [InlineData("Resend")]
+    [InlineData("  resend  ")]
+    public void ResolveImplementation_ResendTransport_IsCaseAndTrimInsensitive(string variant)
+    {
+        var config = Config(
+            transport: variant,
+            linkBase: "https://example.com/reset",
+            resendApiKey: "re_test_key",
+            resendFromAddress: "noreply@example.com");
+
+        var impl = NotifierTransport.ResolveImplementation(config);
+
+        Assert.Equal(typeof(ResendNotifier), impl);
     }
 
     [Fact]
-    public void ResolveImplementation_Resend_MissingApiKey_ThrowsAtStartup()
+    public void ResolveImplementation_ResendTransport_MissingApiKey_ThrowsWithKeyName()
     {
-        var config = Substitute.For<IConfiguration>();
-        config["Notifications:Transport"].Returns("resend");
-        // No api key under any accepted alias.
-        Assert.Throws<System.InvalidOperationException>(
+        // Operator-visible fail-fast: the error message must name the
+        // missing key(s) so the fix is obvious from stdout alone.
+        var config = Config(
+            transport: "resend",
+            linkBase: "https://example.com/reset",
+            resendApiKey: null,
+            resendFromAddress: "noreply@example.com");
+
+        var ex = Assert.Throws<InvalidOperationException>(
             () => NotifierTransport.ResolveImplementation(config));
+        Assert.Contains("Notifications:Resend:ApiKey", ex.Message);
     }
 
     [Fact]
-    public void ResolveImplementation_Resend_AcceptsProviderStyleEnvName()
+    public void ResolveImplementation_ResendTransport_ApiKeyOnly_IsEnough()
     {
-        // Operators copy RESEND_API_KEY from Resend's own docs; accept it.
-        var config = Substitute.For<IConfiguration>();
-        config["Notifications:Transport"].Returns("resend");
-        config["RESEND_API_KEY"].Returns("re_alias_key");
-        Assert.Equal(typeof(ResendNotifier), NotifierTransport.ResolveImplementation(config));
+        // Deliberately NARROWER than the smtp validator. From-address and
+        // link-base have safe fallbacks inside ResendNotifier, so a missing
+        // optional key must degrade to a working default rather than refuse
+        // to boot: throwing here takes the WHOLE site down over a
+        // non-critical email setting. Learned on the first real deploy.
+        var config = Config(
+            transport: "resend", linkBase: null,
+            resendApiKey: "re_test_key", resendFromAddress: null);
+
+        var impl = NotifierTransport.ResolveImplementation(config);
+
+        Assert.Equal(typeof(ResendNotifier), impl);
     }
 
     [Fact]
-    public void ResolveImplementation_Resend_ApiKeyOnly_IsEnough()
+    public void ResolveImplementation_ResendTransport_AcceptsProviderStyleEnvName()
     {
-        // FromAddress + link base fall back to working defaults, so a
-        // missing optional key must NOT take the whole site down.
+        // An operator copies the key out of Resend's own dashboard, where
+        // it is called RESEND_API_KEY, and pastes THAT name into the host's
+        // env vars. Accepting only the app-style key turned that into a
+        // refused boot on the first real deploy.
         var config = Substitute.For<IConfiguration>();
         config["Notifications:Transport"].Returns("resend");
-        config["Resend:ApiKey"].Returns("re_only_key");
-        Assert.Equal(typeof(ResendNotifier), NotifierTransport.ResolveImplementation(config));
+        config["Notifications:Resend:ApiKey"].Returns((string?)null);
+        config["RESEND_API_KEY"].Returns("re_provider_style_key");
+
+        var impl = NotifierTransport.ResolveImplementation(config);
+
+        Assert.Equal(typeof(ResendNotifier), impl);
     }
 
+    [Fact]
+    public void ResolveFrom_NoConfiguredSender_FallsBackToResendTestSender()
+    {
+        // Resend's shared test sender only delivers to the account owner's
+        // own address — exactly the first-run case, and better than not
+        // sending at all.
+        var config = Substitute.For<IConfiguration>();
+
+        Assert.Equal("onboarding@resend.dev", ResendNotifier.ResolveFrom(config));
+    }
+
+    [Fact]
+    public void ResolveApiKey_AppStyleKey_WinsOverProviderStyleAlias()
+    {
+        var config = Substitute.For<IConfiguration>();
+        config["Notifications:Resend:ApiKey"].Returns("re_app_style");
+        config["RESEND_API_KEY"].Returns("re_provider_style");
+
+        Assert.Equal("re_app_style", ResendNotifier.ResolveApiKey(config));
+    }
+
+    [Fact]
+    public void ResolveLinkBase_Unset_FallsBackToPublicDashboardUrl()
+    {
+        // A reset email whose "link" is a bare token is a broken product
+        // experience; the fallback keeps the link whole even when the
+        // operator never set the key.
+        var config = Substitute.For<IConfiguration>();
+
+        var linkBase = ResendNotifier.ResolveLinkBase(config);
+
+        Assert.StartsWith("https://", linkBase);
+        Assert.Contains("parent.html", linkBase);
+    }
 }
