@@ -62,9 +62,21 @@ public class ParentController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
             return BadRequest(new { error = "Email and password are required" });
 
+        // Payload-only shape check — inspects the submitted address, not the
+        // registered set, so it leaks nothing about who has an account.
+        // Also blocks control chars (CR/LF header-injection into a future
+        // real email notifier).
+        if (!EmailNormalizer.IsValid(request.Email))
+            return BadRequest(new { error = "Please enter a valid email address." });
+
         const int MinPasswordLength = 8;
+        const int MaxPasswordLength = 128;
         if (request.Password.Length < MinPasswordLength)
             return BadRequest(new { error = "Password must be at least 8 characters." });
+        // Cap length: bounds request cost and avoids misleading users about
+        // strength (BCrypt silently ignores bytes past 72).
+        if (request.Password.Length > MaxPasswordLength)
+            return BadRequest(new { error = "Password must be at most 128 characters." });
 
         // C1: explicit consent capture. The DTO defaults AcceptedTerms to
         // false so a caller that omits the field is equivalent to declining.
@@ -342,9 +354,11 @@ public class ParentController : ControllerBase
     /// </summary>
     [HttpPost("devices/link")]
     [Authorize]
+    [EnableRateLimiting(AuthRateLimiter.PolicyName)]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]
+    [ProducesResponseType(429)]
     public async Task<IActionResult> LinkDevice([FromBody] LinkDeviceRequest request)
     {
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -595,7 +609,11 @@ public class ParentController : ControllerBase
             parentId, deviceId, request.Start, request.End);
         if (!ok)
             return NotFound(new { error = "Device not found or not linked to this account." });
-        return Ok(new { bedtimeWindow = new { start = request.Start, end = request.End } });
+        // Echo the POST-normalization state (not the raw request), so a
+        // client that trusts the response shows the window that is actually
+        // enforced — half-null and zero-length both collapse to disabled.
+        var (echoStart, echoEnd) = BedtimeWindowNormalizer.Normalize(request.Start, request.End);
+        return Ok(new { bedtimeWindow = new { start = echoStart, end = echoEnd } });
     }
 
     /// <summary>
@@ -613,18 +631,27 @@ public class ParentController : ControllerBase
     public async Task<IActionResult> SetDeviceModeFlags(
         Guid deviceId, [FromBody] DeviceModeFlagsRequest request)
     {
+        // Full-replacement contract: all four must be present. Reject a
+        // partial/empty body rather than silently disabling the unsent
+        // modes (fail-safe — a truncated request must not turn modes off).
+        if (request is null
+            || request.Story is null || request.Game is null
+            || request.Riddle is null || request.Curiosity is null)
+        {
+            return BadRequest(new { error = "All four mode flags (story, game, riddle, curiosity) are required." });
+        }
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var ok = await _parentService.SetDeviceModeFlagsAsync(
             parentId, deviceId,
-            request.Story, request.Game, request.Riddle, request.Curiosity);
+            request.Story.Value, request.Game.Value, request.Riddle.Value, request.Curiosity.Value);
         if (!ok)
             return NotFound(new { error = "Device not found or not linked to this account." });
         return Ok(new { modeFlags = new
         {
-            story = request.Story,
-            game = request.Game,
-            riddle = request.Riddle,
-            curiosity = request.Curiosity
+            story = request.Story.Value,
+            game = request.Game.Value,
+            riddle = request.Riddle.Value,
+            curiosity = request.Curiosity.Value
         } });
     }
 
@@ -761,6 +788,8 @@ public class ParentController : ControllerBase
         if (!string.Equals(blob.Value.MimeType, "audio/mpeg", StringComparison.OrdinalIgnoreCase))
             return NotFound(new { error = "Audio not available." });
 
+        // Child-adjacent recording — no browser disk cache after logout.
+        Response.Headers["Cache-Control"] = "no-store";
         return File(blob.Value.Content, "audio/mpeg");
     }
 }

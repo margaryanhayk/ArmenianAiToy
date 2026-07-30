@@ -147,6 +147,11 @@ public sealed record InternalEnqueueCommandRequest(
     System.Text.Json.JsonElement? Payload = null,
     int? TtlSeconds = null);
 
+// Owner recovery — set a locked-out parent's password. Console-gated
+// (fail-closed 404 unless the admin token is configured). Reason required;
+// the new password is never logged or echoed.
+public sealed record InternalParentPasswordResetRequest(string Email, string NewPassword, string Reason);
+
 // Story-QA tuning playground (Phase 2). Operator-only; text-only; calls
 // OpenAI (cost) but mutates nothing and persists nothing.
 public sealed record AdminStoryQaTestRequest(

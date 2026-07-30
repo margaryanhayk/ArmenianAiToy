@@ -8,6 +8,16 @@ public interface IConversationService
 {
     Task<Conversation> GetOrCreateActiveConversationAsync(Guid deviceId, Guid? childId);
     Task<Message> AddMessageAsync(Guid conversationId, MessageRole role, string content, SafetyFlag flag = SafetyFlag.Clean);
+
+    /// <summary>
+    /// E1.3: stamps the runtime-resolved conversation mode ("story",
+    /// "game", "riddle", "curiosity", "calm") onto an already-persisted
+    /// message row. A separate method — rather than a new parameter on
+    /// <see cref="AddMessageAsync"/> — so the many existing call sites
+    /// and test doubles of the 4-argument shape stay untouched. No-op on
+    /// an unknown message id.
+    /// </summary>
+    Task StampMessageModeAsync(Guid messageId, string? mode);
     Task<List<(string Role, string Content)>> GetRecentMessagesAsync(Guid conversationId, int count = 20);
     Task<List<ConversationDto>> GetConversationHistoryAsync(Guid deviceId, int limit = 10, int offset = 0);
     Task<ConversationDto?> GetConversationByIdAsync(Guid conversationId);

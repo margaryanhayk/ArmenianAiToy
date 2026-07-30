@@ -33,6 +33,7 @@ public static class NotifierTransport
 {
     public const string Log = "log";
     public const string Smtp = "smtp";
+    public const string Resend = "resend";
 
     /// <summary>
     /// Returns the concrete <see cref="ArmenianAiToy.Application.Notifications.INotifier"/>
@@ -55,9 +56,31 @@ public static class NotifierTransport
             return typeof(SmtpNotifier);
         }
 
+        if (transport == Resend)
+        {
+            ValidateResendConfig(config);
+            return typeof(ResendNotifier);
+        }
+
         throw new System.InvalidOperationException(
             $"Notifications:Transport value '{raw}' is not recognised. " +
-            $"Expected '{Log}' or '{Smtp}'.");
+            $"Expected '{Log}', '{Smtp}' or '{Resend}'.");
+    }
+
+    private static void ValidateResendConfig(IConfiguration config)
+    {
+        // Only the API key is genuinely required — without it no send can
+        // ever succeed. FromAddress falls back to Resend's shared test
+        // sender and the link base to the public dashboard URL (see
+        // ResendNotifier), so a missing optional key degrades to a working
+        // default instead of refusing to boot. Deliberately narrower than
+        // the SMTP validator: a boot failure here takes the whole site down
+        // for a NON-critical email setting, which is the worse outcome.
+        var apiKey = ResendNotifier.ResolveApiKey(config);
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new System.InvalidOperationException(
+                "Notifications:Transport=resend requires an API key. Set " +
+                "Resend__ApiKey (or RESEND_API_KEY) to your re_... key.");
     }
 
     private static void ValidateSmtpConfig(IConfiguration config)

@@ -15,4 +15,8 @@ public record ConversationSummaryDto(
     string? FirstUserSnippet,
     string? LastAssistantSnippet,
     SafetyFlag? LastAssistantSafetyFlag = null,
-    int FlaggedMessageCount = 0);
+    int FlaggedMessageCount = 0,
+    // E1.3: distinct runtime-stamped modes present in this conversation
+    // ("story", "game", …), in no guaranteed order. Empty for
+    // conversations recorded before mode stamping existed. Additive.
+    List<string>? Modes = null);

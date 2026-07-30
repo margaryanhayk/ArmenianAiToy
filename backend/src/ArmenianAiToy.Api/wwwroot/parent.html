@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Parent Dashboard</title>
+  <title>Areg — Parent Dashboard</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -19,38 +19,179 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 4px 20px;
+      gap: 10px;
+      background: linear-gradient(135deg, #fff6e3, #ffeccb);
+      border: 1px solid #f3e2bd;
+      border-radius: 18px;
+      padding: 14px 16px;
+      margin: 4px 0 16px;
+      box-shadow: 0 2px 12px rgba(91,62,138,0.07);
     }
-    .header h1 { font-size: 22px; color: #5b3e8a; }
-    .header .sub { font-size: 12px; color: #9a8ab5; }
+    .header .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .header .logo {
+      width: 46px;
+      height: 46px;
+      flex: none;
+      border-radius: 50%;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      box-shadow: inset 0 0 0 2px #f3e2bd;
+    }
+    .header h1 { font-size: 22px; color: #4b2e83; letter-spacing: 0.2px; }
+    .header .sub { font-size: 12px; color: #8a7554; }
     .header .right { display: flex; gap: 8px; align-items: center; }
 
     .card {
       background: white;
-      border-radius: 14px;
+      border-radius: 16px;
       padding: 20px;
-      box-shadow: 0 2px 12px rgba(91,62,138,0.08);
+      box-shadow: 0 4px 18px rgba(91,62,138,0.07);
       margin-bottom: 14px;
     }
-    .card h2 { font-size: 15px; color: #5b3e8a; margin-bottom: 12px; }
+    .card h2 { font-size: 16px; color: #5b3e8a; margin-bottom: 12px; }
 
     label { display: block; font-size: 12px; color: #6b5b8a; margin-bottom: 4px; }
     input {
       width: 100%;
-      padding: 10px 12px;
+      padding: 12px 14px;
       border: 2px solid #e0d6f0;
-      border-radius: 10px;
-      font-size: 14px;
+      border-radius: 12px;
+      font-size: 15px;
       margin-bottom: 12px;
     }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #7c5cbf;
+    }
+    /* The generic input rule above is meant for text fields; without
+       these overrides it inflates checkboxes and time pickers into
+       full-width blobs on mobile (device panel: Modes / Bedtime). */
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      padding: 0;
+      margin: 0;
+      border: none;
+      border-radius: 0;
+      flex: none;
+      accent-color: #7c5cbf;
+    }
+    input[type="time"] {
+      width: auto;
+      max-width: 130px;
+      padding: 6px 8px;
+      margin: 0;
+    }
+
+    /* Design-system pass — shared visual vocabulary for the device
+       panel (chips, control sections, ghost buttons). Matches the
+       Areg Design System kit: purple family, pill status chips,
+       outlined destructive actions. */
+    .chip {
+      display: inline-block;
+      margin: 4px 6px 0 0;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid transparent;
+    }
+    .chip-ok     { background: #e6f6ec; border-color: #b9e4c9; color: #1e7a45; }
+    .chip-muted  { background: #f2f2f2; border-color: #dddddd; color: #666666; }
+    .chip-warn   { background: #fef3c7; border-color: #e7c66a; color: #92400e; }
+    .chip-danger { background: #fee2e2; border-color: #e8a7a7; color: #991b1b; }
+    .chip-info   { background: #f5f0ff; border-color: #e4d9f7; color: #5b3e8a; }
+
+    .ctl-row {
+      margin: 6px 0 10px;
+      padding: 12px 14px;
+      background: #faf8ff;
+      border: 1px solid #e4d9f7;
+      border-radius: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+      color: #2b1f47;
+    }
+    .ctl-label { color: #6b5b8a; font-weight: 600; }
+    .ctl-hint  { color: #9a8ab5; font-size: 11px; flex-basis: 100%; }
+
+    .btn-ghost {
+      padding: 6px 12px;
+      font-size: 12px;
+      background: #ffffff;
+      border: 1px solid #cbb8ec;
+      color: #5b3e8a;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-ghost:hover { background: #f5f0ff; }
+    .btn-ghost-ok {
+      padding: 6px 12px;
+      font-size: 13px;
+      background: #ffffff;
+      border: 1px solid #b9e4c9;
+      color: #1e7a45;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-ghost-ok:hover { background: #e6f6ec; }
+    .btn-ghost-danger {
+      padding: 6px 12px;
+      font-size: 13px;
+      background: #ffffff;
+      border: 1px solid #d9a19e;
+      color: #b3403a;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-ghost-danger:hover { background: #fdf0ef; }
+
+    /* Grouped-settings vocabulary (Family-Link/Yoto-style): quiet
+       uppercase captions between control groups, and a visually
+       separated "careful zone" for destructive actions. */
+    .section-cap {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #9a8ab5;
+      margin: 16px 2px 6px;
+    }
+    .danger-zone {
+      border-top: 1px dashed #e8cfcf;
+      margin-top: 14px;
+      padding-top: 10px;
+    }
+
+    /* Today panel stat tiles */
+    .stat-tiles { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .stat-tile {
+      background: #ffffff;
+      border: 1px solid #e4d9f7;
+      border-radius: 12px;
+      padding: 8px 10px;
+      min-width: 80px;
+      flex: 1;
+      text-align: center;
+    }
+    .stat-value { font-size: 16px; font-weight: 700; color: #4b2e83; }
+    .stat-label { font-size: 11px; color: #9a8ab5; }
+    .stat-tile.stat-warn { background: #fff8ee; border-color: #e7c66a; }
+    .stat-tile.stat-warn .stat-value { color: #92400e; }
     button {
-      padding: 9px 14px;
+      padding: 11px 16px;
       background: #7c5cbf;
       color: white;
       border: none;
-      border-radius: 10px;
+      border-radius: 12px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 14px;
+      font-weight: 600;
     }
     button:hover { background: #6b4aad; }
     button.secondary { background: #e0d6f0; color: #5b3e8a; }
@@ -60,6 +201,7 @@
       color: #7c5cbf;
       padding: 0;
       font-size: 13px;
+      font-weight: 500;
       text-decoration: underline;
     }
     button.link:hover { background: none; color: #5b3e8a; }
@@ -105,10 +247,10 @@
     .today-panel {
       font-size: 13px;
       color: #5b3e8a;
-      background: #f5f0ff;
+      background: linear-gradient(135deg, #f5f0ff, #fdfbff);
       border: 1px solid #e4d9f7;
-      border-radius: 6px;
-      padding: 10px 12px;
+      border-radius: 12px;
+      padding: 12px 14px;
       margin: 0 0 10px;
     }
     .today-panel h3 {
@@ -186,8 +328,8 @@
       vertical-align: middle;
     }
     .tabs button {
-      padding: 5px 12px;
-      font-size: 12px;
+      padding: 7px 14px;
+      font-size: 13px;
       background: #ece4f8;
       color: #5b3e8a;
       border-radius: 999px;
@@ -199,22 +341,25 @@
     .status { font-size: 13px; padding: 8px 0; min-height: 20px; }
     .status.err { color: #c62828; }
     .status.muted { color: #9a8ab5; }
+    .status.ok { color: #1e7a45; font-weight: 600; }
 
     .row {
       display: block;
       width: 100%;
       text-align: left;
       background: #faf7ff;
-      border: 1px solid #ece4f8;
-      border-radius: 10px;
-      padding: 12px 14px;
-      margin-bottom: 8px;
+      border: 1px solid #e4d9f7;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
       cursor: pointer;
       font-size: 14px;
       color: #2b1f47;
     }
     .row:hover { background: #f0e8fc; }
 
+    .row .top span:first-child { font-weight: 600; font-size: 15px; color: #2b1f47; }
+    .row .top span:last-child:not(:first-child) { color: #7c5cbf; font-size: 13px; }
     .row .top {
       display: flex;
       justify-content: space-between;
@@ -268,14 +413,29 @@
     }
 
     .msg {
-      border-left: 3px solid #e0d6f0;
-      padding: 8px 12px;
+      border: 1px solid #e0d6f0;
+      padding: 10px 14px;
       margin-bottom: 10px;
       background: #faf7ff;
-      border-radius: 0 8px 8px 0;
+      border-radius: 14px;
+      max-width: 88%;
     }
-    .msg.flagged { border-left-color: #c62828; background: #fff5f6; }
-    .msg.flagged.warn { border-left-color: #e65100; background: #fff8f0; }
+    /* Chat-bubble layout: child speaks from the left (warm cream),
+       Areg answers from the right (soft lavender). */
+    .msg.from-child {
+      background: #fff6e3;
+      border-color: #f3e2bd;
+      margin-right: auto;
+      border-bottom-left-radius: 4px;
+    }
+    .msg.from-toy {
+      background: #f3edfc;
+      border-color: #e4d9f7;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+    .msg.flagged { border-left: 3px solid #c62828; background: #fff5f6; }
+    .msg.flagged.warn { border-left: 3px solid #e65100; background: #fff8f0; }
     /* Transient highlight when the parent jumps to a specific message
        from the Flagged tab. JS adds the class on arrival and removes
        it after ~1.8s. The box-shadow transition fades the outline out
@@ -305,8 +465,10 @@
     .pager {
       display: flex;
       justify-content: space-between;
+      gap: 8px;
       margin-top: 10px;
     }
+    .pager button { flex: 1; }
 
     [hidden] { display: none !important; }
   </style>
@@ -314,27 +476,36 @@
 <body>
   <div class="app">
     <div class="header">
-      <div>
-        <h1>Parent Dashboard</h1>
-        <div class="sub">Read-only conversation viewer</div>
+      <div class="brand">
+        <div class="logo">🧸</div>
+        <div>
+          <h1>Areg</h1>
+          <div class="sub" data-i18n="tagline">Parent dashboard — your child's play at a glance</div>
+        </div>
       </div>
       <div class="right">
-        <button id="logoutBtn" class="secondary" hidden>Log out</button>
+        <select id="langSelect" aria-label="Language"
+                style="padding:6px 8px;border:1px solid #e0d6f0;border-radius:8px;background:#fff;color:#5b3e8a;font-size:13px;cursor:pointer;">
+          <option value="en">English</option>
+          <option value="ru">Русский</option>
+          <option value="hy">Հայերեն</option>
+        </select>
+        <button id="logoutBtn" class="secondary" hidden data-i18n="logout">Log out</button>
       </div>
     </div>
 
     <!-- Login view -->
     <section id="loginView" class="card" hidden>
-      <h2>Log in</h2>
-      <label for="emailInput">Email</label>
+      <h2 data-i18n="login_title">👋 Welcome back</h2>
+      <label for="emailInput" data-i18n="email">Email</label>
       <input id="emailInput" type="email" autocomplete="username">
-      <label for="passwordInput">Password</label>
+      <label for="passwordInput" data-i18n="password">Password</label>
       <input id="passwordInput" type="password" autocomplete="current-password">
-      <button id="loginBtn">Log in</button>
+      <button id="loginBtn" data-i18n="login_btn">Log in</button>
       <button id="forgotPasswordBtn" class="link" type="button"
-              style="margin-left:8px;">Forgot password?</button>
+              style="margin-left:8px;" data-i18n="forgot">Forgot password?</button>
       <button id="verifyEmailRequestBtn" class="link" type="button"
-              style="margin-left:8px;">Didn't get a verification email?</button>
+              style="margin-left:8px;" data-i18n="no_verif">Didn't get a verification email?</button>
       <div id="loginStatus" class="status" aria-live="polite"></div>
       <!--
         Google sign-in block. Hidden by default; unhidden by the boot
@@ -362,12 +533,12 @@
       response body.
     -->
     <section id="resetRequestView" class="card" hidden>
-      <h2>Reset your password</h2>
-      <label for="resetRequestEmailInput">Email</label>
+      <h2 data-i18n="reset_title">Reset your password</h2>
+      <label for="resetRequestEmailInput" data-i18n="email">Email</label>
       <input id="resetRequestEmailInput" type="email" autocomplete="username">
-      <button id="resetRequestBtn">Send reset link</button>
+      <button id="resetRequestBtn" data-i18n="send_reset">Send reset link</button>
       <button id="resetRequestBackBtn" class="link" type="button"
-              style="margin-left:8px;">Back to login</button>
+              style="margin-left:8px;" data-i18n="back_to_login">Back to login</button>
       <div id="resetRequestStatus" class="status" aria-live="polite"></div>
     </section>
 
@@ -380,12 +551,12 @@
       body.
     -->
     <section id="verifyEmailRequestView" class="card" hidden>
-      <h2>Send verification email</h2>
-      <label for="verifyEmailInput">Email</label>
+      <h2 data-i18n="send_verif_title">Send verification email</h2>
+      <label for="verifyEmailInput" data-i18n="email">Email</label>
       <input id="verifyEmailInput" type="email" autocomplete="username">
-      <button id="verifyEmailRequestSubmitBtn">Send verification email</button>
+      <button id="verifyEmailRequestSubmitBtn" data-i18n="send_verif_btn">Send verification email</button>
       <button id="verifyEmailRequestBackBtn" class="link" type="button"
-              style="margin-left:8px;">Back to login</button>
+              style="margin-left:8px;" data-i18n="back_to_login">Back to login</button>
       <div id="verifyEmailRequestStatus" class="status" aria-live="polite"></div>
     </section>
 
@@ -399,13 +570,13 @@
       for any failure reason; this UI surfaces that message verbatim.
     -->
     <section id="verifyEmailCompleteView" class="card" hidden>
-      <h2>Verify your email</h2>
+      <h2 data-i18n="verify_title">Verify your email</h2>
       <p style="margin:0 0 12px;color:#6b5b8a;font-size:13px;">
-        Click below to confirm your email address.
+        <span data-i18n="confirm_verify">Click below to confirm your email address.</span>
       </p>
-      <button id="verifyEmailCompleteBtn">Verify email</button>
+      <button id="verifyEmailCompleteBtn" data-i18n="verify_btn">Verify email</button>
       <button id="verifyEmailCompleteBackBtn" class="link" type="button"
-              style="margin-left:8px;">Back to login</button>
+              style="margin-left:8px;" data-i18n="back_to_login">Back to login</button>
       <div id="verifyEmailCompleteStatus" class="status" aria-live="polite"></div>
     </section>
 
@@ -419,22 +590,22 @@
       this UI surfaces that message verbatim.
     -->
     <section id="resetPasswordView" class="card" hidden>
-      <h2>Choose a new password</h2>
-      <label for="resetPasswordNewInput">New password</label>
+      <h2 data-i18n="new_pw_title">Choose a new password</h2>
+      <label for="resetPasswordNewInput" data-i18n="new_password">New password</label>
       <input id="resetPasswordNewInput" type="password" autocomplete="new-password">
-      <label for="resetPasswordConfirmInput">Confirm new password</label>
+      <label for="resetPasswordConfirmInput" data-i18n="confirm_new_password">Confirm new password</label>
       <input id="resetPasswordConfirmInput" type="password" autocomplete="new-password">
-      <button id="resetPasswordSubmitBtn">Set new password</button>
+      <button id="resetPasswordSubmitBtn" data-i18n="set_new_pw">Set new password</button>
       <button id="resetPasswordBackBtn" class="link" type="button"
-              style="margin-left:8px;">Back to login</button>
+              style="margin-left:8px;" data-i18n="back_to_login">Back to login</button>
       <div id="resetPasswordStatus" class="status" aria-live="polite"></div>
     </section>
 
     <!-- Devices view -->
     <section id="devicesView" class="card" hidden>
-      <h2>Linked devices</h2>
+      <h2 data-i18n="linked_devices">🧸 Linked devices</h2>
       <div style="margin:0 0 8px;">
-        <button id="openAuditBtn" class="link" type="button">View your activity →</button>
+        <button id="openAuditBtn" class="link" type="button" data-i18n="view_activity">View your activity →</button>
       </div>
       <!--
         Consumer pairing (Phase A.2): claim a toy with the single-use code
@@ -443,22 +614,22 @@
         a second toy can be added. Posts to POST /api/parents/devices/claim.
       -->
       <div style="margin:0 0 12px;">
-        <button id="toggleClaimBtn" class="link" type="button">＋ Add a toy</button>
+        <button id="toggleClaimBtn" class="link" type="button" data-i18n="add_toy">＋ Add a toy</button>
         <div id="claimDeviceForm" hidden
              style="margin-top:8px;padding:10px 12px;background:#f0f7f0;
                     border:1px solid #b6d6b6;border-radius:6px;max-width:420px;">
-          <p style="margin:0 0 8px;font-size:13px;color:#3a5a3a;">
+          <p style="margin:0 0 8px;font-size:13px;color:#3a5a3a;" data-i18n="claim_help">
             Enter the pairing code from your toy's box or setup card (the app can
             scan its QR instead). This links the toy to your account.</p>
-          <label for="claimDeviceIdInput" style="display:block;font-size:12px;color:#555;">Device ID</label>
+          <label for="claimDeviceIdInput" style="display:block;font-size:12px;color:#555;" data-i18n="device_id">Device ID</label>
           <input id="claimDeviceIdInput" type="text" autocomplete="off"
                  placeholder="00000000-0000-0000-0000-000000000000"
                  style="width:100%;padding:5px 8px;margin:2px 0 8px;box-sizing:border-box;">
-          <label for="claimCodeInput" style="display:block;font-size:12px;color:#555;">Pairing code</label>
+          <label for="claimCodeInput" style="display:block;font-size:12px;color:#555;" data-i18n="pairing_code">Pairing code</label>
           <input id="claimCodeInput" type="text" autocomplete="off"
-                 placeholder="code from the toy"
+                 placeholder="code from the toy" data-i18n-ph="ph_pairing"
                  style="width:100%;padding:5px 8px;margin:2px 0 8px;box-sizing:border-box;">
-          <button id="claimDeviceBtn" type="button">Pair toy</button>
+          <button id="claimDeviceBtn" type="button" data-i18n="pair_toy">Pair toy</button>
           <div id="claimDeviceStatus" class="status muted" aria-live="polite"></div>
         </div>
       </div>
@@ -476,27 +647,27 @@
       <div id="devicesList"></div>
       <div id="devicesStatus" class="status muted" aria-live="polite"></div>
       <div id="linkDeviceEmptyState" class="link-device-empty" hidden>
-        <p class="link-device-help">To link a toy to this account, enter the Device ID and API key shown on the toy's setup card.</p>
+        <p class="link-device-help" data-i18n="link_help">To link a toy to this account, enter the Device ID and API key shown on the toy's setup card.</p>
         <label for="linkDeviceIdInput">Device ID</label>
         <input id="linkDeviceIdInput" type="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
         <label for="linkApiKeyInput">API key</label>
         <input id="linkApiKeyInput" type="text" autocomplete="off" placeholder="dtk_…">
-        <button id="linkDeviceBtn" type="button">Link device</button>
+        <button id="linkDeviceBtn" type="button" data-i18n="link_device">Link device</button>
         <div id="linkDeviceStatus" class="status muted" aria-live="polite"></div>
       </div>
       <div class="account-panel">
-        <button id="togglePasswordBtn" class="link" type="button" aria-expanded="false" aria-controls="changePasswordForm">Change password</button>
+        <button id="togglePasswordBtn" class="link" type="button" aria-expanded="false" aria-controls="changePasswordForm" data-i18n="change_password">Change password</button>
         <div id="changePasswordForm" hidden>
-          <label for="currentPasswordInput">Current password</label>
+          <label for="currentPasswordInput" data-i18n="current_password">Current password</label>
           <input id="currentPasswordInput" type="password" autocomplete="current-password">
           <label for="newPasswordInput">New password (min 8 characters)</label>
           <input id="newPasswordInput" type="password" autocomplete="new-password">
           <label for="confirmPasswordInput">Confirm new password</label>
           <input id="confirmPasswordInput" type="password" autocomplete="new-password">
-          <button id="changePasswordBtn" type="button">Update password</button>
+          <button id="changePasswordBtn" type="button" data-i18n="update_password">Update password</button>
           <div id="changePasswordStatus" class="status muted" aria-live="polite"></div>
         </div>
-        <button id="toggleDeleteAccountBtn" class="link" type="button" aria-expanded="false" aria-controls="deleteAccountForm" style="color:#c66;margin-left:12px">Delete account</button>
+        <button id="toggleDeleteAccountBtn" class="link" type="button" aria-expanded="false" aria-controls="deleteAccountForm" style="color:#c66;margin-left:12px" data-i18n="delete_account">Delete account</button>
         <div id="deleteAccountForm" hidden>
           <div style="background:#fee2e2;border:1px solid #c66;padding:10px;border-radius:6px;margin:8px 0;font-size:13px;color:#933">
             <strong>This cannot be undone.</strong> Your account will be deleted. Any devices only you have linked — along with their children, conversations, and messages — will also be permanently deleted. Devices shared with another parent will remain for them.
@@ -505,19 +676,34 @@
           <input id="deleteAccountPasswordInput" type="password" autocomplete="current-password">
           <label for="deleteAccountConfirmInput">Type DELETE to confirm</label>
           <input id="deleteAccountConfirmInput" type="text" autocomplete="off">
-          <button id="deleteAccountBtn" type="button" style="background:#c66;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:4px">Permanently delete account</button>
+          <button id="deleteAccountBtn" type="button" style="background:#c66;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:4px" data-i18n="delete_account_confirm">Permanently delete account</button>
           <div id="deleteAccountStatus" class="status muted" aria-live="polite"></div>
         </div>
       </div>
     </section>
 
+    <!-- Toy detail view — one toy's own page (like opening a profile):
+         name + child + status at the top, a button into its conversations,
+         then all of THIS toy's settings. Reached by tapping a toy card. -->
+    <section id="toyView" class="card" hidden>
+      <h2>
+        <button class="link" id="toyBackBtn" type="button" aria-label="Back to toys"
+                data-i18n="nav_toys">← Toys</button>
+      </h2>
+      <div id="toyHeader" style="margin:4px 0 12px;"></div>
+      <button id="toyConversationsBtn" type="button" style="margin:0 0 8px;"
+              data-i18n="view_conversations">View conversations →</button>
+      <div id="toySettings"></div>
+      <div id="toyStatus" class="status muted" aria-live="polite"></div>
+    </section>
+
     <!-- Summaries view -->
     <section id="summariesView" class="card" hidden>
       <h2>
-        <button class="link" id="backToDevices" aria-label="Back to devices">← Devices</button>
+        <button class="link" id="backToDevices" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button>
         <span class="tabs" role="tablist" aria-label="Device views">
-          <button data-tab="summaries" role="tab" aria-selected="false">Conversations</button>
-          <button data-tab="flagged" role="tab" aria-selected="false">Flagged</button>
+          <button data-tab="summaries" role="tab" aria-selected="false" data-i18n="tab_conversations">Conversations</button>
+          <button data-tab="flagged" role="tab" aria-selected="false" data-i18n="tab_flagged">Flagged</button>
         </span>
       </h2>
       <div id="summariesDeviceContext" class="device-context"></div>
@@ -525,7 +711,7 @@
            paginated conversation list. Hidden until loadTodayPanel
            populates it. -->
       <section id="todayPanel" class="today-panel" hidden aria-live="polite">
-        <h3>Today (UTC)</h3>
+        <h3 data-i18n="today">☀️ Today</h3>
         <div id="todayCounts" class="today-counts"></div>
         <div id="todayNewest"></div>
         <div id="todayFlagged"></div>
@@ -534,8 +720,8 @@
       <div id="summariesList"></div>
       <div id="summariesStatus" class="status muted" aria-live="polite"></div>
       <div class="pager">
-        <button id="newerBtn" class="secondary" aria-label="Newer page">← Newer</button>
-        <button id="olderBtn" class="secondary" aria-label="Older page">Older →</button>
+        <button id="newerBtn" class="secondary" aria-label="Newer page" data-i18n="newer">← Newer</button>
+        <button id="olderBtn" class="secondary" aria-label="Older page" data-i18n="older">Older →</button>
       </div>
       <div id="summariesPagerInfo" class="pager-info"></div>
     </section>
@@ -543,10 +729,10 @@
     <!-- Flagged view -->
     <section id="flaggedView" class="card" hidden>
       <h2>
-        <button class="link" id="flaggedBackToDevices" aria-label="Back to devices">← Devices</button>
+        <button class="link" id="flaggedBackToDevices" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button>
         <span class="tabs" role="tablist" aria-label="Device views">
-          <button data-tab="summaries" role="tab" aria-selected="false">Conversations</button>
-          <button data-tab="flagged" role="tab" aria-selected="false">Flagged</button>
+          <button data-tab="summaries" role="tab" aria-selected="false" data-i18n="tab_conversations">Conversations</button>
+          <button data-tab="flagged" role="tab" aria-selected="false" data-i18n="tab_flagged">Flagged</button>
         </span>
       </h2>
       <div id="flaggedDeviceContext" class="device-context"></div>
@@ -557,8 +743,8 @@
       <div id="flaggedList"></div>
       <div id="flaggedStatus" class="status muted" aria-live="polite"></div>
       <div class="pager">
-        <button id="flaggedNewerBtn" class="secondary" aria-label="Newer page">← Newer</button>
-        <button id="flaggedOlderBtn" class="secondary" aria-label="Older page">Older →</button>
+        <button id="flaggedNewerBtn" class="secondary" aria-label="Newer page" data-i18n="newer">← Newer</button>
+        <button id="flaggedOlderBtn" class="secondary" aria-label="Older page" data-i18n="older">Older →</button>
       </div>
       <div id="flaggedPagerInfo" class="pager-info"></div>
     </section>
@@ -566,8 +752,8 @@
     <!-- Detail view -->
     <section id="detailView" class="card" hidden>
       <h2>
-        <button class="link" id="backFromDetailBtn" aria-label="Back to list">← Back</button>
-        <button id="deleteConversationBtn" type="button" style="color:#c66;margin-left:12px;background:none;border:none;cursor:pointer;font-size:13px" hidden>Delete conversation</button>
+        <button class="link" id="backFromDetailBtn" aria-label="Back to list" data-i18n="nav_back">← Back</button>
+        <button id="deleteConversationBtn" type="button" style="color:#c66;margin-left:12px;background:none;border:none;cursor:pointer;font-size:13px" hidden data-i18n="delete_conversation">Delete conversation</button>
       </h2>
       <div id="detailMeta" class="status muted" aria-live="polite"></div>
       <div id="detailMessages"></div>
@@ -578,7 +764,7 @@
          parent*, not per device: a device shared with another parent
          does not leak that parent's actions into this feed. -->
     <section id="auditView" class="card" hidden>
-      <h2><button class="link" id="backFromAudit" aria-label="Back to devices">← Devices</button> Your activity</h2>
+      <h2><button class="link" id="backFromAudit" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button> <span data-i18n="your_activity">Your activity</span></h2>
       <p style="color:#555;font-size:13px;margin:4px 0 12px;">
         Actions you have taken on this account. Per-device activity
         (conversations, flagged messages) is shown under each device.
@@ -586,8 +772,8 @@
       <div id="auditList"></div>
       <div id="auditStatus" class="status muted" aria-live="polite"></div>
       <div class="pager">
-        <button id="auditNewerBtn" class="secondary" aria-label="Newer page">← Newer</button>
-        <button id="auditOlderBtn" class="secondary" aria-label="Older page">Older →</button>
+        <button id="auditNewerBtn" class="secondary" aria-label="Newer page" data-i18n="newer">← Newer</button>
+        <button id="auditOlderBtn" class="secondary" aria-label="Older page" data-i18n="older">Older →</button>
       </div>
       <div id="auditPagerInfo" class="pager-info"></div>
     </section>
@@ -597,11 +783,151 @@
   (function () {
     'use strict';
 
+    // ---------- i18n (page chrome only — NOT stories/conversations) ----------
+    // Three UI languages: English, Русский, Հայերեն. The child-facing content
+    // (story text, chat) is unaffected; only dashboard labels/buttons/headings
+    // are translated. Choice persists in localStorage. t(key) returns the
+    // string for the active language (English fallback for any missing key).
+    var LANG_KEY = 'areg_parent_lang';
+    var SUPPORTED_LANGS = ['en', 'ru', 'hy'];
+    var I18N = {
+      tagline: { en: "Parent dashboard — your child's play at a glance", ru: 'Родительская панель — занятия ребёнка с первого взгляда', hy: 'Ծնողական վահանակ — ձեր երեխայի խաղը մեկ հայացքով' },
+      logout: { en: 'Log out', ru: 'Выйти', hy: 'Դուրս գալ' },
+      login_title: { en: '👋 Welcome back', ru: '👋 С возвращением', hy: '👋 Բարի վերադարձ' },
+      email: { en: 'Email', ru: 'Эл. почта', hy: 'Էլ. փոստ' },
+      password: { en: 'Password', ru: 'Пароль', hy: 'Գաղտնաբառ' },
+      login_btn: { en: 'Log in', ru: 'Войти', hy: 'Մուտք' },
+      forgot: { en: 'Forgot password?', ru: 'Забыли пароль?', hy: 'Մոռացե՞լ եք գաղտնաբառը' },
+      no_verif: { en: "Didn't get a verification email?", ru: 'Не пришло письмо-подтверждение?', hy: 'Չստացա՞ք հաստատման նամակը' },
+      reset_title: { en: 'Reset your password', ru: 'Сброс пароля', hy: 'Վերականգնել գաղտնաբառը' },
+      send_reset: { en: 'Send reset link', ru: 'Отправить ссылку', hy: 'Ուղարկել հղումը' },
+      back: { en: '← Back', ru: '← Назад', hy: '← Հետ' },
+      send_verif_title: { en: 'Send verification email', ru: 'Отправить письмо-подтверждение', hy: 'Ուղարկել հաստատման նամակ' },
+      send_verif_btn: { en: 'Send verification email', ru: 'Отправить письмо', hy: 'Ուղարկել նամակը' },
+      verify_title: { en: 'Verify your email', ru: 'Подтвердите эл. почту', hy: 'Հաստատեք էլ. փոստը' },
+      verify_btn: { en: 'Verify email', ru: 'Подтвердить', hy: 'Հաստատել' },
+      new_pw_title: { en: 'Choose a new password', ru: 'Новый пароль', hy: 'Ընտրեք նոր գաղտնաբառ' },
+      set_new_pw: { en: 'Set new password', ru: 'Установить пароль', hy: 'Սահմանել գաղտնաբառը' },
+      linked_devices: { en: '🧸 Linked devices', ru: '🧸 Привязанные игрушки', hy: '🧸 Կապակցված խաղալիքներ' },
+      view_activity: { en: 'View your activity →', ru: 'Моя активность →', hy: 'Իմ գործողությունները →' },
+      add_toy: { en: '＋ Add a toy', ru: '＋ Добавить игрушку', hy: '＋ Ավելացնել խաղալիք' },
+      pair_toy: { en: 'Pair toy', ru: 'Привязать', hy: 'Կապակցել' },
+      link_device: { en: 'Link device', ru: 'Привязать устройство', hy: 'Կապակցել սարքը' },
+      change_password: { en: 'Change password', ru: 'Сменить пароль', hy: 'Փոխել գաղտնաբառը' },
+      update_password: { en: 'Update password', ru: 'Обновить пароль', hy: 'Թարմացնել գաղտնաբառը' },
+      delete_account: { en: 'Delete account', ru: 'Удалить аккаунт', hy: 'Ջնջել հաշիվը' },
+      delete_account_confirm: { en: 'Permanently delete account', ru: 'Удалить аккаунт навсегда', hy: 'Ընդմիշտ ջնջել հաշիվը' },
+      nav_devices: { en: '← Devices', ru: '← Игрушки', hy: '← Խաղալիքներ' },
+      tab_conversations: { en: 'Conversations', ru: 'Разговоры', hy: 'Զրույցներ' },
+      tab_flagged: { en: 'Flagged', ru: 'Отмеченные', hy: 'Նշվածներ' },
+      today: { en: '☀️ Today', ru: '☀️ Сегодня', hy: '☀️ Այսօր' },
+      newer: { en: '← Newer', ru: '← Новее', hy: '← Ավելի նոր' },
+      older: { en: 'Older →', ru: 'Старее →', hy: 'Ավելի հին →' },
+      nav_back: { en: '← Back', ru: '← Назад', hy: '← Հետ' },
+      delete_conversation: { en: 'Delete conversation', ru: 'Удалить разговор', hy: 'Ջնջել զրույցը' },
+      your_activity: { en: 'Your activity', ru: 'Моя активность', hy: 'Իմ գործողությունները' },
+      toy_settings: { en: 'Toy settings', ru: 'Настройки игрушки', hy: 'Խաղալիքի կարգավորումներ' },
+      careful_zone: { en: 'Careful zone', ru: 'Осторожная зона', hy: 'Զգույշ գոտի' },
+      pause: { en: 'Pause', ru: 'Пауза', hy: 'Դադար' },
+      resume: { en: 'Resume', ru: 'Продолжить', hy: 'Շարունակել' },
+      bedtime_label: { en: '🌙 Bedtime:', ru: '🌙 Сон:', hy: '🌙 Քնելու ժամ:' },
+      modes_label: { en: '🎮 Modes:', ru: '🎮 Режимы:', hy: '🎮 Ռեժիմներ:' },
+      name_label: { en: '✏️ Name:', ru: '✏️ Имя:', hy: '✏️ Անուն:' },
+      save: { en: 'Save', ru: 'Сохранить', hy: 'Պահպանել' },
+      save_name: { en: 'Save name', ru: 'Сохранить имя', hy: 'Պահպանել անունը' },
+      save_modes: { en: 'Save modes', ru: 'Сохранить режимы', hy: 'Պահպանել ռեժիմները' },
+      revoke: { en: 'Revoke access', ru: 'Отозвать доступ', hy: 'Հետ կանչել մուտքը' },
+      restore: { en: 'Restore access', ru: 'Восстановить доступ', hy: 'Վերականգնել մուտքը' },
+      unlink: { en: 'Unlink', ru: 'Отвязать', hy: 'Անջատել' },
+      remove: { en: 'Remove', ru: 'Удалить', hy: 'Հեռացնել' },
+      online: { en: '● Online', ru: '● В сети', hy: '● Առցանց' },
+      offline: { en: '○ Offline', ru: '○ Не в сети', hy: '○ Անջատված' },
+      modes_need_one: { en: 'Keep at least one mode on — otherwise the toy has nothing to do.', ru: 'Оставьте хотя бы один режим включённым — иначе игрушке нечем заняться.', hy: 'Թողեք գոնե մեկ ռեժիմ միացած, այլապես խաղալիքը անելիք չի ունենա։' },
+      bedtime_need_both: { en: 'Set both a start and an end time (or clear both to turn bedtime off).', ru: 'Укажите и начало, и конец (или очистите оба, чтобы выключить).', hy: 'Նշեք և՛ սկիզբը, և՛ վերջը (կամ մաքրեք երկուսն էլ՝ անջատելու համար)։' },
+      bedtime_same: { en: 'Start and end time cannot be the same.', ru: 'Начало и конец не могут совпадать.', hy: 'Սկիզբը և վերջը չեն կարող նույնը լինել։' },
+      bedtime_off_ok: { en: 'Bedtime turned off.', ru: 'Тихие часы выключены.', hy: 'Քնելու ժամն անջատվեց։' },
+      bedtime_overnight: { en: '(this window runs overnight)', ru: '(это ночной интервал)', hy: '(այս միջակայքը գիշերվա ընթացքում է)' },
+      saved_ok: { en: '✓ Saved', ru: '✓ Сохранено', hy: '✓ Պահպանվեց' },
+      newest: { en: 'Newest:', ru: 'Новейшие:', hy: 'Նորագույն:' },
+      flagged_today: { en: 'Flagged today:', ru: 'Отмечено сегодня:', hy: 'Այսօր նշված:' },
+      no_flagged_today: { en: 'No conversations flagged today.', ru: 'Сегодня нет отмеченных разговоров.', hy: 'Այսօր նշված զրույցներ չկան։' },
+      child: { en: '🧒 Child', ru: '🧒 Ребёнок', hy: '🧒 Երեխա' },
+      mode_story: { en: '📖 Story', ru: '📖 Сказка', hy: '📖 Հեքիաթ' },
+      mode_game: { en: '🎮 Game', ru: '🎮 Игра', hy: '🎮 Խաղ' },
+      mode_riddle: { en: '❓ Riddle', ru: '❓ Загадка', hy: '❓ Հանելուկ' },
+      mode_curiosity: { en: '💡 Curiosity', ru: '💡 Любопытство', hy: '💡 Հետաքրքրություն' },
+      mode_calm: { en: '🌙 Calm', ru: '🌙 Спокойствие', hy: '🌙 Հանգիստ' },
+      ph_email: { en: 'you@example.com', ru: 'you@example.com', hy: 'you@example.com' },
+      ph_pairing: { en: 'code from the toy', ru: 'код с игрушки', hy: 'կոդ խաղալիքից' },
+      back_to_login: { en: 'Back to login', ru: 'Вернуться ко входу', hy: 'Վերադառնալ մուտք' },
+      device_id: { en: 'Device ID', ru: 'ID устройства', hy: 'Սարքի ID' },
+      pairing_code: { en: 'Pairing code', ru: 'Код привязки', hy: 'Կապակցման կոդ' },
+      claim_help: { en: "Enter the pairing code from your toy's box or setup card. This links the toy to your account.", ru: 'Введите код привязки с коробки или карточки игрушки. Это привяжет игрушку к вашему аккаунту.', hy: 'Մուտքագրեք կապակցման կոդը խաղալիքի տուփից կամ քարտից։ Սա կկապի խաղալիքը ձեր հաշվին։' },
+      new_password: { en: 'New password', ru: 'Новый пароль', hy: 'Նոր գաղտնաբառ' },
+      confirm_new_password: { en: 'Confirm new password', ru: 'Повторите пароль', hy: 'Կրկնեք գաղտնաբառը' },
+      current_password: { en: 'Current password', ru: 'Текущий пароль', hy: 'Ընթացիկ գաղտնաբառ' },
+      confirm_verify: { en: 'Click below to confirm your email address.', ru: 'Нажмите ниже, чтобы подтвердить эл. почту.', hy: 'Սեղմեք ներքևում՝ էլ. փոստը հաստատելու համար։' },
+      m_story: { en: 'Story', ru: 'Сказка', hy: 'Հեքիաթ' },
+      m_game: { en: 'Game', ru: 'Игра', hy: 'Խաղ' },
+      m_riddle: { en: 'Riddle', ru: 'Загадка', hy: 'Հանելուկ' },
+      m_curiosity: { en: 'Curiosity', ru: 'Любопытство', hy: 'Հետաքրքրություն' },
+      view_conversations: { en: 'View conversations →', ru: 'Смотреть разговоры →', hy: 'Դիտել զրույցները →' },
+      last_seen: { en: 'last seen', ru: 'был(а) в сети', hy: 'վերջին անգամ' },
+      bedtime_hint: { en: 'clear both to disable · pause overrides', ru: 'очистите оба поля, чтобы выключить · пауза важнее', hy: 'մաքրեք երկուսն էլ՝ անջատելու համար · դադարը գերակա է' },
+      modes_hint: { en: 'Calm stays on always · pause & bedtime override', ru: 'Спокойствие всегда включено · пауза и сон важнее', hy: 'Հանգիստը միշտ միացած է · դադարը և քնի ժամը գերակա են' },
+      child_override_hint: { en: 'child override wins over device · Calm always on', ru: 'настройка ребёнка важнее устройства · Спокойствие всегда', hy: 'երեխայի կարգավորումը գերակա է · Հանգիստը միշտ' },
+      email_not_verified: { en: 'Email not verified yet.', ru: 'Эл. почта ещё не подтверждена.', hy: 'Էլ. փոստը դեռ հաստատված չէ։' },
+      inherit_on: { en: 'Inherit (on)', ru: 'Наследовать (вкл)', hy: 'Ժառանգել (միաց)' },
+      inherit_off: { en: 'Inherit (off)', ru: 'Наследовать (выкл)', hy: 'Ժառանգել (անջ)' },
+      on_word: { en: 'On', ru: 'Вкл', hy: 'Միաց' },
+      off_word: { en: 'Off', ru: 'Выкл', hy: 'Անջ' },
+      modes_for: { en: 'Modes for', ru: 'Режимы для', hy: 'Ռեժիմները' },
+      last_login: { en: 'Last login:', ru: 'Последний вход:', hy: 'Վերջին մուտք․' },
+      not_available: { en: 'not available yet', ru: 'пока недоступно', hy: 'դեռ հասանելի չէ' },
+      dormant_devices: { en: 'Inactive toys:', ru: 'Неактивные игрушки:', hy: 'Անգործ խաղալիքներ․' },
+      link_help: { en: "To link a toy, enter the Device ID and API key shown on the toy's setup card.", ru: 'Чтобы привязать игрушку, введите ID устройства и API-ключ с карточки настройки игрушки.', hy: 'Խաղալիքը կապելու համար մուտքագրեք Սարքի ID-ն և API-բանալին խաղալիքի քարտից։' },
+      nav_toys: { en: '← Toys', ru: '← Игрушки', hy: '← Խաղալիքներ' },
+      child_label: { en: 'Child:', ru: 'Ребёнок:', hy: 'Երեխա․' },
+      no_child: { en: 'No child profile yet', ru: 'Профиль ребёнка ещё не создан', hy: 'Երեխայի պրոֆիլ դեռ չկա' },
+      tap_to_open: { en: 'Tap to open →', ru: 'Открыть →', hy: 'Բացել →' },
+      session_expired: { en: 'Session expired. Please log in again.', ru: 'Сессия истекла. Войдите снова.', hy: 'Աշխատաշրջանն ավարտվեց։ Խնդրում ենք նորից մուտք գործել։' },
+      invalid_login: { en: 'Invalid email or password.', ru: 'Неверная почта или пароль.', hy: 'Սխալ էլ. փոստ կամ գաղտնաբառ։' },
+      reset_sent: { en: 'If an account exists for that email, a reset link has been sent. Check your inbox.', ru: 'Если аккаунт с такой почтой существует, ссылка для сброса отправлена. Проверьте почту.', hy: 'Եթե այդ փոստով հաշիվ կա, վերականգնման հղումն ուղարկվել է։ Ստուգեք ձեր փոստը։' },
+      verify_sent: { en: 'If that email is registered and not yet verified, a verification email has been sent. Check your inbox.', ru: 'Если почта зарегистрирована и не подтверждена, письмо-подтверждение отправлено. Проверьте почту.', hy: 'Եթե այդ փոստը գրանցված է և դեռ հաստատված չէ, հաստատման նամակն ուղարկվել է։ Ստուգեք ձեր փոստը։' }
+    };
+    function getLang() {
+      var l = null;
+      try { l = localStorage.getItem(LANG_KEY); } catch (e) {}
+      return SUPPORTED_LANGS.indexOf(l) >= 0 ? l : 'en';
+    }
+    function setLang(l) {
+      if (SUPPORTED_LANGS.indexOf(l) < 0) l = 'en';
+      try { localStorage.setItem(LANG_KEY, l); } catch (e) {}
+    }
+    function t(key) {
+      var entry = I18N[key];
+      if (!entry) return key;
+      return entry[getLang()] || entry.en || key;
+    }
+    // Translate every static element tagged with data-i18n / data-i18n-ph.
+    function applyStaticI18n() {
+      document.documentElement.lang = getLang();
+      var nodes = document.querySelectorAll('[data-i18n]');
+      for (var i = 0; i < nodes.length; i++) {
+        nodes[i].textContent = t(nodes[i].getAttribute('data-i18n'));
+      }
+      var phs = document.querySelectorAll('[data-i18n-ph]');
+      for (var j = 0; j < phs.length; j++) {
+        phs[j].setAttribute('placeholder', t(phs[j].getAttribute('data-i18n-ph')));
+      }
+    }
+
     // ---------- state ----------
     var TOKEN_KEY = 'areg_parent_token';
     var PAGE_SIZE = 20;
     var state = {
       currentDeviceId: null,
+      currentToyId: null,
       offset: 0,
       flaggedOffset: 0,
       auditOffset: 0,
@@ -633,7 +959,11 @@
       ParentDataExported: 'Data export downloaded',
       ParentPasswordResetRequested: 'Password reset requested',
       ParentPasswordResetCompleted: 'Password reset completed',
-      ParentEmailVerified: 'Email verified'
+      ParentEmailVerified: 'Email verified',
+      ParentDeviceRenamed: 'Device renamed',
+      ParentDeviceClaimed: 'Toy added',
+      ParentDeviceLinked: 'Toy linked',
+      ParentDeviceRevocationChanged: 'Toy access revoked/restored'
     };
 
     // ---------- helpers ----------
@@ -644,7 +974,7 @@
     function show(viewId) {
       var ids = ['loginView', 'resetRequestView', 'resetPasswordView',
                  'verifyEmailRequestView', 'verifyEmailCompleteView',
-                 'devicesView', 'summariesView', 'flaggedView', 'detailView', 'auditView'];
+                 'devicesView', 'toyView', 'summariesView', 'flaggedView', 'detailView', 'auditView'];
       for (var i = 0; i < ids.length; i++) {
         document.getElementById(ids[i]).hidden = (ids[i] !== viewId);
       }
@@ -682,9 +1012,38 @@
       // Parent-facing speaker label. Matches the toy-name "Areg" used
       // on the main app home page (index.html) so the parent dashboard
       // and the device home screen speak consistently.
-      if (role === 'user') return 'Child';
-      if (role === 'assistant') return 'Areg';
+      if (role === 'user') return t('child');
+      if (role === 'assistant') return '🧸 Areg';
       return String(role || '');
+    }
+
+    // Reload-survival: mirror the current view into the URL hash so a
+    // page refresh restores the parent's place instead of bouncing to
+    // the devices list. replaceState only — no history-stack spam, the
+    // in-page Back affordances keep working exactly as before. The
+    // hash carries only ids the page already displays; the JWT stays
+    // in sessionStorage and never appears in the URL.
+    function setViewHash(view, deviceId, conversationId) {
+      try {
+        var h = '';
+        if (view && view !== 'devices') {
+          h = '#v=' + encodeURIComponent(view);
+          if (deviceId) h += '&d=' + encodeURIComponent(deviceId);
+          if (conversationId) h += '&c=' + encodeURIComponent(conversationId);
+        }
+        history.replaceState(null, '',
+          window.location.pathname + window.location.search + h);
+      } catch (e) { /* cosmetic only — never block a view change */ }
+    }
+
+    // E1.3: friendly label for a runtime-stamped conversation mode.
+    // Unknown / future mode strings fall through verbatim.
+    function modeChipLabel(mode) {
+      var map = {
+        story: 'mode_story', game: 'mode_game', riddle: 'mode_riddle',
+        curiosity: 'mode_curiosity', calm: 'mode_calm'
+      };
+      return map[mode] ? t(map[mode]) : mode;
     }
 
     function setActiveTab(name) {
@@ -700,12 +1059,21 @@
       var el = document.getElementById(elId);
       clearChildren(el);
       if (!state.currentDeviceId) return;
+      // Parents think in toy names, not UUIDs. Resolve the name from
+      // the cached device list; the raw id stays available on
+      // long-press / hover via the title attribute for support cases.
+      var name = null;
+      var devices = state.lastDevicesResponse || [];
+      for (var i = 0; i < devices.length; i++) {
+        if (devices[i].deviceId === state.currentDeviceId) {
+          name = devices[i].deviceName;
+          break;
+        }
+      }
       var label = document.createElement('strong');
-      label.textContent = 'Device ' + shortId(state.currentDeviceId);
-      var full = document.createElement('span');
-      full.textContent = ' · ' + state.currentDeviceId;
+      label.textContent = '🧸 ' + (name || ('Toy ' + shortId(state.currentDeviceId)));
+      label.title = state.currentDeviceId;
       el.appendChild(label);
-      el.appendChild(full);
     }
 
     function updatePager(newerBtnId, olderBtnId, infoId, offset, lastPageSize) {
@@ -731,7 +1099,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return Promise.reject({ status: 401, message: 'Unauthorized' });
         }
         if (!res.ok) {
@@ -756,7 +1124,7 @@
         body: JSON.stringify({ email: email, password: password })
       }).then(function (res) {
         if (res.status === 401) {
-          setStatus('loginStatus', 'Invalid email or password.', 'err');
+          setStatus('loginStatus', t('invalid_login'), 'err');
           return null;
         }
         if (!res.ok) {
@@ -809,9 +1177,7 @@
         // message either way so the UI does not become an
         // account-existence oracle. Do not inspect the response body.
         if (res.status === 202) {
-          setStatus('resetRequestStatus',
-            'If an account exists for that email, a reset link has been sent. ' +
-            'Check your inbox.', 'ok');
+          setStatus('resetRequestStatus', t('reset_sent'), 'ok');
           document.getElementById('resetRequestEmailInput').value = '';
           return;
         }
@@ -946,9 +1312,7 @@
         // — do not branch on response body. Matches the password-
         // reset-request UI posture.
         if (res.status === 202) {
-          setStatus('verifyEmailRequestStatus',
-            'If that email is registered and not yet verified, a verification ' +
-            'email has been sent. Check your inbox.', 'ok');
+          setStatus('verifyEmailRequestStatus', t('verify_sent'), 'ok');
           document.getElementById('verifyEmailInput').value = '';
           return;
         }
@@ -1072,7 +1436,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         return res.json().then(function (data) {
@@ -1132,7 +1496,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         return res.json().then(function (data) {
@@ -1186,13 +1550,11 @@
       }
       var lines = [];
       var loginLabel = summary.lastLoginAt
-        ? 'Last login: ' + fmtTime(summary.lastLoginAt)
-        : 'Last login: not available yet';
+        ? t('last_login') + ' ' + fmtTime(summary.lastLoginAt)
+        : t('last_login') + ' ' + t('not_available');
       lines.push(loginLabel);
-      if (totalDevices > 0) {
-        lines.push('Dormant devices: ' +
-          (summary.dormantDevices || 0) + ' of ' + totalDevices);
-      }
+      // "Inactive toys: N of M" removed — non-informative and confusing for a
+      // parent with one toy (per-toy status lives on each toy's own page).
       lines.forEach(function (text) {
         var row = document.createElement('div');
         row.textContent = text;
@@ -1207,13 +1569,13 @@
         verifyRow.style.cssText = 'margin-top:4px;';
         var verifyText = document.createElement('span');
         verifyText.id = 'dashVerifyText';
-        verifyText.textContent = 'Email not verified yet.';
+        verifyText.textContent = t('email_not_verified');
         verifyRow.appendChild(verifyText);
         var verifyBtn = document.createElement('button');
         verifyBtn.id = 'dashVerifySendBtn';
         verifyBtn.type = 'button';
         verifyBtn.className = 'link';
-        verifyBtn.textContent = 'Send verification email';
+        verifyBtn.textContent = t('send_verif_btn');
         verifyBtn.style.cssText = 'margin-left:8px;';
         verifyBtn.addEventListener('click', sendDashboardVerifyRequest);
         verifyRow.appendChild(verifyBtn);
@@ -1273,9 +1635,15 @@
       });
     }
 
+    // Fetches the device list and renders EITHER the toy list OR, when a toy
+    // is currently open (state.currentToyId), that toy's own page — so every
+    // existing post-save `loadDevices()` call keeps the parent where they are
+    // instead of bouncing to the list. openToy sets currentToyId; the back
+    // button and unlink clear it.
     function loadDevices() {
-      show('devicesView');
-      setStatus('devicesStatus', 'Loading…', 'muted');
+      var openingToy = !!state.currentToyId;
+      if (!openingToy) { show('devicesView'); setViewHash('devices'); }
+      deviceStatus('Loading…', 'muted');
       var listEl = document.getElementById('devicesList');
       var emptyState = document.getElementById('linkDeviceEmptyState');
       var summaryEl = document.getElementById('dormancySummary');
@@ -1287,27 +1655,135 @@
         var devices = (data && data.devices) || [];
         // Cache for audit-view target id => display-name resolution.
         state.lastDevicesResponse = devices;
+
+        // If a toy is open, re-render its page (unless it just vanished, e.g.
+        // after unlink — then fall back to the list).
+        if (state.currentToyId) {
+          var stillThere = devices.some(function (d) { return d.deviceId === state.currentToyId; });
+          if (stillThere) { renderToyView(); return; }
+          state.currentToyId = null;
+          show('devicesView'); setViewHash('devices');
+        }
+
         renderDormancySummary(summaryEl, data && data.summary, devices.length);
         if (devices.length === 0) {
-          setStatus('devicesStatus', 'No devices linked to this account yet.', 'muted');
-          // Empty state — show the link-device form so the parent has
-          // a direct path to pair a toy without leaving this page.
+          deviceStatus('No devices linked to this account yet.', 'muted');
           emptyState.hidden = false;
           setStatus('linkDeviceStatus', '', '');
           return;
         }
-        setStatus('devicesStatus', '', '');
+        deviceStatus('', '');
+        window.__toyFlash = null;
         emptyState.hidden = true;
         devices.forEach(function (d) {
+          listEl.appendChild(buildToyCard(d));
+        });
+      }).catch(function (err) {
+        if (err && err.status === 401) return;
+        deviceStatus('Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+      });
+    }
+
+    // Status helper that writes to whichever surface is visible: the toy
+    // page's status line when a toy is open, else the devices-list line.
+    function deviceStatus(msg, kind) {
+      var toy = document.getElementById('toyView');
+      var id = (toy && !toy.hidden) ? 'toyStatus' : 'devicesStatus';
+      setStatus(id, msg, kind);
+    }
+
+    // Open one toy's own page. Sets currentToyId then reuses loadDevices to
+    // fetch fresh data and render the toy view.
+    function openToy(deviceId) {
+      state.currentToyId = deviceId;
+      show('toyView');
+      setViewHash('toy', deviceId);
+      loadDevices();
+    }
+
+    // Render the open toy's header (name, child, status badges) + settings.
+    function renderToyView() {
+      var d = null;
+      var devices = state.lastDevicesResponse || [];
+      for (var i = 0; i < devices.length; i++) {
+        if (devices[i].deviceId === state.currentToyId) { d = devices[i]; break; }
+      }
+      if (!d) { state.currentToyId = null; loadDevices(); return; }
+      show('toyView');
+      // Always stamp the hash as the toy page whenever it is shown — not
+      // just from openToy. Without this, returning to the toy from its
+      // conversations left the hash at '#v=summaries', so a refresh
+      // restored conversations instead of the toy page.
+      setViewHash('toy', state.currentToyId);
+
+      var header = document.getElementById('toyHeader');
+      clearChildren(header);
+      var nameEl = document.createElement('div');
+      nameEl.style.cssText = 'font-size:18px;font-weight:700;color:#2b1f47;';
+      nameEl.textContent = '🧸 ' + (d.deviceName || ('Toy ' + shortId(d.deviceId)));
+      header.appendChild(nameEl);
+
+      var childEl = document.createElement('div');
+      childEl.style.cssText = 'font-size:13px;color:#6b5b8a;margin-top:2px;';
+      if (d.children && d.children.length > 0) {
+        childEl.textContent = t('child_label') + ' ' + d.children.map(function (c) {
+          return c.name + (c.age != null ? ' (' + c.age + ')' : '');
+        }).join(' · ');
+      } else {
+        childEl.textContent = t('no_child');
+      }
+      header.appendChild(childEl);
+
+      var badges = document.createElement('div');
+      badges.style.marginTop = '4px';
+      if (typeof d.isOnline === 'boolean') {
+        var ob = document.createElement('span');
+        ob.textContent = d.isOnline ? t('online') : t('offline');
+        ob.className = 'chip ' + (d.isOnline ? 'chip-ok' : 'chip-muted');
+        badges.appendChild(ob);
+      }
+      if (d.isRevoked) { var rb = document.createElement('span'); rb.textContent = t('revoke'); rb.className = 'chip chip-danger'; badges.appendChild(rb); }
+      if (d.isPaused) { var pb = document.createElement('span'); pb.textContent = t('pause'); pb.className = 'chip chip-warn'; badges.appendChild(pb); }
+      header.appendChild(badges);
+
+      // Conversations button targets this toy.
+      var convBtn = document.getElementById('toyConversationsBtn');
+      convBtn.onclick = function () { openDevice(state.currentToyId); };
+
+      var settings = document.getElementById('toySettings');
+      clearChildren(settings);
+      renderToySettings(d, settings);
+      // Surface a one-shot confirmation from the last action (e.g. bedtime
+      // turned off / overnight note), else clear the status line.
+      if (window.__toyFlash && window.__toyFlash.msg) {
+        var fmsg = window.__toyFlash.msg, fkind = window.__toyFlash.kind || 'ok';
+        window.__toyFlash = null;
+        deviceStatus(fmsg, fkind);
+        setTimeout(function () {
+          var el = document.getElementById('toyStatus');
+          if (el && el.textContent === fmsg) setStatus('toyStatus', '', '');
+        }, 3500);
+      } else {
+        deviceStatus('', '');
+      }
+    }
+
+    // Refresh whichever device surface is open after a settings change.
+    function refreshCurrentToy() { loadDevices(); }
+
+
+    // A single toy card in the list: name + child + status, tap to open
+    // that toy's own page (openToy). Settings live inside, not in the list.
+    function buildToyCard(d) {
           var btn = document.createElement('button');
           btn.className = 'row';
           btn.title = d.deviceId;
           var top = document.createElement('div');
           top.className = 'top';
           var label = document.createElement('span');
-          label.textContent = d.deviceName || ('Device ' + shortId(d.deviceId));
+          label.textContent = '🧸 ' + (d.deviceName || ('Device ' + shortId(d.deviceId)));
           var hint = document.createElement('span');
-          hint.textContent = 'View conversations →';
+          hint.textContent = t('tap_to_open');
           top.appendChild(label);
           top.appendChild(hint);
           btn.appendChild(top);
@@ -1320,7 +1796,7 @@
               return parts.join(', ');
             }).join(' · '));
           }
-          if (d.lastSeenAt) details.push('last seen ' + fmtTime(d.lastSeenAt));
+          if (d.lastSeenAt) details.push(t('last_seen') + ' ' + fmtTime(d.lastSeenAt));
           if (details.length > 0) {
             var sub = document.createElement('div');
             sub.className = 'snippet';
@@ -1334,13 +1810,8 @@
           // field render no badge rather than a misleading "offline".
           if (typeof d.isOnline === 'boolean') {
             var onlineBadge = document.createElement('div');
-            onlineBadge.textContent = d.isOnline ? '● Online' : '○ Offline';
-            onlineBadge.style.cssText =
-              'margin:2px 6px 0 0;padding:2px 8px;display:inline-block;' +
-              'border-radius:4px;font-size:12px;' +
-              (d.isOnline
-                ? 'background:#e6f6e6;border:1px solid #5aa45a;color:#2f6b2f;'
-                : 'background:#f2f2f2;border:1px solid #bbb;color:#777;');
+            onlineBadge.textContent = d.isOnline ? t('online') : t('offline');
+            onlineBadge.className = 'chip ' + (d.isOnline ? 'chip-ok' : 'chip-muted');
             btn.appendChild(onlineBadge);
           }
 
@@ -1349,20 +1820,14 @@
           if (d.isRevoked) {
             var revokedBadge = document.createElement('div');
             revokedBadge.textContent = 'Revoked';
-            revokedBadge.style.cssText =
-              'margin:2px 6px 0 0;padding:2px 8px;display:inline-block;' +
-              'background:#fdecea;border:1px solid #d9534f;color:#a02622;' +
-              'border-radius:4px;font-size:12px;';
+            revokedBadge.className = 'chip chip-danger';
             btn.appendChild(revokedBadge);
           }
 
           if (d.isPaused) {
             var pausedBadge = document.createElement('div');
             pausedBadge.textContent = 'Paused by you';
-            pausedBadge.style.cssText =
-              'margin:2px 0 0;padding:2px 8px;display:inline-block;' +
-              'background:#fff3cd;border:1px solid #e0a800;color:#856404;' +
-              'border-radius:4px;font-size:12px;';
+            pausedBadge.className = 'chip chip-warn';
             btn.appendChild(pausedBadge);
           }
 
@@ -1373,10 +1838,7 @@
             bedtimeBadge.textContent =
               'Bedtime ' + d.bedtimeStart.substring(0, 5) +
               '–' + d.bedtimeEnd.substring(0, 5);
-            bedtimeBadge.style.cssText =
-              'margin:2px 0 0 6px;padding:2px 8px;display:inline-block;' +
-              'background:#e7f0ff;border:1px solid #6a8ec9;color:#2c4a7a;' +
-              'border-radius:4px;font-size:12px;';
+            bedtimeBadge.className = 'chip chip-info';
             btn.appendChild(bedtimeBadge);
           }
 
@@ -1389,15 +1851,17 @@
           if (d.isDormant) {
             var dormantBadge = document.createElement('div');
             dormantBadge.textContent = 'Not seen recently';
-            dormantBadge.style.cssText =
-              'margin:2px 0 0 6px;padding:2px 8px;display:inline-block;' +
-              'background:#f2f2f2;border:1px solid #bbb;color:#555;' +
-              'border-radius:4px;font-size:12px;';
+            dormantBadge.className = 'chip chip-muted';
             btn.appendChild(dormantBadge);
           }
 
-          btn.addEventListener('click', function () { openDevice(d.deviceId); });
-          listEl.appendChild(btn);
+          btn.addEventListener('click', function () { openToy(d.deviceId); });
+          return btn;
+    }
+
+    // Render ONE toy's settings (child profile, pause, bedtime, modes,
+    // name, careful zone) into a container — used by the toy detail page.
+    function renderToySettings(d, listEl) {
 
           // Per-child remove row. Sibling to the clickable device button so
           // we can attach per-child action buttons without nesting buttons.
@@ -1406,19 +1870,15 @@
           if (d.children && d.children.length > 0) {
             d.children.forEach(function (c) {
               var childRow = document.createElement('div');
-              childRow.style.cssText =
-                'margin:2px 0;padding:6px 10px;background:#f7f7f7;' +
-                'border-radius:6px;display:flex;justify-content:space-between;' +
-                'align-items:center;font-size:13px;';
+              childRow.className = 'ctl-row';
+              childRow.style.justifyContent = 'space-between';
               var childLabel = document.createElement('span');
               childLabel.textContent = c.name + (c.age != null ? ' (age ' + c.age + ')' : '');
               childRow.appendChild(childLabel);
               var removeChildBtn = document.createElement('button');
               removeChildBtn.type = 'button';
-              removeChildBtn.textContent = 'Remove';
-              removeChildBtn.style.cssText =
-                'padding:4px 10px;font-size:12px;background:transparent;' +
-                'border:1px solid #c66;color:#c66;border-radius:5px;cursor:pointer;';
+              removeChildBtn.textContent = t('remove');
+              removeChildBtn.className = 'btn-ghost-danger';
               removeChildBtn.addEventListener('click', function () {
                 deleteChild(c.childId, c.name);
               });
@@ -1435,14 +1895,17 @@
           // Pause/Resume control, sibling to the row (not nested in the
           // clickable button). Label flips based on current state. Same
           // inline-style pattern used by the unlink button below.
+          var settingsCap = document.createElement('div');
+          settingsCap.className = 'section-cap';
+          settingsCap.textContent = t('toy_settings');
+          listEl.appendChild(settingsCap);
+
           var pauseBtn = document.createElement('button');
           pauseBtn.type = 'button';
-          pauseBtn.textContent = d.isPaused ? 'Resume' : 'Pause';
+          pauseBtn.textContent = d.isPaused ? t('resume') : t('pause');
           pauseBtn.setAttribute('data-device-id', d.deviceId);
-          pauseBtn.style.cssText =
-            'margin:4px 8px 12px 0;padding:6px 12px;font-size:13px;' +
-            'background:transparent;border:1px solid #999;color:#555;' +
-            'border-radius:6px;cursor:pointer;';
+          pauseBtn.className = 'btn-ghost';
+          pauseBtn.style.cssText = 'margin:4px 8px 12px 0;font-size:13px;';
           pauseBtn.addEventListener('click', function () {
             toggleDevicePause(d.deviceId, d.deviceName, d.isPaused);
           });
@@ -1452,19 +1915,15 @@
           // the clickable device row so inputs aren't nested in a button.
           // Pause is an immediate override; bedtime is a scheduled analogue.
           var bedtimeRow = document.createElement('div');
-          bedtimeRow.style.cssText =
-            'margin:4px 0 12px;padding:6px 10px;background:#f7f7f7;' +
-            'border-radius:6px;display:flex;flex-wrap:wrap;gap:8px;' +
-            'align-items:center;font-size:13px;';
+          bedtimeRow.className = 'ctl-row';
           var bedtimeLabel = document.createElement('span');
-          bedtimeLabel.textContent = 'Bedtime:';
-          bedtimeLabel.style.color = '#555';
+          bedtimeLabel.textContent = t('bedtime_label');
+          bedtimeLabel.className = 'ctl-label';
           bedtimeRow.appendChild(bedtimeLabel);
           var bedStart = document.createElement('input');
           bedStart.type = 'time';
           bedStart.setAttribute('data-role', 'bedtime-start');
           if (d.bedtimeStart) bedStart.value = d.bedtimeStart.substring(0, 5);
-          bedStart.style.cssText = 'padding:3px 6px;font-size:13px;';
           bedtimeRow.appendChild(bedStart);
           var dash = document.createElement('span');
           dash.textContent = '–';
@@ -1474,21 +1933,18 @@
           bedEnd.type = 'time';
           bedEnd.setAttribute('data-role', 'bedtime-end');
           if (d.bedtimeEnd) bedEnd.value = d.bedtimeEnd.substring(0, 5);
-          bedEnd.style.cssText = 'padding:3px 6px;font-size:13px;';
           bedtimeRow.appendChild(bedEnd);
           var saveBedtimeBtn = document.createElement('button');
           saveBedtimeBtn.type = 'button';
-          saveBedtimeBtn.textContent = 'Save';
-          saveBedtimeBtn.style.cssText =
-            'padding:4px 10px;font-size:12px;background:transparent;' +
-            'border:1px solid #6a8ec9;color:#2c4a7a;border-radius:5px;cursor:pointer;';
+          saveBedtimeBtn.textContent = t('save');
+          saveBedtimeBtn.className = 'btn-ghost';
           saveBedtimeBtn.addEventListener('click', function () {
             saveBedtimeWindow(d.deviceId, bedStart.value, bedEnd.value);
           });
           bedtimeRow.appendChild(saveBedtimeBtn);
           var bedtimeHint = document.createElement('span');
-          bedtimeHint.textContent = 'clear both to disable · pause overrides';
-          bedtimeHint.style.cssText = 'color:#888;font-size:11px;';
+          bedtimeHint.textContent = t('bedtime_hint');
+          bedtimeHint.className = 'ctl-hint';
           bedtimeRow.appendChild(bedtimeHint);
           listEl.appendChild(bedtimeRow);
 
@@ -1496,19 +1952,16 @@
           // never represented here (safety invariant: bedtime cues always
           // reach Calm handling regardless of parent config).
           var modesRow = document.createElement('div');
-          modesRow.style.cssText =
-            'margin:4px 0 12px;padding:6px 10px;background:#f7f7f7;' +
-            'border-radius:6px;display:flex;flex-wrap:wrap;gap:10px;' +
-            'align-items:center;font-size:13px;';
+          modesRow.className = 'ctl-row';
           var modesLabel = document.createElement('span');
-          modesLabel.textContent = 'Modes:';
-          modesLabel.style.color = '#555';
+          modesLabel.textContent = t('modes_label');
+          modesLabel.className = 'ctl-label';
           modesRow.appendChild(modesLabel);
           var modeDefs = [
-            { key: 'story',     label: 'Story',     flag: d.storyEnabled },
-            { key: 'game',      label: 'Game',      flag: d.gameEnabled },
-            { key: 'riddle',    label: 'Riddle',    flag: d.riddleEnabled },
-            { key: 'curiosity', label: 'Curiosity', flag: d.curiosityEnabled }
+            { key: 'story',     label: t('m_story'),     flag: d.storyEnabled },
+            { key: 'game',      label: t('m_game'),      flag: d.gameEnabled },
+            { key: 'riddle',    label: t('m_riddle'),    flag: d.riddleEnabled },
+            { key: 'curiosity', label: t('m_curiosity'), flag: d.curiosityEnabled }
           ];
           var modeInputs = {};
           modeDefs.forEach(function (m) {
@@ -1527,11 +1980,19 @@
           });
           var saveModesBtn = document.createElement('button');
           saveModesBtn.type = 'button';
-          saveModesBtn.textContent = 'Save modes';
-          saveModesBtn.style.cssText =
-            'padding:4px 10px;font-size:12px;background:transparent;' +
-            'border:1px solid #6a8ec9;color:#2c4a7a;border-radius:5px;cursor:pointer;';
+          saveModesBtn.textContent = t('save_modes');
+          saveModesBtn.className = 'btn-ghost';
           saveModesBtn.addEventListener('click', function () {
+            var anyOn = modeInputs.story.checked || modeInputs.game.checked
+              || modeInputs.riddle.checked || modeInputs.curiosity.checked;
+            // Guard: never let a parent disable ALL play modes — the toy
+            // would refuse every request (only bedtime/calm would work),
+            // which is almost always an accident. (Calm has no toggle and
+            // stays on regardless, but that's not a play mode.)
+            if (!anyOn) {
+              deviceStatus(t('modes_need_one'), 'err');
+              return;
+            }
             saveDeviceModeFlags(
               d.deviceId,
               modeInputs.story.checked,
@@ -1541,8 +2002,8 @@
           });
           modesRow.appendChild(saveModesBtn);
           var modesHint = document.createElement('span');
-          modesHint.textContent = 'Calm stays on always · pause & bedtime override';
-          modesHint.style.cssText = 'color:#888;font-size:11px;';
+          modesHint.textContent = t('modes_hint');
+          modesHint.className = 'ctl-hint';
           modesRow.appendChild(modesHint);
           listEl.appendChild(modesRow);
 
@@ -1550,27 +2011,24 @@
           // ("Anna's toy", "Living room"). Sibling row (input not nested in a
           // button). PUT /api/parents/devices/{id}/name.
           var renameRow = document.createElement('div');
-          renameRow.style.cssText =
-            'margin:4px 0 12px;padding:6px 10px;background:#f7f7f7;' +
-            'border-radius:6px;display:flex;flex-wrap:wrap;gap:8px;' +
-            'align-items:center;font-size:13px;';
+          renameRow.className = 'ctl-row';
           var renameLabel = document.createElement('span');
-          renameLabel.textContent = 'Name:';
-          renameLabel.style.color = '#555';
+          renameLabel.textContent = t('name_label');
+          renameLabel.className = 'ctl-label';
           renameRow.appendChild(renameLabel);
           var nameInput = document.createElement('input');
           nameInput.type = 'text';
           nameInput.maxLength = 60;
           nameInput.value = d.deviceName || '';
           nameInput.placeholder = 'e.g. Anna’s toy';
-          nameInput.style.cssText = 'padding:3px 6px;font-size:13px;min-width:160px;';
+          nameInput.style.cssText =
+            'flex:1;width:auto;min-width:160px;margin:0;' +
+            'padding:8px 10px;font-size:14px;border-radius:8px;';
           renameRow.appendChild(nameInput);
           var saveNameBtn = document.createElement('button');
           saveNameBtn.type = 'button';
-          saveNameBtn.textContent = 'Save name';
-          saveNameBtn.style.cssText =
-            'padding:4px 10px;font-size:12px;background:transparent;' +
-            'border:1px solid #6a8ec9;color:#2c4a7a;border-radius:5px;cursor:pointer;';
+          saveNameBtn.textContent = t('save_name');
+          saveNameBtn.className = 'btn-ghost';
           saveNameBtn.addEventListener('click', function () {
             renameDevice(d.deviceId, nameInput.value);
           });
@@ -1582,39 +2040,36 @@
           // the link + can cascade data) and pause (soft, still authenticates).
           var revokeBtn = document.createElement('button');
           revokeBtn.type = 'button';
-          revokeBtn.textContent = d.isRevoked ? 'Restore access' : 'Revoke access';
+          revokeBtn.textContent = d.isRevoked ? t('restore') : t('revoke');
           revokeBtn.setAttribute('data-device-id', d.deviceId);
-          revokeBtn.style.cssText =
-            'margin:4px 8px 12px 0;padding:6px 12px;font-size:13px;' +
-            'background:transparent;border:1px solid ' +
-            (d.isRevoked ? '#5aa45a;color:#2f6b2f;' : '#d9534f;color:#a02622;') +
-            'border-radius:6px;cursor:pointer;';
+          revokeBtn.className = d.isRevoked ? 'btn-ghost-ok' : 'btn-ghost-danger';
+          revokeBtn.style.cssText = 'margin:4px 8px 12px 0;';
           revokeBtn.addEventListener('click', function () {
             toggleDeviceRevocation(d.deviceId, d.deviceName, d.isRevoked);
           });
-          listEl.appendChild(revokeBtn);
+          var dangerWrap = document.createElement('div');
+          dangerWrap.className = 'danger-zone';
+          var dangerCap = document.createElement('div');
+          dangerCap.className = 'section-cap';
+          dangerCap.textContent = t('careful_zone');
+          dangerCap.style.margin = '0 2px 8px';
+          dangerWrap.appendChild(dangerCap);
+          dangerWrap.appendChild(revokeBtn);
+          listEl.appendChild(dangerWrap);
 
           // Unlink control, rendered as a sibling so we don't nest a button
           // inside the clickable row. Styling is inline to keep the diff
           // narrow and avoid touching the page's CSS block.
           var unlink = document.createElement('button');
           unlink.type = 'button';
-          unlink.textContent = 'Unlink';
-          unlink.className = 'unlink-btn';
+          unlink.textContent = t('unlink');
+          unlink.className = 'unlink-btn btn-ghost-danger';
           unlink.setAttribute('data-device-id', d.deviceId);
-          unlink.style.cssText =
-            'margin:4px 0 12px;padding:6px 12px;font-size:13px;' +
-            'background:transparent;border:1px solid #c66;color:#c66;' +
-            'border-radius:6px;cursor:pointer;';
+          unlink.style.cssText = 'margin:4px 0 12px;';
           unlink.addEventListener('click', function () {
             unlinkDevice(d.deviceId, d.deviceName);
           });
-          listEl.appendChild(unlink);
-        });
-      }).catch(function (err) {
-        if (err && err.status === 401) return;
-        setStatus('devicesStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
-      });
+          dangerWrap.appendChild(unlink);
     }
 
     // Toggle pause/resume on a linked device. Posts to the appropriate
@@ -1625,7 +2080,7 @@
       if (!token) { show('loginView'); return; }
       var path = currentlyPaused ? 'resume' : 'pause';
       var verb = currentlyPaused ? 'Resuming' : 'Pausing';
-      setStatus('devicesStatus', verb + '…', 'muted');
+      deviceStatus(verb + '…', 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/' + path, {
         method: 'POST',
         headers: {
@@ -1636,16 +2091,17 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
-          setStatus('devicesStatus', (currentlyPaused ? 'Resume' : 'Pause') + ' failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus((currentlyPaused ? 'Resume' : 'Pause') + ' failed (HTTP ' + res.status + ').', 'err');
           return;
         }
+        window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
-        setStatus('devicesStatus', 'Network error.', 'err');
+        deviceStatus('Network error.', 'err');
       });
     }
 
@@ -1656,11 +2112,29 @@
     function saveBedtimeWindow(deviceId, startHHMM, endHHMM) {
       var token = getToken();
       if (!token) { show('loginView'); return; }
+
+      // Client-side logic checks (clear feedback instead of silent no-ops):
+      var hasStart = !!startHHMM, hasEnd = !!endHHMM;
+      // Both empty → intentional "turn off". Confirmed with a message.
+      if (!hasStart && !hasEnd) {
+        // fall through: sends null/null = disabled, then reports it off.
+      } else if (hasStart !== hasEnd) {
+        // Exactly one filled — previously silently disabled. Now explained.
+        deviceStatus(t('bedtime_need_both'), 'err');
+        return;
+      } else if (startHHMM === endHHMM) {
+        // Zero-length window — the server disables it; warn instead of a
+        // silent no-op so the parent isn't misled that quiet hours are on.
+        deviceStatus(t('bedtime_same'), 'err');
+        return;
+      }
+
       var body = {
         start: startHHMM ? startHHMM + ':00' : null,
         end:   endHHMM   ? endHHMM   + ':00' : null
       };
-      setStatus('devicesStatus', 'Saving bedtime…', 'muted');
+      var turningOff = !hasStart && !hasEnd;
+      deviceStatus('Saving bedtime…', 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/bedtime-window', {
         method: 'PUT',
         headers: {
@@ -1673,16 +2147,26 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
-          setStatus('devicesStatus', 'Bedtime save failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus('Bedtime save failed (HTTP ' + res.status + ').', 'err');
           return;
+        }
+        // Confirm what actually happened. When turned off, say so; for an
+        // overnight window (start >= end, wraps past midnight) note it so a
+        // parent isn't confused that "22:00 to 07:00" looks backwards.
+        if (turningOff) {
+          window.__toyFlash = { msg: t('bedtime_off_ok'), kind: 'ok' };
+        } else if (startHHMM >= endHHMM) {
+          window.__toyFlash = { msg: t('saved_ok') + ' ' + t('bedtime_overnight'), kind: 'ok' };
+        } else {
+          window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         }
         loadDevices();
       }).catch(function () {
-        setStatus('devicesStatus', 'Network error.', 'err');
+        deviceStatus('Network error.', 'err');
       });
     }
 
@@ -1691,21 +2175,19 @@
     // the device's current flag is, so "Inherit" is never a silent mystery.
     function renderChildOverridesRow(device, child) {
       var row = document.createElement('div');
-      row.style.cssText =
-        'margin:2px 0 8px;padding:6px 10px;background:#f7f7f7;' +
-        'border-radius:6px;display:flex;flex-wrap:wrap;gap:10px;' +
-        'align-items:center;font-size:12px;color:#555;';
+      row.className = 'ctl-row';
+      row.style.fontSize = '12px';
 
       var prefix = document.createElement('span');
-      prefix.textContent = 'Modes for ' + child.name + ':';
-      prefix.style.fontWeight = '500';
+      prefix.textContent = t('modes_for') + ' ' + child.name + ':';
+      prefix.className = 'ctl-label';
       row.appendChild(prefix);
 
       var modeDefs = [
-        { key: 'story', label: 'Story', override: child.storyEnabled, device: device.storyEnabled },
-        { key: 'game', label: 'Game', override: child.gameEnabled, device: device.gameEnabled },
-        { key: 'riddle', label: 'Riddle', override: child.riddleEnabled, device: device.riddleEnabled },
-        { key: 'curiosity', label: 'Curiosity', override: child.curiosityEnabled, device: device.curiosityEnabled }
+        { key: 'story', label: t('m_story'), override: child.storyEnabled, device: device.storyEnabled },
+        { key: 'game', label: t('m_game'), override: child.gameEnabled, device: device.gameEnabled },
+        { key: 'riddle', label: t('m_riddle'), override: child.riddleEnabled, device: device.riddleEnabled },
+        { key: 'curiosity', label: t('m_curiosity'), override: child.curiosityEnabled, device: device.curiosityEnabled }
       ];
       var selects = {};
       modeDefs.forEach(function (m) {
@@ -1715,13 +2197,15 @@
         lbl.textContent = m.label + ':';
         wrap.appendChild(lbl);
         var sel = document.createElement('select');
-        sel.style.cssText = 'padding:2px 4px;font-size:12px;';
+        sel.style.cssText =
+          'padding:4px 6px;font-size:12px;color:#2b1f47;background:#fff;' +
+          'border:1px solid #e0d6f0;border-radius:8px;';
         sel.setAttribute('data-role', 'child-override-' + m.key);
-        var inheritLabel = 'Inherit (' + (m.device ? 'on' : 'off') + ')';
+        var inheritLabel = m.device ? t('inherit_on') : t('inherit_off');
         [
           { v: 'inherit', t: inheritLabel },
-          { v: 'on', t: 'On' },
-          { v: 'off', t: 'Off' }
+          { v: 'on', t: t('on_word') },
+          { v: 'off', t: t('off_word') }
         ].forEach(function (opt) {
           var o = document.createElement('option');
           o.value = opt.v;
@@ -1737,9 +2221,7 @@
       var saveBtn = document.createElement('button');
       saveBtn.type = 'button';
       saveBtn.textContent = 'Save';
-      saveBtn.style.cssText =
-        'padding:3px 10px;font-size:12px;background:transparent;' +
-        'border:1px solid #6a8ec9;color:#2c4a7a;border-radius:5px;cursor:pointer;';
+      saveBtn.className = 'btn-ghost';
       saveBtn.addEventListener('click', function () {
         saveChildModeOverrides(
           child.childId,
@@ -1752,8 +2234,8 @@
       row.appendChild(saveBtn);
 
       var hint = document.createElement('span');
-      hint.textContent = 'child override wins over device · Calm always on';
-      hint.style.cssText = 'color:#888;font-size:11px;';
+      hint.textContent = t('child_override_hint');
+      hint.className = 'ctl-hint';
       row.appendChild(hint);
       return row;
     }
@@ -1769,7 +2251,7 @@
     function saveChildModeOverrides(childId, story, game, riddle, curiosity) {
       var token = getToken();
       if (!token) { show('loginView'); return; }
-      setStatus('devicesStatus', 'Saving child overrides…', 'muted');
+      deviceStatus('Saving child overrides…', 'muted');
       fetch('/api/parents/children/' + encodeURIComponent(childId) + '/mode-flags', {
         method: 'PUT',
         headers: {
@@ -1787,16 +2269,17 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
-          setStatus('devicesStatus', 'Save failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus('Save failed (HTTP ' + res.status + ').', 'err');
           return;
         }
+        window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
-        setStatus('devicesStatus', 'Network error.', 'err');
+        deviceStatus('Network error.', 'err');
       });
     }
 
@@ -1805,7 +2288,7 @@
     function saveDeviceModeFlags(deviceId, story, game, riddle, curiosity) {
       var token = getToken();
       if (!token) { show('loginView'); return; }
-      setStatus('devicesStatus', 'Saving modes…', 'muted');
+      deviceStatus('Saving modes…', 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/mode-flags', {
         method: 'PUT',
         headers: {
@@ -1823,16 +2306,17 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
-          setStatus('devicesStatus', 'Mode save failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus('Mode save failed (HTTP ' + res.status + ').', 'err');
           return;
         }
+        window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
-        setStatus('devicesStatus', 'Network error.', 'err');
+        deviceStatus('Network error.', 'err');
       });
     }
 
@@ -1848,7 +2332,7 @@
             'Delete ' + label + "'s profile?\n\n" +
             'This also permanently deletes all of ' + label +
             "'s conversations and messages. This cannot be undone.")) return;
-      setStatus('devicesStatus', 'Deleting…', 'muted');
+      deviceStatus('Deleting…', 'muted');
       fetch('/api/parents/children/' + encodeURIComponent(childId), {
         method: 'DELETE',
         headers: {
@@ -1859,16 +2343,16 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
-          setStatus('devicesStatus', 'Delete failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus('Delete failed (HTTP ' + res.status + ').', 'err');
           return;
         }
         loadDevices();
       }).catch(function () {
-        setStatus('devicesStatus', 'Network error.', 'err');
+        deviceStatus('Network error.', 'err');
       });
     }
 
@@ -1899,7 +2383,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
@@ -1921,7 +2405,7 @@
       if (!token) { show('loginView'); return; }
       var label = deviceName || ('device ' + shortId(deviceId));
       if (!window.confirm('Unlink ' + label + '?\n\nYou can re-link it later with the Device ID and API key.')) return;
-      setStatus('devicesStatus', 'Unlinking…', 'muted');
+      deviceStatus('Unlinking…', 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/link', {
         method: 'DELETE',
         headers: {
@@ -1932,16 +2416,16 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
-          setStatus('devicesStatus', 'Unlink failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus('Unlink failed (HTTP ' + res.status + ').', 'err');
           return;
         }
         loadDevices();
       }).catch(function () {
-        setStatus('devicesStatus', 'Unlink failed. Please try again.', 'err');
+        deviceStatus('Unlink failed. Please try again.', 'err');
       });
     }
 
@@ -1972,7 +2456,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return null;
         }
         if (res.status === 400) {
@@ -2024,7 +2508,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return null;
         }
         if (res.status === 400) {
@@ -2061,10 +2545,10 @@
       if (!token) { show('loginView'); return; }
       var name = (rawName || '').trim();
       if (!name) {
-        setStatus('devicesStatus', 'A device name cannot be empty.', 'err');
+        deviceStatus('A device name cannot be empty.', 'err');
         return;
       }
-      setStatus('devicesStatus', 'Saving name…', 'muted');
+      deviceStatus('Saving name…', 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/name', {
         method: 'PUT',
         headers: {
@@ -2077,20 +2561,21 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (res.status === 400) {
-          setStatus('devicesStatus', 'Name must be 1–60 characters.', 'err');
+          deviceStatus('Name must be 1–60 characters.', 'err');
           return;
         }
         if (!res.ok) {
-          setStatus('devicesStatus', 'Rename failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus('Rename failed (HTTP ' + res.status + ').', 'err');
           return;
         }
+        window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
-        setStatus('devicesStatus', 'Network error.', 'err');
+        deviceStatus('Network error.', 'err');
       });
     }
 
@@ -2107,7 +2592,7 @@
             'The toy will be signed out and stop working until it is set up ' +
             'again with a fresh key. Use this if it is lost or stolen. You can ' +
             'restore access later.')) return;
-      setStatus('devicesStatus', (next ? 'Revoking' : 'Restoring') + '…', 'muted');
+      deviceStatus((next ? 'Revoking' : 'Restoring') + '…', 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/revoke', {
         method: 'PUT',
         headers: {
@@ -2120,7 +2605,7 @@
         if (res.status === 401) {
           clearToken();
           show('loginView');
-          setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+          setStatus('loginStatus', t('session_expired'), 'err');
           return;
         }
         if (!res.ok) {
@@ -2128,9 +2613,10 @@
             (next ? 'Revoke' : 'Restore') + ' failed (HTTP ' + res.status + ').', 'err');
           return;
         }
+        window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
-        setStatus('devicesStatus', 'Network error.', 'err');
+        deviceStatus('Network error.', 'err');
       });
     }
 
@@ -2144,6 +2630,7 @@
 
     function loadSummaries() {
       show('summariesView');
+      setViewHash('summaries', state.currentDeviceId);
       setActiveTab('summaries');
       state.backFromDetail = loadSummaries;
       renderDeviceContext('summariesDeviceContext');
@@ -2222,6 +2709,22 @@
       top.appendChild(leftWrap);
       top.appendChild(countSpan);
       btn.appendChild(top);
+
+      // E1.3: mode chips — which of the five modes this conversation
+      // visited. Conversations recorded before mode stamping existed
+      // send an empty list and render no chips.
+      var rowModes = Array.isArray(row.modes) ? row.modes : [];
+      if (rowModes.length > 0) {
+        var modesLine = document.createElement('div');
+        rowModes.forEach(function (mo) {
+          var chip = document.createElement('span');
+          chip.className = 'chip chip-info';
+          chip.style.margin = '2px 6px 4px 0';
+          chip.textContent = modeChipLabel(mo);
+          modesLine.appendChild(chip);
+        });
+        btn.appendChild(modesLine);
+      }
 
       if (row.firstUserSnippet) {
         var u = document.createElement('div');
@@ -2329,37 +2832,44 @@
         return;
       }
 
-      var countsLine = document.createElement('div');
-      countsLine.textContent =
-        conversationsToday + ' conversation' + (conversationsToday === 1 ? '' : 's')
-        + ' · ' + messagesToday + ' message' + (messagesToday === 1 ? '' : 's');
-      counts.appendChild(countsLine);
-
+      // Stat tiles — same aggregates the old counts line carried, as
+      // scannable tiles. Flagged tile only appears when nonzero (calm
+      // by default); audio tile keeps the C2.1 count-only contract.
+      var tiles = document.createElement('div');
+      tiles.className = 'stat-tiles';
+      function statTile(icon, value, label) {
+        var t = document.createElement('div');
+        t.className = 'stat-tile';
+        var v = document.createElement('div');
+        v.className = 'stat-value';
+        v.textContent = icon + ' ' + value;
+        var l = document.createElement('div');
+        l.className = 'stat-label';
+        l.textContent = label;
+        t.appendChild(v);
+        t.appendChild(l);
+        return t;
+      }
+      tiles.appendChild(statTile('💬', conversationsToday,
+        conversationsToday === 1 ? 'conversation' : 'conversations'));
+      tiles.appendChild(statTile('✉️', messagesToday,
+        messagesToday === 1 ? 'message' : 'messages'));
       if (flaggedToday > 0) {
-        var flagBadge = document.createElement('span');
-        flagBadge.className = 'badge';
-        flagBadge.textContent = '⚠ ' + flaggedToday + ' flagged message'
-          + (flaggedToday === 1 ? '' : 's');
-        countsLine.appendChild(document.createTextNode(' '));
-        countsLine.appendChild(flagBadge);
+        var warnTile = statTile('⚠️', flaggedToday, 'flagged');
+        warnTile.classList.add('stat-warn');
+        tiles.appendChild(warnTile);
       }
-
-      // E1.2.ui: count-only badge — playback stays in the detail view
-      // per the C2.1 ▶ Listen contract. The badge does not surface any
-      // path / id; it is a deterministic per-day aggregate.
       if (audioToday > 0) {
-        var audioBadge = document.createElement('span');
-        audioBadge.className = 'badge';
-        audioBadge.title = 'Assistant messages with replayable audio today.';
-        audioBadge.textContent = '🔊 ' + audioToday + ' replayable';
-        countsLine.appendChild(document.createTextNode(' '));
-        countsLine.appendChild(audioBadge);
+        var audioTile = statTile('🔊', audioToday, 'replayable');
+        audioTile.title = 'Assistant messages with replayable audio today.';
+        tiles.appendChild(audioTile);
       }
+      counts.appendChild(tiles);
 
       // Newest — server pre-orders by startedAt desc and caps at 3.
       var newestLabel = document.createElement('div');
       newestLabel.className = 'today-section-label';
-      newestLabel.textContent = 'Newest:';
+      newestLabel.textContent = t('newest');
       newest.appendChild(newestLabel);
       newestRows.forEach(function (r) {
         newest.appendChild(buildTodayLink(r, false));
@@ -2370,7 +2880,7 @@
       if (flaggedRows.length > 0) {
         var flaggedLabel = document.createElement('div');
         flaggedLabel.className = 'today-section-label';
-        flaggedLabel.textContent = 'Flagged today:';
+        flaggedLabel.textContent = t('flagged_today');
         flagged.appendChild(flaggedLabel);
         flaggedRows.forEach(function (r) {
           flagged.appendChild(buildTodayLink(r, true));
@@ -2378,7 +2888,7 @@
       } else {
         var none = document.createElement('div');
         none.className = 'today-empty';
-        none.textContent = 'No flagged conversations today.';
+        none.textContent = t('no_flagged_today');
         flagged.appendChild(none);
       }
 
@@ -2438,6 +2948,7 @@
     // ---------- flagged ----------
     function loadFlagged() {
       show('flaggedView');
+      setViewHash('flagged', state.currentDeviceId);
       setActiveTab('flagged');
       state.backFromDetail = loadFlagged;
       renderDeviceContext('flaggedDeviceContext');
@@ -2545,6 +3056,7 @@
     // and briefly highlights it so the parent does not have to hunt.
     function openConversation(conversationId, targetMessageId) {
       show('detailView');
+      setViewHash('detail', state.currentDeviceId, conversationId);
       var metaEl = document.getElementById('detailMeta');
       var msgsEl = document.getElementById('detailMessages');
       var deleteBtn = document.getElementById('deleteConversationBtn');
@@ -2613,7 +3125,8 @@
 
     function buildMessage(m) {
       var div = document.createElement('div');
-      div.className = 'msg';
+      div.className = 'msg' +
+        (m.role === 'assistant' ? ' from-toy' : (m.role === 'user' ? ' from-child' : ''));
       // Stable per-message id — used by jump-to-message from Flagged
       // tab. Guarded in case m.id is missing on older payloads.
       if (m.id) div.id = 'msg-' + m.id;
@@ -2635,6 +3148,12 @@
       ts.textContent = fmtTime(m.timestamp);
       meta.appendChild(role);
       meta.appendChild(ts);
+      // E1.3: per-message mode tag (assistant rows stamped at chat time).
+      if (m.mode) {
+        var modeTag = document.createElement('span');
+        modeTag.textContent = ' · ' + modeChipLabel(m.mode);
+        meta.appendChild(modeTag);
+      }
 
       var body = document.createElement('div');
       body.className = 'body';
@@ -2683,7 +3202,7 @@
 
         var token = getToken();
         if (!token) {
-          status.textContent = 'Session expired.';
+          status.textContent = t('session_expired');
           status.style.color = '#c62828';
           btn.disabled = false;
           return;
@@ -2694,7 +3213,7 @@
           if (res.status === 401) {
             clearToken();
             show('loginView');
-            setStatus('loginStatus', 'Session expired. Please log in again.', 'err');
+            setStatus('loginStatus', t('session_expired'), 'err');
             return null;
           }
           if (res.status === 404) {
@@ -2741,6 +3260,7 @@
     function loadAudit() {
       state.auditOffset = 0;
       show('auditView');
+      setViewHash('activity');
       fetchAuditPage();
     }
     function pageOlderAudit() {
@@ -2937,6 +3457,10 @@
     document.getElementById('changePasswordBtn').addEventListener('click', doChangePassword);
     document.getElementById('toggleDeleteAccountBtn').addEventListener('click', toggleDeleteAccountForm);
     document.getElementById('deleteAccountBtn').addEventListener('click', doDeleteAccount);
+    document.getElementById('toyBackBtn').addEventListener('click', function () {
+      state.currentToyId = null;
+      loadDevices();
+    });
     document.getElementById('backToDevices').addEventListener('click', loadDevices);
     document.getElementById('flaggedBackToDevices').addEventListener('click', loadDevices);
     document.getElementById('backFromDetailBtn').addEventListener('click', backFromDetail);
@@ -3086,6 +3610,38 @@
     // without overlap. URLSearchParams is available on every browser
     // this dashboard targets; the try/catch is defensive for
     // environments where window.location is unusable.
+    // ---------- language switcher init ----------
+    (function initLang() {
+      var sel = document.getElementById('langSelect');
+      if (sel) {
+        sel.value = getLang();
+        sel.addEventListener('change', function () {
+          setLang(sel.value);
+          applyStaticI18n();
+          // Re-render whichever view is active so JS-built labels (mode
+          // chips, buttons, Today panel, speaker names) pick up the new
+          // language. Falls back to a no-op if no view is loaded yet.
+          try { if (typeof rerenderActiveView === 'function') rerenderActiveView(); } catch (e) {}
+        });
+      }
+      applyStaticI18n();
+    })();
+
+    // Re-run the loader for the currently-visible view so dynamically
+    // built strings are retranslated after a language switch.
+    function rerenderActiveView() {
+      var views = {
+        devicesView: loadDevices,
+        summariesView: loadSummaries,
+        flaggedView: loadFlagged,
+        auditView: loadAudit
+      };
+      for (var id in views) {
+        var el = document.getElementById(id);
+        if (el && !el.hidden) { views[id](); return; }
+      }
+    }
+
     (function bootRouter() {
       var resetToken = null;
       var verifyToken = null;
@@ -3103,7 +3659,46 @@
         return;
       }
       if (getToken()) {
-        loadDevices();
+        // Reload-survival: restore the view recorded in the URL hash
+        // (written by setViewHash) instead of always bouncing to the
+        // devices list. Anything malformed falls back to the list.
+        var v = null, d = null, c = null;
+        try {
+          var hp = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+          v = hp.get('v'); d = hp.get('d'); c = hp.get('c');
+        } catch (e) { /* fall back to the devices list */ }
+
+        // A device-scoped view restored on a cold reload has no cached
+        // device list yet, so the toy's NAME can't resolve and the header
+        // shows "Toy <shortid>". Prime state.lastDevicesResponse first,
+        // then render — so the name is right on the very first paint.
+        function primeDevicesThen(cb) {
+          authedFetch('/api/parents/devices/details').then(function (data) {
+            state.lastDevicesResponse = (data && data.devices) || [];
+          }).catch(function () { /* name just falls back to short id */ })
+            .finally(function () { cb(); });
+        }
+
+        if (v === 'toy' && d) {
+          primeDevicesThen(function () { openToy(d); });
+        } else if (v === 'summaries' && d) {
+          state.currentDeviceId = d; state.offset = 0; state.flaggedOffset = 0;
+          state.currentToyId = d;
+          primeDevicesThen(loadSummaries);
+        } else if (v === 'flagged' && d) {
+          state.currentDeviceId = d; state.offset = 0; state.flaggedOffset = 0;
+          state.currentToyId = d;
+          primeDevicesThen(loadFlagged);
+        } else if (v === 'detail' && d && c) {
+          state.currentDeviceId = d; state.offset = 0; state.flaggedOffset = 0;
+          state.currentToyId = d;
+          state.backFromDetail = loadSummaries;
+          primeDevicesThen(function () { openConversation(c); });
+        } else if (v === 'activity') {
+          loadAudit();
+        } else {
+          loadDevices();
+        }
       } else {
         show('loginView');
       }

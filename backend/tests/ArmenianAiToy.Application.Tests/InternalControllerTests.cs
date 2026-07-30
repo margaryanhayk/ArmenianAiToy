@@ -493,4 +493,39 @@ public class InternalControllerTests
         Assert.Contains("device_pause", audit.Metadata!);
         Assert.Contains("bob-ops", audit.Metadata!);
     }
+
+    [Fact]
+    public async Task ResetParentPassword_SetsNewHash_MatchesLegacyEmail_RequiresReason()
+    {
+        var db = NewDb();
+        db.Parents.Add(new ArmenianAiToy.Domain.Entities.Parent
+        {
+            Id = Guid.NewGuid(),
+            Email = "  Owner@Example.COM  ",   // legacy un-normalized casing/spaces
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("old-forgotten"),
+            RegisteredAt = DateTime.UtcNow,
+            TermsAcceptedAt = DateTime.UtcNow,
+            TermsVersion = "1.0"
+        });
+        await db.SaveChangesAsync();
+
+        // Missing reason -> 400.
+        var bad = await OpController(db).ResetParentPassword(
+            new InternalParentPasswordResetRequest("owner@example.com", "brandnew123", ""), default);
+        Assert.IsType<BadRequestObjectResult>(bad);
+
+        // Unknown email -> 404.
+        var nf = await OpController(db).ResetParentPassword(
+            new InternalParentPasswordResetRequest("nobody@x.com", "brandnew123", "owner locked out"), default);
+        Assert.IsType<NotFoundObjectResult>(nf);
+
+        // Happy path: matches the legacy email, sets a verifiable new hash.
+        var ok = await OpController(db).ResetParentPassword(
+            new InternalParentPasswordResetRequest("owner@example.com", "brandnew123", "owner locked out"), default);
+        Assert.IsType<OkObjectResult>(ok);
+        var parent = await db.Parents.SingleAsync();
+        Assert.True(BCrypt.Net.BCrypt.Verify("brandnew123", parent.PasswordHash));
+        Assert.False(BCrypt.Net.BCrypt.Verify("old-forgotten", parent.PasswordHash));
+    }
+
 }

@@ -1,6 +1,8 @@
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 
 namespace ArmenianAiToy.Api.Controllers;
 

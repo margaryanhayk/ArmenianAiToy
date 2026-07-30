@@ -179,4 +179,47 @@ public class NotifierTransportTests
         Assert.Contains("Notifications:Smtp:FromAddress", ex.Message);
         Assert.Contains("Notifications:PasswordResetLinkBase", ex.Message);
     }
+
+    [Fact]
+    public void ResolveImplementation_Resend_WithRequiredKeys_ResolvesResendNotifier()
+    {
+        var config = Substitute.For<IConfiguration>();
+        config["Notifications:Transport"].Returns("resend");
+        config["Resend:ApiKey"].Returns("re_test_key");
+        config["Resend:FromAddress"].Returns("Areg <noreply@example.com>");
+        config["Notifications:PasswordResetLinkBase"].Returns("https://x/parent.html");
+        Assert.Equal(typeof(ResendNotifier), NotifierTransport.ResolveImplementation(config));
+    }
+
+    [Fact]
+    public void ResolveImplementation_Resend_MissingApiKey_ThrowsAtStartup()
+    {
+        var config = Substitute.For<IConfiguration>();
+        config["Notifications:Transport"].Returns("resend");
+        // No api key under any accepted alias.
+        Assert.Throws<System.InvalidOperationException>(
+            () => NotifierTransport.ResolveImplementation(config));
+    }
+
+    [Fact]
+    public void ResolveImplementation_Resend_AcceptsProviderStyleEnvName()
+    {
+        // Operators copy RESEND_API_KEY from Resend's own docs; accept it.
+        var config = Substitute.For<IConfiguration>();
+        config["Notifications:Transport"].Returns("resend");
+        config["RESEND_API_KEY"].Returns("re_alias_key");
+        Assert.Equal(typeof(ResendNotifier), NotifierTransport.ResolveImplementation(config));
+    }
+
+    [Fact]
+    public void ResolveImplementation_Resend_ApiKeyOnly_IsEnough()
+    {
+        // FromAddress + link base fall back to working defaults, so a
+        // missing optional key must NOT take the whole site down.
+        var config = Substitute.For<IConfiguration>();
+        config["Notifications:Transport"].Returns("resend");
+        config["Resend:ApiKey"].Returns("re_only_key");
+        Assert.Equal(typeof(ResendNotifier), NotifierTransport.ResolveImplementation(config));
+    }
+
 }

@@ -43,6 +43,14 @@ public class DeviceController : ControllerBase
         if (string.IsNullOrWhiteSpace(request?.MacAddress))
             return BadRequest(new { error = "MacAddress is required" });
 
+        // Length bounds: the derived device name takes the MAC's last 4
+        // chars (`request.MacAddress[^4..]`), which throws — HTTP 500 — on
+        // a value shorter than 4. Reject at the boundary instead. Upper cap
+        // bounds request cost / storage. A real MAC is 12–17 chars.
+        var macLen = request.MacAddress.Trim().Length;
+        if (macLen < 4 || macLen > 64)
+            return BadRequest(new { error = "MacAddress must be 4 to 64 characters." });
+
         var presented = Request.Headers[DeviceProvisioningAuth.SecretHeader].ToString();
         var decision = DeviceProvisioningAuth.Evaluate(
             string.IsNullOrEmpty(presented) ? null : presented,

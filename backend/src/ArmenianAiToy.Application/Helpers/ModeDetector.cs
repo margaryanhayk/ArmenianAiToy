@@ -168,7 +168,7 @@ public static class ModeDetector
         IReadOnlyList<(string Role, string Content)>? history,
         bool hasActiveStorySession = false)
     {
-        var lower = (userMessage ?? string.Empty).ToLowerInvariant();
+        var lower = NormalizeForMatch(userMessage);
         history ??= [];
 
         bool hasStoryCue = ContainsAny(lower, StoryTriggers);
@@ -198,7 +198,7 @@ public static class ModeDetector
             if (!string.Equals(history[i].Role, "user", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var hLower = history[i].Content.ToLowerInvariant();
+            var hLower = NormalizeForMatch(history[i].Content);
             if (ContainsAny(hLower, StoryTriggers)) return DetectedMode.Story;
             if (ContainsAny(hLower, GameTriggers)) return DetectedMode.Game;
             if (ContainsAny(hLower, RiddleTriggers)) return DetectedMode.Riddle;
@@ -220,8 +220,35 @@ public static class ModeDetector
     /// </summary>
     public static bool ContainsCalmCue(string? userMessage)
     {
-        var lower = (userMessage ?? string.Empty).ToLowerInvariant();
+        var lower = NormalizeForMatch(userMessage);
         return ContainsAny(lower, CalmTriggers);
+    }
+
+    /// <summary>
+    /// Lowercase + strip Armenian intra-word punctuation before trigger
+    /// matching. In Armenian orthography the question mark ՞ (U+055E),
+    /// emphasis ՛ (U+055B) and exclamation ՜ (U+055C) are written ON the
+    /// stressed vowel INSIDE the word — «Ինչու՞», «Ինչպե՞ս» — so the plain
+    /// token «ինչու» / «ինչպես» never appears contiguously and the
+    /// Curiosity/why starters never matched the most natural phrasing of
+    /// an Armenian "why/how" question (the product is Armenian-first, so
+    /// this made Curiosity effectively unreachable). Removing these marks
+    /// restores the word so the existing needle set matches. Letters are
+    /// untouched, so no new/false matches are introduced.
+    /// </summary>
+    private static string NormalizeForMatch(string? message)
+    {
+        var lower = (message ?? string.Empty).ToLowerInvariant();
+        if (lower.IndexOf('՞') < 0
+            && lower.IndexOf('՛') < 0
+            && lower.IndexOf('՜') < 0)
+        {
+            return lower;
+        }
+        return lower
+            .Replace("՞", string.Empty)
+            .Replace("՛", string.Empty)
+            .Replace("՜", string.Empty);
     }
 
     private static bool ContainsAny(string lower, string[] needles)

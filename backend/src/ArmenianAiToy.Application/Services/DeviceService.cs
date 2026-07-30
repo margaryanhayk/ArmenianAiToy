@@ -95,7 +95,10 @@ public class DeviceService : IDeviceService
         {
             Id = Guid.NewGuid(),
             MacAddress = request.MacAddress,
-            Name = $"Toy-{request.MacAddress[^4..]}",
+            // Defense-in-depth: the controller enforces length >= 4, but
+            // never index past the start here either (a short MAC would
+            // throw ArgumentOutOfRangeException -> 500).
+            Name = $"Toy-{(request.MacAddress.Length >= 4 ? request.MacAddress[^4..] : request.MacAddress)}",
             ApiKey = null,
             ApiKeyHash = DeviceApiKeyHasher.Hash(plaintext),
             ClaimCodeHash = DeviceApiKeyHasher.Hash(claimCode),

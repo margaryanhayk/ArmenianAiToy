@@ -3,6 +3,7 @@ using System;
 using ArmenianAiToy.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ArmenianAiToy.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260728132416_AddMessageMode")]
+    partial class AddMessageMode
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.3");
@@ -135,9 +138,6 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                     b.Property<TimeOnly?>("BedtimeStart")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("BoardModel")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("ClaimCodeHash")
                         .HasColumnType("TEXT");
 
@@ -150,12 +150,6 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                         .HasDefaultValue(true);
 
                     b.Property<DateTime?>("DormancyWarnedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("FirmwareBuild")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("FirmwareReportedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("FirmwareVersion")
@@ -172,9 +166,6 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                     b.Property<bool>("IsRevoked")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("LastOtaStatus")
-                        .HasColumnType("TEXT");
-
                     b.Property<DateTime>("LastSeenAt")
                         .HasColumnType("TEXT");
 
@@ -184,9 +175,6 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("PartitionName")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("RegisteredAt")
@@ -218,57 +206,6 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Devices");
-                });
-
-            modelBuilder.Entity("ArmenianAiToy.Domain.Entities.DeviceCommand", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("AckDiagnosticsJson")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("AckFirmwareVersion")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("AckedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("DeviceId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Error")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("ExpiresAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("PayloadJson")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Result")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("SentAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DeviceId", "Status");
-
-                    b.ToTable("DeviceCommands");
                 });
 
             modelBuilder.Entity("ArmenianAiToy.Domain.Entities.Message", b =>
@@ -464,17 +401,6 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Child");
-
-                    b.Navigation("Device");
-                });
-
-            modelBuilder.Entity("ArmenianAiToy.Domain.Entities.DeviceCommand", b =>
-                {
-                    b.HasOne("ArmenianAiToy.Domain.Entities.Device", "Device")
-                        .WithMany()
-                        .HasForeignKey("DeviceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.Navigation("Device");
                 });
