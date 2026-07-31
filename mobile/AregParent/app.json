@@ -9,7 +9,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.areg.parent"
+      "bundleIdentifier": "com.areg.parent",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.areg.parent",
@@ -32,6 +35,18 @@
           "localNetworkPermission": "Local network access lets Areg talk to your toy during setup."
         }
       ]
-    ]
+    ],
+    "owner": "test111111s-team",
+    "extra": {
+      "eas": {
+        "projectId": "71244ba2-ff1e-40f1-92d4-441e6afe6d7a"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/71244ba2-ff1e-40f1-92d4-441e6afe6d7a"
+    }
   }
 }

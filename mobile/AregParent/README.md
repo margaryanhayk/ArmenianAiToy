@@ -32,7 +32,10 @@ npm install            # first time
 npx expo start         # then scan the QR with Expo Go on your phone
 ```
 
-Point it at your backend by setting the base URL (defaults to the dev LAN IP):
+Point it at your backend by setting the base URL. The **default is the live
+server** (`https://armenianaitoy-production.up.railway.app`), so an
+unconfigured build still reaches a real backend; set the variable to work
+against a bench backend instead:
 
 ```bash
 # PowerShell
@@ -64,12 +67,52 @@ npx eas-cli build --profile development --platform ios
 Profiles (`eas.json`):
 - **preview** — standalone APK: install and run (includes the Bluetooth module). Best for "just put it on my phone."
 - **development** — dev client + live reload (`npx expo start --dev-client`). Best for iterating + Bluetooth testing.
-- **production** — store build; set its `EXPO_PUBLIC_API_BASE_URL` to your HTTPS backend.
+- **production** — store / TestFlight build. Already points at the live
+  HTTPS backend.
 
-The backend URL is baked in at build time from `eas.json` → `env.EXPO_PUBLIC_API_BASE_URL`
-(currently the dev LAN IP `http://192.168.1.4:5000`). The phone must be on the
-same Wi-Fi as that backend for it to connect; switch to your public HTTPS URL
-for a real release.
+The backend URL is baked in at build time from `eas.json` →
+`env.EXPO_PUBLIC_API_BASE_URL`:
+
+| Profile | URL |
+|---|---|
+| development / preview | `http://192.168.1.4:5000` (bench LAN — phone must be on the same Wi-Fi, and the address is DHCP so re-check it) |
+| production | `https://armenianaitoy-production.up.railway.app` (live) |
+
+## TestFlight on your own iPhone (the Day-6 path)
+
+Everything below is already prepared; this is the whole sequence once the
+Apple Developer Program enrolment is approved.
+
+```bash
+cd mobile/AregParent
+npx eas-cli login
+npx eas-cli build --profile production --platform ios
+#   EAS prompts for the Apple ID, creates the bundle id com.areg.parent,
+#   and generates the signing certificate + provisioning profile for you.
+#   ~15-25 min in the cloud. No Mac needed.
+
+npx eas-cli submit --profile production --platform ios --latest
+#   uploads the build to App Store Connect -> TestFlight
+```
+
+Then in App Store Connect → TestFlight, add your own Apple ID as an
+internal tester and install via the TestFlight app on the iPhone.
+
+Already handled so the upload doesn't stall:
+- `ios.bundleIdentifier` = `com.areg.parent`.
+- `ios.config.usesNonExemptEncryption: false` — answers Apple's
+  export-compliance question up front, so every upload doesn't sit
+  waiting on a manual reply.
+- `appVersionSource: "remote"` + `autoIncrement` in `eas.json` — EAS
+  bumps the build number, so re-uploads never collide.
+- App icon is a real 1024×1024 PNG (App Store Connect rejects anything
+  smaller).
+- `updates.url` + `runtimeVersion` — over-the-air JS updates on the
+  `production` channel, so small fixes ship without a new build.
+
+Not needed for TestFlight (only for a public App Store release):
+privacy policy URL, App Store screenshots, age rating, and the review
+submission itself.
 
 ## Bluetooth Wi-Fi setup (needs a dev build)
 
