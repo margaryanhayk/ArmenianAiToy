@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "three-piglets",
+  "title": "Երեք խոզուկները",
+  "minAge": 4,
+  "maxAge": 7,
+  "tone": "warm",
+  "tags": ["patience", "family", "helping"],
+  "category": "general",
+  "bedtimeSafe": false,
+  "segments": [
+    "Անտառի եզրին ապրում էին երեք խոզուկ եղբայրներ՝ Թուխիկը, Մոխրիկը և Ամրիկը։ Եկավ աշունը, և օրերը ցրտեցին։ Եղբայրները որոշեցին տնակներ շինել։",
+    "Թուխիկը շտապում էր խաղալ ու արագ շինեց ծղոտե տնակ։ Մոխրիկն էլ շտապեց ու տնակ շինեց չոր ճյուղերից։ Իսկ Ամրիկն աշխատեց երկար օրեր։ Նա շինեց քարե տնակ՝ ամուր դռնով։",
+    "Մի օր անտառից եկավ գայլը։ Նա փչեց ծղոտե տնակի վրա, և տնակը փլվեց։ Թուխիկը վազեց Մոխրիկի մոտ, բայց գայլը փչեց նաև ճյուղե տնակի վրա։ Երկու խոզուկները վազեցին դեպի Ամրիկի քարե տնակը։",
+    "Գայլը փչեց, փչեց, փչեց, բայց քարե տնակը տեղից անգամ չշարժվեց։ Գայլը հոգնեց ու վերադարձավ անտառ։ Երեք եղբայրները մնացին ապրելու ամուր տնակում։ Ձմեռը նրանց համար տաք էր ու հանգիստ։"
+  ],
+  "reflectionText": "Ամրիկը համբերությամբ աշխատեց, ու նրա ամուր տնակը բոլոր եղբայրներին տաք պահեց։",
+  "reflectionQuestions": ["Ինչի՞ց էր շինել Ամրիկն իր տնակը։"],
+  "review": {
+    "status": "draft",
+    "linguisticReviewAt": null,
+    "listenTestAt": null,
+    "notes": "OWNER-DESIGNATED TITLE (owner decision 2026-08-01, heqiat.am top-9 selection). NEW ORIGINAL Armenian retelling of the public-domain English folk tale — heqiat.am's translation was NOT used (its Նիֆ-Նիֆ/Նուֆ-Նուֆ/Նաֆ-Նաֆ names come from Mikhalkov's copyrighted Russian version; new names Թուխիկ/Մոխրիկ/Ամրիկ). Wolf's defeat softened to giving up and leaving — no chimney/boiling scene."
+  }
+}

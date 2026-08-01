@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "sister-mittens",
+  "title": "Քույրիկի ձեռնոցները",
+  "minAge": 4,
+  "maxAge": 7,
+  "tone": "warm",
+  "tags": ["family", "kindness", "sharing"],
+  "category": "general",
+  "bedtimeSafe": true,
+  "segments": [
+    "Մի լեռնային գյուղում ապրում էին քույր ու եղբայր՝ Լուսինեն և փոքրիկ Արամը։ Լուսինեն մեծն էր։ Նա միշտ հոգ էր տանում եղբոր մասին։",
+    "Մի ցուրտ օր նրանք խաղում էին բակում։ Արամի ձեռնոցները թրջվեցին ձյան մեջ։ Ձեռքերը սկսեցին մրսել։ Լուսինեն հանեց իր տաք ձեռնոցները և տվեց եղբորը։",
+    "Երեկոյան մայրիկը տեսավ դա ու ժպտաց։ Նա գործեց նոր ձեռնոցներ Լուսինեի համար՝ կարմիր ու փափուկ։ Հաջորդ օրը քույր ու եղբայր նորից խաղացին ձյան մեջ։ Երկուսի ձեռքերն էլ տաք էին։"
+  ],
+  "reflectionText": "Երբ հոգ ենք տանում իրար մասին, մեր սիրտն էլ է տաքանում։",
+  "reflectionQuestions": ["Ի՞նչ տվեց Լուսինեն եղբորը։"],
+  "review": {
+    "status": "draft",
+    "linguisticReviewAt": null,
+    "listenTestAt": null,
+    "notes": "OWNER-DESIGNATED THEME (owner decision 2026-08-01, heqiat.am top-9 selection — the site's «Քրոջ սեր» is a modern site-original text and was NOT used). This is a NEW ORIGINAL in-project story on the same sibling-care theme."
+  }
+}

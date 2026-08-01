@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "princess-and-pea",
+  "title": "Արքայադուստրը և սիսեռահատիկը",
+  "minAge": 4,
+  "maxAge": 7,
+  "tone": "warm",
+  "tags": ["curiosity", "calm"],
+  "category": "general",
+  "bedtimeSafe": true,
+  "segments": [
+    "Մի երկրում ապրում էր մի արքայազն։ Նա ուզում էր գտնել մի իսկական արքայադստեր։ Երկար ման եկավ աշխարհով մեկ, բայց իսկականին չգտավ։ Տխուր վերադարձավ տուն։",
+    "Մի անձրևոտ երեկո պալատի դուռը թակեցին։ Դռան մոտ կանգնած էր մի աղջիկ՝ թրջված մազերով։ Նա ասաց, որ իսկական արքայադուստր է։ Թագուհին լուռ ժպտաց։",
+    "Թագուհին վերցրեց մի փոքրիկ սիսեռ և դրեց մահճակալի վրա։ Սիսեռի վրա շարեց քսան փափուկ ներքնակ։ Աղջիկը բարձրացավ ամենավերևն ու պառկեց քնելու։",
+    "Առավոտյան աղջիկն ասաց, որ ամբողջ գիշեր մի կլոր բան էր խանգարում իրեն։ Բոլորը հասկացան, որ նա իսկական արքայադուստր է։ Միայն իսկականը կզգար փոքրիկ սիսեռը քսան ներքնակի տակ։ Արքայազնն ուրախ ժպտաց, և աղջիկը մնաց ապրելու պալատում՝ իր նոր, ջերմ տանը։"
+  ],
+  "reflectionText": "Ահա այսպես փոքրիկ սիսեռը ցույց տվեց, թե ով է իսկական արքայադուստրը։",
+  "reflectionQuestions": ["Ի՞նչ էր դրված ներքնակների տակ։"],
+  "review": {
+    "status": "draft",
+    "linguisticReviewAt": null,
+    "listenTestAt": null,
+    "notes": "OWNER-DESIGNATED TITLE (owner decision 2026-08-01, heqiat.am top-9 selection). NEW ORIGINAL Armenian retelling of Andersen's public-domain «Prinsessen paa Ærten» (1835) — heqiat.am's «նոր փոխադրություն» translation was NOT used (it is the site's own copyrighted text)."
+  }
+}
