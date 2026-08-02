@@ -343,6 +343,26 @@ if (httpsHardening.Enabled)
     app.UseHttpsRedirection();
 }
 
+// Baseline security response headers. Unlike HSTS above these are NOT gated on
+// Security:RequireHttps — they are transport-independent and safe everywhere,
+// and parent.html / admin.html are real credential-entry surfaces served by
+// this app. Kept deliberately small and framework-free (no new package):
+//   X-Content-Type-Options  — stop MIME sniffing turning an upload into script
+//   X-Frame-Options         — no framing => no clickjacking of the login form
+//   Referrer-Policy         — don't leak dashboard URLs (which can carry a
+//                             reset token in ?token=) to third-party sites
+// A full CSP is deliberately NOT set here: parent.html/admin.html run inline
+// scripts and styles by design, so a meaningful policy needs their refactor —
+// tracked as follow-up work, not silently weakened with 'unsafe-inline'.
+app.Use(async (ctx, next) =>
+{
+    var h = ctx.Response.Headers;
+    h["X-Content-Type-Options"] = "nosniff";
+    h["X-Frame-Options"] = "DENY";
+    h["Referrer-Policy"] = "no-referrer";
+    await next();
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

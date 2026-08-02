@@ -66,6 +66,53 @@ public class ChildServiceTests
         Assert.Null(persisted!.BirthYear);
     }
 
+    // --- GetChildForDeviceAsync (cross-family guard) ---
+
+    [Fact]
+    public async Task GetChildForDeviceAsync_ChildOnThisDevice_ReturnsChild()
+    {
+        var (service, _) = CreateService();
+        var deviceId = Guid.NewGuid();
+        var child = await service.CreateChildAsync(deviceId, "Arman", Gender.Boy, 2021);
+
+        var result = await service.GetChildForDeviceAsync(child.Id, deviceId);
+
+        Assert.NotNull(result);
+        Assert.Equal(child.Id, result!.Id);
+    }
+
+    [Fact]
+    public async Task GetChildForDeviceAsync_ChildBelongsToAnotherDevice_ReturnsNull()
+    {
+        // KEYSTONE: childId arrives from the client on every chat request, so a
+        // toy sending ANOTHER family's child id must never resolve that child.
+        // Resolving it would pull a different family's child name / age /
+        // gender into this device's system prompt (and stamp the conversation
+        // with it). Null here is what makes the caller fall back to this
+        // device's own child.
+        var (service, _) = CreateService();
+        var myDevice = Guid.NewGuid();
+        var otherFamilyDevice = Guid.NewGuid();
+        await service.CreateChildAsync(myDevice, "Arman", Gender.Boy, 2021);
+        var otherFamilyChild = await service.CreateChildAsync(otherFamilyDevice, "Ani", Gender.Girl, 2020);
+
+        var result = await service.GetChildForDeviceAsync(otherFamilyChild.Id, myDevice);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetChildForDeviceAsync_UnknownChildId_ReturnsNull()
+    {
+        var (service, _) = CreateService();
+        var deviceId = Guid.NewGuid();
+        await service.CreateChildAsync(deviceId, "Arman", Gender.Boy, 2021);
+
+        var result = await service.GetChildForDeviceAsync(Guid.NewGuid(), deviceId);
+
+        Assert.Null(result);
+    }
+
     // --- GetChildAsync ---
 
     [Fact]

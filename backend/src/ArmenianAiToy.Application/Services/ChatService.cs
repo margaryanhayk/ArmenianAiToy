@@ -1458,8 +1458,12 @@ public class ChatService : IChatService
     /// <inheritdoc />
     public async Task<ChatResponse> ContinueLibraryStoryAsync(Guid deviceId, Guid? childId = null)
     {
+        // childId is client-supplied — resolve it device-scoped and fall back
+        // to this device's own child when it doesn't belong here (see the
+        // GetChildForDeviceAsync xmldoc).
         var child = childId.HasValue
-            ? await _childService.GetChildAsync(childId.Value)
+            ? await _childService.GetChildForDeviceAsync(childId.Value, deviceId)
+              ?? await _childService.GetDefaultChildForDeviceAsync(deviceId)
             : await _childService.GetDefaultChildForDeviceAsync(deviceId);
         var conversation = await _conversations.GetOrCreateActiveConversationAsync(deviceId, child?.Id);
 
@@ -1509,9 +1513,12 @@ public class ChatService : IChatService
     public async Task<ChatResponse> GetResponseAsync(Guid deviceId, string userMessage, Guid? childId = null,
         Guid? storySessionId = null, string? selectedChoice = null)
     {
-        // Load child profile (use provided childId or default child for device)
+        // Load child profile. The provided childId is client-supplied, so it is
+        // resolved DEVICE-SCOPED: an id belonging to another family resolves to
+        // null and falls back to this device's own child, never that family's.
         var child = childId.HasValue
-            ? await _childService.GetChildAsync(childId.Value)
+            ? await _childService.GetChildForDeviceAsync(childId.Value, deviceId)
+              ?? await _childService.GetDefaultChildForDeviceAsync(deviceId)
             : await _childService.GetDefaultChildForDeviceAsync(deviceId);
 
         var conversation = await _conversations.GetOrCreateActiveConversationAsync(deviceId, child?.Id);
@@ -1532,8 +1539,14 @@ public class ChatService : IChatService
             await _conversations.AddMessageAsync(
                 conversation.Id, MessageRole.User, userMessage, SafetyFlag.Blocked);
 
+            // The hardcoded default must be REAL Armenian, not a placeholder:
+            // this is the reply a child hears right after the dangerous-input
+            // prefilter fires — the toy's first line of defense — and it must
+            // still work if the config key is ever missing, renamed, or
+            // overridden away. Reuses the existing reviewed constant rather
+            // than introducing a second string to keep in sync.
             var prefilterFallback = _config["SafetyFallbackResponse"]
-                ?? "Արdelays, delays delays delays delays delays:";
+                ?? DefaultFallbackResponse;
             var prefilterMsg = await _conversations.AddMessageAsync(
                 conversation.Id, MessageRole.Assistant, prefilterFallback, SafetyFlag.Clean);
 
@@ -2049,12 +2062,31 @@ public class ChatService : IChatService
                 var withSeparator = "\n---\n" + fallbackRaw.Trim();
                 if (TailBlockParser.TryExtract(withSeparator, out _, out var fbA, out var fbB))
                 {
-                    PendingChoices[conversation.Id] = new PendingChoice(fbA!, fbB!, DateTime.UtcNow);
-                    choiceA = fbA;
-                    choiceB = fbB;
-                    _logger.LogInformation(
-                        "Fallback choices generated. ConversationId: {ConversationId}, A: {A}, B: {B}",
-                        conversation.Id, fbA, fbB);
+                    // OUTPUT MODERATION on the fallback choices. This is a
+                    // SECOND, separate model call whose text reaches the child
+                    // directly — it is spoken by TTS on the voice path and
+                    // returned on the wire — so it must clear the classifier
+                    // like every other model-authored string. Without this the
+                    // dual-moderation contract has a hole exactly here.
+                    // Fail-closed by contract: moderation_unavailable is unsafe.
+                    var choiceModeration = await _moderation.CheckContentAsync(fbA + "\n" + fbB);
+                    if (!choiceModeration.IsSafe)
+                    {
+                        _logger.LogWarning(
+                            "Fallback choices blocked by output moderation. ConversationId: {ConversationId} | Categories: {Categories}",
+                            conversation.Id, string.Join(", ", choiceModeration.FlaggedCategories));
+                        // choiceA stays null → the deterministic safe choices
+                        // below take over.
+                    }
+                    else
+                    {
+                        PendingChoices[conversation.Id] = new PendingChoice(fbA!, fbB!, DateTime.UtcNow);
+                        choiceA = fbA;
+                        choiceB = fbB;
+                        _logger.LogInformation(
+                            "Fallback choices generated. ConversationId: {ConversationId}, A: {A}, B: {B}",
+                            conversation.Id, fbA, fbB);
+                    }
                 }
                 else
                 {

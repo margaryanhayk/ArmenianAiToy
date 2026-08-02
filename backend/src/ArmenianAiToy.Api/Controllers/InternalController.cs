@@ -548,10 +548,15 @@ public class InternalController : ControllerBase
         if (parent is null)
             return NotFound(new { error = "No account found for that email." });
 
+        var op = HttpContext?.Items["InternalOperator"] as string ?? "unknown";
+
         parent.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+        // Durable audit row in the SAME SaveChanges as the password change —
+        // this endpoint is a full-account-takeover primitive, so its record
+        // must outlive log rotation. Never logs or stores the new password.
+        _db.AuditEvents.Add(AuditEvent.InternalConsolePasswordReset(op, parent.Id, req.Reason.Trim()));
         await _db.SaveChangesAsync(ct);
 
-        var op = HttpContext?.Items["InternalOperator"] as string ?? "unknown";
         _logger.LogWarning(
             "Operator {Operator} reset the password for parent {ParentId} (reason: {Reason})",
             op, parent.Id, req.Reason.Trim());

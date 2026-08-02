@@ -297,6 +297,58 @@ public class ChatServiceTailBlockTests
     }
 
     [Fact]
+    public async Task FallbackChoiceGeneration_UnsafeChoices_AreModeratedOut_NotSpokenToChild()
+    {
+        // KEYSTONE (dual-moderation contract). The Step 10c fallback runs a
+        // SECOND, separate model call to invent the two choice lines when the
+        // story turn arrived without them. That text reaches the child
+        // directly — it is returned on the wire AND spoken aloud by TTS on the
+        // voice path — so it must clear the output classifier like every other
+        // model-authored string. Before this guard existed it did not, which
+        // was a real hole in the "every model call is moderated" invariant.
+        var bodyOnly = "Աղվեսը վազեց անտառով։ Ճյուղին նստած էր թռչունիկը։";
+        var regenerated = "CHOICE_A:Վատ տարբերակ\nCHOICE_B:Ուրիշ վատ տարբերակ";
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(bodyOnly, regenerated);
+
+        // input safe, story-output safe, then the FALLBACK CHOICES are unsafe.
+        _moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(
+                new ModerationResult(true, new List<string>()),
+                new ModerationResult(true, new List<string>()),
+                new ModerationResult(false, new List<string> { "violence" }));
+
+        var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "tell me a story");
+
+        // The blocked choices must NOT reach the child...
+        Assert.NotEqual("Վատ տարբերակ", result.ChoiceA);
+        Assert.NotEqual("Ուրիշ վատ տարբերակ", result.ChoiceB);
+        // ...and the child is not left with no choices at all: the
+        // deterministic safe pair takes over.
+        Assert.False(string.IsNullOrWhiteSpace(result.ChoiceA));
+        Assert.False(string.IsNullOrWhiteSpace(result.ChoiceB));
+    }
+
+    [Fact]
+    public async Task FallbackChoiceGeneration_SafeChoices_StillReachTheChild()
+    {
+        // Control for the guard above: when the fallback choices pass
+        // moderation they must be used unchanged — the new check must not
+        // block the normal path.
+        var bodyOnly = "Աղվեսը վազեց անտառով։ Ճյուղին նստած էր թռչունիկը։ Մոտակայքում զանգում էր զանգակ։";
+        var regenerated = "CHOICE_A:Կանչենք թռչունիկին\nCHOICE_B:Լսենք զանգակի ձայնը";
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(bodyOnly, regenerated);
+
+        var result = await _chatService.GetResponseAsync(Guid.NewGuid(), "tell me a story");
+
+        Assert.Equal("Կանչենք թռչունիկին", result.ChoiceA);
+        Assert.Equal("Լսենք զանգակի ձայնը", result.ChoiceB);
+    }
+
+    [Fact]
     public async Task ChoiceDiversityGuard_DifferentVerbs_DoesNotTriggerRegeneration()
     {
         // Control: genuinely different verbs must pass the guard and the

@@ -43,6 +43,55 @@ public class ForwardedHeadersConfigTests
     }
 
     [Fact]
+    public void Enabled_WithKnownNetwork_TrustsThatCidr()
+    {
+        // Managed hosts (Railway/Fly/Render) have no single stable proxy IP to
+        // pin, so KnownProxies alone cannot be configured there and the per-IP
+        // auth limiters never trip. A CIDR for the platform's internal proxy
+        // network is the pinnable unit.
+        var cfg = Config(
+            ("ForwardedHeaders:Enabled", "true"),
+            ("ForwardedHeaders:KnownNetworks:0", "10.0.0.0/8"));
+
+        var opts = ForwardedHeadersConfig.TryBuild(cfg);
+
+        Assert.NotNull(opts);
+        Assert.Empty(opts!.KnownProxies);
+        Assert.Single(opts.KnownIPNetworks);
+        Assert.Contains(opts.KnownIPNetworks,
+            n => n.BaseAddress.Equals(IPAddress.Parse("10.0.0.0")) && n.PrefixLength == 8);
+    }
+
+    [Fact]
+    public void Enabled_MalformedNetworks_AreDropped_NotWidened()
+    {
+        // A bad CIDR must never silently become "trust everything".
+        var cfg = Config(
+            ("ForwardedHeaders:Enabled", "true"),
+            ("ForwardedHeaders:KnownNetworks:0", "not-a-network"),
+            ("ForwardedHeaders:KnownNetworks:1", "10.0.0.0/999"),
+            ("ForwardedHeaders:KnownNetworks:2", "10.0.0.0/"),
+            ("ForwardedHeaders:KnownNetworks:3", "10.0.0.0"));
+
+        Assert.Null(ForwardedHeadersConfig.TryBuild(cfg));
+    }
+
+    [Fact]
+    public void Enabled_ProxiesAndNetworks_BothHonored()
+    {
+        var cfg = Config(
+            ("ForwardedHeaders:Enabled", "true"),
+            ("ForwardedHeaders:KnownProxies:0", "192.168.1.9"),
+            ("ForwardedHeaders:KnownNetworks:0", "10.0.0.0/8"));
+
+        var opts = ForwardedHeadersConfig.TryBuild(cfg);
+
+        Assert.NotNull(opts);
+        Assert.Single(opts!.KnownProxies);
+        Assert.Single(opts.KnownIPNetworks);
+    }
+
+    [Fact]
     public void Enabled_WithValidProxies_TrustsOnlyThem_ClearsDefaults()
     {
         var cfg = Config(

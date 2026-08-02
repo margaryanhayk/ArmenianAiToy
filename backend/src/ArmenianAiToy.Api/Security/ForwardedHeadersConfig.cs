@@ -49,8 +49,23 @@ public static class ForwardedHeadersConfig
             .Cast<IPAddress>()
             .ToList();
 
+        // KnownNetworks (CIDR) — needed on managed hosts. A PaaS edge proxy
+        // (Railway, Fly, Render...) does not have ONE stable address an
+        // operator can pin, so KnownProxies alone cannot be configured there
+        // and the per-IP auth limiters silently never trip (observed on the
+        // live deployment). A CIDR for the platform's internal proxy network
+        // is the pinnable unit. Entries are "a.b.c.d/prefix"; malformed
+        // entries are dropped rather than widening trust.
+        var networks = (section.GetSection("KnownNetworks").Get<string[]>() ?? Array.Empty<string>())
+            .Select(ParseNetwork)
+            .Where(n => n is not null)
+            .Cast<System.Net.IPNetwork>()
+            .ToList();
+
         // Enabled but nothing trustworthy listed => DO NOT process XFF.
-        if (proxies.Count == 0)
+        // Trusting every upstream would let any client forge X-Forwarded-For
+        // and evade or poison the per-IP limiters.
+        if (proxies.Count == 0 && networks.Count == 0)
             return null;
 
         var options = new ForwardedHeadersOptions
@@ -58,12 +73,44 @@ public static class ForwardedHeadersConfig
             ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
             ForwardLimit = section.GetValue<int?>("ForwardLimit") ?? 1,
         };
-        // Trust ONLY the explicitly listed proxies — clear loopback defaults so
-        // the trusted set is fully operator-controlled and predictable.
+        // Trust ONLY what the operator listed — clear loopback defaults so the
+        // trusted set is fully operator-controlled and predictable.
         options.KnownIPNetworks.Clear();
         options.KnownProxies.Clear();
         foreach (var ip in proxies)
             options.KnownProxies.Add(ip);
+        foreach (var net in networks)
+            options.KnownIPNetworks.Add(net);
         return options;
+    }
+
+    private static System.Net.IPNetwork? ParseNetwork(string? entry)
+    {
+        var raw = entry?.Trim();
+        if (string.IsNullOrEmpty(raw))
+            return null;
+
+        var slash = raw.IndexOf('/');
+        if (slash <= 0 || slash == raw.Length - 1)
+            return null;
+
+        if (!IPAddress.TryParse(raw[..slash], out var address))
+            return null;
+        if (!int.TryParse(raw[(slash + 1)..], out var prefix))
+            return null;
+
+        var maxPrefix = address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? 128 : 32;
+        if (prefix < 0 || prefix > maxPrefix)
+            return null;
+
+        try
+        {
+            return new System.Net.IPNetwork(address, prefix);
+        }
+        catch (ArgumentException)
+        {
+            // e.g. host bits set in the address for the given prefix.
+            return null;
+        }
     }
 }

@@ -35,6 +35,22 @@ public class ChildService : IChildService
         return await _db.Set<Child>().FindAsync(childId);
     }
 
+    /// <summary>
+    /// Device-scoped child lookup: returns the child ONLY when it belongs to
+    /// the calling device. A <c>childId</c> arriving on a chat request is
+    /// client-supplied (the firmware sends it), so it must never be trusted on
+    /// its own — an id belonging to another family would otherwise pull that
+    /// child's name / age / gender into this device's system prompt and stamp
+    /// the conversation with it. Same cross-device probe guard
+    /// <see cref="DeviceService.IsModeEnabledForRequestAsync"/> already applies
+    /// to the mode-flag path; this closes the child-context path to match.
+    /// </summary>
+    public async Task<Child?> GetChildForDeviceAsync(Guid childId, Guid deviceId)
+    {
+        return await _db.Set<Child>()
+            .FirstOrDefaultAsync(c => c.Id == childId && c.DeviceId == deviceId);
+    }
+
     public async Task<Child?> GetDefaultChildForDeviceAsync(Guid deviceId)
     {
         return await _db.Set<Child>()

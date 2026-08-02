@@ -717,4 +717,33 @@ public class AuditEvent
             reason = reason
         })
     };
+
+    /// <summary>
+    /// A superuser-console operator reset a parent's password (owner-recovery
+    /// path). This is the console's highest-blast-radius mutation — full
+    /// account takeover of any parent — so it gets the same DURABLE audit row
+    /// the reversible device actions get, not just a stdout log line: stdout
+    /// has no retention owner in this repo (see § Retention), so a log-only
+    /// record of an account takeover can silently age out.
+    /// <see cref="ActorParentId"/> is null (operator, not a parent) so the row
+    /// stays out of parent-facing feeds; the affected parent is recorded in
+    /// metadata rather than as an actor. NO password material, ever.
+    /// </summary>
+    public static AuditEvent InternalConsolePasswordReset(
+        string operatorName, Guid targetParentId, string reason) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.InternalConsoleAction,
+        ActorParentId = null,
+        TargetDeviceId = null,
+        TargetChildId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            @operator = operatorName,
+            action = "parent_password_reset",
+            target_parent_id = targetParentId,
+            reason = reason
+        })
+    };
 }
