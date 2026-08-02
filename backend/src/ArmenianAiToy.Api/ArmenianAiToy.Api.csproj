@@ -47,4 +47,19 @@
     <InternalsVisibleTo Include="ArmenianAiToy.Application.Tests" />
   </ItemGroup>
 
+  <!--
+    Pre-rendered story narration shipped INSIDE the image. These are the
+    files GET /api/devices/content-file streams to the toy, which then
+    caches them on its SD card - that is the only way the toy's narration
+    voice can be anything other than the backend's runtime TTS voice.
+    Deliberately NOT wwwroot: the endpoint is device-authed, so the audio
+    is not openly downloadable.
+    Resolved at runtime via ContentSync:AudioRoot ("story-audio"), which
+    is relative to the app base directory and therefore identical on the
+    Windows bench and in the Linux container.
+  -->
+  <ItemGroup>
+    <Content Include="story-audio\*.mp3" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

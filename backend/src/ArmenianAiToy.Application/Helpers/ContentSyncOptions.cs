@@ -67,6 +67,29 @@ public sealed class ContentSyncOptions
     /// <see cref="FirmwareUpdateOptions.ImagePath"/>). Empty → 404.</summary>
     public string AudioPath { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Optional base directory for RELATIVE <c>AudioPath</c> values.
+    ///
+    /// <para>
+    /// The serving endpoint requires an absolute path and 404s otherwise, so
+    /// without this every deployment would have to hardcode absolute paths —
+    /// impossible when the same config must work on a Windows bench
+    /// (<c>C:\...</c>) and in the Linux container (<c>/app/...</c>). With a
+    /// root set, a story can say <c>AudioPath: "anban-huri.mp3"</c> and stay
+    /// portable.
+    /// </para>
+    ///
+    /// <para>
+    /// The fail-closed property is preserved: this only RESOLVES a path, it
+    /// does not bypass anything. The endpoint still requires the resolved
+    /// path to be absolute AND the file to exist, so a typo still 404s
+    /// rather than serving something unintended. A relative root is itself
+    /// resolved against the app's base directory, which is where content
+    /// shipped inside the image lands.
+    /// </para>
+    /// </summary>
+    public string AudioRoot { get; set; } = string.Empty;
+
     /// <summary>Legacy single-item: lowercase hex SHA-256 of the MP3.</summary>
     public string Sha256 { get; set; } = string.Empty;
 
@@ -85,6 +108,23 @@ public sealed class ContentSyncOptions
     /// device received an empty manifest.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Applies <see cref="AudioRoot"/> to a configured <paramref name="audioPath"/>.
+    /// An already-absolute path is returned untouched (existing configs are
+    /// unaffected); an empty path stays empty so it keeps failing closed.
+    /// </summary>
+    public static string ResolveAudioPath(string audioRoot, string audioPath)
+    {
+        if (string.IsNullOrWhiteSpace(audioPath)) return audioPath ?? string.Empty;
+        if (Path.IsPathRooted(audioPath)) return audioPath;
+        if (string.IsNullOrWhiteSpace(audioRoot)) return audioPath;
+
+        var root = Path.IsPathRooted(audioRoot)
+            ? audioRoot
+            : Path.Combine(AppContext.BaseDirectory, audioRoot);
+        return Path.GetFullPath(Path.Combine(root, audioPath));
+    }
+
     public static ContentSyncOptions Resolve(IConfiguration config)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -99,6 +139,7 @@ public sealed class ContentSyncOptions
         options.AudioUrl = string.IsNullOrWhiteSpace(section["AudioUrl"])
             ? options.AudioUrl : section["AudioUrl"]!;
         options.AudioPath = section["AudioPath"] ?? "";
+        options.AudioRoot = section["AudioRoot"] ?? "";
         options.Sha256 = section["Sha256"] ?? "";
         if (long.TryParse(section["SizeBytes"], out var size)) options.SizeBytes = size;
 
@@ -132,9 +173,23 @@ public sealed class ContentSyncOptions
     /// </summary>
     public IReadOnlyList<ContentSyncStoryOptions> ResolveStories()
     {
+        // AudioRoot is applied HERE, in the one place both the manifest
+        // service and the content-file endpoint read, so they can never
+        // disagree about which file a story id points at.
         if (Stories.Count > 0)
         {
-            return Stories;
+            return Stories
+                .Select(s => new ContentSyncStoryOptions
+                {
+                    StoryId = s.StoryId,
+                    Version = s.Version,
+                    Title = s.Title,
+                    AudioUrl = s.AudioUrl,
+                    AudioPath = ResolveAudioPath(AudioRoot, s.AudioPath),
+                    Sha256 = s.Sha256,
+                    SizeBytes = s.SizeBytes,
+                })
+                .ToList();
         }
 
         return new[]
@@ -145,7 +200,7 @@ public sealed class ContentSyncOptions
                 Version = Version,
                 Title = Title,
                 AudioUrl = AudioUrl,
-                AudioPath = AudioPath,
+                AudioPath = ResolveAudioPath(AudioRoot, AudioPath),
                 Sha256 = Sha256,
                 SizeBytes = SizeBytes,
             },
