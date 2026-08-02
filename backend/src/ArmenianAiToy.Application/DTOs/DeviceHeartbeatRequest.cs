@@ -12,7 +12,8 @@ public sealed record DeviceHeartbeatRequest(
     string? FirmwareBuild = null,
     string? BoardModel = null,
     string? PartitionName = null,
-    string? LastOtaStatus = null)
+    string? LastOtaStatus = null,
+    bool? SdCardOk = null)
 {
     /// <summary>True when the body carried at least one firmware field worth
     /// persisting (so a bare presence-only heartbeat does no DB write).</summary>
@@ -21,5 +22,6 @@ public sealed record DeviceHeartbeatRequest(
         || FirmwareBuild is not null
         || BoardModel is not null
         || PartitionName is not null
-        || LastOtaStatus is not null;
+        || LastOtaStatus is not null
+        || SdCardOk is not null;
 }

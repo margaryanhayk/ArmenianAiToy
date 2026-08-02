@@ -1381,7 +1381,11 @@ public class ParentService : IParentService
             l.Device.RiddleEnabled,
             l.Device.CuriosityEnabled,
             IsDormant: l.Device.LastSeenAt <= dormancyCutoff,
-            IsOnline: l.Device.LastSeenAt >= onlineCutoff
+            IsOnline: l.Device.LastSeenAt >= onlineCutoff,
+            // Same snapshot-once nowUtc as the two cutoffs above, so every
+            // device in this response is judged against one clock.
+            StoryHealth: DeviceStoryHealth.Resolve(
+                l.Device.SdCardOk, l.Device.LastSeenAt, nowUtc, ReadOnlineThresholdSeconds())
         )).ToList();
     }
 

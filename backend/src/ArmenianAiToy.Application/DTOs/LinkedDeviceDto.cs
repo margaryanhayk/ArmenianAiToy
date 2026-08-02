@@ -37,7 +37,16 @@ public record LinkedDeviceDto(
     bool RiddleEnabled,
     bool CuriosityEnabled,
     bool IsDormant,
-    bool IsOnline);
+    bool IsOnline,
+
+    /// <summary>
+    /// Whether the toy can actually play stories, derived at read time by
+    /// <c>DeviceStoryHealth.Resolve</c> from the SD-card health the toy
+    /// reports on its heartbeat: "ok" / "no_storage" / "offline" / "unknown".
+    /// Exists so a broken toy is never merely SILENT to a parent — see the
+    /// helper's docs for the bench failure that motivated it.
+    /// </summary>
+    string StoryHealth);
 
 public record LinkedDeviceChildDto(
     Guid ChildId,

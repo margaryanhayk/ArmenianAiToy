@@ -40,6 +40,22 @@ public class Device
     public string? LastOtaStatus { get; set; }
     public DateTime? FirmwareReportedAt { get; set; }
 
+    /// <summary>
+    /// Toy self-diagnostics, stamped from the heartbeat. Null = never reported
+    /// (legacy firmware), so "unknown" stays distinguishable from "known bad".
+    ///
+    /// <para>
+    /// <b>Why this exists.</b> A toy whose SD card is not mounted plays no
+    /// stories: the button looks dead and the toy is simply SILENT. That
+    /// happened on the bench (a 5 V wire to the card reader came loose) and was
+    /// invisible without a serial cable — the parent's only signal would have
+    /// been "it stopped working". The toy knows within a second of boot, so it
+    /// reports it and the parent surface can say so in plain language. Silence
+    /// is the worst failure mode for a children's toy.
+    /// </para>
+    /// </summary>
+    public bool? SdCardOk { get; set; }
+
     public DateTime RegisteredAt { get; set; }
     public DateTime LastSeenAt { get; set; }
 

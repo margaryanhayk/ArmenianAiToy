@@ -192,6 +192,9 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                     b.Property<DateTime>("RegisteredAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool?>("SdCardOk")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("RiddleEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")

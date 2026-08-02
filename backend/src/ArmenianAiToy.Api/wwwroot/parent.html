@@ -854,6 +854,19 @@
       remove: { en: 'Remove', ru: 'Удалить', hy: 'Հեռացնել' },
       online: { en: '● Online', ru: '● В сети', hy: '● Առցանց' },
       offline: { en: '○ Offline', ru: '○ Не в сети', hy: '○ Անջատված' },
+      // Toy self-diagnostics. Deliberately plain language + a concrete next
+      // step: a parent must never be shown "SD.begin failed", and must never
+      // be left to guess why the toy went silent.
+      storage_bad: {
+        en: '⚠ Memory card not working',
+        ru: '⚠ Карта памяти не работает',
+        hy: '⚠ Հիշողության քարտը չի աշխատում'
+      },
+      storage_bad_help: {
+        en: 'The toy cannot play stories. Check that its memory card is pushed in properly, then switch the toy off and on again.',
+        ru: 'Игрушка не может рассказывать сказки. Проверьте, вставлена ли карта памяти до конца, затем выключите и включите игрушку.',
+        hy: 'Խաղալիքը չի կարող հեքիաթներ պատմել։ Ստուգե՛ք՝ հիշողության քարտը մինչև վերջ մտցված է, ապա անջատե՛ք ու նորից միացրե՛ք խաղալիքը։'
+      },
       modes_need_one: { en: 'Keep at least one mode on — otherwise the toy has nothing to do.', ru: 'Оставьте хотя бы один режим включённым — иначе игрушке нечем заняться.', hy: 'Թողեք գոնե մեկ ռեժիմ միացած, այլապես խաղալիքը անելիք չի ունենա։' },
       bedtime_need_both: { en: 'Set both a start and an end time (or clear both to turn bedtime off).', ru: 'Укажите и начало, и конец (или очистите оба, чтобы выключить).', hy: 'Նշեք և՛ սկիզբը, և՛ վերջը (կամ մաքրեք երկուսն էլ՝ անջատելու համար)։' },
       bedtime_same: { en: 'Start and end time cannot be the same.', ru: 'Начало и конец не могут совпадать.', hy: 'Սկիզբը և վերջը չեն կարող նույնը լինել։' },
@@ -1756,7 +1769,26 @@
       }
       if (d.isRevoked) { var rb = document.createElement('span'); rb.textContent = t('revoke'); rb.className = 'chip chip-danger'; badges.appendChild(rb); }
       if (d.isPaused) { var pb = document.createElement('span'); pb.textContent = t('pause'); pb.className = 'chip chip-warn'; badges.appendChild(pb); }
+      // Toy self-diagnostics. Only 'no_storage' is shown: 'offline' is already
+      // covered by the presence chip above, and 'unknown' (older firmware that
+      // never reports) is not a fault. Rendering those too would train parents
+      // to ignore this line.
+      if (d.storyHealth === 'no_storage') {
+        var sb = document.createElement('span');
+        sb.textContent = t('storage_bad');
+        sb.className = 'chip chip-danger';
+        badges.appendChild(sb);
+      }
       header.appendChild(badges);
+
+      // The chip says WHAT is wrong; this line says what to DO about it. A
+      // parent whose toy went silent needs the fix, not a diagnosis.
+      if (d.storyHealth === 'no_storage') {
+        var helpEl = document.createElement('p');
+        helpEl.textContent = t('storage_bad_help');
+        helpEl.style.cssText = 'margin:8px 0 0;font-size:13px;line-height:1.45;color:#8a3b3b;';
+        header.appendChild(helpEl);
+      }
 
       // Conversations button targets this toy.
       var convBtn = document.getElementById('toyConversationsBtn');

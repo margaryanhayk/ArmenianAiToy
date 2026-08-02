@@ -205,6 +205,7 @@ public class DeviceService : IDeviceService
         if (report.BoardModel is not null) device.BoardModel = report.BoardModel;
         if (report.PartitionName is not null) device.PartitionName = report.PartitionName;
         if (report.LastOtaStatus is not null) device.LastOtaStatus = report.LastOtaStatus;
+        if (report.SdCardOk is not null) device.SdCardOk = report.SdCardOk;
         device.FirmwareReportedAt = nowUtc;
         await _db.SaveChangesAsync();
     }

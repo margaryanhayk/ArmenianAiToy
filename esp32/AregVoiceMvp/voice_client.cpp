@@ -11,6 +11,7 @@
 #include "voice_client.h"
 #include "config.h"
 #include "net_transport.h"
+#include "audio_io.h"   // audio_sd_available() - SD health in the heartbeat
 #include "diag.h"
 #include "wifi_creds.h"     // Phase B.1 — NVS-backed Wi-Fi credentials
 #include "device_creds.h"   // Phase C   — NVS-backed device identity
@@ -246,13 +247,23 @@ void voice_send_heartbeat() {
     // constants + the running partition label — no JSON escaping needed.
     // Best-effort exactly like before: any status (incl. 401 on a stale
     // key, or a transport failure) is fine, the next interval retries.
-    char body[256];
+    //
+    // SELF-DIAGNOSTICS (sdCardOk). A toy whose SD card is not mounted plays
+    // no stories at all: the button appears dead and the toy is simply
+    // silent. That happened on the bench (a 5 V wire to the card reader came
+    // loose) and was invisible without a serial cable — the parent's only
+    // signal was "it stopped working". The toy KNOWS within a second of boot,
+    // so it reports it here and the parent surface can say so in plain words.
+    // Bounded boolean, no free-form strings, no PII — same discipline as the
+    // metric tags.
+    char body[320];
     snprintf(body, sizeof(body),
              "{\"firmwareVersion\":\"%s\",\"firmwareBuild\":\"%s\","
              "\"boardModel\":\"%s\",\"partitionName\":\"%s\","
-             "\"lastOtaStatus\":\"%s\"}",
+             "\"lastOtaStatus\":\"%s\",\"sdCardOk\":%s}",
              AREG_FW_VERSION, AREG_FW_BUILD, AREG_BOARD_MODEL,
-             ota_running_partition_label(), ota_state_status_cstr());
+             ota_running_partition_label(), ota_state_status_cstr(),
+             audio_sd_available() ? "true" : "false");
     http.addHeader("Content-Type", "application/json");
     const int status = http.POST(body);
     http.end();
