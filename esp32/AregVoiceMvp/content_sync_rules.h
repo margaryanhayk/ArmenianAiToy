@@ -33,8 +33,17 @@
 // ceiling is wall-clock download time on a one-shot-per-boot sync, not
 // storage. A backend offering more is TRUNCATED (never a crash, never a
 // partial-item read) — see cs_truncated_count().
+// Raised 8 -> 16 on 2026-08-03. The 8 dated from when the backend offered
+// exactly ONE story; the first real library (12) silently lost four of them
+// to truncation ("12 offered, max 8, 4 ignored") - the toy worked, so nothing
+// looked broken, the stories were just quietly absent.
+//
+// Cost is bounded and was measured, not guessed: three CsStory arrays of this
+// size live in RAM, ~443 bytes each, so 8 -> 16 costs ~10 KB against ~245 KB
+// free on the S3. SD space is a non-issue: 12 stories are 11.5 MB on an 8 GB
+// card. Headroom for the next batch without revisiting this.
 #ifndef CS_MAX_STORIES
-#define CS_MAX_STORIES 8
+#define CS_MAX_STORIES 16
 #endif
 
 // A story id becomes part of an SD filename, so it is length-bounded
