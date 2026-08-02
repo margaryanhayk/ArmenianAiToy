@@ -330,7 +330,45 @@ using (var scope = app.Services.CreateScope())
 // rate limiter, device auth, controllers) sees the corrected client IP.
 var forwardedHeaders = ForwardedHeadersConfig.TryBuild(builder.Configuration);
 if (forwardedHeaders is not null)
+{
     app.UseForwardedHeaders(forwardedHeaders);
+    app.Logger.LogInformation(
+        "ForwardedHeaders ON — trusting {ProxyCount} proxy IP(s) and {NetworkCount} network(s): {Networks}",
+        forwardedHeaders.KnownProxies.Count,
+        forwardedHeaders.KnownIPNetworks.Count,
+        string.Join(", ", forwardedHeaders.KnownIPNetworks.Select(n => $"{n.BaseAddress}/{n.PrefixLength}")));
+}
+else if (builder.Configuration.GetValue<bool>("ForwardedHeaders:Enabled"))
+{
+    // Enabled but nothing trustworthy resolved — the operator asked for
+    // proxy-aware IPs and did NOT get them. Silent here would look exactly
+    // like a working limiter that simply never trips.
+    app.Logger.LogWarning(
+        "ForwardedHeaders:Enabled=true but no valid KnownProxies/KnownNetworks resolved — " +
+        "X-Forwarded-For is NOT processed and the per-IP rate limiters key on the proxy, not the client. " +
+        "Check the ForwardedHeaders__KnownNetworks value.");
+}
+
+// Diagnostic for the managed-host case: on a PaaS the edge proxy's address is
+// not documented, so an operator cannot pin it without observing it once. When
+// ForwardedHeaders is enabled, log the peer address + XFF of the first few
+// requests so the correct CIDR is readable from the host's log view. Bounded to
+// 3 lines per process so it can never become a per-request PII firehose.
+if (builder.Configuration.GetValue<bool>("ForwardedHeaders:Enabled"))
+{
+    var peerLogBudget = 3;
+    app.Use(async (ctx, next) =>
+    {
+        if (Interlocked.Decrement(ref peerLogBudget) >= 0)
+        {
+            app.Logger.LogInformation(
+                "Client-IP diagnostic: RemoteIpAddress={Peer} X-Forwarded-For={Xff}",
+                ctx.Connection.RemoteIpAddress?.ToString() ?? "(null)",
+                ctx.Request.Headers["X-Forwarded-For"].ToString() is { Length: > 0 } x ? x : "(absent)");
+        }
+        await next();
+    });
+}
 
 // #007/#008 — when Security:RequireHttps=true, redirect HTTP->HTTPS and emit
 // HSTS. OFF by default in every environment, so dev/bench are unaffected; an

@@ -63,6 +63,36 @@ public class ForwardedHeadersConfigTests
     }
 
     [Fact]
+    public void Enabled_KnownNetworks_AcceptsCommaSeparatedScalar()
+    {
+        // These are set as env vars in a hosting dashboard, often from a
+        // phone. One variable with a comma-separated list beats five indexed
+        // ones, where a typo'd index silently yields an empty list that is
+        // indistinguishable from "not configured".
+        var cfg = Config(
+            ("ForwardedHeaders:Enabled", "true"),
+            ("ForwardedHeaders:KnownNetworks", "10.0.0.0/8, 172.16.0.0/12 ;192.168.0.0/16"));
+
+        var opts = ForwardedHeadersConfig.TryBuild(cfg);
+
+        Assert.NotNull(opts);
+        Assert.Equal(3, opts!.KnownIPNetworks.Count);
+    }
+
+    [Fact]
+    public void Enabled_KnownProxies_AcceptsCommaSeparatedScalar()
+    {
+        var cfg = Config(
+            ("ForwardedHeaders:Enabled", "true"),
+            ("ForwardedHeaders:KnownProxies", "10.0.0.5,192.168.1.9"));
+
+        var opts = ForwardedHeadersConfig.TryBuild(cfg);
+
+        Assert.NotNull(opts);
+        Assert.Equal(2, opts!.KnownProxies.Count);
+    }
+
+    [Fact]
     public void Enabled_MalformedNetworks_AreDropped_NotWidened()
     {
         // A bad CIDR must never silently become "trust everything".

@@ -43,8 +43,8 @@ public static class ForwardedHeadersConfig
         if (!section.GetValue<bool>("Enabled"))
             return null;
 
-        var proxies = (section.GetSection("KnownProxies").Get<string[]>() ?? Array.Empty<string>())
-            .Select(p => IPAddress.TryParse(p?.Trim(), out var ip) ? ip : null)
+        var proxies = ReadList(section, "KnownProxies")
+            .Select(p => IPAddress.TryParse(p, out var ip) ? ip : null)
             .Where(ip => ip is not null)
             .Cast<IPAddress>()
             .ToList();
@@ -56,7 +56,7 @@ public static class ForwardedHeadersConfig
         // live deployment). A CIDR for the platform's internal proxy network
         // is the pinnable unit. Entries are "a.b.c.d/prefix"; malformed
         // entries are dropped rather than widening trust.
-        var networks = (section.GetSection("KnownNetworks").Get<string[]>() ?? Array.Empty<string>())
+        var networks = ReadList(section, "KnownNetworks")
             .Select(ParseNetwork)
             .Where(n => n is not null)
             .Cast<System.Net.IPNetwork>()
@@ -82,6 +82,29 @@ public static class ForwardedHeadersConfig
         foreach (var net in networks)
             options.KnownIPNetworks.Add(net);
         return options;
+    }
+
+    /// <summary>
+    /// Reads a config list that may be expressed EITHER as a real array
+    /// (<c>Key__0</c>, <c>Key__1</c>, …) OR as one comma/semicolon-separated
+    /// scalar. The scalar form exists because these values are set as
+    /// environment variables in a hosting dashboard, often from a phone:
+    /// one variable holding "10.0.0.0/8,172.16.0.0/12" is far less
+    /// error-prone than five indexed ones, and a typo'd index silently
+    /// yields an empty list (which fails closed to "no trust" and is
+    /// indistinguishable from "not configured").
+    /// </summary>
+    private static IEnumerable<string> ReadList(IConfigurationSection section, string key)
+    {
+        var fromArray = section.GetSection(key).Get<string[]>() ?? Array.Empty<string>();
+        var scalar = section[key];
+        var fromScalar = string.IsNullOrWhiteSpace(scalar)
+            ? Array.Empty<string>()
+            : scalar.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+
+        return fromArray.Concat(fromScalar)
+            .Select(v => v?.Trim() ?? string.Empty)
+            .Where(v => v.Length > 0);
     }
 
     private static System.Net.IPNetwork? ParseNetwork(string? entry)
