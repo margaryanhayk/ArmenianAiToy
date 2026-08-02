@@ -261,14 +261,27 @@ public class EmbeddedCuratedStoryLibraryTests
     // ── Slice 2: real content migration ──────────────────────────────
 
     [Fact]
-    public void RealContent_ApplicationAssembly_EmbedsExactlyTheTwoLaunchStories()
+    public void RealContent_ApplicationAssembly_EmbedsExactlyTheApprovedLibrary()
     {
+        // THE inventory test: an exact list, so a story can never reach a
+        // child by accident. Adding one here is the deliberate act that says
+        // "this is approved to be spoken to children" — which is why the
+        // assertion stays exact rather than a count or a subset.
+        // 2026-08-03: owner promoted 12 stories (the heqiat.am selection plus
+        // the in-project originals) alongside the two launch stories.
         var real = new EmbeddedCuratedStoryLibrary(
             typeof(CuratedStory).Assembly,
             "ArmenianAiToy.Application.Stories.Content");
 
         var ids = real.ListAvailable().Select(s => s.Id).OrderBy(i => i, StringComparer.Ordinal).ToList();
-        Assert.Equal(["hedgehog-apple", "little-cloud"], ids);
+        Assert.Equal(
+            [
+                "anban-huri", "faithful-dog", "hedgehog-apple", "khosogh-dzuk",
+                "little-cloud", "little-seed", "night-friends", "pochat-aghves",
+                "princess-and-pea", "sister-mittens", "sutasan", "sutlik-orskan",
+                "three-piglets", "ulik",
+            ],
+            ids);
     }
 
     [Fact]

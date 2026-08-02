@@ -25,7 +25,7 @@ public class ConfigurableCuratedStoryLibraryTests
     }
 
     private static string AnbanHuriDraftPath() => Path.Combine(
-        RepoRoot(), "backend", "content", "story-drafts", "anban-huri.story.json");
+        RepoRoot(), "backend", "src", "ArmenianAiToy.Application", "Stories", "Content", "anban-huri.story.json");
 
     [Fact]
     public void NoConfig_IsTransparentOverInner()
@@ -34,7 +34,10 @@ public class ConfigurableCuratedStoryLibraryTests
 
         Assert.Equal(Inner.ListAvailable().Count, lib.ListAvailable().Count);
         Assert.Equal(Inner.SelectDefault().Id, lib.SelectDefault().Id);
-        Assert.Null(lib.GetById("anban-huri")); // draft NOT side-loaded
+        // An id the inner library does not serve stays unresolvable when no
+        // side-load is configured. (Fixture was "anban-huri" while it was a
+        // draft; promoted 2026-08-03, so this uses a genuinely absent id.)
+        Assert.Null(lib.GetById("not-an-approved-story"));
     }
 
     [Fact]
@@ -62,7 +65,9 @@ public class ConfigurableCuratedStoryLibraryTests
     public void DefaultIdOnly_NoSideload_FallsBackToInnerWhenIdUnknown()
     {
         // Default id that isn't loaded → SelectDefault falls back to inner.
-        var lib = ConfigurableCuratedStoryLibrary.Create(Inner, [], "anban-huri");
+        // (Fixture was "anban-huri" while it was a draft; promoted
+        // 2026-08-03, so this uses a genuinely unknown id.)
+        var lib = ConfigurableCuratedStoryLibrary.Create(Inner, [], "not-an-approved-story");
         Assert.Equal(Inner.SelectDefault().Id, lib.SelectDefault().Id);
     }
 

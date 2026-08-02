@@ -5,7 +5,10 @@
   "minAge": 4,
   "maxAge": 7,
   "tone": "warm",
-  "tags": ["patience", "helping"],
+  "tags": [
+    "patience",
+    "helping"
+  ],
   "category": "general",
   "bedtimeSafe": false,
   "segments": [
@@ -17,11 +20,13 @@
     "Աղվեսը կուտը տանում է հավին, հավը ձու է տալի․ ձուն տանում է չարչուն, չարչին ուլունք է տալի․ ուլունքը տանում է աղջկան, աղջիկը կուժ է տալի․ կուժը տանում է աղբյուրին, աղբյուրը ջուր է տալի․ ջուրը տանում է արտին, արտը խոտ է տալի․ խոտը տանում է կովին, կովը կաթ է տալի․ կաթը տանում է պառավին, պառավը պոչը տալիս է իրեն․ կցում է, կցմցում, վազում է գնում, իր ընկերներին հասնում։"
   ],
   "reflectionText": "Աղվեսը երկար աշխատեց, հերթով բոլորին օգնեց ու վերջում իր պոչը ետ ստացավ։",
-  "reflectionQuestions": ["Ի՞նչ տվեց աղջիկը աղվեսին։"],
+  "reflectionQuestions": [
+    "Ի՞նչ տվեց աղջիկը աղվեսին։"
+  ],
   "review": {
-    "status": "draft",
-    "linguisticReviewAt": null,
-    "listenTestAt": null,
-    "notes": "OWNER-DESIGNATED CLASSIC (owner decision 2026-08-01, heqiat.am top-9 selection): Թումանյանի «Պոչատ աղվեսը», public-domain chain tale. Carried from heqiat.am/story/pochat-aghves; segmentation plus THREE narration-slip fixes in the final reverse-chain paragraph (site text slipped into first person «կուժը տանեմ աղբյուրին տամ» — normalized to third person matching the canonical pattern). Also fixed one OCR-style «Աղվեսր»→«Աղվեսը» and «վրա Է»→«վրա է». Canonical-source verification (ԵԼԺ) required before promotion."
+    "status": "approved",
+    "linguisticReviewAt": "2026-08-03",
+    "listenTestAt": "2026-08-03",
+    "notes": "OWNER-DESIGNATED CLASSIC (owner decision 2026-08-01, heqiat.am top-9 selection): Թումանյանի «Պոչատ աղվեսը», public-domain chain tale. Carried from heqiat.am/story/pochat-aghves; segmentation plus THREE narration-slip fixes in the final reverse-chain paragraph (site text slipped into first person «կուժը տանեմ աղբյուրին տամ» — normalized to third person matching the canonical pattern). Also fixed one OCR-style «Աղվեսր»→«Աղվեսը» and «վրա Է»→«վրա է». Canonical-source verification (ԵԼԺ) required before promotion. | PROMOTED 2026-08-03 by owner decision (\"promote them\") after the owner listen-tested the batch rendered in the interim storyteller voice. OPEN ITEM for the carried classics: text is still unverified against a canonical printed source (see the anban-huri precedent) - verify before any reprint/redistribution claim."
   }
 }

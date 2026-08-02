@@ -285,13 +285,14 @@ public class ChatServiceLibraryStoryRoutingTests
     }
 
     [Fact]
-    public async Task AnbanHuriDraft_SessionPointingAtIt_IsUnreachable_FallsThroughToLegacy()
+    public async Task UnapprovedStory_SessionPointingAtIt_IsUnreachable_FallsThroughToLegacy()
     {
-        // Even a session row naming the draft cannot make it serve: the
-        // approved-only library does not resolve "anban-huri", so the
-        // session is cleared and the turn runs legacy. The draft stays
-        // draft — runtime Q&A never touches it.
-        _tracker.Start(_conversationId, "anban-huri");
+        // Even a session row naming an unapproved story cannot make it serve:
+        // the approved-only library does not resolve it, so the session is
+        // cleared and the turn runs legacy. (Fixture was "anban-huri" while
+        // that was a draft; it was promoted 2026-08-03, so this now uses an
+        // id that is genuinely absent — the invariant is unchanged.)
+        _tracker.Start(_conversationId, "not-an-approved-story");
         var service = MakeService("library");
 
         var result = await service.GetResponseAsync(Guid.NewGuid(), "Ո՞վ է Հուռին");

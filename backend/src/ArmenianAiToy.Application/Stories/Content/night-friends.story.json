@@ -5,7 +5,10 @@
   "minAge": 4,
   "maxAge": 7,
   "tone": "warm",
-  "tags": ["calm", "nature"],
+  "tags": [
+    "calm",
+    "nature"
+  ],
   "category": "prophylactic",
   "bedtimeSafe": true,
   "segments": [
@@ -14,11 +17,13 @@
     "Մուրիկը պառկեց իր տաքուկ վերմակի վրա։ Լուսինը մեղմ լուսավորում էր նրան երկնքից։ Մուրիկը փակեց աչքերը։ Գիշերը կամաց օրորեց նրան։"
   ],
   "reflectionText": "Գիշերն էլ ընկերներ ունի՝ լուսինը, աստղերն ու ծղրիդը։",
-  "reflectionQuestions": ["Ի՞նչ լսեց Մուրիկը խոտերի մեջ։"],
+  "reflectionQuestions": [
+    "Ի՞նչ լսեց Մուրիկը խոտերի մեջ։"
+  ],
   "review": {
-    "status": "draft",
-    "linguisticReviewAt": null,
-    "listenTestAt": null,
-    "notes": null
+    "status": "approved",
+    "linguisticReviewAt": "2026-08-03",
+    "listenTestAt": "2026-08-03",
+    "notes": "PROMOTED 2026-08-03 by owner decision (\"promote them\") after the owner listen-tested the batch rendered in the interim storyteller voice. OPEN ITEM for the carried classics: text is still unverified against a canonical printed source (see the anban-huri precedent) - verify before any reprint/redistribution claim."
   }
 }

@@ -5,7 +5,11 @@
   "minAge": 4,
   "maxAge": 7,
   "tone": "warm",
-  "tags": ["patience", "family", "helping"],
+  "tags": [
+    "patience",
+    "family",
+    "helping"
+  ],
   "category": "general",
   "bedtimeSafe": false,
   "segments": [
@@ -17,11 +21,13 @@
     "Գայլը վախեցավ, ցատկեց կտուրից ու փախավ անտառ՝ էլ երբեք չվերադառնալու։ Երեք եղբայրներն ամբողջ ձմեռն ապրեցին քարե տանը՝ տաք ու հանգիստ։ Իսկ գարնանը Նիֆ-Նիֆն ու Նաֆ-Նաֆն էլ իրենց համար քարե տներ շինեցին։"
   ],
   "reflectionText": "Նուֆ-Նուֆը համբերությամբ աշխատեց, ու նրա ամուր տունը բոլոր եղբայրներին տաք պահեց։",
-  "reflectionQuestions": ["Ինչի՞ց էր շինել Նուֆ-Նուֆն իր տունը։"],
+  "reflectionQuestions": [
+    "Ինչի՞ց էր շինել Նուֆ-Նուֆն իր տունը։"
+  ],
   "review": {
-    "status": "draft",
-    "linguisticReviewAt": null,
-    "listenTestAt": null,
-    "notes": "OWNER-DESIGNATED TITLE (owner decision 2026-08-01, heqiat.am top-9 selection). NEW ORIGINAL Armenian retelling — no published translation text used. NAMES Նիֆ-Նիֆ/Նուֆ-Նուֆ/Նաֆ-Նաֆ and the fuller plot structure (summer play, mocked builder, three houses in reverse order, chimney attempt, spring stone houses) are by OWNER DECISION (2026-08-01, via the owner's edited review doc; reaffirmed after the Mikhalkov-provenance caution — bare names/plot beats, never Mikhalkov's or a translator's text). Owner's doc maps the youngest Նուֆ-Նուֆ as the stone-builder — kept. SAFETY DEVIATION from the owner's pasted version: the wolf is NOT boiled ('խաշվեց' rejected — safety-first product rule); he is scared off by hot steam and flees for good."
+    "status": "approved",
+    "linguisticReviewAt": "2026-08-03",
+    "listenTestAt": "2026-08-03",
+    "notes": "OWNER-DESIGNATED TITLE (owner decision 2026-08-01, heqiat.am top-9 selection). NEW ORIGINAL Armenian retelling — no published translation text used. NAMES Նիֆ-Նիֆ/Նուֆ-Նուֆ/Նաֆ-Նաֆ and the fuller plot structure (summer play, mocked builder, three houses in reverse order, chimney attempt, spring stone houses) are by OWNER DECISION (2026-08-01, via the owner's edited review doc; reaffirmed after the Mikhalkov-provenance caution — bare names/plot beats, never Mikhalkov's or a translator's text). Owner's doc maps the youngest Նուֆ-Նուֆ as the stone-builder — kept. SAFETY DEVIATION from the owner's pasted version: the wolf is NOT boiled ('խաշվեց' rejected — safety-first product rule); he is scared off by hot steam and flees for good. | PROMOTED 2026-08-03 by owner decision (\"promote them\") after the owner listen-tested the batch rendered in the interim storyteller voice. OPEN ITEM for the carried classics: text is still unverified against a canonical printed source (see the anban-huri precedent) - verify before any reprint/redistribution claim."
   }
 }

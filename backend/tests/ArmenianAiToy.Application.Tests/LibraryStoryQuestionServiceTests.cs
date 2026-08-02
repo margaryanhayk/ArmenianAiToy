@@ -27,7 +27,7 @@ public class LibraryStoryQuestionServiceTests
     private static CuratedStory LoadAnbanHuri()
     {
         var path = Path.Combine(
-            RepoRoot(), "backend", "content", "story-drafts", "anban-huri.story.json");
+            RepoRoot(), "backend", "src", "ArmenianAiToy.Application", "Stories", "Content", "anban-huri.story.json");
         return StoryFileParser.Parse(File.ReadAllText(path), path, requireApproved: false);
     }
 

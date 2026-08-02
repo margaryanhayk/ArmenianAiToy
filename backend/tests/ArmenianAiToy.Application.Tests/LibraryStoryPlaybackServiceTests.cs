@@ -153,14 +153,27 @@ public class LibraryStoryPlaybackServiceTests
     }
 
     [Fact]
-    public void AnbanHuriDraft_IsNotListedOrServed()
+    public void UnapprovedStoryId_IsNotListedOrServed()
     {
-        Assert.Null(Library.GetById("anban-huri"));
-        Assert.DoesNotContain(Library.ListAvailable(), s => s.Id == "anban-huri");
-        // And it cannot be started as a playback session even with the
-        // engine on:
+        // anban-huri used to be the fixture here because it was a draft; the
+        // owner promoted it 2026-08-03, so this now uses an id that is
+        // genuinely absent. The invariant is unchanged and is the point of
+        // the test: an id the library does not serve can never be started.
+        const string notInLibrary = "not-an-approved-story";
+        Assert.Null(Library.GetById(notInLibrary));
+        Assert.DoesNotContain(Library.ListAvailable(), s => s.Id == notInLibrary);
         var service = MakeService("library", out _);
-        Assert.Null(service.Start(Guid.NewGuid(), "anban-huri"));
+        Assert.Null(service.Start(Guid.NewGuid(), notInLibrary));
+    }
+
+    [Fact]
+    public void PromotedAnbanHuri_IsNowServable()
+    {
+        // The other half of the promotion: it must actually be reachable now,
+        // otherwise the toy still cannot play or answer questions about it.
+        Assert.NotNull(Library.GetById("anban-huri"));
+        var service = MakeService("library", out _);
+        Assert.NotNull(service.Start(Guid.NewGuid(), "anban-huri"));
     }
 
     // ── Session lifecycle (engine on, approved story) ───────────────

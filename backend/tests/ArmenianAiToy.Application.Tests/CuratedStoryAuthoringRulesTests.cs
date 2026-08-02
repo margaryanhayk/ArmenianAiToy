@@ -37,6 +37,28 @@ public class CuratedStoryAuthoringRulesTests
         }
     }
 
+    /// <summary>
+    /// Owner-designated CARRIED CLASSICS. Their text is a published work
+    /// reproduced faithfully, so two of the authoring rules below do not
+    /// apply to them: CLAUDE.md states classics "keep the source's natural
+    /// segment count" and are "never force-resegmented to 3", which also
+    /// means their scene beats are longer than an in-project original's and
+    /// a beat may trail off on «․․․» instead of closing on «։».
+    ///
+    /// <para>
+    /// This is an EXPLICIT list, not a heuristic, precisely so it cannot
+    /// grow silently: a newly authored story is held to the full rules
+    /// unless someone deliberately adds its id here, and that edit is
+    /// visible in review. Every other rule — no Latin, no digits, no
+    /// emoji, no markdown, the TTS-safe whitelist, no structural tokens,
+    /// no malformed words, bedtime-safety — still applies to classics too.
+    /// </para>
+    /// </summary>
+    private static readonly HashSet<string> CarriedClassics = new()
+    {
+        "anban-huri", "khosogh-dzuk", "pochat-aghves", "sutasan", "sutlik-orskan", "ulik",
+    };
+
     private static void AssertNoneMatch(Func<char, bool> bad, string ruleName)
     {
         var violations = new StringBuilder();
@@ -77,10 +99,39 @@ public class CuratedStoryAuthoringRulesTests
     {
         // Whitelist form of the §1A punctuation rule: Armenian block
         // (letters + «։», «՛», «՜», «՝», «՞»), space, comma, guillemets.
-        // Anything else (hyphens, ellipsis, ASCII punctuation, symbols)
-        // is a TTS risk and fails authoring.
+        // Anything else (ellipsis, ASCII punctuation, symbols) is a TTS
+        // risk and fails authoring.
+        //
+        // WIDENED when the classic library was promoted (2026-08-03). The
+        // original list was written for in-project originals; real Armenian
+        // literary prose legitimately uses four more characters, and every
+        // one of them was audited before being admitted:
+        //   U+2024 ․  the MIJAKET — standard Armenian punctuation, 174 uses
+        //             across seven stories. Not optional in classic text.
+        //   U+002D -  hyphen inside compound words: «պարապ-սարապ»,
+        //             «կամաց-կամաց», «Նիֆ-Նիֆ». Not a dash, not a separator.
+        //   U+2014 —  the em dash that opens a line of speech. The ONE
+        //             permitted dialogue dash: en dash (U+2013) and
+        //             horizontal bar (U+2015) were strays and were
+        //             normalised to this at promotion, so they stay
+        //             rejected and cannot creep back.
+        //   U+000A \n verse line breaks (the songs inside anban-huri).
+        //   U+2032 ′  ONE occurrence, «մանեցե′ք» in anban-huri. This looks
+        //             like a typo for «՛» and I "corrected" it — then
+        //             LibraryStoryQuestionTests.StoryText_RemainsUnchanged
+        //             failed, because that character is a deliberately
+        //             PRESERVED SOURCE QUIRK ("the import must never be
+        //             'fixed'"). The edit was reverted. Admitted here as a
+        //             documented exception rather than silently normalising
+        //             a text somebody decided to keep verbatim. TTS impact
+        //             is checked at listen test, not guessed at here.
+        // The en dash (U+2013) and horizontal bar (U+2015) were NOT admitted:
+        // they were inconsistent strays among em dashes and were normalised
+        // in the source, so they stay rejected and cannot creep back.
         AssertNoneMatch(
-            c => !(c is >= '԰' and <= '֏' or ' ' or ',' or '«' or '»'),
+            c => !(c is >= '԰' and <= '֏'
+                     or ' ' or ',' or '«' or '»'
+                     or '․' or '-' or '—' or '\n' or '′'),
             "tts-safe-whitelist");
     }
 
@@ -146,7 +197,10 @@ public class CuratedStoryAuthoringRulesTests
     [Fact]
     public void EverySegment_EndsWithArmenianFullStop()
     {
-        foreach (var story in AllStories)
+        // In-project originals only — a carried classic may legitimately let
+        // a beat trail off on «․․․» because that is what the published text
+        // does. See CarriedClassics.
+        foreach (var story in AllStories.Where(s => !CarriedClassics.Contains(s.Id)))
         {
             foreach (var segment in story.Segments)
             {
@@ -160,7 +214,9 @@ public class CuratedStoryAuthoringRulesTests
     public void EverySegment_IsShortEnoughForOneTtsRender()
     {
         // MODES.md §1A: segment = one scene beat, 2-4 sentences, ~≤300 chars.
-        foreach (var story in AllStories)
+        // In-project originals only: classics keep the source's own scene
+        // beats, which run longer. See CarriedClassics.
+        foreach (var story in AllStories.Where(s => !CarriedClassics.Contains(s.Id)))
         {
             foreach (var segment in story.Segments)
             {
@@ -221,11 +277,16 @@ public class CuratedStoryAuthoringRulesTests
     }
 
     [Fact]
-    public void ListAvailable_IncludesBothLaunchStories()
+    public void ListAvailable_IncludesTheOriginalLaunchStories()
     {
+        // The two originals must never silently disappear from the library.
+        // The COUNT is deliberately not pinned here: the library grows as
+        // stories are promoted (12 more on 2026-08-03), and a hard count
+        // would turn every future promotion into a failing test that says
+        // nothing useful. EmbeddedCuratedStoryLibraryTests owns the
+        // "exactly what is embedded" inventory.
         var ids = AllStories.Select(s => s.Id).ToList();
 
-        Assert.Equal(2, ids.Count);
         Assert.Contains(InMemoryCuratedStoryLibrary.LittleCloudId, ids);
         Assert.Contains(InMemoryCuratedStoryLibrary.HedgehogAppleId, ids);
     }

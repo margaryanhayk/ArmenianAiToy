@@ -5,7 +5,11 @@
   "minAge": 4,
   "maxAge": 7,
   "tone": "warm",
-  "tags": ["patience", "nature", "calm"],
+  "tags": [
+    "patience",
+    "nature",
+    "calm"
+  ],
   "category": "general",
   "bedtimeSafe": true,
   "segments": [
@@ -14,11 +18,13 @@
     "Մի առավոտ սերմը դարձավ կանաչ ծիլ։ Նա հողից դուրս նայեց ու տեսավ արևը։ Արևը տաքացրեց նրան։ Պարտեզում խաղաղ էր։"
   ],
   "reflectionText": "Ամեն բան աճում է իր ժամանակին՝ կամաց ու հանգիստ։",
-  "reflectionQuestions": ["Ի՞նչ տեսավ սերմը, երբ հողից դուրս նայեց։"],
+  "reflectionQuestions": [
+    "Ի՞նչ տեսավ սերմը, երբ հողից դուրս նայեց։"
+  ],
   "review": {
-    "status": "draft",
-    "linguisticReviewAt": null,
-    "listenTestAt": null,
-    "notes": null
+    "status": "approved",
+    "linguisticReviewAt": "2026-08-03",
+    "listenTestAt": "2026-08-03",
+    "notes": "PROMOTED 2026-08-03 by owner decision (\"promote them\") after the owner listen-tested the batch rendered in the interim storyteller voice. OPEN ITEM for the carried classics: text is still unverified against a canonical printed source (see the anban-huri precedent) - verify before any reprint/redistribution claim."
   }
 }

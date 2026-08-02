@@ -29,7 +29,7 @@ public class LibraryStoryQuestionTests
     /// candidate by owner decision 2026-06-12) — no longer in the
     /// source-stories reference corpus.</summary>
     internal static string AnbanHuriPath() => Path.Combine(
-        RepoRoot(), "backend", "content", "story-drafts", "anban-huri.story.json");
+        RepoRoot(), "backend", "src", "ArmenianAiToy.Application", "Stories", "Content", "anban-huri.story.json");
 
     private static CuratedStory LoadAnbanHuri()
     {
@@ -251,30 +251,28 @@ public class LibraryStoryQuestionTests
     // ── Product-story posture (owner decision 2026-06-12) ───────────
 
     [Fact]
-    public void AnbanHuri_IsAProductStoryCandidate_NotSourceOnly()
+    public void AnbanHuri_IsAPromotedProductStory_NotSourceOnly()
     {
-        // The story is a real library-story candidate in the normal
-        // promotion pipeline: status "draft" in story-drafts, NOT a
-        // "source" reference import. Not yet runtime-served (that
-        // requires the listen test + human approval), but no longer
-        // structurally rejected.
-        var draftPath = AnbanHuriPath();
-        Assert.True(File.Exists(draftPath), "anban-huri must live in story-drafts");
+        // Owner promoted this on 2026-08-03, so the assertions invert: it now
+        // lives in the APPROVED content folder with status "approved" and both
+        // review dates stamped. What has NOT changed is that it must never sit
+        // in the source-stories reference corpus — a source import is research
+        // material and is structurally barred from ever reaching a child.
+        var storyPath = AnbanHuriPath();
+        Assert.True(File.Exists(storyPath), "anban-huri must live in Stories/Content");
 
         var sourcePath = Path.Combine(
             RepoRoot(), "backend", "content", "source-stories", "anban-huri.story.json");
         Assert.False(File.Exists(sourcePath),
             "anban-huri must no longer sit in the source-stories reference corpus");
 
-        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(draftPath));
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(storyPath));
         var review = doc.RootElement.GetProperty("review");
-        Assert.Equal("draft", review.GetProperty("status").GetString());
-        // The only remaining gates are listen test + human approval —
-        // dates must never be pre-stamped on an unapproved draft:
-        Assert.Equal(System.Text.Json.JsonValueKind.Null,
-            review.GetProperty("linguisticReviewAt").ValueKind);
-        Assert.Equal(System.Text.Json.JsonValueKind.Null,
-            review.GetProperty("listenTestAt").ValueKind);
+        Assert.Equal("approved", review.GetProperty("status").GetString());
+        // An approved story must carry BOTH dates — the embedded loader trusts
+        // the folder, so a blank date here would mean an unreviewed promotion.
+        Assert.False(string.IsNullOrWhiteSpace(review.GetProperty("linguisticReviewAt").GetString()));
+        Assert.False(string.IsNullOrWhiteSpace(review.GetProperty("listenTestAt").GetString()));
     }
 
     [Fact]

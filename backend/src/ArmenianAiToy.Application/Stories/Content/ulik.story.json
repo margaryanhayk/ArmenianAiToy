@@ -5,7 +5,10 @@
   "minAge": 4,
   "maxAge": 7,
   "tone": "warm",
-  "tags": ["family", "courage"],
+  "tags": [
+    "family",
+    "courage"
+  ],
   "category": "general",
   "bedtimeSafe": false,
   "segments": [
@@ -17,11 +20,13 @@
     "— Պա՛ պա՛, պա՛, պա՛, Սևուկ ջան, ի՜նչ լավ է եղել, որ բաց չես արել,— ասավ վախեցած մայրը։ — Էդ գայլն է եղել, եկել է, որ քեզ ուտի։ Մյուս անգամ էլ որ գա, բաց չանես, ասա՝ գնա՛, թե չէ՝ իմ մայրը քեզ կսպանի իր սուր պոզերով։"
   ],
   "reflectionText": "Ուլիկը լավ գիտեր մայրիկի քաղցր ձայնն ու գայլին դուռը չբացեց։",
-  "reflectionQuestions": ["Ինչո՞ւ Ուլիկը դուռը չբացեց գայլի առաջ։"],
+  "reflectionQuestions": [
+    "Ինչո՞ւ Ուլիկը դուռը չբացեց գայլի առաջ։"
+  ],
   "review": {
-    "status": "draft",
-    "linguisticReviewAt": null,
-    "listenTestAt": null,
-    "notes": "OWNER-DESIGNATED CLASSIC (owner decision 2026-08-01, heqiat.am top-9 selection): «Ուլիկը» classic goat-and-kid tale, public-domain era text. Carried from heqiat.am/story/ulik; segmentation plus OWNER TEXT EDIT (2026-08-01): all suckling references changed to milk at the owner's direction — song line «Անուշ-անուշ ծիծ տամ քեզ»→«…կաթ տամ քեզ» (3×), «ծիծ է տալիս»→«կաթ է տալիս», «ծիծ է ուտում»→«կաթ է խմում»; additionally (owner's edited review doc, same day) song line «Կաթն եմ արել քեզ համար»→«Կաթն եմ բերել քեզ համար» (3×). Deliberate deviations from the classic text. Owner decision 2026-08-01 (CLOSED): the classic closing «քեզ կսպանի իր սուր պոզերով» stays as-is — keep, do not soften. AUTHORSHIP UNVERIFIED (likely Խնկո Ապեր / folk adaptation) — canonical-source verification required before promotion, same path as anban-huri."
+    "status": "approved",
+    "linguisticReviewAt": "2026-08-03",
+    "listenTestAt": "2026-08-03",
+    "notes": "OWNER-DESIGNATED CLASSIC (owner decision 2026-08-01, heqiat.am top-9 selection): «Ուլիկը» classic goat-and-kid tale, public-domain era text. Carried from heqiat.am/story/ulik; segmentation plus OWNER TEXT EDIT (2026-08-01): all suckling references changed to milk at the owner's direction — song line «Անուշ-անուշ ծիծ տամ քեզ»→«…կաթ տամ քեզ» (3×), «ծիծ է տալիս»→«կաթ է տալիս», «ծիծ է ուտում»→«կաթ է խմում»; additionally (owner's edited review doc, same day) song line «Կաթն եմ արել քեզ համար»→«Կաթն եմ բերել քեզ համար» (3×). Deliberate deviations from the classic text. Owner decision 2026-08-01 (CLOSED): the classic closing «քեզ կսպանի իր սուր պոզերով» stays as-is — keep, do not soften. AUTHORSHIP UNVERIFIED (likely Խնկո Ապեր / folk adaptation) — canonical-source verification required before promotion, same path as anban-huri. | PROMOTED 2026-08-03 by owner decision (\"promote them\") after the owner listen-tested the batch rendered in the interim storyteller voice. OPEN ITEM for the carried classics: text is still unverified against a canonical printed source (see the anban-huri precedent) - verify before any reprint/redistribution claim."
   }
 }

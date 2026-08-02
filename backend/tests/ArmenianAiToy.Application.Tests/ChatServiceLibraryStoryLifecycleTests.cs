@@ -266,18 +266,20 @@ public class ChatServiceLibraryStoryLifecycleTests
     // ── Draft posture ───────────────────────────────────────────────
 
     [Fact]
-    public async Task StoryStart_NeverSelectsAnbanHuriDraft()
+    public async Task StoryStart_OnlyEverSelectsAnApprovedStory()
     {
+        // Was "never selects the anban-huri DRAFT". The owner promoted that
+        // story on 2026-08-03, so the specific id is no longer the point —
+        // the durable invariant is that whatever gets selected must be a
+        // story the approved library actually serves.
         var service = MakeService("library");
 
         await service.GetResponseAsync(Guid.NewGuid(), "հեքիաթ պատմիր");
 
         var session = _tracker.GetCurrent(_conversationId);
         Assert.NotNull(session);
-        Assert.NotEqual("anban-huri", session!.StoryId);
-        // The draft is structurally absent from the approved library:
-        Assert.Null(_library.GetById("anban-huri"));
-        Assert.DoesNotContain(_library.ListAvailable(), s => s.Id == "anban-huri");
+        Assert.NotNull(_library.GetById(session!.StoryId));
+        Assert.Contains(_library.ListAvailable(), s => s.Id == session.StoryId);
     }
 
     // ── Verbatim contract / TTS seam ────────────────────────────────

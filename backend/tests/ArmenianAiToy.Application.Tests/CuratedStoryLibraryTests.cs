@@ -53,11 +53,14 @@ public class CuratedStoryLibraryTests
     }
 
     [Fact]
-    public void ListAvailable_ReturnsBothStories()
+    public void ListAvailable_ReturnsTheOriginalLaunchStories()
     {
         var stories = _library.ListAvailable();
 
-        Assert.Equal(2, stories.Count);
+        // Count is deliberately not pinned — the library grows as stories are
+        // promoted (12 added 2026-08-03). EmbeddedCuratedStoryLibraryTests
+        // owns the full inventory; this only guards that the two originals
+        // never silently vanish.
         Assert.Contains(stories, s => s.Id == InMemoryCuratedStoryLibrary.LittleCloudId);
         Assert.Contains(stories, s => s.Id == InMemoryCuratedStoryLibrary.HedgehogAppleId);
     }

@@ -5,7 +5,11 @@
   "minAge": 5,
   "maxAge": 7,
   "tone": "warm",
-  "tags": ["kindness", "helping", "courage"],
+  "tags": [
+    "kindness",
+    "helping",
+    "courage"
+  ],
   "category": "general",
   "bedtimeSafe": false,
   "segments": [
@@ -20,11 +24,13 @@
     "Սրանք նոր մեռած տեղներիցը ետ են գալի, ուրախանում, աշխարհքովը մին են լինում։ Հետն էլ բացվում է բարի լուսը, և երիտասարդ հյուրը վեր է կենում, մնաք բարով է ասում, որ գնա իր ճանապարհը։ - Չենք թողնի որ չենք թողնի,- առաջը կտրում են մարդ ու կին,- դու, որ փրկեցիր մեր կյանքը, ասա՛, ինչով ետ վճարենք քո լավությունը․․․ - Չէ՛, անկարելի բան է, պետք է գնամ իմ ճանապարհը։ - Դե գոնե անունդ ասա, գոնե իմանանք, թե ում ենք օրհնելու․․․ - Լավությունը արա ու թեկուզ ջուրը գցի՝ չի կորչիլ։ Ես հենց էն Խոսող ձուկն եմ, որի կյանքը դու խնայեցիր․․․- ասում է անծանոթն ու չքանում ապշած մարդ ու կնկա աչքերից։"
   ],
   "reflectionText": "Ահա այսպես բարի մարդու լավությունը չկորավ՝ խոսող ձուկը եկավ ու օգնեց նրան։",
-  "reflectionQuestions": ["Ո՞վ էր գեղեցիկ երիտասարդ հյուրը։"],
+  "reflectionQuestions": [
+    "Ո՞վ էր գեղեցիկ երիտասարդ հյուրը։"
+  ],
   "review": {
-    "status": "draft",
-    "linguisticReviewAt": null,
-    "listenTestAt": null,
-    "notes": "OWNER-DESIGNATED CLASSIC (owner decision 2026-08-01, heqiat.am top-9 selection): Թումանյանի «Խոսող ձուկը», public-domain. Carried from heqiat.am/story/khosogh-dzuk; segmentation plus: removed a wikisource artifact «{{Կենտրոն|2}», one typo fix «ընկերնեիս»→«ընկերներս», «գնա՛, սովից մեռի՛» harsh clause dropped from the fisherman's dismissal, and the couple's regret line + the condition retell compressed in segment six (marked for canonical comparison). Canonical-source verification (ԵԼԺ) required before promotion."
+    "status": "approved",
+    "linguisticReviewAt": "2026-08-03",
+    "listenTestAt": "2026-08-03",
+    "notes": "OWNER-DESIGNATED CLASSIC (owner decision 2026-08-01, heqiat.am top-9 selection): Թումանյանի «Խոսող ձուկը», public-domain. Carried from heqiat.am/story/khosogh-dzuk; segmentation plus: removed a wikisource artifact «{{Կենտրոն|2}», one typo fix «ընկերնեիս»→«ընկերներս», «գնա՛, սովից մեռի՛» harsh clause dropped from the fisherman's dismissal, and the couple's regret line + the condition retell compressed in segment six (marked for canonical comparison). Canonical-source verification (ԵԼԺ) required before promotion. | PROMOTED 2026-08-03 by owner decision (\"promote them\") after the owner listen-tested the batch rendered in the interim storyteller voice. OPEN ITEM for the carried classics: text is still unverified against a canonical printed source (see the anban-huri precedent) - verify before any reprint/redistribution claim."
   }
 }

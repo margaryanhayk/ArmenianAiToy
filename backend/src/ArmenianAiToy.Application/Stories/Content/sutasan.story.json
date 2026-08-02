@@ -5,21 +5,26 @@
   "minAge": 4,
   "maxAge": 7,
   "tone": "warm",
-  "tags": ["curiosity", "courage"],
+  "tags": [
+    "curiosity",
+    "courage"
+  ],
   "category": "general",
   "bedtimeSafe": false,
   "segments": [
     "Լինում է, չի լինում՝ մի թագավոր։ Էս թագավորը իր երկրում հայտնում է․ — Ով էնպես սուտ ասի, որ ես ասեմ՝ սուտ է, իմ թագավորության կեսը կտամ նրան։",
     "Գալիս է մի հովիվ։ Ասում է․ — Թագավորն ապրած կենա, իմ հերը մի դագանակ ուներ, որ էստեղից մեկնում էր, երկնքում աստղերը խառնում։ — Կպատահի՛,— պատասխանում է թագավորը։ — Իմ պապն էլ մի չիբուխ ուներ, մի ծերը բերանին էր դնում, մյուս ծերը մեկնում, արեգակիցը վառում։ Ստախոսը գլուխը քորելով դուրս է գնում։",
     "Գալիս է մի դերձակ։ Ասում է․ — Ներողությո՛ւն, թագավո՛ր, ես վաղ պիտի գայի, ուշացա։ Երեկ շատ անձրև եկավ, կայծակները տրաքեցին, երկինքը պատռվեց, գնացել էի կարկատելու։ — Հա՛, լավ ես արել,— ասում է թագավորը,— բայց լավ չէիր կարկատել, էս առավոտ էլ մի քիչ անձրև թափվեց։ Սա էլ է դուրս գնում։",
-    "Ներս է մտնում մի աղքատ գյուղացի, կոտը կռնատակին։ — Դո՞ւ ինչ ես ուզում, ա՛յ մարդ,– հարցնում է թագավորը։ — Ինձ մի կոտ ոսկի ես պարտ, եկել եմ տանեմ։ — Մի կոտ ոսկի՞– զարմանում է թագավորը։ — Սո՛ւտ ես ասում, ես քեզ ոսկի չեմ պարտ։ — Թե որ սուտ եմ ասում, թագավորությանդ կեսը տուր։ — Չէ՛, չէ՛, ճշմարիտ ես ասում,― խոսքը փոխում է թագավորը։ — Ճշմարիտ եմ ասում՝ մի կոտ ոսկին տուր։"
+    "Ներս է մտնում մի աղքատ գյուղացի, կոտը կռնատակին։ — Դո՞ւ ինչ ես ուզում, ա՛յ մարդ,— հարցնում է թագավորը։ — Ինձ մի կոտ ոսկի ես պարտ, եկել եմ տանեմ։ — Մի կոտ ոսկի՞— զարմանում է թագավորը։ — Սո՛ւտ ես ասում, ես քեզ ոսկի չեմ պարտ։ — Թե որ սուտ եմ ասում, թագավորությանդ կեսը տուր։ — Չէ՛, չէ՛, ճշմարիտ ես ասում,— խոսքը փոխում է թագավորը։ — Ճշմարիտ եմ ասում՝ մի կոտ ոսկին տուր։"
   ],
   "reflectionText": "Ահա այսպես խելացի խոսքով աղքատ գյուղացին հաղթեց թագավորին։",
-  "reflectionQuestions": ["Ի՞նչ էր ուզում գյուղացին թագավորից։"],
+  "reflectionQuestions": [
+    "Ի՞նչ էր ուզում գյուղացին թագավորից։"
+  ],
   "review": {
-    "status": "draft",
-    "linguisticReviewAt": null,
-    "listenTestAt": null,
-    "notes": "OWNER-DESIGNATED CLASSIC (owner decision 2026-08-01, heqiat.am top-9 selection): Թումանյանի «Սուտասանը», public-domain. Text carried from heqiat.am/story/sutasan verbatim; segmentation only. NOT yet verified against a canonical printed source (ԵԼԺ) — source verification required before promotion, same path as anban-huri."
+    "status": "approved",
+    "linguisticReviewAt": "2026-08-03",
+    "listenTestAt": "2026-08-03",
+    "notes": "OWNER-DESIGNATED CLASSIC (owner decision 2026-08-01, heqiat.am top-9 selection): Թումանյանի «Սուտասանը», public-domain. Text carried from heqiat.am/story/sutasan verbatim; segmentation only. NOT yet verified against a canonical printed source (ԵԼԺ) — source verification required before promotion, same path as anban-huri. | PROMOTED 2026-08-03 by owner decision (\"promote them\") after the owner listen-tested the batch rendered in the interim storyteller voice. OPEN ITEM for the carried classics: text is still unverified against a canonical printed source (see the anban-huri precedent) - verify before any reprint/redistribution claim."
   }
 }

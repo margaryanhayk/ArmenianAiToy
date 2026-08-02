@@ -5,7 +5,11 @@
   "minAge": 4,
   "maxAge": 7,
   "tone": "warm",
-  "tags": ["family", "kindness", "sharing"],
+  "tags": [
+    "family",
+    "kindness",
+    "sharing"
+  ],
   "category": "general",
   "bedtimeSafe": true,
   "segments": [
@@ -14,11 +18,13 @@
     "Երեկոյան մայրիկը տեսավ դա ու ժպտաց։ Նա գործեց նոր ձեռնոցներ Լուսինեի համար՝ կարմիր ու փափուկ։ Հաջորդ օրը քույր ու եղբայր նորից խաղացին ձյան մեջ։ Երկուսի ձեռքերն էլ տաք էին։"
   ],
   "reflectionText": "Երբ հոգ ենք տանում իրար մասին, մեր սիրտն էլ է տաքանում։",
-  "reflectionQuestions": ["Ի՞նչ տվեց Լուսինեն եղբորը։"],
+  "reflectionQuestions": [
+    "Ի՞նչ տվեց Լուսինեն եղբորը։"
+  ],
   "review": {
-    "status": "draft",
-    "linguisticReviewAt": null,
-    "listenTestAt": null,
-    "notes": "OWNER-DESIGNATED THEME (owner decision 2026-08-01, heqiat.am top-9 selection — the site's «Քրոջ սեր» is a modern site-original text and was NOT used). This is a NEW ORIGINAL in-project story on the same sibling-care theme."
+    "status": "approved",
+    "linguisticReviewAt": "2026-08-03",
+    "listenTestAt": "2026-08-03",
+    "notes": "OWNER-DESIGNATED THEME (owner decision 2026-08-01, heqiat.am top-9 selection — the site's «Քրոջ սեր» is a modern site-original text and was NOT used). This is a NEW ORIGINAL in-project story on the same sibling-care theme. | PROMOTED 2026-08-03 by owner decision (\"promote them\") after the owner listen-tested the batch rendered in the interim storyteller voice. OPEN ITEM for the carried classics: text is still unverified against a canonical printed source (see the anban-huri precedent) - verify before any reprint/redistribution claim."
   }
 }
