@@ -19,12 +19,17 @@
 
 #include <Arduino.h>
 
-// --- Wi-Fi credentials (SECRET — fill in) --------------------
+// --- Wi-Fi credentials ---------------------------------------
+// PRODUCT RULE: LEAVE THESE EMPTY. A shipped toy must not carry any
+// developer's home network. The parent provisions Wi-Fi from their phone
+// over BLE (AREG_USE_BLE_PROVISIONING below) and the toy stores it in
+// NVS; these defines exist only as a bench escape hatch and as the
+// fallback the B.1 code checks when NVS is empty.
 #ifndef AREG_WIFI_SSID
-#define AREG_WIFI_SSID          "YOUR_WIFI_SSID"
+#define AREG_WIFI_SSID          ""
 #endif
 #ifndef AREG_WIFI_PASSWORD
-#define AREG_WIFI_PASSWORD      "YOUR_WIFI_PASSWORD"
+#define AREG_WIFI_PASSWORD      ""
 #endif
 
 // --- Backend base URL (SINGLE SOURCE OF TRUTH — edit host here) ---
@@ -38,7 +43,13 @@
 // calls failed with no obvious cause. Keep it that way: never paste a
 // literal host into a URL define below.
 //
-// Plain HTTP is fine on a bench LAN; TLS is a later-phase concern.
+// http:// and https:// are BOTH supported — net_transport.cpp picks the
+// transport from the scheme, so a bench LAN server and the live cloud
+// differ by this one line. For the cloud use the full https origin, e.g.
+//   "https://armenianaitoy-production.up.railway.app"
+// TLS verifies against the pinned ISRG Root X1 (Let's Encrypt) in
+// net_transport.cpp; define AREG_TLS_INSECURE to skip verification for
+// bench triage only (it prints a loud warning every boot).
 #ifndef AREG_BACKEND_BASE_URL
 #define AREG_BACKEND_BASE_URL   "http://YOUR_LAN_IP:5000"
 #endif
@@ -254,7 +265,13 @@
 // PLATFORM-ARCHITECTURE.txt, Phase B.2 build spec). With the flag OFF (default),
 // none of the BLE code is compiled and the firmware is identical to B.1.
 //
-// #define AREG_USE_BLE_PROVISIONING 1
+#define AREG_USE_BLE_PROVISIONING 1
+//
+// CORE VERSION WARNING: Arduino-ESP32 3.3.7 and 3.3.8 crash on the
+// ESP32-S3 inside btdm_controller_init the moment BLE provisioning
+// starts (LoadProhibited boot loop; upstream regression, arduino-esp32
+// issues #12436 / #12357). Build this with core 3.3.6:
+//     arduino-cli core install esp32:esp32@3.3.6
 //
 // BLE service name the toy advertises during provisioning (what the parent
 // sees in the phone app). Keep it short.

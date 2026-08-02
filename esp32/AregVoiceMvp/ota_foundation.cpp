@@ -13,6 +13,7 @@
 #include <esp_ota_ops.h>
 
 #include "config.h"
+#include "net_transport.h"
 #include "voice_client.h"
 #include "ota_apply.h"   // real apply pipeline (reboots on success)
 #include "ota_state.h"   // persisted cross-reboot OTA state (NVS)
@@ -94,7 +95,7 @@ static bool ack_command(const char *command_id, const char *result,
     url += "/ack";
 
     HTTPClient http;
-    if (!http.begin(url)) {
+    if (!areg_http_begin(http, url)) {
         return false;
     }
     voice_add_device_auth_headers(http);
@@ -303,7 +304,7 @@ static void ota_checkin_tick() {
 
 static void poll_commands() {
     HTTPClient http;
-    if (!http.begin(api_url("/api/devices/commands"))) {
+    if (!areg_http_begin(http, api_url("/api/devices/commands"))) {
         return;
     }
     voice_add_device_auth_headers(http);

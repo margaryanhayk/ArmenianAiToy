@@ -11,13 +11,20 @@
 // -------------------------------------------------------------
 #include "ble_provisioning.h"
 
+// config.h FIRST — it is what defines AREG_USE_BLE_PROVISIONING. Testing the
+// macro before including it made this whole translation unit compile to
+// nothing while the .ino (which includes config.h early) still called into
+// it, so enabling the flag produced only "undefined reference" at link time
+// and the module could never actually ship. Same class of bug as the OTA
+// "make config.h overrides visible in every translation unit" fix.
+#include "config.h"
+
 #ifdef AREG_USE_BLE_PROVISIONING
 
 #include <WiFi.h>
 #include <WiFiProv.h>
 
 #include "wifi_creds.h"   // wifi_creds_save — persist the received creds (B.1)
-#include "config.h"
 
 // Non-secret knobs. Self-defaulted so the build never depends on config.h
 // carrying them (same pattern as the #047 watchdog tunables). Override in
@@ -92,17 +99,48 @@ static void prov_event(arduino_event_t *sys_event) {
 }
 
 void ble_provisioning_begin() {
+    // Pre-flight diagnostic. The BLE controller allocates a large block of
+    // INTERNAL (DMA-capable) DRAM; a crash inside btdm_controller_init has two
+    // very different causes that look identical from the backtrace:
+    //   (a) the heap was already corrupted by an earlier overflow, or
+    //   (b) internal DRAM is exhausted/too fragmented for the controller.
+    // Printing integrity + internal free/largest-block here separates them
+    // without another guess-and-reflash cycle.
+    {
+        const bool heap_ok = heap_caps_check_integrity_all(true);
+        Serial.printf("[prov] pre-BLE heap_integrity=%s internal_free=%u largest_internal_block=%u\n",
+                      heap_ok ? "OK" : "CORRUPT",
+                      (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+        Serial.flush();
+    }
+
     WiFi.onEvent(prov_event);
     s_active = true;
-    // SCHEME_BLE: BLE transport. HANDLER_FREE_BTDM: free the BT-classic memory
-    // (we use BLE only). SECURITY_1: curve25519 key-exchange + AES-CTR with a
-    // proof-of-possession — the creds travel encrypted phone->toy and never
-    // touch our backend. reset_provisioned defaults true (clears any IDF-side
-    // stored creds at session start); we keep our own NVS copy regardless.
-    // Core 3.x renamed the WIFI_PROV_* constants to the NETWORK_PROV_* family.
+    // SCHEME_BLE: BLE transport. SECURITY_1: curve25519 key-exchange + AES-CTR
+    // with a proof-of-possession — the creds travel encrypted phone->toy and
+    // never touch our backend. reset_provisioned defaults true (clears any
+    // IDF-side stored creds at session start); we keep our own NVS copy
+    // regardless. Core 3.x renamed the WIFI_PROV_* constants to NETWORK_PROV_*.
+    //
+    // MEMORY-HANDLER CHOICE IS CHIP-SPECIFIC — getting it wrong is fatal, not
+    // merely wasteful. HANDLER_FREE_BTDM releases the Bluetooth CLASSIC
+    // controller memory, which only exists on the original ESP32. The ESP32-S3
+    // is BLE-only: asking it to free a BT-classic pool that was never
+    // allocated corrupted the heap and the next allocation inside
+    // btdm_controller_init crashed with LoadProhibited on a garbage free-block
+    // pointer (observed on hardware 2026-08-02 — a boot loop, which is why the
+    // toy never appeared in the phone's scan list). On BLE-only targets the
+    // correct value is HANDLER_NONE.
+#if CONFIG_IDF_TARGET_ESP32
+    const scheme_handler_t kMemHandler = NETWORK_PROV_SCHEME_HANDLER_FREE_BTDM;
+#else
+    const scheme_handler_t kMemHandler = NETWORK_PROV_SCHEME_HANDLER_NONE;
+#endif
+
     WiFiProv.beginProvision(
         NETWORK_PROV_SCHEME_BLE,
-        NETWORK_PROV_SCHEME_HANDLER_FREE_BTDM,
+        kMemHandler,
         NETWORK_PROV_SECURITY_1,
         AREG_PROV_POP,
         AREG_PROV_SERVICE_NAME);

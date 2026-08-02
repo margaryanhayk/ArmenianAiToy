@@ -10,6 +10,7 @@
 // -------------------------------------------------------------
 #include "voice_client.h"
 #include "config.h"
+#include "net_transport.h"
 #include "diag.h"
 #include "wifi_creds.h"     // Phase B.1 — NVS-backed Wi-Fi credentials
 #include "device_creds.h"   // Phase C   — NVS-backed device identity
@@ -229,7 +230,7 @@ void voice_send_heartbeat() {
     url.replace("/api/chat/audio", "/api/devices/heartbeat");
 
     HTTPClient http;
-    if (!http.begin(url)) {
+    if (!areg_http_begin(http, url)) {
         return;
     }
     add_device_auth_headers(http);
@@ -296,7 +297,7 @@ bool voice_fetch_story_audio_token(const char *story_id, char *out_token, size_t
     tokenUrl += story_id;
 
     HTTPClient http;
-    if (!http.begin(tokenUrl)) {
+    if (!areg_http_begin(http, tokenUrl)) {
         return false;
     }
     add_device_auth_headers(http);
@@ -441,7 +442,7 @@ VoiceTurnResult voice_upload_turn(const uint8_t *payload, size_t length) {
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
     http.setTimeout(AREG_HTTP_READ_MS);
     DIAG_MARK(5000, "http_begin_before");
-    if (!http.begin(AREG_BACKEND_URL)) {
+    if (!areg_http_begin(http, AREG_BACKEND_URL)) {
         DIAG_MARK(5001, "http_begin_fail");
         Serial.println("[voice] http.begin failed");
         Serial.flush();
@@ -498,7 +499,7 @@ VoiceTurnResult voice_upload_question(const uint8_t *payload, size_t length,
     HTTPClient http;
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
     http.setTimeout(AREG_HTTP_READ_MS);
-    if (!http.begin(url)) {
+    if (!areg_http_begin(http, url)) {
         Serial.println("[qa] http.begin failed");
         Serial.flush();
         return result;
@@ -556,7 +557,7 @@ VoiceTurnResult voice_upload_reflection_answer(const uint8_t *payload, size_t le
     HTTPClient http;
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
     http.setTimeout(AREG_HTTP_READ_MS);
-    if (!http.begin(url)) {
+    if (!areg_http_begin(http, url)) {
         Serial.println("[post] http.begin failed");
         Serial.flush();
         return result;
@@ -679,7 +680,7 @@ static void upload_question_task(void * /*pvParams*/) {
     HTTPClient http;
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
     http.setTimeout(AREG_HTTP_READ_MS);
-    if (!http.begin(url)) {
+    if (!areg_http_begin(http, url)) {
         Serial.println("[qa-async] http.begin failed");
         Serial.flush();
         async_publish_result(result);
@@ -809,7 +810,7 @@ VoiceTurnResult voice_continue_turn() {
     HTTPClient http;
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
     http.setTimeout(AREG_HTTP_READ_MS);
-    if (!http.begin(AREG_BACKEND_URL)) {
+    if (!areg_http_begin(http, AREG_BACKEND_URL)) {
         Serial.println("[voice] continue: http.begin failed");
         return result;
     }

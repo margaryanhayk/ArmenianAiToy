@@ -13,6 +13,7 @@
 #include <mbedtls/md.h>
 
 #include "config.h"
+#include "net_transport.h"
 #include "ota_foundation.h"  // AREG_FW_VERSION / AREG_BOARD_MODEL
 #include "ota_state.h"
 #include "voice_client.h"    // voice_add_device_auth_headers
@@ -68,7 +69,7 @@ String resolve_image_url(const char *url) {
 // http.begin(secureClient, url) with setCACert(); every OTA HTTP call in
 // this module goes through here.
 bool ota_http_begin(HTTPClient &http, const String &url) {
-    return http.begin(url);
+    return areg_http_begin(http, url);
 }
 
 // Lowercase-hex encode.

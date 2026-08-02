@@ -17,6 +17,7 @@
 #include <mbedtls/sha256.h>
 
 #include "config.h"
+#include "net_transport.h"
 #include "content_sync_rules.h"  // pure validation / path / decision logic
 #include "content_sync_model.h"  // JSON <-> CsStory (manifest + index schemas)
 #include "audio_io.h"      // audio_sd_available() — reuse the boot mount
@@ -261,7 +262,7 @@ bool download_story(const CsStory *story, const char *audio_url) {
     }
 
     HTTPClient dl;
-    if (!dl.begin(resolve_url(audio_url))) {
+    if (!areg_http_begin(dl, resolve_url(audio_url))) {
         story_fail(story->story_id, "download_begin_failed");
         return false;
     }
@@ -438,7 +439,7 @@ void content_sync_run() {
 
     // ---- 1. Manifest ----
     HTTPClient http;
-    if (!http.begin(resolve_url("/api/devices/content-manifest"))) {
+    if (!areg_http_begin(http, resolve_url("/api/devices/content-manifest"))) {
         fail("manifest_begin_failed");
         return;
     }

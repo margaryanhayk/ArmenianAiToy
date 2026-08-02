@@ -19,6 +19,7 @@
 #include <WiFi.h>
 
 #include "config.h"
+#include "net_transport.h"     // TLS/plain transport seam for every backend call
 #include "audio_io.h"
 #include "voice_client.h"
 #include "canned_clip.h"
@@ -1179,6 +1180,8 @@ void setup() {
     delay(200);
     Serial.println();
     Serial.println("[boot] AregVoiceMvp starting");
+    Serial.printf("[boot] backend = %s\n", AREG_BACKEND_BASE_URL);
+    areg_transport_log_policy();
     Serial.flush();
     // Diag: reset reason. Distinguishes power-on / EN / panic /
     // brownout / watchdog so a "monitor came back" after a hang
