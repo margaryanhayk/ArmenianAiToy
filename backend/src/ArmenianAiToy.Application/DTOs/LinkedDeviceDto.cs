@@ -41,12 +41,19 @@ public record LinkedDeviceDto(
 
     /// <summary>
     /// Whether the toy can actually play stories, derived at read time by
-    /// <c>DeviceStoryHealth.Resolve</c> from the SD-card health the toy
-    /// reports on its heartbeat: "ok" / "no_storage" / "offline" / "unknown".
-    /// Exists so a broken toy is never merely SILENT to a parent — see the
-    /// helper's docs for the bench failure that motivated it.
+    /// <c>DeviceStoryHealth.Resolve</c>: "ok" / "no_storage" / "offline" /
+    /// "unknown". Diagnostic detail — for the operator console and support,
+    /// NOT shown to the parent.
     /// </summary>
-    string StoryHealth);
+    string StoryHealth,
+
+    /// <summary>
+    /// The short fault code the PARENT sees (e.g. "E-101"), empty when there
+    /// is nothing to report. Owner decision 2026-08-03: parents get a code to
+    /// quote to support, never a technical explanation or a self-service fix.
+    /// See <c>DeviceFaultCode</c>.
+    /// </summary>
+    string FaultCode);
 
 public record LinkedDeviceChildDto(
     Guid ChildId,

@@ -87,6 +87,30 @@ public class DeviceStoryHealthTests
     }
 
     [Fact]
+    public void FaultCode_IsIssuedOnlyForARealFault()
+    {
+        // Owner decision: the parent sees a CODE to quote to support, never an
+        // explanation. Only a genuine fault earns one — giving "offline" or
+        // "unknown" a code would train parents to ignore codes.
+        Assert.Equal(DeviceFaultCode.StorageUnavailable,
+            DeviceFaultCode.FromStoryHealth(DeviceStoryHealth.NoStorage));
+
+        Assert.Equal(DeviceFaultCode.None, DeviceFaultCode.FromStoryHealth(DeviceStoryHealth.Ok));
+        Assert.Equal(DeviceFaultCode.None, DeviceFaultCode.FromStoryHealth(DeviceStoryHealth.Offline));
+        Assert.Equal(DeviceFaultCode.None, DeviceFaultCode.FromStoryHealth(DeviceStoryHealth.Unknown));
+    }
+
+    [Fact]
+    public void FaultCode_ValueIsStable()
+    {
+        // Codes go out to parents and get read back to support months later.
+        // Pinning the literal makes an accidental renumbering a failing test
+        // rather than a support call nobody can decode.
+        Assert.Equal("E-101", DeviceFaultCode.StorageUnavailable);
+        Assert.Equal("", DeviceFaultCode.None);
+    }
+
+    [Fact]
     public void NonPositiveThresholdFallsBackToTheDefault()
     {
         // A misconfigured Presence:OnlineThresholdSeconds must not make every

@@ -1385,7 +1385,9 @@ public class ParentService : IParentService
             // Same snapshot-once nowUtc as the two cutoffs above, so every
             // device in this response is judged against one clock.
             StoryHealth: DeviceStoryHealth.Resolve(
-                l.Device.SdCardOk, l.Device.LastSeenAt, nowUtc, ReadOnlineThresholdSeconds())
+                l.Device.SdCardOk, l.Device.LastSeenAt, nowUtc, ReadOnlineThresholdSeconds()),
+            FaultCode: DeviceFaultCode.FromStoryHealth(DeviceStoryHealth.Resolve(
+                l.Device.SdCardOk, l.Device.LastSeenAt, nowUtc, ReadOnlineThresholdSeconds()))
         )).ToList();
     }
 
