@@ -276,9 +276,8 @@ public class EmbeddedCuratedStoryLibraryTests
         var ids = real.ListAvailable().Select(s => s.Id).OrderBy(i => i, StringComparer.Ordinal).ToList();
         Assert.Equal(
             [
-                "anban-huri", "faithful-dog", "hedgehog-apple", "khosogh-dzuk",
-                "little-cloud", "little-seed", "night-friends", "pochat-aghves",
-                "princess-and-pea", "sister-mittens", "sutasan", "sutlik-orskan",
+                "anban-huri", "hedgehog-apple", "khosogh-dzuk", "little-cloud",
+                "pochat-aghves", "princess-and-pea", "sutasan", "sutlik-orskan",
                 "three-piglets", "ulik",
             ],
             ids);
