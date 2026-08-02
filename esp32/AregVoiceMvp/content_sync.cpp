@@ -3,6 +3,12 @@
 // See content_sync.h for the scope statement and the index contract.
 // Entire file compiles out unless AREG_CONTENT_SYNC_BENCH is defined.
 // -------------------------------------------------------------
+// config.h FIRST - it defines AREG_CONTENT_SYNC_BENCH. Testing the macro
+// before including it would compile this whole file to nothing while the
+// .ino still called into it (the exact latent bug found in
+// ble_provisioning.cpp on 2026-08-03).
+#include "config.h"
+
 #ifdef AREG_CONTENT_SYNC_BENCH
 
 #include "content_sync.h"
