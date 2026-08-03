@@ -114,4 +114,35 @@ public class BedtimeMusicToggleTests
 
         Assert.Equal(BedtimeMusicSetResult.NotLinked, result);
     }
+
+    // KEYSTONE (symmetry): clearing the bedtime window auto-disables
+    // bedtime music, so it can never be left "on" but inert.
+    [Fact]
+    public async Task ClearingBedtimeWindow_AutoDisablesMusic()
+    {
+        var (svc, db) = Create();
+        var (parentId, deviceId) = await SeedAsync(db, withBedtime: true);
+        Assert.Equal(BedtimeMusicSetResult.Ok,
+            await svc.SetBedtimeMusicAsync(parentId, deviceId, enabled: true));
+
+        // Clear the window (both null).
+        var ok = await svc.SetBedtimeWindowAsync(parentId, deviceId, null, null);
+
+        Assert.True(ok);
+        Assert.False((await db.Set<Device>().SingleAsync()).BedtimeMusicEnabled);
+    }
+
+    [Fact]
+    public async Task SettingAWindow_DoesNotDisableMusic()
+    {
+        var (svc, db) = Create();
+        var (parentId, deviceId) = await SeedAsync(db, withBedtime: true);
+        await svc.SetBedtimeMusicAsync(parentId, deviceId, enabled: true);
+
+        // Change (not clear) the window — music must survive.
+        await svc.SetBedtimeWindowAsync(parentId, deviceId,
+            new TimeOnly(22, 0), new TimeOnly(6, 0));
+
+        Assert.True((await db.Set<Device>().SingleAsync()).BedtimeMusicEnabled);
+    }
 }

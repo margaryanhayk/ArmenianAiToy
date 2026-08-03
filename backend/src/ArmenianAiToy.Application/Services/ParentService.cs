@@ -1348,6 +1348,20 @@ public class ParentService : IParentService
         // {start:null,end:null} here, not {start:"22:00:00",end:null}.
         TrackAndAddAudit(AuditEvent.ParentBedtimeWindowSet(
             parentId, deviceId, device.BedtimeStart, device.BedtimeEnd));
+
+        // Slice E symmetry: bedtime music only plays inside the window, so
+        // clearing the window must also turn music OFF — otherwise the toggle
+        // is left "on" but permanently inert (the mirror of the guard that
+        // refuses enabling music without a window). Audited as its own flip.
+        if ((device.BedtimeStart is null || device.BedtimeEnd is null)
+            && device.BedtimeMusicEnabled)
+        {
+            device.BedtimeMusicEnabled = false;
+            TrackAndAddAudit(AuditEvent.ParentBedtimeMusicSet(parentId, deviceId, false));
+            _logger.LogInformation(
+                "Parent {ParentId} cleared bedtime window on device {DeviceId}; bedtime music auto-disabled",
+                parentId, deviceId);
+        }
         await _db.SaveChangesAsync();
         _logger.LogInformation(
             "Parent {ParentId} set bedtime window on device {DeviceId} to {Start}-{End}",
