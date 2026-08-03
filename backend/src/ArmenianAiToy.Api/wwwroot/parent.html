@@ -12,6 +12,9 @@
       color: #2b1f47;
       min-height: 100vh;
       padding: 16px;
+      /* The page must never scroll sideways on a phone — any wide row
+         (tab strip, table, audio player) manages its own overflow. */
+      overflow-x: hidden;
     }
     .app { max-width: 720px; margin: 0 auto; }
 
@@ -322,17 +325,22 @@
     }
 
     .tabs {
-      display: inline-flex;
+      /* Eight tabs since the mode-tabs slice — WRAP instead of blowing the
+         page out sideways on phones (that overflow squashed the whole
+         layout on iOS). Block-level flex row that sits under the back
+         button and wraps to as many lines as the width needs. */
+      display: flex;
+      flex-wrap: wrap;
       gap: 6px;
-      margin: 0 8px;
-      vertical-align: middle;
+      margin: 10px 0 2px;
     }
     .tabs button {
-      padding: 7px 14px;
+      padding: 6px 12px;
       font-size: 13px;
       background: #ece4f8;
       color: #5b3e8a;
       border-radius: 999px;
+      white-space: nowrap;
     }
     .tabs button:hover { background: #d8c8f0; }
     .tabs button.active { background: #7c5cbf; color: white; }
@@ -364,6 +372,8 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;        /* long titles/timestamps wrap on phones */
+      gap: 2px 10px;
       margin-bottom: 6px;
       font-size: 12px;
       color: #6b5b8a;
