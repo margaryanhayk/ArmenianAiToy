@@ -893,8 +893,17 @@ public class StoryQaController : ControllerBase
                 deviceId, childId);
             await _conversations.AddMessageAsync(
                 conversation.Id, MessageRole.User, question, userFlag);
-            await _conversations.AddMessageAsync(
+            var assistantMsg = await _conversations.AddMessageAsync(
                 conversation.Id, MessageRole.Assistant, answerText, assistantFlag);
+            // Every turn on this controller happens INSIDE a story (in-story
+            // Q&A or the post-story reflection), so stamp the same runtime
+            // mode name ChatService stamps — without it these conversations
+            // are invisible to the dashboard's Stories tab (owner-reported
+            // bug 2026-08-03: story conversations existed, tab was empty).
+            if (assistantMsg is not null)
+            {
+                await _conversations.StampMessageModeAsync(assistantMsg.Id, "story");
+            }
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)

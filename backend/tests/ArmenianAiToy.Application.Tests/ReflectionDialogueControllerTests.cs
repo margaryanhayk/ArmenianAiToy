@@ -191,6 +191,23 @@ public class ReflectionDialogueControllerTests
             .GetCompletionAsync(default!, default!);
     }
 
+    // Story-QA/reflection turns must carry the "story" mode stamp, or the
+    // dashboard's Stories tab shows nothing for a child who only used the
+    // story flow (owner-reported bug 2026-08-03).
+    [Fact]
+    public async Task PersistedTurn_IsStampedWithStoryMode()
+    {
+        var h = Create();
+        WireTranscript(h, "պատասխան");
+        WireModeration(h, inputSafe: true, reactionSafe: true);
+        h.DialogueAi.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(ValidReaction);
+
+        await h.Controller.AnswerReflection(StoryId, questionIndex: 0, CancellationToken.None);
+
+        await h.Conversations.Received(1).StampMessageModeAsync(Arg.Any<Guid>(), "story");
+    }
+
     // `last=false` (multi-question loop, non-final question): the fixed
     // goodbye is NOT spoken/persisted — it belongs to the final question.
     [Fact]
