@@ -42,14 +42,14 @@ Two firmware sketches and a backend with three browser pages:
 |---|---|---|
 | `esp32/AregVoiceMvp/AregVoiceMvp.ino` | C1 voice bench prototype (button-to-talk → `/api/chat/audio`). Sends device-auth headers. | **Active** — matches current backend contract. |
 | `esp32/ArmenianAiToy/ArmenianAiToy.ino` | Phase-1 text-chat sketch (browser → ESP32 → `/api/chat`). | **Stale.** Does not send `X-Device-Id` / `X-Api-Key`; the backend's `DeviceAuthMiddleware` rejects it with 401. Not part of any current proven flow. |
-| `backend/src/ArmenianAiToy.Api/wwwroot/index.html` | Browser dev UI: register a device + send chat messages with the issued device id/key. | Active. |
+| `backend/src/ArmenianAiToy.Api/wwwroot/bench.html` | Browser dev UI: register a device + send chat messages with the issued device id/key. Served at `/bench.html`; it was moved off `/` on 2026-08-04 because a visitor to the site was landing on it. | Active. |
 | `backend/src/ArmenianAiToy.Api/wwwroot/story.html` | Browser story-mode UI (handles `storySessionId` / `selectedChoice` round-trip). | Active. |
 | `backend/src/ArmenianAiToy.Api/wwwroot/parent.html` | Parent dashboard (login, linked devices, conversation history, etc.). | Active. |
 
 ## Proven chain — browser → backend
 
 Used during development from a phone on the same LAN as the dev
-laptop. This is the chain exercised by `wwwroot/index.html` and
+laptop. This is the chain exercised by `wwwroot/bench.html` and
 `wwwroot/story.html`.
 
 ```
@@ -59,7 +59,8 @@ Phone (browser)
   ▼
 Backend (ArmenianAiToy.Api)
   │
-  ├── GET  /                            → wwwroot/index.html
+  ├── GET  /                            → wwwroot/index.html (product front page)
+  ├── GET  /bench.html                  → wwwroot/bench.html (dev UI)
   ├── GET  /story.html                  → wwwroot/story.html
   │
   ├── POST /api/devices/register         → returns { deviceId, apiKey }
@@ -173,7 +174,7 @@ and lives outside the repo entirely.
   `esp32/ArmenianAiToy/ArmenianAiToy.ino` forwards
   `POST /api/chat` with no `X-Device-Id` / `X-Api-Key`, so the
   `DeviceAuthMiddleware` returns 401. The browser dev UI
-  (`wwwroot/index.html` / `wwwroot/story.html`) is the
+  (`wwwroot/bench.html` / `wwwroot/story.html`) is the
   currently-working text path; the legacy sketch needs a
   register-then-attach-headers retrofit before it talks to the
   current backend. Not in scope for this slice.

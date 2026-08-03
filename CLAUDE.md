@@ -195,7 +195,7 @@ no editing, no deletion, no child-facing features.
 
 **UI**
 - `wwwroot/parent.html` — single self-contained static page (HTML + inline CSS + vanilla JS, no framework, no build step).
-- Discoverable via a small link inside the Parent Monitoring panel of `wwwroot/index.html`.
+- Linked from the product front page `wwwroot/index.html` ("Open the parent dashboard"), and from the Parent Monitoring panel of the dev bench `wwwroot/bench.html`.
 - Views: login → linked devices → conversation summaries / flagged messages tabs → conversation detail. A separate **Your activity** view, reached from the "View your activity →" link in the linked-devices header, renders the per-actor audit feed (see § Audit events). The activity view is deliberately *not* nested under a device because the feed is per actor parent, not per device.
 - **Home-screen install (add-to-home-screen, no app store).** Apple declined
   the Developer Program enrollment on 2026-08-04, so there is no TestFlight /

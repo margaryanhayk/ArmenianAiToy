@@ -1,455 +1,277 @@
 <!DOCTYPE html>
-<html lang="hy">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Areg — Armenian AI Toy</title>
+  <title>Areg — an Armenian storytelling toy</title>
+  <meta name="description" content="Areg tells stories, plays games and asks riddles in Armenian. Parents see everything their child heard.">
+  <meta name="theme-color" content="#fff6e3">
+  <link rel="icon" href="/icons/areg-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="/icons/areg-180.png">
+  <!--
+    The public front door. This used to be the developer bench page —
+    MAC-address device registration, a raw chat box and an API-key field —
+    which is what a parent saw first when they visited the site. The bench
+    still exists at /bench.html; it is simply no longer the front door.
+
+    Same rules as parent.html: one self-contained file, no framework, no
+    build step, no CDN, trilingual, mobile first.
+  -->
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f0f2f5;
+      background: #f6f4fb;
+      color: #2b1f47;
       min-height: 100vh;
-    }
-    .app {
-      max-width: 500px;
-      margin: 0 auto;
       padding: 16px;
-    }
-
-    /* Setup Panel */
-    .setup {
-      background: white;
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 16px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    .setup h2 { margin-bottom: 12px; font-size: 18px; }
-    .setup .row { display: flex; gap: 8px; margin-bottom: 8px; }
-    .setup input {
-      flex: 1;
-      padding: 10px 12px;
-      border: 2px solid #ddd;
-      border-radius: 10px;
-      font-size: 14px;
-    }
-    .setup button {
-      padding: 10px 16px;
-      background: #28a745;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    .setup button:hover { background: #22943d; }
-    .setup .status {
-      font-size: 13px;
-      padding: 8px;
-      border-radius: 8px;
-      margin-top: 8px;
-    }
-    .setup .status.ok { background: #d4edda; color: #155724; }
-    .setup .status.err { background: #f8d7da; color: #721c24; }
-
-    /* Chat Panel */
-    .chat-container {
-      background: white;
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    .chat-header {
-      text-align: center;
-      margin-bottom: 16px;
-    }
-    .chat-header h1 { font-size: 24px; }
-    .chat-header p { color: #888; font-size: 13px; }
-    .chat-box {
-      height: 400px;
-      overflow-y: auto;
-      border: 2px solid #eee;
-      border-radius: 12px;
-      padding: 12px;
-      margin-bottom: 12px;
-      background: #fafafa;
-    }
-    .msg {
-      margin-bottom: 10px;
-      padding: 10px 14px;
-      border-radius: 14px;
-      max-width: 85%;
-      word-wrap: break-word;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+      overflow-x: hidden;
       line-height: 1.5;
-      font-size: 15px;
     }
-    .msg.user {
-      background: #667eea;
-      color: white;
-      margin-left: auto;
-      border-bottom-right-radius: 4px;
-    }
-    .msg.bot {
-      background: #e8e8e8;
-      color: #333;
-      border-bottom-left-radius: 4px;
-    }
-    .msg.error { background: #ffe0e0; color: #c00; }
-    .msg.thinking { background: #e8e8e8; color: #888; font-style: italic; }
-    .msg .safety-badge {
-      display: inline-block;
-      font-size: 11px;
-      padding: 2px 6px;
-      border-radius: 4px;
-      margin-left: 6px;
-    }
-    .safety-badge.blocked { background: #f8d7da; color: #721c24; }
-    .safety-badge.flagged { background: #fff3cd; color: #856404; }
-    .input-row {
-      display: flex;
-      gap: 8px;
-    }
-    .input-row input {
-      flex: 1;
-      padding: 12px 14px;
-      border: 2px solid #ddd;
-      border-radius: 14px;
-      font-size: 16px;
-      outline: none;
-    }
-    .input-row input:focus { border-color: #667eea; }
-    .input-row button {
-      padding: 12px 20px;
-      background: #667eea;
-      color: white;
-      border: none;
-      border-radius: 14px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    .input-row button:disabled { background: #ccc; cursor: not-allowed; }
+    .app { max-width: 720px; margin: 0 auto; }
 
-    /* Parent Panel */
-    .parent-panel {
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      background: linear-gradient(135deg, #fff6e3, #ffeccb);
+      border: 1px solid #f3e2bd;
+      border-radius: 18px;
+      padding: 14px 16px;
+      margin: 4px 0 16px;
+      box-shadow: 0 2px 12px rgba(91,62,138,0.07);
+    }
+    .header .brand { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 180px; }
+    .header .logo {
+      width: 46px; height: 46px; flex: none;
+      border-radius: 50%;
+      background: #ffffff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px;
+      box-shadow: inset 0 0 0 2px #f3e2bd;
+    }
+    .header h1 { font-size: 22px; color: #4b2e83; letter-spacing: 0.2px; }
+    .header .sub { font-size: 12px; color: #8a7554; }
+    select {
+      padding: 8px;
+      border: 1px solid #e0d6f0;
+      border-radius: 8px;
+      background: #fff;
+      color: #5b3e8a;
+      font-size: 13px;
+      cursor: pointer;
+      max-width: 120px;
+      min-height: 40px;
+    }
+
+    .card {
       background: white;
       border-radius: 16px;
       padding: 20px;
-      margin-top: 16px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 18px rgba(91,62,138,0.07);
+      margin-bottom: 14px;
     }
-    .parent-panel h2 { margin-bottom: 12px; font-size: 18px; }
-    .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-    .tabs button {
-      padding: 8px 16px;
-      border: 2px solid #ddd;
-      border-radius: 10px;
-      background: white;
+    .hero h2 {
+      font-size: 24px;
+      color: #4b2e83;
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+    .hero p { color: #4b3b6e; font-size: 15px; margin-bottom: 18px; }
+
+    .cta {
+      display: inline-block;
+      padding: 14px 22px;
+      min-height: 48px;
+      background: #7c5cbf;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
       cursor: pointer;
-      font-size: 13px;
     }
-    .tabs button.active { border-color: #667eea; background: #667eea; color: white; }
-    .history-list { max-height: 300px; overflow-y: auto; }
-    .history-item {
-      border: 1px solid #eee;
-      border-radius: 8px;
-      padding: 10px;
+    .cta:hover { background: #6b4aad; }
+    .cta:focus-visible { outline: 2px solid #4b2e83; outline-offset: 2px; }
+    .cta-note { font-size: 13px; color: #6b5b8a; margin-top: 10px; }
+
+    .section-cap {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #6b5b8a;
+      margin: 0 2px 8px;
+    }
+
+    .tile {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: #faf7ff;
+      border: 1px solid #e4d9f7;
+      border-radius: 14px;
+      padding: 14px;
       margin-bottom: 8px;
     }
-    .history-item .meta { font-size: 12px; color: #888; margin-bottom: 6px; }
-    .history-item .q { color: #667eea; font-weight: 500; }
-    .history-item .a { color: #333; margin-top: 4px; }
+    .tile .ico {
+      width: 38px; height: 38px; flex: none;
+      border-radius: 11px;
+      background: #ffffff;
+      border: 1px solid #ece4f8;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    .tile .body { min-width: 0; }
+    .tile .t { font-size: 15px; font-weight: 600; color: #2b1f47; display: block; }
+    .tile .s { font-size: 13px; color: #5b4c7d; margin-top: 2px; display: block; }
+
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: #6b5b8a;
+      padding: 8px 0 20px;
+    }
+    footer a { color: #5b3e8a; }
   </style>
 </head>
 <body>
-<div class="app">
-  <!-- Step 1: Device Setup -->
-  <div class="setup" id="setupPanel">
-    <h2>1. Register Device</h2>
-    <div class="row">
-      <input id="macAddr" placeholder="MAC Address (e.g. AA:BB:CC:DD:EE:FF)" value="AA:BB:CC:DD:EE:FF" />
-      <button onclick="registerDevice()">Register</button>
-    </div>
-    <div id="setupStatus" class="status" style="display:none"></div>
-  </div>
-
-  <!-- Step 2: Chat -->
-  <div class="chat-container" id="chatPanel" style="display:none">
-    <div class="chat-header">
-      <h1>&#9728; Areg</h1>
-      <p id="deviceInfo"></p>
-    </div>
-    <div class="chat-box" id="chat"></div>
-    <div class="input-row">
-      <input type="text" id="msg" placeholder="Type your question..." autocomplete="off" />
-      <button id="btn" onclick="sendMsg()">Send</button>
-    </div>
-  </div>
-
-  <!-- Step 3: Parent Panel -->
-  <div class="parent-panel" id="parentPanel">
-    <h2>Parent Monitoring</h2>
-    <div class="tabs">
-      <button class="active" onclick="showTab('auth')">Login/Register</button>
-      <button onclick="showTab('history')">History</button>
-    </div>
-
-    <div id="authTab">
-      <div class="row" style="display:flex;gap:8px;margin-bottom:8px">
-        <input id="parentEmail" placeholder="Email" style="flex:1;padding:8px;border:2px solid #ddd;border-radius:8px" />
-        <input id="parentPass" type="password" placeholder="Password" style="flex:1;padding:8px;border:2px solid #ddd;border-radius:8px" />
+  <div class="app">
+    <div class="header">
+      <div class="brand">
+        <div class="logo">🧸</div>
+        <div>
+          <h1>Areg</h1>
+          <div class="sub" data-i18n="tagline">An Armenian storytelling toy</div>
+        </div>
       </div>
-      <label style="display:block;margin-bottom:8px;font-size:13px;color:#555">
-        <input id="parentAcceptTerms" type="checkbox" style="margin-right:6px">
-        I have read and accepted the terms of service (required for Register).
-      </label>
-      <div style="display:flex;gap:8px">
-        <button onclick="parentRegister()" style="padding:8px 16px;background:#28a745;color:white;border:none;border-radius:8px;cursor:pointer">Register</button>
-        <button onclick="parentLogin()" style="padding:8px 16px;background:#667eea;color:white;border:none;border-radius:8px;cursor:pointer">Login</button>
-        <button onclick="linkDevice()" style="padding:8px 16px;background:#ffc107;color:#333;border:none;border-radius:8px;cursor:pointer">Link Device</button>
+      <select id="langSelect" data-i18n-aria="language" aria-label="Language">
+        <option value="en">English</option>
+        <option value="ru">Русский</option>
+        <option value="hy">Հայերեն</option>
+      </select>
+    </div>
+
+    <section class="card hero">
+      <h2 data-i18n="hero_title">Stories, games and riddles — in Armenian.</h2>
+      <p data-i18n="hero_body">Areg is a soft toy that tells your child a story, plays a game, asks a riddle, and answers the odd question — all in Armenian. One button, one voice. No screen.</p>
+      <a class="cta" href="/parent.html" data-i18n="open_dashboard">Open the parent dashboard →</a>
+      <div class="cta-note" data-i18n="cta_note">Sign in, or create an account. If you have a toy, you can add it there with the code from its box.</div>
+    </section>
+
+    <section class="card">
+      <div class="section-cap" data-i18n="cap_parents">For parents</div>
+
+      <div class="tile">
+        <span class="ico">👀</span>
+        <span class="body">
+          <span class="t" data-i18n="t_see">You see what your child heard</span>
+          <span class="s" data-i18n="s_see">Every conversation, every story played, and the answers your child gave after each one.</span>
+        </span>
       </div>
-      <div id="parentStatus" class="status" style="display:none;margin-top:8px"></div>
-    </div>
 
-    <div id="historyTab" style="display:none">
-      <button onclick="loadHistory()" style="padding:8px 16px;background:#667eea;color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:12px">Load History</button>
-      <div class="history-list" id="historyList"></div>
-    </div>
+      <div class="tile">
+        <span class="ico">🛡️</span>
+        <span class="body">
+          <span class="t" data-i18n="t_safe">Everything is checked before your child hears it</span>
+          <span class="s" data-i18n="s_safe">Both what your child says and what Areg answers are checked. If something is held back, you are told.</span>
+        </span>
+      </div>
 
-    <p style="margin-top:12px;font-size:12px;color:#888">
-      Read-only parent dashboard:
-      <a href="/parent.html" target="_blank" rel="noopener" style="color:#667eea">Open the Parent Dashboard →</a>
-    </p>
+      <div class="tile">
+        <span class="ico">🌙</span>
+        <span class="body">
+          <span class="t" data-i18n="t_rules">You set the rules</span>
+          <span class="s" data-i18n="s_rules">Quiet hours, which kinds of play are allowed, and a pause button that stops the toy at once.</span>
+        </span>
+      </div>
+
+      <div class="tile">
+        <span class="ico">🤐</span>
+        <span class="body">
+          <span class="t" data-i18n="t_bounded">Not a chatbot</span>
+          <span class="s" data-i18n="s_bounded">Areg is a play leader and a storyteller. It does not do open-ended conversation, and it is not your child's friend.</span>
+        </span>
+      </div>
+    </section>
+
+    <footer>
+      <a href="/privacy.html" data-i18n="privacy">Privacy Policy</a>
+      ·
+      <a href="/terms.html" data-i18n="terms">Terms of Service</a>
+    </footer>
   </div>
-</div>
 
-<script>
-  let deviceId = localStorage.getItem('deviceId') || '';
-  let apiKey = localStorage.getItem('apiKey') || '';
-  let parentToken = localStorage.getItem('parentToken') || '';
+  <script>
+  (function () {
+    'use strict';
+    // Same storage key and the same t()/data-i18n pattern parent.html uses,
+    // so a visitor who picks Armenian here stays in Armenian when they open
+    // the dashboard.
+    var LANG_KEY = 'areg_parent_lang';
+    var SUPPORTED = ['en', 'ru', 'hy'];
+    var I18N = {
+      tagline: { en: 'An Armenian storytelling toy', ru: 'Игрушка-сказочник на армянском', hy: 'Հայերեն հեքիաթ պատմող խաղալիք' },
+      language: { en: 'Language', ru: 'Язык', hy: 'Լեզու' },
+      hero_title: { en: 'Stories, games and riddles — in Armenian.', ru: 'Сказки, игры и загадки — на армянском.', hy: 'Հեքիաթներ, խաղեր և հանելուկներ՝ հայերեն։' },
+      hero_body: { en: 'Areg is a soft toy that tells your child a story, plays a game, asks a riddle, and answers the odd question — all in Armenian. One button, one voice. No screen.', ru: 'Арег — мягкая игрушка, которая расскажет ребёнку сказку, поиграет, загадает загадку и ответит на вопрос — всё на армянском. Одна кнопка, один голос. Без экрана.', hy: 'Արեգը փափուկ խաղալիք է, որը ձեր երեխային հեքիաթ կպատմի, կխաղա, հանելուկ կհարցնի և կպատասխանի հարցերին՝ ամբողջը հայերեն։ Մեկ կոճակ, մեկ ձայն։ Առանց էկրանի։' },
+      open_dashboard: { en: 'Open the parent dashboard →', ru: 'Открыть родительскую панель →', hy: 'Բացել ծնողական վահանակը →' },
+      cta_note: { en: 'Sign in, or create an account. If you have a toy, you can add it there with the code from its box.', ru: 'Войдите или создайте аккаунт. Если игрушка у вас есть, добавьте её там кодом с коробки.', hy: 'Մուտք գործեք կամ ստեղծեք հաշիվ։ Եթե խաղալիքն արդեն ունեք, ավելացրեք այն այնտեղ՝ տուփի կոդով։' },
+      cap_parents: { en: 'For parents', ru: 'Для родителей', hy: 'Ծնողների համար' },
+      t_see: { en: 'You see what your child heard', ru: 'Вы видите, что услышал ваш ребёнок', hy: 'Դուք տեսնում եք, թե ինչ է լսել ձեր երեխան' },
+      s_see: { en: 'Every conversation, every story played, and the answers your child gave after each one.', ru: 'Каждый разговор, каждую прослушанную сказку и ответы ребёнка после неё.', hy: 'Ամեն զրույց, ամեն լսած հեքիաթ և ձեր երեխայի պատասխանները դրանից հետո։' },
+      t_safe: { en: 'Everything is checked before your child hears it', ru: 'Всё проверяется до того, как ребёнок это услышит', hy: 'Ամեն ինչ ստուգվում է, նախքան ձեր երեխան կլսի' },
+      s_safe: { en: 'Both what your child says and what Areg answers are checked. If something is held back, you are told.', ru: 'Проверяется и то, что говорит ребёнок, и то, что отвечает Арег. Если что-то задержано, вы об этом узнаете.', hy: 'Ստուգվում է և՛ երեխայի ասածը, և՛ Արեգի պատասխանը։ Եթե ինչ-որ բան հետ է պահվում, դուք կիմանաք։' },
+      t_rules: { en: 'You set the rules', ru: 'Правила устанавливаете вы', hy: 'Կանոնները դուք եք սահմանում' },
+      s_rules: { en: 'Quiet hours, which kinds of play are allowed, and a pause button that stops the toy at once.', ru: 'Часы сна, разрешённые виды игры и кнопка паузы, которая останавливает игрушку сразу.', hy: 'Քնի ժամեր, թույլատրված խաղերի տեսակներ և դադարի կոճակ, որն անմիջապես կանգնեցնում է խաղալիքը։' },
+      t_bounded: { en: 'Not a chatbot', ru: 'Это не чат-бот', hy: 'Սա չաթ-բոտ չէ' },
+      s_bounded: { en: "Areg is a play leader and a storyteller. It does not do open-ended conversation, and it is not your child's friend.", ru: 'Арег — ведущий игры и сказочник. Он не ведёт свободные беседы и не заменяет ребёнку друга.', hy: 'Արեգը խաղավար է և հեքիաթասաց։ Նա ազատ զրույց չի վարում և ձեր երեխայի ընկերը չէ։' },
+      privacy: { en: 'Privacy Policy', ru: 'Политика конфиденциальности', hy: 'Գաղտնիության քաղաքականություն' },
+      terms: { en: 'Terms of Service', ru: 'Условия использования', hy: 'Օգտագործման պայմաններ' }
+    };
 
-  // Restore state on load
-  if (deviceId && apiKey) {
-    document.getElementById('setupStatus').textContent = `Device: ${deviceId.slice(0,8)}...`;
-    document.getElementById('setupStatus').className = 'status ok';
-    document.getElementById('setupStatus').style.display = 'block';
-    document.getElementById('chatPanel').style.display = 'block';
-    document.getElementById('deviceInfo').textContent = `Device: ${deviceId.slice(0,8)}...`;
-  }
-
-  document.getElementById('msg').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !document.getElementById('btn').disabled) sendMsg();
-  });
-
-  async function registerDevice() {
-    const mac = document.getElementById('macAddr').value.trim();
-    const status = document.getElementById('setupStatus');
-    try {
-      const res = await fetch('/api/devices/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ macAddress: mac })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        deviceId = data.deviceId;
-        apiKey = data.apiKey;
-        localStorage.setItem('deviceId', deviceId);
-        localStorage.setItem('apiKey', apiKey);
-        status.textContent = `Registered! Device: ${deviceId.slice(0,8)}... API Key: ${apiKey.slice(0,12)}...`;
-        status.className = 'status ok';
-        document.getElementById('chatPanel').style.display = 'block';
-        document.getElementById('deviceInfo').textContent = `Device: ${deviceId.slice(0,8)}...`;
-      } else {
-        status.textContent = `Error: ${JSON.stringify(data)}`;
-        status.className = 'status err';
+    function getLang() {
+      var l = null;
+      try { l = localStorage.getItem(LANG_KEY); } catch (e) {}
+      if (SUPPORTED.indexOf(l) >= 0) return l;
+      // First visit: follow the browser, and default an Armenian-first
+      // product to Armenian rather than English when we cannot tell.
+      var nav = (navigator.language || '').toLowerCase();
+      if (nav.indexOf('hy') === 0) return 'hy';
+      if (nav.indexOf('ru') === 0) return 'ru';
+      return 'en';
+    }
+    function t(key) {
+      var e = I18N[key];
+      if (!e) return key;
+      return e[getLang()] || e.en || key;
+    }
+    function apply() {
+      document.documentElement.lang = getLang();
+      var nodes = document.querySelectorAll('[data-i18n]');
+      for (var i = 0; i < nodes.length; i++) {
+        nodes[i].textContent = t(nodes[i].getAttribute('data-i18n'));
       }
-    } catch(e) {
-      status.textContent = `Error: ${e.message}`;
-      status.className = 'status err';
-    }
-    status.style.display = 'block';
-  }
-
-  function addMsg(text, cls, safetyFlag) {
-    const div = document.createElement('div');
-    div.className = 'msg ' + cls;
-    div.textContent = text;
-    if (safetyFlag && safetyFlag !== 'Clean') {
-      const badge = document.createElement('span');
-      badge.className = 'safety-badge ' + safetyFlag.toLowerCase();
-      badge.textContent = safetyFlag;
-      div.appendChild(badge);
-    }
-    const chat = document.getElementById('chat');
-    chat.appendChild(div);
-    chat.scrollTop = chat.scrollHeight;
-    return div;
-  }
-
-  async function sendMsg() {
-    const input = document.getElementById('msg');
-    const btn = document.getElementById('btn');
-    const text = input.value.trim();
-    if (!text || !deviceId) return;
-
-    addMsg(text, 'user');
-    input.value = '';
-    btn.disabled = true;
-
-    const thinking = addMsg('Thinking...', 'thinking');
-
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Device-Id': deviceId,
-          'X-Api-Key': apiKey
-        },
-        body: JSON.stringify({ message: text })
-      });
-
-      document.getElementById('chat').removeChild(thinking);
-
-      if (res.ok) {
-        const data = await res.json();
-        addMsg(data.response, 'bot', data.safetyFlag);
-      } else {
-        const err = await res.text();
-        addMsg('Error: ' + err, 'error');
+      var ar = document.querySelectorAll('[data-i18n-aria]');
+      for (var j = 0; j < ar.length; j++) {
+        ar[j].setAttribute('aria-label', t(ar[j].getAttribute('data-i18n-aria')));
       }
-    } catch(e) {
-      document.getElementById('chat').removeChild(thinking);
-      addMsg('Error: ' + e.message, 'error');
+      document.title = 'Areg — ' + t('tagline');
     }
 
-    btn.disabled = false;
-    input.focus();
-  }
-
-  function showTab(tab) {
-    document.getElementById('authTab').style.display = tab === 'auth' ? 'block' : 'none';
-    document.getElementById('historyTab').style.display = tab === 'history' ? 'block' : 'none';
-    document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
-  }
-
-  async function parentRegister() {
-    const email = document.getElementById('parentEmail').value;
-    const password = document.getElementById('parentPass').value;
-    const acceptedTerms = document.getElementById('parentAcceptTerms').checked;
-    const status = document.getElementById('parentStatus');
-    if (!acceptedTerms) {
-      status.textContent = 'You must accept the terms to register.';
-      status.className = 'status err';
-      status.style.display = 'block';
-      return;
-    }
-    try {
-      const res = await fetch('/api/parents/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, acceptedTerms })
-      });
-      const data = await res.json();
-      status.textContent = res.ok ? `Registered! Now login.` : `Error: ${JSON.stringify(data)}`;
-      status.className = res.ok ? 'status ok' : 'status err';
-    } catch(e) {
-      status.textContent = e.message;
-      status.className = 'status err';
-    }
-    status.style.display = 'block';
-  }
-
-  async function parentLogin() {
-    const email = document.getElementById('parentEmail').value;
-    const password = document.getElementById('parentPass').value;
-    const status = document.getElementById('parentStatus');
-    try {
-      const res = await fetch('/api/parents/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        parentToken = data.token;
-        localStorage.setItem('parentToken', parentToken);
-        status.textContent = 'Logged in!';
-        status.className = 'status ok';
-      } else {
-        status.textContent = `Error: ${JSON.stringify(data)}`;
-        status.className = 'status err';
-      }
-    } catch(e) {
-      status.textContent = e.message;
-      status.className = 'status err';
-    }
-    status.style.display = 'block';
-  }
-
-  async function linkDevice() {
-    if (!parentToken || !deviceId) {
-      alert('Login first and register a device');
-      return;
-    }
-    const status = document.getElementById('parentStatus');
-    try {
-      const res = await fetch('/api/parents/devices/link', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + parentToken
-        },
-        body: JSON.stringify({ deviceId, apiKey })
-      });
-      const data = await res.json();
-      status.textContent = res.ok ? 'Device linked!' : `Error: ${JSON.stringify(data)}`;
-      status.className = res.ok ? 'status ok' : 'status err';
-    } catch(e) {
-      status.textContent = e.message;
-      status.className = 'status err';
-    }
-    status.style.display = 'block';
-  }
-
-  async function loadHistory() {
-    if (!parentToken || !deviceId) {
-      alert('Login first and link a device');
-      return;
-    }
-    const list = document.getElementById('historyList');
-    list.innerHTML = 'Loading...';
-    try {
-      const res = await fetch(`/api/conversations?deviceId=${deviceId}&limit=10`, {
-        headers: { 'Authorization': 'Bearer ' + parentToken }
-      });
-      const data = await res.json();
-      if (!res.ok) { list.innerHTML = `Error: ${JSON.stringify(data)}`; return; }
-
-      list.innerHTML = '';
-      if (data.conversations.length === 0) {
-        list.innerHTML = '<p style="color:#888">No conversations yet.</p>';
-        return;
-      }
-      data.conversations.forEach(conv => {
-        const div = document.createElement('div');
-        div.className = 'history-item';
-        const time = new Date(conv.startedAt).toLocaleString();
-        const flagged = conv.hasFlaggedContent ? ' <span style="color:red">[FLAGGED]</span>' : '';
-        let html = `<div class="meta">${time} (${conv.messageCount} messages)${flagged}</div>`;
-        conv.messages.forEach(m => {
-          if (m.role === 'user') html += `<div class="q">Child: ${m.content}</div>`;
-          else if (m.role === 'assistant') html += `<div class="a">Areg: ${m.content}</div>`;
-        });
-        div.innerHTML = html;
-        list.appendChild(div);
-      });
-    } catch(e) {
-      list.innerHTML = 'Error: ' + e.message;
-    }
-  }
-</script>
+    var sel = document.getElementById('langSelect');
+    sel.value = getLang();
+    sel.addEventListener('change', function () {
+      try { localStorage.setItem(LANG_KEY, sel.value); } catch (e) {}
+      sel.value = getLang();
+      apply();
+    });
+    apply();
+  })();
+  </script>
 </body>
 </html>
