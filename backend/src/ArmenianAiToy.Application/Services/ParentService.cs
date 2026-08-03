@@ -1253,20 +1253,29 @@ public class ParentService : IParentService
     /// Slice E — toggle bedtime music on a linked device. Same ownership +
     /// silent-false + idempotent shape as the story-intro toggle.
     /// </summary>
-    public async Task<bool> SetBedtimeMusicAsync(Guid parentId, Guid deviceId, bool enabled)
+    public async Task<BedtimeMusicSetResult> SetBedtimeMusicAsync(
+        Guid parentId, Guid deviceId, bool enabled)
     {
         var linked = await _db.Set<ParentDevice>()
             .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
         if (!linked)
-            return false;
+            return BedtimeMusicSetResult.NotLinked;
 
         var device = await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == deviceId);
         if (device == null)
-            return false;
+            return BedtimeMusicSetResult.NotLinked;
+
+        // Enabling requires a bedtime window — music only ever plays inside
+        // it, so turning it on with no window would be a silent no-op that
+        // looks enabled. Disabling is always allowed.
+        if (enabled && (device.BedtimeStart is null || device.BedtimeEnd is null))
+        {
+            return BedtimeMusicSetResult.NoBedtimeWindow;
+        }
 
         if (device.BedtimeMusicEnabled == enabled)
         {
-            return true;   // idempotent — no mutation, no audit row
+            return BedtimeMusicSetResult.Ok;   // idempotent — no mutation, no audit
         }
 
         device.BedtimeMusicEnabled = enabled;
@@ -1275,7 +1284,7 @@ public class ParentService : IParentService
         _logger.LogInformation(
             "Parent {ParentId} set device {DeviceId} bedtimeMusicEnabled={Enabled}",
             parentId, deviceId, enabled);
-        return true;
+        return BedtimeMusicSetResult.Ok;
     }
 
     /// <summary>

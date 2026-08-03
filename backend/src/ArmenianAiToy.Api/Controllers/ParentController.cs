@@ -609,11 +609,16 @@ public class ParentController : ControllerBase
             return BadRequest(new { error = "enabled (true/false) is required." });
 
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var ok = await _parentService.SetBedtimeMusicAsync(
+        var result = await _parentService.SetBedtimeMusicAsync(
             parentId, deviceId, request.Enabled.Value);
-        if (!ok)
-            return NotFound(new { error = "Device not found or not linked to this account." });
-        return Ok(new { bedtimeMusicEnabled = request.Enabled.Value });
+        return result switch
+        {
+            BedtimeMusicSetResult.NotLinked =>
+                NotFound(new { error = "Device not found or not linked to this account." }),
+            BedtimeMusicSetResult.NoBedtimeWindow =>
+                BadRequest(new { error = "Set a bedtime window first — music only plays during bedtime hours." }),
+            _ => Ok(new { bedtimeMusicEnabled = request.Enabled.Value }),
+        };
     }
 
     /// <summary>Slice E — the parent-facing music library: the bedtime

@@ -3,6 +3,11 @@ using ArmenianAiToy.Application.Notifications;
 
 namespace ArmenianAiToy.Application.Interfaces;
 
+/// <summary>Outcome of <see cref="IParentService.SetBedtimeMusicAsync"/>:
+/// distinguishes "not your device" (→ 404) from "no bedtime window set"
+/// (→ 400) so the parent gets an honest message.</summary>
+public enum BedtimeMusicSetResult { Ok, NotLinked, NoBedtimeWindow }
+
 public interface IParentService
 {
     /// <summary>
@@ -44,9 +49,10 @@ public interface IParentService
     /// only a real flip.</summary>
     Task<bool> SetDeviceStoryIntroAsync(Guid parentId, Guid deviceId, bool enabled);
 
-    /// <summary>Slice E bedtime-music toggle. Same shape as the story-intro
-    /// toggle; default OFF (opt-in).</summary>
-    Task<bool> SetBedtimeMusicAsync(Guid parentId, Guid deviceId, bool enabled);
+    /// <summary>Slice E bedtime-music toggle. Enabling REQUIRES a configured
+    /// bedtime window (music only fires inside it — no window means it could
+    /// never play). Disabling is always allowed.</summary>
+    Task<BedtimeMusicSetResult> SetBedtimeMusicAsync(Guid parentId, Guid deviceId, bool enabled);
     Task<bool> SetBedtimeWindowAsync(Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end);
     Task<bool> SetDeviceModeFlagsAsync(
         Guid parentId, Guid deviceId,

@@ -961,6 +961,7 @@
       request_status_declined: { en: 'declined', ru: 'отклонён', hy: 'մերժված է' },
       story_intro_label: { en: 'Spoken story intro (title + author)', ru: 'Озвученное вступление (название + автор)', hy: 'Հեքիաթի ձայնային ներածություն (վերնագիր + հեղինակ)' },
       bedtime_music_label: { en: 'Music at bedtime hours', ru: 'Музыка в часы сна', hy: 'Երաժշտություն քնի ժամերին' },
+      bedtime_music_needs_window: { en: 'set a bedtime window first', ru: 'сначала задайте часы сна', hy: 'նախ սահմանեք քնի ժամերը' },
       flag_on: { en: 'On ✓', ru: 'Вкл ✓', hy: 'Միացված ✓' },
       flag_off: { en: 'Off', ru: 'Выкл', hy: 'Անջատված' },
       view_music: { en: '🎵 Music →', ru: '🎵 Музыка →', hy: '🎵 Երաժշտություն →' },
@@ -2096,7 +2097,11 @@
           // B3 + Slice E — two simple flag toggles (spoken story intro,
           // bedtime music). PUT the opposite value, then reload the page
           // state, same shape as the pause control.
-          function flagToggle(labelKey, current, endpoint) {
+          // opts.requiresBedtime → the toggle is disabled (with a hint) until
+          // a bedtime window exists; opts.hintKey names the i18n hint. When
+          // the server still returns a 400 (race), its message is surfaced.
+          function flagToggle(labelKey, current, endpoint, opts) {
+            opts = opts || {};
             var row = document.createElement('div');
             row.className = 'ctl-row';
             var label = document.createElement('span');
@@ -2107,7 +2112,20 @@
             btn.type = 'button';
             btn.className = 'btn-ghost';
             btn.style.cssText = 'font-size:13px;';
+            var blocked = opts.requiresBedtime && !current
+              && !(d.bedtimeStart && d.bedtimeEnd);
             btn.textContent = current ? t('flag_on') : t('flag_off');
+            if (blocked) {
+              btn.disabled = true;
+              btn.style.opacity = '0.5';
+              btn.title = t(opts.hintKey);
+              var hint = document.createElement('span');
+              hint.style.cssText = 'font-size:11px;color:#a08;margin-left:8px;';
+              hint.textContent = t(opts.hintKey);
+              row.appendChild(btn);
+              row.appendChild(hint);
+              return row;
+            }
             btn.addEventListener('click', function () {
               var token = getToken();
               if (!token) { show('loginView'); return; }
@@ -2116,7 +2134,10 @@
                 headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ enabled: !current })
               }).then(function (res) {
-                if (res.ok) { openToy(d.deviceId); }
+                if (res.ok) { openToy(d.deviceId); return; }
+                res.json().then(function (data) {
+                  alert((data && data.error) || 'Could not change this setting.');
+                }).catch(function () {});
               }).catch(function () { /* quiet; state unchanged */ });
             });
             row.appendChild(btn);
@@ -2125,7 +2146,8 @@
           listEl.appendChild(flagToggle('story_intro_label',
             d.storyIntroEnabled !== false, 'story-intro'));
           listEl.appendChild(flagToggle('bedtime_music_label',
-            d.bedtimeMusicEnabled === true, 'bedtime-music'));
+            d.bedtimeMusicEnabled === true, 'bedtime-music',
+            { requiresBedtime: true, hintKey: 'bedtime_music_needs_window' }));
 
           // B4: bedtime window row — two time inputs + Save, sibling to
           // the clickable device row so inputs aren't nested in a button.
