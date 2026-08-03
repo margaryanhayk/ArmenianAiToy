@@ -1137,6 +1137,10 @@
     function clearToken() { sessionStorage.removeItem(TOKEN_KEY); }
 
     function show(viewId) {
+      // Leaving a view must silence any preview it was playing — otherwise
+      // a story keeps narrating from a page the parent has left.
+      // (Declared later in this IIFE; function declarations hoist.)
+      stopOtherPreviews(null);
       var ids = ['loginView', 'resetRequestView', 'resetPasswordView',
                  'verifyEmailRequestView', 'verifyEmailCompleteView',
                  'devicesView', 'toyView', 'summariesView', 'flaggedView',
@@ -3514,10 +3518,14 @@
           audio.controls = true;
           audio.autoplay = true;
           audio.src = url;
+          audio.setAttribute('data-areg-preview', '1');
           audio.style.cssText = 'max-width:100%;vertical-align:middle;';
           audio.addEventListener('ended', function () {
             URL.revokeObjectURL(url);
           });
+          // One at a time — starting this clip pauses any other player.
+          audio.addEventListener('play', function () { stopOtherPreviews(audio); });
+          stopOtherPreviews(audio);
           // Replace the button + status with the player so the row
           // doesn't pile up controls if the parent listens twice.
           wrap.innerHTML = '';
@@ -4051,6 +4059,19 @@
       return card;
     }
 
+    // Only ONE preview may sound at a time: starting a second story (or
+    // music track) pauses whatever was playing, instead of layering two
+    // narrations over each other (owner-reported 2026-08-04). Tracks the
+    // live <audio> element across cards and views.
+    function stopOtherPreviews(except) {
+      var audios = document.querySelectorAll('audio[data-areg-preview]');
+      for (var i = 0; i < audios.length; i++) {
+        if (audios[i] !== except) {
+          try { audios[i].pause(); } catch (e) { /* already gone */ }
+        }
+      }
+    }
+
     // Same JWT-fetched Blob pattern as the C2.1 message-audio Listen
     // button — the bytes never appear in the URL bar / history.
     function buildPreviewAffordance(url) {
@@ -4084,8 +4105,13 @@
             audio.controls = true;
             audio.autoplay = true;
             audio.src = blobUrl;
+            audio.setAttribute('data-areg-preview', '1');
             audio.style.cssText = 'max-width:100%;vertical-align:middle;';
             audio.addEventListener('ended', function () { URL.revokeObjectURL(blobUrl); });
+            // One at a time: stop any other preview the moment this one
+            // starts (covers autoplay AND a later manual re-play).
+            audio.addEventListener('play', function () { stopOtherPreviews(audio); });
+            stopOtherPreviews(audio);
             wrap.innerHTML = '';
             wrap.appendChild(audio);
           }).catch(function () {
