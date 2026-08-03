@@ -10,11 +10,16 @@ import {
 } from 'react-native';
 import {
   ConversationSummary,
+  errText,
   getConversations,
   getTodaySummary,
   TodaySummary,
   UnauthorizedError,
 } from '../api';
+import { Key, getLanguage, t, tf } from '../i18n';
+import { useLang } from '../useLang';
+
+const LOCALE: Record<string, string> = { en: 'en-GB', ru: 'ru-RU', hy: 'hy-AM' };
 
 type Props = {
   deviceId: string;
@@ -25,9 +30,15 @@ type Props = {
   onLogout: () => void;
 };
 
+// Dates follow the chosen language, not the phone's.
 function fmtTime(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+  if (Number.isNaN(d.getTime())) return iso;
+  try {
+    return d.toLocaleString(LOCALE[getLanguage()] ?? 'en-GB');
+  } catch {
+    return d.toLocaleString();
+  }
 }
 
 export default function ConversationsScreen({
@@ -38,6 +49,7 @@ export default function ConversationsScreen({
   onOpenFlagged,
   onLogout,
 }: Props) {
+  useLang();
   const [today, setToday] = useState<TodaySummary | null>(null);
   const [convos, setConvos] = useState<ConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +64,7 @@ export default function ConversationsScreen({
       setConvos(c);
     } catch (err) {
       if (err instanceof UnauthorizedError) return onLogout();
-      setError(err instanceof Error ? err.message : 'Failed to load.');
+      setError(errText(err, 'e_load'));
     }
   }, [deviceId, onLogout]);
 
@@ -74,47 +86,50 @@ export default function ConversationsScreen({
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Pressable onPress={onBack}>
-          <Text style={styles.back}>‹ Toys</Text>
+          <Text style={styles.back}>{t('back_toys')}</Text>
         </Pressable>
         <Pressable onPress={onOpenFlagged}>
-          <Text style={styles.flaggedLink}>⚑ Flagged</Text>
+          <Text style={styles.flaggedLink}>{t('flagged_link')}</Text>
         </Pressable>
       </View>
-      <Text style={styles.title}>{deviceName || 'Toy'}</Text>
+      <Text style={styles.title}>{deviceName || t('toy_word')}</Text>
 
       {loading ? (
         <ActivityIndicator size="large" color="#2c4a7a" style={{ marginTop: 40 }} />
       ) : (
         <FlatList
           data={convos}
+          extraData={getLanguage()}
           keyExtractor={(c) => c.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListHeaderComponent={
             <View>
               {today ? (
                 <View style={styles.todayCard}>
-                  <Text style={styles.todayTitle}>Today</Text>
+                  <Text style={styles.todayTitle}>{t('today')}</Text>
                   <View style={styles.todayRow}>
-                    <Stat label="Talks" value={today.conversationsCount} />
-                    <Stat label="Messages" value={today.messagesCount} />
-                    <Stat label="Flagged" value={today.flaggedMessagesCount} warn={today.flaggedMessagesCount > 0} />
+                    <Stat labelKey="stat_talks" value={today.conversationsCount} />
+                    <Stat labelKey="stat_messages" value={today.messagesCount} />
+                    <Stat
+                      labelKey="stat_flagged"
+                      value={today.flaggedMessagesCount}
+                      warn={today.flaggedMessagesCount > 0}
+                    />
                   </View>
                 </View>
               ) : null}
               {error ? <Text style={styles.error}>{error}</Text> : null}
-              <Text style={styles.sectionLabel}>Conversations</Text>
+              <Text style={styles.sectionLabel}>{t('section_conversations')}</Text>
             </View>
           }
           ListEmptyComponent={
-            <Text style={styles.empty}>
-              No conversations yet. They&apos;ll appear here after your child talks with the toy.
-            </Text>
+            <Text style={styles.empty}>{t('no_conversations')}</Text>
           }
           renderItem={({ item }) => (
             <Pressable style={styles.row} onPress={() => onOpenConversation(item.id)}>
               <View style={styles.rowTop}>
                 <Text style={styles.rowTime}>{fmtTime(item.startedAt)}</Text>
-                <Text style={styles.rowCount}>{item.messageCount} msg</Text>
+                <Text style={styles.rowCount}>{tf('msg_count', { n: item.messageCount })}</Text>
                 {item.flaggedMessageCount > 0 ? (
                   <Text style={styles.flag}>⚑ {item.flaggedMessageCount}</Text>
                 ) : null}
@@ -137,11 +152,11 @@ export default function ConversationsScreen({
   );
 }
 
-function Stat({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
+function Stat({ labelKey, value, warn }: { labelKey: Key; value: number; warn?: boolean }) {
   return (
     <View style={styles.stat}>
       <Text style={[styles.statValue, warn ? styles.statWarn : null]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statLabel}>{t(labelKey)}</Text>
     </View>
   );
 }

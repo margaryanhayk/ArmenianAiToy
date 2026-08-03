@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import {
+  errText,
   LinkedDevice,
   ModeFlags,
   setBedtime,
@@ -16,6 +17,8 @@ import {
   setPaused,
   UnauthorizedError,
 } from '../api';
+import { t, tf } from '../i18n';
+import { useLang } from '../useLang';
 
 type Props = {
   device: LinkedDevice;
@@ -37,6 +40,7 @@ export default function DeviceSettingsScreen({
   onLogout,
   onOpenProvisioning,
 }: Props) {
+  useLang();
   const [paused, setPausedState] = useState(device.isPaused);
   const [modes, setModes] = useState<ModeFlags>({
     story: device.storyEnabled,
@@ -56,14 +60,14 @@ export default function DeviceSettingsScreen({
   function fail(err: unknown) {
     if (err instanceof UnauthorizedError) return onLogout();
     setStatus(null);
-    setError(err instanceof Error ? err.message : 'Failed.');
+    setError(errText(err));
   }
 
   async function togglePause(value: boolean) {
     setPausedState(value);
     try {
       await setPaused(device.deviceId, value);
-      flash(value ? 'Toy paused.' : 'Toy resumed.');
+      flash(value ? t('toy_paused') : t('toy_resumed'));
       await onChanged();
     } catch (e) {
       setPausedState(!value);
@@ -76,7 +80,7 @@ export default function DeviceSettingsScreen({
     setModes(next);
     try {
       await setModeFlags(device.deviceId, next);
-      flash('Modes updated.');
+      flash(t('modes_updated'));
       await onChanged();
     } catch (e) {
       setModes(modes);
@@ -90,12 +94,12 @@ export default function DeviceSettingsScreen({
     const s = bedStart.trim();
     const e = bedEnd.trim();
     if ((s && !hhmm.test(s)) || (e && !hhmm.test(e))) {
-      setError('Use 24-hour time like 21:30.');
+      setError(t('e_time_format'));
       return;
     }
     try {
       await setBedtime(device.deviceId, s ? `${s}:00` : null, e ? `${e}:00` : null);
-      flash(s && e ? `Bedtime set ${s}–${e}.` : 'Bedtime turned off.');
+      flash(s && e ? tf('bedtime_set', { start: s, end: e }) : t('bedtime_off'));
       await onChanged();
     } catch (err) {
       fail(err);
@@ -107,7 +111,7 @@ export default function DeviceSettingsScreen({
     setBedEnd('');
     try {
       await setBedtime(device.deviceId, null, null);
-      flash('Bedtime turned off.');
+      flash(t('bedtime_off'));
       await onChanged();
     } catch (err) {
       fail(err);
@@ -117,21 +121,21 @@ export default function DeviceSettingsScreen({
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
       <Pressable onPress={onBack}>
-        <Text style={styles.back}>‹ Toys</Text>
+        <Text style={styles.back}>{t('back_toys')}</Text>
       </Pressable>
-      <Text style={styles.title}>{device.deviceName || 'Toy'} · Settings</Text>
+      <Text style={styles.title}>{tf('settings_of', { name: device.deviceName || t('toy_word') })}</Text>
 
       {/* Wi-Fi setup over Bluetooth */}
       <Pressable style={styles.wifiBtn} onPress={onOpenProvisioning}>
-        <Text style={styles.wifiBtnText}>📶 Connect to Wi-Fi (Bluetooth)</Text>
+        <Text style={styles.wifiBtnText}>{t('wifi_btn')}</Text>
       </Pressable>
 
       {/* Pause */}
       <View style={styles.card}>
         <View style={styles.rowBetween}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>Pause the toy</Text>
-            <Text style={styles.rowHint}>Stops all play right now until you turn it back on.</Text>
+            <Text style={styles.rowTitle}>{t('pause_title')}</Text>
+            <Text style={styles.rowHint}>{t('pause_hint')}</Text>
           </View>
           <Switch value={paused} onValueChange={togglePause} />
         </View>
@@ -139,27 +143,27 @@ export default function DeviceSettingsScreen({
 
       {/* Modes */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>What the toy can do</Text>
+        <Text style={styles.cardTitle}>{t('modes_title')}</Text>
         {(
           [
-            ['story', 'Story'],
-            ['game', 'Game'],
-            ['riddle', 'Riddle'],
-            ['curiosity', 'Curiosity questions'],
-          ] as [keyof ModeFlags, string][]
-        ).map(([key, label]) => (
+            ['story', 'mode_story'],
+            ['game', 'mode_game'],
+            ['riddle', 'mode_riddle'],
+            ['curiosity', 'mode_curiosity'],
+          ] as [keyof ModeFlags, 'mode_story' | 'mode_game' | 'mode_riddle' | 'mode_curiosity'][]
+        ).map(([key, labelKey]) => (
           <View key={key} style={styles.rowBetween}>
-            <Text style={styles.modeLabel}>{label}</Text>
+            <Text style={styles.modeLabel}>{t(labelKey)}</Text>
             <Switch value={modes[key]} onValueChange={(v) => toggleMode(key, v)} />
           </View>
         ))}
-        <Text style={styles.rowHint}>Bedtime calm-down stays available no matter what.</Text>
+        <Text style={styles.rowHint}>{t('modes_hint')}</Text>
       </View>
 
       {/* Bedtime */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Quiet hours (bedtime)</Text>
-        <Text style={styles.rowHint}>The toy won&apos;t respond during this window. 24-hour time.</Text>
+        <Text style={styles.cardTitle}>{t('bedtime_title')}</Text>
+        <Text style={styles.rowHint}>{t('bedtime_hint')}</Text>
         <View style={styles.timeRow}>
           <TextInput
             style={styles.timeInput}
@@ -168,7 +172,7 @@ export default function DeviceSettingsScreen({
             onChangeText={setBedStart}
             maxLength={5}
           />
-          <Text style={styles.dash}>to</Text>
+          <Text style={styles.dash}>{t('bedtime_to')}</Text>
           <TextInput
             style={styles.timeInput}
             placeholder="07:00"
@@ -179,10 +183,10 @@ export default function DeviceSettingsScreen({
         </View>
         <View style={styles.btnRow}>
           <Pressable style={styles.primaryBtn} onPress={saveBedtime}>
-            <Text style={styles.primaryBtnText}>Save</Text>
+            <Text style={styles.primaryBtnText}>{t('save')}</Text>
           </Pressable>
           <Pressable style={styles.secondaryBtn} onPress={clearBedtime}>
-            <Text style={styles.secondaryBtnText}>Turn off</Text>
+            <Text style={styles.secondaryBtnText}>{t('turn_off')}</Text>
           </Pressable>
         </View>
       </View>

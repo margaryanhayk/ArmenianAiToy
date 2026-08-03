@@ -2,6 +2,7 @@
 // verified live end-to-end during the bench session (see PLATFORM-ARCHITECTURE.txt).
 import { API_BASE_URL } from './config';
 import { getToken } from './auth';
+import { Key, t } from './i18n';
 
 /** Thrown on a 401 so screens can route back to login. */
 export class UnauthorizedError extends Error {
@@ -9,6 +10,25 @@ export class UnauthorizedError extends Error {
     super('Session expired');
     this.name = 'UnauthorizedError';
   }
+}
+
+/**
+ * A failure the parent will be shown. It carries a translation key rather
+ * than an English sentence, because whatever this layer throws ends up on
+ * screen verbatim — and the app is used in three languages.
+ */
+export class ApiError extends Error {
+  readonly key: Key;
+  constructor(key: Key) {
+    super(key);
+    this.name = 'ApiError';
+    this.key = key;
+  }
+}
+
+/** Turn anything thrown into one sentence in the parent's language. */
+export function errText(err: unknown, fallback: Key = 'e_generic'): string {
+  return err instanceof ApiError ? t(err.key) : t(fallback);
 }
 
 export type LinkedDeviceChild = {
@@ -59,10 +79,10 @@ export async function login(email: string, password: string): Promise<string> {
       body: JSON.stringify({ email, password }),
     });
   } catch {
-    throw new Error(`Can't reach the server at ${API_BASE_URL}. Check Wi-Fi.`);
+    throw new ApiError('e_unreachable');
   }
-  if (res.status === 401) throw new Error('That email or password is incorrect.');
-  if (!res.ok) throw new Error(`Server said HTTP ${res.status} (not a password problem).`);
+  if (res.status === 401) throw new ApiError('e_bad_credentials');
+  if (!res.ok) throw new ApiError('e_generic');
   const data = (await res.json()) as { token: string };
   return data.token;
 }
@@ -75,11 +95,7 @@ export async function register(email: string, password: string): Promise<void> {
     body: JSON.stringify({ email, password, acceptedTerms: true }),
   });
   if (!res.ok) {
-    const msg =
-      res.status === 400
-        ? 'Please use a valid email and a password of at least 8 characters.'
-        : `Registration failed (HTTP ${res.status}).`;
-    throw new Error(msg);
+    throw new ApiError(res.status === 400 ? 'e_register_shape' : 'e_generic');
   }
 }
 
@@ -89,7 +105,7 @@ export async function getDevices(): Promise<LinkedDevice[]> {
     headers: await authHeader(),
   });
   if (res.status === 401) throw new UnauthorizedError();
-  if (!res.ok) throw new Error(`Could not load devices (HTTP ${res.status}).`);
+  if (!res.ok) throw new ApiError('e_load');
   const data = (await res.json()) as { devices?: LinkedDevice[] };
   return data.devices ?? [];
 }
@@ -103,10 +119,10 @@ export async function claimDevice(deviceId: string, claimCode: string): Promise<
   });
   if (res.status === 401) throw new UnauthorizedError();
   if (res.status === 429) {
-    throw new Error('Too many tries. Please wait a moment and retry.');
+    throw new ApiError('e_too_many');
   }
   if (!res.ok) {
-    throw new Error("That code didn't work. Check the code on your toy and try again.");
+    throw new ApiError('e_bad_code');
   }
 }
 
@@ -118,8 +134,8 @@ export async function renameDevice(deviceId: string, name: string): Promise<void
     body: JSON.stringify({ name }),
   });
   if (res.status === 401) throw new UnauthorizedError();
-  if (res.status === 400) throw new Error('Name must be 1–60 characters.');
-  if (!res.ok) throw new Error(`Rename failed (HTTP ${res.status}).`);
+  if (res.status === 400) throw new ApiError('e_name_length');
+  if (!res.ok) throw new ApiError('e_generic');
 }
 
 /** PUT /api/parents/devices/{id}/revoke. Kill-switch; reversible. */
@@ -130,7 +146,7 @@ export async function setRevoked(deviceId: string, revoked: boolean): Promise<vo
     body: JSON.stringify({ revoked }),
   });
   if (res.status === 401) throw new UnauthorizedError();
-  if (!res.ok) throw new Error(`${revoked ? 'Revoke' : 'Restore'} failed (HTTP ${res.status}).`);
+  if (!res.ok) throw new ApiError('e_generic');
 }
 
 async function getJson<T>(path: string): Promise<T> {
@@ -138,10 +154,10 @@ async function getJson<T>(path: string): Promise<T> {
   try {
     res = await fetch(url(path), { headers: await authHeader() });
   } catch {
-    throw new Error(`Can't reach the server at ${API_BASE_URL}.`);
+    throw new ApiError('e_unreachable');
   }
   if (res.status === 401) throw new UnauthorizedError();
-  if (!res.ok) throw new Error(`Request failed (HTTP ${res.status}).`);
+  if (!res.ok) throw new ApiError('e_generic');
   return (await res.json()) as T;
 }
 
@@ -207,10 +223,10 @@ async function mutate(path: string, method: 'POST' | 'PUT', body?: unknown): Pro
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new Error(`Can't reach the server at ${API_BASE_URL}.`);
+    throw new ApiError('e_unreachable');
   }
   if (res.status === 401) throw new UnauthorizedError();
-  if (!res.ok) throw new Error(`Request failed (HTTP ${res.status}).`);
+  if (!res.ok) throw new ApiError('e_generic');
 }
 
 /** POST /api/parents/devices/{id}/pause | /resume — instant quiet override. */
@@ -276,11 +292,11 @@ export async function fetchExport(): Promise<string> {
   try {
     res = await fetch(url('/api/parents/export'), { headers: await authHeader() });
   } catch {
-    throw new Error(`Can't reach the server at ${API_BASE_URL}.`);
+    throw new ApiError('e_unreachable');
   }
   if (res.status === 401) throw new UnauthorizedError();
-  if (res.status === 429) throw new Error('Please wait a minute before exporting again.');
-  if (!res.ok) throw new Error(`Export failed (HTTP ${res.status}).`);
+  if (res.status === 429) throw new ApiError('e_export_wait');
+  if (!res.ok) throw new ApiError('e_generic');
   return res.text();
 }
 
@@ -294,13 +310,13 @@ export async function changePassword(current: string, next: string): Promise<voi
       body: JSON.stringify({ currentPassword: current, newPassword: next }),
     });
   } catch {
-    throw new Error(`Can't reach the server at ${API_BASE_URL}.`);
+    throw new ApiError('e_unreachable');
   }
   if (res.status === 401) throw new UnauthorizedError();
   if (res.status === 400) {
-    throw new Error('Current password is wrong, or the new one is under 8 characters / unchanged.');
+    throw new ApiError('e_password_rules');
   }
-  if (!res.ok) throw new Error(`Change failed (HTTP ${res.status}).`);
+  if (!res.ok) throw new ApiError('e_generic');
 }
 
 /** DELETE /api/parents/account — permanent; requires the current password. */
@@ -313,9 +329,9 @@ export async function deleteAccount(currentPassword: string): Promise<void> {
       body: JSON.stringify({ currentPassword }),
     });
   } catch {
-    throw new Error(`Can't reach the server at ${API_BASE_URL}.`);
+    throw new ApiError('e_unreachable');
   }
   if (res.status === 401) throw new UnauthorizedError();
-  if (res.status === 400) throw new Error('Password is incorrect.');
-  if (!res.ok) throw new Error(`Delete failed (HTTP ${res.status}).`);
+  if (res.status === 400) throw new ApiError('e_password_wrong');
+  if (!res.ok) throw new ApiError('e_generic');
 }

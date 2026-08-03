@@ -12,12 +12,15 @@ import {
 } from 'react-native';
 import {
   claimDevice,
+  errText,
   getDevices,
   LinkedDevice,
   renameDevice,
   setRevoked,
   UnauthorizedError,
 } from '../api';
+import { getLanguage, t, tf } from '../i18n';
+import { useLang } from '../useLang';
 
 type Props = {
   onLogout: () => void;
@@ -32,6 +35,7 @@ export default function DevicesScreen({
   onOpenSettings,
   onOpenAccount,
 }: Props) {
+  useLang();
   const [devices, setDevices] = useState<LinkedDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -53,7 +57,7 @@ export default function DevicesScreen({
         onLogout();
         return;
       }
-      setError(err instanceof Error ? err.message : 'Failed to load.');
+      setError(errText(err, 'e_load'));
     }
   }, [onLogout]);
 
@@ -74,7 +78,7 @@ export default function DevicesScreen({
   async function handleClaim() {
     setClaimMsg(null);
     if (!claimId.trim() || !claimCode.trim()) {
-      setClaimMsg('Device ID and pairing code are required.');
+      setClaimMsg(t('e_pair_fields'));
       return;
     }
     setClaimBusy(true);
@@ -86,7 +90,7 @@ export default function DevicesScreen({
       await load();
     } catch (err) {
       if (err instanceof UnauthorizedError) return onLogout();
-      setClaimMsg(err instanceof Error ? err.message : 'Pairing failed.');
+      setClaimMsg(errText(err));
     } finally {
       setClaimBusy(false);
     }
@@ -99,11 +103,15 @@ export default function DevicesScreen({
       return;
     }
     Alert.alert(
-      'Revoke access?',
-      `${d.deviceName || 'This toy'} will be signed out and stop working until it is set up again. Use this if it is lost or stolen. You can restore access later.`,
+      t('confirm_revoke_title'),
+      tf('confirm_revoke_body', { name: d.deviceName || t('this_toy') }),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Revoke', style: 'destructive', onPress: () => void doRevoke(d.deviceId, true) },
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('revoke_access'),
+          style: 'destructive',
+          onPress: () => void doRevoke(d.deviceId, true),
+        },
       ],
     );
   }
@@ -114,7 +122,7 @@ export default function DevicesScreen({
       await load();
     } catch (err) {
       if (err instanceof UnauthorizedError) return onLogout();
-      setError(err instanceof Error ? err.message : 'Failed.');
+      setError(errText(err));
     }
   }
 
@@ -129,24 +137,22 @@ export default function DevicesScreen({
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.title}>Your toys</Text>
+        <Text style={styles.title}>{t('your_toys')}</Text>
         <Pressable onPress={onOpenAccount}>
-          <Text style={styles.link}>Account</Text>
+          <Text style={styles.link}>{t('account')}</Text>
         </Pressable>
       </View>
 
       <Pressable style={styles.addBtn} onPress={() => setShowClaim((v) => !v)}>
-        <Text style={styles.addBtnText}>{showClaim ? '× Close' : '＋ Add a toy'}</Text>
+        <Text style={styles.addBtnText}>{showClaim ? t('close_form') : t('add_toy')}</Text>
       </Pressable>
 
       {showClaim ? (
         <View style={styles.claimBox}>
-          <Text style={styles.claimHelp}>
-            Enter the pairing code from your toy&apos;s box or setup card.
-          </Text>
+          <Text style={styles.claimHelp}>{t('claim_help')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Device ID"
+            placeholder={t('ph_device_id')}
             autoCapitalize="none"
             autoCorrect={false}
             value={claimId}
@@ -155,7 +161,7 @@ export default function DevicesScreen({
           />
           <TextInput
             style={styles.input}
-            placeholder="Pairing code"
+            placeholder={t('ph_pairing_code')}
             autoCapitalize="characters"
             autoCorrect={false}
             value={claimCode}
@@ -170,7 +176,7 @@ export default function DevicesScreen({
             {claimBusy ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.primaryBtnText}>Pair toy</Text>
+              <Text style={styles.primaryBtnText}>{t('pair_toy')}</Text>
             )}
           </Pressable>
           {claimMsg ? <Text style={styles.error}>{claimMsg}</Text> : null}
@@ -181,10 +187,11 @@ export default function DevicesScreen({
 
       <FlatList
         data={devices}
+        extraData={getLanguage()}
         keyExtractor={(d) => d.deviceId}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
-          <Text style={styles.empty}>No toys yet. Tap “＋ Add a toy” to pair one.</Text>
+          <Text style={styles.empty}>{t('no_toys')}</Text>
         }
         renderItem={({ item }) => (
           <DeviceCard
@@ -228,33 +235,39 @@ function DeviceCard({
       await onRenamed();
     } catch (err) {
       if (err instanceof UnauthorizedError) return onLogout();
-      Alert.alert('Rename failed', err instanceof Error ? err.message : 'Try again.');
+      Alert.alert(t('rename_failed'), errText(err));
     } finally {
       setSaving(false);
     }
   }
 
   const childLine = device.children
-    .map((c) => (c.age != null ? `${c.name} (age ${c.age})` : c.name))
+    .map((c) => (c.age != null ? tf('child_with_age', { name: c.name, n: c.age }) : c.name))
     .join(', ');
 
   return (
     <View style={styles.card}>
+      {/* The card never showed the toy's own name — only an editable input
+          further down — so two toys could only be told apart by their
+          children's names. */}
+      <Text style={styles.cardName}>
+        {'🧸 ' + (device.deviceName || t('toy_word'))}
+      </Text>
       <View style={styles.cardTop}>
         <View style={[styles.dot, device.isOnline ? styles.dotOn : styles.dotOff]} />
-        <Text style={styles.dotLabel}>{device.isOnline ? 'Online' : 'Offline'}</Text>
-        {device.isRevoked ? <Text style={styles.revokedTag}>Revoked</Text> : null}
-        {device.isPaused ? <Text style={styles.pausedTag}>Paused</Text> : null}
+        <Text style={styles.dotLabel}>{device.isOnline ? t('online') : t('offline')}</Text>
+        {device.isRevoked ? <Text style={styles.revokedTag}>{t('revoked')}</Text> : null}
+        {device.isPaused ? <Text style={styles.pausedTag}>{t('paused')}</Text> : null}
       </View>
 
       {childLine ? <Text style={styles.children}>{childLine}</Text> : null}
 
       <View style={styles.actionRow}>
         <Pressable style={styles.activityBtn} onPress={onOpen}>
-          <Text style={styles.activityText}>See activity →</Text>
+          <Text style={styles.activityText}>{t('see_activity')}</Text>
         </Pressable>
         <Pressable style={styles.settingsBtn} onPress={onSettings}>
-          <Text style={styles.activityText}>Settings →</Text>
+          <Text style={styles.activityText}>{t('open_settings')}</Text>
         </Pressable>
       </View>
 
@@ -264,17 +277,17 @@ function DeviceCard({
           value={name}
           onChangeText={setName}
           maxLength={60}
-          placeholder="Toy name"
+          placeholder={t('ph_toy_name')}
           editable={!saving}
         />
         <Pressable style={styles.saveBtn} onPress={save} disabled={saving}>
-          <Text style={styles.saveBtnText}>{saving ? '…' : 'Save'}</Text>
+          <Text style={styles.saveBtnText}>{saving ? '…' : t('save')}</Text>
         </Pressable>
       </View>
 
       <Pressable style={styles.revokeBtn} onPress={() => onRevoke(device)}>
         <Text style={[styles.revokeText, { color: device.isRevoked ? '#2f6b2f' : '#a02622' }]}>
-          {device.isRevoked ? 'Restore access' : 'Revoke access'}
+          {device.isRevoked ? t('restore_access') : t('revoke_access')}
         </Text>
       </Pressable>
     </View>
@@ -312,6 +325,7 @@ const styles = StyleSheet.create({
     marginVertical: 6,
     backgroundColor: '#fafafa',
   },
+  cardName: { fontSize: 16, fontWeight: '700', color: '#222', marginBottom: 6 },
   cardTop: { flexDirection: 'row', alignItems: 'center' },
   dot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
   dotOn: { backgroundColor: '#5aa45a' },

@@ -13,12 +13,15 @@ import {
 import {
   changePassword,
   deleteAccount,
+  errText,
   fetchExport,
   getMe,
   Me,
   requestVerification,
   UnauthorizedError,
 } from '../api';
+import { LANG_NAMES, LANGS, getLanguage, setLanguage, t, tf } from '../i18n';
+import { useLang } from '../useLang';
 
 type Props = {
   onBack: () => void;
@@ -26,6 +29,7 @@ type Props = {
 };
 
 export default function AccountScreen({ onBack, onLogout }: Props) {
+  useLang();
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
@@ -41,7 +45,7 @@ export default function AccountScreen({ onBack, onLogout }: Props) {
         setMe(await getMe());
       } catch (err) {
         if (err instanceof UnauthorizedError) return onLogout();
-        setError(err instanceof Error ? err.message : 'Failed to load.');
+        setError(errText(err, 'e_load'));
       } finally {
         setLoading(false);
       }
@@ -55,14 +59,14 @@ export default function AccountScreen({ onBack, onLogout }: Props) {
   function fail(err: unknown) {
     if (err instanceof UnauthorizedError) return onLogout();
     setStatus(null);
-    setError(err instanceof Error ? err.message : 'Failed.');
+    setError(errText(err));
   }
 
   async function sendVerification() {
     if (!me) return;
     try {
       await requestVerification(me.email);
-      ok('If your email needs verifying, a link has been sent. Check your inbox.');
+      ok(t('verification_sent'));
     } catch (err) {
       fail(err);
     }
@@ -87,9 +91,9 @@ export default function AccountScreen({ onBack, onLogout }: Props) {
         a.download = 'areg-export.json';
         a.click();
         g.URL.revokeObjectURL(href);
-        ok('Your data downloaded as areg-export.json.');
+        ok(t('export_done_web'));
       } else {
-        ok(`Export ready (${text.length} characters). Download is available in the web app.`);
+        ok(tf('export_ready_native', { n: text.length }));
       }
     } catch (err) {
       fail(err);
@@ -100,7 +104,7 @@ export default function AccountScreen({ onBack, onLogout }: Props) {
 
   async function doChangePassword() {
     if (!curPw || !newPw) {
-      setError('Enter your current and new password.');
+      setError(t('e_both_passwords'));
       return;
     }
     setBusy(true);
@@ -108,7 +112,7 @@ export default function AccountScreen({ onBack, onLogout }: Props) {
       await changePassword(curPw, newPw);
       setCurPw('');
       setNewPw('');
-      ok('Password changed.');
+      ok(t('password_changed'));
     } catch (err) {
       fail(err);
     } finally {
@@ -118,16 +122,16 @@ export default function AccountScreen({ onBack, onLogout }: Props) {
 
   function confirmDelete() {
     if (!curPw) {
-      setError('Type your current password above first, then tap Delete.');
+      setError(t('e_password_first'));
       return;
     }
     Alert.alert(
-      'Delete your account?',
-      'This permanently deletes your account and any toys only you own, with their conversations. This cannot be undone.',
+      t('confirm_delete_title'),
+      t('confirm_delete_body'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('delete_word'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -153,36 +157,53 @@ export default function AccountScreen({ onBack, onLogout }: Props) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
       <Pressable onPress={onBack}>
-        <Text style={styles.back}>‹ Toys</Text>
+        <Text style={styles.back}>{t('back_toys')}</Text>
       </Pressable>
-      <Text style={styles.title}>Account</Text>
+      <Text style={styles.title}>{t('account_title')}</Text>
 
       <View style={styles.card}>
-        <Text style={styles.label}>Email</Text>
+        <Text style={styles.label}>{t('email_label')}</Text>
         <Text style={styles.value}>{me?.email}</Text>
         <Text style={[styles.verify, me?.emailVerifiedAt ? styles.verified : styles.unverified]}>
-          {me?.emailVerifiedAt ? '✓ Email verified' : 'Email not verified'}
+          {me?.emailVerifiedAt ? t('email_verified') : t('email_unverified')}
         </Text>
         {!me?.emailVerifiedAt ? (
           <Pressable style={styles.secondaryBtn} onPress={sendVerification}>
-            <Text style={styles.secondaryBtnText}>Send verification email</Text>
+            <Text style={styles.secondaryBtnText}>{t('send_verification')}</Text>
           </Pressable>
         ) : null}
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Your data</Text>
-        <Text style={styles.hint}>Download everything we hold for your account as a file.</Text>
+        <Text style={styles.cardTitle}>{t('language')}</Text>
+        <View style={styles.langRow}>
+          {LANGS.map((l) => (
+            <Pressable
+              key={l}
+              style={[styles.langPill, getLanguage() === l && styles.langPillOn]}
+              onPress={() => setLanguage(l)}
+            >
+              <Text style={[styles.langText, getLanguage() === l && styles.langTextOn]}>
+                {LANG_NAMES[l]}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>{t('your_data')}</Text>
+        <Text style={styles.hint}>{t('export_hint')}</Text>
         <Pressable style={styles.secondaryBtn} onPress={doExport} disabled={busy}>
-          <Text style={styles.secondaryBtnText}>Export my data</Text>
+          <Text style={styles.secondaryBtnText}>{t('export_btn')}</Text>
         </Pressable>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Change password</Text>
+        <Text style={styles.cardTitle}>{t('change_password_title')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="Current password"
+          placeholder={t('ph_current_pw')}
           secureTextEntry
           value={curPw}
           onChangeText={setCurPw}
@@ -190,28 +211,26 @@ export default function AccountScreen({ onBack, onLogout }: Props) {
         />
         <TextInput
           style={styles.input}
-          placeholder="New password (min 8 characters)"
+          placeholder={t('ph_new_pw')}
           secureTextEntry
           value={newPw}
           onChangeText={setNewPw}
           editable={!busy}
         />
         <Pressable style={styles.primaryBtn} onPress={doChangePassword} disabled={busy}>
-          <Text style={styles.primaryBtnText}>Update password</Text>
+          <Text style={styles.primaryBtnText}>{t('update_password')}</Text>
         </Pressable>
       </View>
 
       <Pressable style={styles.logoutBtn} onPress={onLogout}>
-        <Text style={styles.logoutText}>Log out</Text>
+        <Text style={styles.logoutText}>{t('log_out')}</Text>
       </Pressable>
 
       <View style={styles.dangerCard}>
-        <Text style={styles.dangerTitle}>Delete account</Text>
-        <Text style={styles.hint}>
-          Permanent. Type your current password above, then confirm.
-        </Text>
+        <Text style={styles.dangerTitle}>{t('delete_title')}</Text>
+        <Text style={styles.hint}>{t('delete_hint')}</Text>
         <Pressable style={styles.dangerBtn} onPress={confirmDelete}>
-          <Text style={styles.dangerBtnText}>Delete my account</Text>
+          <Text style={styles.dangerBtnText}>{t('delete_btn')}</Text>
         </Pressable>
       </View>
 
@@ -271,6 +290,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dangerBtnText: { color: '#a02622', fontWeight: '700' },
+  langRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  langPill: {
+    borderWidth: 1,
+    borderColor: '#d5d5d5',
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  langPillOn: { borderColor: '#2c4a7a', backgroundColor: '#eef3fb' },
+  langText: { color: '#666', fontSize: 13 },
+  langTextOn: { color: '#2c4a7a', fontWeight: '700' },
   status: { color: '#2f6b2f', marginTop: 12 },
   error: { color: '#a02622', marginTop: 12 },
 });

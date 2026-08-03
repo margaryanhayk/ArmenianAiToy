@@ -1,5 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinkedDevice } from '../api';
+import { t } from '../i18n';
+import { useLang } from '../useLang';
 
 type Props = {
   device: LinkedDevice;
@@ -10,20 +12,15 @@ type Props = {
 // provisioning. Metro picks this file on web so the native ESP module is never
 // bundled there. Shows how to set up Wi-Fi for now.
 export default function ProvisioningScreen({ device, onBack }: Props) {
+  useLang();
   return (
     <View style={styles.container}>
       <Pressable onPress={onBack}>
-        <Text style={styles.back}>‹ Settings</Text>
+        <Text style={styles.back}>{t('back_settings')}</Text>
       </Pressable>
-      <Text style={styles.title}>Connect to Wi-Fi</Text>
+      <Text style={styles.title}>{t('wifi_btn')}</Text>
       <View style={styles.card}>
-        <Text style={styles.body}>
-          Bluetooth setup runs on the phone app (the Areg dev/store build), not in
-          this web preview.
-        </Text>
-        <Text style={styles.body}>For now you can set up the toy&apos;s Wi-Fi with the free</Text>
-        <Text style={styles.strong}>ESP BLE Provisioning</Text>
-        <Text style={styles.body}>app — pairing code (PoP):</Text>
+        <Text style={styles.body}>{t('wifi_web_note')}</Text>
         <Text style={styles.code}>areg-pair</Text>
       </View>
     </View>

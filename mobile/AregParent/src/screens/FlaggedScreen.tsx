@@ -8,7 +8,11 @@ import {
   Text,
   View,
 } from 'react-native';
-import { FlaggedMessage, getFlagged, UnauthorizedError } from '../api';
+import { errText, FlaggedMessage, getFlagged, UnauthorizedError } from '../api';
+import { getLanguage, t, tf } from '../i18n';
+import { useLang } from '../useLang';
+
+const LOCALE: Record<string, string> = { en: 'en-GB', ru: 'ru-RU', hy: 'hy-AM' };
 
 type Props = {
   deviceId: string;
@@ -20,7 +24,12 @@ type Props = {
 
 function fmtTime(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+  if (Number.isNaN(d.getTime())) return iso;
+  try {
+    return d.toLocaleString(LOCALE[getLanguage()] ?? 'en-GB');
+  } catch {
+    return d.toLocaleString();
+  }
 }
 
 export default function FlaggedScreen({
@@ -30,6 +39,7 @@ export default function FlaggedScreen({
   onOpenConversation,
   onLogout,
 }: Props) {
+  useLang();
   const [items, setItems] = useState<FlaggedMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -41,7 +51,7 @@ export default function FlaggedScreen({
       setItems(await getFlagged(deviceId));
     } catch (err) {
       if (err instanceof UnauthorizedError) return onLogout();
-      setError(err instanceof Error ? err.message : 'Failed to load.');
+      setError(errText(err, 'e_load'));
     }
   }, [deviceId, onLogout]);
 
@@ -62,39 +72,39 @@ export default function FlaggedScreen({
   return (
     <View style={styles.container}>
       <Pressable onPress={onBack}>
-        <Text style={styles.back}>‹ Activity</Text>
+        <Text style={styles.back}>{t('back_activity')}</Text>
       </Pressable>
-      <Text style={styles.title}>Flagged · {deviceName || 'Toy'}</Text>
+      <Text style={styles.title}>{tf('flagged_of', { name: deviceName || t('toy_word') })}</Text>
 
       {loading ? (
         <ActivityIndicator size="large" color="#2c4a7a" style={{ marginTop: 40 }} />
       ) : (
         <FlatList
           data={items}
+          extraData={getLanguage()}
           keyExtractor={(m) => m.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListHeaderComponent={error ? <Text style={styles.error}>{error}</Text> : null}
           ListEmptyComponent={
             <View style={styles.clear}>
               <Text style={styles.clearIcon}>✓</Text>
-              <Text style={styles.clearText}>All clear</Text>
-              <Text style={styles.clearHint}>
-                Nothing has been flagged on this toy. Anything the safety system
-                catches will show up here.
-              </Text>
+              <Text style={styles.clearText}>{t('all_clear')}</Text>
+              <Text style={styles.clearHint}>{t('all_clear_hint')}</Text>
             </View>
           }
           renderItem={({ item }) => (
             <Pressable style={styles.row} onPress={() => onOpenConversation(item.conversationId)}>
               <View style={styles.rowTop}>
-                <Text style={styles.flag}>⚑ flagged</Text>
-                <Text style={styles.role}>{item.role}</Text>
+                <Text style={styles.flag}>{t('flagged_tag')}</Text>
+                <Text style={styles.role}>
+                  {item.role === 'user' ? t('role_child') : t('role_toy')}
+                </Text>
                 <Text style={styles.time}>{fmtTime(item.timestamp)}</Text>
               </View>
               <Text style={styles.content} numberOfLines={3}>
                 {item.content?.trim()}
               </Text>
-              <Text style={styles.openHint}>Open conversation →</Text>
+              <Text style={styles.openHint}>{t('open_conversation')}</Text>
             </Pressable>
           )}
         />

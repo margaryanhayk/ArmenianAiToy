@@ -3,9 +3,14 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import {
   ConversationDetail,
   ConversationMessage,
+  errText,
   getConversation,
   UnauthorizedError,
 } from '../api';
+import { getLanguage, t } from '../i18n';
+import { useLang } from '../useLang';
+
+const LOCALE: Record<string, string> = { en: 'en-GB', ru: 'ru-RU', hy: 'hy-AM' };
 
 type Props = {
   conversationId: string;
@@ -15,10 +20,16 @@ type Props = {
 
 function fmtTime(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleTimeString();
+  if (Number.isNaN(d.getTime())) return iso;
+  try {
+    return d.toLocaleTimeString(LOCALE[getLanguage()] ?? 'en-GB');
+  } catch {
+    return d.toLocaleTimeString();
+  }
 }
 
 export default function ConversationDetailScreen({ conversationId, onBack, onLogout }: Props) {
+  useLang();
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +40,7 @@ export default function ConversationDetailScreen({ conversationId, onBack, onLog
       setDetail(await getConversation(conversationId));
     } catch (err) {
       if (err instanceof UnauthorizedError) return onLogout();
-      setError(err instanceof Error ? err.message : 'Failed to load.');
+      setError(errText(err, 'e_load'));
     }
   }, [conversationId, onLogout]);
 
@@ -44,9 +55,9 @@ export default function ConversationDetailScreen({ conversationId, onBack, onLog
   return (
     <View style={styles.container}>
       <Pressable onPress={onBack}>
-        <Text style={styles.back}>‹ Back</Text>
+        <Text style={styles.back}>{t('back_plain')}</Text>
       </Pressable>
-      <Text style={styles.title}>Conversation</Text>
+      <Text style={styles.title}>{t('conversation_title')}</Text>
 
       {loading ? (
         <ActivityIndicator size="large" color="#2c4a7a" style={{ marginTop: 40 }} />
@@ -55,9 +66,10 @@ export default function ConversationDetailScreen({ conversationId, onBack, onLog
       ) : (
         <FlatList
           data={detail?.messages ?? []}
+          extraData={getLanguage()}
           keyExtractor={(m) => m.id}
           renderItem={({ item }) => <Bubble message={item} />}
-          ListEmptyComponent={<Text style={styles.empty}>No messages.</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>{t('no_messages')}</Text>}
         />
       )}
     </View>
@@ -69,7 +81,7 @@ function Bubble({ message }: { message: ConversationMessage }) {
   const flagged = message.safetyFlag !== 0;
   return (
     <View style={[styles.bubbleWrap, isChild ? styles.wrapRight : styles.wrapLeft]}>
-      <Text style={styles.who}>{isChild ? '🧒 Child' : '🧸 Areg'}</Text>
+      <Text style={styles.who}>{isChild ? t('who_child') : t('who_toy')}</Text>
       <View
         style={[
           styles.bubble,
@@ -81,7 +93,7 @@ function Bubble({ message }: { message: ConversationMessage }) {
       </View>
       <Text style={styles.time}>
         {fmtTime(message.timestamp)}
-        {flagged ? '  ·  ⚑ flagged' : ''}
+        {flagged ? '  ·  ' + t('flagged_tag') : ''}
       </Text>
     </View>
   );

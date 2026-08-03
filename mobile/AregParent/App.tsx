@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { clearToken, getToken, saveToken } from './src/auth';
+import { loadLanguage } from './src/i18n';
 import { LinkedDevice } from './src/api';
 import LoginScreen from './src/screens/LoginScreen';
 import DevicesScreen from './src/screens/DevicesScreen';
@@ -127,9 +128,12 @@ export default function App() {
   const [booting, setBooting] = useState(true);
   const [signedIn, setSignedIn] = useState(false);
 
-  // Restore an existing session on launch.
+  // Restore the saved language and an existing session on launch. The
+  // language must be read BEFORE the first render, or the parent would see
+  // one frame of English before their choice takes effect.
   useEffect(() => {
     (async () => {
+      await loadLanguage();
       const token = await getToken();
       setSignedIn(!!token);
       setBooting(false);

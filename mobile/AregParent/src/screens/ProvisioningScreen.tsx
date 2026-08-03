@@ -12,6 +12,8 @@ import {
 // into a bundle. The runtime module is loaded lazily in loadEsp() below.
 import type { ESPDevice, ESPWifiList } from '@orbital-systems/react-native-esp-idf-provisioning';
 import { LinkedDevice } from '../api';
+import { t, tf } from '../i18n';
+import { useLang } from '../useLang';
 
 // Must match the firmware (ble_provisioning.cpp): the toy advertises
 // "Areg-Setup" (prefix "Areg"), proof-of-possession "areg-pair", security 1.
@@ -46,6 +48,7 @@ type Props = {
 };
 
 export default function ProvisioningScreen({ device, onBack }: Props) {
+  useLang();
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
   const [espDevice, setEspDevice] = useState<ESPDevice | null>(null);
@@ -68,7 +71,7 @@ export default function ProvisioningScreen({ device, onBack }: Props) {
         esp.ESPSecurity.secure,
       );
       if (!found.length) {
-        setError('No toy found in setup mode. Hold the toy’s button at power-on for ~5s, then try again.');
+        setError(t('e_no_toy_found'));
         setPhase('idle');
         return;
       }
@@ -85,7 +88,7 @@ export default function ProvisioningScreen({ device, onBack }: Props) {
       setNetworks(unique);
       setPhase('wifi');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Bluetooth setup failed. Try again.');
+      setError(t('e_bluetooth'));
       setPhase('idle');
     }
   }
@@ -100,11 +103,11 @@ export default function ProvisioningScreen({ device, onBack }: Props) {
       if (res.status && res.status.toLowerCase().includes('success')) {
         setPhase('done');
       } else {
-        setError(`The toy could not join "${ssid}". Check the password and try again.`);
+        setError(tf('e_wifi_join', { ssid }));
         setPhase('wifi');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not send Wi-Fi to the toy.');
+      setError(t('e_send_wifi'));
       setPhase('wifi');
     }
   }
@@ -112,54 +115,47 @@ export default function ProvisioningScreen({ device, onBack }: Props) {
   return (
     <View style={styles.container}>
       <Pressable onPress={onBack}>
-        <Text style={styles.back}>‹ Settings</Text>
+        <Text style={styles.back}>{t('back_settings')}</Text>
       </Pressable>
-      <Text style={styles.title}>Connect {device.deviceName || 'toy'} to Wi-Fi</Text>
+      <Text style={styles.title}>{tf('wifi_title', { name: device.deviceName || t('toy_word') })}</Text>
 
       {phase === 'unavailable' ? (
         <View style={styles.card}>
-          <Text style={styles.body}>
-            Bluetooth setup needs the Areg app build (it isn&apos;t available in
-            Expo Go). For now, use the free ESP BLE Provisioning app with pairing
-            code:
-          </Text>
+          <Text style={styles.body}>{t('wifi_unavailable')}</Text>
           <Text style={styles.code}>areg-pair</Text>
         </View>
       ) : phase === 'idle' ? (
         <View style={styles.card}>
-          <Text style={styles.body}>
-            Put the toy in setup mode (hold its button at power-on for ~5s), then
-            search for it over Bluetooth.
-          </Text>
+          <Text style={styles.body}>{t('wifi_setup_mode')}</Text>
           <Pressable style={styles.primaryBtn} onPress={startSearch}>
-            <Text style={styles.primaryBtnText}>Search for my toy</Text>
+            <Text style={styles.primaryBtnText}>{t('wifi_search')}</Text>
           </Pressable>
         </View>
       ) : phase === 'searching' || phase === 'connecting' ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#2c4a7a" />
           <Text style={styles.body}>
-            {phase === 'searching' ? 'Looking for your toy…' : 'Connecting…'}
+            {phase === 'searching' ? t('wifi_looking') : t('wifi_connecting')}
           </Text>
         </View>
       ) : phase === 'provisioning' ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#2c4a7a" />
-          <Text style={styles.body}>Sending Wi-Fi to the toy…</Text>
+          <Text style={styles.body}>{t('wifi_sending')}</Text>
         </View>
       ) : phase === 'done' ? (
         <View style={styles.card}>
           <Text style={styles.doneIcon}>✓</Text>
-          <Text style={styles.doneText}>Toy connected to Wi-Fi!</Text>
-          <Text style={styles.body}>It will come online in a moment.</Text>
+          <Text style={styles.doneText}>{t('wifi_done')}</Text>
+          <Text style={styles.body}>{t('wifi_done_hint')}</Text>
           <Pressable style={styles.primaryBtn} onPress={onBack}>
-            <Text style={styles.primaryBtnText}>Done</Text>
+            <Text style={styles.primaryBtnText}>{t('done')}</Text>
           </Pressable>
         </View>
       ) : (
         // wifi list
         <View style={{ flex: 1 }}>
-          <Text style={styles.body}>Pick your home Wi-Fi:</Text>
+          <Text style={styles.body}>{t('wifi_pick')}</Text>
           <FlatList
             data={networks}
             keyExtractor={(n, i) => `${n.ssid}-${i}`}
@@ -173,11 +169,11 @@ export default function ProvisioningScreen({ device, onBack }: Props) {
                 {item.ssid === ssid ? <Text style={styles.netCheck}>✓</Text> : null}
               </Pressable>
             )}
-            ListEmptyComponent={<Text style={styles.body}>No networks found.</Text>}
+            ListEmptyComponent={<Text style={styles.body}>{t('wifi_none')}</Text>}
           />
           <TextInput
             style={styles.input}
-            placeholder={ssid ? `Password for ${ssid}` : 'Wi-Fi password'}
+            placeholder={ssid ? tf('wifi_password_for', { ssid }) : t('wifi_password')}
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -187,7 +183,7 @@ export default function ProvisioningScreen({ device, onBack }: Props) {
             onPress={provision}
             disabled={!ssid}
           >
-            <Text style={styles.primaryBtnText}>Send Wi-Fi to toy</Text>
+            <Text style={styles.primaryBtnText}>{t('wifi_send')}</Text>
           </Pressable>
         </View>
       )}

@@ -10,13 +10,16 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { login, register } from '../api';
+import { errText, login, register } from '../api';
+import { LANG_NAMES, LANGS, getLanguage, setLanguage, t } from '../i18n';
+import { useLang } from '../useLang';
 
 type Props = {
   onLoggedIn: (token: string) => void;
 };
 
 export default function LoginScreen({ onLoggedIn }: Props) {
+  useLang();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,21 +32,21 @@ export default function LoginScreen({ onLoggedIn }: Props) {
     setStatus(null);
     const e = email.trim();
     if (!e || !password) {
-      setError('Email and password are required.');
+      setError(t('e_email_password'));
       return;
     }
     setBusy(true);
     try {
       if (mode === 'register') {
         await register(e, password);
-        setStatus('Account created. You can log in now.');
+        setStatus(t('account_created'));
         setMode('login');
       } else {
         const token = await login(e, password);
         onLoggedIn(token);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setError(errText(err));
     } finally {
       setBusy(false);
     }
@@ -61,12 +64,12 @@ export default function LoginScreen({ onLoggedIn }: Props) {
       />
       <Text style={styles.brand}>Areg</Text>
       <Text style={styles.subtitle}>
-        {mode === 'login' ? 'Parent sign in' : 'Create a parent account'}
+        {mode === 'login' ? t('login_subtitle') : t('register_subtitle')}
       </Text>
 
       <TextInput
         style={styles.input}
-        placeholder="Email"
+        placeholder={t('ph_email')}
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="email-address"
@@ -76,7 +79,7 @@ export default function LoginScreen({ onLoggedIn }: Props) {
       />
       <TextInput
         style={styles.input}
-        placeholder="Password"
+        placeholder={t('ph_password')}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
@@ -92,7 +95,7 @@ export default function LoginScreen({ onLoggedIn }: Props) {
           <ActivityIndicator color="#fff" />
         ) : (
           <Text style={styles.buttonText}>
-            {mode === 'login' ? 'Sign in' : 'Create account'}
+            {mode === 'login' ? t('sign_in') : t('create_account')}
           </Text>
         )}
       </Pressable>
@@ -106,14 +109,29 @@ export default function LoginScreen({ onLoggedIn }: Props) {
         disabled={busy}
       >
         <Text style={styles.link}>
-          {mode === 'login'
-            ? "Don't have an account? Create one"
-            : 'Already have an account? Sign in'}
+          {mode === 'login' ? t('to_register') : t('to_login')}
         </Text>
       </Pressable>
 
       {status ? <Text style={styles.status}>{status}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      {/* The language picker lives on the sign-in screen because a parent
+          who does not read English has to be able to change it BEFORE they
+          can reach any settings. */}
+      <View style={styles.langRow}>
+        {LANGS.map((l) => (
+          <Pressable
+            key={l}
+            style={[styles.langPill, getLanguage() === l && styles.langPillOn]}
+            onPress={() => setLanguage(l)}
+          >
+            <Text style={[styles.langText, getLanguage() === l && styles.langTextOn]}>
+              {LANG_NAMES[l]}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -143,4 +161,17 @@ const styles = StyleSheet.create({
   link: { color: '#2c4a7a', textAlign: 'center', marginTop: 16 },
   status: { color: '#2f6b2f', textAlign: 'center', marginTop: 16 },
   error: { color: '#a02622', textAlign: 'center', marginTop: 16 },
+  langRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 28 },
+  langPill: {
+    borderWidth: 1,
+    borderColor: '#d5d5d5',
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  langPillOn: { borderColor: '#2c4a7a', backgroundColor: '#eef3fb' },
+  langText: { color: '#666', fontSize: 13 },
+  langTextOn: { color: '#2c4a7a', fontWeight: '700' },
 });
