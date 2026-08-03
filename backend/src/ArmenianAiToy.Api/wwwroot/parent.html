@@ -154,6 +154,17 @@
     }
     .btn-ghost-danger:hover { background: #fdf0ef; }
 
+    /* 44px is the thumb floor on a phone, and the whole toy-settings panel
+       (pause, toggles, saves, revoke, unlink, remove) is built from these
+       three — at 26px a parent aiming for Unlink can hit Revoke. */
+    .btn-ghost, .btn-ghost-ok, .btn-ghost-danger {
+      min-height: 44px;
+      padding: 10px 14px;
+    }
+    .tabs button { min-height: 40px; }
+    /* Shared hint text next to a blocked or inert control. */
+    .ctl-hint { font-size: 11px; color: #7a6b95; margin-left: 8px; }
+
     /* Grouped-settings vocabulary (Family-Link/Yoto-style): quiet
        uppercase captions between control groups, and a visually
        separated "careful zone" for destructive actions. */
@@ -791,7 +802,7 @@
     <!-- Summaries view -->
     <section id="summariesView" class="card" hidden>
       <h2>
-        <button class="link" id="backToDevices" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button>
+        <button class="link" id="backToDevices" aria-label="Back to this toy" data-i18n="nav_toy">← Toy</button>
         <span class="tabs" role="tablist" aria-label="Device views">
           <button data-tab="summaries" role="tab" aria-selected="false" data-i18n="tab_conversations">Conversations</button>
           <button data-tab="mode:story" role="tab" aria-selected="false" data-i18n="tab_stories">Stories</button>
@@ -826,7 +837,7 @@
     <!-- Flagged view -->
     <section id="flaggedView" class="card" hidden>
       <h2>
-        <button class="link" id="flaggedBackToDevices" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button>
+        <button class="link" id="flaggedBackToDevices" aria-label="Back to this toy" data-i18n="nav_toy">← Toy</button>
         <span class="tabs" role="tablist" aria-label="Device views">
           <button data-tab="summaries" role="tab" aria-selected="false" data-i18n="tab_conversations">Conversations</button>
           <button data-tab="mode:story" role="tab" aria-selected="false" data-i18n="tab_stories">Stories</button>
@@ -859,7 +870,7 @@
          after-story question (B4). -->
     <section id="playsView" class="card" hidden>
       <h2>
-        <button class="link" id="playsBackToDevices" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button>
+        <button class="link" id="playsBackToDevices" aria-label="Back to this toy" data-i18n="nav_toy">← Toy</button>
         <span class="tabs" role="tablist" aria-label="Device views">
           <button data-tab="summaries" role="tab" aria-selected="false" data-i18n="tab_conversations">Conversations</button>
           <button data-tab="mode:story" role="tab" aria-selected="false" data-i18n="tab_stories">Stories</button>
@@ -883,7 +894,7 @@
          counts, and a ▶ preview of the shipped narration. -->
     <section id="libraryView" class="card" hidden>
       <h2>
-        <button class="link" id="libraryBackToDevices" aria-label="Back to toy" data-i18n="nav_toys">← Toys</button>
+        <button class="link" id="libraryBackToDevices" aria-label="Back to this toy" data-i18n="nav_toy">← Toy</button>
         <span data-i18n="story_library">📚 Story library</span>
       </h2>
       <div id="libraryList"></div>
@@ -893,7 +904,7 @@
     <!-- Music view (Slice E) — the bedtime tracks the toy can play. -->
     <section id="musicView" class="card" hidden>
       <h2>
-        <button class="link" id="musicBackToDevices" aria-label="Back to toy" data-i18n="nav_toys">← Toys</button>
+        <button class="link" id="musicBackToDevices" aria-label="Back to this toy" data-i18n="nav_toy">← Toy</button>
         <span data-i18n="music_title">🎵 Music</span>
       </h2>
       <div id="musicList"></div>
@@ -1009,6 +1020,20 @@
       flag_on: { en: 'On ✓ — tap to turn off', ru: 'Вкл ✓ — нажмите, чтобы выключить', hy: 'Միացված ✓ — սեղմեք անջատելու համար' },
       flag_off: { en: 'Off — tap to turn on', ru: 'Выкл — нажмите, чтобы включить', hy: 'Անջատված — սեղմեք միացնելու համար' },
       view_music: { en: '🎵 Music →', ru: '🎵 Музыка →', hy: '🎵 Երաժշտություն →' },
+      nav_toy: { en: '← Toy', ru: '← Игрушка', hy: '← Խաղալիք' },
+      pause_on: { en: 'Playing — tap to pause', ru: 'Работает — нажмите, чтобы поставить на паузу', hy: 'Աշխատում է — սեղմեք դադարեցնելու համար' },
+      pause_off: { en: 'Paused — tap to resume', ru: 'На паузе — нажмите, чтобы продолжить', hy: 'Դադարեցված — սեղմեք շարունակելու համար' },
+      state_paused: { en: 'Paused', ru: 'На паузе', hy: 'Դադարեցված' },
+      state_revoked: { en: 'Access revoked', ru: 'Доступ отозван', hy: 'Մուտքը կասեցված է' },
+      state_dormant: { en: 'Not seen recently', ru: 'Давно не в сети', hy: 'Վաղուց առցանց չի եղել' },
+      bedtime_chip: { en: 'Bedtime', ru: 'Сон', hy: 'Քնի ժամ' },
+      bedtime_music_inactive: { en: 'On, but nothing will play — set a bedtime window below.', ru: 'Включено, но играть нечего — задайте часы сна ниже.', hy: 'Միացված է, բայց ոչինչ չի նվագի — ներքևում սահմանեք քնի ժամերը։' },
+      no_devices: { en: 'No toys linked yet. Add one with the pairing code from its box.', ru: 'Игрушек пока нет. Добавьте её кодом привязки с коробки.', hy: 'Խաղալիքներ դեռ չկան։ Ավելացրեք տուփի կապակցման կոդով։' },
+      no_convos: { en: 'No conversations yet. They appear here after your child talks to the toy.', ru: 'Разговоров пока нет. Они появятся, когда ребёнок поговорит с игрушкой.', hy: 'Զրույցներ դեռ չկան։ Դրանք կհայտնվեն, երբ երեխան խոսի խաղալիքի հետ։' },
+      no_more_convos: { en: 'No more conversations.', ru: 'Больше разговоров нет.', hy: 'Այլ զրույցներ չկան։' },
+      no_stories: { en: 'No stories yet. New ones appear here as we publish them.', ru: 'Сказок пока нет. Новые появятся здесь по мере выпуска.', hy: 'Հեքիաթներ դեռ չկան։ Նորերը կհայտնվեն այստեղ հրապարակմանը զուգընթաց։' },
+      msgs_suffix: { en: 'messages', ru: 'сообщ.', hy: 'հաղորդագրություն' },
+      listen_btn: { en: '▶ Listen', ru: '▶ Послушать', hy: '▶ Լսել' },
       tile_conversations: { en: 'Conversations', ru: 'Разговоры', hy: 'Զրույցներ' },
       tile_conversations_sub: { en: 'What your child talked about', ru: 'О чём говорил ваш ребёнок', hy: 'Ինչի մասին է խոսել ձեր երեխան' },
       tile_library: { en: 'Story library', ru: 'Библиотека сказок', hy: 'Հեքիաթների գրադարան' },
@@ -1144,6 +1169,9 @@
       // so the Story-plays list shows names instead of ids.
       modeFilter: null,
       storyTitles: null,
+      // Cached #storyRequestBlock node — it gets detached from the DOM each
+      // time the toy page re-renders (see renderToyView).
+      storyRequestBlock: null,
       // Monotonic id of the newest conversations fetch — replies from
       // superseded requests are dropped (see loadSummaries).
       summariesRequestId: 0,
@@ -1897,7 +1925,7 @@
 
         renderDormancySummary(summaryEl, data && data.summary, devices.length);
         if (devices.length === 0) {
-          deviceStatus('No devices linked to this account yet.', 'muted');
+          deviceStatus(t('no_devices'), 'muted');
           emptyState.hidden = false;
           setStatus('linkDeviceStatus', '', '');
           return;
@@ -1985,10 +2013,17 @@
       links.appendChild(toyTile('🎵', 'tile_music', 'tile_music_sub', loadMusicLibrary));
       links.appendChild(toyTile('✍️', 'tile_request', 'tile_request_sub', function () {
         var f = document.getElementById('storyRequestForm');
+        if (!f) return;   // defensive: block detached (see cache below)
         f.hidden = !f.hidden;
         if (!f.hidden) loadMyStoryRequests();
       }));
-      var reqBlock = document.getElementById('storyRequestBlock');
+      // clearChildren(links) above DETACHES this block on every re-render,
+      // after which getElementById can no longer find it — cache the node
+      // so the request form survives a second visit to the toy page.
+      if (!state.storyRequestBlock) {
+        state.storyRequestBlock = document.getElementById('storyRequestBlock');
+      }
+      var reqBlock = state.storyRequestBlock;
       if (reqBlock) {
         reqBlock.hidden = false;
         links.appendChild(reqBlock);   // relocate the form under this toy
@@ -2020,8 +2055,8 @@
         ob.className = 'chip ' + (d.isOnline ? 'chip-ok' : 'chip-muted');
         badges.appendChild(ob);
       }
-      if (d.isRevoked) { var rb = document.createElement('span'); rb.textContent = t('revoke'); rb.className = 'chip chip-danger'; badges.appendChild(rb); }
-      if (d.isPaused) { var pb = document.createElement('span'); pb.textContent = t('pause'); pb.className = 'chip chip-warn'; badges.appendChild(pb); }
+      if (d.isRevoked) { var rb = document.createElement('span'); rb.textContent = t('state_revoked'); rb.className = 'chip chip-danger'; badges.appendChild(rb); }
+      if (d.isPaused) { var pb = document.createElement('span'); pb.textContent = t('state_paused'); pb.className = 'chip chip-warn'; badges.appendChild(pb); }
       // Fault indicator. The backend decides whether there is anything worth
       // reporting (faultCode is empty when there is not), so the UI never has
       // to know which conditions count.
@@ -2115,14 +2150,14 @@
           // is signed out everywhere until it re-provisions a fresh key.
           if (d.isRevoked) {
             var revokedBadge = document.createElement('div');
-            revokedBadge.textContent = 'Revoked';
+            revokedBadge.textContent = t('state_revoked');
             revokedBadge.className = 'chip chip-danger';
             btn.appendChild(revokedBadge);
           }
 
           if (d.isPaused) {
             var pausedBadge = document.createElement('div');
-            pausedBadge.textContent = 'Paused by you';
+            pausedBadge.textContent = t('state_paused');
             pausedBadge.className = 'chip chip-warn';
             btn.appendChild(pausedBadge);
           }
@@ -2132,7 +2167,7 @@
           if (d.bedtimeStart && d.bedtimeEnd) {
             var bedtimeBadge = document.createElement('div');
             bedtimeBadge.textContent =
-              'Bedtime ' + d.bedtimeStart.substring(0, 5) +
+              t('bedtime_chip') + ' ' + d.bedtimeStart.substring(0, 5) +
               '–' + d.bedtimeEnd.substring(0, 5);
             bedtimeBadge.className = 'chip chip-info';
             btn.appendChild(bedtimeBadge);
@@ -2146,7 +2181,7 @@
           // line above.
           if (d.isDormant) {
             var dormantBadge = document.createElement('div');
-            dormantBadge.textContent = 'Not seen recently';
+            dormantBadge.textContent = t('state_dormant');
             dormantBadge.className = 'chip chip-muted';
             btn.appendChild(dormantBadge);
           }
@@ -2198,7 +2233,7 @@
 
           var pauseBtn = document.createElement('button');
           pauseBtn.type = 'button';
-          pauseBtn.textContent = d.isPaused ? t('resume') : t('pause');
+          pauseBtn.textContent = d.isPaused ? t('pause_off') : t('pause_on');
           pauseBtn.setAttribute('data-device-id', d.deviceId);
           pauseBtn.className = 'btn-ghost';
           pauseBtn.style.cssText = 'margin:4px 8px 12px 0;font-size:13px;';
@@ -2240,10 +2275,21 @@
               btn.style.opacity = '0.5';
               btn.title = blockHint;
               var hint = document.createElement('span');
-              hint.style.cssText = 'font-size:11px;color:#a08;margin-left:8px;';
+              hint.className = 'ctl-hint';
               hint.textContent = blockHint;
               row.appendChild(btn);
               row.appendChild(hint);
+              return row;
+            }
+            // Honest state for a switch that is ON but cannot act (the
+            // server clears music when the window is cleared, but a stale
+            // page — or any future precondition — must still say so).
+            if (opts.requiresBedtime && current && !(d.bedtimeStart && d.bedtimeEnd)) {
+              var inert = document.createElement('span');
+              inert.className = 'ctl-hint';
+              inert.textContent = t('bedtime_music_inactive');
+              row.appendChild(btn);
+              row.appendChild(inert);
               return row;
             }
             btn.addEventListener('click', function () {
@@ -2265,9 +2311,9 @@
           }
           listEl.appendChild(flagToggle('story_intro_label',
             d.storyIntroEnabled !== false, 'story-intro'));
-          listEl.appendChild(flagToggle('bedtime_music_label',
-            d.bedtimeMusicEnabled === true, 'bedtime-music',
-            { requiresBedtime: true, requiresMusic: true }));
+          // NOTE: the bedtime-music toggle is appended AFTER the bedtime
+          // window row below — its hint tells the parent to set that window,
+          // so the thing it points at must not be above it.
 
           // B4: bedtime window row — two time inputs + Save, sibling to
           // the clickable device row so inputs aren't nested in a button.
@@ -2305,6 +2351,11 @@
           bedtimeHint.className = 'ctl-hint';
           bedtimeRow.appendChild(bedtimeHint);
           listEl.appendChild(bedtimeRow);
+
+          // Bedtime music sits directly under the window it depends on.
+          listEl.appendChild(flagToggle('bedtime_music_label',
+            d.bedtimeMusicEnabled === true, 'bedtime-music',
+            { requiresBedtime: true, requiresMusic: true }));
 
           // B5: mode enable/disable row — four checkboxes + Save. Calm is
           // never represented here (safety invariant: bedtime cues always
@@ -3031,8 +3082,8 @@
         if (rows.length === 0) {
           setStatus('summariesStatus',
             state.offset === 0
-              ? 'No conversations recorded for this device yet.'
-              : 'No more conversations.',
+              ? t('no_convos')
+              : t('no_more_convos'),
             'muted');
         } else {
           setStatus('summariesStatus', '', '');
@@ -3082,7 +3133,7 @@
 
       var countSpan = document.createElement('span');
       var count = (typeof row.messageCount === 'number') ? row.messageCount : 0;
-      countSpan.textContent = count + (count === 1 ? ' message' : ' messages');
+      countSpan.textContent = count + ' ' + t('msgs_suffix');
 
       top.appendChild(leftWrap);
       top.appendChild(countSpan);
@@ -3466,7 +3517,7 @@
         }
         var metaParts = ['Started ' + fmtTime(c.startedAt)];
         if (c.endedAt) metaParts.push('Ended ' + fmtTime(c.endedAt));
-        metaParts.push((c.messageCount || 0) + ' messages');
+        metaParts.push((c.messageCount || 0) + ' ' + t('msgs_suffix'));
         if (flaggedCount > 0) {
           metaParts.push('⚠ ' + flaggedCount + ' flagged message' + (flaggedCount === 1 ? '' : 's'));
         } else if (c.hasFlaggedContent) {
@@ -3565,10 +3616,8 @@
 
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.textContent = '▶ Listen';
-      btn.style.cssText =
-        'background:#ece4f8;color:#5b3e8a;border:none;border-radius:6px;' +
-        'padding:4px 10px;font-size:12px;cursor:pointer;';
+      btn.textContent = t('listen_btn');
+      btn.className = 'btn-ghost';
 
       var status = document.createElement('span');
       status.style.cssText = 'font-size:12px;color:#888;';
@@ -4011,15 +4060,20 @@
         plays.forEach(function (p) {
           var row = document.createElement('div');
           row.className = 'row';
+          // Not tappable — kill the hover affordance so it reads as a list
+          // item rather than a button that does nothing.
           row.style.cursor = 'default';
+          row.style.pointerEvents = 'none';
           var top = document.createElement('div');
           top.className = 'top';
+          // The STORY leads (it is what the parent came to see); the clock
+          // and outcome are the supporting detail.
           var left = document.createElement('span');
-          left.textContent = fmtTime(p.playedAtUtc)
-            + (p.timeIsApproximate ? ' (~' + t('approx_time') + ')' : '');
+          left.textContent = '📖 ' + storyTitle(p.storyId);
           var right = document.createElement('span');
-          right.textContent = storyTitle(p.storyId) + ' · '
-            + (p.finished ? t('play_finished') : t('play_partial'));
+          right.textContent = fmtTime(p.playedAtUtc)
+            + (p.timeIsApproximate ? ' (~' + t('approx_time') + ')' : '')
+            + ' · ' + (p.finished ? t('play_finished') : t('play_partial'));
           top.appendChild(left);
           top.appendChild(right);
           row.appendChild(top);
@@ -4077,7 +4131,7 @@
         state.storyTitles = map;
 
         if (stories.length === 0) {
-          setStatus('libraryStatus', 'No stories are published yet.', 'muted');
+          setStatus('libraryStatus', t('no_stories'), 'muted');
           return;
         }
         setStatus('libraryStatus', '', '');
@@ -4092,7 +4146,7 @@
 
     function buildLibraryCard(s) {
       var card = document.createElement('div');
-      card.style.cssText = 'padding:12px;border:1px solid #e2e2e2;border-radius:8px;margin:0 0 10px;';
+      card.style.cssText = 'padding:14px;background:#faf7ff;border:1px solid #e4d9f7;border-radius:14px;margin:0 0 10px;';
 
       var title = document.createElement('div');
       title.style.cssText = 'font-size:16px;font-weight:600;';
@@ -4184,10 +4238,8 @@
       wrap.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.textContent = '▶ Listen';
-      btn.style.cssText =
-        'background:#ece4f8;color:#5b3e8a;border:none;border-radius:6px;' +
-        'padding:4px 10px;font-size:12px;cursor:pointer;';
+      btn.textContent = t('listen_btn');
+      btn.className = 'btn-ghost';
       var status = document.createElement('span');
       status.style.cssText = 'font-size:12px;color:#888;';
       btn.onclick = function () {
@@ -4246,7 +4298,7 @@
         setStatus('musicStatus', '', '');
         tracks.forEach(function (m) {
           var card = document.createElement('div');
-          card.style.cssText = 'padding:12px;border:1px solid #e2e2e2;border-radius:8px;margin:0 0 10px;';
+          card.style.cssText = 'padding:14px;background:#faf7ff;border:1px solid #e4d9f7;border-radius:14px;margin:0 0 10px;';
           var title = document.createElement('div');
           title.style.cssText = 'font-size:15px;font-weight:600;';
           title.textContent = '🎵 ' + (m.title || m.trackId);
@@ -4422,10 +4474,17 @@
     // Re-run the loader for the currently-visible view so dynamically
     // built strings are retranslated after a language switch.
     function rerenderActiveView() {
+      // Every view whose strings are built in JS must be listed, or a
+      // language switch leaves that screen in the old language. toyView
+      // first: loadDevices re-renders the toy page when a toy is open.
       var views = {
+        toyView: loadDevices,
         devicesView: loadDevices,
         summariesView: loadSummaries,
         flaggedView: loadFlagged,
+        playsView: loadStoryPlays,
+        libraryView: function () { loadStoryLibrary(state.currentToyId); },
+        musicView: loadMusicLibrary,
         auditView: loadAudit
       };
       for (var id in views) {

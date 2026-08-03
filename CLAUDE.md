@@ -2972,6 +2972,12 @@ Claude CLI operates on this project using a multi-agent pipeline. The agents and
 - `areg-story-evaluator` — story output quality scoring (7-dimension rubric)
 - `armenian-linguistic-reviewer` — Armenian text naturalness review
 - `prompt-reviewer` — pre-implementation scope/risk/safety review
+- `ux-ui-designer` — parent-facing UI/UX review (parent.html, admin.html,
+  index.html, mobile app). **Run it for ANY user-facing change**, before
+  shipping a new view/control and after any UI edit — the same reflex as
+  `test-runner` for code. Owns layout, mobile fit, the trilingual copy
+  rule, parent-trust tone, and the "never offer an action that cannot
+  work" principle.
 
 **Available skills** (`.claude/skills/`):
 - `/change-decision` — classify work mode before touching code
