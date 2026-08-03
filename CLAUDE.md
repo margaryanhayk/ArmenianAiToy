@@ -44,7 +44,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2115 tests)
+dotnet test                                     # Run all tests (2200 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -1889,6 +1889,146 @@ no DB match older than a configurable grace window (default
 24 h). Per-tick directory cap, path-traversal hardening, system-
 actor audit row on tick-with-deletions only, counts-only
 metadata. No content inspection, no parent-/user-facing endpoint.
+
+## Story plays, reflection memory, library & clips (owner batch 2026-08-03)
+
+One coordinated batch (slices A–D of the owner's 9-item request; plan in
+`.claude/plans/composed-yawning-stroustrup.md`). All backend surfaces are
+tested; the firmware half is compile-verified only (bench verification with
+real hardware is still open — see "Open items" below).
+
+**A. Story-play reporting (store-and-forward).** SD-cache playback never
+touches the backend, so the dashboard under-reported what the child heard.
+- Firmware `story_report.{h,cpp}` (compiled into every build): one event per
+  NEW story session (enqueued only after playback genuinely started — same
+  `started` gate as the rotation cursor; natural end closes it as
+  `finished`), persisted as a whole-queue NVS blob (namespace `aregplays`,
+  ≤16 events, drop-oldest). Upload via `voice_post_story_plays` on the idle
+  heartbeat cadence (prompt ~3 s after an event closes); events are deleted
+  ONLY on a 2xx. Keys `b<boot>-<n>` make re-uploads idempotent. The OPEN
+  (in-progress/paused) event is held back so a mid-pause upload can't freeze
+  it as unfinished; after a reboot it honestly uploads unfinished.
+- Backend `StoryPlay` entity (FK cascade to Device; unique
+  `(DeviceId, ClientEventKey)`), `POST /api/devices/story-plays` (device-
+  authed via the middleware list, ≤32 events, malformed events skipped not
+  fatal, bounded `source` vocabulary `sd|pack|stream|other`, `secondsAgo`
+  → server-stamped `PlayedAtUtc` with `TimeIsApproximate` when absent/out
+  of range). Parent read `GET /api/parents/devices/{id}/story-plays`
+  (ownership-checked silent 404, standard pagination, whole-history
+  per-story `totals`). Migration `AddStoryPlays` (hand-written).
+
+**B. Story metadata + reflection pack + answer memory.**
+- B1 — `*.story.json` gains optional `author`/`goal`/`lesson`
+  (present-but-blank rejected; absent = null). Author is set ONLY where the
+  project notes verify it (the five Tumanyan classics + Andersen);
+  unverified/original/folk titles carry null — never guess an attribution
+  spoken to a child. The goal/lesson Armenian texts are DRAFTS pending
+  owner review before any render.
+- B2 — per-story CLIPS over content sync: bounded kinds
+  `intro|question|summary` on `ContentSyncStoryOptions.Clips` +
+  `ContentStoryItem.Clips` (invalid clip drops only itself; dup kind keeps
+  first; default URL `/api/devices/content-file?storyId=…&clip=…`; clips
+  share the story's `Version`). `content-file` gains `&clip=` (lookup key
+  only — no traversal surface). Firmware: index schema v3 (v2/v1 parse
+  retained; absence of clips = pre-B2 behavior), `CsClip` slots on
+  `CsStory` (compact, no per-clip URL — the device constructs the backend
+  default), per-clip download/sha-verify in `content_sync.cpp`,
+  `story_select_resolve_clip_path()`. `handle_post_story_flow()` now
+  resolves the ACTIVE story's summary/question clips from the index (pack
+  paths remain as fallback) — this un-breaks the after-story flow for
+  synced stories, which previously no-op'd. Intro clip plays before a NEW
+  cached story when enabled.
+- B3 — `Device.StoryIntroEnabled` (default ON, migration
+  `AddDeviceStoryIntroEnabled`), `PUT /api/parents/devices/{id}/story-intro`
+  (pause-shaped; audited `ParentDeviceStoryIntroSet` on real flips only).
+  Delivered to the toy as `storyIntroEnabled` on the content-manifest
+  response and cached in the index root (`introEnabled`) so the toggle
+  applies offline (`story_select_intro_enabled()`).
+- B4 — `StoryReflectionAnswer` entity (APPEND-ONLY: one row per listen,
+  never overwritten; FK cascade to Device; migration
+  `AddStoryReflectionAnswers`). Persisted best-effort in the existing
+  reflection endpoint after moderation. Parent read
+  `GET /api/parents/devices/{id}/reflection-answers?storyId=` (newest-
+  first). Both story plays and reflection answers are included in the
+  parent export (`ParentExportDevice.StoryPlays`/`ReflectionAnswers`,
+  additive init-props).
+
+**C. Narration render tool** — `tools/ElevenLabsRender/` (raw HTTP, no new
+NuGet): renders narration at a chosen `voice_settings.speed` (0.7–1.2) and
+the B5 clips (intro composed «Հեքիաթ՝ …։ Հեղինակ՝ …։», question =
+`reflectionQuestions[0]`, summary = `lesson ?? reflectionText`) in the
+ElevenLabs storyteller clone. DRY-RUN by default; paid render requires
+`--render --confirm-paid-api`; keys via `ELEVENLABS_API_KEY` /
+`ELEVENLABS_VOICE_ID` (never in the repo). Emits `manifest-snippet.json`
+(sha256/sizeBytes) for the ContentSync config; remember to BUMP `Version`
+per story or devices keep the cached copy. Human listen test still gates
+shipping any rendered asset.
+
+**D. Dashboard.** `GET /api/conversations/summary` gains optional `&mode=`
+(bounded `story|game|riddle|curiosity|calm`, else 400) filtering
+conversations by stamped message mode. `GET /api/parents/stories` — the
+parent story library (shipped ContentSync set joined with curated metadata
++ the caller's listen counts across their devices; falls back to the whole
+curated library when sync is disabled). `GET /api/parents/stories/{id}/audio`
+— parent-authed ▶ preview of the shipped narration (uniform 404).
+`parent.html`: tab strip is now Conversations / Stories / Games / Riddles /
+Questions / Bedtime / Flagged / Story plays (mode tabs = server-filtered
+conversations; Today panel hidden on mode tabs), a Story-plays view (play
+history + per-story listen counters + the child's saved reflection
+answers), and a Story-library view (cards with author/goal/lesson/counts +
+JWT-fetched blob ▶ preview) reached from the devices header.
+
+**Reflection DIALOGUE (owner request 2026-08-03, same day).** The
+after-story talk is a multi-round back-and-forth: up to 3 questions per
+story; each round = ask → listen → REACT to what the child said → speak
+that question's authored takeaway; the goodbye line plays once, after the
+final round.
+- Story schema: optional `reflectionConclusions[]` MUST pair 1:1 with
+  `reflectionQuestions[]` (parser fails loudly on mismatch). All 10 files
+  grew to 3 questions + 3 conclusions — the ORIGINAL reviewed question
+  stays pinned at index 0 (`CuratedStoryLibraryTests` updated); the new
+  texts are drafts pending owner review.
+- `ReflectionDialogueService` (`Application/Stories/`) — the ONE new GPT
+  surface: `LibraryStoryQuestionService`-shaped (bounded English prompt
+  grounded in story+question+lesson, one call, `StoryAnswerFilter`
+  validation, one repair retry, null on failure). Null Text ⇒ the caller
+  uses the deterministic rotated acknowledgement — a child never hears
+  unvalidated model text. Never grades, never asks back.
+- `StoryQaController.AnswerReflection`: reaction is OUTPUT-MODERATED
+  before TTS (unsafe ⇒ deterministic ack); per-(story,question)
+  conclusion TTS cache; `?last=false` (sent by the firmware loop on
+  non-final rounds) suppresses the goodbye. Config gate
+  `StoryQa:ReflectionAiReplies` (default true; false = exact pre-dialogue
+  behavior, pinned by the untouched legacy reflection tests). Persisted
+  assistant text = exactly what was spoken.
+- Firmware: clip kinds + `question1`/`question2` (`CS_MAX_CLIPS` 5,
+  `CS_CLIP_KIND_LEN` 10, `cs_question_clip_kind()`), same kinds added to
+  `ContentSyncClipOptions.AllowedKinds`. `handle_post_story_flow()` loops
+  rounds 0..2 (clip-gated; question 0 keeps the SD-pack fallback), quiet
+  close on no-answer/short/failed round — never badgers;
+  `voice_upload_reflection_answer` gained `bool last`.
+- Library card: "Discuss with your child" `<details>` block (questions +
+  takeaways — the same guide the toy speaks).
+- Pinned by `ReflectionDialogueTests` + `ReflectionDialogueControllerTests`
+  (keystones: unsafe reaction never reaches TTS; blocked child answer
+  never reaches the model; gate-off never calls the model).
+
+**Open items from this batch (deliberate):**
+- Bench verification on real hardware: play reporting end-to-end, index
+  v2→v3 upgrade, clip sync, intro/summary/question playback, reflection
+  round-trip for a synced story. `content_sync_test.cpp` assertions for
+  the v3 clip fields are also still to add.
+- The goal/lesson texts + any clip render need owner review + listen test;
+  clips ship only after `ContentSync` config gains `Clips` entries.
+- Slower narration: DROPPED (owner decision 2026-08-03). The 0.9/0.8
+  ElevenLabs speed-test renders were rejected on listen and the owner
+  chose to keep the current pace ("forget it for now"). The shipped
+  narration stays as-is; `tools/ElevenLabsRender` remains available for
+  future renders (clips, new stories).
+- Slice E (music-for-sleep content section) and Slice F (custom story
+  request form + admin queue) from the same plan are NOT implemented yet.
+- Item 6 decision recorded: content is paid, controls stay free; nothing
+  billing-related is built.
 
 ## Story Q&A text harness (`POST /api/story-qa-text`)
 

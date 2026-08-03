@@ -35,4 +35,28 @@ public sealed record CuratedStory(
     IReadOnlyList<CuratedStorySegment> Segments,
     string ReflectionText,
     IReadOnlyList<string> ReflectionQuestions,
-    bool BedtimeSafe);
+    bool BedtimeSafe)
+{
+    /// <summary>Optional author attribution (Armenian). Null = unknown /
+    /// unverified / in-project original — the spoken intro then omits the
+    /// author line. Never guessed: a wrong attribution spoken to a child is
+    /// worse than none.</summary>
+    public string? Author { get; init; }
+
+    /// <summary>Optional parent-facing purpose (Armenian, one sentence).
+    /// Library card only; not spoken.</summary>
+    public string? Goal { get; init; }
+
+    /// <summary>Optional "what the story teaches" (Armenian, 1–2 warm
+    /// sentences). Library card + source text for the toy's after-story
+    /// summary clip. Toy-spoken content: owner listen test gates any render.</summary>
+    public string? Lesson { get; init; }
+
+    /// <summary>Optional per-question takeaway lines for the reflection
+    /// dialogue, paired 1:1 with <see cref="ReflectionQuestions"/> (the
+    /// parser enforces equal length). Spoken by the toy after it reacts to
+    /// the child's answer to that question; also shown on the parent
+    /// library card. Null = no conclusions authored (the dialogue then
+    /// closes with the reaction alone).</summary>
+    public IReadOnlyList<string>? ReflectionConclusions { get; init; }
+}

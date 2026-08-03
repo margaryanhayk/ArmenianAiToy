@@ -205,6 +205,11 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(true);
 
+                    b.Property<bool>("StoryIntroEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("TimeZone")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -443,6 +448,84 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                     b.ToTable("ParentPasswordResetTokens");
                 });
 
+            modelBuilder.Entity("ArmenianAiToy.Domain.Entities.StoryReflectionAnswer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AnswerText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("QuestionIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SafetyFlag")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StoryId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId", "CreatedAtUtc");
+
+                    b.HasIndex("DeviceId", "StoryId");
+
+                    b.ToTable("StoryReflectionAnswers");
+                });
+
+            modelBuilder.Entity("ArmenianAiToy.Domain.Entities.StoryPlay", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ClientEventKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Finished")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("PlayedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StoryId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("TimeIsApproximate")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId", "ClientEventKey")
+                        .IsUnique();
+
+                    b.HasIndex("DeviceId", "PlayedAtUtc");
+
+                    b.HasIndex("DeviceId", "StoryId");
+
+                    b.ToTable("StoryPlays");
+                });
+
             modelBuilder.Entity("ArmenianAiToy.Domain.Entities.Child", b =>
                 {
                     b.HasOne("ArmenianAiToy.Domain.Entities.Device", "Device")
@@ -532,6 +615,28 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Parent");
+                });
+
+            modelBuilder.Entity("ArmenianAiToy.Domain.Entities.StoryPlay", b =>
+                {
+                    b.HasOne("ArmenianAiToy.Domain.Entities.Device", "Device")
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Device");
+                });
+
+            modelBuilder.Entity("ArmenianAiToy.Domain.Entities.StoryReflectionAnswer", b =>
+                {
+                    b.HasOne("ArmenianAiToy.Domain.Entities.Device", "Device")
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Device");
                 });
 
             modelBuilder.Entity("ArmenianAiToy.Domain.Entities.Child", b =>

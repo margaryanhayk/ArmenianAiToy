@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ArmenianAiToy.Tools.ElevenLabsRender</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    Application only — for the embedded curated story library (texts read
+    directly, byte-identical, never hand-copied). Raw HTTP to the
+    ElevenLabs API (no new NuGet): the storyteller voice is an ElevenLabs
+    clone, which no OpenAI path can produce. This tool renders CONTENT
+    ASSETS (narration + intro/question/summary clips) that ship via
+    ContentSync — it is not a runtime component.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\backend\src\ArmenianAiToy.Application\ArmenianAiToy.Application.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -18,6 +18,8 @@ public class AppDbContext : DbContext
     public DbSet<ParentPasswordResetToken> ParentPasswordResetTokens => Set<ParentPasswordResetToken>();
     public DbSet<ParentEmailVerificationToken> ParentEmailVerificationTokens => Set<ParentEmailVerificationToken>();
     public DbSet<DeviceCommand> DeviceCommands => Set<DeviceCommand>();
+    public DbSet<StoryPlay> StoryPlays => Set<StoryPlay>();
+    public DbSet<StoryReflectionAnswer> StoryReflectionAnswers => Set<StoryReflectionAnswer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +48,9 @@ public class AppDbContext : DbContext
             e.Property(d => d.GameEnabled).HasDefaultValue(true);
             e.Property(d => d.RiddleEnabled).HasDefaultValue(true);
             e.Property(d => d.CuriosityEnabled).HasDefaultValue(true);
+            // Spoken story intro defaults ON — existing devices gain the
+            // intro after migration (educational-by-default, owner decision).
+            e.Property(d => d.StoryIntroEnabled).HasDefaultValue(true);
         });
 
         modelBuilder.Entity<Child>(e =>
@@ -148,6 +153,41 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(c => new { c.DeviceId, c.Status });
             e.Property(c => c.Status).HasConversion<string>();
+        });
+
+        // StoryPlay — device-reported story playback events (store-and-forward
+        // from the toy). FK cascade to Device: play history is parent-facing
+        // activity data, not audit material, so it dies with the device. The
+        // unique (DeviceId, ClientEventKey) index is the idempotency contract
+        // for the at-least-once upload; (DeviceId, PlayedAtUtc) backs the
+        // parent dashboard's newest-first list; (DeviceId, StoryId) backs the
+        // per-story listen counts.
+        modelBuilder.Entity<StoryPlay>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.HasOne(p => p.Device)
+                .WithMany()
+                .HasForeignKey(p => p.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(p => new { p.DeviceId, p.ClientEventKey }).IsUnique();
+            e.HasIndex(p => new { p.DeviceId, p.PlayedAtUtc });
+            e.HasIndex(p => new { p.DeviceId, p.StoryId });
+        });
+
+        // StoryReflectionAnswer — append-only per-listen child answers to the
+        // post-story reflection question. FK cascade to Device (children's
+        // data dies with the device, same as conversations). SafetyFlag
+        // stored as string, consistent with Message.
+        modelBuilder.Entity<StoryReflectionAnswer>(e =>
+        {
+            e.HasKey(a => a.Id);
+            e.HasOne(a => a.Device)
+                .WithMany()
+                .HasForeignKey(a => a.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(a => new { a.DeviceId, a.StoryId });
+            e.HasIndex(a => new { a.DeviceId, a.CreatedAtUtc });
+            e.Property(a => a.SafetyFlag).HasConversion<string>();
         });
     }
 }

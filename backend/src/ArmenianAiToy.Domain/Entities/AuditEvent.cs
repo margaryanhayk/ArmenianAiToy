@@ -205,6 +205,23 @@ public class AuditEvent
         })
     };
 
+    /// <summary>A parent toggled the spoken story intro on a linked device.
+    /// Metadata is the post-change flag only. Written only on a real flip
+    /// (idempotent no-ops write nothing — same contract as pause/revoke).</summary>
+    public static AuditEvent ParentDeviceStoryIntroSet(
+        Guid parentId, Guid deviceId, bool enabled) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDeviceStoryIntroSet,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            enabled = enabled
+        })
+    };
+
     public static AuditEvent ParentDeviceModeFlagsSet(
         Guid parentId, Guid deviceId,
         bool story, bool game, bool riddle, bool curiosity) => new()

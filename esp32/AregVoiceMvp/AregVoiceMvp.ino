@@ -34,6 +34,7 @@
 #include "sd_playback.h"       // cached-MP3 SD playback (AREG_SD_PLAYBACK_BENCH builds only)
 
 #include "story_select.h"      // which cached story to play (index v2 + no-repeat)
+#include "story_report.h"      // story-play reporting (store-and-forward to backend)
 #include "story_select_test.h" // selection tests (AREG_STORY_SELECT_TEST_BENCH only)
 #include <SD.h>            // FS.h + SD — read /content_index.json (already linked)
 #include <ArduinoJson.h>   // JsonDocument/deserializeJson (already a project dep)
@@ -444,103 +445,162 @@ static size_t record_question() {
 // self-gates on the file being present, so this is a safe no-op when playing
 // the Wi-Fi stream (no pack on the card).
 static void handle_post_story_flow() {
-    // 1. Conclusion (offline) — the finalization of the story.
-    if (audio_sd_has_file(AREG_SD_STORY_CONCLUSION)) {
+    // B2 — clips for the ACTIVE story come from the content-sync cache
+    // (index-resolved, verified) with the legacy compile-time SD-pack
+    // paths as fallback. This is what makes the after-story talk work for
+    // synced stories: the pack paths only ever existed for AREG_STORY_ID,
+    // so a cache-selected story used to skip the whole flow silently.
+    const char *post_story_id = voice_active_story_id();
+
+    // 1. Summary / conclusion (offline) — the toy's short "what the story
+    //    teaches" line, in the storyteller voice when the clip is synced.
+    char summary_path[CS_MAX_PATH_LEN];
+    const char *summary_clip = nullptr;
+    if (story_select_resolve_clip_path(post_story_id, "summary",
+                                       summary_path, sizeof(summary_path))) {
+        summary_clip = summary_path;
+    } else if (audio_sd_has_file(AREG_SD_STORY_CONCLUSION)) {
+        summary_clip = AREG_SD_STORY_CONCLUSION;
+    }
+    if (summary_clip != nullptr) {
         transition_to(ST_PLAYING);
         audio_speaker_begin();
-        Serial.println("[post] conclusion");
+        Serial.printf("[post] summary/conclusion (%s)\n", summary_clip);
         Serial.flush();
-        audio_play_story_file(AREG_SD_STORY_CONCLUSION, 0, nullptr, nullptr);
+        audio_play_story_file(summary_clip, 0, nullptr, nullptr);
     }
 
-    // 2. Reflection question (offline). No question on the card → done.
-    if (!audio_sd_has_file(AREG_SD_STORY_QUESTION0)) {
-        return;
-    }
-    transition_to(ST_PLAYING);
-    audio_speaker_begin();
-    Serial.println("[post] question");
-    Serial.flush();
-    audio_play_story_file(AREG_SD_STORY_QUESTION0, 0, nullptr, nullptr);
-
-    // 3. The ANSWER needs the cloud (STT + GPT). Offline → optional close, stop.
-    if (!voice_wifi_is_connected()) {
-        Serial.println("[post] offline — answer needs connectivity; closing");
-        Serial.flush();
-        if (audio_sd_has_file(AREG_SD_OFFLINE_CLOSE)) {
-            audio_speaker_begin();
-            audio_play_story_file(AREG_SD_OFFLINE_CLOSE, 0, nullptr, nullptr);
+    // 2..N — the reflection DIALOGUE (owner request 2026-08-03): up to 3
+    // questions per story (clip kinds question / question1 / question2),
+    // each round = ask → listen → record → upload → play the backend's
+    // reaction + conclusion. The FINAL round's reply carries the goodbye
+    // line (the `last` flag tells the backend which round that is). The
+    // child is never badgered: no press in the window, a too-short answer,
+    // or any failure ends the dialogue quietly.
+    for (int q = 0; q < 3; q++) {
+        // Resolve THIS round's question clip. Question 0 keeps the legacy
+        // SD-pack fallback; later questions exist only via content sync.
+        char question_path[CS_MAX_PATH_LEN];
+        const char *question_clip = nullptr;
+        const char *kind = cs_question_clip_kind(q);
+        if (kind != nullptr
+            && story_select_resolve_clip_path(post_story_id, kind,
+                                              question_path, sizeof(question_path))) {
+            question_clip = question_path;
+        } else if (q == 0 && audio_sd_has_file(AREG_SD_STORY_QUESTION0)) {
+            question_clip = AREG_SD_STORY_QUESTION0;
         }
-        return;
-    }
-
-    // 4. Listening window: invite the child to press & hold and answer. The
-    //    recording color is the "your turn" cue. No press in the window → quiet
-    //    close (never force an answer from a small child).
-    Serial.println("[post] listening for the answer (press & hold to talk)");
-    Serial.flush();
-    led_for_state(ST_RECORDING);
-    bool got_press = false;
-    const uint32_t listen_started = millis();
-    while (millis() - listen_started < AREG_REFLECTION_LISTEN_MS) {
-        if (button_poll() == 'P') {
-            got_press = true;
+        if (question_clip == nullptr) {
+            // No clip for this round → the dialogue is over (round 0 with no
+            // clip means the story ships no reflection at all).
+            if (q == 0) return;
             break;
         }
-        delay(AREG_BUTTON_POLL_MS);
-    }
-    if (!got_press) {
-        Serial.println("[post] no answer in window; closing quietly");
-        Serial.flush();
-        led_for_state(ST_IDLE);
-        return;
-    }
 
-    // 5. Record the answer while held, then POST to the reflection endpoint.
-    transition_to(ST_RECORDING);
-    const size_t captured = record_question();
-    const uint32_t ms_held = (captured * 1000) / AREG_SAMPLE_RATE_HZ;
-    if (ms_held < AREG_MIN_RECORD_MS) {
-        Serial.printf("[post] answer too short (%u ms); closing\n", (unsigned)ms_held);
-        Serial.flush();
-        led_for_state(ST_IDLE);
-        return;
-    }
+        // Is there a NEXT question after this one? Decides the `last` flag
+        // so the backend appends the goodbye exactly once per dialogue.
+        bool has_next = false;
+        if (q < 2) {
+            char next_path[CS_MAX_PATH_LEN];
+            const char *next_kind = cs_question_clip_kind(q + 1);
+            has_next = next_kind != nullptr
+                && story_select_resolve_clip_path(post_story_id, next_kind,
+                                                  next_path, sizeof(next_path));
+        }
 
-    const size_t pcm_bytes = captured * sizeof(int16_t);
-    const size_t payload_bytes = 44 + pcm_bytes;
-    uint8_t *payload = (uint8_t *)heap_caps_malloc(payload_bytes, MALLOC_CAP_SPIRAM);
-    if (payload == nullptr) {
-        Serial.println("[post] payload alloc failed; closing");
-        Serial.flush();
-        led_for_state(ST_IDLE);
-        return;
-    }
-    audio_write_wav_header(payload, (uint32_t)captured);
-    memcpy(payload + 44, s_capture_buf, pcm_bytes);
-
-    transition_to(ST_UPLOADING);
-    audio_speaker_begin();
-    audio_play_thinking_earcon();  // immediate acoustic ack while we upload
-    Serial.println("[post] uploading answer to reflection endpoint");
-    Serial.flush();
-
-    // questionIndex 0 — this slice asks the first reflection question only.
-    VoiceTurnResult turn = voice_upload_reflection_answer(payload, payload_bytes, 0);
-    heap_caps_free(payload);
-    payload = nullptr;
-
-    if (turn.ok) {
         transition_to(ST_PLAYING);
         audio_speaker_begin();
-        audio_play_mp3_buffer(turn.response_bytes, turn.response_length);
-        Serial.println("[post] acknowledgement played");
+        Serial.printf("[post] question %d (%s)\n", q, question_clip);
         Serial.flush();
-    } else {
-        Serial.printf("[post] reflection upload failed (status=%d)\n", turn.http_status);
+        audio_play_story_file(question_clip, 0, nullptr, nullptr);
+
+        // The ANSWER needs the cloud (STT + the bounded reaction). Offline →
+        // optional close, stop the dialogue.
+        if (!voice_wifi_is_connected()) {
+            Serial.println("[post] offline — answer needs connectivity; closing");
+            Serial.flush();
+            if (audio_sd_has_file(AREG_SD_OFFLINE_CLOSE)) {
+                audio_speaker_begin();
+                audio_play_story_file(AREG_SD_OFFLINE_CLOSE, 0, nullptr, nullptr);
+            }
+            led_for_state(ST_IDLE);
+            return;
+        }
+
+        // Listening window: the recording color is the "your turn" cue. No
+        // press → quiet close (never force an answer from a small child).
+        Serial.printf("[post] listening for answer %d (press & hold to talk)\n", q);
         Serial.flush();
+        led_for_state(ST_RECORDING);
+        bool got_press = false;
+        const uint32_t listen_started = millis();
+        while (millis() - listen_started < AREG_REFLECTION_LISTEN_MS) {
+            if (button_poll() == 'P') {
+                got_press = true;
+                break;
+            }
+            delay(AREG_BUTTON_POLL_MS);
+        }
+        if (!got_press) {
+            Serial.println("[post] no answer in window; closing quietly");
+            Serial.flush();
+            led_for_state(ST_IDLE);
+            return;
+        }
+
+        // Record the answer while held, then POST to the reflection endpoint.
+        transition_to(ST_RECORDING);
+        const size_t captured = record_question();
+        const uint32_t ms_held = (captured * 1000) / AREG_SAMPLE_RATE_HZ;
+        if (ms_held < AREG_MIN_RECORD_MS) {
+            Serial.printf("[post] answer too short (%u ms); closing\n", (unsigned)ms_held);
+            Serial.flush();
+            led_for_state(ST_IDLE);
+            return;
+        }
+
+        const size_t pcm_bytes = captured * sizeof(int16_t);
+        const size_t payload_bytes = 44 + pcm_bytes;
+        uint8_t *payload = (uint8_t *)heap_caps_malloc(payload_bytes, MALLOC_CAP_SPIRAM);
+        if (payload == nullptr) {
+            Serial.println("[post] payload alloc failed; closing");
+            Serial.flush();
+            led_for_state(ST_IDLE);
+            return;
+        }
+        audio_write_wav_header(payload, (uint32_t)captured);
+        memcpy(payload + 44, s_capture_buf, pcm_bytes);
+
+        transition_to(ST_UPLOADING);
+        audio_speaker_begin();
+        audio_play_thinking_earcon();  // immediate acoustic ack while we upload
+        Serial.printf("[post] uploading answer %d (last=%d)\n", q, has_next ? 0 : 1);
+        Serial.flush();
+
+        VoiceTurnResult turn = voice_upload_reflection_answer(
+            payload, payload_bytes, q, /*last=*/!has_next);
+        heap_caps_free(payload);
+        payload = nullptr;
+
+        if (turn.ok) {
+            transition_to(ST_PLAYING);
+            audio_speaker_begin();
+            audio_play_mp3_buffer(turn.response_bytes, turn.response_length);
+            Serial.printf("[post] reply %d played\n", q);
+            Serial.flush();
+        } else {
+            Serial.printf("[post] reflection upload failed (status=%d)\n", turn.http_status);
+            Serial.flush();
+            voice_release_last_response();
+            led_for_state(ST_IDLE);
+            return;  // a failed round ends the dialogue quietly
+        }
+        voice_release_last_response();
+
+        if (!has_next) {
+            break;   // that reply carried the goodbye — dialogue complete
+        }
     }
-    voice_release_last_response();
     led_for_state(ST_IDLE);
 }
 
@@ -655,6 +715,22 @@ static void handle_story_session() {
         s_current_story_id[0] ? s_current_story_id : AREG_STORY_ID;
     voice_set_active_story_id(active_story_id);
 
+    // B2/B3 — spoken story intro («Հեքիաթ՝ …, հեղինակ՝ …») before a NEW
+    // story, when the parent toggle (cached in the index) is on and the
+    // intro clip is synced+verified for the selected story. Plays to its
+    // natural end (a few seconds); a resume (offset > 0) never replays it.
+    if (s_story_offset == 0 && cache_hit && story_select_intro_enabled()) {
+        char intro_path[CS_MAX_PATH_LEN];
+        if (story_select_resolve_clip_path(active_story_id, "intro",
+                                           intro_path, sizeof(intro_path))) {
+            transition_to(ST_PLAYING);
+            audio_speaker_begin();
+            Serial.printf("[story] intro clip (%s)\n", intro_path);
+            Serial.flush();
+            audio_play_story_file(intro_path, 0, nullptr, nullptr);
+        }
+    }
+
     // Story-audio access token (gap 1) — only the Wi-Fi stream needs it.
     static char story_token[256];
     bool have_token = use_sd
@@ -664,6 +740,12 @@ static void handle_story_session() {
     // The rotation cursor advances at most once per session, and ONLY after
     // playback genuinely started.
     bool selection_settled = false;
+    // Story-play reporting: enqueue at most one event per NEW story session
+    // (a resume re-enters this function with offset > 0 and must not
+    // double-count the listen — the open event from the original start is
+    // still queued and gets closed at natural end).
+    const bool report_new_start = (s_story_offset == 0);
+    bool play_reported = false;
     bool active = true;
     while (active) {
         transition_to(ST_PLAYING);
@@ -733,6 +815,16 @@ static void handle_story_session() {
             }
         }
 
+        // Story-play reporting: one queued event per NEW session, only after
+        // playback genuinely started (same `started` gate as the rotation
+        // cursor — a story that resolved but made no sound is not a play).
+        // Fires for every source (cache / pack / stream) via active_story_id.
+        if (report_new_start && started && !play_reported) {
+            play_reported = true;
+            story_report_on_started(active_story_id,
+                                    cache_hit ? "sd" : (use_sd ? "pack" : "stream"));
+        }
+
         // #063 — token-rejection recovery now driven by the REAL stream-open
         // status surfaced from the decoder layer (a non-200 GET = the
         // concealment 404 of an expired/rejected token), NOT a wall-clock guess.
@@ -749,6 +841,13 @@ static void handle_story_session() {
 
         if (!interrupted) {
             s_story_offset = 0;
+            // Story-play reporting: natural end closes the open event (a
+            // resumed session closes the event its original start opened).
+            // Guarded on `started` so an SD open-failure (which also returns
+            // interrupted=false) cannot close an unrelated open event.
+            if (started) {
+                story_report_on_finished();
+            }
             // Slice 3: conclusion → reflection question → (online) listen for the
             // child's answer → warm acknowledgement. Self-gates on the SD pack,
             // so it is a no-op when playing the Wi-Fi stream.
@@ -1417,6 +1516,13 @@ void loop() {
         // (this branch), same as the heartbeat, so a poll can never stall a
         // voice turn. NO firmware download/apply in this slice.
         ota_foundation_tick();
+
+        // Story-play reporting — upload queued play events (SD-cache plays
+        // never touch the backend, so without this the parent dashboard
+        // under-reports). Prompt after a story ends, else on the heartbeat
+        // cadence while anything is queued. IDLE-only, best-effort; events
+        // are deleted only after a server 2xx.
+        story_report_tick();
 
 #ifdef AREG_CONTENT_SYNC_BENCH
         // Cloud→SD story sync (bench builds only): one attempt per boot,

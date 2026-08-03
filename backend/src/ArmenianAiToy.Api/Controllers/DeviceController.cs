@@ -94,6 +94,36 @@ public class DeviceController : ControllerBase
         return Ok(new { ok = true, deviceId, serverTimeUtc = DateTime.UtcNow });
     }
 
+    // Store-and-forward upload of story playback events. The toy plays stories
+    // from its SD cache (offline path), queues a tiny record per play in NVS,
+    // and uploads the queue here whenever Wi-Fi is up — deleting queued events
+    // only after a 2xx. At-least-once transport: every event carries a
+    // device-generated idempotency key, so a re-upload inserts nothing twice
+    // and `accepted` may legitimately be 0. Device-authed (middleware).
+    [HttpPost("story-plays")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> ReportStoryPlays(
+        [FromBody] StoryPlayReportRequest request)
+    {
+        var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
+        if (request?.Events is null || request.Events.Count == 0)
+        {
+            return BadRequest(new { error = "At least one event is required." });
+        }
+        if (request.Events.Count > StoryPlayReportRequest.MaxEvents)
+        {
+            return BadRequest(new
+            {
+                error = $"At most {StoryPlayReportRequest.MaxEvents} events per upload."
+            });
+        }
+        var accepted = await _deviceService.ReportStoryPlaysAsync(
+            deviceId, request, DateTime.UtcNow);
+        return Ok(new { accepted });
+    }
+
     // Device polls its command queue. Device-authed (middleware). Returns only
     // this device's deliverable commands (Pending/Sent, not expired) and marks
     // Pending → Sent. The toy connects OUTBOUND only — there is no inbound
@@ -186,10 +216,20 @@ public class DeviceController : ControllerBase
     [HttpGet("content-manifest")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
-    public IActionResult GetContentManifest(
+    public async Task<IActionResult> GetContentManifest(
         [FromServices] IContentManifestService manifest)
     {
-        return Ok(manifest.Build());
+        // B3 — stamp this device's spoken-story-intro flag onto the static
+        // manifest. Additive field: pre-B3 firmware ignores it; new firmware
+        // caches the last-known value so the toggle applies offline. Missing
+        // device row (shouldn't happen behind the auth middleware) falls back
+        // to the shipped default (ON).
+        var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
+        var device = await _deviceService.GetDeviceAsync(deviceId);
+        return Ok(manifest.Build() with
+        {
+            StoryIntroEnabled = device?.StoryIntroEnabled ?? true,
+        });
     }
 
     // Streams a configured story MP3 to the device. Same fail-closed
@@ -212,7 +252,8 @@ public class DeviceController : ControllerBase
     public IActionResult GetContentFile(
         [FromServices] ContentSyncOptions options,
         [FromServices] ILogger<DeviceController> logger,
-        [FromQuery] string? storyId = null)
+        [FromQuery] string? storyId = null,
+        [FromQuery] string? clip = null)
     {
         if (!options.Enabled)
         {
@@ -230,19 +271,41 @@ public class DeviceController : ControllerBase
         {
             story = stories.Count == 1 ? stories[0] : null;
         }
-
-        if (story is null || string.IsNullOrWhiteSpace(story.AudioPath))
+        if (story is null)
         {
             return NotFound(new { error = "No content available." });
         }
-        if (!Path.IsPathRooted(story.AudioPath) || !System.IO.File.Exists(story.AudioPath))
+
+        // B2 — `clip` selects a per-story clip (intro/question/summary)
+        // instead of the narration. Like storyId, it is ONLY a lookup key
+        // against configured items — it never reaches the filesystem, so it
+        // carries no traversal risk. Unknown kind → same uniform 404.
+        var audioPath = story.AudioPath;
+        var pathOwnerId = story.StoryId;
+        if (!string.IsNullOrWhiteSpace(clip))
+        {
+            var clipItem = story.Clips.FirstOrDefault(c =>
+                string.Equals(c.Kind, clip, StringComparison.OrdinalIgnoreCase));
+            if (clipItem is null)
+            {
+                return NotFound(new { error = "No content available." });
+            }
+            audioPath = clipItem.AudioPath;
+            pathOwnerId = $"{story.StoryId}:{clipItem.Kind}";
+        }
+
+        if (string.IsNullOrWhiteSpace(audioPath))
+        {
+            return NotFound(new { error = "No content available." });
+        }
+        if (!Path.IsPathRooted(audioPath) || !System.IO.File.Exists(audioPath))
         {
             logger.LogWarning(
                 "Content audio path missing or not absolute for {StoryId}: {AudioPath}",
-                story.StoryId, story.AudioPath);
+                pathOwnerId, audioPath);
             return NotFound(new { error = "No content available." });
         }
-        return PhysicalFile(story.AudioPath, "audio/mpeg",
+        return PhysicalFile(audioPath, "audio/mpeg",
             enableRangeProcessing: true);
     }
 }

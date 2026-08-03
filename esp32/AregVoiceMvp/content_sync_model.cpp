@@ -111,6 +111,39 @@ int cs_manifest_parse(JsonArrayConst stories, CsStory *out, int max_out,
             Serial.printf("[content-sync] item %s rejected (path_too_long)\n", story_id);
             continue;
         }
+
+        // B2 — per-story clips. Same per-item fail-closed rule at clip
+        // granularity: a bad clip is skipped and never takes the story or
+        // its valid sibling clips with it. Duplicate kinds keep the first.
+        dst->clip_count = 0;
+        if (item["clips"].is<JsonArrayConst>()) {
+            for (JsonObjectConst c : item["clips"].as<JsonArrayConst>()) {
+                if (dst->clip_count >= CS_MAX_CLIPS) break;
+                const char *kind = c["kind"]      | "";
+                const char *csha = c["sha256"]    | "";
+                const long  csz  = c["sizeBytes"] | 0L;
+                if (!cs_is_valid_clip_kind(kind) || !cs_is_sha256_hex(csha)
+                    || !cs_is_valid_size(csz)) {
+                    Serial.printf("[content-sync] %s clip rejected (kind=%s)\n",
+                                  dst->story_id, kind);
+                    continue;
+                }
+                bool cdup = false;
+                for (int k = 0; k < dst->clip_count; k++) {
+                    if (strcmp(dst->clips[k].kind, kind) == 0) { cdup = true; break; }
+                }
+                if (cdup) continue;
+                CsClip *clip = &dst->clips[dst->clip_count];
+                memset(clip, 0, sizeof(*clip));
+                if (!cs_copy_bounded(clip->kind, sizeof(clip->kind), kind)
+                    || !cs_copy_bounded(clip->sha256, sizeof(clip->sha256), csha)) {
+                    continue;
+                }
+                clip->size_bytes = csz;
+                clip->verified   = false;
+                dst->clip_count++;
+            }
+        }
         count++;
     }
 
@@ -151,6 +184,31 @@ int cs_index_parse(JsonDocument &doc, CsStory *out, int max_out, int *out_schema
             dst->version    = cs_normalize_version(e["version"] | 1);
             dst->size_bytes = e["sizeBytes"] | 0L;
             dst->verified   = e["verified"] | false;
+
+            // v3 clips[] — absent on every v2 card, yielding clip_count 0
+            // (story plays without intro/reflection, the pre-B2 behavior).
+            dst->clip_count = 0;
+            if (e["clips"].is<JsonArrayConst>()) {
+                for (JsonObjectConst c : e["clips"].as<JsonArrayConst>()) {
+                    if (dst->clip_count >= CS_MAX_CLIPS) break;
+                    const char *kind = c["kind"]      | "";
+                    const char *csha = c["sha256"]    | "";
+                    const long  csz  = c["sizeBytes"] | 0L;
+                    if (!cs_is_valid_clip_kind(kind) || !cs_is_sha256_hex(csha)
+                        || !cs_is_valid_size(csz)) {
+                        continue;
+                    }
+                    CsClip *clip = &dst->clips[dst->clip_count];
+                    memset(clip, 0, sizeof(*clip));
+                    if (!cs_copy_bounded(clip->kind, sizeof(clip->kind), kind)
+                        || !cs_copy_bounded(clip->sha256, sizeof(clip->sha256), csha)) {
+                        continue;
+                    }
+                    clip->size_bytes = csz;
+                    clip->verified   = c["verified"] | false;
+                    dst->clip_count++;
+                }
+            }
             count++;
         }
         return count;
@@ -182,9 +240,13 @@ int cs_index_parse(JsonDocument &doc, CsStory *out, int max_out, int *out_schema
 }
 
 void cs_index_build(JsonDocument &doc, const CsStory *active, int count,
-                    const char *mirror_story_id) {
+                    const char *mirror_story_id, bool intro_enabled) {
     doc.clear();
     doc["schemaVersion"] = CS_INDEX_SCHEMA_VERSION;
+    // Parent story-intro toggle, cached on the card so the last-known
+    // value applies offline too. Root-level: it is per-device, not
+    // per-story.
+    doc["introEnabled"] = intro_enabled;
     JsonArray arr = doc["stories"].to<JsonArray>();
     if (active == nullptr || count < 0) {
         count = 0;
@@ -198,6 +260,16 @@ void cs_index_build(JsonDocument &doc, const CsStory *active, int count,
         e["sizeBytes"] = active[i].size_bytes;
         e["cachePath"] = active[i].cache_path;
         e["verified"]  = active[i].verified;
+        if (active[i].clip_count > 0) {
+            JsonArray clips = e["clips"].to<JsonArray>();
+            for (int k = 0; k < active[i].clip_count && k < CS_MAX_CLIPS; k++) {
+                JsonObject c = clips.add<JsonObject>();
+                c["kind"]      = active[i].clips[k].kind;
+                c["sha256"]    = active[i].clips[k].sha256;
+                c["sizeBytes"] = active[i].clips[k].size_bytes;
+                c["verified"]  = active[i].clips[k].verified;
+            }
+        }
     }
 
     if (mirror_story_id == nullptr || count == 0) {
@@ -218,4 +290,8 @@ void cs_index_build(JsonDocument &doc, const CsStory *active, int count,
     doc["sha256"]    = active[mirror].sha256;
     doc["file"]      = active[mirror].cache_path;
     doc["sizeBytes"] = active[mirror].size_bytes;
+}
+
+bool cs_index_intro_enabled(JsonDocument &doc) {
+    return doc["introEnabled"] | true;
 }

@@ -618,6 +618,7 @@
       <h2 data-i18n="linked_devices">🧸 Linked devices</h2>
       <div style="margin:0 0 8px;">
         <button id="openAuditBtn" class="link" type="button" data-i18n="view_activity">View your activity →</button>
+        <button id="openLibraryBtn" class="link" type="button" style="margin-left:14px;" data-i18n="view_library">📚 Story library →</button>
       </div>
       <!--
         Consumer pairing (Phase A.2): claim a toy with the single-use code
@@ -715,7 +716,13 @@
         <button class="link" id="backToDevices" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button>
         <span class="tabs" role="tablist" aria-label="Device views">
           <button data-tab="summaries" role="tab" aria-selected="false" data-i18n="tab_conversations">Conversations</button>
+          <button data-tab="mode:story" role="tab" aria-selected="false" data-i18n="tab_stories">Stories</button>
+          <button data-tab="mode:game" role="tab" aria-selected="false" data-i18n="tab_games">Games</button>
+          <button data-tab="mode:riddle" role="tab" aria-selected="false" data-i18n="tab_riddles">Riddles</button>
+          <button data-tab="mode:curiosity" role="tab" aria-selected="false" data-i18n="tab_questions">Questions</button>
+          <button data-tab="mode:calm" role="tab" aria-selected="false" data-i18n="tab_bedtime">Bedtime</button>
           <button data-tab="flagged" role="tab" aria-selected="false" data-i18n="tab_flagged">Flagged</button>
+          <button data-tab="plays" role="tab" aria-selected="false" data-i18n="tab_plays">Story plays</button>
         </span>
       </h2>
       <div id="summariesDeviceContext" class="device-context"></div>
@@ -744,7 +751,13 @@
         <button class="link" id="flaggedBackToDevices" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button>
         <span class="tabs" role="tablist" aria-label="Device views">
           <button data-tab="summaries" role="tab" aria-selected="false" data-i18n="tab_conversations">Conversations</button>
+          <button data-tab="mode:story" role="tab" aria-selected="false" data-i18n="tab_stories">Stories</button>
+          <button data-tab="mode:game" role="tab" aria-selected="false" data-i18n="tab_games">Games</button>
+          <button data-tab="mode:riddle" role="tab" aria-selected="false" data-i18n="tab_riddles">Riddles</button>
+          <button data-tab="mode:curiosity" role="tab" aria-selected="false" data-i18n="tab_questions">Questions</button>
+          <button data-tab="mode:calm" role="tab" aria-selected="false" data-i18n="tab_bedtime">Bedtime</button>
           <button data-tab="flagged" role="tab" aria-selected="false" data-i18n="tab_flagged">Flagged</button>
+          <button data-tab="plays" role="tab" aria-selected="false" data-i18n="tab_plays">Story plays</button>
         </span>
       </h2>
       <div id="flaggedDeviceContext" class="device-context"></div>
@@ -759,6 +772,44 @@
         <button id="flaggedOlderBtn" class="secondary" aria-label="Older page" data-i18n="older">Older →</button>
       </div>
       <div id="flaggedPagerInfo" class="pager-info"></div>
+    </section>
+
+    <!-- Story plays view (Slice A/D) — device-reported playback history.
+         Stories play from the toy's SD card, so they never appear as
+         conversations; this list is the honest record of what the child
+         actually heard, plus the child's saved answers to each story's
+         after-story question (B4). -->
+    <section id="playsView" class="card" hidden>
+      <h2>
+        <button class="link" id="playsBackToDevices" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button>
+        <span class="tabs" role="tablist" aria-label="Device views">
+          <button data-tab="summaries" role="tab" aria-selected="false" data-i18n="tab_conversations">Conversations</button>
+          <button data-tab="mode:story" role="tab" aria-selected="false" data-i18n="tab_stories">Stories</button>
+          <button data-tab="mode:game" role="tab" aria-selected="false" data-i18n="tab_games">Games</button>
+          <button data-tab="mode:riddle" role="tab" aria-selected="false" data-i18n="tab_riddles">Riddles</button>
+          <button data-tab="mode:curiosity" role="tab" aria-selected="false" data-i18n="tab_questions">Questions</button>
+          <button data-tab="mode:calm" role="tab" aria-selected="false" data-i18n="tab_bedtime">Bedtime</button>
+          <button data-tab="flagged" role="tab" aria-selected="false" data-i18n="tab_flagged">Flagged</button>
+          <button data-tab="plays" role="tab" aria-selected="false" data-i18n="tab_plays">Story plays</button>
+        </span>
+      </h2>
+      <div id="playsDeviceContext" class="device-context"></div>
+      <div id="playsTotals" style="margin:8px 0 12px;"></div>
+      <div id="playsList"></div>
+      <div id="playsAnswers" style="margin-top:16px;"></div>
+      <div id="playsStatus" class="status muted" aria-live="polite"></div>
+    </section>
+
+    <!-- Story library view (Slice D) — what the toy can play, with the
+         story metadata (author / goal / lesson), the parent's own listen
+         counts, and a ▶ preview of the shipped narration. -->
+    <section id="libraryView" class="card" hidden>
+      <h2>
+        <button class="link" id="libraryBackToDevices" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button>
+        <span data-i18n="story_library">📚 Story library</span>
+      </h2>
+      <div id="libraryList"></div>
+      <div id="libraryStatus" class="status muted" aria-live="polite"></div>
     </section>
 
     <!-- Detail view -->
@@ -832,6 +883,27 @@
       nav_devices: { en: '← Devices', ru: '← Игрушки', hy: '← Խաղալիքներ' },
       tab_conversations: { en: 'Conversations', ru: 'Разговоры', hy: 'Զրույցներ' },
       tab_flagged: { en: 'Flagged', ru: 'Отмеченные', hy: 'Նշվածներ' },
+      tab_stories: { en: 'Stories', ru: 'Сказки', hy: 'Հեքիաթներ' },
+      tab_games: { en: 'Games', ru: 'Игры', hy: 'Խաղեր' },
+      tab_riddles: { en: 'Riddles', ru: 'Загадки', hy: 'Հանելուկներ' },
+      tab_questions: { en: 'Questions', ru: 'Вопросы', hy: 'Հարցեր' },
+      tab_bedtime: { en: 'Bedtime', ru: 'Сон', hy: 'Քնելուց առաջ' },
+      tab_plays: { en: 'Story plays', ru: 'Прослушивания', hy: 'Լսումներ' },
+      view_library: { en: '📚 Story library →', ru: '📚 Библиотека сказок →', hy: '📚 Հեքիաթների գրադարան →' },
+      story_library: { en: '📚 Story library', ru: '📚 Библиотека сказок', hy: '📚 Հեքիաթների գրադարան' },
+      listened: { en: 'Listened', ru: 'Прослушано', hy: 'Լսվել է' },
+      times_suffix: { en: 'time(s)', ru: 'раз', hy: 'անգամ' },
+      finished_label: { en: 'finished', ru: 'до конца', hy: 'մինչև վերջ' },
+      child_answers: { en: "Child's answers to the story question", ru: 'Ответы ребёнка на вопрос сказки', hy: 'Երեխայի պատասխանները հեքիաթի հարցին' },
+      approx_time: { en: 'approximate time', ru: 'примерное время', hy: 'մոտավոր ժամանակ' },
+      play_finished: { en: '✓ finished', ru: '✓ до конца', hy: '✓ մինչև վերջ' },
+      play_partial: { en: 'stopped early', ru: 'не до конца', hy: 'ընդհատվել է' },
+      author_label: { en: 'Author', ru: 'Автор', hy: 'Հեղինակ' },
+      goal_label: { en: 'About', ru: 'О сказке', hy: 'Հեքիաթի մասին' },
+      lesson_label: { en: 'What it teaches', ru: 'Чему учит', hy: 'Ինչ է սովորեցնում' },
+      bedtime_safe: { en: '🌙 bedtime-safe', ru: '🌙 подходит для сна', hy: '🌙 քնելուց առաջ' },
+      no_plays_yet: { en: 'No story plays reported yet. The toy uploads them when it is online.', ru: 'Прослушиваний пока нет. Игрушка отправит их, когда будет онлайн.', hy: 'Դեռ լսումներ չկան։ Խաղալիքը կուղարկի դրանք, երբ առցանց լինի։' },
+      discuss_with_child: { en: 'Discuss with your child', ru: 'Обсудите с ребёнком', hy: 'Քննարկեք երեխայի հետ' },
       today: { en: '☀️ Today', ru: '☀️ Сегодня', hy: '☀️ Այսօր' },
       newer: { en: '← Newer', ru: '← Новее', hy: '← Ավելի նոր' },
       older: { en: 'Older →', ru: 'Старее →', hy: 'Ավելի հին →' },
@@ -952,6 +1024,11 @@
       offset: 0,
       flaggedOffset: 0,
       auditOffset: 0,
+      // Slice D — active per-mode tab filter for the conversations list
+      // (null = all), and a storyId→title map from the library endpoint
+      // so the Story-plays list shows names instead of ids.
+      modeFilter: null,
+      storyTitles: null,
       backFromDetail: null,
       lastSummariesPageSize: 0,
       lastFlaggedPageSize: 0,
@@ -995,7 +1072,8 @@
     function show(viewId) {
       var ids = ['loginView', 'resetRequestView', 'resetPasswordView',
                  'verifyEmailRequestView', 'verifyEmailCompleteView',
-                 'devicesView', 'toyView', 'summariesView', 'flaggedView', 'detailView', 'auditView'];
+                 'devicesView', 'toyView', 'summariesView', 'flaggedView',
+                 'playsView', 'libraryView', 'detailView', 'auditView'];
       for (var i = 0; i < ids.length; i++) {
         document.getElementById(ids[i]).hidden = (ids[i] !== viewId);
       }
@@ -2667,13 +2745,17 @@
       state.currentDeviceId = deviceId;
       state.offset = 0;
       state.flaggedOffset = 0;
+      state.modeFilter = null;   // a fresh device view starts on "all"
       loadSummaries();
     }
 
     function loadSummaries() {
       show('summariesView');
       setViewHash('summaries', state.currentDeviceId);
-      setActiveTab('summaries');
+      // Slice D — the per-mode tabs are the conversations list filtered
+      // server-side by the stamped message mode; the active tab reflects
+      // the filter so the strip stays truthful.
+      setActiveTab(state.modeFilter ? ('mode:' + state.modeFilter) : 'summaries');
       state.backFromDetail = loadSummaries;
       renderDeviceContext('summariesDeviceContext');
       setStatus('summariesStatus', 'Loading…', 'muted');
@@ -2683,12 +2765,20 @@
       // E1.1: kick off the Today panel fetch in parallel with the paged
       // conversation list. The two are independent — a Today fetch
       // failure does NOT block or affect the paginated list below.
-      loadTodayPanel(state.currentDeviceId);
+      // Hidden on mode tabs (the panel summarizes the whole day, not one
+      // mode — showing it under "Riddles" would be misleading).
+      var todayPanel = document.getElementById('todayPanel');
+      if (state.modeFilter) {
+        todayPanel.hidden = true;
+      } else {
+        loadTodayPanel(state.currentDeviceId);
+      }
 
       var url = '/api/conversations/summary'
         + '?deviceId=' + encodeURIComponent(state.currentDeviceId)
         + '&limit=' + PAGE_SIZE
-        + '&offset=' + state.offset;
+        + '&offset=' + state.offset
+        + (state.modeFilter ? '&mode=' + encodeURIComponent(state.modeFilter) : '');
 
       authedFetch(url).then(function (data) {
         var rows = (data && data.conversations) || [];
@@ -3520,18 +3610,291 @@
     });
     document.getElementById('openAuditBtn').addEventListener('click', loadAudit);
     document.getElementById('backFromAudit').addEventListener('click', loadDevices);
+    document.getElementById('openLibraryBtn').addEventListener('click', loadStoryLibrary);
+    document.getElementById('libraryBackToDevices').addEventListener('click', loadDevices);
+    document.getElementById('playsBackToDevices').addEventListener('click', loadDevices);
     document.getElementById('auditOlderBtn').addEventListener('click', pageOlderAudit);
     document.getElementById('auditNewerBtn').addEventListener('click', pageNewerAudit);
 
-    // Tab buttons (in both summaries and flagged views)
+    // ---------- story plays + library (Slice A/D) ----------
+
+    function storyTitle(id) {
+      return (state.storyTitles && state.storyTitles[id]) || id;
+    }
+
+    // Loads the library once per session so the plays list can show story
+    // TITLES instead of ids. Failure is harmless — ids render instead.
+    function ensureStoryTitles() {
+      if (state.storyTitles) return Promise.resolve(state.storyTitles);
+      return authedFetch('/api/parents/stories').then(function (data) {
+        var map = {};
+        ((data && data.stories) || []).forEach(function (s) {
+          map[s.storyId] = s.title;
+        });
+        state.storyTitles = map;
+        return map;
+      }).catch(function () { return {}; });
+    }
+
+    function loadStoryPlays() {
+      show('playsView');
+      setViewHash('plays', state.currentDeviceId);
+      setActiveTab('plays');
+      renderDeviceContext('playsDeviceContext');
+      setStatus('playsStatus', 'Loading…', 'muted');
+      var totalsEl = document.getElementById('playsTotals');
+      var listEl = document.getElementById('playsList');
+      var answersEl = document.getElementById('playsAnswers');
+      clearChildren(totalsEl);
+      clearChildren(listEl);
+      clearChildren(answersEl);
+
+      ensureStoryTitles().then(function () {
+        return authedFetch('/api/parents/devices/'
+          + encodeURIComponent(state.currentDeviceId)
+          + '/story-plays?limit=100&offset=0');
+      }).then(function (data) {
+        var totals = (data && data.totals) || [];
+        var plays = (data && data.plays) || [];
+        if (plays.length === 0) {
+          setStatus('playsStatus', t('no_plays_yet'), 'muted');
+        } else {
+          setStatus('playsStatus', '', '');
+        }
+        // Per-story listen counters — the real count the owner asked for.
+        totals.forEach(function (tt) {
+          var line = document.createElement('div');
+          line.style.cssText = 'padding:4px 0;font-size:14px;';
+          var name = document.createElement('strong');
+          name.textContent = '📖 ' + storyTitle(tt.storyId);
+          line.appendChild(name);
+          var counts = document.createElement('span');
+          counts.style.cssText = 'color:#666;margin-left:8px;font-size:13px;';
+          counts.textContent = t('listened') + ' ' + tt.count + ' '
+            + t('times_suffix') + ' (' + tt.finishedCount + ' ' + t('finished_label') + ')';
+          line.appendChild(counts);
+          totalsEl.appendChild(line);
+        });
+        // Newest-first play rows.
+        plays.forEach(function (p) {
+          var row = document.createElement('div');
+          row.className = 'row';
+          row.style.cursor = 'default';
+          var top = document.createElement('div');
+          top.className = 'top';
+          var left = document.createElement('span');
+          left.textContent = fmtTime(p.playedAtUtc)
+            + (p.timeIsApproximate ? ' (~' + t('approx_time') + ')' : '');
+          var right = document.createElement('span');
+          right.textContent = storyTitle(p.storyId) + ' · '
+            + (p.finished ? t('play_finished') : t('play_partial'));
+          top.appendChild(left);
+          top.appendChild(right);
+          row.appendChild(top);
+          listEl.appendChild(row);
+        });
+      }).catch(function (err) {
+        if (err && err.status === 401) return;
+        setStatus('playsStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+      });
+
+      // B4 — the child's saved answers to each story's meaning question.
+      // Independent fetch: a failure here never hides the plays list.
+      authedFetch('/api/parents/devices/'
+        + encodeURIComponent(state.currentDeviceId)
+        + '/reflection-answers?limit=100&offset=0'
+      ).then(function (data) {
+        var answers = (data && data.answers) || [];
+        if (answers.length === 0) return;
+        var h = document.createElement('h3');
+        h.style.cssText = 'font-size:15px;margin:8px 0;';
+        h.textContent = '💬 ' + t('child_answers');
+        answersEl.appendChild(h);
+        answers.forEach(function (a) {
+          var row = document.createElement('div');
+          row.style.cssText = 'padding:6px 0;border-bottom:1px solid #eee;font-size:13px;';
+          var meta = document.createElement('div');
+          meta.style.cssText = 'color:#888;font-size:12px;';
+          meta.textContent = storyTitle(a.storyId) + ' · ' + fmtTime(a.createdAtUtc)
+            + (a.safetyFlag && a.safetyFlag !== 'Clean' ? ' · ⚠ ' + a.safetyFlag : '');
+          var text = document.createElement('div');
+          text.textContent = '«' + a.answerText + '»';
+          row.appendChild(meta);
+          row.appendChild(text);
+          answersEl.appendChild(row);
+        });
+      }).catch(function () { /* answers are additive — quiet failure */ });
+    }
+
+    function loadStoryLibrary() {
+      show('libraryView');
+      setViewHash('library');
+      setStatus('libraryStatus', 'Loading…', 'muted');
+      var listEl = document.getElementById('libraryList');
+      clearChildren(listEl);
+
+      authedFetch('/api/parents/stories').then(function (data) {
+        var stories = (data && data.stories) || [];
+        // Refresh the title cache for the plays view while we're here.
+        var map = {};
+        stories.forEach(function (s) { map[s.storyId] = s.title; });
+        state.storyTitles = map;
+
+        if (stories.length === 0) {
+          setStatus('libraryStatus', 'No stories are published yet.', 'muted');
+          return;
+        }
+        setStatus('libraryStatus', '', '');
+        stories.forEach(function (s) {
+          listEl.appendChild(buildLibraryCard(s));
+        });
+      }).catch(function (err) {
+        if (err && err.status === 401) return;
+        setStatus('libraryStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+      });
+    }
+
+    function buildLibraryCard(s) {
+      var card = document.createElement('div');
+      card.style.cssText = 'padding:12px;border:1px solid #e2e2e2;border-radius:8px;margin:0 0 10px;';
+
+      var title = document.createElement('div');
+      title.style.cssText = 'font-size:16px;font-weight:600;';
+      title.textContent = '📖 ' + s.title;
+      card.appendChild(title);
+
+      var metaBits = [];
+      if (s.author) metaBits.push(t('author_label') + '՝ ' + s.author);
+      if (typeof s.minAge === 'number' && typeof s.maxAge === 'number') {
+        metaBits.push(s.minAge + '–' + s.maxAge);
+      }
+      if (s.bedtimeSafe === true) metaBits.push(t('bedtime_safe'));
+      if (metaBits.length > 0) {
+        var meta = document.createElement('div');
+        meta.style.cssText = 'color:#777;font-size:12px;margin:2px 0 6px;';
+        meta.textContent = metaBits.join(' · ');
+        card.appendChild(meta);
+      }
+
+      if (s.goal) {
+        var goal = document.createElement('div');
+        goal.style.cssText = 'font-size:13px;margin:4px 0;';
+        goal.textContent = t('goal_label') + ': ' + s.goal;
+        card.appendChild(goal);
+      }
+      if (s.lesson) {
+        var lesson = document.createElement('div');
+        lesson.style.cssText = 'font-size:13px;margin:4px 0;color:#3a5a3a;';
+        lesson.textContent = t('lesson_label') + ': ' + s.lesson;
+        card.appendChild(lesson);
+      }
+
+      var counts = document.createElement('div');
+      counts.style.cssText = 'font-size:12px;color:#666;margin:6px 0 4px;';
+      counts.textContent = t('listened') + ' ' + (s.listenCount || 0) + ' '
+        + t('times_suffix') + ' (' + (s.finishedCount || 0) + ' ' + t('finished_label') + ')';
+      card.appendChild(counts);
+
+      // Reflection dialogue — the same question/takeaway guide the toy
+      // speaks after the story, so a parent can continue the conversation
+      // off-device.
+      var qs = Array.isArray(s.reflectionQuestions) ? s.reflectionQuestions : [];
+      if (qs.length > 0) {
+        var discuss = document.createElement('details');
+        discuss.style.cssText = 'margin:6px 0 4px;font-size:13px;';
+        var summaryEl = document.createElement('summary');
+        summaryEl.style.cssText = 'cursor:pointer;color:#5b3e8a;';
+        summaryEl.textContent = '💬 ' + t('discuss_with_child');
+        discuss.appendChild(summaryEl);
+        var cons = Array.isArray(s.reflectionConclusions) ? s.reflectionConclusions : [];
+        qs.forEach(function (question, i) {
+          var qEl = document.createElement('div');
+          qEl.style.cssText = 'margin:6px 0 0 8px;';
+          qEl.textContent = (i + 1) + '. ' + question;
+          discuss.appendChild(qEl);
+          if (cons[i]) {
+            var cEl = document.createElement('div');
+            cEl.style.cssText = 'margin:2px 0 0 20px;color:#3a5a3a;font-size:12px;';
+            cEl.textContent = '→ ' + cons[i];
+            discuss.appendChild(cEl);
+          }
+        });
+        card.appendChild(discuss);
+      }
+
+      if (s.previewUrl) {
+        card.appendChild(buildPreviewAffordance(s.previewUrl));
+      }
+      return card;
+    }
+
+    // Same JWT-fetched Blob pattern as the C2.1 message-audio Listen
+    // button — the bytes never appear in the URL bar / history.
+    function buildPreviewAffordance(url) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '▶ Listen';
+      btn.style.cssText =
+        'background:#ece4f8;color:#5b3e8a;border:none;border-radius:6px;' +
+        'padding:4px 10px;font-size:12px;cursor:pointer;';
+      var status = document.createElement('span');
+      status.style.cssText = 'font-size:12px;color:#888;';
+      btn.onclick = function () {
+        btn.disabled = true;
+        status.textContent = 'Loading…';
+        var token = getToken();
+        if (!token) { status.textContent = t('session_expired'); btn.disabled = false; return; }
+        fetch(url, { headers: { 'Authorization': 'Bearer ' + token } })
+          .then(function (res) {
+            if (!res.ok) {
+              status.textContent = 'Audio not available.';
+              btn.disabled = false;
+              return null;
+            }
+            return res.blob();
+          }).then(function (blob) {
+            if (!blob) return;
+            var blobUrl = URL.createObjectURL(blob);
+            var audio = document.createElement('audio');
+            audio.controls = true;
+            audio.autoplay = true;
+            audio.src = blobUrl;
+            audio.style.cssText = 'max-width:100%;vertical-align:middle;';
+            audio.addEventListener('ended', function () { URL.revokeObjectURL(blobUrl); });
+            wrap.innerHTML = '';
+            wrap.appendChild(audio);
+          }).catch(function () {
+            status.textContent = 'Network error.';
+            btn.disabled = false;
+          });
+      };
+      wrap.appendChild(btn);
+      wrap.appendChild(status);
+      return wrap;
+    }
+
+    // Tab buttons (identical strips in the summaries, flagged, and plays
+    // views). Mode tabs are the conversations list with a server-side
+    // &mode= filter; switching tabs always restarts at page one.
     var tabButtons = document.querySelectorAll('.tabs button');
     for (var i = 0; i < tabButtons.length; i++) {
       (function (btn) {
         btn.addEventListener('click', function () {
           var t = btn.getAttribute('data-tab');
+          state.offset = 0;
           if (t === 'flagged') {
+            state.modeFilter = null;
             loadFlagged();
+          } else if (t === 'plays') {
+            state.modeFilter = null;
+            loadStoryPlays();
+          } else if (t && t.indexOf('mode:') === 0) {
+            state.modeFilter = t.slice(5);
+            loadSummaries();
           } else {
+            state.modeFilter = null;
             loadSummaries();
           }
         });
@@ -3731,6 +4094,12 @@
           state.currentDeviceId = d; state.offset = 0; state.flaggedOffset = 0;
           state.currentToyId = d;
           primeDevicesThen(loadFlagged);
+        } else if (v === 'plays' && d) {
+          state.currentDeviceId = d; state.offset = 0; state.flaggedOffset = 0;
+          state.currentToyId = d;
+          primeDevicesThen(loadStoryPlays);
+        } else if (v === 'library') {
+          loadStoryLibrary();
         } else if (v === 'detail' && d && c) {
           state.currentDeviceId = d; state.offset = 0; state.flaggedOffset = 0;
           state.currentToyId = d;

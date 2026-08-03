@@ -55,12 +55,52 @@ public sealed class ContentManifestService : IContentManifestService
                 AudioUrl: ResolveAudioUrl(story),
                 Sha256: story.Sha256.ToLowerInvariant(),
                 SizeBytes: story.SizeBytes,
-                Enabled: true));
+                Enabled: true)
+            {
+                Clips = BuildClips(story),
+            });
         }
 
         return items.Count == 0
             ? ContentManifestResponse.Empty()
             : new ContentManifestResponse(items);
+    }
+
+    /// <summary>
+    /// B2 — per-clip validation, same fail-closed-per-item discipline as the
+    /// story loop: an invalid clip (unknown kind, bad sha, non-positive
+    /// size) is dropped and NEVER takes the story or its valid sibling clips
+    /// with it. Duplicate kinds keep the first (the kind is the lookup key
+    /// for <c>content-file?clip=</c>). Returns null when nothing survives so
+    /// the wire stays byte-identical for clip-less stories.
+    /// </summary>
+    private static IReadOnlyList<ContentClipItem>? BuildClips(ContentSyncStoryOptions story)
+    {
+        if (story.Clips.Count == 0)
+        {
+            return null;
+        }
+        var clips = new List<ContentClipItem>();
+        var seenKinds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var clip in story.Clips)
+        {
+            var kind = (clip.Kind ?? string.Empty).Trim().ToLowerInvariant();
+            if (!ContentSyncClipOptions.AllowedKinds.Contains(kind, StringComparer.Ordinal)
+                || clip.SizeBytes <= 0
+                || !IsSha256Hex(clip.Sha256)
+                || !seenKinds.Add(kind))
+            {
+                continue;
+            }
+            clips.Add(new ContentClipItem(
+                Kind: kind,
+                AudioUrl: string.IsNullOrWhiteSpace(clip.AudioUrl)
+                    ? $"{DefaultContentFileRoute}?storyId={Uri.EscapeDataString(story.StoryId)}&clip={kind}"
+                    : clip.AudioUrl,
+                Sha256: clip.Sha256.ToLowerInvariant(),
+                SizeBytes: clip.SizeBytes));
+        }
+        return clips.Count == 0 ? null : clips;
     }
 
     /// <summary>A configured URL wins verbatim — that is what keeps the

@@ -90,6 +90,11 @@ public class StoryQaController : ControllerBase
     private readonly IConfiguration _config;
     private readonly ILogger<StoryQaController> _logger;
 
+    // Reflection-dialogue slice: optional (defaults null) so the many
+    // pre-existing controller-constructing tests compile unchanged; a null
+    // service simply keeps the deterministic-acknowledgement behavior.
+    private readonly ReflectionDialogueService? _reflectionDialogue;
+
     public StoryQaController(
         IAudioTranscriptionService transcription,
         IAudioSynthesisService synthesis,
@@ -104,7 +109,8 @@ public class StoryQaController : ControllerBase
         IOptions<OpenAIDailyCostCapOptions> costCapOptions,
         IWebHostEnvironment env,
         IConfiguration config,
-        ILogger<StoryQaController> logger)
+        ILogger<StoryQaController> logger,
+        ReflectionDialogueService? reflectionDialogue = null)
     {
         _transcription = transcription;
         _synthesis = synthesis;
@@ -120,6 +126,7 @@ public class StoryQaController : ControllerBase
         _env = env;
         _config = config;
         _logger = logger;
+        _reflectionDialogue = reflectionDialogue;
     }
 
     [HttpPost]
@@ -690,11 +697,59 @@ public class StoryQaController : ControllerBase
             }
         }
 
-        // Compose the spoken reply from PRE-APPROVED cached clips: a rotated
-        // acknowledgement (only when affirming) + a calm pause + the fixed
-        // close. No model-authored child-facing text → no output-moderation
-        // surface. The chosen ack line is captured so the persisted assistant
-        // text matches exactly what was spoken.
+        // Reflection dialogue (owner request 2026-08-03): when the answer is
+        // affirmable, try a MODEL-composed reaction to what the child
+        // actually said — the one GPT surface of the after-story flow, with
+        // the same validate/repair/fallback discipline as in-story Q&A plus
+        // OUTPUT MODERATION here. Any doubt (gate off, service absent,
+        // validation failure, unsafe output, moderation unavailable) falls
+        // back to the deterministic rotated acknowledgement — the child
+        // never hears unvalidated model text.
+        string? reactionText = null;
+        var aiRepliesEnabled =
+            !bool.TryParse(_config["StoryQa:ReflectionAiReplies"], out var aiOn) || aiOn;
+        if (affirm && aiRepliesEnabled && _reflectionDialogue is not null)
+        {
+            try
+            {
+                var reaction = await _reflectionDialogue.ReactAsync(story, questionIndex, answer);
+                if (reaction.Text is not null)
+                {
+                    var outputModeration = await _moderation.CheckContentAsync(reaction.Text);
+                    if (outputModeration.IsSafe)
+                    {
+                        reactionText = reaction.Text;
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "Reflection reaction blocked by output moderation for {StoryId} (falling back)",
+                            storyId);
+                    }
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Reflection reaction failed for {StoryId} (falling back)", storyId);
+            }
+        }
+
+        // The per-question CONCLUSION (authored, reviewed) — spoken after the
+        // reaction. Cached per (story, question) like the ack clips. Null for
+        // stories that haven't authored conclusions yet.
+        var conclusionText = story.ReflectionConclusions is { } conclusions
+            && questionIndex < conclusions.Count
+                ? conclusions[questionIndex]
+                : null;
+
+        // `last=false` is sent by the multi-question firmware loop for every
+        // question but the final one, so the fixed goodbye line is spoken
+        // once per dialogue, not after every question. Absent (legacy
+        // single-question firmware) means "this is the last one".
+        var isLast = !bool.TryParse(Request.Query["last"], out var lastFlag) || lastFlag;
+
         string? ackLineText = null;
         byte[] spoken;
         try
@@ -702,11 +757,32 @@ public class StoryQaController : ControllerBase
             var closeAudio = await GetReflectionCloseAudioAsync(cancellationToken);
             if (affirm)
             {
-                var ackIndex = (int)((uint)Interlocked.Increment(ref _reflectionAckRotation)
-                    % ReflectionAcknowledgements.Length);
-                ackLineText = ReflectionAcknowledgements[ackIndex];
-                var ackAudio = await GetReflectionAckAudioAsync(ackIndex, cancellationToken);
-                spoken = ComposeAnswerWithPause(ackAudio, closeAudio, null);
+                byte[] firstPart;
+                if (reactionText is not null)
+                {
+                    // Per-request TTS — the reaction is unique to this answer.
+                    var reactionTts = await _synthesis.SynthesizeArmenianAsync(
+                        reactionText, cancellationToken);
+                    firstPart = reactionTts.Content;
+                }
+                else
+                {
+                    var ackIndex = (int)((uint)Interlocked.Increment(ref _reflectionAckRotation)
+                        % ReflectionAcknowledgements.Length);
+                    ackLineText = ReflectionAcknowledgements[ackIndex];
+                    firstPart = await GetReflectionAckAudioAsync(ackIndex, cancellationToken);
+                }
+
+                byte[]? conclusionAudio = conclusionText is not null
+                    ? await GetReflectionConclusionAudioAsync(
+                        story.Id, questionIndex, conclusionText, cancellationToken)
+                    : null;
+
+                spoken = conclusionAudio is not null
+                    ? ComposeAnswerWithPause(firstPart, conclusionAudio, isLast ? closeAudio : null)
+                    : (isLast
+                        ? ComposeAnswerWithPause(firstPart, closeAudio, null)
+                        : firstPart);
             }
             else
             {
@@ -726,11 +802,42 @@ public class StoryQaController : ControllerBase
         // empty transcript.
         if (!string.IsNullOrWhiteSpace(answer))
         {
-            var assistantText = ackLineText is null
-                ? ReflectionClose
-                : ackLineText + " " + ReflectionClose;
+            // Persist EXACTLY what was spoken: reaction-or-ack, then the
+            // conclusion (when authored), then the close (only on the final
+            // question of the dialogue). Blocked answers keep close-only.
+            string assistantText;
+            if (!affirm)
+            {
+                assistantText = ReflectionClose;
+            }
+            else
+            {
+                var spokenParts = new List<string>(3);
+                if (reactionText is not null) spokenParts.Add(reactionText);
+                else if (ackLineText is not null) spokenParts.Add(ackLineText);
+                if (conclusionText is not null) spokenParts.Add(conclusionText);
+                if (isLast) spokenParts.Add(ReflectionClose);
+                assistantText = string.Join(" ", spokenParts);
+            }
             await PersistTurnAsync(
                 deviceId, childId, answer, assistantText, userFlag, assistantFlag, cancellationToken);
+
+            // B4 — append-only reflection-answer memory: one row per listen,
+            // never overwritten, so the parent sees how the child's answers
+            // evolve across repeat listens of the same story. Best-effort:
+            // the conversation record above is already persisted, and a
+            // failure here must never break the spoken reply.
+            try
+            {
+                await _deviceService.AddStoryReflectionAnswerAsync(
+                    deviceId, story.Id, questionIndex, answer, userFlag, DateTime.UtcNow);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Reflection: answer-memory persist failed for {StoryId} (suppressed)", storyId);
+            }
         }
 
         // Best-effort per-device cost recording (STT only — ack/close TTS are
@@ -984,6 +1091,25 @@ public class StoryQaController : ControllerBase
         {
             _bridgeLock.Release();
         }
+    }
+
+    /// <summary>Per-(story, question) cache of the authored reflection
+    /// CONCLUSION lines' TTS — fixed reviewed text, so each costs at most
+    /// one TTS call per process lifetime.</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]>
+        _reflectionConclusionAudio = new();
+
+    private async Task<byte[]> GetReflectionConclusionAudioAsync(
+        string storyId, int questionIndex, string conclusionText, CancellationToken ct)
+    {
+        var key = storyId + "|" + questionIndex;
+        if (_reflectionConclusionAudio.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+        var rendered = await _synthesis.SynthesizeArmenianAsync(conclusionText, ct);
+        _reflectionConclusionAudio.TryAdd(key, rendered.Content);
+        return _reflectionConclusionAudio[key];
     }
 
     /// <summary>Renders the fixed reflection close line once and caches it for

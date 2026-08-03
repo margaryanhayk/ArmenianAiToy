@@ -21,7 +21,12 @@ public interface IConversationService
     Task<List<(string Role, string Content)>> GetRecentMessagesAsync(Guid conversationId, int count = 20);
     Task<List<ConversationDto>> GetConversationHistoryAsync(Guid deviceId, int limit = 10, int offset = 0);
     Task<ConversationDto?> GetConversationByIdAsync(Guid conversationId);
-    Task<List<ConversationSummaryDto>> GetConversationSummariesAsync(Guid deviceId, int limit = 20, int offset = 0);
+    /// <summary><paramref name="mode"/> (Slice D) optionally narrows to
+    /// conversations that contain at least one message stamped with that
+    /// mode (lowercase enum name, e.g. "story") — drives the dashboard's
+    /// per-mode tabs. Null/empty = all conversations (unchanged).</summary>
+    Task<List<ConversationSummaryDto>> GetConversationSummariesAsync(
+        Guid deviceId, int limit = 20, int offset = 0, string? mode = null);
     Task<List<FlaggedMessageDto>> GetFlaggedMessagesAsync(Guid deviceId, int limit = 20, int offset = 0);
 
     /// <summary>

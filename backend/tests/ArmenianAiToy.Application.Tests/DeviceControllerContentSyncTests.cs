@@ -34,7 +34,7 @@ public class DeviceControllerContentSyncTests
     // ---- content-manifest ----
 
     [Fact]
-    public void ContentManifest_ReturnsServiceManifest()
+    public async Task ContentManifest_ReturnsServiceManifest_WithIntroFlagStamped()
     {
         var manifest = Substitute.For<IContentManifestService>();
         var response = new ContentManifestResponse(new[]
@@ -44,19 +44,23 @@ public class DeviceControllerContentSyncTests
         });
         manifest.Build().Returns(response);
 
-        var result = Controller().GetContentManifest(manifest);
+        var result = await Controller().GetContentManifest(manifest);
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        Assert.Same(response, ok.Value);
+        var body = Assert.IsType<ContentManifestResponse>(ok.Value);
+        // Stories pass through untouched; the B3 intro flag is stamped by the
+        // controller (defaults ON when the device row can't be loaded).
+        Assert.Same(response.Stories, body.Stories);
+        Assert.True(body.StoryIntroEnabled);
     }
 
     [Fact]
-    public void ContentManifest_EmptyWhenServiceEmpty()
+    public async Task ContentManifest_EmptyWhenServiceEmpty()
     {
         var manifest = Substitute.For<IContentManifestService>();
         manifest.Build().Returns(ContentManifestResponse.Empty());
 
-        var ok = Assert.IsType<OkObjectResult>(Controller().GetContentManifest(manifest));
+        var ok = Assert.IsType<OkObjectResult>(await Controller().GetContentManifest(manifest));
         var body = Assert.IsType<ContentManifestResponse>(ok.Value);
         Assert.Empty(body.Stories);
     }

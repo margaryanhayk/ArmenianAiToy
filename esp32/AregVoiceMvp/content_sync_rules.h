@@ -82,8 +82,36 @@
 
 // Bumped when the on-card index shape changes. v1 = the flat
 // single-object index written before multi-story; v2 = the stories[]
-// array (plus a legacy mirror, see content_sync.cpp).
-#define CS_INDEX_SCHEMA_VERSION 2
+// array (plus a legacy mirror, see content_sync.cpp); v3 = v2 plus
+// per-story clips[] and the root introEnabled flag. v3 is a superset —
+// a v2 reader ignores the extra fields, a v3 reader treats their absence
+// as "no clips / intro on", so no destructive migration exists.
+#define CS_INDEX_SCHEMA_VERSION 3
+
+// Per-story clip slots (intro / question / question1 / question2 /
+// summary). Fixed small array — an open-ended list would multiply the
+// three CS_MAX_STORIES tables' RAM for no product reason.
+#ifndef CS_MAX_CLIPS
+#define CS_MAX_CLIPS 5
+#endif
+
+// Longest allowed kind is "question2" (9). The kind reaches an SD
+// filename, so it is allowlisted (below), not merely length-bounded.
+#define CS_CLIP_KIND_LEN 10
+
+// ---- one clip, as held in memory ----------------------------------
+
+/// Compact on purpose: no URL (the download URL is CONSTRUCTED as
+/// /api/devices/content-file?storyId=<id>&clip=<kind>, matching the
+/// backend's default fill — a config that points clips at an external
+/// CDN is not supported on-device in this slice) and no separate cache
+/// path (derived via cs_build_clip_cache_path from the owning story).
+struct CsClip {
+    char kind[CS_CLIP_KIND_LEN + 1];
+    char sha256[65];
+    long size_bytes;
+    bool verified;   // a full SHA-256 has matched for THIS clip file
+};
 
 // ---- one story, as held in memory ---------------------------------
 
@@ -99,6 +127,13 @@ struct CsStory {
     /// leave it empty.
     char audio_url[CS_MAX_URL_LEN];
     bool verified;   // a full SHA-256 has matched for THIS file at some point
+
+    /// B2 — per-story clips (intro / question / summary). clip_count is
+    /// 0 for stories that ship none, which is also what every pre-B2
+    /// index yields on parse — the story then plays without intro or
+    /// reflection, exactly the pre-B2 behavior.
+    CsClip clips[CS_MAX_CLIPS];
+    int    clip_count;
 };
 
 // ---- validation ---------------------------------------------------
@@ -221,6 +256,72 @@ inline bool cs_build_cache_path(char *out, size_t out_len,
     char scratch[CS_MAX_PATH_LEN * 2];
     const int written = snprintf(scratch, sizeof(scratch),
                                  "/stories/%s-v%d.mp3", story_id, v);
+    if (written <= 0 || (size_t)written >= out_len || (size_t)written >= sizeof(scratch)) {
+        return false;
+    }
+    memcpy(out, scratch, (size_t)written + 1);
+    return true;
+}
+
+/// Bounded clip-kind allowlist: exactly "intro", "question",
+/// "question1", "question2" or "summary" ("question" = dialogue question
+/// index 0; question1/2 are the reflection-dialogue follow-ups). The
+/// kind reaches an SD filename, so like story ids it is allowlisted —
+/// traversal characters are unrepresentable, not filtered.
+inline bool cs_is_valid_clip_kind(const char *kind) {
+    if (kind == NULL) {
+        return false;
+    }
+    return strcmp(kind, "intro") == 0
+        || strcmp(kind, "question") == 0
+        || strcmp(kind, "question1") == 0
+        || strcmp(kind, "question2") == 0
+        || strcmp(kind, "summary") == 0;
+}
+
+/// Clip kind for dialogue question `index` (0 → "question",
+/// 1 → "question1", 2 → "question2"); NULL for any other index.
+inline const char *cs_question_clip_kind(int index) {
+    switch (index) {
+        case 0:  return "question";
+        case 1:  return "question1";
+        case 2:  return "question2";
+        default: return NULL;
+    }
+}
+
+/// "/stories/<storyId>-v<version>-<kind>.mp3". Same refuse-on-truncation
+/// contract as cs_build_cache_path.
+inline bool cs_build_clip_cache_path(char *out, size_t out_len,
+                                     const char *story_id, int version,
+                                     const char *kind) {
+    if (out == NULL || out_len == 0
+        || !cs_is_valid_story_id(story_id) || !cs_is_valid_clip_kind(kind)) {
+        return false;
+    }
+    const int v = cs_normalize_version(version);
+    char scratch[CS_MAX_PATH_LEN * 2];
+    const int written = snprintf(scratch, sizeof(scratch),
+                                 "/stories/%s-v%d-%s.mp3", story_id, v, kind);
+    if (written <= 0 || (size_t)written >= out_len || (size_t)written >= sizeof(scratch)) {
+        return false;
+    }
+    memcpy(out, scratch, (size_t)written + 1);
+    return true;
+}
+
+/// "/tmp/<storyId>-v<version>-<kind>.mp3.part".
+inline bool cs_build_clip_temp_path(char *out, size_t out_len,
+                                    const char *story_id, int version,
+                                    const char *kind) {
+    if (out == NULL || out_len == 0
+        || !cs_is_valid_story_id(story_id) || !cs_is_valid_clip_kind(kind)) {
+        return false;
+    }
+    const int v = cs_normalize_version(version);
+    char scratch[CS_MAX_PATH_LEN * 2];
+    const int written = snprintf(scratch, sizeof(scratch),
+                                 "/tmp/%s-v%d-%s.mp3.part", story_id, v, kind);
     if (written <= 0 || (size_t)written >= out_len || (size_t)written >= sizeof(scratch)) {
         return false;
     }

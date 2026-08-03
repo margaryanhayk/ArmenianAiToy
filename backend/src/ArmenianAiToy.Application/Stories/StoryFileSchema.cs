@@ -18,6 +18,26 @@ internal sealed class StoryFileDto
     public required int SchemaVersion { get; init; }
     public required string Id { get; init; }
     public required string Title { get; init; }
+
+    /// <summary>Optional author attribution (Armenian, e.g. «Հովհաննես
+    /// Թումանյան»). Feeds the parent library card and the spoken story
+    /// intro («Հեքիաթ՝ …, հեղինակ՝ …»). Null = unknown/unverified or an
+    /// in-project original — the intro then omits the author line. Never
+    /// guess an attribution: a wrong author spoken to a child is worse
+    /// than none.</summary>
+    public string? Author { get; init; }
+
+    /// <summary>Optional parent-facing purpose of the story (Armenian,
+    /// one sentence). Shown on the library card; not spoken.</summary>
+    public string? Goal { get; init; }
+
+    /// <summary>Optional "what the story teaches" (Armenian, 1–2 warm
+    /// sentences, never a lecture). Parent library card + the source text
+    /// for the toy's spoken after-story summary clip. Like reflection
+    /// metadata, it is toy-spoken content: owner listen test gates any
+    /// render of it.</summary>
+    public string? Lesson { get; init; }
+
     public required int MinAge { get; init; }
     public required int MaxAge { get; init; }
     public required string Tone { get; init; }
@@ -27,6 +47,14 @@ internal sealed class StoryFileDto
     public required string[] Segments { get; init; }
     public required string ReflectionText { get; init; }
     public required string[] ReflectionQuestions { get; init; }
+
+    /// <summary>Optional per-question takeaway lines for the reflection
+    /// dialogue («here is what this question teaches us»), spoken by the
+    /// toy after it reacts to the child's answer. When present, MUST be
+    /// exactly as long as <see cref="ReflectionQuestions"/> — a mismatch
+    /// is an authoring bug, never a runtime guess.</summary>
+    public string[]? ReflectionConclusions { get; init; }
+
     public required StoryFileReviewDto Review { get; init; }
 }
 
@@ -119,6 +147,21 @@ internal static class StoryFileParser
         {
             throw Fail(sourceName, "title is empty");
         }
+        // Optional metadata: absent (null) is fine; PRESENT-but-blank is a
+        // shape violation — an empty author/goal/lesson in a file is always
+        // an authoring mistake, not a statement.
+        if (dto.Author is not null && string.IsNullOrWhiteSpace(dto.Author))
+        {
+            throw Fail(sourceName, "author is present but blank (omit the field instead)");
+        }
+        if (dto.Goal is not null && string.IsNullOrWhiteSpace(dto.Goal))
+        {
+            throw Fail(sourceName, "goal is present but blank (omit the field instead)");
+        }
+        if (dto.Lesson is not null && string.IsNullOrWhiteSpace(dto.Lesson))
+        {
+            throw Fail(sourceName, "lesson is present but blank (omit the field instead)");
+        }
         if (dto.MinAge <= 0 || dto.MaxAge < dto.MinAge)
         {
             throw Fail(sourceName, $"invalid age range {dto.MinAge}-{dto.MaxAge}");
@@ -150,6 +193,18 @@ internal static class StoryFileParser
         {
             throw Fail(sourceName, "reflectionQuestions must be a non-empty array of non-blank strings");
         }
+        if (dto.ReflectionConclusions is not null)
+        {
+            if (dto.ReflectionConclusions.Length != dto.ReflectionQuestions.Length)
+            {
+                throw Fail(sourceName,
+                    $"reflectionConclusions has {dto.ReflectionConclusions.Length} entries but reflectionQuestions has {dto.ReflectionQuestions.Length} — they must pair 1:1");
+            }
+            if (dto.ReflectionConclusions.Any(string.IsNullOrWhiteSpace))
+            {
+                throw Fail(sourceName, "reflectionConclusions entries must be non-blank");
+            }
+        }
         if (!AllowedStatuses.Contains(dto.Review.Status, StringComparer.Ordinal))
         {
             throw Fail(sourceName, $"review.status '{dto.Review.Status}' is not one of: {string.Join(", ", AllowedStatuses)}");
@@ -178,7 +233,13 @@ internal static class StoryFileParser
             segments,
             dto.ReflectionText,
             dto.ReflectionQuestions,
-            dto.BedtimeSafe);
+            dto.BedtimeSafe)
+        {
+            Author = dto.Author,
+            Goal = dto.Goal,
+            Lesson = dto.Lesson,
+            ReflectionConclusions = dto.ReflectionConclusions,
+        };
     }
 
     private static InvalidDataException Fail(string sourceName, string message) =>

@@ -186,6 +186,12 @@ public static class DependencyInjection
                     qaChatClient, sp.GetRequiredService<OpenAIReliabilityGate>())));
         }
 
+        // Reflection-dialogue reaction service — same bounded surface family
+        // as the in-story Q&A above; uses the ambient IAiChatClient (the
+        // StoryQa:AnswerModel seam can be extended here later if the
+        // reaction ever needs its own model).
+        services.AddScoped<ReflectionDialogueService>();
+
         // Application services
         services.AddSingleton<IStoryChoiceCoherenceGate, StoryChoiceCoherenceGate>();
         services.AddScoped<IChatService, ChatService>();

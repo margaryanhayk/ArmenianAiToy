@@ -62,10 +62,22 @@ public class ConversationController : ControllerBase
     public async Task<IActionResult> GetSummary(
         [FromQuery] Guid deviceId,
         [FromQuery] int limit = 20,
-        [FromQuery] int offset = 0)
+        [FromQuery] int offset = 0,
+        [FromQuery] string? mode = null)
     {
         if (!TryNormalizePagination(ref limit, offset, out var error))
             return BadRequest(new { error });
+
+        // Slice D — optional per-mode tab filter. Bounded vocabulary (the
+        // five product modes), rejected otherwise so the value space stays
+        // closed; matching is exact against the lowercase stamped names.
+        string? normalizedMode = null;
+        if (!string.IsNullOrWhiteSpace(mode))
+        {
+            normalizedMode = mode.Trim().ToLowerInvariant();
+            if (normalizedMode is not ("story" or "game" or "riddle" or "curiosity" or "calm"))
+                return BadRequest(new { error = "mode must be one of: story, game, riddle, curiosity, calm" });
+        }
 
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var linkedDevices = await _parentService.GetLinkedDeviceIdsAsync(parentId);
@@ -73,7 +85,8 @@ public class ConversationController : ControllerBase
         if (!linkedDevices.Contains(deviceId))
             return Forbid();
 
-        var conversations = await _conversationService.GetConversationSummariesAsync(deviceId, limit, offset);
+        var conversations = await _conversationService.GetConversationSummariesAsync(
+            deviceId, limit, offset, normalizedMode);
         return Ok(new { conversations });
     }
 

@@ -85,14 +85,20 @@ int load_raw_index(CsStory *out, int max_out) {
     return n;
 }
 
+// One shared scratch table for every index read below. All callers run
+// on the single Arduino loop task (no reentrancy), and each function
+// fully re-loads the index before reading it — sharing saves ~2 × the
+// table (~22 KB with the B2 clip slots) versus per-function statics.
+CsStory s_raw[CS_MAX_STORIES];
+
 }  // namespace
 
 int story_select_load_eligible(CsStory *out, int max_out) {
     if (out == NULL || max_out <= 0) {
         return 0;
     }
-    static CsStory raw[CS_MAX_STORIES];
-    const int raw_count = load_raw_index(raw, CS_MAX_STORIES);
+    const int raw_count = load_raw_index(s_raw, CS_MAX_STORIES);
+    CsStory *raw = s_raw;
 
     int count = 0;
     for (int i = 0; i < raw_count && count < max_out; i++) {
@@ -123,8 +129,8 @@ bool story_select_resolve_path(const char *story_id, char *out, size_t out_len) 
         return false;
     }
 
-    static CsStory raw[CS_MAX_STORIES];
-    const int raw_count = load_raw_index(raw, CS_MAX_STORIES);
+    const int raw_count = load_raw_index(s_raw, CS_MAX_STORIES);
+    CsStory *raw = s_raw;
 
     for (int i = 0; i < raw_count; i++) {
         if (!cs_story_ids_equal(raw[i].story_id, story_id)) {
@@ -142,6 +148,64 @@ bool story_select_resolve_path(const char *story_id, char *out, size_t out_len) 
         return cs_copy_bounded(out, out_len, raw[i].cache_path);
     }
     return false;
+}
+
+bool story_select_resolve_clip_path(const char *story_id, const char *kind,
+                                    char *out, size_t out_len) {
+    if (out == NULL || out_len == 0) {
+        return false;
+    }
+    out[0] = '\0';
+    if (!cs_is_valid_story_id(story_id) || !cs_is_valid_clip_kind(kind)) {
+        return false;
+    }
+
+    const int raw_count = load_raw_index(s_raw, CS_MAX_STORIES);
+    CsStory *raw = s_raw;
+
+    for (int i = 0; i < raw_count; i++) {
+        if (!cs_story_ids_equal(raw[i].story_id, story_id)) {
+            continue;
+        }
+        for (int k = 0; k < raw[i].clip_count; k++) {
+            const CsClip *clip = &raw[i].clips[k];
+            if (strcmp(clip->kind, kind) != 0) {
+                continue;
+            }
+            if (!clip->verified || clip->size_bytes <= 0) {
+                return false;   // exact kind found but not usable
+            }
+            char path[CS_MAX_PATH_LEN];
+            if (!cs_build_clip_cache_path(path, sizeof(path),
+                                          raw[i].story_id, raw[i].version, kind)) {
+                return false;
+            }
+            // Card must agree with the metadata — same rule as narration.
+            if (sd_file_size(path) != clip->size_bytes) {
+                return false;
+            }
+            return cs_copy_bounded(out, out_len, path);
+        }
+        return false;   // story found, clip kind absent
+    }
+    return false;
+}
+
+bool story_select_intro_enabled() {
+    if (!audio_sd_available() || !SD.exists(kIndexPath)) {
+        return true;   // no card / no index — shipped default is ON
+    }
+    File f = SD.open(kIndexPath, FILE_READ);
+    if (!f) {
+        return true;
+    }
+    JsonDocument doc;
+    const DeserializationError err = deserializeJson(doc, f);
+    f.close();
+    if (err != DeserializationError::Ok) {
+        return true;
+    }
+    return cs_index_intro_enabled(doc);
 }
 
 bool story_select_load_last(char *out, size_t out_len) {

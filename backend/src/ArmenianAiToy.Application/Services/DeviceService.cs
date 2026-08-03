@@ -4,6 +4,7 @@ using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Domain.Entities;
+using ArmenianAiToy.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -207,6 +208,127 @@ public class DeviceService : IDeviceService
         if (report.LastOtaStatus is not null) device.LastOtaStatus = report.LastOtaStatus;
         if (report.SdCardOk is not null) device.SdCardOk = report.SdCardOk;
         device.FirmwareReportedAt = nowUtc;
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task<int> ReportStoryPlaysAsync(
+        Guid deviceId, StoryPlayReportRequest request, DateTime nowUtc)
+    {
+        var events = request?.Events;
+        if (events is null || events.Count == 0)
+        {
+            return 0;
+        }
+
+        // Bounded relative age: the toy has no wall clock and reports a
+        // best-effort "seconds ago" from its boot timer. Anything past this
+        // window is treated as unknown (approximate upload-time stamp) rather
+        // than producing a nonsense historical timestamp.
+        var maxSecondsAgo = (long)TimeSpan.FromDays(90).TotalSeconds;
+
+        var seenKeys = new HashSet<string>(StringComparer.Ordinal);
+        var accepted = 0;
+        foreach (var ev in events.Take(StoryPlayReportRequest.MaxEvents))
+        {
+            var key = ev?.Key?.Trim();
+            var storyId = ev?.StoryId?.Trim();
+            // Malformed events are skipped, not rejected wholesale — one bad
+            // entry must not make the device re-upload its good siblings
+            // forever. Length caps bound storage on a device-writable field.
+            if (ev is null
+                || string.IsNullOrEmpty(key) || key.Length > 64
+                || string.IsNullOrEmpty(storyId) || storyId.Length > 64)
+            {
+                continue;
+            }
+            if (!seenKeys.Add(key))
+            {
+                continue; // in-batch duplicate — keep the first
+            }
+
+            // Idempotency: the upload is at-least-once, so a key we already
+            // hold is a silent no-op (the unique DB index is the backstop for
+            // the concurrent-upload race below).
+            var exists = await _db.Set<StoryPlay>()
+                .AnyAsync(p => p.DeviceId == deviceId && p.ClientEventKey == key);
+            if (exists)
+            {
+                continue;
+            }
+
+            // Bounded source vocabulary — mirrors the metrics no-free-form
+            // discipline. Unknown values collapse to "other" rather than
+            // storing arbitrary device-supplied strings.
+            var source = (ev.Source ?? string.Empty).Trim().ToLowerInvariant();
+            if (source is not ("sd" or "pack" or "stream"))
+            {
+                source = "other";
+            }
+
+            var playedAt = nowUtc;
+            var approximate = true;
+            if (ev.SecondsAgo is { } ago && ago >= 0 && ago <= maxSecondsAgo)
+            {
+                playedAt = nowUtc.AddSeconds(-ago);
+                approximate = false;
+            }
+
+            var row = new StoryPlay
+            {
+                Id = Guid.NewGuid(),
+                DeviceId = deviceId,
+                StoryId = storyId,
+                Source = source,
+                Finished = ev.Finished,
+                ClientEventKey = key,
+                PlayedAtUtc = playedAt,
+                TimeIsApproximate = approximate,
+            };
+            _db.Set<StoryPlay>().Add(row);
+            try
+            {
+                // Per-event save: a unique-index race (a concurrently retried
+                // upload) fails only ITS row, and the 2xx the device gets
+                // still covers every event actually persisted. Batches are
+                // tiny (firmware queue ~16), so per-row saves are cheap.
+                await _db.SaveChangesAsync();
+                accepted++;
+            }
+            catch (DbUpdateException ex)
+            {
+                _db.Entry(row).State = EntityState.Detached;
+                _logger.LogWarning(ex,
+                    "Story-play insert skipped for device {DeviceId} key {EventKey} (likely duplicate)",
+                    deviceId, key);
+            }
+        }
+
+        if (accepted > 0)
+        {
+            _logger.LogInformation(
+                "Device {DeviceId} reported {Count} new story play(s)", deviceId, accepted);
+        }
+        return accepted;
+    }
+
+    public async Task AddStoryReflectionAnswerAsync(
+        Guid deviceId, string storyId, int questionIndex,
+        string answerText, SafetyFlag safetyFlag, DateTime nowUtc)
+    {
+        // Append-only by contract — one row per listen. Bounded fields: the
+        // storyId comes from the validated library lookup upstream, the
+        // answer is the STT transcript (same persistence discipline as the
+        // conversation record).
+        _db.Set<StoryReflectionAnswer>().Add(new StoryReflectionAnswer
+        {
+            Id = Guid.NewGuid(),
+            DeviceId = deviceId,
+            StoryId = storyId,
+            QuestionIndex = questionIndex,
+            AnswerText = answerText,
+            SafetyFlag = safetyFlag,
+            CreatedAtUtc = nowUtc,
+        });
         await _db.SaveChangesAsync();
     }
 

@@ -3,6 +3,7 @@ using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
+using ArmenianAiToy.Application.Stories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -561,6 +562,35 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// B3: toggle the spoken story intro («Հեքիաթ՝ …, հեղինակ՝ …») on a
+    /// linked device. ON by default for every device; the toy picks the new
+    /// value up on its next content-manifest fetch and caches it so the
+    /// toggle applies offline too. Parent-JWT, ownership-checked, silent 404
+    /// on a device not linked to this account; idempotent (audit only on a
+    /// real flip). 400 on a missing body/flag — a truncated request must not
+    /// silently flip the setting.
+    /// </summary>
+    [HttpPut("devices/{deviceId}/story-intro")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> SetDeviceStoryIntro(
+        Guid deviceId, [FromBody] DeviceStoryIntroRequest request)
+    {
+        if (request?.Enabled is null)
+            return BadRequest(new { error = "enabled (true/false) is required." });
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ok = await _parentService.SetDeviceStoryIntroAsync(
+            parentId, deviceId, request.Enabled.Value);
+        if (!ok)
+            return NotFound(new { error = "Device not found or not linked to this account." });
+        return Ok(new { storyIntroEnabled = request.Enabled.Value });
+    }
+
+    /// <summary>
     /// Rename a linked device so a parent can tell their toys apart when they
     /// own more than one ("Anna's toy", "Living room"). Parent-JWT, ownership-
     /// checked; 400 on an empty / over-length name, silent 404 on a device not
@@ -685,6 +715,176 @@ public class ParentController : ControllerBase
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var deviceIds = await _parentService.GetLinkedDeviceIdsAsync(parentId);
         return Ok(new { devices = deviceIds });
+    }
+
+    /// <summary>
+    /// Device-reported story playback history for a linked device — the
+    /// "Story plays" dashboard list. These rows come from the toy's
+    /// store-and-forward upload (stories play from the SD cache, so they never
+    /// appear as conversations); <c>timeIsApproximate</c> marks rows whose
+    /// play happened while the toy was offline, where only the upload time is
+    /// known. Paginated newest-first; <c>totals</c> carries whole-history
+    /// per-story listen counts. Ownership-checked; silent 404 on a device not
+    /// linked to this account. Same pagination contract as the conversation
+    /// endpoints (offset &lt; 0 / limit &lt; 1 → 400; limit clamped to 100).
+    /// </summary>
+    [HttpGet("devices/{deviceId}/story-plays")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetStoryPlays(
+        Guid deviceId, [FromQuery] int limit = 20, [FromQuery] int offset = 0)
+    {
+        if (offset < 0)
+            return BadRequest(new { error = "offset must be >= 0" });
+        if (limit < 1)
+            return BadRequest(new { error = "limit must be between 1 and 100" });
+        if (limit > 100)
+            limit = 100;
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var result = await _parentService.GetStoryPlaysAsync(parentId, deviceId, limit, offset);
+        if (result is null)
+            return NotFound(new { error = "Device not found or not linked to this account." });
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// B4: append-only history of the child's answers to the after-story
+    /// meaning question — one row per listen, never overwritten, so a parent
+    /// can watch understanding grow across repeat listens. Newest-first,
+    /// optionally filtered by <c>storyId</c>. Ownership-checked; silent 404
+    /// on a device not linked to this account; same pagination contract as
+    /// the other list endpoints.
+    /// </summary>
+    [HttpGet("devices/{deviceId}/reflection-answers")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetReflectionAnswers(
+        Guid deviceId,
+        [FromQuery] string? storyId = null,
+        [FromQuery] int limit = 20,
+        [FromQuery] int offset = 0)
+    {
+        if (offset < 0)
+            return BadRequest(new { error = "offset must be >= 0" });
+        if (limit < 1)
+            return BadRequest(new { error = "limit must be between 1 and 100" });
+        if (limit > 100)
+            limit = 100;
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var result = await _parentService.GetStoryReflectionAnswersAsync(
+            parentId, deviceId, storyId, limit, offset);
+        if (result is null)
+            return NotFound(new { error = "Device not found or not linked to this account." });
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Slice D — the parent-facing story library: every story the toy can
+    /// play (the shipped ContentSync set), with the B1 metadata (author /
+    /// goal / lesson), age range, bedtime-safety, the reflection question,
+    /// this parent's own listen counts (across their linked devices), and a
+    /// parent-authed ▶ preview URL. Falls back to the whole curated library
+    /// (no preview) when content sync is disabled — dev/bench posture.
+    /// No child data and no server paths on the wire.
+    /// </summary>
+    [HttpGet("stories")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetStoryLibrary(
+        [FromServices] ICuratedStoryLibrary library,
+        [FromServices] IContentManifestService manifest)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var totals = (await _parentService.GetStoryPlayTotalsForParentAsync(parentId))
+            .ToDictionary(t => t.StoryId, StringComparer.OrdinalIgnoreCase);
+
+        var shipped = manifest.Build().Stories;
+        List<StoryLibraryItemDto> items;
+        if (shipped.Count > 0)
+        {
+            items = shipped.Select(item =>
+            {
+                var story = library.GetById(item.StoryId);
+                totals.TryGetValue(item.StoryId, out var t);
+                return new StoryLibraryItemDto(
+                    item.StoryId,
+                    string.IsNullOrWhiteSpace(story?.Title) ? item.Title : story!.Title,
+                    story?.Author,
+                    story?.Goal,
+                    story?.Lesson,
+                    story?.BedtimeSafe,
+                    story?.MinAge,
+                    story?.MaxAge,
+                    story?.Segments.Count ?? 0,
+                    story?.ReflectionQuestions.ToList() ?? new List<string>(),
+                    t?.Count ?? 0,
+                    t?.FinishedCount ?? 0,
+                    $"/api/parents/stories/{Uri.EscapeDataString(item.StoryId)}/audio",
+                    story?.ReflectionConclusions?.ToList());
+            }).ToList();
+        }
+        else
+        {
+            items = library.ListAvailable().Select(story =>
+            {
+                totals.TryGetValue(story.Id, out var t);
+                return new StoryLibraryItemDto(
+                    story.Id, story.Title, story.Author, story.Goal, story.Lesson,
+                    story.BedtimeSafe, story.MinAge, story.MaxAge,
+                    story.Segments.Count, story.ReflectionQuestions.ToList(),
+                    t?.Count ?? 0, t?.FinishedCount ?? 0,
+                    PreviewUrl: null,
+                    story.ReflectionConclusions?.ToList());
+            }).ToList();
+        }
+        return Ok(new StoryLibraryResponse(items));
+    }
+
+    /// <summary>
+    /// Slice D — parent-authed ▶ preview stream of a shipped story's
+    /// narration (the same MP3 the toy downloads). Uniform 404 for every
+    /// miss reason (unknown id / sync disabled / path missing) — same
+    /// posture as the C2.1 message-audio streamer. Product content, not
+    /// child data, so any authenticated parent may preview any library
+    /// story.
+    /// </summary>
+    [HttpGet("stories/{storyId}/audio")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public IActionResult GetStoryPreviewAudio(
+        string storyId,
+        [FromServices] ContentSyncOptions contentSync,
+        [FromServices] ILogger<ParentController> logger)
+    {
+        if (!contentSync.Enabled || string.IsNullOrWhiteSpace(storyId))
+            return NotFound(new { error = "Audio not available." });
+
+        // storyId is only ever a lookup key against configured items — it
+        // never reaches the filesystem (same contract as the device
+        // content-file endpoint).
+        var story = contentSync.ResolveStories().FirstOrDefault(s =>
+            string.Equals(s.StoryId, storyId, StringComparison.OrdinalIgnoreCase));
+        if (story is null || string.IsNullOrWhiteSpace(story.AudioPath))
+            return NotFound(new { error = "Audio not available." });
+        if (!System.IO.Path.IsPathRooted(story.AudioPath)
+            || !System.IO.File.Exists(story.AudioPath))
+        {
+            logger.LogWarning(
+                "Story preview path missing or not absolute for {StoryId}", story.StoryId);
+            return NotFound(new { error = "Audio not available." });
+        }
+        return PhysicalFile(story.AudioPath, "audio/mpeg", enableRangeProcessing: true);
     }
 
     /// <summary>

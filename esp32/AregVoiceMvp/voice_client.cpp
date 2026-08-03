@@ -271,6 +271,27 @@ void voice_send_heartbeat() {
     Serial.flush();
 }
 
+int voice_post_story_plays(const char *json_body) {
+    if (json_body == nullptr || !voice_wifi_is_connected()) {
+        return -1;
+    }
+    // Same URL-derivation trick as the heartbeat: no new config constant.
+    String url = AREG_BACKEND_URL;
+    url.replace("/api/chat/audio", "/api/devices/story-plays");
+
+    HTTPClient http;
+    if (!areg_http_begin(http, url)) {
+        return -1;
+    }
+    add_device_auth_headers(http);
+    http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
+    http.setTimeout(AREG_HTTP_READ_MS);
+    http.addHeader("Content-Type", "application/json");
+    const int status = http.POST((uint8_t *)json_body, strlen(json_body));
+    http.end();
+    return status;
+}
+
 // -------------------------------------------------------------
 // Upload
 // -------------------------------------------------------------
@@ -547,7 +568,7 @@ VoiceTurnResult voice_upload_question(const uint8_t *payload, size_t length,
 // and carries questionIndex instead of the story byte offset.
 // -------------------------------------------------------------
 VoiceTurnResult voice_upload_reflection_answer(const uint8_t *payload, size_t length,
-                                               int question_index) {
+                                               int question_index, bool last) {
     VoiceTurnResult result;
     voice_release_last_response();
 
@@ -561,9 +582,13 @@ VoiceTurnResult voice_upload_reflection_answer(const uint8_t *payload, size_t le
         return result;
     }
 
+    // `last=false` only when the dialogue has MORE questions after this one
+    // — the backend then omits its goodbye line (it belongs to the final
+    // round). Absent (the default) means "final", matching legacy behavior.
     char url[384];
-    snprintf(url, sizeof(url), "%s?storyId=%s&questionIndex=%d",
-             AREG_STORY_REFLECTION_URL, voice_active_story_id(), question_index);
+    snprintf(url, sizeof(url), "%s?storyId=%s&questionIndex=%d%s",
+             AREG_STORY_REFLECTION_URL, voice_active_story_id(), question_index,
+             last ? "" : "&last=false");
 
     HTTPClient http;
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);

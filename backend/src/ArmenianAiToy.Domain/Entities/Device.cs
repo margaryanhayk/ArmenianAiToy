@@ -133,6 +133,16 @@ public class Device
     public bool CuriosityEnabled { get; set; } = true;
 
     /// <summary>
+    /// Parent toggle for the spoken story intro («Հեքիաթ՝ …, հեղինակ՝ …»)
+    /// the toy plays before a cached story's narration. ON by default
+    /// (educational-by-default, owner decision 2026-08-03). Delivered to the
+    /// toy in the content-manifest response; the firmware caches the
+    /// last-known value so the toggle applies offline too. Distinct from the
+    /// B5 mode flags: this shapes the story experience, it never gates chat.
+    /// </summary>
+    public bool StoryIntroEnabled { get; set; } = true;
+
+    /// <summary>
     /// Timestamp of the most recent dormant-device warning email
     /// dispatched to this device's verified linked parents by the
     /// scheduled <c>WarnDormantDevicesAsync</c> pass. Null for

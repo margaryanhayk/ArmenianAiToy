@@ -10,6 +10,13 @@ namespace ArmenianAiToy.Application.DTOs;
 public sealed record ContentManifestResponse(
     IReadOnlyList<ContentStoryItem> Stories)
 {
+    /// <summary>B3 — the device's parent-set spoken-story-intro flag,
+    /// stamped by the controller (the manifest service is static config and
+    /// knows nothing about devices). Nullable so service-built instances and
+    /// pre-B3 consumers are unaffected; the firmware caches the last-known
+    /// value so the toggle applies offline.</summary>
+    public bool? StoryIntroEnabled { get; init; }
+
     public static ContentManifestResponse Empty() =>
         new(Array.Empty<ContentStoryItem>());
 }
@@ -25,4 +32,21 @@ public sealed record ContentStoryItem(
     string AudioUrl,
     string Sha256,
     long SizeBytes,
-    bool Enabled);
+    bool Enabled)
+{
+    /// <summary>B2 — optional per-story clips (intro / question / summary),
+    /// each downloaded and sha-verified like the narration and sharing the
+    /// story's <c>Version</c>. Null/empty for stories that ship no clips;
+    /// pre-B2 firmware ignores the field entirely. Init-prop rather than a
+    /// positional parameter so existing constructor call sites compile
+    /// unchanged.</summary>
+    public IReadOnlyList<ContentClipItem>? Clips { get; init; }
+}
+
+/// <summary>One per-story clip. <c>Kind</c> is a bounded vocabulary
+/// (intro | question | summary) — validated server-side at manifest build.</summary>
+public sealed record ContentClipItem(
+    string Kind,
+    string AudioUrl,
+    string Sha256,
+    long SizeBytes);

@@ -52,6 +52,11 @@ public enum AuditEventType
     /// name → potential PII); only that a rename happened.</summary>
     ParentDeviceRenamed,
 
+    /// <summary>A parent toggled the spoken story intro («Հեքիաթ՝ …,
+    /// հեղինակ՝ …») on a linked device. Metadata carries the post-change
+    /// state (enabled: bool). Written only when the flag actually flips.</summary>
+    ParentDeviceStoryIntroSet,
+
     /// <summary>A parent attached to a device via the legacy API-key link path
     /// (POST /api/parents/devices/link) — distinct from the single-use claim-code
     /// path (ParentDeviceClaimed). ActorParentId = the linker; TargetDeviceId =

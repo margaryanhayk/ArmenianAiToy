@@ -117,8 +117,13 @@ public class CuratedStoryLibraryTests
         var story = _library.SelectDefault();
 
         Assert.Equal(ExpectedReflection, story.ReflectionText);
-        var question = Assert.Single(story.ReflectionQuestions);
-        Assert.Equal(ExpectedQuestion, question);
+        // Reflection-dialogue slice (2026-08-03): stories carry up to 3
+        // questions; the ORIGINAL reviewed question stays pinned at index 0,
+        // and every question must pair with a conclusion.
+        Assert.Equal(ExpectedQuestion, story.ReflectionQuestions[0]);
+        Assert.InRange(story.ReflectionQuestions.Count, 1, 3);
+        Assert.NotNull(story.ReflectionConclusions);
+        Assert.Equal(story.ReflectionQuestions.Count, story.ReflectionConclusions!.Count);
     }
 
     [Fact]
@@ -157,8 +162,10 @@ public class CuratedStoryLibraryTests
             Assert.Equal(ExpectedHedgehogSegments[i], story.Segments[i].Text);
         }
         Assert.Equal(ExpectedHedgehogReflection, story.ReflectionText);
-        var question = Assert.Single(story.ReflectionQuestions);
-        Assert.Equal(ExpectedHedgehogQuestion, question);
+        // Reflection-dialogue slice: original question pinned at index 0
+        // (see the note in Story_ReflectionTextAndQuestion_ArePinnedVerbatim).
+        Assert.Equal(ExpectedHedgehogQuestion, story.ReflectionQuestions[0]);
+        Assert.InRange(story.ReflectionQuestions.Count, 1, 3);
     }
 
     [Fact]

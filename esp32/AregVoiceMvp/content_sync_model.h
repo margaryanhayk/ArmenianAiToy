@@ -48,7 +48,9 @@ int cs_manifest_parse(JsonArrayConst stories, CsStory *out, int max_out,
 /// yields 0 and is never an error — the caller keeps every cached file.
 int cs_index_parse(JsonDocument &doc, CsStory *out, int max_out, int *out_schema);
 
-/// Builds the v2 index document from `active`.
+/// Builds the v3 index document from `active` (stories[] with per-story
+/// clips[], plus the root `introEnabled` flag the parent toggle caches
+/// on the card).
 ///
 /// Also writes the LEGACY COMPATIBILITY MIRROR (flat storyId/version/
 /// sha256/file/sizeBytes) pointing at the entry whose id equals
@@ -57,4 +59,8 @@ int cs_index_parse(JsonDocument &doc, CsStory *out, int max_out, int *out_schema
 /// slice must not change playback behavior. Pass nullptr to omit the
 /// mirror entirely.
 void cs_index_build(JsonDocument &doc, const CsStory *active, int count,
-                    const char *mirror_story_id);
+                    const char *mirror_story_id, bool intro_enabled = true);
+
+/// Reads the root `introEnabled` flag from an index document. Absent
+/// (every pre-v3 card) → true, the shipped default.
+bool cs_index_intro_enabled(JsonDocument &doc);

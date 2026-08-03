@@ -52,6 +52,9 @@ CsStory s_active[CS_MAX_STORIES];     // what the new index will contain
 int s_manifest_count = 0;
 int s_previous_count = 0;
 int s_active_count   = 0;
+// B3 — the parent's spoken-story-intro toggle, from the manifest root.
+// Cached into the index so the last-known value applies offline.
+bool s_intro_enabled = true;
 
 // ---- small helpers (duplicated from ota_apply's file-locals by repo
 // convention: no shared util until a third caller) ----
@@ -215,7 +218,7 @@ bool write_index() {
     // three readers that still parse the flat shape keep behaving exactly
     // as they did in the single-story build. It has no effect on which
     // stories are synced or indexed.
-    cs_index_build(idx, s_active, s_active_count, AREG_STORY_ID);
+    cs_index_build(idx, s_active, s_active_count, AREG_STORY_ID, s_intro_enabled);
 
     if (SD.exists(kIndexTmpPath)) {
         SD.remove(kIndexTmpPath);
@@ -241,26 +244,22 @@ bool write_index() {
     return true;
 }
 
-// ---- per-story download -------------------------------------------
+// ---- verified download (stories AND clips) ------------------------
 
-// Downloads one story to its temp path, verifies SHA-256 and size, then
-// promotes it. Returns true only when the final file is in place and
-// verified. NEVER removes the existing final file unless a fully
-// verified replacement is ready to take its place.
-bool download_story(const CsStory *story, const char *audio_url) {
-    char temp_path[CS_MAX_PATH_LEN];
-    if (!cs_build_temp_path(temp_path, sizeof(temp_path),
-                            story->story_id, story->version)) {
-        story_fail(story->story_id, "temp_path_too_long");
-        return false;
-    }
-
+// Downloads one asset to `temp_path`, verifies SHA-256 and size, then
+// promotes it to `final_path`. Returns true only when the final file is
+// in place and verified. NEVER removes the existing final file unless a
+// fully verified replacement is ready to take its place. `label` is the
+// serial-log identity ("<storyId>" or "<storyId>:<kind>").
+bool download_file_verified(const char *label, const char *url,
+                            const char *temp_path, const char *final_path,
+                            long size_bytes, const char *sha256_expected) {
     ensure_dir("/tmp");
     ensure_dir("/stories");
 
     const uint64_t free_bytes = SD.totalBytes() - SD.usedBytes();
-    if (free_bytes < (uint64_t)story->size_bytes + kFreeSpaceSlack) {
-        story_fail(story->story_id, "no_space");
+    if (free_bytes < (uint64_t)size_bytes + kFreeSpaceSlack) {
+        story_fail(label, "no_space");
         return false;
     }
     if (SD.exists(temp_path)) {
@@ -268,8 +267,8 @@ bool download_story(const CsStory *story, const char *audio_url) {
     }
 
     HTTPClient dl;
-    if (!areg_http_begin(dl, resolve_url(audio_url))) {
-        story_fail(story->story_id, "download_begin_failed");
+    if (!areg_http_begin(dl, resolve_url(url))) {
+        story_fail(label, "download_begin_failed");
         return false;
     }
     voice_add_device_auth_headers(dl);
@@ -278,15 +277,15 @@ bool download_story(const CsStory *story, const char *audio_url) {
     const int dstatus = dl.GET();
     if (dstatus != 200) {
         dl.end();
-        Serial.printf("[content-sync] %s download status=%d\n", story->story_id, dstatus);
-        story_fail(story->story_id, "download_failed");
+        Serial.printf("[content-sync] %s download status=%d\n", label, dstatus);
+        story_fail(label, "download_failed");
         return false;
     }
 
     File out = SD.open(temp_path, FILE_WRITE);
     if (!out) {
         dl.end();
-        story_fail(story->story_id, "temp_open_failed");
+        story_fail(label, "temp_open_failed");
         return false;
     }
 
@@ -296,7 +295,7 @@ bool download_story(const CsStory *story, const char *audio_url) {
 
     WiFiClient *stream = dl.getStreamPtr();
     static uint8_t buf[4096];
-    const long size = story->size_bytes;
+    const long size = size_bytes;
     long received = 0;
     int last_pct = -1;
     uint32_t last_data_ms = millis();
@@ -340,7 +339,7 @@ bool download_story(const CsStory *story, const char *audio_url) {
         if (pct / 10 != last_pct / 10) {
             last_pct = pct;
             Serial.printf("[content-sync] %s download %d%% (%ld/%ld)\n",
-                          story->story_id, pct, received, size);
+                          label, pct, received, size);
         }
     }
     dl.end();
@@ -352,35 +351,106 @@ bool download_story(const CsStory *story, const char *audio_url) {
 
     if (!io_ok || received != size) {
         SD.remove(temp_path);  // failed download never lingers
-        story_fail(story->story_id, io_err);
+        story_fail(label, io_err);
         return false;
     }
 
     // Verify SHA-256 BEFORE touching the final path.
     char actual_hex[65];
     to_hex_lower(digest, sizeof(digest), actual_hex);
-    if (!hex_equals_ci(actual_hex, story->sha256)) {
+    if (!hex_equals_ci(actual_hex, sha256_expected)) {
         SD.remove(temp_path);
         Serial.printf("[content-sync] %s sha256 mismatch (got %s)\n",
-                      story->story_id, actual_hex);
-        story_fail(story->story_id, "sha256_mismatch");
+                      label, actual_hex);
+        story_fail(label, "sha256_mismatch");
         return false;
     }
-    Serial.printf("[content-sync] %s sha256 ok\n", story->story_id);
+    Serial.printf("[content-sync] %s sha256 ok\n", label);
     Serial.flush();
 
     // Atomic move into place (only now may an old copy go).
-    if (SD.exists(story->cache_path)) {
-        SD.remove(story->cache_path);  // FAT rename cannot overwrite in place
+    if (SD.exists(final_path)) {
+        SD.remove(final_path);  // FAT rename cannot overwrite in place
     }
-    if (!SD.rename(temp_path, story->cache_path)) {
+    if (!SD.rename(temp_path, final_path)) {
         SD.remove(temp_path);
-        story_fail(story->story_id, "rename_failed");
+        story_fail(label, "rename_failed");
         return false;
     }
-    Serial.printf("[content-sync] moved %s -> %s\n", temp_path, story->cache_path);
+    Serial.printf("[content-sync] moved %s -> %s\n", temp_path, final_path);
     Serial.flush();
     return true;
+}
+
+bool download_story(const CsStory *story, const char *audio_url) {
+    char temp_path[CS_MAX_PATH_LEN];
+    if (!cs_build_temp_path(temp_path, sizeof(temp_path),
+                            story->story_id, story->version)) {
+        story_fail(story->story_id, "temp_path_too_long");
+        return false;
+    }
+    return download_file_verified(story->story_id, audio_url, temp_path,
+                                  story->cache_path, story->size_bytes,
+                                  story->sha256);
+}
+
+// ---- per-story clip sync (B2) -------------------------------------
+//
+// Runs only for a story whose narration is in place (downloaded or
+// already current). Each clip is independently checked / downloaded /
+// verified; a clip failure marks THAT clip unverified and never affects
+// the story or its sibling clips. The download URL is constructed —
+// /api/devices/content-file?storyId=<id>&clip=<kind> — matching the
+// backend's default fill for clips.
+void sync_story_clips(CsStory *story) {
+    for (int k = 0; k < story->clip_count; k++) {
+        CsClip *clip = &story->clips[k];
+        char clip_path[CS_MAX_PATH_LEN];
+        if (!cs_build_clip_cache_path(clip_path, sizeof(clip_path),
+                                      story->story_id, story->version,
+                                      clip->kind)) {
+            clip->verified = false;
+            continue;
+        }
+        char label[CS_MAX_STORY_ID_LEN + CS_CLIP_KIND_LEN + 2];
+        snprintf(label, sizeof(label), "%s:%s", story->story_id, clip->kind);
+
+        // Already current? Requires a verified matching clip in the
+        // previous index AND the file on the card at the exact size —
+        // same metadata-is-never-enough rule the story check uses.
+        const CsStory *prev = find_previous(story->story_id);
+        if (prev != nullptr && prev->version == story->version) {
+            for (int p = 0; p < prev->clip_count; p++) {
+                const CsClip *pc = &prev->clips[p];
+                if (strcmp(pc->kind, clip->kind) == 0
+                    && pc->verified
+                    && pc->size_bytes == clip->size_bytes
+                    && hex_equals_ci(pc->sha256, clip->sha256)
+                    && sd_file_size(clip_path) == clip->size_bytes) {
+                    clip->verified = true;
+                    break;
+                }
+            }
+        }
+        if (clip->verified) {
+            Serial.printf("[content-sync] %s already current\n", label);
+            continue;
+        }
+
+        char url[CS_MAX_URL_LEN];
+        snprintf(url, sizeof(url),
+                 "/api/devices/content-file?storyId=%s&clip=%s",
+                 story->story_id, clip->kind);
+        char temp_path[CS_MAX_PATH_LEN];
+        if (!cs_build_clip_temp_path(temp_path, sizeof(temp_path),
+                                     story->story_id, story->version,
+                                     clip->kind)) {
+            clip->verified = false;
+            continue;
+        }
+        clip->verified = download_file_verified(
+            label, url, temp_path, clip_path, clip->size_bytes, clip->sha256);
+    }
 }
 
 // Is this story already on the card and current?
@@ -467,8 +537,12 @@ void content_sync_run() {
         return;
     }
     JsonArray stories = doc["stories"].as<JsonArray>();
-    Serial.printf("[content-sync] manifest status=200 stories=%u\n",
-                  stories.isNull() ? 0U : (unsigned)stories.size());
+    // B3 — per-device intro toggle rides the manifest; absent (pre-B3
+    // backend) means the shipped default (ON).
+    s_intro_enabled = doc["storyIntroEnabled"] | true;
+    Serial.printf("[content-sync] manifest status=200 stories=%u introEnabled=%d\n",
+                  stories.isNull() ? 0U : (unsigned)stories.size(),
+                  s_intro_enabled ? 1 : 0);
     Serial.flush();
     if (stories.isNull() || stories.size() == 0) {
         // An empty manifest is NOT a retirement instruction. The index and
@@ -518,6 +592,10 @@ void content_sync_run() {
         }
 
         if (ok && s_active_count < CS_MAX_STORIES) {
+            // B2 — clips ride along only once the narration itself is in
+            // place. A clip failure marks that clip unverified in the
+            // index (playback then skips it) and never fails the story.
+            sync_story_clips(story);
             s_active[s_active_count] = *story;
             s_active[s_active_count].verified = true;
             s_active_count++;

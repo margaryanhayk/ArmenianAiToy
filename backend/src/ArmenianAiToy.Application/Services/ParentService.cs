@@ -1196,6 +1196,40 @@ public class ParentService : IParentService
     }
 
     /// <summary>
+    /// B3 — toggle the spoken story intro on a linked device. Same ownership
+    /// + silent-false + idempotent shape as <see cref="SetDevicePauseStateAsync"/>.
+    /// The toy picks the new value up on its next content-manifest fetch and
+    /// caches it for offline sessions.
+    /// </summary>
+    public async Task<bool> SetDeviceStoryIntroAsync(Guid parentId, Guid deviceId, bool enabled)
+    {
+        var linked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!linked)
+            return false;
+
+        var device = await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == deviceId);
+        if (device == null)
+            return false;
+
+        if (device.StoryIntroEnabled == enabled)
+        {
+            // Idempotent: already in the requested state — no mutation, no
+            // audit row, parent still sees success.
+            return true;
+        }
+
+        device.StoryIntroEnabled = enabled;
+        TrackAndAddAudit(
+            AuditEvent.ParentDeviceStoryIntroSet(parentId, deviceId, enabled));
+        await _db.SaveChangesAsync();
+        _logger.LogInformation(
+            "Parent {ParentId} set device {DeviceId} storyIntroEnabled={Enabled}",
+            parentId, deviceId, enabled);
+        return true;
+    }
+
+    /// <summary>
     /// Rename a linked device so a parent can tell their toys apart (multi-toy
     /// labeling). Trims + caps the name; returns false on a non-owned/unknown
     /// device or an empty/over-length name (the controller maps that to 404 /
@@ -1517,6 +1551,23 @@ public class ParentService : IParentService
             .GroupBy(c => c.DeviceId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
+        // Slice A/B — story plays + reflection answers are children's
+        // activity data; a complete export carries them (same parent-scoped
+        // filter as everything else in this method).
+        var linkedIds = devices.Select(d => d.Id).ToList();
+        var storyPlaysByDevice = (await _db.Set<StoryPlay>()
+                .Where(p => linkedIds.Contains(p.DeviceId))
+                .OrderByDescending(p => p.PlayedAtUtc)
+                .ToListAsync())
+            .GroupBy(p => p.DeviceId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+        var reflectionAnswersByDevice = (await _db.Set<StoryReflectionAnswer>()
+                .Where(a => linkedIds.Contains(a.DeviceId))
+                .OrderByDescending(a => a.CreatedAtUtc)
+                .ToListAsync())
+            .GroupBy(a => a.DeviceId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
         var deviceExports = devices.Select(d => new ParentExportDevice(
             d.Id,
             d.MacAddress,
@@ -1563,7 +1614,18 @@ public class ParentService : IParentService
                     )).ToList()
                 )).ToList()
                 : new List<ConversationDto>()
-        )).ToList();
+        )
+        {
+            StoryPlays = storyPlaysByDevice.TryGetValue(d.Id, out var devicePlays)
+                ? devicePlays.Select(p => new StoryPlayDto(
+                    p.StoryId, p.Finished, p.Source, p.PlayedAtUtc, p.TimeIsApproximate)).ToList()
+                : new List<StoryPlayDto>(),
+            ReflectionAnswers = reflectionAnswersByDevice.TryGetValue(d.Id, out var deviceAnswers)
+                ? deviceAnswers.Select(a => new StoryReflectionAnswerDto(
+                    a.StoryId, a.QuestionIndex, a.AnswerText,
+                    a.SafetyFlag.ToString(), a.CreatedAtUtc)).ToList()
+                : new List<StoryReflectionAnswerDto>(),
+        }).ToList();
 
         var auditDtos = auditRows.Select(a => new AuditEventDto(
             a.Id,
@@ -1671,6 +1733,124 @@ public class ParentService : IParentService
             // blob is always valid JSON (or null).
             a.Metadata is null ? null : JsonNode.Parse(a.Metadata)
         )).ToList();
+    }
+
+    public async Task<StoryPlaysResponse?> GetStoryPlaysAsync(
+        Guid parentId, Guid deviceId, int limit, int offset)
+    {
+        // Ownership gate first — an unlinked device yields null (silent 404),
+        // same convention as the pause/bedtime/mode-flags family. No
+        // existence leak: "not yours" and "unknown device" are identical.
+        var linked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!linked)
+        {
+            return null;
+        }
+
+        var query = _db.Set<StoryPlay>().Where(p => p.DeviceId == deviceId);
+
+        var total = await query.CountAsync();
+
+        var plays = await query
+            .OrderByDescending(p => p.PlayedAtUtc)
+            .Skip(offset)
+            .Take(limit)
+            .Select(p => new
+            {
+                p.StoryId,
+                p.Finished,
+                p.Source,
+                p.PlayedAtUtc,
+                p.TimeIsApproximate,
+            })
+            .ToListAsync();
+
+        // Whole-history per-story counters (not paginated) — these drive the
+        // library view's "listened N times" and must not depend on the page
+        // the parent happens to be on.
+        var totals = await query
+            .GroupBy(p => p.StoryId)
+            .Select(g => new
+            {
+                StoryId = g.Key,
+                Count = g.Count(),
+                FinishedCount = g.Count(p => p.Finished),
+            })
+            .ToListAsync();
+
+        return new StoryPlaysResponse(
+            plays.Select(p => new StoryPlayDto(
+                p.StoryId, p.Finished, p.Source, p.PlayedAtUtc, p.TimeIsApproximate)).ToList(),
+            totals
+                .OrderByDescending(t => t.Count)
+                .ThenBy(t => t.StoryId, StringComparer.Ordinal)
+                .Select(t => new StoryPlayTotalDto(t.StoryId, t.Count, t.FinishedCount))
+                .ToList(),
+            total);
+    }
+
+    public async Task<StoryReflectionAnswersResponse?> GetStoryReflectionAnswersAsync(
+        Guid parentId, Guid deviceId, string? storyId, int limit, int offset)
+    {
+        // Same ownership gate + silent-null shape as GetStoryPlaysAsync.
+        var linked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!linked)
+        {
+            return null;
+        }
+
+        var query = _db.Set<StoryReflectionAnswer>()
+            .Where(a => a.DeviceId == deviceId);
+        if (!string.IsNullOrWhiteSpace(storyId))
+        {
+            query = query.Where(a => a.StoryId == storyId);
+        }
+
+        var total = await query.CountAsync();
+        var rows = await query
+            .OrderByDescending(a => a.CreatedAtUtc)
+            .Skip(offset)
+            .Take(limit)
+            .ToListAsync();
+
+        return new StoryReflectionAnswersResponse(
+            rows.Select(a => new StoryReflectionAnswerDto(
+                a.StoryId, a.QuestionIndex, a.AnswerText,
+                a.SafetyFlag.ToString(), a.CreatedAtUtc)).ToList(),
+            total);
+    }
+
+    public async Task<List<StoryPlayTotalDto>> GetStoryPlayTotalsForParentAsync(Guid parentId)
+    {
+        // Whole-account aggregation across the parent's linked devices —
+        // ownership is enforced at query level through the ParentDevice join.
+        var linkedIds = await _db.Set<ParentDevice>()
+            .Where(pd => pd.ParentId == parentId)
+            .Select(pd => pd.DeviceId)
+            .ToListAsync();
+        if (linkedIds.Count == 0)
+        {
+            return new List<StoryPlayTotalDto>();
+        }
+
+        var totals = await _db.Set<StoryPlay>()
+            .Where(p => linkedIds.Contains(p.DeviceId))
+            .GroupBy(p => p.StoryId)
+            .Select(g => new
+            {
+                StoryId = g.Key,
+                Count = g.Count(),
+                FinishedCount = g.Count(p => p.Finished),
+            })
+            .ToListAsync();
+
+        return totals
+            .OrderByDescending(t => t.Count)
+            .ThenBy(t => t.StoryId, StringComparer.Ordinal)
+            .Select(t => new StoryPlayTotalDto(t.StoryId, t.Count, t.FinishedCount))
+            .ToList();
     }
 
     /// <summary>

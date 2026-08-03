@@ -109,7 +109,16 @@ public record ParentExportDevice(
     bool RiddleEnabled,
     bool CuriosityEnabled,
     List<ParentExportChild> Children,
-    List<ConversationDto> Conversations);
+    List<ConversationDto> Conversations)
+{
+    /// <summary>Slice-A/B additive fields (init-props rather than positional
+    /// parameters so pre-existing constructor call sites and test doubles
+    /// compile unchanged). Device-reported story plays and the append-only
+    /// reflection-answer history are children's activity data — a complete
+    /// export must carry them.</summary>
+    public List<StoryPlayDto> StoryPlays { get; init; } = new();
+    public List<StoryReflectionAnswerDto> ReflectionAnswers { get; init; } = new();
+}
 
 /// <summary>
 /// Export-only projection of <see cref="ArmenianAiToy.Domain.Entities.Child"/>.

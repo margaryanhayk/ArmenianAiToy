@@ -120,10 +120,19 @@ public class ConversationService : IConversationService
         )).ToList();
     }
 
-    public async Task<List<ConversationSummaryDto>> GetConversationSummariesAsync(Guid deviceId, int limit = 20, int offset = 0)
+    public async Task<List<ConversationSummaryDto>> GetConversationSummariesAsync(
+        Guid deviceId, int limit = 20, int offset = 0, string? mode = null)
     {
-        var conversations = await _db.Set<Conversation>()
-            .Where(c => c.DeviceId == deviceId)
+        var query = _db.Set<Conversation>()
+            .Where(c => c.DeviceId == deviceId);
+        if (!string.IsNullOrWhiteSpace(mode))
+        {
+            // Modes are stamped lowercase at chat time (ChatService), so an
+            // exact match is correct; the controller normalizes the input.
+            query = query.Where(c => c.Messages.Any(m => m.Mode == mode));
+        }
+
+        var conversations = await query
             .OrderByDescending(c => c.StartedAt)
             .Skip(offset)
             .Take(limit)

@@ -27,6 +27,19 @@ public interface IDeviceService
     /// non-null ones) plus <c>FirmwareReportedAt</c>, from a heartbeat body.
     /// No-op when the device row is missing.</summary>
     Task UpdateFirmwareReportAsync(Guid deviceId, DeviceHeartbeatRequest report, DateTime nowUtc);
+    /// <summary>Ingest a batch of device-reported story playback events
+    /// (store-and-forward upload). Idempotent per (device, event key) — the
+    /// transport is at-least-once, so duplicates are silent no-ops. Returns
+    /// the number of NEW rows written.</summary>
+    Task<int> ReportStoryPlaysAsync(Guid deviceId, StoryPlayReportRequest request, DateTime nowUtc);
+
+    /// <summary>B4 — append one child reflection answer (per-listen row,
+    /// never an overwrite). Called by the reflection voice endpoint after
+    /// STT + moderation; best-effort at the call site (a persistence failure
+    /// must never break the spoken reply).</summary>
+    Task AddStoryReflectionAnswerAsync(
+        Guid deviceId, string storyId, int questionIndex,
+        string answerText, Domain.Enums.SafetyFlag safetyFlag, DateTime nowUtc);
     Task<bool> IsDevicePausedAsync(Guid deviceId);
     Task<bool> IsDeviceInBedtimeWindowAsync(Guid deviceId, DateTime nowUtc);
     Task<bool> IsDeviceModeEnabledAsync(Guid deviceId, DetectedMode mode);

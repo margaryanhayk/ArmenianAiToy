@@ -38,6 +38,11 @@ public interface IParentService
     Task<bool> SetDevicePauseStateAsync(Guid parentId, Guid deviceId, bool paused);
     Task<bool> SetDeviceNameAsync(Guid parentId, Guid deviceId, string name);
     Task<bool> SetDeviceRevocationAsync(Guid parentId, Guid deviceId, bool revoked);
+
+    /// <summary>B3 spoken-story-intro toggle. Same ownership + silent-false +
+    /// idempotent shape as <see cref="SetDevicePauseStateAsync"/>; audits
+    /// only a real flip.</summary>
+    Task<bool> SetDeviceStoryIntroAsync(Guid parentId, Guid deviceId, bool enabled);
     Task<bool> SetBedtimeWindowAsync(Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end);
     Task<bool> SetDeviceModeFlagsAsync(
         Guid parentId, Guid deviceId,
@@ -129,6 +134,31 @@ public interface IParentService
         Guid parentId, Guid childId,
         bool? story, bool? game, bool? riddle, bool? curiosity);
     Task<List<AuditEventDto>> GetAuditEventsForParentAsync(Guid parentId, int limit, int offset);
+
+    /// <summary>
+    /// Device-reported story playback history + per-story listen totals for a
+    /// linked device. Returns null when the device is not linked to this
+    /// parent (silent 404 at the controller — same shape as pause/bedtime).
+    /// <paramref name="limit"/>/<paramref name="offset"/> paginate the play
+    /// list only; the totals are always whole-history.
+    /// </summary>
+    Task<StoryPlaysResponse?> GetStoryPlaysAsync(
+        Guid parentId, Guid deviceId, int limit, int offset);
+
+    /// <summary>
+    /// B4 — append-only reflection-answer history for a linked device,
+    /// newest-first, optionally filtered by story. Null when the device is
+    /// not linked to this parent (silent 404 at the controller).
+    /// </summary>
+    Task<StoryReflectionAnswersResponse?> GetStoryReflectionAnswersAsync(
+        Guid parentId, Guid deviceId, string? storyId, int limit, int offset);
+
+    /// <summary>
+    /// Slice D — per-story listen totals aggregated across ALL of this
+    /// parent's linked devices (drives the library view's counts). Empty
+    /// list when the parent has no devices or no plays.
+    /// </summary>
+    Task<List<StoryPlayTotalDto>> GetStoryPlayTotalsForParentAsync(Guid parentId);
     Task<ParentExport?> BuildExportAsync(Guid parentId);
 
     /// <summary>

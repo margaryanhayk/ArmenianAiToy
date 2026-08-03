@@ -155,6 +155,22 @@ public sealed class ContentSyncOptions
             };
             if (int.TryParse(child["Version"], out var storyVersion)) story.Version = storyVersion;
             if (long.TryParse(child["SizeBytes"], out var storySize)) story.SizeBytes = storySize;
+
+            // B2 — hand-rolled clip binding, same reachable-by-tests rule as
+            // the story array itself: a new field silently missing from this
+            // loop would bind as default and leave every unit test green.
+            foreach (var clipChild in child.GetSection("Clips").GetChildren())
+            {
+                var clip = new ContentSyncClipOptions
+                {
+                    Kind = clipChild["Kind"] ?? "",
+                    AudioUrl = clipChild["AudioUrl"] ?? "",
+                    AudioPath = clipChild["AudioPath"] ?? "",
+                    Sha256 = clipChild["Sha256"] ?? "",
+                };
+                if (long.TryParse(clipChild["SizeBytes"], out var clipSize)) clip.SizeBytes = clipSize;
+                story.Clips.Add(clip);
+            }
             options.Stories.Add(story);
         }
 
@@ -188,6 +204,16 @@ public sealed class ContentSyncOptions
                     AudioPath = ResolveAudioPath(AudioRoot, s.AudioPath),
                     Sha256 = s.Sha256,
                     SizeBytes = s.SizeBytes,
+                    Clips = s.Clips
+                        .Select(c => new ContentSyncClipOptions
+                        {
+                            Kind = c.Kind,
+                            AudioUrl = c.AudioUrl,
+                            AudioPath = ResolveAudioPath(AudioRoot, c.AudioPath),
+                            Sha256 = c.Sha256,
+                            SizeBytes = c.SizeBytes,
+                        })
+                        .ToList(),
                 })
                 .ToList();
         }
@@ -244,5 +270,54 @@ public sealed class ContentSyncStoryOptions
     public string Sha256 { get; set; } = string.Empty;
 
     /// <summary>Exact byte length of the MP3.</summary>
+    public long SizeBytes { get; set; }
+
+    /// <summary>
+    /// B2 — optional per-story CLIPS: short pre-rendered MP3s that travel
+    /// with the narration (spoken intro, reflection question, after-story
+    /// summary). Clips share the story's <see cref="Version"/> — bumping the
+    /// story version refreshes narration AND clips (clips are tiny; a
+    /// separate per-clip version is not worth the contract surface). Empty
+    /// for stories that ship no clips — the toy then plays the story without
+    /// intro/reflection, exactly the pre-B2 behavior.
+    /// </summary>
+    public List<ContentSyncClipOptions> Clips { get; set; } = new();
+}
+
+/// <summary>
+/// One per-story clip. <see cref="Kind"/> is a bounded vocabulary
+/// (<c>intro</c> / <c>question</c> / <c>summary</c>) — the manifest service
+/// drops unknown kinds so a config typo can never push an arbitrary file
+/// role to the fleet.
+/// </summary>
+public sealed class ContentSyncClipOptions
+{
+    public const string KindIntro = "intro";
+    public const string KindQuestion = "question";
+    public const string KindSummary = "summary";
+
+    /// <summary>Reflection-dialogue slice: questions 2 and 3 of the
+    /// after-story dialogue. Bare <c>question</c> stays question index 0.</summary>
+    public const string KindQuestion1 = "question1";
+    public const string KindQuestion2 = "question2";
+
+    public static readonly IReadOnlyList<string> AllowedKinds =
+        [KindIntro, KindQuestion, KindSummary, KindQuestion1, KindQuestion2];
+
+    /// <summary>Clip role: intro | question | summary.</summary>
+    public string Kind { get; set; } = string.Empty;
+
+    /// <summary>URL the device downloads from. Empty → the manifest service
+    /// fills in <c>/api/devices/content-file?storyId=…&amp;clip=…</c>.</summary>
+    public string AudioUrl { get; set; } = string.Empty;
+
+    /// <summary>Server-side filesystem path of the clip MP3 (outside
+    /// wwwroot; relative values resolve against <c>AudioRoot</c>).</summary>
+    public string AudioPath { get; set; } = string.Empty;
+
+    /// <summary>Lowercase hex SHA-256 of the clip MP3.</summary>
+    public string Sha256 { get; set; } = string.Empty;
+
+    /// <summary>Exact byte length of the clip MP3.</summary>
     public long SizeBytes { get; set; }
 }

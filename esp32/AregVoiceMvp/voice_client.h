@@ -64,6 +64,13 @@ uint32_t voice_wifi_down_duration_ms();
 // is down. The URL is derived from AREG_BACKEND_URL, so no new config constant.
 void voice_send_heartbeat();
 
+// Story-play reporting (store-and-forward) — POST a pre-composed JSON body
+// to /api/devices/story-plays with the device-auth headers. Returns the HTTP
+// status (negative on transport failure / offline). The URL is derived from
+// AREG_BACKEND_URL like the heartbeat, so no new config constant. The caller
+// (story_report.cpp) owns the queue/retry logic; this is just the transport.
+int voice_post_story_plays(const char *json_body);
+
 // Result of a single voice turn upload.
 struct VoiceTurnResult {
     // true iff HTTP status was 200 AND a response body was
@@ -109,15 +116,18 @@ const char *voice_active_story_id();
 VoiceTurnResult voice_upload_question(const uint8_t *payload, size_t length,
                                       uint32_t offset);
 
-// Post-story reflection answer upload (Slice 3). POSTs the WAV `payload` (the
-// child's recorded answer to Areg's reflection question) to
-// AREG_STORY_REFLECTION_URL with "?storyId=AREG_STORY_ID&questionIndex=<n>"
-// and the device-auth headers. The response body (on HTTP 200) is the spoken
-// warm-acknowledgement MP3, returned via the result's PSRAM buffer exactly
-// like voice_upload_question. Synchronous; call voice_release_last_response()
-// when done with the bytes. UNVERIFIED — not compiled/flashed.
+// Post-story reflection answer upload (Slice 3 + reflection dialogue).
+// POSTs the WAV `payload` (the child's recorded answer to Areg's reflection
+// question) to AREG_STORY_REFLECTION_URL with
+// "?storyId=<active>&questionIndex=<n>[&last=false]" and the device-auth
+// headers. `last=false` tells the backend more questions follow, so its
+// goodbye line is spoken once per dialogue (on the final round), not after
+// every question. The response body (on HTTP 200) is the spoken
+// reaction/acknowledgement MP3, returned via the result's PSRAM buffer
+// exactly like voice_upload_question. Synchronous; call
+// voice_release_last_response() when done with the bytes.
 VoiceTurnResult voice_upload_reflection_answer(const uint8_t *payload, size_t length,
-                                               int question_index);
+                                               int question_index, bool last = true);
 
 // Hands-free autoplay continuation: POST to AREG_BACKEND_URL with
 // the device-auth headers AND `X-Areg-Continue: 1` and an EMPTY

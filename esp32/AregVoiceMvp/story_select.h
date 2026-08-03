@@ -184,6 +184,20 @@ int story_select_load_eligible(CsStory *out, int max_out);
 /// through it; only ids that appear in the index resolve.
 bool story_select_resolve_path(const char *story_id, char *out, size_t out_len);
 
+/// B2 — clip-path resolver. Fills `out` with the cached clip MP3 path
+/// (/stories/<id>-v<n>-<kind>.mp3) for EXACTLY `story_id` + `kind`, or
+/// returns false. Same never-a-different-file contract as
+/// story_select_resolve_path: requires the story present in the index,
+/// a VERIFIED clip entry of that kind, and the file on the card at the
+/// recorded size. Kinds: "intro" | "question" | "summary".
+bool story_select_resolve_clip_path(const char *story_id, const char *kind,
+                                    char *out, size_t out_len);
+
+/// B3 — the parent's spoken-story-intro toggle as cached on the card
+/// (index root `introEnabled`, written by content_sync from the
+/// manifest). Absent index / pre-v3 card → true, the shipped default.
+bool story_select_intro_enabled();
+
 /// Last-played story id, persisted in NVS so the rotation survives a
 /// reboot. Returns false when nothing valid is stored (missing key,
 /// unavailable NVS, or a stored value that no longer passes id
