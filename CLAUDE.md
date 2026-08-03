@@ -44,7 +44,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2220 tests)
+dotnet test                                     # Run all tests (2231 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -197,6 +197,23 @@ no editing, no deletion, no child-facing features.
 - `wwwroot/parent.html` — single self-contained static page (HTML + inline CSS + vanilla JS, no framework, no build step).
 - Discoverable via a small link inside the Parent Monitoring panel of `wwwroot/index.html`.
 - Views: login → linked devices → conversation summaries / flagged messages tabs → conversation detail. A separate **Your activity** view, reached from the "View your activity →" link in the linked-devices header, renders the per-actor audit feed (see § Audit events). The activity view is deliberately *not* nested under a device because the feed is per actor parent, not per device.
+- **Home-screen install (add-to-home-screen, no app store).** Apple declined
+  the Developer Program enrollment on 2026-08-04, so there is no TestFlight /
+  App Store build a parent can reach; this page is the phone surface. Added:
+  `wwwroot/manifest.webmanifest` (standalone display, `start_url=/parent.html`,
+  cream `theme_color` matching the header) and `wwwroot/icons/areg-{180,192,512}.png`
+  (generated sun mark — *Areg* = "sun"). `parent.html` links the manifest plus
+  the iOS-only `apple-touch-icon` / `apple-mobile-web-app-*` metas (iOS ignores
+  manifest icons), and pads the body by `env(safe-area-inset-bottom)` so the
+  last row clears the iPhone home indicator (0 in a normal tab).
+  A trilingual install tip (`#installHint`, keys `install_ios` /
+  `install_other`) appears on the login view **only** on a phone that is not
+  already running the installed page — never on desktop, never once installed,
+  per the "don't offer an action that cannot work" rule. The platform-specific
+  key is stamped onto `data-i18n` at boot so a later language switch
+  retranslates it through the normal `applyStaticI18n` pass. No service
+  worker, no offline cache, no build step — the page still loads from the
+  network every time.
 
 **Backend endpoints** (all parent-JWT authenticated, ownership-checked against linked devices)
 - `POST /api/parents/login` — issues JWT

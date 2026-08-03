@@ -4,6 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Areg — Parent Dashboard</title>
+  <!--
+    Home-screen install. There is no app-store build a parent can reach
+    today, so this page IS the phone app: added to the home screen it
+    opens full-screen, with its own icon, from a tap. Everything below is
+    inert in a desktop browser and costs one extra request (the manifest).
+  -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#fff6e3">
+  <link rel="icon" href="/icons/areg-192.png" sizes="192x192" type="image/png">
+  <!-- iOS ignores the manifest's icons; it reads apple-touch-icon only. -->
+  <link rel="apple-touch-icon" href="/icons/areg-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Areg">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -12,6 +27,10 @@
       color: #2b1f47;
       min-height: 100vh;
       padding: 16px;
+      /* Installed on a home screen there is no browser toolbar below the
+         page, so the last row would sit under the iPhone home indicator.
+         env() is 0 in a normal browser tab, so this changes nothing there. */
+      padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
       /* The page must never scroll sideways on a phone — any wide row
          (tab strip, table, audio player) manages its own overflow. */
       overflow-x: hidden;
@@ -22,6 +41,10 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      /* On a 360px phone the brand + language picker + account button
+         overflow a single line; wrapping keeps the page from scrolling
+         sideways instead of squashing the title. */
+      flex-wrap: wrap;
       gap: 10px;
       background: linear-gradient(135deg, #fff6e3, #ffeccb);
       border: 1px solid #f3e2bd;
@@ -30,7 +53,7 @@
       margin: 4px 0 16px;
       box-shadow: 0 2px 12px rgba(91,62,138,0.07);
     }
-    .header .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .header .brand { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 180px; }
     .header .logo {
       width: 46px;
       height: 46px;
@@ -121,7 +144,7 @@
       color: #2b1f47;
     }
     .ctl-label { color: #6b5b8a; font-weight: 600; }
-    .ctl-hint  { color: #9a8ab5; font-size: 11px; flex-basis: 100%; }
+    .ctl-hint  { color: #6b5b8a; font-size: 11px; flex-basis: 100%; }
 
     .btn-ghost {
       padding: 6px 12px;
@@ -173,7 +196,7 @@
       font-weight: 600;
       letter-spacing: 1px;
       text-transform: uppercase;
-      color: #9a8ab5;
+      color: #6b5b8a;
       margin: 16px 2px 6px;
     }
 
@@ -229,7 +252,7 @@
       text-align: center;
     }
     .stat-value { font-size: 16px; font-weight: 700; color: #4b2e83; }
-    .stat-label { font-size: 11px; color: #9a8ab5; }
+    .stat-label { font-size: 11px; color: #5b4c7d; }
     .stat-tile.stat-warn { background: #fff8ee; border-color: #e7c66a; }
     .stat-tile.stat-warn .stat-value { color: #92400e; }
     button {
@@ -332,12 +355,12 @@
     .today-link:hover { background: #ece4f8; }
     .today-empty {
       font-style: italic;
-      color: #9a8ab5;
+      color: #6b5b8a;
       font-size: 12px;
     }
     .today-footnote {
       font-size: 11px;
-      color: #9a8ab5;
+      color: #6b5b8a;
       margin-top: 6px;
     }
     .today-error {
@@ -347,7 +370,7 @@
 
     .pager-info {
       font-size: 12px;
-      color: #9a8ab5;
+      color: #6b5b8a;
       text-align: center;
       margin-top: 6px;
     }
@@ -392,10 +415,46 @@
     .tabs button.active { background: #7c5cbf; color: white; }
     .tabs button.active:hover { background: #6b4aad; }
 
+    /* Mode filter under the tab strip. The five per-mode pills used to sit
+       in the tab strip itself; as filters of one list they belong in a
+       control that stays one line wide in every language. */
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 0 0 10px;
+    }
+    .filter-label { font-size: 12px; color: #6b5b8a; margin: 0; }
+    .filter-select {
+      flex: 1 1 160px;
+      min-width: 0;
+      max-width: 260px;
+      min-height: 44px;
+      padding: 8px 10px;
+      font-size: 14px;
+      color: #2b1f47;
+      background: #fff;
+      border: 1px solid #e0d6f0;
+      border-radius: 10px;
+    }
+    .inline-note {
+      font-size: 12px;
+      color: #5b3e8a;
+      background: #f5f0ff;
+      border: 1px solid #e4d9f7;
+      border-radius: 10px;
+      padding: 8px 10px;
+      margin: 0 0 10px;
+      line-height: 1.45;
+    }
+
     .status { font-size: 13px; padding: 8px 0; min-height: 20px; }
-    .status.err { color: #c62828; }
-    .status.muted { color: #9a8ab5; }
-    .status.ok { color: #1e7a45; font-weight: 600; }
+    .status.err { color: #b3261e; }
+    /* #9a8ab5 on white is ~3:1 — under the AA floor for body text, and this
+       is the colour every "Loading…" and empty state used. */
+    .status.muted { color: #6b5b8a; }
+    .status.ok { color: #1a6b3c; font-weight: 600; }
 
     .row {
       display: block;
@@ -444,7 +503,7 @@
     }
     .row .from-line {
       font-size: 11px;
-      color: #9a8ab5;
+      color: #6b5b8a;
       margin-top: 6px;
     }
 
@@ -503,7 +562,7 @@
     }
     .msg .meta {
       font-size: 11px;
-      color: #9a8ab5;
+      color: #6b5b8a;
       margin-bottom: 4px;
     }
     .msg .role {
@@ -540,13 +599,16 @@
         </div>
       </div>
       <div class="right">
-        <select id="langSelect" aria-label="Language"
-                style="padding:6px 8px;border:1px solid #e0d6f0;border-radius:8px;background:#fff;color:#5b3e8a;font-size:13px;cursor:pointer;">
+        <select id="langSelect" data-i18n-aria="cap_language" aria-label="Language"
+                style="padding:8px;border:1px solid #e0d6f0;border-radius:8px;background:#fff;color:#5b3e8a;font-size:13px;cursor:pointer;max-width:120px;min-height:40px;">
           <option value="en">English</option>
           <option value="ru">Русский</option>
           <option value="hy">Հայերեն</option>
         </select>
-        <button id="logoutBtn" class="secondary" hidden data-i18n="logout">Log out</button>
+        <!-- Account replaces the old header Log out: signing out is a rare,
+             deliberate act and belongs with the other account controls,
+             while "Account" is the door a parent actually looks for. -->
+        <button id="accountBtn" class="secondary" hidden data-i18n="account">Account</button>
       </div>
     </div>
 
@@ -554,14 +616,17 @@
     <section id="loginView" class="card" hidden>
       <h2 data-i18n="login_title">👋 Welcome back</h2>
       <label for="emailInput" data-i18n="email">Email</label>
-      <input id="emailInput" type="email" autocomplete="username">
+      <input id="emailInput" type="email" autocomplete="username" data-i18n-ph="ph_email">
       <label for="passwordInput" data-i18n="password">Password</label>
       <input id="passwordInput" type="password" autocomplete="current-password">
       <button id="loginBtn" data-i18n="login_btn">Log in</button>
-      <button id="forgotPasswordBtn" class="link" type="button"
-              style="margin-left:8px;" data-i18n="forgot">Forgot password?</button>
-      <button id="verifyEmailRequestBtn" class="link" type="button"
-              style="margin-left:8px;" data-i18n="no_verif">Didn't get a verification email?</button>
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+        <!-- A parent who has just unboxed the toy has no account yet; before
+             this, the only way to make one was the developer bench page. -->
+        <button id="showSignupBtn" class="link" type="button" data-i18n="signup_link">New here? Create an account</button>
+        <button id="forgotPasswordBtn" class="link" type="button" data-i18n="forgot">Forgot password?</button>
+        <button id="verifyEmailRequestBtn" class="link" type="button" data-i18n="no_verif">Didn't get a verification email?</button>
+      </div>
       <div id="loginStatus" class="status" aria-live="polite"></div>
       <!--
         Google sign-in block. Hidden by default; unhidden by the boot
@@ -573,10 +638,9 @@
       <div id="googleSignInBlock" hidden
            style="margin-top:16px;padding-top:12px;border-top:1px solid #eee;">
         <div id="googleSignInButton" style="margin-bottom:6px;"></div>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#555;cursor:pointer;">
-          <input id="googleAcceptTerms" type="checkbox">
-          <span>I accept the <a href="/terms.html" target="_blank" rel="noopener">terms</a>
-            (required for first-time Google sign-up).</span>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#4b3b6e;cursor:pointer;line-height:1.4;">
+          <input id="googleAcceptTerms" type="checkbox" style="margin-top:3px;">
+          <span data-i18n="google_terms">I accept the terms (needed the first time you sign in with Google).</span>
         </label>
         <div id="googleSignInStatus" class="status" aria-live="polite"></div>
       </div>
@@ -586,11 +650,52 @@
         acceptance must be reachable without signing in first — and the
         privacy URL is required later for an App Store listing.
       -->
-      <p style="margin-top:16px;font-size:12px;color:#777;">
-        <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+      <p style="margin-top:16px;font-size:12px;color:#6b5b8a;">
+        <a href="/privacy.html" target="_blank" rel="noopener" style="color:#5b3e8a;" data-i18n="privacy_link">Privacy Policy</a>
         ·
-        <a href="/terms.html" target="_blank" rel="noopener">Terms of Service</a>
+        <a href="/terms.html" target="_blank" rel="noopener" style="color:#5b3e8a;" data-i18n="terms_link">Terms of Service</a>
       </p>
+      <!--
+        Home-screen tip. Unhidden by initInstallHint() ONLY on a phone that
+        is not already running the installed page — never on desktop, never
+        once installed, so it can't tell a parent to do something they have
+        already done. The wording differs per platform, so the boot code
+        stamps the matching data-i18n key and a later language switch
+        retranslates it through the normal applyStaticI18n pass.
+      -->
+      <p id="installHint" hidden
+         style="margin-top:10px;font-size:12px;color:#6b5b8a;line-height:1.5;"></p>
+    </section>
+
+    <!--
+      Sign-up view. Until now POST /api/parents/register was reachable only
+      from index.html, the developer bench page — so a parent who bought a
+      toy had no way to create an account on the surface built for them.
+      The backend answers 201 for a new email AND for one already
+      registered (anti-enumeration), so the success copy deliberately says
+      "please log in" rather than claiming a new account was created.
+    -->
+    <section id="signupView" class="card" hidden>
+      <h2 data-i18n="signup_title">Create your account</h2>
+      <label for="signupEmailInput" data-i18n="email">Email</label>
+      <input id="signupEmailInput" type="email" autocomplete="username" data-i18n-ph="ph_email">
+      <label for="signupPasswordInput" data-i18n="pw_min8">Password (at least 8 characters)</label>
+      <input id="signupPasswordInput" type="password" autocomplete="new-password">
+      <label for="signupConfirmInput" data-i18n="confirm_new_password">Confirm new password</label>
+      <input id="signupConfirmInput" type="password" autocomplete="new-password">
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#4b3b6e;cursor:pointer;line-height:1.4;margin:4px 0 14px;">
+        <input id="signupAcceptTerms" type="checkbox" style="margin-top:3px;">
+        <span data-i18n="accept_terms">I accept the Terms of Service and the Privacy Policy.</span>
+      </label>
+      <p style="margin:-8px 0 14px;font-size:12px;">
+        <a href="/terms.html" target="_blank" rel="noopener" style="color:#5b3e8a;" data-i18n="terms_link">Terms of Service</a>
+        ·
+        <a href="/privacy.html" target="_blank" rel="noopener" style="color:#5b3e8a;" data-i18n="privacy_link">Privacy Policy</a>
+      </p>
+      <button id="signupBtn" data-i18n="signup_btn">Create account</button>
+      <button id="signupBackBtn" class="link" type="button"
+              style="margin-left:8px;" data-i18n="have_account">I already have an account</button>
+      <div id="signupStatus" class="status" aria-live="polite"></div>
     </section>
 
     <!--
@@ -669,17 +774,12 @@
       <div id="resetPasswordStatus" class="status" aria-live="polite"></div>
     </section>
 
-    <!-- Devices view -->
+    <!-- Devices view — the home screen. It answers one question: which
+         toys do I have, and are they all right? Account-level controls
+         (password, activity, data, deletion) moved to their own view so
+         this screen is only ever about the toys. -->
     <section id="devicesView" class="card" hidden>
       <h2 data-i18n="linked_devices">🧸 Linked devices</h2>
-      <!-- Account-level only. Content links (library / music / request a
-           story) live INSIDE a toy, where the parent is thinking about what
-           their child hears — owner decision 2026-08-04. "Your activity" is
-           per-PARENT (a shared toy must not leak the other parent's
-           actions), so it stays here. -->
-      <div style="margin:0 0 8px;">
-        <button id="openAuditBtn" class="link" type="button" data-i18n="view_activity">View your activity →</button>
-      </div>
       <!-- Slice F — custom story request: the parent describes an idea or
            photographs a book page; fulfilment is by hand (owner queue).
            The form itself is rendered here but reached from the toy page. -->
@@ -721,16 +821,38 @@
           <p style="margin:0 0 8px;font-size:13px;color:#3a5a3a;" data-i18n="claim_help">
             Enter the pairing code from your toy's box or setup card (the app can
             scan its QR instead). This links the toy to your account.</p>
-          <label for="claimDeviceIdInput" style="display:block;font-size:12px;color:#555;" data-i18n="device_id">Device ID</label>
-          <input id="claimDeviceIdInput" type="text" autocomplete="off"
+          <label for="claimDeviceIdInput" style="display:block;font-size:12px;color:#4b3b6e;" data-i18n="device_id">Device ID</label>
+          <input id="claimDeviceIdInput" type="text" autocomplete="off" inputmode="text"
                  placeholder="00000000-0000-0000-0000-000000000000"
-                 style="width:100%;padding:5px 8px;margin:2px 0 8px;box-sizing:border-box;">
-          <label for="claimCodeInput" style="display:block;font-size:12px;color:#555;" data-i18n="pairing_code">Pairing code</label>
+                 style="width:100%;padding:10px;margin:2px 0 8px;box-sizing:border-box;">
+          <label for="claimCodeInput" style="display:block;font-size:12px;color:#4b3b6e;" data-i18n="pairing_code">Pairing code</label>
           <input id="claimCodeInput" type="text" autocomplete="off"
                  placeholder="code from the toy" data-i18n-ph="ph_pairing"
-                 style="width:100%;padding:5px 8px;margin:2px 0 8px;box-sizing:border-box;">
+                 style="width:100%;padding:10px;margin:2px 0 8px;box-sizing:border-box;">
           <button id="claimDeviceBtn" type="button" data-i18n="pair_toy">Pair toy</button>
           <div id="claimDeviceStatus" class="status muted" aria-live="polite"></div>
+          <!--
+            Setup-card path, kept but demoted. The consumer flow is the
+            pairing code; the device API key must never be printed on a
+            consumer box (see the three-secrets rule), so this is only
+            useful for early/bench units. It used to be the FIRST thing a
+            new parent saw, which taught them to handle a credential they
+            should never hold.
+          -->
+          <div style="margin-top:12px;border-top:1px dashed #b6d6b6;padding-top:8px;">
+            <button id="toggleSetupCardBtn" class="link" type="button"
+                    aria-expanded="false" aria-controls="linkDeviceEmptyState"
+                    data-i18n="setup_card_toggle">Use a setup card instead</button>
+            <div id="linkDeviceEmptyState" class="link-device-empty" hidden>
+              <p class="link-device-help" data-i18n="setup_card_help">Some early toys came with a setup card that lists an ID and a key. Most toys pair with the code on the box instead.</p>
+              <label for="linkDeviceIdInput" data-i18n="device_id">Device ID</label>
+              <input id="linkDeviceIdInput" type="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
+              <label for="linkApiKeyInput" data-i18n="api_key_label">Key from the setup card</label>
+              <input id="linkApiKeyInput" type="text" autocomplete="off" placeholder="dtk_…">
+              <button id="linkDeviceBtn" type="button" data-i18n="link_device">Link device</button>
+              <div id="linkDeviceStatus" class="status muted" aria-live="polite"></div>
+            </div>
+          </div>
         </div>
       </div>
       <!--
@@ -743,40 +865,67 @@
            hidden
            style="margin:0 0 12px;padding:8px 12px;
                   background:#f7f7f7;border:1px solid #ddd;
-                  border-radius:6px;font-size:13px;color:#555;"></div>
+                  border-radius:6px;font-size:13px;color:#4b3b6e;"></div>
       <div id="devicesList"></div>
       <div id="devicesStatus" class="status muted" aria-live="polite"></div>
-      <div id="linkDeviceEmptyState" class="link-device-empty" hidden>
-        <p class="link-device-help" data-i18n="link_help">To link a toy to this account, enter the Device ID and API key shown on the toy's setup card.</p>
-        <label for="linkDeviceIdInput">Device ID</label>
-        <input id="linkDeviceIdInput" type="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
-        <label for="linkApiKeyInput">API key</label>
-        <input id="linkApiKeyInput" type="text" autocomplete="off" placeholder="dtk_…">
-        <button id="linkDeviceBtn" type="button" data-i18n="link_device">Link device</button>
-        <div id="linkDeviceStatus" class="status muted" aria-live="polite"></div>
+    </section>
+
+    <!--
+      Account view. Everything that is about the PARENT rather than a toy:
+      who is signed in, language, sign-in security, their data, and the
+      careful zone. Previously these were stacked under the toy list, which
+      made the home screen answer two unrelated questions at once.
+    -->
+    <section id="accountView" class="card" hidden>
+      <h2>
+        <button class="link" id="accountBackBtn" type="button"
+                data-i18n-aria="nav_toys" data-i18n="nav_toys">← Toys</button>
+      </h2>
+      <div id="accountIdentity" style="margin:4px 0 14px;"></div>
+
+      <div class="section-cap" data-i18n="cap_language">Language</div>
+      <select id="accountLangSelect" data-i18n-aria="cap_language"
+              style="width:100%;max-width:280px;padding:10px;border:2px solid #e0d6f0;border-radius:12px;background:#fff;color:#2b1f47;font-size:15px;min-height:44px;">
+        <option value="en">English</option>
+        <option value="ru">Русский</option>
+        <option value="hy">Հայերեն</option>
+      </select>
+
+      <div class="section-cap" data-i18n="cap_your_data">Your data</div>
+      <div id="accountDataTiles"></div>
+      <div id="accountExportStatus" class="status muted" aria-live="polite"></div>
+
+      <div class="section-cap" data-i18n="cap_security">Sign-in</div>
+      <button id="togglePasswordBtn" class="btn-ghost" type="button"
+              aria-expanded="false" aria-controls="changePasswordForm"
+              style="margin-bottom:4px;" data-i18n="change_password">Change password</button>
+      <div id="changePasswordForm" hidden>
+        <label for="currentPasswordInput" data-i18n="current_password">Current password</label>
+        <input id="currentPasswordInput" type="password" autocomplete="current-password">
+        <label for="newPasswordInput" data-i18n="pw_min8">Password (at least 8 characters)</label>
+        <input id="newPasswordInput" type="password" autocomplete="new-password">
+        <label for="confirmPasswordInput" data-i18n="confirm_new_password">Confirm new password</label>
+        <input id="confirmPasswordInput" type="password" autocomplete="new-password">
+        <button id="changePasswordBtn" type="button" data-i18n="update_password">Update password</button>
+        <div id="changePasswordStatus" class="status muted" aria-live="polite"></div>
       </div>
-      <div class="account-panel">
-        <button id="togglePasswordBtn" class="link" type="button" aria-expanded="false" aria-controls="changePasswordForm" data-i18n="change_password">Change password</button>
-        <div id="changePasswordForm" hidden>
-          <label for="currentPasswordInput" data-i18n="current_password">Current password</label>
-          <input id="currentPasswordInput" type="password" autocomplete="current-password">
-          <label for="newPasswordInput">New password (min 8 characters)</label>
-          <input id="newPasswordInput" type="password" autocomplete="new-password">
-          <label for="confirmPasswordInput">Confirm new password</label>
-          <input id="confirmPasswordInput" type="password" autocomplete="new-password">
-          <button id="changePasswordBtn" type="button" data-i18n="update_password">Update password</button>
-          <div id="changePasswordStatus" class="status muted" aria-live="polite"></div>
-        </div>
-        <button id="toggleDeleteAccountBtn" class="link" type="button" aria-expanded="false" aria-controls="deleteAccountForm" style="color:#c66;margin-left:12px" data-i18n="delete_account">Delete account</button>
+      <button id="logoutBtn" class="btn-ghost" type="button"
+              style="margin-top:8px;" data-i18n="logout">Log out</button>
+
+      <div class="danger-zone">
+        <div class="section-cap" style="margin:0 2px 8px;" data-i18n="careful_zone">Careful zone</div>
+        <button id="toggleDeleteAccountBtn" class="btn-ghost-danger" type="button"
+                aria-expanded="false" aria-controls="deleteAccountForm"
+                data-i18n="delete_account">Delete account</button>
         <div id="deleteAccountForm" hidden>
-          <div style="background:#fee2e2;border:1px solid #c66;padding:10px;border-radius:6px;margin:8px 0;font-size:13px;color:#933">
-            <strong>This cannot be undone.</strong> Your account will be deleted. Any devices only you have linked — along with their children, conversations, and messages — will also be permanently deleted. Devices shared with another parent will remain for them.
-          </div>
-          <label for="deleteAccountPasswordInput">Current password</label>
+          <div style="background:#fee2e2;border:1px solid #e8a7a7;padding:12px;border-radius:12px;margin:10px 0;font-size:13px;color:#8a2f2f;line-height:1.5;"
+               data-i18n="delete_account_warning">This cannot be undone.</div>
+          <label for="deleteAccountPasswordInput" data-i18n="current_password">Current password</label>
           <input id="deleteAccountPasswordInput" type="password" autocomplete="current-password">
-          <label for="deleteAccountConfirmInput">Type DELETE to confirm</label>
+          <label for="deleteAccountConfirmInput" data-i18n="type_delete">Type DELETE to confirm</label>
           <input id="deleteAccountConfirmInput" type="text" autocomplete="off">
-          <button id="deleteAccountBtn" type="button" style="background:#c66;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:4px" data-i18n="delete_account_confirm">Permanently delete account</button>
+          <button id="deleteAccountBtn" type="button" class="btn-ghost-danger"
+                  style="margin-top:4px;" data-i18n="delete_account_confirm">Permanently delete account</button>
           <div id="deleteAccountStatus" class="status muted" aria-live="polite"></div>
         </div>
       </div>
@@ -799,22 +948,35 @@
       <div id="toyStatus" class="status muted" aria-live="polite"></div>
     </section>
 
-    <!-- Summaries view -->
+    <!-- Summaries view.
+         The tab strip used to carry eight pills — three rows of them on a
+         phone once Armenian labels were in. The five mode pills were only
+         ever filters of this same list, so they became a filter control
+         and the strip is back to the three things that are genuinely
+         different places. The strip also moved OUT of the <h2>: a screen
+         reader was announcing all eight buttons as the heading text. -->
     <section id="summariesView" class="card" hidden>
       <h2>
-        <button class="link" id="backToDevices" aria-label="Back to this toy" data-i18n="nav_toy">← Toy</button>
-        <span class="tabs" role="tablist" aria-label="Device views">
-          <button data-tab="summaries" role="tab" aria-selected="false" data-i18n="tab_conversations">Conversations</button>
-          <button data-tab="mode:story" role="tab" aria-selected="false" data-i18n="tab_stories">Stories</button>
-          <button data-tab="mode:game" role="tab" aria-selected="false" data-i18n="tab_games">Games</button>
-          <button data-tab="mode:riddle" role="tab" aria-selected="false" data-i18n="tab_riddles">Riddles</button>
-          <button data-tab="mode:curiosity" role="tab" aria-selected="false" data-i18n="tab_questions">Questions</button>
-          <button data-tab="mode:calm" role="tab" aria-selected="false" data-i18n="tab_bedtime">Calm</button>
-          <button data-tab="flagged" role="tab" aria-selected="false" data-i18n="tab_flagged">Flagged</button>
-          <button data-tab="plays" role="tab" aria-selected="false" data-i18n="tab_plays">Story plays</button>
-        </span>
+        <button class="link" id="backToDevices" data-i18n-aria="nav_toy" data-i18n="nav_toy">← Toy</button>
       </h2>
+      <div class="tabs" role="tablist" data-i18n-aria="aria_toy_views" aria-label="Toy views">
+        <button data-tab="summaries" role="tab" aria-selected="false" aria-controls="summariesList" data-i18n="tab_conversations">Conversations</button>
+        <button data-tab="flagged" role="tab" aria-selected="false" aria-controls="flaggedList" data-i18n="tab_flagged">Flagged</button>
+        <button data-tab="plays" role="tab" aria-selected="false" aria-controls="playsList" data-i18n="tab_plays">Story plays</button>
+      </div>
       <div id="summariesDeviceContext" class="device-context"></div>
+      <div class="filter-row">
+        <label for="modeFilterSelect" class="filter-label" data-i18n="filter_show">Show</label>
+        <select id="modeFilterSelect" class="filter-select">
+          <option value="" data-i18n-opt="filter_all">All play</option>
+          <option value="story" data-i18n-opt="tab_stories">Stories</option>
+          <option value="game" data-i18n-opt="tab_games">Games</option>
+          <option value="riddle" data-i18n-opt="tab_riddles">Riddles</option>
+          <option value="curiosity" data-i18n-opt="tab_questions">Questions</option>
+          <option value="calm" data-i18n-opt="tab_bedtime">Calm</option>
+        </select>
+      </div>
+      <p id="storiesNote" class="inline-note" hidden data-i18n="stories_note"></p>
       <!-- E1.1 Today summary panel — frontend-only digest above the
            paginated conversation list. Hidden until loadTodayPanel
            populates it. -->
@@ -837,23 +999,19 @@
     <!-- Flagged view -->
     <section id="flaggedView" class="card" hidden>
       <h2>
-        <button class="link" id="flaggedBackToDevices" aria-label="Back to this toy" data-i18n="nav_toy">← Toy</button>
-        <span class="tabs" role="tablist" aria-label="Device views">
-          <button data-tab="summaries" role="tab" aria-selected="false" data-i18n="tab_conversations">Conversations</button>
-          <button data-tab="mode:story" role="tab" aria-selected="false" data-i18n="tab_stories">Stories</button>
-          <button data-tab="mode:game" role="tab" aria-selected="false" data-i18n="tab_games">Games</button>
-          <button data-tab="mode:riddle" role="tab" aria-selected="false" data-i18n="tab_riddles">Riddles</button>
-          <button data-tab="mode:curiosity" role="tab" aria-selected="false" data-i18n="tab_questions">Questions</button>
-          <button data-tab="mode:calm" role="tab" aria-selected="false" data-i18n="tab_bedtime">Calm</button>
-          <button data-tab="flagged" role="tab" aria-selected="false" data-i18n="tab_flagged">Flagged</button>
-          <button data-tab="plays" role="tab" aria-selected="false" data-i18n="tab_plays">Story plays</button>
-        </span>
+        <button class="link" id="flaggedBackToDevices" data-i18n-aria="nav_toy" data-i18n="nav_toy">← Toy</button>
       </h2>
-      <div id="flaggedDeviceContext" class="device-context"></div>
-      <div class="legend-box" role="note" aria-label="Safety flag legend">
-        <p><span class="badge">⚠ Blocked</span> The toy held this back. If it's a child message, the toy did not respond normally; if it's a toy message, the original reply was not shown to your child — a safe fallback was sent instead.</p>
-        <p><span class="badge warn">⚠ Flagged</span> Noted for review but shown. A softer concern was detected; the conversation continued.</p>
+      <div class="tabs" role="tablist" data-i18n-aria="aria_toy_views" aria-label="Toy views">
+        <button data-tab="summaries" role="tab" aria-selected="false" aria-controls="summariesList" data-i18n="tab_conversations">Conversations</button>
+        <button data-tab="flagged" role="tab" aria-selected="false" aria-controls="flaggedList" data-i18n="tab_flagged">Flagged</button>
+        <button data-tab="plays" role="tab" aria-selected="false" aria-controls="playsList" data-i18n="tab_plays">Story plays</button>
       </div>
+      <div id="flaggedDeviceContext" class="device-context"></div>
+      <details class="legend-box">
+        <summary style="cursor:pointer;font-weight:600;" data-i18n="legend_title">What the marks mean</summary>
+        <p style="margin-top:6px;"><span class="badge" data-i18n="badge_blocked">⚠ Held back</span> <span data-i18n="legend_blocked"></span></p>
+        <p><span class="badge warn" data-i18n="badge_flagged">⚠ Noted</span> <span data-i18n="legend_flagged"></span></p>
+      </details>
       <div id="flaggedList"></div>
       <div id="flaggedStatus" class="status muted" aria-live="polite"></div>
       <div class="pager">
@@ -870,21 +1028,20 @@
          after-story question (B4). -->
     <section id="playsView" class="card" hidden>
       <h2>
-        <button class="link" id="playsBackToDevices" aria-label="Back to this toy" data-i18n="nav_toy">← Toy</button>
-        <span class="tabs" role="tablist" aria-label="Device views">
-          <button data-tab="summaries" role="tab" aria-selected="false" data-i18n="tab_conversations">Conversations</button>
-          <button data-tab="mode:story" role="tab" aria-selected="false" data-i18n="tab_stories">Stories</button>
-          <button data-tab="mode:game" role="tab" aria-selected="false" data-i18n="tab_games">Games</button>
-          <button data-tab="mode:riddle" role="tab" aria-selected="false" data-i18n="tab_riddles">Riddles</button>
-          <button data-tab="mode:curiosity" role="tab" aria-selected="false" data-i18n="tab_questions">Questions</button>
-          <button data-tab="mode:calm" role="tab" aria-selected="false" data-i18n="tab_bedtime">Calm</button>
-          <button data-tab="flagged" role="tab" aria-selected="false" data-i18n="tab_flagged">Flagged</button>
-          <button data-tab="plays" role="tab" aria-selected="false" data-i18n="tab_plays">Story plays</button>
-        </span>
+        <button class="link" id="playsBackToDevices" data-i18n-aria="nav_toy" data-i18n="nav_toy">← Toy</button>
       </h2>
+      <div class="tabs" role="tablist" data-i18n-aria="aria_toy_views" aria-label="Toy views">
+        <button data-tab="summaries" role="tab" aria-selected="false" aria-controls="summariesList" data-i18n="tab_conversations">Conversations</button>
+        <button data-tab="flagged" role="tab" aria-selected="false" aria-controls="flaggedList" data-i18n="tab_flagged">Flagged</button>
+        <button data-tab="plays" role="tab" aria-selected="false" aria-controls="playsList" data-i18n="tab_plays">Story plays</button>
+      </div>
       <div id="playsDeviceContext" class="device-context"></div>
       <div id="playsTotals" style="margin:8px 0 12px;"></div>
       <div id="playsList"></div>
+      <!-- Honest tail when the toy has played more than one page's worth:
+           the totals above are whole-history, so a bare list of 100 rows
+           silently contradicted a counter reading "listened 140 times". -->
+      <div id="playsTruncated" class="pager-info" hidden></div>
       <div id="playsAnswers" style="margin-top:16px;"></div>
       <div id="playsStatus" class="status muted" aria-live="polite"></div>
     </section>
@@ -894,9 +1051,14 @@
          counts, and a ▶ preview of the shipped narration. -->
     <section id="libraryView" class="card" hidden>
       <h2>
-        <button class="link" id="libraryBackToDevices" aria-label="Back to this toy" data-i18n="nav_toy">← Toy</button>
+        <button class="link" id="libraryBackToDevices" data-i18n-aria="nav_toy" data-i18n="nav_toy">← Toy</button>
         <span data-i18n="story_library">📚 Story library</span>
       </h2>
+      <!-- The listen counts on these cards are scoped to one toy when the
+           library is opened from inside a toy, and to every toy otherwise.
+           A number without its scope is not information, so the scope is
+           always stated here. -->
+      <div id="libraryScope" class="device-context"></div>
       <div id="libraryList"></div>
       <div id="libraryStatus" class="status muted" aria-live="polite"></div>
     </section>
@@ -904,7 +1066,7 @@
     <!-- Music view (Slice E) — the bedtime tracks the toy can play. -->
     <section id="musicView" class="card" hidden>
       <h2>
-        <button class="link" id="musicBackToDevices" aria-label="Back to this toy" data-i18n="nav_toy">← Toy</button>
+        <button class="link" id="musicBackToDevices" data-i18n-aria="nav_toy" data-i18n="nav_toy">← Toy</button>
         <span data-i18n="music_title">🎵 Music</span>
       </h2>
       <div id="musicList"></div>
@@ -926,11 +1088,9 @@
          parent*, not per device: a device shared with another parent
          does not leak that parent's actions into this feed. -->
     <section id="auditView" class="card" hidden>
-      <h2><button class="link" id="backFromAudit" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button> <span data-i18n="your_activity">Your activity</span></h2>
-      <p style="color:#555;font-size:13px;margin:4px 0 12px;">
-        Actions you have taken on this account. Per-device activity
-        (conversations, flagged messages) is shown under each device.
-      </p>
+      <h2><button class="link" id="backFromAudit" data-i18n-aria="nav_account" data-i18n="nav_account">← Account</button> <span data-i18n="your_activity">Your activity</span></h2>
+      <p style="color:#4b3b6e;font-size:13px;margin:4px 0 12px;line-height:1.5;"
+         data-i18n="activity_intro">Changes you have made to this account.</p>
       <div id="auditList"></div>
       <div id="auditStatus" class="status muted" aria-live="polite"></div>
       <div class="pager">
@@ -1126,7 +1286,203 @@
       session_expired: { en: 'Session expired. Please log in again.', ru: 'Сессия истекла. Войдите снова.', hy: 'Աշխատաշրջանն ավարտվեց։ Խնդրում ենք նորից մուտք գործել։' },
       invalid_login: { en: 'Invalid email or password.', ru: 'Неверная почта или пароль.', hy: 'Սխալ էլ. փոստ կամ գաղտնաբառ։' },
       reset_sent: { en: 'If an account exists for that email, a reset link has been sent. Check your inbox.', ru: 'Если аккаунт с такой почтой существует, ссылка для сброса отправлена. Проверьте почту.', hy: 'Եթե այդ փոստով հաշիվ կա, վերականգնման հղումն ուղարկվել է։ Ստուգեք ձեր փոստը։' },
-      verify_sent: { en: 'If that email is registered and not yet verified, a verification email has been sent. Check your inbox.', ru: 'Если почта зарегистрирована и не подтверждена, письмо-подтверждение отправлено. Проверьте почту.', hy: 'Եթե այդ փոստը գրանցված է և դեռ հաստատված չէ, հաստատման նամակն ուղարկվել է։ Ստուգեք ձեր փոստը։' }
+      verify_sent: { en: 'If that email is registered and not yet verified, a verification email has been sent. Check your inbox.', ru: 'Если почта зарегистрирована и не подтверждена, письмо-подтверждение отправлено. Проверьте почту.', hy: 'Եթե այդ փոստը գրանցված է և դեռ հաստատված չէ, հաստատման նամակն ուղարկվել է։ Ստուգեք ձեր փոստը։' },
+
+      // ---------- sign-up ----------
+      signup_link: { en: 'New here? Create an account', ru: 'Впервые здесь? Создайте аккаунт', hy: 'Առաջի՞ն անգամ եք։ Ստեղծեք հաշիվ' },
+      signup_title: { en: 'Create your account', ru: 'Создайте аккаунт', hy: 'Ստեղծեք ձեր հաշիվը' },
+      signup_btn: { en: 'Create account', ru: 'Создать аккаунт', hy: 'Ստեղծել հաշիվը' },
+      have_account: { en: 'I already have an account', ru: 'У меня уже есть аккаунт', hy: 'Ես արդեն ունեմ հաշիվ' },
+      pw_min8: { en: 'Password (at least 8 characters)', ru: 'Пароль (не менее 8 символов)', hy: 'Գաղտնաբառ (առնվազն 8 նիշ)' },
+      accept_terms: { en: 'I accept the Terms of Service and the Privacy Policy.', ru: 'Я принимаю Условия использования и Политику конфиденциальности.', hy: 'Ընդունում եմ Օգտագործման պայմանները և Գաղտնիության քաղաքականությունը։' },
+      google_terms: { en: 'I accept the terms (needed the first time you sign in with Google).', ru: 'Я принимаю условия (нужно при первом входе через Google).', hy: 'Ընդունում եմ պայմանները (պահանջվում է Google-ով առաջին մուտքի ժամանակ)։' },
+      terms_link: { en: 'Terms of Service', ru: 'Условия использования', hy: 'Օգտագործման պայմաններ' },
+      privacy_link: { en: 'Privacy Policy', ru: 'Политика конфиденциальности', hy: 'Գաղտնիության քաղաքականություն' },
+      signup_done: { en: 'Your account is ready. Please log in.', ru: 'Аккаунт готов. Войдите, пожалуйста.', hy: 'Ձեր հաշիվը պատրաստ է։ Խնդրում ենք մուտք գործել։' },
+      need_terms: { en: 'Please accept the terms to continue.', ru: 'Примите условия, чтобы продолжить.', hy: 'Շարունակելու համար ընդունեք պայմանները։' },
+
+      // ---------- account ----------
+      account: { en: 'Account', ru: 'Аккаунт', hy: 'Հաշիվ' },
+      nav_account: { en: '← Account', ru: '← Аккаунт', hy: '← Հաշիվ' },
+      account_title: { en: '👤 Your account', ru: '👤 Ваш аккаунт', hy: '👤 Ձեր հաշիվը' },
+      signed_in_as: { en: 'Signed in as', ru: 'Вы вошли как', hy: 'Մուտք եք գործել որպես' },
+      email_verified_ok: { en: 'Email confirmed', ru: 'Почта подтверждена', hy: 'Փոստը հաստատված է' },
+      cap_language: { en: 'Language', ru: 'Язык', hy: 'Լեզու' },
+      cap_security: { en: 'Sign-in', ru: 'Вход', hy: 'Մուտք' },
+      cap_your_data: { en: 'Your data', ru: 'Ваши данные', hy: 'Ձեր տվյալները' },
+      tile_activity: { en: 'Your activity', ru: 'Моя активность', hy: 'Իմ գործողությունները' },
+      tile_activity_sub: { en: 'Every change you have made to this account', ru: 'Все изменения, которые вы вносили', hy: 'Բոլոր փոփոխությունները, որ դուք արել եք' },
+      tile_export: { en: 'Download your data', ru: 'Скачать ваши данные', hy: 'Ներբեռնել ձեր տվյալները' },
+      tile_export_sub: { en: 'A copy of everything we keep for your family', ru: 'Копия всего, что мы храним о вашей семье', hy: 'Ձեր ընտանիքի մասին մեր պահած ամեն ինչի պատճենը' },
+      tile_password: { en: 'Change password', ru: 'Сменить пароль', hy: 'Փոխել գաղտնաբառը' },
+      tile_password_sub: { en: 'Use a new password from now on', ru: 'Использовать новый пароль', hy: 'Այսուհետ օգտագործել նոր գաղտնաբառ' },
+      export_busy: { en: 'Preparing your file…', ru: 'Готовим файл…', hy: 'Պատրաստում ենք ֆայլը…' },
+      export_done: { en: 'Downloaded. Check your downloads folder.', ru: 'Скачано. Проверьте папку загрузок.', hy: 'Ներբեռնված է։ Ստուգեք ներբեռնումների պանակը։' },
+      export_wait: { en: 'You just downloaded a copy. Please try again in a minute.', ru: 'Вы только что скачали копию. Попробуйте через минуту.', hy: 'Դուք հենց նոր ներբեռնեցիք պատճենը։ Փորձեք մեկ րոպեից։' },
+
+      // ---------- shared status / errors ----------
+      busy_loading: { en: 'Loading…', ru: 'Загрузка…', hy: 'Բեռնվում է…' },
+      busy_saving: { en: 'Saving…', ru: 'Сохраняем…', hy: 'Պահպանվում է…' },
+      busy_sending: { en: 'Sending…', ru: 'Отправляем…', hy: 'Ուղարկվում է…' },
+      busy_deleting: { en: 'Deleting…', ru: 'Удаляем…', hy: 'Ջնջվում է…' },
+      busy_signing_in: { en: 'Signing in…', ru: 'Входим…', hy: 'Մուտք ենք գործում…' },
+      busy_verifying: { en: 'Checking…', ru: 'Проверяем…', hy: 'Ստուգվում է…' },
+      busy_pairing: { en: 'Pairing…', ru: 'Привязываем…', hy: 'Կապակցվում է…' },
+      err_network: { en: 'No connection. Check your internet and try again.', ru: 'Нет связи. Проверьте интернет и попробуйте снова.', hy: 'Կապ չկա։ Ստուգեք ինտերնետը և կրկին փորձեք։' },
+      err_generic: { en: 'Something went wrong. Please try again.', ru: 'Что-то пошло не так. Попробуйте ещё раз.', hy: 'Ինչ-որ բան այնպես չգնաց։ Խնդրում ենք կրկին փորձել։' },
+      err_too_many: { en: 'Too many tries. Please wait a minute and try again.', ru: 'Слишком много попыток. Подождите минуту и попробуйте снова.', hy: 'Չափից շատ փորձեր։ Սպասեք մեկ րոպե և կրկին փորձեք։' },
+      err_email_password: { en: 'Please enter your email and password.', ru: 'Введите почту и пароль.', hy: 'Մուտքագրեք ձեր էլ. փոստը և գաղտնաբառը։' },
+      err_email_required: { en: 'Please enter your email.', ru: 'Введите почту.', hy: 'Մուտքագրեք ձեր էլ. փոստը։' },
+      err_email_invalid: { en: 'Please enter a valid email.', ru: 'Введите корректный адрес почты.', hy: 'Մուտքագրեք վավեր էլ. փոստ։' },
+      err_pw_short: { en: 'Password must be at least 8 characters.', ru: 'Пароль должен быть не короче 8 символов.', hy: 'Գաղտնաբառը պետք է լինի առնվազն 8 նիշ։' },
+      err_pw_mismatch: { en: 'The two passwords do not match.', ru: 'Пароли не совпадают.', hy: 'Երկու գաղտնաբառերը չեն համընկնում։' },
+      err_pw_same: { en: 'Please choose a password different from your current one.', ru: 'Выберите пароль, отличный от текущего.', hy: 'Ընտրեք ընթացիկից տարբեր գաղտնաբառ։' },
+      err_all_fields: { en: 'Please fill in all three fields.', ru: 'Заполните все три поля.', hy: 'Լրացրեք բոլոր երեք դաշտերը։' },
+      err_reset_link: { en: 'This link is no longer valid. Please request a new one.', ru: 'Ссылка больше не действует. Запросите новую.', hy: 'Հղումն այլևս վավեր չէ։ Խնդրեք նորը։' },
+      err_verify_link: { en: 'This link is no longer valid. Please request a new one.', ru: 'Ссылка больше не действует. Запросите новую.', hy: 'Հղումն այլևս վավեր չէ։ Խնդրեք նորը։' },
+      err_not_yours: { en: 'This toy is no longer on your account.', ru: 'Эта игрушка больше не привязана к вашему аккаунту.', hy: 'Այս խաղալիքն այլևս ձեր հաշվին կապված չէ։' },
+      err_gone: { en: 'This is no longer here. It may have been deleted.', ru: 'Этого больше нет — возможно, оно было удалено.', hy: 'Սա այլևս չկա։ Հնարավոր է՝ ջնջվել է։' },
+      ok_pw_updated: { en: 'Password updated.', ru: 'Пароль обновлён.', hy: 'Գաղտնաբառը թարմացվեց։' },
+      ok_pw_reset: { en: 'Your password has been reset. Please log in.', ru: 'Пароль сброшен. Войдите, пожалуйста.', hy: 'Գաղտնաբառը վերականգնվեց։ Խնդրում ենք մուտք գործել։' },
+      ok_verified: { en: 'Your email is confirmed. You can log in now.', ru: 'Почта подтверждена. Теперь можно войти.', hy: 'Ձեր փոստը հաստատված է։ Այժմ կարող եք մուտք գործել։' },
+      ok_account_deleted: { en: 'Your account has been deleted.', ru: 'Ваш аккаунт удалён.', hy: 'Ձեր հաշիվը ջնջվեց։' },
+      verify_sent_inline: { en: 'Sent — check your inbox.', ru: 'Отправлено — проверьте почту.', hy: 'Ուղարկվեց․ ստուգեք ձեր փոստը։' },
+      retry: { en: 'Try again', ru: 'Повторить', hy: 'Կրկին փորձել' },
+      page_label: { en: 'Page {n}', ru: 'Страница {n}', hy: 'Էջ {n}' },
+
+      // ---------- toys ----------
+      toy_fallback: { en: 'Toy {id}', ru: 'Игрушка {id}', hy: 'Խաղալիք {id}' },
+      age_short: { en: 'age {n}', ru: '{n} лет', hy: '{n} տարեկան' },
+      setup_card_toggle: { en: 'Use a setup card instead', ru: 'Использовать карточку настройки', hy: 'Օգտագործել կարգավորման քարտը' },
+      setup_card_help: { en: 'Some early toys came with a setup card that lists an ID and a key. Most toys pair with the code on the box instead.', ru: 'Некоторые ранние игрушки поставлялись с карточкой настройки, где указаны ID и ключ. Большинство игрушек привязывается кодом с коробки.', hy: 'Որոշ վաղ խաղալիքներ ունեին կարգավորման քարտ՝ ID-ով և բանալիով։ Խաղալիքների մեծ մասը կապակցվում է տուփի կոդով։' },
+      api_key_label: { en: 'Key from the setup card', ru: 'Ключ с карточки настройки', hy: 'Բանալի կարգավորման քարտից' },
+      err_pair_fields: { en: 'Please enter both the Device ID and the pairing code.', ru: 'Введите и ID устройства, и код привязки.', hy: 'Մուտքագրեք և՛ սարքի ID-ն, և՛ կապակցման կոդը։' },
+      err_pair_code: { en: "That code didn't work. Check the code on your toy's box and try again.", ru: 'Код не подошёл. Проверьте код на коробке игрушки и попробуйте снова.', hy: 'Կոդը չաշխատեց։ Ստուգեք խաղալիքի տուփի կոդը և կրկին փորձեք։' },
+      ok_paired: { en: 'Toy added ✓', ru: 'Игрушка добавлена ✓', hy: 'Խաղալիքն ավելացվեց ✓' },
+      err_link_fields: { en: 'Please enter both the Device ID and the key.', ru: 'Введите и ID устройства, и ключ.', hy: 'Մուտքագրեք և՛ սարքի ID-ն, և՛ բանալին։' },
+      err_link_failed: { en: "That didn't work. Check the ID and the key and try again.", ru: 'Не получилось. Проверьте ID и ключ и попробуйте снова.', hy: 'Չստացվեց։ Ստուգեք ID-ն և բանալին և կրկին փորձեք։' },
+      err_name_empty: { en: 'Please give the toy a name.', ru: 'Введите имя игрушки.', hy: 'Տվեք խաղալիքին անուն։' },
+      err_name_length: { en: 'The name can be 1–60 characters.', ru: 'Имя может быть от 1 до 60 символов.', hy: 'Անունը կարող է լինել 1–60 նիշ։' },
+      name_placeholder: { en: "e.g. Anna's toy", ru: 'например, игрушка Анны', hy: 'օրինակ՝ Աննայի խաղալիք' },
+      busy_pause: { en: 'Pausing…', ru: 'Ставим на паузу…', hy: 'Դադարեցվում է…' },
+      busy_resume: { en: 'Resuming…', ru: 'Продолжаем…', hy: 'Շարունակվում է…' },
+      busy_revoke: { en: 'Revoking access…', ru: 'Отзываем доступ…', hy: 'Մուտքը կասեցվում է…' },
+      busy_restore: { en: 'Restoring access…', ru: 'Восстанавливаем доступ…', hy: 'Մուտքը վերականգնվում է…' },
+      err_setting: { en: "That setting couldn't be changed. Please try again.", ru: 'Не удалось изменить настройку. Попробуйте снова.', hy: 'Չհաջողվեց փոխել կարգավորումը։ Կրկին փորձեք։' },
+      modes_of: { en: 'Modes · {name}', ru: 'Режимы · {name}', hy: 'Ռեժիմներ · {name}' },
+
+      // ---------- confirmations (destructive) ----------
+      confirm_unlink: { en: 'Remove {name} from your account?\n\nYou will stop seeing what your child hears on this toy. To add it back you will need the pairing code from its box.', ru: 'Убрать «{name}» из вашего аккаунта?\n\nВы перестанете видеть, что слышит ребёнок на этой игрушке. Чтобы вернуть её, понадобится код привязки с коробки.', hy: 'Հեռացնե՞լ «{name}»-ը ձեր հաշվից։\n\nԴուք այլևս չեք տեսնի, թե ինչ է լսում ձեր երեխան այս խաղալիքով։ Այն վերադարձնելու համար պետք կգա տուփի կապակցման կոդը։' },
+      confirm_revoke: { en: 'Turn off {name}?\n\nThe toy will stop working until it is set up again. Use this if it is lost or stolen. You can turn it back on here at any time.', ru: 'Отключить «{name}»?\n\nИгрушка перестанет работать, пока её не настроят заново. Используйте это, если она потеряна или украдена. Включить обратно можно здесь в любой момент.', hy: 'Անջատե՞լ «{name}»-ը։\n\nԽաղալիքը կդադարի աշխատել, մինչև նորից չկարգավորվի։ Օգտագործեք սա, եթե այն կորել կամ գողացվել է։ Ցանկացած պահի կարող եք այստեղից կրկին միացնել։' },
+      confirm_delete_child: { en: "Delete {name}'s profile?\n\nAll of {name}'s conversations and messages are deleted too. This cannot be undone.", ru: 'Удалить профиль «{name}»?\n\nВсе разговоры и сообщения «{name}» также будут удалены. Это нельзя отменить.', hy: 'Ջնջե՞լ «{name}»-ի պրոֆիլը։\n\nՆաև կջնջվեն «{name}»-ի բոլոր զրույցներն ու հաղորդագրությունները։ Սա հնարավոր չէ հետարկել։' },
+      confirm_delete_conversation: { en: 'Delete this conversation?\n\nEvery message in it is removed for good. This cannot be undone.', ru: 'Удалить этот разговор?\n\nВсе сообщения в нём будут удалены навсегда. Это нельзя отменить.', hy: 'Ջնջե՞լ այս զրույցը։\n\nԴրա բոլոր հաղորդագրությունները կհեռացվեն ընդմիշտ։ Սա հնարավոր չէ հետարկել։' },
+      this_child: { en: 'this child', ru: 'этого ребёнка', hy: 'այս երեխայի' },
+      delete_account_warning: { en: 'This cannot be undone. Your account is deleted. Any toy only you have linked — with its children, conversations and messages — is deleted too. A toy shared with another parent stays with them.', ru: 'Это нельзя отменить. Ваш аккаунт будет удалён. Каждая игрушка, привязанная только к вам, — вместе с детьми, разговорами и сообщениями — тоже будет удалена. Игрушка, общая с другим родителем, останется у него.', hy: 'Սա հնարավոր չէ հետարկել։ Ձեր հաշիվը կջնջվի։ Ամեն խաղալիք, որը կապված է միայն ձեզ հետ՝ իր երեխաներով, զրույցներով և հաղորդագրություններով, նույնպես կջնջվի։ Մեկ այլ ծնողի հետ կիսվող խաղալիքը կմնա նրա մոտ։' },
+      type_delete: { en: 'Type DELETE to confirm', ru: 'Введите DELETE для подтверждения', hy: 'Հաստատելու համար մուտքագրեք DELETE' },
+      err_type_delete: { en: 'Type DELETE in capital letters to confirm.', ru: 'Введите DELETE заглавными буквами для подтверждения.', hy: 'Հաստատելու համար մուտքագրեք DELETE մեծատառերով։' },
+      err_pw_required: { en: 'Please enter your current password.', ru: 'Введите текущий пароль.', hy: 'Մուտքագրեք ձեր ընթացիկ գաղտնաբառը։' },
+
+      // ---------- conversations & flagged ----------
+      speaker_child: { en: 'Child', ru: 'Ребёнок', hy: 'Երեխա' },
+      speaker_toy: { en: 'Areg', ru: 'Арег', hy: 'Արեգ' },
+      safe_reply_note: { en: 'safe reply sent instead', ru: 'вместо этого отправлен безопасный ответ', hy: 'փոխարենը ուղարկվել է անվտանգ պատասխան' },
+      msg_count: { en: 'Messages: {n}', ru: 'Сообщений: {n}', hy: 'Հաղորդագրություն՝ {n}' },
+      badge_blocked: { en: '⚠ Held back', ru: '⚠ Задержано', hy: '⚠ Պահվել է' },
+      badge_flagged: { en: '⚠ Noted', ru: '⚠ Отмечено', hy: '⚠ Նշվել է' },
+      badge_needs_look: { en: '⚠ Needs a look: {n}', ru: '⚠ Требует внимания: {n}', hy: '⚠ Ուշադրության կարիք՝ {n}' },
+      badge_needs_look_any: { en: '⚠ Needs a look', ru: '⚠ Требует внимания', hy: '⚠ Ուշադրության կարիք' },
+      legend_blocked: { en: 'The toy held this back. If your child said it, the toy did not answer as usual; if the toy said it, your child heard a safe reply instead.', ru: 'Игрушка задержала это. Если так сказал ребёнок — игрушка не ответила как обычно; если игрушка — ребёнок услышал вместо этого безопасный ответ.', hy: 'Խաղալիքը սա պահել է։ Եթե դա ասել է ձեր երեխան, խաղալիքը սովորականի պես չի պատասխանել․ եթե խաղալիքն է ասել, ձեր երեխան փոխարենը լսել է անվտանգ պատասխան։' },
+      legend_flagged: { en: 'Noted for you to see, but the play continued as normal.', ru: 'Отмечено, чтобы вы видели, но игра продолжилась как обычно.', hy: 'Նշվել է, որ դուք տեսնեք, բայց խաղը շարունակվել է սովորականի պես։' },
+      legend_title: { en: 'What the marks mean', ru: 'Что означают отметки', hy: 'Ի՞նչ են նշանակում նշանները' },
+      started_at: { en: 'Started {time}', ru: 'Начало: {time}', hy: 'Սկիզբ՝ {time}' },
+      ended_at: { en: 'Ended {time}', ru: 'Конец: {time}', hy: 'Ավարտ՝ {time}' },
+      needs_look_count: { en: '⚠ {n} to look at', ru: '⚠ {n} для просмотра', hy: '⚠ {n} դիտելու' },
+      no_messages: { en: 'This conversation has no messages.', ru: 'В этом разговоре нет сообщений.', hy: 'Այս զրույցում հաղորդագրություններ չկան։' },
+      from_conversation: { en: 'from a conversation that started {time}', ru: 'из разговора, начатого {time}', hy: '{time} սկսված զրույցից' },
+      no_flagged: { en: 'Nothing has needed a look on this toy. ✓', ru: 'На этой игрушке ничего не потребовало внимания. ✓', hy: 'Այս խաղալիքի վրա ոչինչ ուշադրության կարիք չի ունեցել։ ✓' },
+      no_more_flagged: { en: 'Nothing more to show.', ru: 'Больше показывать нечего.', hy: 'Այլ ցուցադրելու բան չկա։' },
+      stories_note: { en: 'Stories played from the toy’s own memory are not conversations — you will find them under Story plays.', ru: 'Сказки, сыгранные из памяти самой игрушки, не являются разговорами — они находятся в разделе «Прослушивания».', hy: 'Խաղալիքի սեփական հիշողությունից նվագարկված հեքիաթները զրույցներ չեն․ դրանք կգտնեք «Լսումներ» բաժնում։' },
+
+      // ---------- today panel ----------
+      stat_conversations: { en: 'Conversations', ru: 'Разговоры', hy: 'Զրույցներ' },
+      stat_messages: { en: 'Messages', ru: 'Сообщения', hy: 'Հաղորդագրություններ' },
+      stat_needs_look: { en: 'Needs a look', ru: 'Требует внимания', hy: 'Ուշադրության կարիք' },
+      stat_replayable: { en: 'Can replay', ru: 'Можно послушать', hy: 'Կարելի է լսել' },
+      today_none: { en: 'Nothing yet today on this toy.', ru: 'Сегодня на этой игрушке пока ничего.', hy: 'Այսօր այս խաղալիքի վրա դեռ ոչինչ չկա։' },
+      today_unavailable: { en: "Today's summary isn't available right now.", ru: 'Сводка за сегодня сейчас недоступна.', hy: 'Այսօրվա ամփոփումն այս պահին հասանելի չէ։' },
+      today_local: { en: "Counts the day so far, in your toy's local time.", ru: 'Считаем день с начала, по местному времени игрушки.', hy: 'Հաշվում ենք օրն սկզբից՝ խաղալիքի տեղական ժամանակով։' },
+      today_utc: { en: 'Counts the day so far (UTC).', ru: 'Считаем день с начала (UTC).', hy: 'Հաշվում ենք օրն սկզբից (UTC)։' },
+      no_snippet: { en: '(no text)', ru: '(без текста)', hy: '(տեքստ չկա)' },
+      today_tail: { en: '{n} today', ru: 'сегодня: {n}', hy: 'այսօր՝ {n}' },
+
+      // ---------- story plays & library ----------
+      listened_count: { en: 'Listened: {n} · to the end: {f}', ru: 'Прослушано: {n} · до конца: {f}', hy: 'Լսվել է՝ {n} · մինչև վերջ՝ {f}' },
+      listened_on_toy: { en: 'On this toy', ru: 'На этой игрушке', hy: 'Այս խաղալիքի վրա' },
+      listened_all_toys: { en: 'Across all your toys', ru: 'По всем вашим игрушкам', hy: 'Ձեր բոլոր խաղալիքների վրա' },
+      plays_more: { en: 'Showing the {n} most recent.', ru: 'Показаны {n} последних.', hy: 'Ցուցադրված են վերջին {n}-ը։' },
+      no_requests_yet: { en: "You haven't asked for a story yet.", ru: 'Вы ещё не заказывали сказку.', hy: 'Դուք դեռ հեքիաթ չեք պատվիրել։' },
+      err_request_empty: { en: 'Please describe the story, or attach a photo.', ru: 'Опишите сказку или приложите фото.', hy: 'Նկարագրեք հեքիաթը կամ կցեք լուսանկար։' },
+      photo_only: { en: '(photo only)', ru: '(только фото)', hy: '(միայն լուսանկար)' },
+      audio_unavailable: { en: 'This recording is not available.', ru: 'Эта запись недоступна.', hy: 'Այս ձայնագրությունը հասանելի չէ։' },
+
+      // ---------- activity feed ----------
+      activity_intro: { en: 'Changes you have made to this account. What happens on each toy is shown inside that toy.', ru: 'Изменения, которые вы вносили в аккаунт. Что происходит на каждой игрушке — внутри самой игрушки.', hy: 'Փոփոխությունները, որ դուք արել եք այս հաշվում։ Ինչ է կատարվում ամեն խաղալիքի հետ, ցուցադրվում է հենց այդ խաղալիքի ներսում։' },
+      activity_empty: { en: 'Nothing here yet. When you change a setting, add a toy, or update your password, it appears here.', ru: 'Пока пусто. Когда вы измените настройку, добавите игрушку или смените пароль — это появится здесь.', hy: 'Այստեղ դեռ ոչինչ չկա։ Երբ փոխեք կարգավորում, ավելացնեք խաղալիք կամ թարմացնեք գաղտնաբառը, դա կհայտնվի այստեղ։' },
+      activity_no_more: { en: 'Nothing older to show.', ru: 'Более старых записей нет.', hy: 'Ավելի հին գրառումներ չկան։' },
+      a_target_toy: { en: 'Toy: {name}', ru: 'Игрушка: {name}', hy: 'Խաղալիք՝ {name}' },
+      a_target_child: { en: 'Child: {name}', ru: 'Ребёнок: {name}', hy: 'Երեխա՝ {name}' },
+      ev_account_deleted: { en: 'Account deleted', ru: 'Аккаунт удалён', hy: 'Հաշիվը ջնջվեց' },
+      ev_child_deleted: { en: 'Child profile removed', ru: 'Профиль ребёнка удалён', hy: 'Երեխայի պրոֆիլը հեռացվեց' },
+      ev_device_unlinked: { en: 'Toy removed', ru: 'Игрушка убрана', hy: 'Խաղալիքը հեռացվեց' },
+      ev_password_changed: { en: 'Password changed', ru: 'Пароль изменён', hy: 'Գաղտնաբառը փոխվեց' },
+      ev_pause_changed: { en: 'Toy paused or resumed', ru: 'Игрушка на паузе или продолжена', hy: 'Խաղալիքը դադարեցվեց կամ շարունակվեց' },
+      ev_bedtime_set: { en: 'Bedtime hours updated', ru: 'Часы сна обновлены', hy: 'Քնի ժամերը թարմացվեցին' },
+      ev_modes_set: { en: 'Modes updated', ru: 'Режимы обновлены', hy: 'Ռեժիմները թարմացվեցին' },
+      ev_child_modes_set: { en: "A child's modes updated", ru: 'Режимы ребёнка обновлены', hy: 'Երեխայի ռեժիմները թարմացվեցին' },
+      ev_conversation_deleted: { en: 'Conversation deleted', ru: 'Разговор удалён', hy: 'Զրույցը ջնջվեց' },
+      ev_google_signin: { en: 'Signed in with Google', ru: 'Вход через Google', hy: 'Մուտք Google-ով' },
+      ev_data_exported: { en: 'Data downloaded', ru: 'Данные скачаны', hy: 'Տվյալները ներբեռնվեցին' },
+      ev_reset_requested: { en: 'Password reset requested', ru: 'Запрошен сброс пароля', hy: 'Խնդրվեց գաղտնաբառի վերականգնում' },
+      ev_reset_completed: { en: 'Password reset finished', ru: 'Сброс пароля завершён', hy: 'Գաղտնաբառի վերականգնումն ավարտվեց' },
+      ev_email_verified: { en: 'Email confirmed', ru: 'Почта подтверждена', hy: 'Փոստը հաստատվեց' },
+      ev_device_renamed: { en: 'Toy renamed', ru: 'Игрушка переименована', hy: 'Խաղալիքը վերանվանվեց' },
+      ev_device_claimed: { en: 'Toy added', ru: 'Игрушка добавлена', hy: 'Խաղալիքն ավելացվեց' },
+      ev_device_linked: { en: 'Toy added', ru: 'Игрушка добавлена', hy: 'Խաղալիքն ավելացվեց' },
+      ev_revocation_changed: { en: 'Toy access changed', ru: 'Доступ игрушки изменён', hy: 'Խաղալիքի մուտքը փոխվեց' },
+      ev_story_intro_set: { en: 'Spoken story intro changed', ru: 'Озвученное вступление изменено', hy: 'Հեքիաթի ձայնային ներածությունը փոխվեց' },
+      ev_bedtime_music_set: { en: 'Bedtime music changed', ru: 'Музыка для сна изменена', hy: 'Քնի երաժշտությունը փոխվեց' },
+      ev_story_requested: { en: 'Story requested', ru: 'Заказана сказка', hy: 'Պատվիրվեց հեքիաթ' },
+      m_turned_on: { en: 'turned on', ru: 'включено', hy: 'միացվեց' },
+      m_turned_off: { en: 'turned off', ru: 'выключено', hy: 'անջատվեց' },
+      m_paused: { en: 'paused', ru: 'на паузе', hy: 'դադարեցվեց' },
+      m_resumed: { en: 'resumed', ru: 'продолжено', hy: 'շարունակվեց' },
+      m_access_off: { en: 'access turned off', ru: 'доступ отключён', hy: 'մուտքն անջատվեց' },
+      m_access_on: { en: 'access restored', ru: 'доступ восстановлен', hy: 'մուտքը վերականգնվեց' },
+      m_window_set: { en: 'set to {start}–{end}', ru: 'установлено {start}–{end}', hy: 'սահմանվեց {start}–{end}' },
+      m_window_off: { en: 'turned off', ru: 'выключено', hy: 'անջատվեց' },
+      m_removed_convos: { en: 'conversations removed: {n}', ru: 'удалено разговоров: {n}', hy: 'հեռացված զրույցներ՝ {n}' },
+      m_removed_msgs: { en: 'messages removed: {n}', ru: 'удалено сообщений: {n}', hy: 'հեռացված հաղորդագրություններ՝ {n}' },
+      m_toys_linked: { en: 'toys linked: {n}', ru: 'привязано игрушек: {n}', hy: 'կապակցված խաղալիքներ՝ {n}' },
+      m_toys_deleted: { en: 'toys deleted: {n}', ru: 'удалено игрушек: {n}', hy: 'ջնջված խաղալիքներ՝ {n}' },
+      m_cascaded: { en: 'its data was deleted too', ru: 'её данные тоже удалены', hy: 'նրա տվյալները նույնպես ջնջվեցին' },
+      m_still_shared: { en: 'still linked to another parent', ru: 'остаётся у другого родителя', hy: 'մնում է մեկ այլ ծնողի մոտ' },
+      m_modes_on: { en: 'on: {list}', ru: 'вкл: {list}', hy: 'միաց՝ {list}' },
+      m_modes_off: { en: 'off: {list}', ru: 'выкл: {list}', hy: 'անջ՝ {list}' },
+      m_with_photo: { en: 'with a photo', ru: 'с фото', hy: 'լուսանկարով' },
+      // The OS button names are kept in English inside the sentence: the
+      // phone's own menu says "Share" / "Add to Home Screen" on most
+      // devices an Armenian parent owns, and a translated guess would send
+      // them looking for a label that isn't there.
+      install_ios: {
+        en: 'Tip: tap Share, then “Add to Home Screen” — Areg then opens like an app.',
+        ru: 'Совет: нажмите Share («Поделиться»), затем “Add to Home Screen” — Areg будет открываться как приложение.',
+        hy: 'Խորհուրդ՝ սեղմեք Share, ապա “Add to Home Screen” — Areg-ը կբացվի հավելվածի պես։'
+      },
+      install_other: {
+        en: 'Tip: open your browser menu and choose “Install app” — Areg then opens like an app.',
+        ru: 'Совет: откройте меню браузера и выберите “Install app” — Areg будет открываться как приложение.',
+        hy: 'Խորհուրդ՝ բացեք դիտարկիչի ցանկը և ընտրեք “Install app” — Areg-ը կբացվի հավելվածի պես։'
+      }
     };
     function getLang() {
       var l = null;
@@ -1142,7 +1498,27 @@
       if (!entry) return key;
       return entry[getLang()] || entry.en || key;
     }
-    // Translate every static element tagged with data-i18n / data-i18n-ph.
+    // Interpolating translate: tf('page_label', { n: 3 }).
+    // Values are substituted into named {slots} so each language keeps its
+    // own word order — never build a sentence by concatenating fragments,
+    // because Russian and Armenian put the number and the noun differently.
+    function tf(key, vals) {
+      var s = t(key);
+      if (!vals) return s;
+      for (var k in vals) {
+        if (Object.prototype.hasOwnProperty.call(vals, k)) {
+          s = s.split('{' + k + '}').join(String(vals[k]));
+        }
+      }
+      return s;
+    }
+    // Dates follow the SELECTED dashboard language, not the browser's —
+    // an Armenian dashboard on an en-US phone used to print US dates.
+    var LOCALE_TAG = { en: 'en-GB', ru: 'ru-RU', hy: 'hy-AM' };
+    function activeLocale() { return LOCALE_TAG[getLang()] || 'en-GB'; }
+    // Translate every static element tagged with data-i18n / data-i18n-ph /
+    // data-i18n-aria. The aria variant matters: a screen-reader user gets
+    // the page in their language too, not just the sighted labels.
     function applyStaticI18n() {
       document.documentElement.lang = getLang();
       var nodes = document.querySelectorAll('[data-i18n]');
@@ -1152,6 +1528,10 @@
       var phs = document.querySelectorAll('[data-i18n-ph]');
       for (var j = 0; j < phs.length; j++) {
         phs[j].setAttribute('placeholder', t(phs[j].getAttribute('data-i18n-ph')));
+      }
+      var ar = document.querySelectorAll('[data-i18n-aria]');
+      for (var k = 0; k < ar.length; k++) {
+        ar[k].setAttribute('aria-label', t(ar[k].getAttribute('data-i18n-aria')));
       }
     }
 
@@ -1217,24 +1597,31 @@
 
     function show(viewId) {
       // Leaving a view must silence any preview it was playing — otherwise
-      // a story keeps narrating from a page the parent has left.
+      // a story keeps narrating from a page the parent has left — and hand
+      // back the audio memory, which used to be held until a page reload.
       // (Declared later in this IIFE; function declarations hoist.)
       stopOtherPreviews(null);
-      var ids = ['loginView', 'resetRequestView', 'resetPasswordView',
+      releaseObjectUrls();
+      var ids = ['loginView', 'signupView', 'resetRequestView', 'resetPasswordView',
                  'verifyEmailRequestView', 'verifyEmailCompleteView',
-                 'devicesView', 'toyView', 'summariesView', 'flaggedView',
+                 'devicesView', 'toyView', 'accountView', 'summariesView', 'flaggedView',
                  'playsView', 'libraryView', 'musicView', 'detailView', 'auditView'];
       for (var i = 0; i < ids.length; i++) {
-        document.getElementById(ids[i]).hidden = (ids[i] !== viewId);
+        var node = document.getElementById(ids[i]);
+        if (node) node.hidden = (ids[i] !== viewId);
       }
-      // Log-out only makes sense for authenticated, post-login views.
-      // All five pre-auth surfaces hide logoutBtn.
+      // The account button only makes sense once signed in. All six
+      // pre-auth surfaces hide it.
       var preAuthViews = {
-        loginView: 1,
+        loginView: 1, signupView: 1,
         resetRequestView: 1, resetPasswordView: 1,
         verifyEmailRequestView: 1, verifyEmailCompleteView: 1
       };
-      document.getElementById('logoutBtn').hidden = !!preAuthViews[viewId];
+      document.getElementById('accountBtn').hidden = !!preAuthViews[viewId];
+      // Every view change starts at the top — otherwise tapping a toy from
+      // half-way down a long list opens its page already scrolled past the
+      // toy's name.
+      try { window.scrollTo(0, 0); } catch (e) { /* cosmetic */ }
     }
 
     function setStatus(elId, text, kind) {
@@ -1249,7 +1636,10 @@
 
     function fmtTime(iso) {
       if (!iso) return '';
-      try { return new Date(iso).toLocaleString(); } catch (e) { return iso; }
+      try { return new Date(iso).toLocaleString(activeLocale()); }
+      catch (e) {
+        try { return new Date(iso).toLocaleString(); } catch (e2) { return iso; }
+      }
     }
 
     function shortId(guid) {
@@ -1257,14 +1647,55 @@
       return String(guid).slice(0, 8) + '…';
     }
 
+    // One place that decides what a toy without a name is called, so the
+    // list, the toy page and the conversation header never disagree
+    // ("Toy 1a2b…" in one place and "Device 1a2b…" in another).
+    function toyLabel(d) {
+      if (!d) return '';
+      return d.deviceName || tf('toy_fallback', { id: shortId(d.deviceId) });
+    }
+
     function roleLabel(role) {
       // Parent-facing speaker label. Matches the toy-name "Areg" used
       // on the main app home page (index.html) so the parent dashboard
       // and the device home screen speak consistently.
-      if (role === 'user') return t('child');
-      if (role === 'assistant') return '🧸 Areg';
+      if (role === 'user') return '🧒 ' + t('speaker_child');
+      if (role === 'assistant') return '🧸 ' + t('speaker_toy');
       return String(role || '');
     }
+
+    // Turn any failure into one calm sentence a parent can act on. Never
+    // print a bare status code at them — "Error: HTTP 403" tells a tired
+    // parent nothing and reads like the product is broken.
+    function friendlyError(err) {
+      var s = err && err.status;
+      if (s === 403) return t('err_not_yours');
+      if (s === 404) return t('err_gone');
+      if (s === 429) return t('err_too_many');
+      if (s === 0)   return t('err_network');
+      return t('err_generic');
+    }
+
+    // Blob URLs held by audio players. `ended` alone never fired for a
+    // parent who previewed eight stories without finishing any of them,
+    // so every created URL is tracked and released when the player goes
+    // away with the view.
+    var liveObjectUrls = [];
+    function trackObjectUrl(url) { liveObjectUrls.push(url); return url; }
+    function releaseObjectUrls() {
+      for (var i = 0; i < liveObjectUrls.length; i++) {
+        try { URL.revokeObjectURL(liveObjectUrls[i]); } catch (e) { /* already gone */ }
+      }
+      liveObjectUrls = [];
+    }
+
+    // Monotonic request tokens, one per list. A reply from a superseded
+    // request must never paint: without this, opening toy A's flagged
+    // list and then toy B's could leave A's messages under B's name.
+    var reqSeq = { summaries: 0, flagged: 0, plays: 0, library: 0,
+                   music: 0, audit: 0, requests: 0 };
+    function nextReq(name) { return ++reqSeq[name]; }
+    function isCurrentReq(name, id) { return reqSeq[name] === id; }
 
     // Reload-survival: mirror the current view into the URL hash so a
     // page refresh restores the parent's place instead of bouncing to
@@ -1320,7 +1751,7 @@
         }
       }
       var label = document.createElement('strong');
-      label.textContent = '🧸 ' + (name || ('Toy ' + shortId(state.currentDeviceId)));
+      label.textContent = '🧸 ' + (name || tf('toy_fallback', { id: shortId(state.currentDeviceId) }));
       label.title = state.currentDeviceId;
       el.appendChild(label);
     }
@@ -1333,10 +1764,13 @@
       // Disable Older when the just-loaded page was empty or short (last page).
       olderBtn.disabled = (lastPageSize < PAGE_SIZE);
       var page = Math.floor(offset / PAGE_SIZE) + 1;
-      info.textContent = 'Page ' + page;
+      info.textContent = tf('page_label', { n: page });
     }
 
     // ---------- fetch wrapper ----------
+    // Rejects with { status } so callers can map it through friendlyError.
+    // A dropped connection reports status 0 rather than an undefined, so
+    // "no internet" is distinguishable from "the server said no".
     function authedFetch(url) {
       var token = getToken();
       if (!token) {
@@ -1344,11 +1778,11 @@
       }
       return fetch(url, {
         headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
+      }).catch(function () {
+        return Promise.reject({ status: 0, message: 'Network' });
       }).then(function (res) {
         if (res.status === 401) {
-          clearToken();
-          show('loginView');
-          setStatus('loginStatus', t('session_expired'), 'err');
+          sessionExpired();
           return Promise.reject({ status: 401, message: 'Unauthorized' });
         }
         if (!res.ok) {
@@ -1358,12 +1792,51 @@
       });
     }
 
+    // Single place that ends a session. Clears the token AND the cached
+    // family data, so a second parent signing in on the same phone can
+    // never see the first parent's toy or child names.
+    function sessionExpired() {
+      clearToken();
+      resetSessionState();
+      show('loginView');
+      setStatus('loginStatus', t('session_expired'), 'err');
+    }
+
+    // Everything derived from "who is signed in". Called on log out and on
+    // any 401 — leaving currentToyId set used to drop the next parent
+    // straight inside the previous parent's toy page.
+    function resetSessionState() {
+      state.currentDeviceId = null;
+      state.currentToyId = null;
+      state.offset = 0;
+      state.flaggedOffset = 0;
+      state.auditOffset = 0;
+      state.modeFilter = null;
+      state.storyTitles = null;
+      state.musicAvailable = undefined;
+      state.detailConversationId = null;
+      state.backFromDetail = null;
+      state.lastSummariesPageSize = 0;
+      state.lastFlaggedPageSize = 0;
+      state.lastAuditPageSize = 0;
+      state.lastDevicesResponse = [];
+      state.parentEmail = null;
+      state.libraryDeviceId = null;
+      releaseObjectUrls();
+      // The hash carries a toy id; leaving it behind puts one family's
+      // device id into the next person's address bar and history.
+      try {
+        history.replaceState(null, '',
+          window.location.pathname + window.location.search);
+      } catch (e) { /* cosmetic only */ }
+    }
+
     // ---------- login ----------
     function doLogin() {
       var email = document.getElementById('emailInput').value.trim();
       var password = document.getElementById('passwordInput').value;
       if (!email || !password) {
-        setStatus('loginStatus', 'Email and password are required.', 'err');
+        setStatus('loginStatus', t('err_email_password'), 'err');
         return;
       }
       setStatus('loginStatus', 'Logging in…', 'muted');
@@ -1377,14 +1850,14 @@
           return null;
         }
         if (!res.ok) {
-          setStatus('loginStatus', 'Error: HTTP ' + res.status, 'err');
+          setStatus('loginStatus', t('err_generic'), 'err');
           return null;
         }
         return res.json();
       }).then(function (data) {
         if (!data) return;
         if (!data.token) {
-          setStatus('loginStatus', 'Login response missing token.', 'err');
+          setStatus('loginStatus', t('err_generic'), 'err');
           return;
         }
         setToken(data.token);
@@ -1392,7 +1865,7 @@
         document.getElementById('passwordInput').value = '';
         loadDevices();
       }).catch(function () {
-        setStatus('loginStatus', 'Network error.', 'err');
+        setStatus('loginStatus', t('err_network'), 'err');
       });
     }
 
@@ -1412,10 +1885,10 @@
     function submitResetRequest() {
       var email = document.getElementById('resetRequestEmailInput').value.trim();
       if (!email) {
-        setStatus('resetRequestStatus', 'Email is required.', 'err');
+        setStatus('resetRequestStatus', t('err_email_required'), 'err');
         return;
       }
-      setStatus('resetRequestStatus', 'Sending…', 'muted');
+      setStatus('resetRequestStatus', t('busy_sending'), 'muted');
       fetch('/api/parents/password/reset-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1432,19 +1905,19 @@
         }
         if (res.status === 429) {
           setStatus('resetRequestStatus',
-            'Too many requests. Please slow down.', 'err');
+            t('err_too_many'), 'err');
           return;
         }
         if (res.status === 400) {
           // The backend uses 400 only for request-shape problems here
           // (empty email), never to distinguish known from unknown.
           setStatus('resetRequestStatus',
-            'Please enter a valid email.', 'err');
+            t('err_email_invalid'), 'err');
           return;
         }
-        setStatus('resetRequestStatus', 'Error: HTTP ' + res.status, 'err');
+        setStatus('resetRequestStatus', t('err_generic'), 'err');
       }).catch(function () {
-        setStatus('resetRequestStatus', 'Network error.', 'err');
+        setStatus('resetRequestStatus', t('err_network'), 'err');
       });
     }
 
@@ -1473,22 +1946,22 @@
       // local "too short" message avoids a round-trip.
       if (!pw || pw.length < 8) {
         setStatus('resetPasswordStatus',
-          'Password must be at least 8 characters.', 'err');
+          t('err_pw_short'), 'err');
         return;
       }
       if (pw !== confirmPw) {
         setStatus('resetPasswordStatus',
-          'The two passwords do not match.', 'err');
+          t('err_pw_mismatch'), 'err');
         return;
       }
       if (!pendingResetToken) {
         // Shouldn't happen in the normal flow (view is only shown when
         // a token was captured on boot), but guard defensively.
         setStatus('resetPasswordStatus',
-          'Reset link is invalid or expired.', 'err');
+          t('err_reset_link'), 'err');
         return;
       }
-      setStatus('resetPasswordStatus', 'Saving…', 'muted');
+      setStatus('resetPasswordStatus', t('busy_saving'), 'muted');
       fetch('/api/parents/password/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1506,17 +1979,17 @@
           document.getElementById('resetPasswordConfirmInput').value = '';
           show('loginView');
           setStatus('loginStatus',
-            'Your password has been reset. Please log in.', 'ok');
+            t('ok_pw_reset'), 'ok');
           return;
         }
         // The backend returns a uniform 400 with a fixed error message
         // for every failure reason (unknown / expired / already
         // consumed / too-short password) — surface it as-is so we
         // match the anti-enumeration posture.
-        var msg = (r.data && r.data.error) || 'Reset link is invalid or expired.';
+        var msg = t('err_reset_link');
         setStatus('resetPasswordStatus', msg, 'err');
       }).catch(function () {
-        setStatus('resetPasswordStatus', 'Network error.', 'err');
+        setStatus('resetPasswordStatus', t('err_network'), 'err');
       });
     }
 
@@ -1547,10 +2020,10 @@
     function submitVerifyEmailRequest() {
       var email = document.getElementById('verifyEmailInput').value.trim();
       if (!email) {
-        setStatus('verifyEmailRequestStatus', 'Email is required.', 'err');
+        setStatus('verifyEmailRequestStatus', t('err_email_required'), 'err');
         return;
       }
-      setStatus('verifyEmailRequestStatus', 'Sending…', 'muted');
+      setStatus('verifyEmailRequestStatus', t('busy_sending'), 'muted');
       fetch('/api/parents/verify-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1567,17 +2040,17 @@
         }
         if (res.status === 429) {
           setStatus('verifyEmailRequestStatus',
-            'Too many requests. Please slow down.', 'err');
+            t('err_too_many'), 'err');
           return;
         }
         if (res.status === 400) {
           setStatus('verifyEmailRequestStatus',
-            'Please enter a valid email.', 'err');
+            t('err_email_invalid'), 'err');
           return;
         }
-        setStatus('verifyEmailRequestStatus', 'Error: HTTP ' + res.status, 'err');
+        setStatus('verifyEmailRequestStatus', t('err_generic'), 'err');
       }).catch(function () {
-        setStatus('verifyEmailRequestStatus', 'Network error.', 'err');
+        setStatus('verifyEmailRequestStatus', t('err_network'), 'err');
       });
     }
 
@@ -1596,10 +2069,10 @@
     function submitVerifyEmailComplete() {
       if (!pendingVerifyToken) {
         setStatus('verifyEmailCompleteStatus',
-          'Verification link is invalid or expired.', 'err');
+          t('err_verify_link'), 'err');
         return;
       }
-      setStatus('verifyEmailCompleteStatus', 'Verifying…', 'muted');
+      setStatus('verifyEmailCompleteStatus', t('busy_verifying'), 'muted');
       fetch('/api/parents/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1612,14 +2085,14 @@
           pendingVerifyToken = null;
           show('loginView');
           setStatus('loginStatus',
-            'Your email has been verified. You can now log in.', 'ok');
+            t('ok_verified'), 'ok');
           return;
         }
         // Uniform backend 400 — surface the error body verbatim.
-        var msg = (r.data && r.data.error) || 'Verification link is invalid or expired.';
+        var msg = t('err_verify_link');
         setStatus('verifyEmailCompleteStatus', msg, 'err');
       }).catch(function () {
-        setStatus('verifyEmailCompleteStatus', 'Network error.', 'err');
+        setStatus('verifyEmailCompleteStatus', t('err_network'), 'err');
       });
     }
 
@@ -1652,25 +2125,25 @@
       var confirm = document.getElementById('confirmPasswordInput').value;
 
       if (!current || !next || !confirm) {
-        setStatus('changePasswordStatus', 'All three fields are required.', 'err');
+        setStatus('changePasswordStatus', t('err_all_fields'), 'err');
         return;
       }
       if (next.length < 8) {
-        setStatus('changePasswordStatus', 'New password must be at least 8 characters.', 'err');
+        setStatus('changePasswordStatus', t('err_pw_short'), 'err');
         return;
       }
       if (next !== confirm) {
-        setStatus('changePasswordStatus', 'New password and confirmation do not match.', 'err');
+        setStatus('changePasswordStatus', t('err_pw_mismatch'), 'err');
         return;
       }
       if (current === next) {
-        setStatus('changePasswordStatus', 'New password must be different from the current password.', 'err');
+        setStatus('changePasswordStatus', t('err_pw_same'), 'err');
         return;
       }
 
       var token = getToken();
       if (!token) { show('loginView'); return; }
-      setStatus('changePasswordStatus', 'Updating…', 'muted');
+      setStatus('changePasswordStatus', t('busy_saving'), 'muted');
       // authedFetch is GET-only, so POST with inline Authorization header —
       // same pattern as unlinkDevice and submitLinkDevice elsewhere in this file.
       fetch('/api/parents/password', {
@@ -1683,9 +2156,7 @@
         body: JSON.stringify({ currentPassword: current, newPassword: next })
       }).then(function (res) {
         if (res.status === 401) {
-          clearToken();
-          show('loginView');
-          setStatus('loginStatus', t('session_expired'), 'err');
+          sessionExpired();
           return;
         }
         return res.json().then(function (data) {
@@ -1693,13 +2164,13 @@
             document.getElementById('currentPasswordInput').value = '';
             document.getElementById('newPasswordInput').value = '';
             document.getElementById('confirmPasswordInput').value = '';
-            setStatus('changePasswordStatus', 'Password updated.', 'ok');
+            setStatus('changePasswordStatus', t('ok_pw_updated'), 'ok');
           } else {
-            setStatus('changePasswordStatus', (data && data.error) || 'Update failed.', 'err');
+            setStatus('changePasswordStatus', t('err_generic'), 'err');
           }
         });
       }).catch(function () {
-        setStatus('changePasswordStatus', 'Network error.', 'err');
+        setStatus('changePasswordStatus', t('err_network'), 'err');
       });
     }
 
@@ -1720,16 +2191,16 @@
       var password = document.getElementById('deleteAccountPasswordInput').value;
       var confirmWord = document.getElementById('deleteAccountConfirmInput').value;
       if (!password) {
-        setStatus('deleteAccountStatus', 'Current password is required.', 'err');
+        setStatus('deleteAccountStatus', t('err_pw_required'), 'err');
         return;
       }
       if (confirmWord !== 'DELETE') {
-        setStatus('deleteAccountStatus', 'Type DELETE (all caps) to confirm.', 'err');
+        setStatus('deleteAccountStatus', t('err_type_delete'), 'err');
         return;
       }
       var token = getToken();
       if (!token) { show('loginView'); return; }
-      setStatus('deleteAccountStatus', 'Deleting account…', 'muted');
+      setStatus('deleteAccountStatus', t('busy_deleting'), 'muted');
       // DELETE with a JSON body is supported by ASP.NET Core's
       // [FromBody] binding. Same Bearer-header pattern as the other
       // authed endpoints in this file.
@@ -1743,35 +2214,29 @@
         body: JSON.stringify({ currentPassword: password })
       }).then(function (res) {
         if (res.status === 401) {
-          clearToken();
-          show('loginView');
-          setStatus('loginStatus', t('session_expired'), 'err');
+          sessionExpired();
           return;
         }
         return res.json().then(function (data) {
           if (res.ok && data && data.deleted) {
-            // Account is gone — wipe the token, return to login, and
-            // surface a success message on the login screen.
+            // Account is gone — wipe the token and every trace of this
+            // family from memory, then say so on the login screen.
             clearToken();
+            resetSessionState();
             show('loginView');
-            setStatus('loginStatus', 'Account deleted.', 'ok');
+            setStatus('loginStatus', t('ok_account_deleted'), 'ok');
           } else {
-            setStatus('deleteAccountStatus', (data && data.error) || 'Delete failed.', 'err');
+            setStatus('deleteAccountStatus', (data && data.error) || t('err_generic'), 'err');
           }
         });
       }).catch(function () {
-        setStatus('deleteAccountStatus', 'Network error.', 'err');
+        setStatus('deleteAccountStatus', t('err_network'), 'err');
       });
     }
 
     function doLogout() {
       clearToken();
-      state.currentDeviceId = null;
-      state.offset = 0;
-      state.flaggedOffset = 0;
-      state.backFromDetail = null;
-      state.lastSummariesPageSize = 0;
-      state.lastFlaggedPageSize = 0;
+      resetSessionState();
       show('loginView');
       setStatus('loginStatus', '', '');
     }
@@ -1901,7 +2366,7 @@
           state.musicAvailable = !!(m && m.tracks && m.tracks.length > 0);
         }).catch(function () {});
       }
-      deviceStatus('Loading…', 'muted');
+      deviceStatus(t('busy_loading'), 'muted');
       var listEl = document.getElementById('devicesList');
       var emptyState = document.getElementById('linkDeviceEmptyState');
       var summaryEl = document.getElementById('dormancySummary');
@@ -1938,7 +2403,7 @@
         });
       }).catch(function (err) {
         if (err && err.status === 401) return;
-        deviceStatus('Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+        deviceStatus(friendlyError(err), 'err');
       });
     }
 
@@ -2033,14 +2498,14 @@
       clearChildren(header);
       var nameEl = document.createElement('div');
       nameEl.style.cssText = 'font-size:18px;font-weight:700;color:#2b1f47;';
-      nameEl.textContent = '🧸 ' + (d.deviceName || ('Toy ' + shortId(d.deviceId)));
+      nameEl.textContent = '🧸 ' + toyLabel(d);
       header.appendChild(nameEl);
 
       var childEl = document.createElement('div');
       childEl.style.cssText = 'font-size:13px;color:#6b5b8a;margin-top:2px;';
       if (d.children && d.children.length > 0) {
         childEl.textContent = t('child_label') + ' ' + d.children.map(function (c) {
-          return c.name + (c.age != null ? ' (' + c.age + ')' : '');
+          return c.name + (c.age != null ? ' (' + tf('age_short', { n: c.age }) + ')' : '');
         }).join(' · ');
       } else {
         childEl.textContent = t('no_child');
@@ -2112,7 +2577,7 @@
           var top = document.createElement('div');
           top.className = 'top';
           var label = document.createElement('span');
-          label.textContent = '🧸 ' + (d.deviceName || ('Device ' + shortId(d.deviceId)));
+          label.textContent = '🧸 ' + toyLabel(d);
           var hint = document.createElement('span');
           hint.textContent = t('tap_to_open');
           top.appendChild(label);
@@ -2123,7 +2588,7 @@
           if (d.children && d.children.length > 0) {
             details.push(d.children.map(function (c) {
               var parts = [c.name];
-              if (c.age != null) parts.push('age ' + c.age);
+              if (c.age != null) parts.push(tf('age_short', { n: c.age }));
               return parts.join(', ');
             }).join(' · '));
           }
@@ -2204,7 +2669,7 @@
               childRow.className = 'ctl-row';
               childRow.style.justifyContent = 'space-between';
               var childLabel = document.createElement('span');
-              childLabel.textContent = c.name + (c.age != null ? ' (age ' + c.age + ')' : '');
+              childLabel.textContent = c.name + (c.age != null ? ' (' + tf('age_short', { n: c.age }) + ')' : '');
               childRow.appendChild(childLabel);
               var removeChildBtn = document.createElement('button');
               removeChildBtn.type = 'button';
@@ -2294,17 +2759,30 @@
             }
             btn.addEventListener('click', function () {
               var token = getToken();
-              if (!token) { show('loginView'); return; }
+              if (!token) { sessionExpired(); return; }
+              // These two toggles used to be the only writes in the file
+              // that swallowed every failure: offline did nothing at all,
+              // and an expired session did nothing at all, so the parent
+              // tapped repeatedly and concluded the toy was broken.
+              btn.disabled = true;
+              deviceStatus(t('busy_saving'), 'muted');
               fetch('/api/parents/devices/' + encodeURIComponent(d.deviceId) + '/' + endpoint, {
                 method: 'PUT',
                 headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ enabled: !current })
               }).then(function (res) {
-                if (res.ok) { openToy(d.deviceId); return; }
-                res.json().then(function (data) {
-                  alert((data && data.error) || 'Could not change this setting.');
-                }).catch(function () {});
-              }).catch(function () { /* quiet; state unchanged */ });
+                if (res.status === 401) { sessionExpired(); return; }
+                if (res.ok) {
+                  window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
+                  openToy(d.deviceId);
+                  return;
+                }
+                btn.disabled = false;
+                deviceStatus(t('err_setting'), 'err');
+              }).catch(function () {
+                btn.disabled = false;
+                deviceStatus(t('err_network'), 'err');
+              });
             });
             row.appendChild(btn);
             return row;
@@ -2429,7 +2907,7 @@
           nameInput.type = 'text';
           nameInput.maxLength = 60;
           nameInput.value = d.deviceName || '';
-          nameInput.placeholder = 'e.g. Anna’s toy';
+          nameInput.placeholder = t('name_placeholder');
           nameInput.style.cssText =
             'flex:1;width:auto;min-width:160px;margin:0;' +
             'padding:8px 10px;font-size:14px;border-radius:8px;';
@@ -2488,8 +2966,7 @@
       var token = getToken();
       if (!token) { show('loginView'); return; }
       var path = currentlyPaused ? 'resume' : 'pause';
-      var verb = currentlyPaused ? 'Resuming' : 'Pausing';
-      deviceStatus(verb + '…', 'muted');
+      deviceStatus(currentlyPaused ? t('busy_resume') : t('busy_pause'), 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/' + path, {
         method: 'POST',
         headers: {
@@ -2498,19 +2975,17 @@
         }
       }).then(function (res) {
         if (res.status === 401) {
-          clearToken();
-          show('loginView');
-          setStatus('loginStatus', t('session_expired'), 'err');
+          sessionExpired();
           return;
         }
         if (!res.ok) {
-          deviceStatus((currentlyPaused ? 'Resume' : 'Pause') + ' failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus(friendlyError({ status: res.status }), 'err');
           return;
         }
         window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
-        deviceStatus('Network error.', 'err');
+        deviceStatus(t('err_network'), 'err');
       });
     }
 
@@ -2543,7 +3018,7 @@
         end:   endHHMM   ? endHHMM   + ':00' : null
       };
       var turningOff = !hasStart && !hasEnd;
-      deviceStatus('Saving bedtime…', 'muted');
+      deviceStatus(t('busy_saving'), 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/bedtime-window', {
         method: 'PUT',
         headers: {
@@ -2554,13 +3029,11 @@
         body: JSON.stringify(body)
       }).then(function (res) {
         if (res.status === 401) {
-          clearToken();
-          show('loginView');
-          setStatus('loginStatus', t('session_expired'), 'err');
+          sessionExpired();
           return;
         }
         if (!res.ok) {
-          deviceStatus('Bedtime save failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus(t('err_generic'), 'err');
           return;
         }
         // Confirm what actually happened. When turned off, say so; for an
@@ -2575,7 +3048,7 @@
         }
         loadDevices();
       }).catch(function () {
-        deviceStatus('Network error.', 'err');
+        deviceStatus(t('err_network'), 'err');
       });
     }
 
@@ -2629,7 +3102,7 @@
 
       var saveBtn = document.createElement('button');
       saveBtn.type = 'button';
-      saveBtn.textContent = 'Save';
+      saveBtn.textContent = t('save');
       saveBtn.className = 'btn-ghost';
       saveBtn.addEventListener('click', function () {
         saveChildModeOverrides(
@@ -2660,7 +3133,7 @@
     function saveChildModeOverrides(childId, story, game, riddle, curiosity) {
       var token = getToken();
       if (!token) { show('loginView'); return; }
-      deviceStatus('Saving child overrides…', 'muted');
+      deviceStatus(t('busy_saving'), 'muted');
       fetch('/api/parents/children/' + encodeURIComponent(childId) + '/mode-flags', {
         method: 'PUT',
         headers: {
@@ -2676,19 +3149,17 @@
         })
       }).then(function (res) {
         if (res.status === 401) {
-          clearToken();
-          show('loginView');
-          setStatus('loginStatus', t('session_expired'), 'err');
+          sessionExpired();
           return;
         }
         if (!res.ok) {
-          deviceStatus('Save failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus(t('err_generic'), 'err');
           return;
         }
         window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
-        deviceStatus('Network error.', 'err');
+        deviceStatus(t('err_network'), 'err');
       });
     }
 
@@ -2697,7 +3168,7 @@
     function saveDeviceModeFlags(deviceId, story, game, riddle, curiosity) {
       var token = getToken();
       if (!token) { show('loginView'); return; }
-      deviceStatus('Saving modes…', 'muted');
+      deviceStatus(t('busy_saving'), 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/mode-flags', {
         method: 'PUT',
         headers: {
@@ -2713,19 +3184,17 @@
         })
       }).then(function (res) {
         if (res.status === 401) {
-          clearToken();
-          show('loginView');
-          setStatus('loginStatus', t('session_expired'), 'err');
+          sessionExpired();
           return;
         }
         if (!res.ok) {
-          deviceStatus('Mode save failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus(t('err_generic'), 'err');
           return;
         }
         window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
-        deviceStatus('Network error.', 'err');
+        deviceStatus(t('err_network'), 'err');
       });
     }
 
@@ -2736,12 +3205,9 @@
     function deleteChild(childId, childName) {
       var token = getToken();
       if (!token) { show('loginView'); return; }
-      var label = childName || 'this child';
-      if (!window.confirm(
-            'Delete ' + label + "'s profile?\n\n" +
-            'This also permanently deletes all of ' + label +
-            "'s conversations and messages. This cannot be undone.")) return;
-      deviceStatus('Deleting…', 'muted');
+      var label = childName || t('this_child');
+      if (!window.confirm(tf('confirm_delete_child', { name: label }))) return;
+      deviceStatus(t('busy_deleting'), 'muted');
       fetch('/api/parents/children/' + encodeURIComponent(childId), {
         method: 'DELETE',
         headers: {
@@ -2750,18 +3216,16 @@
         }
       }).then(function (res) {
         if (res.status === 401) {
-          clearToken();
-          show('loginView');
-          setStatus('loginStatus', t('session_expired'), 'err');
+          sessionExpired();
           return;
         }
         if (!res.ok) {
-          deviceStatus('Delete failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus(t('err_generic'), 'err');
           return;
         }
         loadDevices();
       }).catch(function () {
-        deviceStatus('Network error.', 'err');
+        deviceStatus(t('err_network'), 'err');
       });
     }
 
@@ -2777,11 +3241,8 @@
       if (!token) { show('loginView'); return; }
       var conversationId = state.detailConversationId;
       if (!conversationId) return;
-      if (!window.confirm(
-            'Delete this conversation?\n\n' +
-            'All messages in this conversation will be permanently ' +
-            'removed. This cannot be undone.')) return;
-      setStatus('detailStatus', 'Deleting…', 'muted');
+      if (!window.confirm(t('confirm_delete_conversation'))) return;
+      setStatus('detailStatus', t('busy_deleting'), 'muted');
       fetch('/api/conversations/' + encodeURIComponent(conversationId), {
         method: 'DELETE',
         headers: {
@@ -2790,19 +3251,17 @@
         }
       }).then(function (res) {
         if (res.status === 401) {
-          clearToken();
-          show('loginView');
-          setStatus('loginStatus', t('session_expired'), 'err');
+          sessionExpired();
           return;
         }
         if (!res.ok) {
-          setStatus('detailStatus', 'Delete failed (HTTP ' + res.status + ').', 'err');
+          setStatus('detailStatus', t('err_generic'), 'err');
           return;
         }
         state.detailConversationId = null;
         backFromDetail();
       }).catch(function () {
-        setStatus('detailStatus', 'Network error.', 'err');
+        setStatus('detailStatus', t('err_network'), 'err');
       });
     }
 
@@ -2812,9 +3271,9 @@
     function unlinkDevice(deviceId, deviceName) {
       var token = getToken();
       if (!token) { show('loginView'); return; }
-      var label = deviceName || ('device ' + shortId(deviceId));
-      if (!window.confirm('Unlink ' + label + '?\n\nYou can re-link it later with the Device ID and API key.')) return;
-      deviceStatus('Unlinking…', 'muted');
+      var label = deviceName || tf('toy_fallback', { id: shortId(deviceId) });
+      if (!window.confirm(tf('confirm_unlink', { name: label }))) return;
+      deviceStatus(t('busy_deleting'), 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/link', {
         method: 'DELETE',
         headers: {
@@ -2823,18 +3282,16 @@
         }
       }).then(function (res) {
         if (res.status === 401) {
-          clearToken();
-          show('loginView');
-          setStatus('loginStatus', t('session_expired'), 'err');
+          sessionExpired();
           return;
         }
         if (!res.ok) {
-          deviceStatus('Unlink failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus(t('err_generic'), 'err');
           return;
         }
         loadDevices();
       }).catch(function () {
-        deviceStatus('Unlink failed. Please try again.', 'err');
+        deviceStatus(t('err_network'), 'err');
       });
     }
 
@@ -2849,10 +3306,10 @@
       var deviceIdRaw = idInput.value.trim();
       var apiKeyRaw = keyInput.value.trim();
       if (!deviceIdRaw || !apiKeyRaw) {
-        setStatus('linkDeviceStatus', 'Device ID and API key are required.', 'err');
+        setStatus('linkDeviceStatus', t('err_link_fields'), 'err');
         return;
       }
-      setStatus('linkDeviceStatus', 'Linking…', 'muted');
+      setStatus('linkDeviceStatus', t('busy_pairing'), 'muted');
       fetch('/api/parents/devices/link', {
         method: 'POST',
         headers: {
@@ -2863,17 +3320,15 @@
         body: JSON.stringify({ deviceId: deviceIdRaw, apiKey: apiKeyRaw })
       }).then(function (res) {
         if (res.status === 401) {
-          clearToken();
-          show('loginView');
-          setStatus('loginStatus', t('session_expired'), 'err');
+          sessionExpired();
           return null;
         }
         if (res.status === 400) {
-          setStatus('linkDeviceStatus', 'Could not link — check the Device ID and API key.', 'err');
+          setStatus('linkDeviceStatus', t('err_link_failed'), 'err');
           return null;
         }
         if (!res.ok) {
-          setStatus('linkDeviceStatus', 'Link failed (HTTP ' + res.status + ').', 'err');
+          setStatus('linkDeviceStatus', t('err_generic'), 'err');
           return null;
         }
         return res.json();
@@ -2885,7 +3340,7 @@
           loadDevices();
         }
       }).catch(function () {
-        setStatus('linkDeviceStatus', 'Link failed. Please try again.', 'err');
+        setStatus('linkDeviceStatus', t('err_network'), 'err');
       });
     }
 
@@ -2901,10 +3356,10 @@
       var deviceIdRaw = idInput.value.trim();
       var codeRaw = codeInput.value.trim();
       if (!deviceIdRaw || !codeRaw) {
-        setStatus('claimDeviceStatus', 'Device ID and pairing code are required.', 'err');
+        setStatus('claimDeviceStatus', t('err_pair_fields'), 'err');
         return;
       }
-      setStatus('claimDeviceStatus', 'Pairing…', 'muted');
+      setStatus('claimDeviceStatus', t('busy_pairing'), 'muted');
       fetch('/api/parents/devices/claim', {
         method: 'POST',
         headers: {
@@ -2915,22 +3370,20 @@
         body: JSON.stringify({ deviceId: deviceIdRaw, claimCode: codeRaw })
       }).then(function (res) {
         if (res.status === 401) {
-          clearToken();
-          show('loginView');
-          setStatus('loginStatus', t('session_expired'), 'err');
+          sessionExpired();
           return null;
         }
         if (res.status === 400) {
           setStatus('claimDeviceStatus',
-            "That code didn't work. Check the code on your toy and try again.", 'err');
+            t('err_pair_code'), 'err');
           return null;
         }
         if (res.status === 429) {
-          setStatus('claimDeviceStatus', 'Too many tries. Please wait a moment and retry.', 'err');
+          setStatus('claimDeviceStatus', t('err_too_many'), 'err');
           return null;
         }
         if (!res.ok) {
-          setStatus('claimDeviceStatus', 'Pairing failed (HTTP ' + res.status + ').', 'err');
+          setStatus('claimDeviceStatus', t('err_generic'), 'err');
           return null;
         }
         return res.json();
@@ -2938,12 +3391,12 @@
         if (data && data.claimed) {
           idInput.value = '';
           codeInput.value = '';
-          setStatus('claimDeviceStatus', 'Toy paired ✓', 'muted');
+          setStatus('claimDeviceStatus', t('ok_paired'), 'ok');
           document.getElementById('claimDeviceForm').hidden = true;
           loadDevices();
         }
       }).catch(function () {
-        setStatus('claimDeviceStatus', 'Pairing failed. Please try again.', 'err');
+        setStatus('claimDeviceStatus', t('err_network'), 'err');
       });
     }
 
@@ -2954,10 +3407,10 @@
       if (!token) { show('loginView'); return; }
       var name = (rawName || '').trim();
       if (!name) {
-        deviceStatus('A device name cannot be empty.', 'err');
+        deviceStatus(t('err_name_empty'), 'err');
         return;
       }
-      deviceStatus('Saving name…', 'muted');
+      deviceStatus(t('busy_saving'), 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/name', {
         method: 'PUT',
         headers: {
@@ -2968,23 +3421,21 @@
         body: JSON.stringify({ name: name })
       }).then(function (res) {
         if (res.status === 401) {
-          clearToken();
-          show('loginView');
-          setStatus('loginStatus', t('session_expired'), 'err');
+          sessionExpired();
           return;
         }
         if (res.status === 400) {
-          deviceStatus('Name must be 1–60 characters.', 'err');
+          deviceStatus(t('err_name_length'), 'err');
           return;
         }
         if (!res.ok) {
-          deviceStatus('Rename failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus(t('err_generic'), 'err');
           return;
         }
         window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
-        deviceStatus('Network error.', 'err');
+        deviceStatus(t('err_network'), 'err');
       });
     }
 
@@ -2994,14 +3445,10 @@
     function toggleDeviceRevocation(deviceId, deviceName, currentlyRevoked) {
       var token = getToken();
       if (!token) { show('loginView'); return; }
-      var label = deviceName || ('device ' + shortId(deviceId));
+      var label = deviceName || tf('toy_fallback', { id: shortId(deviceId) });
       var next = !currentlyRevoked;
-      if (next && !window.confirm(
-            'Revoke access for ' + label + '?\n\n' +
-            'The toy will be signed out and stop working until it is set up ' +
-            'again with a fresh key. Use this if it is lost or stolen. You can ' +
-            'restore access later.')) return;
-      deviceStatus((next ? 'Revoking' : 'Restoring') + '…', 'muted');
+      if (next && !window.confirm(tf('confirm_revoke', { name: label }))) return;
+      deviceStatus(next ? t('busy_revoke') : t('busy_restore'), 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/revoke', {
         method: 'PUT',
         headers: {
@@ -3012,20 +3459,17 @@
         body: JSON.stringify({ revoked: next })
       }).then(function (res) {
         if (res.status === 401) {
-          clearToken();
-          show('loginView');
-          setStatus('loginStatus', t('session_expired'), 'err');
+          sessionExpired();
           return;
         }
         if (!res.ok) {
-          setStatus('devicesStatus',
-            (next ? 'Revoke' : 'Restore') + ' failed (HTTP ' + res.status + ').', 'err');
+          deviceStatus(friendlyError({ status: res.status }), 'err');
           return;
         }
         window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
-        deviceStatus('Network error.', 'err');
+        deviceStatus(t('err_network'), 'err');
       });
     }
 
@@ -3047,7 +3491,7 @@
       setActiveTab(state.modeFilter ? ('mode:' + state.modeFilter) : 'summaries');
       state.backFromDetail = loadSummaries;
       renderDeviceContext('summariesDeviceContext');
-      setStatus('summariesStatus', 'Loading…', 'muted');
+      setStatus('summariesStatus', t('busy_loading'), 'muted');
       var listEl = document.getElementById('summariesList');
       clearChildren(listEl);
 
@@ -3096,7 +3540,7 @@
         if (err && err.status === 401) return;
         if (reqId !== state.summariesRequestId) return;   // superseded
         state.lastSummariesPageSize = 0;
-        setStatus('summariesStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+        setStatus('summariesStatus', friendlyError(err), 'err');
         updatePager('newerBtn', 'olderBtn', 'summariesPagerInfo', state.offset, 0);
       });
     }
@@ -3225,7 +3669,7 @@
         if (state.currentDeviceId !== deviceId) return;
         var msg = document.createElement('div');
         msg.className = 'today-error';
-        msg.textContent = 'Today summary unavailable.';
+        msg.textContent = t('today_unavailable');
         counts.appendChild(msg);
       });
     }
@@ -3381,7 +3825,7 @@
       setActiveTab('flagged');
       state.backFromDetail = loadFlagged;
       renderDeviceContext('flaggedDeviceContext');
-      setStatus('flaggedStatus', 'Loading…', 'muted');
+      setStatus('flaggedStatus', t('busy_loading'), 'muted');
       var listEl = document.getElementById('flaggedList');
       clearChildren(listEl);
 
@@ -3396,8 +3840,8 @@
         if (rows.length === 0) {
           setStatus('flaggedStatus',
             state.flaggedOffset === 0
-              ? 'No safety-flagged messages on this device. ✓'
-              : 'No more flagged messages.',
+              ? t('no_flagged')
+              : t('no_more_flagged'),
             'muted');
         } else {
           setStatus('flaggedStatus', '', '');
@@ -3409,7 +3853,7 @@
       }).catch(function (err) {
         if (err && err.status === 401) return;
         state.lastFlaggedPageSize = 0;
-        setStatus('flaggedStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+        setStatus('flaggedStatus', friendlyError(err), 'err');
         updatePager('flaggedNewerBtn', 'flaggedOlderBtn', 'flaggedPagerInfo', state.flaggedOffset, 0);
       });
     }
@@ -3489,7 +3933,7 @@
       var metaEl = document.getElementById('detailMeta');
       var msgsEl = document.getElementById('detailMessages');
       var deleteBtn = document.getElementById('deleteConversationBtn');
-      metaEl.textContent = 'Loading…';
+      metaEl.textContent = t('busy_loading');
       clearChildren(msgsEl);
       setStatus('detailStatus', '', '');
       // Hide the delete button until the conversation actually loads —
@@ -3500,7 +3944,7 @@
       authedFetch('/api/conversations/' + encodeURIComponent(conversationId)).then(function (data) {
         var c = data && data.conversation;
         if (!c) {
-          setStatus('detailStatus', 'Conversation not found.', 'err');
+          setStatus('detailStatus', t('err_gone'), 'err');
           metaEl.textContent = '';
           return;
         }
@@ -3525,7 +3969,7 @@
         }
         metaEl.textContent = metaParts.join(' · ');
         if (msgs.length === 0) {
-          setStatus('detailStatus', 'No messages in this conversation.', 'muted');
+          setStatus('detailStatus', t('no_messages'), 'muted');
           return;
         }
         msgs.forEach(function (m) {
@@ -3548,7 +3992,7 @@
       }).catch(function (err) {
         if (err && err.status === 401) return;
         metaEl.textContent = '';
-        setStatus('detailStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+        setStatus('detailStatus', friendlyError(err), 'err');
       });
     }
 
@@ -3620,17 +4064,17 @@
       btn.className = 'btn-ghost';
 
       var status = document.createElement('span');
-      status.style.cssText = 'font-size:12px;color:#888;';
+      status.style.cssText = 'font-size:12px;color:#6b5b8a;';
 
       btn.onclick = function () {
         btn.disabled = true;
-        status.textContent = 'Loading…';
-        status.style.color = '#888';
+        status.textContent = t('busy_loading');
+        status.style.color = '#6b5b8a';
 
         var token = getToken();
         if (!token) {
           status.textContent = t('session_expired');
-          status.style.color = '#c62828';
+          status.style.color = '#b3261e';
           btn.disabled = false;
           return;
         }
@@ -3638,20 +4082,18 @@
           headers: { 'Authorization': 'Bearer ' + token }
         }).then(function (res) {
           if (res.status === 401) {
-            clearToken();
-            show('loginView');
-            setStatus('loginStatus', t('session_expired'), 'err');
+            sessionExpired();
             return null;
           }
           if (res.status === 404) {
-            status.textContent = 'Audio not available.';
-            status.style.color = '#c62828';
+            status.textContent = t('audio_unavailable');
+            status.style.color = '#b3261e';
             btn.disabled = false;
             return null;
           }
           if (!res.ok) {
-            status.textContent = 'Error: HTTP ' + res.status;
-            status.style.color = '#c62828';
+            status.textContent = t('err_generic');
+            status.style.color = '#b3261e';
             btn.disabled = false;
             return null;
           }
@@ -3676,8 +4118,8 @@
           wrap.innerHTML = '';
           wrap.appendChild(audio);
         }).catch(function () {
-          status.textContent = 'Network error.';
-          status.style.color = '#c62828';
+          status.textContent = t('err_network');
+          status.style.color = '#b3261e';
           btn.disabled = false;
         });
       };
@@ -3703,7 +4145,7 @@
       fetchAuditPage();
     }
     function fetchAuditPage() {
-      setStatus('auditStatus', 'Loading…', 'muted');
+      setStatus('auditStatus', t('busy_loading'), 'muted');
       var listEl = document.getElementById('auditList');
       clearChildren(listEl);
       authedFetch('/api/parents/audit?limit=' + PAGE_SIZE + '&offset=' + state.auditOffset)
@@ -3724,7 +4166,7 @@
         .catch(function (err) {
           if (err && err.status === 401) return; // authedFetch already redirected
           setStatus('auditStatus',
-            'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+            friendlyError(err), 'err');
         });
     }
 
@@ -3743,7 +4185,7 @@
       top.appendChild(labelSpan);
       var timeSpan = document.createElement('span');
       timeSpan.textContent = fmtTime(e.timestamp);
-      timeSpan.style.cssText = 'color:#888;font-size:12px;white-space:nowrap;';
+      timeSpan.style.cssText = 'color:#6b5b8a;font-size:12px;white-space:nowrap;';
       top.appendChild(timeSpan);
       row.appendChild(top);
 
@@ -3759,7 +4201,7 @@
       if (summary) {
         var sumDiv = document.createElement('div');
         sumDiv.className = 'snippet';
-        sumDiv.style.color = '#666';
+        sumDiv.style.color = '#5b4c7d';
         sumDiv.textContent = summary;
         row.appendChild(sumDiv);
       }
@@ -3947,7 +4389,7 @@
           var row = document.createElement('div');
           row.style.cssText = 'padding:6px 0;border-top:1px solid #e4d9f7;font-size:13px;';
           var meta = document.createElement('div');
-          meta.style.cssText = 'color:#888;font-size:12px;';
+          meta.style.cssText = 'color:#6b5b8a;font-size:12px;';
           meta.textContent = fmtTime(r.createdAtUtc) + ' · '
             + requestStatusLabel(r.status)
             + (r.hasPhoto ? ' · 📷' : '');
@@ -3965,7 +4407,7 @@
       var photoInput = document.getElementById('storyRequestPhoto');
       var photo = photoInput.files && photoInput.files[0];
       if (!text && !photo) {
-        setStatus('storyRequestStatus', t('request_story_help'), 'err');
+        setStatus('storyRequestStatus', t('err_request_empty'), 'err');
         return;
       }
       var token = getToken();
@@ -3990,10 +4432,10 @@
         }
         return res.json().then(function (data) {
           setStatus('storyRequestStatus',
-            (data && data.error) || ('HTTP ' + res.status), 'err');
+            t('err_generic'), 'err');
         });
       }).catch(function () {
-        setStatus('storyRequestStatus', 'Network error.', 'err');
+        setStatus('storyRequestStatus', t('err_network'), 'err');
       });
     }
 
@@ -4022,7 +4464,7 @@
       setViewHash('plays', state.currentDeviceId);
       setActiveTab('plays');
       renderDeviceContext('playsDeviceContext');
-      setStatus('playsStatus', 'Loading…', 'muted');
+      setStatus('playsStatus', t('busy_loading'), 'muted');
       var totalsEl = document.getElementById('playsTotals');
       var listEl = document.getElementById('playsList');
       var answersEl = document.getElementById('playsAnswers');
@@ -4050,7 +4492,7 @@
           name.textContent = '📖 ' + storyTitle(tt.storyId);
           line.appendChild(name);
           var counts = document.createElement('span');
-          counts.style.cssText = 'color:#666;margin-left:8px;font-size:13px;';
+          counts.style.cssText = 'color:#5b4c7d;margin-left:8px;font-size:13px;';
           counts.textContent = t('listened') + ' ' + tt.count + ' '
             + t('times_suffix') + ' (' + tt.finishedCount + ' ' + t('finished_label') + ')';
           line.appendChild(counts);
@@ -4081,7 +4523,7 @@
         });
       }).catch(function (err) {
         if (err && err.status === 401) return;
-        setStatus('playsStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+        setStatus('playsStatus', friendlyError(err), 'err');
       });
 
       // B4 — the child's saved answers to each story's meaning question.
@@ -4100,7 +4542,7 @@
           var row = document.createElement('div');
           row.style.cssText = 'padding:6px 0;border-bottom:1px solid #eee;font-size:13px;';
           var meta = document.createElement('div');
-          meta.style.cssText = 'color:#888;font-size:12px;';
+          meta.style.cssText = 'color:#6b5b8a;font-size:12px;';
           meta.textContent = storyTitle(a.storyId) + ' · ' + fmtTime(a.createdAtUtc)
             + (a.safetyFlag && a.safetyFlag !== 'Clean' ? ' · ⚠ ' + a.safetyFlag : '');
           var text = document.createElement('div');
@@ -4117,7 +4559,7 @@
     function loadStoryLibrary(deviceId) {
       show('libraryView');
       setViewHash('library');
-      setStatus('libraryStatus', 'Loading…', 'muted');
+      setStatus('libraryStatus', t('busy_loading'), 'muted');
       var listEl = document.getElementById('libraryList');
       clearChildren(listEl);
 
@@ -4140,7 +4582,7 @@
         });
       }).catch(function (err) {
         if (err && err.status === 401) return;
-        setStatus('libraryStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+        setStatus('libraryStatus', friendlyError(err), 'err');
       });
     }
 
@@ -4161,7 +4603,7 @@
       if (s.bedtimeSafe === true) metaBits.push(t('bedtime_safe'));
       if (metaBits.length > 0) {
         var meta = document.createElement('div');
-        meta.style.cssText = 'color:#777;font-size:12px;margin:2px 0 6px;';
+        meta.style.cssText = 'color:#6b5b8a;font-size:12px;margin:2px 0 6px;';
         meta.textContent = metaBits.join(' · ');
         card.appendChild(meta);
       }
@@ -4180,7 +4622,7 @@
       }
 
       var counts = document.createElement('div');
-      counts.style.cssText = 'font-size:12px;color:#666;margin:6px 0 4px;';
+      counts.style.cssText = 'font-size:12px;color:#5b4c7d;margin:6px 0 4px;';
       counts.textContent = t('listened') + ' ' + (s.listenCount || 0) + ' '
         + t('times_suffix') + ' (' + (s.finishedCount || 0) + ' ' + t('finished_label') + ')';
       card.appendChild(counts);
@@ -4241,16 +4683,16 @@
       btn.textContent = t('listen_btn');
       btn.className = 'btn-ghost';
       var status = document.createElement('span');
-      status.style.cssText = 'font-size:12px;color:#888;';
+      status.style.cssText = 'font-size:12px;color:#6b5b8a;';
       btn.onclick = function () {
         btn.disabled = true;
-        status.textContent = 'Loading…';
+        status.textContent = t('busy_loading');
         var token = getToken();
         if (!token) { status.textContent = t('session_expired'); btn.disabled = false; return; }
         fetch(url, { headers: { 'Authorization': 'Bearer ' + token } })
           .then(function (res) {
             if (!res.ok) {
-              status.textContent = 'Audio not available.';
+              status.textContent = t('audio_unavailable');
               btn.disabled = false;
               return null;
             }
@@ -4272,7 +4714,7 @@
             wrap.innerHTML = '';
             wrap.appendChild(audio);
           }).catch(function () {
-            status.textContent = 'Network error.';
+            status.textContent = t('err_network');
             btn.disabled = false;
           });
       };
@@ -4286,7 +4728,7 @@
     function loadMusicLibrary() {
       show('musicView');
       setViewHash('music');
-      setStatus('musicStatus', 'Loading…', 'muted');
+      setStatus('musicStatus', t('busy_loading'), 'muted');
       var listEl = document.getElementById('musicList');
       clearChildren(listEl);
       authedFetch('/api/parents/music').then(function (data) {
@@ -4310,7 +4752,7 @@
         });
       }).catch(function (err) {
         if (err && err.status === 401) return;
-        setStatus('musicStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+        setStatus('musicStatus', friendlyError(err), 'err');
       });
     }
 
@@ -4396,11 +4838,11 @@
 
     function onGoogleCredential(response) {
       if (!response || !response.credential) {
-        setStatus('googleSignInStatus', 'Google sign-in failed.', 'err');
+        setStatus('googleSignInStatus', t('err_generic'), 'err');
         return;
       }
       var accepted = !!document.getElementById('googleAcceptTerms').checked;
-      setStatus('googleSignInStatus', 'Signing in…', 'muted');
+      setStatus('googleSignInStatus', t('busy_signing_in'), 'muted');
       fetch('/api/parents/google-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -4409,7 +4851,7 @@
         if (res.status === 200) {
           return res.json().then(function (data) {
             if (!data || !data.token) {
-              setStatus('googleSignInStatus', 'Sign-in response missing token.', 'err');
+              setStatus('googleSignInStatus', t('err_generic'), 'err');
               return;
             }
             setToken(data.token);
@@ -4420,12 +4862,12 @@
         if (res.status === 400) {
           return res.json().then(function (data) {
             var msg = (data && data.error) ||
-              'Please accept the terms to continue.';
+              t('need_terms');
             setStatus('googleSignInStatus', msg, 'err');
           });
         }
         if (res.status === 401) {
-          setStatus('googleSignInStatus', 'Sign-in failed.', 'err');
+          setStatus('googleSignInStatus', t('err_generic'), 'err');
           return;
         }
         if (res.status === 404) {
@@ -4436,12 +4878,12 @@
         }
         if (res.status === 429) {
           setStatus('googleSignInStatus',
-            'Too many requests. Please slow down.', 'err');
+            t('err_too_many'), 'err');
           return;
         }
-        setStatus('googleSignInStatus', 'Error: HTTP ' + res.status, 'err');
+        setStatus('googleSignInStatus', t('err_generic'), 'err');
       }).catch(function () {
-        setStatus('googleSignInStatus', 'Network error.', 'err');
+        setStatus('googleSignInStatus', t('err_network'), 'err');
       });
     }
 
@@ -4469,6 +4911,30 @@
         });
       }
       applyStaticI18n();
+    })();
+
+    // ---------- home-screen install hint ----------
+    // Shown only where it can actually be acted on: a phone browser that
+    // is not already the installed page. Desktop and the installed app
+    // both leave it hidden. Runs after initLang so applyStaticI18n has
+    // already stamped the rest of the static copy.
+    (function initInstallHint() {
+      var el = document.getElementById('installHint');
+      if (!el) return;
+      var ua = navigator.userAgent || '';
+      var isIos = /iPad|iPhone|iPod/.test(ua) ||
+                  (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1); // iPadOS reports as Mac
+      var isPhone = isIos || /Android/i.test(ua);
+      var installed = false;
+      try {
+        installed = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+                    window.navigator.standalone === true;
+      } catch (e) { /* treat an unusable matchMedia as "not installed" */ }
+      if (!isPhone || installed) return;
+      var key = isIos ? 'install_ios' : 'install_other';
+      el.setAttribute('data-i18n', key);
+      el.textContent = t(key);
+      el.hidden = false;
     })();
 
     // Re-run the loader for the currently-visible view so dynamically
