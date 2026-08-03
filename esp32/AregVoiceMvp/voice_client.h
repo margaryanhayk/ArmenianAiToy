@@ -71,6 +71,12 @@ void voice_send_heartbeat();
 // stands, which bounds the staleness to one interval.
 bool voice_in_bedtime_window();
 
+// Last-known pause state from the heartbeat response. When true, the toy
+// stays fully silent (local SD story/music playback is skipped too, not
+// just online chat). Defaults false until the first heartbeat; cached
+// between heartbeats (staleness bounded to one interval).
+bool voice_is_paused();
+
 // Story-play reporting (store-and-forward) — POST a pre-composed JSON body
 // to /api/devices/story-plays with the device-auth headers. Returns the HTTP
 // status (negative on transport failure / offline). The URL is derived from

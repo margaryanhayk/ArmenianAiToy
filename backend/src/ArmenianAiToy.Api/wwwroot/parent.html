@@ -755,7 +755,7 @@
           <button data-tab="mode:game" role="tab" aria-selected="false" data-i18n="tab_games">Games</button>
           <button data-tab="mode:riddle" role="tab" aria-selected="false" data-i18n="tab_riddles">Riddles</button>
           <button data-tab="mode:curiosity" role="tab" aria-selected="false" data-i18n="tab_questions">Questions</button>
-          <button data-tab="mode:calm" role="tab" aria-selected="false" data-i18n="tab_bedtime">Bedtime</button>
+          <button data-tab="mode:calm" role="tab" aria-selected="false" data-i18n="tab_bedtime">Calm</button>
           <button data-tab="flagged" role="tab" aria-selected="false" data-i18n="tab_flagged">Flagged</button>
           <button data-tab="plays" role="tab" aria-selected="false" data-i18n="tab_plays">Story plays</button>
         </span>
@@ -790,7 +790,7 @@
           <button data-tab="mode:game" role="tab" aria-selected="false" data-i18n="tab_games">Games</button>
           <button data-tab="mode:riddle" role="tab" aria-selected="false" data-i18n="tab_riddles">Riddles</button>
           <button data-tab="mode:curiosity" role="tab" aria-selected="false" data-i18n="tab_questions">Questions</button>
-          <button data-tab="mode:calm" role="tab" aria-selected="false" data-i18n="tab_bedtime">Bedtime</button>
+          <button data-tab="mode:calm" role="tab" aria-selected="false" data-i18n="tab_bedtime">Calm</button>
           <button data-tab="flagged" role="tab" aria-selected="false" data-i18n="tab_flagged">Flagged</button>
           <button data-tab="plays" role="tab" aria-selected="false" data-i18n="tab_plays">Story plays</button>
         </span>
@@ -823,7 +823,7 @@
           <button data-tab="mode:game" role="tab" aria-selected="false" data-i18n="tab_games">Games</button>
           <button data-tab="mode:riddle" role="tab" aria-selected="false" data-i18n="tab_riddles">Riddles</button>
           <button data-tab="mode:curiosity" role="tab" aria-selected="false" data-i18n="tab_questions">Questions</button>
-          <button data-tab="mode:calm" role="tab" aria-selected="false" data-i18n="tab_bedtime">Bedtime</button>
+          <button data-tab="mode:calm" role="tab" aria-selected="false" data-i18n="tab_bedtime">Calm</button>
           <button data-tab="flagged" role="tab" aria-selected="false" data-i18n="tab_flagged">Flagged</button>
           <button data-tab="plays" role="tab" aria-selected="false" data-i18n="tab_plays">Story plays</button>
         </span>
@@ -932,7 +932,7 @@
       tab_games: { en: 'Games', ru: 'Игры', hy: 'Խաղեր' },
       tab_riddles: { en: 'Riddles', ru: 'Загадки', hy: 'Հանելուկներ' },
       tab_questions: { en: 'Questions', ru: 'Вопросы', hy: 'Հարցեր' },
-      tab_bedtime: { en: 'Bedtime', ru: 'Сон', hy: 'Քնելուց առաջ' },
+      tab_bedtime: { en: 'Calm', ru: 'Спокойные', hy: 'Հանգիստ' },
       tab_plays: { en: 'Story plays', ru: 'Прослушивания', hy: 'Լսումներ' },
       view_library: { en: '📚 Story library →', ru: '📚 Библиотека сказок →', hy: '📚 Հեքիաթների գրադարան →' },
       story_library: { en: '📚 Story library', ru: '📚 Библиотека сказок', hy: '📚 Հեքիաթների գրադարան' },
@@ -962,6 +962,7 @@
       story_intro_label: { en: 'Spoken story intro (title + author)', ru: 'Озвученное вступление (название + автор)', hy: 'Հեքիաթի ձայնային ներածություն (վերնագիր + հեղինակ)' },
       bedtime_music_label: { en: 'Music at bedtime hours', ru: 'Музыка в часы сна', hy: 'Երաժշտություն քնի ժամերին' },
       bedtime_music_needs_window: { en: 'set a bedtime window first', ru: 'сначала задайте часы сна', hy: 'նախ սահմանեք քնի ժամերը' },
+      bedtime_music_needs_tracks: { en: 'no music available yet', ru: 'музыки пока нет', hy: 'երաժշտություն դեռ չկա' },
       flag_on: { en: 'On ✓', ru: 'Вкл ✓', hy: 'Միացված ✓' },
       flag_off: { en: 'Off', ru: 'Выкл', hy: 'Անջատված' },
       view_music: { en: '🎵 Music →', ru: '🎵 Музыка →', hy: '🎵 Երաժշտություն →' },
@@ -1805,6 +1806,15 @@
     function loadDevices() {
       var openingToy = !!state.currentToyId;
       if (!openingToy) { show('devicesView'); setViewHash('devices'); }
+      // Whether any bedtime-music track is published — drives greying the
+      // per-device music toggle. Fetched once; failure leaves it false
+      // (toggle stays greyed, which is the safe default).
+      if (state.musicAvailable === undefined) {
+        state.musicAvailable = false;
+        authedFetch('/api/parents/music').then(function (m) {
+          state.musicAvailable = !!(m && m.tracks && m.tracks.length > 0);
+        }).catch(function () {});
+      }
       deviceStatus('Loading…', 'muted');
       var listEl = document.getElementById('devicesList');
       var emptyState = document.getElementById('linkDeviceEmptyState');
@@ -2112,16 +2122,23 @@
             btn.type = 'button';
             btn.className = 'btn-ghost';
             btn.style.cssText = 'font-size:13px;';
-            var blocked = opts.requiresBedtime && !current
-              && !(d.bedtimeStart && d.bedtimeEnd);
+            // Grey the toggle (with a hint) when turning it ON would be
+            // meaningless: no bedtime window set, or — for music — no tracks
+            // published yet. Turning it OFF is always allowed.
+            var blockHint = null;
+            if (opts.requiresBedtime && !current && !(d.bedtimeStart && d.bedtimeEnd)) {
+              blockHint = t('bedtime_music_needs_window');
+            } else if (opts.requiresMusic && !current && !state.musicAvailable) {
+              blockHint = t('bedtime_music_needs_tracks');
+            }
             btn.textContent = current ? t('flag_on') : t('flag_off');
-            if (blocked) {
+            if (blockHint) {
               btn.disabled = true;
               btn.style.opacity = '0.5';
-              btn.title = t(opts.hintKey);
+              btn.title = blockHint;
               var hint = document.createElement('span');
               hint.style.cssText = 'font-size:11px;color:#a08;margin-left:8px;';
-              hint.textContent = t(opts.hintKey);
+              hint.textContent = blockHint;
               row.appendChild(btn);
               row.appendChild(hint);
               return row;
@@ -2147,7 +2164,7 @@
             d.storyIntroEnabled !== false, 'story-intro'));
           listEl.appendChild(flagToggle('bedtime_music_label',
             d.bedtimeMusicEnabled === true, 'bedtime-music',
-            { requiresBedtime: true, hintKey: 'bedtime_music_needs_window' }));
+            { requiresBedtime: true, requiresMusic: true }));
 
           // B4: bedtime window row — two time inputs + Save, sibling to
           // the clickable device row so inputs aren't nested in a button.

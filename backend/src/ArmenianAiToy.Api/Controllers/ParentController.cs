@@ -603,10 +603,19 @@ public class ParentController : ControllerBase
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> SetBedtimeMusic(
-        Guid deviceId, [FromBody] DeviceStoryIntroRequest request)
+        Guid deviceId, [FromBody] DeviceStoryIntroRequest request,
+        [FromServices] IContentManifestService manifest)
     {
         if (request?.Enabled is null)
             return BadRequest(new { error = "enabled (true/false) is required." });
+
+        // Can't opt IN to music when no tracks are published yet — the toggle
+        // would look on but there'd be nothing to play. (Turning it off is
+        // always fine and skips this check.)
+        if (request.Enabled.Value && (manifest.Build().Music?.Count ?? 0) == 0)
+        {
+            return BadRequest(new { error = "No music is available yet. Please try again once music has been added." });
+        }
 
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var result = await _parentService.SetBedtimeMusicAsync(

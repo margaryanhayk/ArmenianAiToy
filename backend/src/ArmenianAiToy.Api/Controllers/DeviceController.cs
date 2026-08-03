@@ -97,7 +97,18 @@ public class DeviceController : ControllerBase
         // ignore it.
         var inBedtimeWindow = await _deviceService.IsDeviceInBedtimeWindowAsync(
             deviceId, DateTime.UtcNow);
-        return Ok(new { ok = true, deviceId, serverTimeUtc = DateTime.UtcNow, inBedtimeWindow });
+        // The toy also learns its PAUSE state here so a paused toy stays
+        // fully silent even for local SD playback (pause used to gate only
+        // the online chat path). Cached last-known between heartbeats.
+        var isPaused = await _deviceService.IsDevicePausedAsync(deviceId);
+        return Ok(new
+        {
+            ok = true,
+            deviceId,
+            serverTimeUtc = DateTime.UtcNow,
+            inBedtimeWindow,
+            isPaused,
+        });
     }
 
     // Store-and-forward upload of story playback events. The toy plays stories

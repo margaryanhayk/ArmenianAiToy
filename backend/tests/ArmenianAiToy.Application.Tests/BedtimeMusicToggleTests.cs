@@ -1,6 +1,12 @@
+using System.Security.Claims;
+using ArmenianAiToy.Api.Controllers;
+using ArmenianAiToy.Application.DTOs;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Services;
 using ArmenianAiToy.Domain.Entities;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -130,6 +136,51 @@ public class BedtimeMusicToggleTests
 
         Assert.True(ok);
         Assert.False((await db.Set<Device>().SingleAsync()).BedtimeMusicEnabled);
+    }
+
+    // ---- controller: no-music-available guard ----
+
+    private static (ParentController Controller, IParentService Service, IContentManifestService Manifest)
+        CreateController()
+    {
+        var service = Substitute.For<IParentService>();
+        var manifest = Substitute.For<IContentManifestService>();
+        var controller = new ParentController(service, new ExportCooldown());
+        var user = new ClaimsPrincipal(new ClaimsIdentity(
+            new[] { new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()) }, "TestAuth"));
+        controller.ControllerContext = new ControllerContext
+        { HttpContext = new DefaultHttpContext { User = user } };
+        return (controller, service, manifest);
+    }
+
+    // KEYSTONE: enabling music with an empty music library is refused at the
+    // controller BEFORE the service is called.
+    [Fact]
+    public async Task Controller_EnableWithNoTracks_Returns400_NoServiceCall()
+    {
+        var (controller, service, manifest) = CreateController();
+        manifest.Build().Returns(ContentManifestResponse.Empty()); // Music == null
+
+        var result = await controller.SetBedtimeMusic(
+            Guid.NewGuid(), new DeviceStoryIntroRequest(true), manifest);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        await service.DidNotReceiveWithAnyArgs().SetBedtimeMusicAsync(default, default, default);
+    }
+
+    [Fact]
+    public async Task Controller_DisableWithNoTracks_StillReachesService()
+    {
+        var (controller, service, manifest) = CreateController();
+        manifest.Build().Returns(ContentManifestResponse.Empty());
+        service.SetBedtimeMusicAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), false)
+            .Returns(BedtimeMusicSetResult.Ok);
+
+        var result = await controller.SetBedtimeMusic(
+            Guid.NewGuid(), new DeviceStoryIntroRequest(false), manifest);
+
+        Assert.IsType<OkObjectResult>(result);
+        await service.Received(1).SetBedtimeMusicAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), false);
     }
 
     [Fact]

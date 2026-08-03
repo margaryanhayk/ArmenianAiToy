@@ -1574,19 +1574,27 @@ void loop() {
             Serial.println("[button] pressed");
             Serial.flush();
             DIAG_MARK(200, "button_press");
-            // Slice E — bedtime music: while the server says the bedtime
-            // window is active (heartbeat-cached; the toy has no clock) AND
-            // the parent opted in (index-cached) AND a verified track is on
-            // the card, a press plays calm music instead of a story. A
-            // press during the music stops it quietly (no Q&A, no resume
-            // bookkeeping — it's music, not a narrative). Never touches a
-            // paused story's resume offset, so a mid-story bedtime cutover
-            // can't lose the child's place.
+            // Parent PAUSE: a paused toy is fully silent — even local SD
+            // story/music playback is skipped (pause used to gate only the
+            // online chat path, so a child could still play cached stories).
+            // The pause state is heartbeat-cached; when offline the last-known
+            // value stands. A paused press just flicks the LED, no sound.
             char music_path[CS_MAX_PATH_LEN];
-            if (s_story_offset == 0
-                && voice_in_bedtime_window()
-                && story_select_music_enabled()
-                && music_select_next(music_path, sizeof(music_path))) {
+            if (voice_is_paused()) {
+                Serial.println("[button] ignored — toy is paused");
+                Serial.flush();
+                led_for_state(ST_IDLE);
+            } else if (s_story_offset == 0
+                       && voice_in_bedtime_window()
+                       && story_select_music_enabled()
+                       && music_select_next(music_path, sizeof(music_path))) {
+                // Slice E — bedtime music: while the server says the bedtime
+                // window is active (heartbeat-cached; the toy has no clock)
+                // AND the parent opted in (index-cached) AND a verified track
+                // is on the card, a press plays calm music instead of a
+                // story. A press during music stops it quietly (no Q&A, no
+                // resume bookkeeping — it's music, not a narrative). Never
+                // touches a paused story's resume offset.
                 transition_to(ST_PLAYING);
                 audio_speaker_begin();
                 Serial.printf("[music] playing %s\n", music_path);

@@ -100,6 +100,10 @@ static uint32_t s_wifi_down_since_ms = 0;
 
 // Slice E — last-known bedtime-window state from the heartbeat response.
 static bool s_in_bedtime_window = false;
+// Last-known PAUSE state from the heartbeat response, so a paused toy stays
+// fully silent even for local SD playback (pause used to gate only online
+// chat). Defaults false; cached between heartbeats like the bedtime flag.
+static bool s_is_paused = false;
 
 // The story every in-story backend call is grounded in. Empty means "use the
 // compile-time configured story", which is the pre-selection behavior. Once
@@ -279,16 +283,22 @@ void voice_send_heartbeat() {
         JsonDocument doc;
         if (deserializeJson(doc, resp) == DeserializationError::Ok) {
             s_in_bedtime_window = doc["inBedtimeWindow"] | false;
+            s_is_paused = doc["isPaused"] | false;
         }
     }
     http.end();
-    Serial.printf("[heartbeat] status=%d (fw=%s bedtime=%d)\n",
-                  status, AREG_FW_VERSION, s_in_bedtime_window ? 1 : 0);
+    Serial.printf("[heartbeat] status=%d (fw=%s bedtime=%d paused=%d)\n",
+                  status, AREG_FW_VERSION, s_in_bedtime_window ? 1 : 0,
+                  s_is_paused ? 1 : 0);
     Serial.flush();
 }
 
 bool voice_in_bedtime_window() {
     return s_in_bedtime_window;
+}
+
+bool voice_is_paused() {
+    return s_is_paused;
 }
 
 int voice_post_story_plays(const char *json_body) {
