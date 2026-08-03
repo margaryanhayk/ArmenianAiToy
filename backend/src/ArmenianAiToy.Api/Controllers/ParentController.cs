@@ -948,10 +948,14 @@ public class ParentController : ControllerBase
     [ProducesResponseType(401)]
     public async Task<IActionResult> GetStoryLibrary(
         [FromServices] ICuratedStoryLibrary library,
-        [FromServices] IContentManifestService manifest)
+        [FromServices] IContentManifestService manifest,
+        [FromQuery] Guid? deviceId = null)
     {
+        // deviceId scopes the listen counts to one toy (the library is
+        // opened from inside a toy). Unowned/unknown ids simply yield zero
+        // counts — ownership is enforced in the service.
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var totals = (await _parentService.GetStoryPlayTotalsForParentAsync(parentId))
+        var totals = (await _parentService.GetStoryPlayTotalsForParentAsync(parentId, deviceId))
             .ToDictionary(t => t.StoryId, StringComparer.OrdinalIgnoreCase);
 
         var shipped = manifest.Build().Stories;

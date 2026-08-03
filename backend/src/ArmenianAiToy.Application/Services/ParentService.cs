@@ -1967,14 +1967,20 @@ public class ParentService : IParentService
             r.CreatedAtUtc, r.UpdatedAtUtc)).ToList();
     }
 
-    public async Task<List<StoryPlayTotalDto>> GetStoryPlayTotalsForParentAsync(Guid parentId)
+    public async Task<List<StoryPlayTotalDto>> GetStoryPlayTotalsForParentAsync(
+        Guid parentId, Guid? deviceId = null)
     {
-        // Whole-account aggregation across the parent's linked devices —
-        // ownership is enforced at query level through the ParentDevice join.
+        // Ownership is enforced at query level through the ParentDevice join.
         var linkedIds = await _db.Set<ParentDevice>()
             .Where(pd => pd.ParentId == parentId)
             .Select(pd => pd.DeviceId)
             .ToListAsync();
+        if (deviceId is { } scoped)
+        {
+            // Scope to ONE toy — and only if the caller owns it, so an
+            // unowned id yields empty counts rather than a leak.
+            linkedIds = linkedIds.Where(id => id == scoped).ToList();
+        }
         if (linkedIds.Count == 0)
         {
             return new List<StoryPlayTotalDto>();

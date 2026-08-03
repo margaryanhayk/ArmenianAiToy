@@ -164,11 +164,15 @@ public interface IParentService
         Guid parentId, Guid deviceId, string? storyId, int limit, int offset);
 
     /// <summary>
-    /// Slice D — per-story listen totals aggregated across ALL of this
-    /// parent's linked devices (drives the library view's counts). Empty
-    /// list when the parent has no devices or no plays.
+    /// Slice D — per-story listen totals for the library view. With
+    /// <paramref name="deviceId"/> null, aggregates across ALL of this
+    /// parent's linked devices; with a deviceId, scopes to that one toy
+    /// (the library is opened from inside a toy, so the counts must
+    /// describe THAT toy). A deviceId the parent does not own yields an
+    /// empty list — never another family's counts.
     /// </summary>
-    Task<List<StoryPlayTotalDto>> GetStoryPlayTotalsForParentAsync(Guid parentId);
+    Task<List<StoryPlayTotalDto>> GetStoryPlayTotalsForParentAsync(
+        Guid parentId, Guid? deviceId = null);
 
     /// <summary>
     /// Slice F — submit a custom-story request (idea text and/or book-page

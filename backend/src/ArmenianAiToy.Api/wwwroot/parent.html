@@ -626,14 +626,18 @@
     <!-- Devices view -->
     <section id="devicesView" class="card" hidden>
       <h2 data-i18n="linked_devices">🧸 Linked devices</h2>
+      <!-- Account-level only. Content links (library / music / request a
+           story) live INSIDE a toy, where the parent is thinking about what
+           their child hears — owner decision 2026-08-04. "Your activity" is
+           per-PARENT (a shared toy must not leak the other parent's
+           actions), so it stays here. -->
       <div style="margin:0 0 8px;">
         <button id="openAuditBtn" class="link" type="button" data-i18n="view_activity">View your activity →</button>
-        <button id="openLibraryBtn" class="link" type="button" style="margin-left:14px;" data-i18n="view_library">📚 Story library →</button>
-        <button id="openMusicBtn" class="link" type="button" style="margin-left:14px;" data-i18n="view_music">🎵 Music →</button>
       </div>
       <!-- Slice F — custom story request: the parent describes an idea or
-           photographs a book page; fulfilment is by hand (owner queue). -->
-      <div style="margin:0 0 12px;">
+           photographs a book page; fulfilment is by hand (owner queue).
+           The form itself is rendered here but reached from the toy page. -->
+      <div id="storyRequestBlock" style="margin:0 0 12px;" hidden>
         <button id="toggleStoryRequestBtn" class="link" type="button" data-i18n="request_story">✍️ Request a story</button>
         <div id="storyRequestForm" hidden
              style="margin-top:8px;padding:10px 12px;background:#f5f0ff;
@@ -741,6 +745,10 @@
       <div id="toyHeader" style="margin:4px 0 12px;"></div>
       <button id="toyConversationsBtn" type="button" style="margin:0 0 8px;"
               data-i18n="view_conversations">View conversations →</button>
+      <!-- Content links for THIS toy (library / music / request a story).
+           Populated by renderToyView; the request-form block is physically
+           moved in here so its form and status live with it. -->
+      <div id="toyContentLinks" style="margin:0 0 12px;"></div>
       <div id="toySettings"></div>
       <div id="toyStatus" class="status muted" aria-live="polite"></div>
     </section>
@@ -840,7 +848,7 @@
          counts, and a ▶ preview of the shipped narration. -->
     <section id="libraryView" class="card" hidden>
       <h2>
-        <button class="link" id="libraryBackToDevices" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button>
+        <button class="link" id="libraryBackToDevices" aria-label="Back to toy" data-i18n="nav_toys">← Toys</button>
         <span data-i18n="story_library">📚 Story library</span>
       </h2>
       <div id="libraryList"></div>
@@ -850,7 +858,7 @@
     <!-- Music view (Slice E) — the bedtime tracks the toy can play. -->
     <section id="musicView" class="card" hidden>
       <h2>
-        <button class="link" id="musicBackToDevices" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button>
+        <button class="link" id="musicBackToDevices" aria-label="Back to toy" data-i18n="nav_toys">← Toys</button>
         <span data-i18n="music_title">🎵 Music</span>
       </h2>
       <div id="musicList"></div>
@@ -1894,6 +1902,29 @@
       // conversations left the hash at '#v=summaries', so a refresh
       // restored conversations instead of the toy page.
       setViewHash('toy', state.currentToyId);
+
+      // Content links for THIS toy — what the child can hear, plus the
+      // request form (moved into the toy page, owner decision 2026-08-04).
+      var links = document.getElementById('toyContentLinks');
+      clearChildren(links);
+      function toyLink(labelKey, onClick) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'link';
+        b.style.cssText = 'margin-right:14px;';
+        b.textContent = t(labelKey);
+        b.addEventListener('click', onClick);
+        return b;
+      }
+      links.appendChild(toyLink('view_library', function () {
+        loadStoryLibrary(d.deviceId);
+      }));
+      links.appendChild(toyLink('view_music', loadMusicLibrary));
+      var reqBlock = document.getElementById('storyRequestBlock');
+      if (reqBlock) {
+        reqBlock.hidden = false;
+        links.appendChild(reqBlock);   // relocate the form under this toy
+      }
 
       var header = document.getElementById('toyHeader');
       clearChildren(header);
@@ -3764,11 +3795,16 @@
     });
     document.getElementById('openAuditBtn').addEventListener('click', loadAudit);
     document.getElementById('backFromAudit').addEventListener('click', loadDevices);
-    document.getElementById('openLibraryBtn').addEventListener('click', loadStoryLibrary);
-    document.getElementById('libraryBackToDevices').addEventListener('click', loadDevices);
+    document.getElementById('libraryBackToDevices').addEventListener('click', function () {
+      backFromContentView();
+    });
     document.getElementById('playsBackToDevices').addEventListener('click', loadDevices);
-    document.getElementById('openMusicBtn').addEventListener('click', loadMusicLibrary);
-    document.getElementById('musicBackToDevices').addEventListener('click', loadDevices);
+    // Library / Music are reached from INSIDE a toy, so their back buttons
+    // return to that toy (falling back to the devices list if none is open).
+    function backFromContentView() {
+      if (state.currentToyId) { openToy(state.currentToyId); } else { loadDevices(); }
+    }
+    document.getElementById('musicBackToDevices').addEventListener('click', backFromContentView);
     document.getElementById('toggleStoryRequestBtn').addEventListener('click', function () {
       var f = document.getElementById('storyRequestForm');
       f.hidden = !f.hidden;
@@ -3957,14 +3993,18 @@
       }).catch(function () { /* answers are additive — quiet failure */ });
     }
 
-    function loadStoryLibrary() {
+    // deviceId scopes the listen counts to that toy (the library is opened
+    // from inside a toy). Omitted → counts across all the parent's toys.
+    function loadStoryLibrary(deviceId) {
       show('libraryView');
       setViewHash('library');
       setStatus('libraryStatus', 'Loading…', 'muted');
       var listEl = document.getElementById('libraryList');
       clearChildren(listEl);
 
-      authedFetch('/api/parents/stories').then(function (data) {
+      var url = '/api/parents/stories'
+        + (deviceId ? '?deviceId=' + encodeURIComponent(deviceId) : '');
+      authedFetch(url).then(function (data) {
         var stories = (data && data.stories) || [];
         // Refresh the title cache for the plays view while we're here.
         var map = {};
