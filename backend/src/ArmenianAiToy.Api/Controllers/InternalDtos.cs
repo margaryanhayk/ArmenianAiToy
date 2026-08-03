@@ -138,6 +138,10 @@ public sealed record InternalSessionRequest(string? Totp);
 // (revoked/paused); Reason is required and recorded in the audit row.
 public sealed record InternalDeviceActionRequest(bool Value, string Reason);
 
+/// <summary>Slice F — operator moves a story request through its
+/// lifecycle. Bounded status vocabulary validated at the action.</summary>
+public sealed record InternalStoryRequestStatusRequest(string? Status, string? Reason);
+
 // OTA foundation — bench/test enqueue of a device command. Type must be a
 // known DeviceCommandTypes value; Payload is an optional JSON object stored
 // verbatim; TtlSeconds bounds how long the command stays deliverable

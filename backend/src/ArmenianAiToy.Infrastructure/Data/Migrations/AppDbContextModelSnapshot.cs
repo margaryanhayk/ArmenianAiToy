@@ -205,6 +205,9 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(true);
 
+                    b.Property<bool>("BedtimeMusicEnabled")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("StoryIntroEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
@@ -482,6 +485,45 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                     b.HasIndex("DeviceId", "StoryId");
 
                     b.ToTable("StoryReflectionAnswers");
+                });
+
+            modelBuilder.Entity("ArmenianAiToy.Domain.Entities.StoryRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ParentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PhotoPath")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId");
+
+                    b.HasIndex("Status", "CreatedAtUtc");
+
+                    b.ToTable("StoryRequests");
                 });
 
             modelBuilder.Entity("ArmenianAiToy.Domain.Entities.StoryPlay", b =>

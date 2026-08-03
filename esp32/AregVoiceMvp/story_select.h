@@ -198,6 +198,18 @@ bool story_select_resolve_clip_path(const char *story_id, const char *kind,
 /// manifest). Absent index / pre-v3 card → true, the shipped default.
 bool story_select_intro_enabled();
 
+/// Slice E — the parent's bedtime-music opt-in as cached on the card
+/// (index root `musicEnabled`). Absent → false (music is opt-in).
+bool story_select_music_enabled();
+
+/// Slice E — picks the next bedtime-music track (round-robin over the
+/// index's verified `music` entries whose file is on the card at the
+/// recorded size; NVS cursor namespace `aregmusic`) and resolves its
+/// cache path into `out`. Returns false when no usable track exists.
+/// The cursor advances on pick (music has no started-gate — a rare
+/// skipped track costs nothing).
+bool music_select_next(char *out_path, size_t out_len);
+
 /// Last-played story id, persisted in NVS so the rotation survives a
 /// reboot. Returns false when nothing valid is stored (missing key,
 /// unavailable NVS, or a stored value that no longer passes id

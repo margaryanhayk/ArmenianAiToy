@@ -113,6 +113,22 @@ struct CsClip {
     bool verified;   // a full SHA-256 has matched for THIS clip file
 };
 
+// Slice E — bedtime-music slots. Small fixed table; a track must never
+// enter the story rotation, so music lives in its own namespace, its own
+// SD directory (/music) and its own index section.
+#ifndef CS_MAX_MUSIC
+#define CS_MAX_MUSIC 8
+#endif
+
+struct CsMusic {
+    char track_id[CS_MAX_STORY_ID_LEN + 1];  // same allowlist as story ids
+    int  version;
+    char title[CS_MAX_TITLE_LEN + 1];
+    char sha256[65];
+    long size_bytes;
+    bool verified;
+};
+
 // ---- one story, as held in memory ---------------------------------
 
 struct CsStory {
@@ -341,6 +357,42 @@ inline bool cs_build_temp_path(char *out, size_t out_len,
     char scratch[CS_MAX_PATH_LEN * 2];
     const int written = snprintf(scratch, sizeof(scratch),
                                  "/tmp/%s-v%d.mp3.part", story_id, v);
+    if (written <= 0 || (size_t)written >= out_len || (size_t)written >= sizeof(scratch)) {
+        return false;
+    }
+    memcpy(out, scratch, (size_t)written + 1);
+    return true;
+}
+
+/// "/music/<trackId>-v<version>.mp3" — the music namespace's analogue of
+/// cs_build_cache_path, same refuse-on-truncation contract.
+inline bool cs_build_music_cache_path(char *out, size_t out_len,
+                                      const char *track_id, int version) {
+    if (out == NULL || out_len == 0 || !cs_is_valid_story_id(track_id)) {
+        return false;
+    }
+    const int v = cs_normalize_version(version);
+    char scratch[CS_MAX_PATH_LEN * 2];
+    const int written = snprintf(scratch, sizeof(scratch),
+                                 "/music/%s-v%d.mp3", track_id, v);
+    if (written <= 0 || (size_t)written >= out_len || (size_t)written >= sizeof(scratch)) {
+        return false;
+    }
+    memcpy(out, scratch, (size_t)written + 1);
+    return true;
+}
+
+/// "/tmp/m-<trackId>-v<version>.mp3.part" ("m-" keeps a music part file
+/// from ever colliding with a story's).
+inline bool cs_build_music_temp_path(char *out, size_t out_len,
+                                     const char *track_id, int version) {
+    if (out == NULL || out_len == 0 || !cs_is_valid_story_id(track_id)) {
+        return false;
+    }
+    const int v = cs_normalize_version(version);
+    char scratch[CS_MAX_PATH_LEN * 2];
+    const int written = snprintf(scratch, sizeof(scratch),
+                                 "/tmp/m-%s-v%d.mp3.part", track_id, v);
     if (written <= 0 || (size_t)written >= out_len || (size_t)written >= sizeof(scratch)) {
         return false;
     }

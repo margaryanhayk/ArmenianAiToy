@@ -205,6 +205,60 @@ public class AuditEvent
         })
     };
 
+    /// <summary>Slice E — a parent toggled bedtime music on a linked
+    /// device. Post-change flag only; written only on real flips.</summary>
+    public static AuditEvent ParentBedtimeMusicSet(
+        Guid parentId, Guid deviceId, bool enabled) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentBedtimeMusicSet,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            enabled = enabled
+        })
+    };
+
+    /// <summary>Slice F — a parent submitted a custom-story request.
+    /// Metadata: bounded type + has-photo only; the free text stays on the
+    /// request row (audit never carries parent-authored content).</summary>
+    public static AuditEvent ParentStoryRequestSubmitted(
+        Guid parentId, Guid requestId, string type, bool hasPhoto) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentStoryRequestSubmitted,
+        ActorParentId = parentId,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            request_id = requestId,
+            type = type,
+            has_photo = hasPhoto
+        })
+    };
+
+    /// <summary>Slice F — a console operator moved a story request through
+    /// its lifecycle. Same InternalConsoleAction envelope as the other
+    /// operator mutations (ActorParentId null keeps it console-only).</summary>
+    public static AuditEvent InternalConsoleStoryRequestStatus(
+        string operatorName, Guid requestId, string status, string reason) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.InternalConsoleAction,
+        ActorParentId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            @operator = operatorName,
+            action = "story_request_status",
+            request_id = requestId,
+            status = status,
+            reason = reason
+        })
+    };
+
     /// <summary>A parent toggled the spoken story intro on a linked device.
     /// Metadata is the post-change flag only. Written only on a real flip
     /// (idempotent no-ops write nothing — same contract as pause/revoke).</summary>

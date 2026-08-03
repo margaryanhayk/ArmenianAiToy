@@ -53,7 +53,15 @@ public record LinkedDeviceDto(
     /// quote to support, never a technical explanation or a self-service fix.
     /// See <c>DeviceFaultCode</c>.
     /// </summary>
-    string FaultCode);
+    string FaultCode)
+{
+    /// <summary>B3 — spoken story intro toggle (default ON). Init-prop so
+    /// pre-existing constructor call sites/tests compile unchanged.</summary>
+    public bool StoryIntroEnabled { get; init; } = true;
+
+    /// <summary>Slice E — bedtime-music opt-in (default OFF).</summary>
+    public bool BedtimeMusicEnabled { get; init; }
+}
 
 public record LinkedDeviceChildDto(
     Guid ChildId,

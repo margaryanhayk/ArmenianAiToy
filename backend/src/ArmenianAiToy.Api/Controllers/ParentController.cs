@@ -591,6 +591,82 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Slice E: toggle bedtime music on a linked device. When ON, a button
+    /// press during the device's bedtime window plays a calm Armenian music
+    /// track (synced to the toy's SD card) instead of a story. Default OFF
+    /// (opt-in). Same shape as the story-intro toggle.
+    /// </summary>
+    [HttpPut("devices/{deviceId}/bedtime-music")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> SetBedtimeMusic(
+        Guid deviceId, [FromBody] DeviceStoryIntroRequest request)
+    {
+        if (request?.Enabled is null)
+            return BadRequest(new { error = "enabled (true/false) is required." });
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ok = await _parentService.SetBedtimeMusicAsync(
+            parentId, deviceId, request.Enabled.Value);
+        if (!ok)
+            return NotFound(new { error = "Device not found or not linked to this account." });
+        return Ok(new { bedtimeMusicEnabled = request.Enabled.Value });
+    }
+
+    /// <summary>Slice E — the parent-facing music library: the bedtime
+    /// tracks the toy can play, with a parent-authed ▶ preview. Empty until
+    /// tracks are configured.</summary>
+    [HttpGet("music")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public IActionResult GetMusicLibrary(
+        [FromServices] IContentManifestService manifest)
+    {
+        var music = manifest.Build().Music ?? (IReadOnlyList<ContentMusicItem>)[];
+        return Ok(new
+        {
+            tracks = music.Select(m => new
+            {
+                trackId = m.TrackId,
+                title = m.Title,
+                previewUrl = $"/api/parents/music/{Uri.EscapeDataString(m.TrackId)}/audio",
+            }).ToList()
+        });
+    }
+
+    /// <summary>Slice E — parent-authed ▶ preview stream of a configured
+    /// music track. Uniform 404 for every miss reason.</summary>
+    [HttpGet("music/{trackId}/audio")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public IActionResult GetMusicPreviewAudio(
+        string trackId,
+        [FromServices] ContentSyncOptions contentSync,
+        [FromServices] ILogger<ParentController> logger)
+    {
+        if (!contentSync.Enabled || string.IsNullOrWhiteSpace(trackId))
+            return NotFound(new { error = "Audio not available." });
+        var track = contentSync.ResolveMusic().FirstOrDefault(m =>
+            string.Equals(m.TrackId, trackId, StringComparison.OrdinalIgnoreCase));
+        if (track is null || string.IsNullOrWhiteSpace(track.AudioPath))
+            return NotFound(new { error = "Audio not available." });
+        if (!System.IO.Path.IsPathRooted(track.AudioPath)
+            || !System.IO.File.Exists(track.AudioPath))
+        {
+            logger.LogWarning(
+                "Music preview path missing or not absolute for {TrackId}", track.TrackId);
+            return NotFound(new { error = "Audio not available." });
+        }
+        return PhysicalFile(track.AudioPath, "audio/mpeg", enableRangeProcessing: true);
+    }
+
+    /// <summary>
     /// Rename a linked device so a parent can tell their toys apart when they
     /// own more than one ("Anna's toy", "Living room"). Parent-JWT, ownership-
     /// checked; 400 on an empty / over-length name, silent 404 on a device not
@@ -784,6 +860,63 @@ public class ParentController : ControllerBase
         if (result is null)
             return NotFound(new { error = "Device not found or not linked to this account." });
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Slice F — submit a custom-story request: a story idea in free text
+    /// and/or a photographed book page. Fulfilment is BY HAND (the owner's
+    /// queue in the internal console) — this endpoint only records the wish.
+    /// Multipart form: <c>text</c> (≤2000 chars) + optional <c>photo</c>
+    /// (jpeg/png/heic, ≤8 MB). Parent-JWT; auth rate-limit bucket (a write
+    /// with disk cost); audited with counts-only metadata.
+    /// </summary>
+    [HttpPost("story-requests")]
+    [Authorize]
+    [EnableRateLimiting(AuthRateLimiter.PolicyName)]
+    [RequestSizeLimit(9_000_000)]
+    [ProducesResponseType(201)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(429)]
+    public async Task<IActionResult> SubmitStoryRequest(
+        [FromForm] string? text,
+        IFormFile? photo,
+        CancellationToken cancellationToken)
+    {
+        byte[]? photoBytes = null;
+        string? photoContentType = null;
+        if (photo is not null && photo.Length > 0)
+        {
+            if (photo.Length > 8_000_000)
+                return BadRequest(new { error = "Photo must be under 8 MB." });
+            using var ms = new MemoryStream();
+            await photo.CopyToAsync(ms, cancellationToken);
+            photoBytes = ms.ToArray();
+            photoContentType = photo.ContentType;
+        }
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var requestId = await _parentService.SubmitStoryRequestAsync(
+            parentId, text, photoBytes, photoContentType, cancellationToken);
+        if (requestId is null)
+            return BadRequest(new
+            {
+                error = "Describe your story idea (up to 2000 characters) and/or attach a JPEG/PNG photo."
+            });
+        return Created("", new { requestId });
+    }
+
+    /// <summary>Slice F — the caller's own story requests with status,
+    /// newest first. Drives the dashboard's "my requests" list.</summary>
+    [HttpGet("story-requests")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetStoryRequests()
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var requests = await _parentService.GetStoryRequestsForParentAsync(parentId);
+        return Ok(new StoryRequestsResponse(requests));
     }
 
     /// <summary>

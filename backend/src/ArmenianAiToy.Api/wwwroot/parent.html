@@ -629,6 +629,31 @@
       <div style="margin:0 0 8px;">
         <button id="openAuditBtn" class="link" type="button" data-i18n="view_activity">View your activity →</button>
         <button id="openLibraryBtn" class="link" type="button" style="margin-left:14px;" data-i18n="view_library">📚 Story library →</button>
+        <button id="openMusicBtn" class="link" type="button" style="margin-left:14px;" data-i18n="view_music">🎵 Music →</button>
+      </div>
+      <!-- Slice F — custom story request: the parent describes an idea or
+           photographs a book page; fulfilment is by hand (owner queue). -->
+      <div style="margin:0 0 12px;">
+        <button id="toggleStoryRequestBtn" class="link" type="button" data-i18n="request_story">✍️ Request a story</button>
+        <div id="storyRequestForm" hidden
+             style="margin-top:8px;padding:10px 12px;background:#f5f0ff;
+                    border:1px solid #e4d9f7;border-radius:6px;max-width:460px;">
+          <p style="margin:0 0 8px;font-size:13px;color:#5b3e8a;" data-i18n="request_story_help">
+            Describe the story you'd like for your child — or attach a photo
+            of a book page. We review every request by hand and record it in
+            the storyteller's voice.</p>
+          <label for="storyRequestText" data-i18n="request_story_text">Your story idea</label>
+          <textarea id="storyRequestText" rows="4" maxlength="2000"
+                    style="width:100%;padding:10px 12px;border:2px solid #e0d6f0;
+                           border-radius:12px;font-size:14px;margin-bottom:10px;
+                           font-family:inherit;"></textarea>
+          <label for="storyRequestPhoto" data-i18n="request_story_photo">Book page photo (optional)</label>
+          <input id="storyRequestPhoto" type="file" accept="image/jpeg,image/png,image/heic"
+                 style="border:none;padding:4px 0;">
+          <button id="submitStoryRequestBtn" type="button" data-i18n="request_story_send">Send request</button>
+          <div id="storyRequestStatus" class="status muted" aria-live="polite"></div>
+          <div id="myStoryRequests" style="margin-top:10px;"></div>
+        </div>
       </div>
       <!--
         Consumer pairing (Phase A.2): claim a toy with the single-use code
@@ -822,6 +847,16 @@
       <div id="libraryStatus" class="status muted" aria-live="polite"></div>
     </section>
 
+    <!-- Music view (Slice E) — the bedtime tracks the toy can play. -->
+    <section id="musicView" class="card" hidden>
+      <h2>
+        <button class="link" id="musicBackToDevices" aria-label="Back to devices" data-i18n="nav_devices">← Devices</button>
+        <span data-i18n="music_title">🎵 Music</span>
+      </h2>
+      <div id="musicList"></div>
+      <div id="musicStatus" class="status muted" aria-live="polite"></div>
+    </section>
+
     <!-- Detail view -->
     <section id="detailView" class="card" hidden>
       <h2>
@@ -914,6 +949,23 @@
       bedtime_safe: { en: '🌙 bedtime-safe', ru: '🌙 подходит для сна', hy: '🌙 քնելուց առաջ' },
       no_plays_yet: { en: 'No story plays reported yet. The toy uploads them when it is online.', ru: 'Прослушиваний пока нет. Игрушка отправит их, когда будет онлайн.', hy: 'Դեռ լսումներ չկան։ Խաղալիքը կուղարկի դրանք, երբ առցանց լինի։' },
       discuss_with_child: { en: 'Discuss with your child', ru: 'Обсудите с ребёнком', hy: 'Քննարկեք երեխայի հետ' },
+      request_story: { en: '✍️ Request a story', ru: '✍️ Заказать сказку', hy: '✍️ Պատվիրել հեքիաթ' },
+      request_story_help: { en: "Describe the story you'd like for your child — or attach a photo of a book page. We review every request by hand and record it in the storyteller's voice.", ru: 'Опишите сказку для вашего ребёнка — или приложите фото страницы книги. Мы вручную рассматриваем каждый запрос и озвучиваем голосом сказочника.', hy: 'Նկարագրեք հեքիաթը, որ կուզեիք ձեր երեխայի համար, կամ կցեք գրքի էջի լուսանկար։ Ամեն հայտ դիտարկում ենք ձեռքով և ձայնագրում հեքիաթասացի ձայնով։' },
+      request_story_text: { en: 'Your story idea', ru: 'Ваша идея сказки', hy: 'Ձեր հեքիաթի գաղափարը' },
+      request_story_photo: { en: 'Book page photo (optional)', ru: 'Фото страницы книги (необязательно)', hy: 'Գրքի էջի լուսանկար (ոչ պարտադիր)' },
+      request_story_send: { en: 'Send request', ru: 'Отправить', hy: 'Ուղարկել' },
+      request_story_sent: { en: 'Request sent! We will review it soon.', ru: 'Запрос отправлен! Скоро рассмотрим.', hy: 'Հայտն ուղարկված է։ Շուտով կդիտարկենք։' },
+      request_status_new: { en: 'received', ru: 'получен', hy: 'ստացված է' },
+      request_status_in_review: { en: 'in review', ru: 'рассматривается', hy: 'դիտարկվում է' },
+      request_status_delivered: { en: 'delivered', ru: 'готово', hy: 'պատրաստ է' },
+      request_status_declined: { en: 'declined', ru: 'отклонён', hy: 'մերժված է' },
+      story_intro_label: { en: 'Spoken story intro (title + author)', ru: 'Озвученное вступление (название + автор)', hy: 'Հեքիաթի ձայնային ներածություն (վերնագիր + հեղինակ)' },
+      bedtime_music_label: { en: 'Music at bedtime hours', ru: 'Музыка в часы сна', hy: 'Երաժշտություն քնի ժամերին' },
+      flag_on: { en: 'On ✓', ru: 'Вкл ✓', hy: 'Միացված ✓' },
+      flag_off: { en: 'Off', ru: 'Выкл', hy: 'Անջատված' },
+      view_music: { en: '🎵 Music →', ru: '🎵 Музыка →', hy: '🎵 Երաժշտություն →' },
+      music_title: { en: '🎵 Music', ru: '🎵 Музыка', hy: '🎵 Երաժշտություն' },
+      no_music_yet: { en: 'No music tracks are published yet.', ru: 'Музыкальных треков пока нет.', hy: 'Երաժշտական ձայնագրություններ դեռ չկան։' },
       today: { en: '☀️ Today', ru: '☀️ Сегодня', hy: '☀️ Այսօր' },
       newer: { en: '← Newer', ru: '← Новее', hy: '← Ավելի նոր' },
       older: { en: 'Older →', ru: 'Старее →', hy: 'Ավելի հին →' },
@@ -1083,7 +1135,7 @@
       var ids = ['loginView', 'resetRequestView', 'resetPasswordView',
                  'verifyEmailRequestView', 'verifyEmailCompleteView',
                  'devicesView', 'toyView', 'summariesView', 'flaggedView',
-                 'playsView', 'libraryView', 'detailView', 'auditView'];
+                 'playsView', 'libraryView', 'musicView', 'detailView', 'auditView'];
       for (var i = 0; i < ids.length; i++) {
         document.getElementById(ids[i]).hidden = (ids[i] !== viewId);
       }
@@ -2040,6 +2092,40 @@
             toggleDevicePause(d.deviceId, d.deviceName, d.isPaused);
           });
           listEl.appendChild(pauseBtn);
+
+          // B3 + Slice E — two simple flag toggles (spoken story intro,
+          // bedtime music). PUT the opposite value, then reload the page
+          // state, same shape as the pause control.
+          function flagToggle(labelKey, current, endpoint) {
+            var row = document.createElement('div');
+            row.className = 'ctl-row';
+            var label = document.createElement('span');
+            label.textContent = t(labelKey);
+            label.className = 'ctl-label';
+            row.appendChild(label);
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-ghost';
+            btn.style.cssText = 'font-size:13px;';
+            btn.textContent = current ? t('flag_on') : t('flag_off');
+            btn.addEventListener('click', function () {
+              var token = getToken();
+              if (!token) { show('loginView'); return; }
+              fetch('/api/parents/devices/' + encodeURIComponent(d.deviceId) + '/' + endpoint, {
+                method: 'PUT',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: !current })
+              }).then(function (res) {
+                if (res.ok) { openToy(d.deviceId); }
+              }).catch(function () { /* quiet; state unchanged */ });
+            });
+            row.appendChild(btn);
+            return row;
+          }
+          listEl.appendChild(flagToggle('story_intro_label',
+            d.storyIntroEnabled !== false, 'story-intro'));
+          listEl.appendChild(flagToggle('bedtime_music_label',
+            d.bedtimeMusicEnabled === true, 'bedtime-music'));
 
           // B4: bedtime window row — two time inputs + Save, sibling to
           // the clickable device row so inputs aren't nested in a button.
@@ -3623,8 +3709,85 @@
     document.getElementById('openLibraryBtn').addEventListener('click', loadStoryLibrary);
     document.getElementById('libraryBackToDevices').addEventListener('click', loadDevices);
     document.getElementById('playsBackToDevices').addEventListener('click', loadDevices);
+    document.getElementById('openMusicBtn').addEventListener('click', loadMusicLibrary);
+    document.getElementById('musicBackToDevices').addEventListener('click', loadDevices);
+    document.getElementById('toggleStoryRequestBtn').addEventListener('click', function () {
+      var f = document.getElementById('storyRequestForm');
+      f.hidden = !f.hidden;
+      if (!f.hidden) loadMyStoryRequests();
+    });
+    document.getElementById('submitStoryRequestBtn').addEventListener('click', submitStoryRequest);
     document.getElementById('auditOlderBtn').addEventListener('click', pageOlderAudit);
     document.getElementById('auditNewerBtn').addEventListener('click', pageNewerAudit);
+
+    // ---------- custom story requests (Slice F) ----------
+
+    function requestStatusLabel(status) {
+      var map = {
+        'new': 'request_status_new', 'in_review': 'request_status_in_review',
+        'delivered': 'request_status_delivered', 'declined': 'request_status_declined'
+      };
+      return map[status] ? t(map[status]) : status;
+    }
+
+    function loadMyStoryRequests() {
+      var listEl = document.getElementById('myStoryRequests');
+      clearChildren(listEl);
+      authedFetch('/api/parents/story-requests').then(function (data) {
+        var rows = (data && data.requests) || [];
+        rows.forEach(function (r) {
+          var row = document.createElement('div');
+          row.style.cssText = 'padding:6px 0;border-top:1px solid #e4d9f7;font-size:13px;';
+          var meta = document.createElement('div');
+          meta.style.cssText = 'color:#888;font-size:12px;';
+          meta.textContent = fmtTime(r.createdAtUtc) + ' · '
+            + requestStatusLabel(r.status)
+            + (r.hasPhoto ? ' · 📷' : '');
+          var text = document.createElement('div');
+          text.textContent = r.text || '(photo)';
+          row.appendChild(meta);
+          row.appendChild(text);
+          listEl.appendChild(row);
+        });
+      }).catch(function () { /* additive list — quiet failure */ });
+    }
+
+    function submitStoryRequest() {
+      var text = document.getElementById('storyRequestText').value.trim();
+      var photoInput = document.getElementById('storyRequestPhoto');
+      var photo = photoInput.files && photoInput.files[0];
+      if (!text && !photo) {
+        setStatus('storyRequestStatus', t('request_story_help'), 'err');
+        return;
+      }
+      var token = getToken();
+      if (!token) { show('loginView'); return; }
+
+      var form = new FormData();
+      form.append('text', text);
+      if (photo) form.append('photo', photo);
+
+      setStatus('storyRequestStatus', '…', 'muted');
+      fetch('/api/parents/story-requests', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token },
+        body: form
+      }).then(function (res) {
+        if (res.status === 201) {
+          setStatus('storyRequestStatus', t('request_story_sent'), '');
+          document.getElementById('storyRequestText').value = '';
+          photoInput.value = '';
+          loadMyStoryRequests();
+          return;
+        }
+        return res.json().then(function (data) {
+          setStatus('storyRequestStatus',
+            (data && data.error) || ('HTTP ' + res.status), 'err');
+        });
+      }).catch(function () {
+        setStatus('storyRequestStatus', 'Network error.', 'err');
+      });
+    }
 
     // ---------- story plays + library (Slice A/D) ----------
 
@@ -3883,6 +4046,39 @@
       wrap.appendChild(btn);
       wrap.appendChild(status);
       return wrap;
+    }
+
+    // ---------- music library (Slice E) ----------
+
+    function loadMusicLibrary() {
+      show('musicView');
+      setViewHash('music');
+      setStatus('musicStatus', 'Loading…', 'muted');
+      var listEl = document.getElementById('musicList');
+      clearChildren(listEl);
+      authedFetch('/api/parents/music').then(function (data) {
+        var tracks = (data && data.tracks) || [];
+        if (tracks.length === 0) {
+          setStatus('musicStatus', t('no_music_yet'), 'muted');
+          return;
+        }
+        setStatus('musicStatus', '', '');
+        tracks.forEach(function (m) {
+          var card = document.createElement('div');
+          card.style.cssText = 'padding:12px;border:1px solid #e2e2e2;border-radius:8px;margin:0 0 10px;';
+          var title = document.createElement('div');
+          title.style.cssText = 'font-size:15px;font-weight:600;';
+          title.textContent = '🎵 ' + (m.title || m.trackId);
+          card.appendChild(title);
+          if (m.previewUrl) {
+            card.appendChild(buildPreviewAffordance(m.previewUrl));
+          }
+          listEl.appendChild(card);
+        });
+      }).catch(function (err) {
+        if (err && err.status === 401) return;
+        setStatus('musicStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
+      });
     }
 
     // Tab buttons (identical strips in the summaries, flagged, and plays

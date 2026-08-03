@@ -20,6 +20,7 @@
 
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <ArduinoJson.h>         // Slice E — heartbeat-response parse (bedtime flag)
 #include <esp_heap_caps.h>
 #include <freertos/FreeRTOS.h>   // xTaskCreatePinnedToCore (S3 async upload, UNVERIFIED)
 #include <freertos/task.h>       // vTaskDelete, BaseType_t
@@ -96,6 +97,9 @@ static char s_wifi_pass[65] = {0};
 // observed down). Set/cleared by voice_wifi_tick(); read by
 // voice_wifi_down_duration_ms() to drive the auto-fallback to provisioning.
 static uint32_t s_wifi_down_since_ms = 0;
+
+// Slice E — last-known bedtime-window state from the heartbeat response.
+static bool s_in_bedtime_window = false;
 
 // The story every in-story backend call is grounded in. Empty means "use the
 // compile-time configured story", which is the pre-selection behavior. Once
@@ -266,9 +270,25 @@ void voice_send_heartbeat() {
              audio_sd_available() ? "true" : "false");
     http.addHeader("Content-Type", "application/json");
     const int status = http.POST(body);
+    if (status == 200) {
+        // Slice E — the server tells us whether the bedtime window is
+        // active right now (additive field; older backends omit it and the
+        // cached value defaults false). Best-effort parse: a malformed
+        // body just leaves the previous value standing.
+        const String resp = http.getString();
+        JsonDocument doc;
+        if (deserializeJson(doc, resp) == DeserializationError::Ok) {
+            s_in_bedtime_window = doc["inBedtimeWindow"] | false;
+        }
+    }
     http.end();
-    Serial.printf("[heartbeat] status=%d (fw=%s)\n", status, AREG_FW_VERSION);
+    Serial.printf("[heartbeat] status=%d (fw=%s bedtime=%d)\n",
+                  status, AREG_FW_VERSION, s_in_bedtime_window ? 1 : 0);
     Serial.flush();
+}
+
+bool voice_in_bedtime_window() {
+    return s_in_bedtime_window;
 }
 
 int voice_post_story_plays(const char *json_body) {

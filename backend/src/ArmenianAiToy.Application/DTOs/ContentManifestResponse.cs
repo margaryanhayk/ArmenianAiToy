@@ -17,9 +17,28 @@ public sealed record ContentManifestResponse(
     /// value so the toggle applies offline.</summary>
     public bool? StoryIntroEnabled { get; init; }
 
+    /// <summary>Slice E — bedtime music tracks (separate namespace from
+    /// stories; firmware syncs them to /music). Null/empty until the owner
+    /// configures rights-cleared tracks; pre-music firmware ignores it.</summary>
+    public IReadOnlyList<ContentMusicItem>? Music { get; init; }
+
+    /// <summary>Slice E — the device's parent-set bedtime-music toggle,
+    /// stamped by the controller like <see cref="StoryIntroEnabled"/>.</summary>
+    public bool? BedtimeMusicEnabled { get; init; }
+
     public static ContentManifestResponse Empty() =>
         new(Array.Empty<ContentStoryItem>());
 }
+
+/// <summary>Slice E — one downloadable bedtime-music track.</summary>
+public sealed record ContentMusicItem(
+    string TrackId,
+    int Version,
+    string Title,
+    string AudioUrl,
+    string Sha256,
+    long SizeBytes,
+    bool Enabled);
 
 /// <summary>One downloadable story-audio item. <c>Enabled=false</c> tells
 /// the device to remove its cached copy (retire) — the device may ignore

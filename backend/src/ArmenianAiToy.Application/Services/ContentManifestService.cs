@@ -61,9 +61,43 @@ public sealed class ContentManifestService : IContentManifestService
             });
         }
 
-        return items.Count == 0
-            ? ContentManifestResponse.Empty()
-            : new ContentManifestResponse(items);
+        var music = BuildMusic();
+        if (items.Count == 0 && music is null)
+        {
+            return ContentManifestResponse.Empty();
+        }
+        return new ContentManifestResponse(items) { Music = music };
+    }
+
+    /// <summary>Slice E — per-track validation, mirroring the story loop
+    /// (drop only the offending track; dedupe keeps the first; default URL
+    /// fill scoped by trackId). Null when nothing valid is configured, so
+    /// the wire stays byte-identical for music-less deployments.</summary>
+    private IReadOnlyList<ContentMusicItem>? BuildMusic()
+    {
+        var items = new List<ContentMusicItem>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var track in _options.ResolveMusic())
+        {
+            if (string.IsNullOrWhiteSpace(track.TrackId)
+                || track.SizeBytes <= 0
+                || !IsSha256Hex(track.Sha256)
+                || !seen.Add(track.TrackId))
+            {
+                continue;
+            }
+            items.Add(new ContentMusicItem(
+                TrackId: track.TrackId,
+                Version: track.Version < 1 ? 1 : track.Version,
+                Title: track.Title,
+                AudioUrl: string.IsNullOrWhiteSpace(track.AudioUrl)
+                    ? $"{DefaultContentFileRoute}?trackId={Uri.EscapeDataString(track.TrackId)}"
+                    : track.AudioUrl,
+                Sha256: track.Sha256.ToLowerInvariant(),
+                SizeBytes: track.SizeBytes,
+                Enabled: true));
+        }
+        return items.Count == 0 ? null : items;
     }
 
     /// <summary>

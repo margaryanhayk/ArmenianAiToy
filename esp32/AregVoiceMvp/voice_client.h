@@ -64,6 +64,13 @@ uint32_t voice_wifi_down_duration_ms();
 // is down. The URL is derived from AREG_BACKEND_URL, so no new config constant.
 void voice_send_heartbeat();
 
+// Slice E — last-known "is the bedtime window active right now" as told
+// by the server on the most recent successful heartbeat (the toy has no
+// wall clock, so the server owns the clock). Defaults to false until the
+// first heartbeat lands; between heartbeats (~60 s) the cached value
+// stands, which bounds the staleness to one interval.
+bool voice_in_bedtime_window();
+
 // Story-play reporting (store-and-forward) — POST a pre-composed JSON body
 // to /api/devices/story-plays with the device-auth headers. Returns the HTTP
 // status (negative on transport failure / offline). The URL is derived from

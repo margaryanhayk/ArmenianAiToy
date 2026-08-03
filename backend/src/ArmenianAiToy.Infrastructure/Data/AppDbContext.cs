@@ -20,6 +20,7 @@ public class AppDbContext : DbContext
     public DbSet<DeviceCommand> DeviceCommands => Set<DeviceCommand>();
     public DbSet<StoryPlay> StoryPlays => Set<StoryPlay>();
     public DbSet<StoryReflectionAnswer> StoryReflectionAnswers => Set<StoryReflectionAnswer>();
+    public DbSet<StoryRequest> StoryRequests => Set<StoryRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -188,6 +189,16 @@ public class AppDbContext : DbContext
             e.HasIndex(a => new { a.DeviceId, a.StoryId });
             e.HasIndex(a => new { a.DeviceId, a.CreatedAtUtc });
             e.Property(a => a.SafetyFlag).HasConversion<string>();
+        });
+
+        // StoryRequest — the owner's custom-story work queue. Deliberately
+        // FK-free (AuditEvent idiom): requests survive account deletion;
+        // ParentId is a plain scoping column.
+        modelBuilder.Entity<StoryRequest>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.HasIndex(r => r.ParentId);
+            e.HasIndex(r => new { r.Status, r.CreatedAtUtc });
         });
     }
 }

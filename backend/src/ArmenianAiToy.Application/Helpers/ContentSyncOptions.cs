@@ -45,6 +45,13 @@ public sealed class ContentSyncOptions
     /// legacy scalars below.</summary>
     public List<ContentSyncStoryOptions> Stories { get; set; } = new();
 
+    /// <summary>Slice E — calm Armenian music tracks for the bedtime
+    /// window, synced to the toy's SD alongside stories but kept in a
+    /// SEPARATE namespace (a music track must never enter the story
+    /// rotation). Empty by default — the feature ships dark until the
+    /// owner adds rights-cleared tracks.</summary>
+    public List<ContentSyncMusicOptions> Music { get; set; } = new();
+
     /// <summary>Legacy single-item: library story id (kebab-case).</summary>
     public string StoryId { get; set; } = string.Empty;
 
@@ -174,8 +181,41 @@ public sealed class ContentSyncOptions
             options.Stories.Add(story);
         }
 
+        // Slice E — hand-rolled music binding, same reachable-by-tests rule.
+        foreach (var child in section.GetSection("Music").GetChildren())
+        {
+            var track = new ContentSyncMusicOptions
+            {
+                TrackId = child["TrackId"] ?? "",
+                Title = child["Title"] ?? "",
+                AudioUrl = child["AudioUrl"] ?? "",
+                AudioPath = child["AudioPath"] ?? "",
+                Sha256 = child["Sha256"] ?? "",
+            };
+            if (int.TryParse(child["Version"], out var trackVersion)) track.Version = trackVersion;
+            if (long.TryParse(child["SizeBytes"], out var trackSize)) track.SizeBytes = trackSize;
+            options.Music.Add(track);
+        }
+
         return options;
     }
+
+    /// <summary>Slice E — the configured music set with
+    /// <see cref="AudioRoot"/> applied, mirroring <see cref="ResolveStories"/>
+    /// (one resolution site for the manifest service AND content-file).</summary>
+    public IReadOnlyList<ContentSyncMusicOptions> ResolveMusic()
+        => Music
+            .Select(m => new ContentSyncMusicOptions
+            {
+                TrackId = m.TrackId,
+                Version = m.Version,
+                Title = m.Title,
+                AudioUrl = m.AudioUrl,
+                AudioPath = ResolveAudioPath(AudioRoot, m.AudioPath),
+                Sha256 = m.Sha256,
+                SizeBytes = m.SizeBytes,
+            })
+            .ToList();
 
     /// <summary>
     /// The configured story set, in order: <see cref="Stories"/> when it has
@@ -282,6 +322,23 @@ public sealed class ContentSyncStoryOptions
     /// intro/reflection, exactly the pre-B2 behavior.
     /// </summary>
     public List<ContentSyncClipOptions> Clips { get; set; } = new();
+}
+
+/// <summary>
+/// Slice E — one configured bedtime-music track. Same field discipline as
+/// <see cref="ContentSyncStoryOptions"/> (id is a lookup key + SD filename
+/// component, sha/size verified on-device), but a distinct type and id
+/// namespace so a track can never be mistaken for a story.
+/// </summary>
+public sealed class ContentSyncMusicOptions
+{
+    public string TrackId { get; set; } = string.Empty;
+    public int Version { get; set; } = 1;
+    public string Title { get; set; } = string.Empty;
+    public string AudioUrl { get; set; } = string.Empty;
+    public string AudioPath { get; set; } = string.Empty;
+    public string Sha256 { get; set; } = string.Empty;
+    public long SizeBytes { get; set; }
 }
 
 /// <summary>

@@ -56,6 +56,16 @@ int s_active_count   = 0;
 // Cached into the index so the last-known value applies offline.
 bool s_intro_enabled = true;
 
+// Slice E — bedtime music: manifest/prev/active tables + the parent's
+// opt-in flag, all cached into the index like the intro toggle.
+CsMusic s_music_manifest[CS_MAX_MUSIC];
+CsMusic s_music_previous[CS_MAX_MUSIC];
+CsMusic s_music_active[CS_MAX_MUSIC];
+int s_music_manifest_count = 0;
+int s_music_previous_count = 0;
+int s_music_active_count   = 0;
+bool s_music_enabled = false;
+
 // ---- small helpers (duplicated from ota_apply's file-locals by repo
 // convention: no shared util until a third caller) ----
 
@@ -179,8 +189,9 @@ void load_previous_index() {
     }
     int schema = 0;
     s_previous_count = cs_index_parse(doc, s_previous, CS_MAX_STORIES, &schema);
-    Serial.printf("[content-sync] index v%d loaded entries=%d\n",
-                  schema, s_previous_count);
+    s_music_previous_count = cs_index_parse_music(doc, s_music_previous, CS_MAX_MUSIC);
+    Serial.printf("[content-sync] index v%d loaded entries=%d music=%d\n",
+                  schema, s_previous_count, s_music_previous_count);
     if (schema < 2 && s_previous_count > 0) {
         Serial.printf("[content-sync] legacy v1 index migrated (%s)\n",
                       s_previous[0].story_id);
@@ -219,6 +230,7 @@ bool write_index() {
     // as they did in the single-story build. It has no effect on which
     // stories are synced or indexed.
     cs_index_build(idx, s_active, s_active_count, AREG_STORY_ID, s_intro_enabled);
+    cs_index_add_music(idx, s_music_active, s_music_active_count, s_music_enabled);
 
     if (SD.exists(kIndexTmpPath)) {
         SD.remove(kIndexTmpPath);
@@ -500,6 +512,93 @@ bool already_current(const CsStory *story) {
     return false;
 }
 
+// ---- bedtime-music sync (Slice E) ---------------------------------
+//
+// Mirrors the story pass at track granularity: already-current check
+// against the previous index + on-card size, else download/sha-verify/
+// rename via the shared helper. A track failure never affects stories or
+// its music siblings; tracks absent from the manifest but still verified
+// on the card are carried forward (absence is not retirement).
+void sync_music() {
+    int already = 0, downloaded = 0, failed = 0;
+    for (int i = 0; i < s_music_manifest_count; i++) {
+        CsMusic *track = &s_music_manifest[i];
+        char cache_path[CS_MAX_PATH_LEN];
+        if (!cs_build_music_cache_path(cache_path, sizeof(cache_path),
+                                       track->track_id, track->version)) {
+            failed++;
+            continue;
+        }
+
+        bool ok = false;
+        // Already current? prev entry match + file at the recorded size.
+        for (int p = 0; p < s_music_previous_count; p++) {
+            const CsMusic *prev = &s_music_previous[p];
+            if (cs_story_ids_equal(prev->track_id, track->track_id)
+                && prev->version == track->version
+                && prev->verified
+                && prev->size_bytes == track->size_bytes
+                && hex_equals_ci(prev->sha256, track->sha256)
+                && sd_file_size(cache_path) == track->size_bytes) {
+                ok = true;
+                already++;
+                Serial.printf("[content-sync] music %s already current\n", track->track_id);
+                break;
+            }
+        }
+        if (!ok) {
+            char url[CS_MAX_URL_LEN];
+            snprintf(url, sizeof(url),
+                     "/api/devices/content-file?trackId=%s", track->track_id);
+            char temp_path[CS_MAX_PATH_LEN];
+            char label[CS_MAX_STORY_ID_LEN + 8];
+            snprintf(label, sizeof(label), "m:%s", track->track_id);
+            if (cs_build_music_temp_path(temp_path, sizeof(temp_path),
+                                         track->track_id, track->version)) {
+                SD.mkdir("/music");
+                ok = download_file_verified(label, url, temp_path, cache_path,
+                                            track->size_bytes, track->sha256);
+            }
+            if (ok) downloaded++; else failed++;
+        }
+
+        if (ok && s_music_active_count < CS_MAX_MUSIC) {
+            s_music_active[s_music_active_count] = *track;
+            s_music_active[s_music_active_count].verified = true;
+            s_music_active_count++;
+        }
+    }
+
+    // Carry forward verified tracks the manifest did not mention.
+    for (int i = 0; i < s_music_previous_count && s_music_active_count < CS_MAX_MUSIC; i++) {
+        const CsMusic *prev = &s_music_previous[i];
+        if (!prev->verified) continue;
+        bool present = false;
+        for (int a = 0; a < s_music_active_count; a++) {
+            if (cs_story_ids_equal(s_music_active[a].track_id, prev->track_id)) {
+                present = true;
+                break;
+            }
+        }
+        if (present) continue;
+        char cache_path[CS_MAX_PATH_LEN];
+        if (!cs_build_music_cache_path(cache_path, sizeof(cache_path),
+                                       prev->track_id, prev->version)
+            || sd_file_size(cache_path) != prev->size_bytes) {
+            continue;
+        }
+        s_music_active[s_music_active_count++] = *prev;
+    }
+
+    if (s_music_manifest_count > 0 || s_music_active_count > 0) {
+        Serial.printf("[content-sync] music summary offered=%d already=%d "
+                      "downloaded=%d failed=%d active=%d enabled=%d\n",
+                      s_music_manifest_count, already, downloaded, failed,
+                      s_music_active_count, s_music_enabled ? 1 : 0);
+        Serial.flush();
+    }
+}
+
 // ---- the one sync attempt -----------------------------------------
 
 // All [content-sync] serial lines here are the bench PASS/FAIL evidence
@@ -512,6 +611,9 @@ void content_sync_run() {
     s_manifest_count = 0;
     s_previous_count = 0;
     s_active_count   = 0;
+    s_music_manifest_count = 0;
+    s_music_previous_count = 0;
+    s_music_active_count   = 0;
 
     // ---- 1. Manifest ----
     HTTPClient http;
@@ -540,11 +642,17 @@ void content_sync_run() {
     // B3 — per-device intro toggle rides the manifest; absent (pre-B3
     // backend) means the shipped default (ON).
     s_intro_enabled = doc["storyIntroEnabled"] | true;
-    Serial.printf("[content-sync] manifest status=200 stories=%u introEnabled=%d\n",
+    // Slice E — bedtime-music opt-in + track list (absent → off/none).
+    s_music_enabled = doc["bedtimeMusicEnabled"] | false;
+    s_music_manifest_count = cs_manifest_parse_music(
+        doc["music"].as<JsonArrayConst>(), s_music_manifest, CS_MAX_MUSIC);
+    Serial.printf("[content-sync] manifest status=200 stories=%u introEnabled=%d "
+                  "music=%d musicEnabled=%d\n",
                   stories.isNull() ? 0U : (unsigned)stories.size(),
-                  s_intro_enabled ? 1 : 0);
+                  s_intro_enabled ? 1 : 0,
+                  s_music_manifest_count, s_music_enabled ? 1 : 0);
     Serial.flush();
-    if (stories.isNull() || stories.size() == 0) {
+    if ((stories.isNull() || stories.size() == 0) && s_music_manifest_count == 0) {
         // An empty manifest is NOT a retirement instruction. The index and
         // every cached MP3 are left exactly as they are.
         Serial.println("[content-sync] no content — existing cache untouched");
@@ -559,7 +667,7 @@ void content_sync_run() {
                       stats.offered, CS_MAX_STORIES, stats.truncated);
         Serial.flush();
     }
-    if (s_manifest_count == 0) {
+    if (s_manifest_count == 0 && s_music_manifest_count == 0) {
         Serial.println("[content-sync] no valid items — existing cache untouched");
         Serial.flush();
         return;
@@ -621,9 +729,12 @@ void content_sync_run() {
         carried++;
     }
 
+    // ---- 4b. Bedtime music (Slice E) ----
+    sync_music();
+
     // ---- 5. Index written LAST, once ----
     bool index_written = false;
-    if (s_active_count > 0) {
+    if (s_active_count > 0 || s_music_active_count > 0) {
         index_written = write_index();
         if (!index_written) {
             // The previous index survives a failed replacement; every MP3

@@ -143,6 +143,16 @@ public class Device
     public bool StoryIntroEnabled { get; set; } = true;
 
     /// <summary>
+    /// Slice E — parent opt-IN for bedtime music: while the bedtime window
+    /// is active and this is true, a button press plays a calm Armenian
+    /// music track (synced to SD) instead of a story. Default FALSE — the
+    /// suggestion is explicitly opt-in. Delivered to the toy via the
+    /// content-manifest response; the "bedtime now" signal itself rides the
+    /// heartbeat response (the toy has no wall clock).
+    /// </summary>
+    public bool BedtimeMusicEnabled { get; set; }
+
+    /// <summary>
     /// Timestamp of the most recent dormant-device warning email
     /// dispatched to this device's verified linked parents by the
     /// scheduled <c>WarnDormantDevicesAsync</c> pass. Null for

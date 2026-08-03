@@ -83,7 +83,8 @@ public class ParentService : IParentService
         INotifier? notifier = null,
         IGoogleIdTokenValidator? googleValidator = null,
         IAudioBlobStore? blobStore = null,
-        LoginAttemptThrottle? loginThrottle = null)
+        LoginAttemptThrottle? loginThrottle = null,
+        IStoryRequestPhotoStore? storyRequestPhotos = null)
     {
         _db = db;
         _config = config;
@@ -96,6 +97,25 @@ public class ParentService : IParentService
         // across scoped requests; the default fresh instance exists only so
         // unit tests for unrelated flows construct ParentService unchanged.
         _loginThrottle = loginThrottle ?? new LoginAttemptThrottle();
+        // Slice F photo seam, same optional-with-null-default idiom as the
+        // blob store. The null store REJECTS photo saves (fail-safe: a photo
+        // submission without real storage must not silently drop the photo);
+        // real DI registers LocalDiskStoryRequestPhotoStore.
+        _storyRequestPhotos = storyRequestPhotos ?? NullStoryRequestPhotoStore.Instance;
+    }
+
+    private readonly IStoryRequestPhotoStore _storyRequestPhotos;
+
+    private sealed class NullStoryRequestPhotoStore : IStoryRequestPhotoStore
+    {
+        public static readonly NullStoryRequestPhotoStore Instance = new();
+        public Task<string?> SaveAsync(
+            Guid requestId, byte[] content, string contentType,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult<string?>(null);
+        public Task<(byte[] Content, string ContentType)?> ReadAsync(
+            string photoPath, CancellationToken cancellationToken = default)
+            => Task.FromResult<(byte[], string)?>(null);
     }
 
     // Private no-op notifier. Used as the safe default when no
@@ -1230,6 +1250,35 @@ public class ParentService : IParentService
     }
 
     /// <summary>
+    /// Slice E — toggle bedtime music on a linked device. Same ownership +
+    /// silent-false + idempotent shape as the story-intro toggle.
+    /// </summary>
+    public async Task<bool> SetBedtimeMusicAsync(Guid parentId, Guid deviceId, bool enabled)
+    {
+        var linked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!linked)
+            return false;
+
+        var device = await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == deviceId);
+        if (device == null)
+            return false;
+
+        if (device.BedtimeMusicEnabled == enabled)
+        {
+            return true;   // idempotent — no mutation, no audit row
+        }
+
+        device.BedtimeMusicEnabled = enabled;
+        TrackAndAddAudit(AuditEvent.ParentBedtimeMusicSet(parentId, deviceId, enabled));
+        await _db.SaveChangesAsync();
+        _logger.LogInformation(
+            "Parent {ParentId} set device {DeviceId} bedtimeMusicEnabled={Enabled}",
+            parentId, deviceId, enabled);
+        return true;
+    }
+
+    /// <summary>
     /// Rename a linked device so a parent can tell their toys apart (multi-toy
     /// labeling). Trims + caps the name; returns false on a non-owned/unknown
     /// device or an empty/over-length name (the controller maps that to 404 /
@@ -1422,7 +1471,11 @@ public class ParentService : IParentService
                 l.Device.SdCardOk, l.Device.LastSeenAt, nowUtc, ReadOnlineThresholdSeconds()),
             FaultCode: DeviceFaultCode.FromStoryHealth(DeviceStoryHealth.Resolve(
                 l.Device.SdCardOk, l.Device.LastSeenAt, nowUtc, ReadOnlineThresholdSeconds()))
-        )).ToList();
+        )
+        {
+            StoryIntroEnabled = l.Device.StoryIntroEnabled,
+            BedtimeMusicEnabled = l.Device.BedtimeMusicEnabled,
+        }).ToList();
     }
 
     /// <summary>
@@ -1820,6 +1873,75 @@ public class ParentService : IParentService
                 a.StoryId, a.QuestionIndex, a.AnswerText,
                 a.SafetyFlag.ToString(), a.CreatedAtUtc)).ToList(),
             total);
+    }
+
+    /// <summary>Hard cap on the request description; the parent form
+    /// enforces the same number client-side.</summary>
+    public const int StoryRequestMaxTextLength = 2000;
+
+    public async Task<Guid?> SubmitStoryRequestAsync(
+        Guid parentId, string? text, byte[]? photo, string? photoContentType,
+        CancellationToken cancellationToken = default)
+    {
+        var trimmed = (text ?? string.Empty).Trim();
+        var hasPhoto = photo is { Length: > 0 };
+        // A request must SAY something: text, a photo, or both.
+        if (trimmed.Length == 0 && !hasPhoto)
+        {
+            return null;
+        }
+        if (trimmed.Length > StoryRequestMaxTextLength)
+        {
+            return null;
+        }
+
+        var request = new StoryRequest
+        {
+            Id = Guid.NewGuid(),
+            ParentId = parentId,
+            Type = hasPhoto ? "book_photo" : "idea",
+            Text = trimmed,
+            Status = "new",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        };
+
+        if (hasPhoto)
+        {
+            // Photo first: an allowlist-rejected upload must fail the whole
+            // submission (a parent who attached a page expects it to arrive).
+            var photoPath = await _storyRequestPhotos.SaveAsync(
+                request.Id, photo!, photoContentType ?? string.Empty, cancellationToken);
+            if (photoPath is null)
+            {
+                _logger.LogWarning(
+                    "Story request rejected: unsupported photo content type {ContentType}",
+                    photoContentType);
+                return null;
+            }
+            request.PhotoPath = photoPath;
+        }
+
+        _db.Set<StoryRequest>().Add(request);
+        TrackAndAddAudit(AuditEvent.ParentStoryRequestSubmitted(
+            parentId, request.Id, request.Type, hasPhoto));
+        await _db.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation(
+            "Parent {ParentId} submitted story request {RequestId} (type={Type}, photo={HasPhoto})",
+            parentId, request.Id, request.Type, hasPhoto);
+        return request.Id;
+    }
+
+    public async Task<List<StoryRequestDto>> GetStoryRequestsForParentAsync(Guid parentId)
+    {
+        var rows = await _db.Set<StoryRequest>()
+            .Where(r => r.ParentId == parentId)
+            .OrderByDescending(r => r.CreatedAtUtc)
+            .Take(50)
+            .ToListAsync();
+        return rows.Select(r => new StoryRequestDto(
+            r.Id, r.Type, r.Text, r.PhotoPath != null, r.Status,
+            r.CreatedAtUtc, r.UpdatedAtUtc)).ToList();
     }
 
     public async Task<List<StoryPlayTotalDto>> GetStoryPlayTotalsForParentAsync(Guid parentId)

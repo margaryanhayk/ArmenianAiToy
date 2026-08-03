@@ -1574,12 +1574,35 @@ void loop() {
             Serial.println("[button] pressed");
             Serial.flush();
             DIAG_MARK(200, "button_press");
-            // Continuous story: a press starts the story (or resumes
-            // it from the last barge-in offset). During playback a
-            // press cuts the audio instantly; holding + speaking asks
-            // a question (answered, then the story auto-resumes), a
-            // quick tap just pauses. All handled in handle_story_session.
-            handle_story_session();
+            // Slice E — bedtime music: while the server says the bedtime
+            // window is active (heartbeat-cached; the toy has no clock) AND
+            // the parent opted in (index-cached) AND a verified track is on
+            // the card, a press plays calm music instead of a story. A
+            // press during the music stops it quietly (no Q&A, no resume
+            // bookkeeping — it's music, not a narrative). Never touches a
+            // paused story's resume offset, so a mid-story bedtime cutover
+            // can't lose the child's place.
+            char music_path[CS_MAX_PATH_LEN];
+            if (s_story_offset == 0
+                && voice_in_bedtime_window()
+                && story_select_music_enabled()
+                && music_select_next(music_path, sizeof(music_path))) {
+                transition_to(ST_PLAYING);
+                audio_speaker_begin();
+                Serial.printf("[music] playing %s\n", music_path);
+                Serial.flush();
+                audio_play_story_file(music_path, 0, story_barge_in_poll, nullptr);
+                Serial.println("[music] done");
+                Serial.flush();
+                transition_to(ST_IDLE);
+            } else {
+                // Continuous story: a press starts the story (or resumes
+                // it from the last barge-in offset). During playback a
+                // press cuts the audio instantly; holding + speaking asks
+                // a question (answered, then the story auto-resumes), a
+                // quick tap just pauses. All handled in handle_story_session.
+                handle_story_session();
+            }
         }
     }
     delay(AREG_BUTTON_POLL_MS);

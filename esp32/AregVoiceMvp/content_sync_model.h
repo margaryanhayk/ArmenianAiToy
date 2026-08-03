@@ -64,3 +64,21 @@ void cs_index_build(JsonDocument &doc, const CsStory *active, int count,
 /// Reads the root `introEnabled` flag from an index document. Absent
 /// (every pre-v3 card) → true, the shipped default.
 bool cs_index_intro_enabled(JsonDocument &doc);
+
+/// Slice E — parses the manifest's `music` array (validated per item,
+/// dedup keeps first). Returns the accepted count.
+int cs_manifest_parse_music(JsonArrayConst music, CsMusic *out, int max_out);
+
+/// Slice E — reads the index's `music` array (absent on pre-music cards
+/// → 0, never an error).
+int cs_index_parse_music(JsonDocument &doc, CsMusic *out, int max_out);
+
+/// Slice E — appends the music section + the root `musicEnabled` flag to
+/// an index document ALREADY built by cs_index_build. Separate call so
+/// cs_index_build's signature (and its existing callers/tests) stay
+/// untouched.
+void cs_index_add_music(JsonDocument &doc, const CsMusic *music, int count,
+                        bool music_enabled);
+
+/// Reads the root `musicEnabled` flag (absent → false; music is opt-in).
+bool cs_index_music_enabled(JsonDocument &doc);

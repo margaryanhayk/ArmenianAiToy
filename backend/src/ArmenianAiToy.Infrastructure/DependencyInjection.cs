@@ -99,6 +99,9 @@ public static class DependencyInjection
                 ttsClient,
                 sp.GetRequiredService<ILogger<OpenAITtsSynthesisService>>()));
         services.AddSingleton<IAudioBlobStore, LocalDiskAudioBlobStore>();
+        // Slice F — custom-story-request photo storage (owner queue).
+        services.AddSingleton<IStoryRequestPhotoStore,
+            StoryRequests.LocalDiskStoryRequestPhotoStore>();
         // Canned-clip cache is process-local state keyed on the TTS
         // service; singleton so the cache survives across requests
         // for the process lifetime.

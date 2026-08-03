@@ -43,6 +43,10 @@ public interface IParentService
     /// idempotent shape as <see cref="SetDevicePauseStateAsync"/>; audits
     /// only a real flip.</summary>
     Task<bool> SetDeviceStoryIntroAsync(Guid parentId, Guid deviceId, bool enabled);
+
+    /// <summary>Slice E bedtime-music toggle. Same shape as the story-intro
+    /// toggle; default OFF (opt-in).</summary>
+    Task<bool> SetBedtimeMusicAsync(Guid parentId, Guid deviceId, bool enabled);
     Task<bool> SetBedtimeWindowAsync(Guid parentId, Guid deviceId, TimeOnly? start, TimeOnly? end);
     Task<bool> SetDeviceModeFlagsAsync(
         Guid parentId, Guid deviceId,
@@ -159,6 +163,19 @@ public interface IParentService
     /// list when the parent has no devices or no plays.
     /// </summary>
     Task<List<StoryPlayTotalDto>> GetStoryPlayTotalsForParentAsync(Guid parentId);
+
+    /// <summary>
+    /// Slice F — submit a custom-story request (idea text and/or book-page
+    /// photo). Returns the new request id, or null when the submission is
+    /// invalid (no text AND no photo, text over-length, or a photo whose
+    /// content type is outside the allowlist). Audited on success.
+    /// </summary>
+    Task<Guid?> SubmitStoryRequestAsync(
+        Guid parentId, string? text, byte[]? photo, string? photoContentType,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Slice F — the caller's own requests, newest first (capped).</summary>
+    Task<List<StoryRequestDto>> GetStoryRequestsForParentAsync(Guid parentId);
     Task<ParentExport?> BuildExportAsync(Guid parentId);
 
     /// <summary>

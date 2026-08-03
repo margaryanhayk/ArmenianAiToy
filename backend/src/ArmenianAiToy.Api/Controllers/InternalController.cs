@@ -1,3 +1,4 @@
+using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Stories;
@@ -421,6 +422,99 @@ public class InternalController : ControllerBase
                 "Internal story-qa-test failed for {StoryId}", req.StoryId);
             return StatusCode(502, new { error = "Story-QA test failed. See server logs." });
         }
+    }
+
+    // ── Slice F: the owner's custom-story-request queue ─────────────
+
+    /// <summary>All story requests, newest first, optionally filtered by
+    /// status. Includes the requester's email when the account still exists
+    /// (requests are FK-free and outlive accounts).</summary>
+    [HttpGet("story-requests")]
+    public async Task<IActionResult> StoryRequests(
+        [FromQuery] string? status, CancellationToken ct)
+    {
+        var query = _db.StoryRequests.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            var normalized = status.Trim().ToLowerInvariant();
+            query = query.Where(r => r.Status == normalized);
+        }
+        var rows = await query
+            .OrderByDescending(r => r.CreatedAtUtc)
+            .Take(200)
+            .ToListAsync(ct);
+
+        var parentIds = rows.Select(r => r.ParentId).Distinct().ToList();
+        var emails = await _db.Parents
+            .Where(p => parentIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.Email })
+            .ToDictionaryAsync(p => p.Id, p => p.Email, ct);
+
+        return Ok(new
+        {
+            requests = rows.Select(r => new AdminStoryRequestDto(
+                r.Id, r.ParentId,
+                emails.TryGetValue(r.ParentId, out var email) ? email : null,
+                r.Type, r.Text, r.PhotoPath != null, r.Status,
+                r.CreatedAtUtc, r.UpdatedAtUtc)).ToList()
+        });
+    }
+
+    /// <summary>Streams a request's uploaded book-page photo to the
+    /// operator. Uniform 404 for unknown id / no photo / missing file.</summary>
+    [HttpGet("story-requests/{id:guid}/photo")]
+    public async Task<IActionResult> StoryRequestPhoto(
+        Guid id, [FromServices] IStoryRequestPhotoStore photos, CancellationToken ct)
+    {
+        var request = await _db.StoryRequests.FirstOrDefaultAsync(r => r.Id == id, ct);
+        if (request?.PhotoPath is null)
+        {
+            return NotFound(new { error = "Photo not available." });
+        }
+        var photo = await photos.ReadAsync(request.PhotoPath, ct);
+        if (photo is null)
+        {
+            return NotFound(new { error = "Photo not available." });
+        }
+        return File(photo.Value.Content, photo.Value.ContentType);
+    }
+
+    /// <summary>Operator moves a request through its lifecycle
+    /// (new → in_review → delivered | declined). Reason required; audited
+    /// as an InternalConsoleAction. Idempotent (same status = no-op).</summary>
+    [HttpPost("story-requests/{id:guid}/status")]
+    public async Task<IActionResult> SetStoryRequestStatus(
+        Guid id, [FromBody] InternalStoryRequestStatusRequest? req, CancellationToken ct)
+    {
+        var status = req?.Status?.Trim().ToLowerInvariant();
+        if (status is not ("new" or "in_review" or "delivered" or "declined"))
+        {
+            return BadRequest(new { error = "status must be one of: new, in_review, delivered, declined." });
+        }
+        if (string.IsNullOrWhiteSpace(req?.Reason))
+        {
+            return BadRequest(new { error = "A reason is required." });
+        }
+        var request = await _db.StoryRequests.FirstOrDefaultAsync(r => r.Id == id, ct);
+        if (request is null)
+        {
+            return NotFound(new { error = "Request not found." });
+        }
+        if (request.Status == status)
+        {
+            return Ok(new { status });   // idempotent no-op, no audit row
+        }
+
+        request.Status = status;
+        request.UpdatedAtUtc = DateTime.UtcNow;
+        var op = HttpContext?.Items["InternalOperator"] as string ?? "unknown";
+        _db.AuditEvents.Add(AuditEvent.InternalConsoleStoryRequestStatus(
+            op, id, status, req!.Reason!));
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation(
+            "Operator {Operator} set story request {RequestId} to {Status} (reason: {Reason})",
+            op, id, status, req.Reason);
+        return Ok(new { status });
     }
 
     /// <summary>Resolved console operator identity (from the auth gate) so the

@@ -44,7 +44,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2200 tests)
+dotnet test                                     # Run all tests (2220 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2012,6 +2012,51 @@ final round.
 - Pinned by `ReflectionDialogueTests` + `ReflectionDialogueControllerTests`
   (keystones: unsafe reaction never reaches TTS; blocked child answer
   never reaches the model; gate-off never calls the model).
+
+**Slice F — custom story requests (same day).** `StoryRequest` entity
+(FK-FREE like AuditEvent — requests outlive accounts; `ParentId` scoping
+column; migration `AddStoryRequests`). `POST /api/parents/story-requests`
+(parent-JWT, auth rate bucket, multipart `text` ≤2000 chars + optional
+`photo` jpeg/png/heic ≤8 MB; photo rejection fails the WHOLE submission —
+never a silent text-only row) + `GET` (own requests, newest first).
+Photos: `IStoryRequestPhotoStore` / `LocalDiskStoryRequestPhotoStore`
+(`StoryRequests:PhotoRoot`, bare-filename storage, path-shaped reads
+rejected). Audit `ParentStoryRequestSubmitted` (type + has_photo only —
+NEVER the parent's text). Internal console: `GET /api/internal/
+story-requests` (+`?status=`), operator photo streamer, `POST …/status`
+(bounded `new|in_review|delivered|declined`, reason required, audited as
+InternalConsoleAction, idempotent) + an admin.html "Requests" tab.
+parent.html: «✍️ Request a story» form + my-requests list. Pinned by
+`StoryRequestTests` (keystones: rejected photo fails whole submission;
+path-shaped photo reads rejected; audit carries no free text).
+
+**Slice E — bedtime music (same day).** Owner shape: parent opt-IN
+toggle + separate Music tab + music at bedtime hours on the toy.
+- Config `ContentSync:Music` (`ContentSyncMusicOptions`: trackId/version/
+  title/audioUrl/audioPath/sha256/sizeBytes; hand-bound like Stories;
+  `ResolveMusic()` applies AudioRoot). Manifest gains additive `music[]`
+  (`ContentMusicItem`; null when unconfigured — music-less wire is
+  byte-identical) + `bedtimeMusicEnabled` stamped per device.
+  `content-file` gains `?trackId=` (lookup key only). Ships EMPTY until
+  the owner adds rights-cleared tracks.
+- `Device.BedtimeMusicEnabled` (default FALSE — opt-in; migration
+  `AddDeviceBedtimeMusicEnabled`), `PUT /api/parents/devices/{id}/
+  bedtime-music` (audited `ParentBedtimeMusicSet` on real flips).
+  `LinkedDeviceDto` gains `StoryIntroEnabled`/`BedtimeMusicEnabled`
+  init-props; toy settings surface both toggles.
+- The toy has NO wall clock: the heartbeat RESPONSE carries
+  `inBedtimeWindow` (server-evaluated); firmware caches it
+  (`voice_in_bedtime_window()`, staleness ≤ one heartbeat interval).
+- Firmware: manifest `music[]` → `/music/<id>-v<n>.mp3` (CsMusic tables,
+  shared `download_file_verified`, carry-forward, index `music[]` +
+  root `musicEnabled` via `cs_index_add_music`). Button press while
+  (bedtime window && opt-in && a verified track resolves && no story is
+  paused mid-way) plays music round-robin (`aregmusic` NVS cursor,
+  `music_select_next`); a press stops it. Stories unchanged otherwise.
+- Parent endpoints: `GET /api/parents/music` + parent-authed preview
+  streamer `GET /api/parents/music/{trackId}/audio`; dashboard 🎵 Music
+  view. Pinned by `ContentSyncMusicTests` (keystone: music-less manifest
+  stays null).
 
 **Open items from this batch (deliberate):**
 - Bench verification on real hardware: play reporting end-to-end, index

@@ -208,6 +208,92 @@ bool story_select_intro_enabled() {
     return cs_index_intro_enabled(doc);
 }
 
+bool story_select_music_enabled() {
+    if (!audio_sd_available() || !SD.exists(kIndexPath)) {
+        return false;   // opt-in: absent card/index means OFF
+    }
+    File f = SD.open(kIndexPath, FILE_READ);
+    if (!f) {
+        return false;
+    }
+    JsonDocument doc;
+    const DeserializationError err = deserializeJson(doc, f);
+    f.close();
+    if (err != DeserializationError::Ok) {
+        return false;
+    }
+    return cs_index_music_enabled(doc);
+}
+
+bool music_select_next(char *out_path, size_t out_len) {
+    if (out_path == NULL || out_len == 0) {
+        return false;
+    }
+    out_path[0] = '\0';
+    if (!audio_sd_available() || !SD.exists(kIndexPath)) {
+        return false;
+    }
+    File f = SD.open(kIndexPath, FILE_READ);
+    if (!f) {
+        return false;
+    }
+    JsonDocument doc;
+    const DeserializationError err = deserializeJson(doc, f);
+    f.close();
+    if (err != DeserializationError::Ok) {
+        return false;
+    }
+
+    static CsMusic tracks[CS_MAX_MUSIC];
+    const int raw = cs_index_parse_music(doc, tracks, CS_MAX_MUSIC);
+
+    // Eligible = verified + file on the card at the recorded size.
+    int eligible[CS_MAX_MUSIC];
+    char paths[CS_MAX_MUSIC][CS_MAX_PATH_LEN];
+    int n = 0;
+    for (int i = 0; i < raw && n < CS_MAX_MUSIC; i++) {
+        if (!tracks[i].verified || tracks[i].size_bytes <= 0) {
+            continue;
+        }
+        if (!cs_build_music_cache_path(paths[n], sizeof(paths[n]),
+                                       tracks[i].track_id, tracks[i].version)) {
+            continue;
+        }
+        if (sd_file_size(paths[n]) != tracks[i].size_bytes) {
+            continue;
+        }
+        eligible[n++] = i;
+    }
+    if (n == 0) {
+        return false;
+    }
+
+    // Round-robin cursor, own NVS namespace so it never collides with the
+    // story rotation.
+    char last_id[CS_MAX_STORY_ID_LEN + 1] = "";
+    Preferences prefs;
+    if (prefs.begin("aregmusic", /*readOnly=*/true)) {
+        prefs.getString("last_id", last_id, sizeof(last_id));
+        prefs.end();
+    }
+    int prev_pos = -1;
+    for (int k = 0; k < n; k++) {
+        if (cs_story_ids_equal(tracks[eligible[k]].track_id, last_id)) {
+            prev_pos = k;
+            break;
+        }
+    }
+    const int chosen = (prev_pos >= 0) ? (prev_pos + 1) % n : 0;
+
+    if (prefs.begin("aregmusic", /*readOnly=*/false)) {
+        prefs.putString("last_id", tracks[eligible[chosen]].track_id);
+        prefs.end();
+    }
+    Serial.printf("[music] selected %s\n", tracks[eligible[chosen]].track_id);
+    Serial.flush();
+    return cs_copy_bounded(out_path, out_len, paths[chosen]);
+}
+
 bool story_select_load_last(char *out, size_t out_len) {
     if (out == NULL || out_len == 0) {
         return false;

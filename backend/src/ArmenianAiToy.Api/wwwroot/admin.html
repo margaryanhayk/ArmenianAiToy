@@ -63,6 +63,7 @@
   <a data-tab="stories">Stories</a>
   <a data-tab="flagged">Flagged</a>
   <a data-tab="conversations">Conversations</a>
+  <a data-tab="requests">Requests</a>
   <a data-tab="audit">Audit</a>
   <a data-tab="tuning">Tuning</a>
 </nav>
@@ -212,6 +213,25 @@ const tabs = {
       {h:'Conclusion',f:r=>onoff(r.hasReflectionText)},
       {h:'Questions',f:r=>r.reflectionQuestions},
     ], s);
+  },
+  async requests(){
+    // Slice F — the owner's custom-story-request queue. Read + reversible
+    // status moves (reason required, audited). Photos stream operator-only.
+    const rs = (await api('/story-requests')).requests;
+    const pill = s => ({'new':'flag','in_review':'info','delivered':'on','declined':'blk'}[s]||'off');
+    main.innerHTML = `<div class="row mut">Custom-story requests from parents — work them top-down; move the status as you go.</div>`
+      + table([
+        {h:'When',f:r=>dt(r.createdAtUtc)},
+        {h:'From',f:r=>r.parentEmail?esc(r.parentEmail):'<span class="mut">account gone</span>'},
+        {h:'Type',f:r=>esc(r.type)},
+        {h:'Request',f:r=>esc(r.text||'(photo only)')
+          + (r.hasPhoto?` <a class="mono" style="color:var(--acc);cursor:pointer" onclick="openRequestPhoto('${r.id}')">📷 photo</a>`:'')},
+        {h:'Status',f:r=>`<span class="pill ${pill(r.status)}">${esc(r.status)}</span>`},
+        {h:'Move to',f:r=>['in_review','delivered','declined']
+          .filter(s=>s!==r.status)
+          .map(s=>`<button class="ghost" onclick="setRequestStatus('${r.id}','${s}')">${s}</button>`)
+          .join(' ')},
+      ], rs);
   },
   async flagged(){
     _flagged = (await api('/flagged?limit=100')).messages;
@@ -391,6 +411,29 @@ window.opAction = async function(kind, id, value){
     await apiPost('/devices/'+id+'/'+kind, { value: value, reason: reason.trim() });
     _devices = (await api('/devices')).devices; // refresh cached flags
     openDevice(id);                             // re-render with the new state
+  } catch(e){ err(e.message); }
+};
+
+window.setRequestStatus = async function(id, status){
+  const reason = prompt('Reason for moving this request to "'+status+'":');
+  if (reason === null) return;
+  if (!reason.trim()) { alert('A reason is required.'); return; }
+  try {
+    await apiPost('/story-requests/'+id+'/status', { status: status, reason: reason.trim() });
+    show('requests');
+  } catch(e){ err(e.message); }
+};
+
+window.openRequestPhoto = async function(id){
+  // Operator-only stream; fetched with the token and opened as a blob so
+  // the photo never needs a public URL.
+  try {
+    const r = await fetch('/api/internal/story-requests/'+id+'/photo', {
+      cache:'no-store', headers:{ 'Authorization':'Bearer '+TOKEN }
+    });
+    if (!r.ok) throw new Error('Photo not available.');
+    const blob = await r.blob();
+    window.open(URL.createObjectURL(blob), '_blank');
   } catch(e){ err(e.message); }
 };
 

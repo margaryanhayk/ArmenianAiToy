@@ -295,3 +295,90 @@ void cs_index_build(JsonDocument &doc, const CsStory *active, int count,
 bool cs_index_intro_enabled(JsonDocument &doc) {
     return doc["introEnabled"] | true;
 }
+
+int cs_manifest_parse_music(JsonArrayConst music, CsMusic *out, int max_out) {
+    if (out == nullptr || max_out <= 0 || music.isNull()) {
+        return 0;
+    }
+    int count = 0;
+    for (JsonObjectConst item : music) {
+        if (count >= max_out) break;
+        const char *track_id = item["trackId"]   | "";
+        const int   version  = item["version"]   | 1;
+        const char *title    = item["title"]     | "";
+        const char *sha256   = item["sha256"]    | "";
+        const long  size     = item["sizeBytes"] | 0L;
+        const bool  enabled  = item["enabled"]   | false;
+        if (!enabled || !cs_is_valid_story_id(track_id)
+            || !cs_is_sha256_hex(sha256) || !cs_is_valid_size(size)) {
+            Serial.printf("[content-sync] music item rejected (%s)\n", track_id);
+            continue;
+        }
+        bool dup = false;
+        for (int i = 0; i < count; i++) {
+            if (cs_story_ids_equal(out[i].track_id, track_id)) { dup = true; break; }
+        }
+        if (dup) continue;
+        CsMusic *dst = &out[count];
+        memset(dst, 0, sizeof(*dst));
+        if (!cs_copy_bounded(dst->track_id, sizeof(dst->track_id), track_id)
+            || !cs_copy_bounded(dst->sha256, sizeof(dst->sha256), sha256)) {
+            continue;
+        }
+        cs_copy_bounded(dst->title, sizeof(dst->title), title);  // truncation OK
+        dst->version    = cs_normalize_version(version);
+        dst->size_bytes = size;
+        dst->verified   = false;
+        count++;
+    }
+    return count;
+}
+
+int cs_index_parse_music(JsonDocument &doc, CsMusic *out, int max_out) {
+    if (out == nullptr || max_out <= 0 || !doc["music"].is<JsonArrayConst>()) {
+        return 0;
+    }
+    int count = 0;
+    for (JsonObjectConst e : doc["music"].as<JsonArrayConst>()) {
+        if (count >= max_out) break;
+        const char *tid = e["trackId"] | "";
+        const char *sha = e["sha256"]  | "";
+        if (!cs_is_valid_story_id(tid) || !cs_is_sha256_hex(sha)) {
+            continue;
+        }
+        CsMusic *dst = &out[count];
+        memset(dst, 0, sizeof(*dst));
+        if (!cs_copy_bounded(dst->track_id, sizeof(dst->track_id), tid)
+            || !cs_copy_bounded(dst->sha256, sizeof(dst->sha256), sha)) {
+            continue;
+        }
+        cs_copy_bounded(dst->title, sizeof(dst->title), e["title"] | "");
+        dst->version    = cs_normalize_version(e["version"] | 1);
+        dst->size_bytes = e["sizeBytes"] | 0L;
+        dst->verified   = e["verified"] | false;
+        count++;
+    }
+    return count;
+}
+
+void cs_index_add_music(JsonDocument &doc, const CsMusic *music, int count,
+                        bool music_enabled) {
+    doc["musicEnabled"] = music_enabled;
+    if (music == nullptr || count <= 0) {
+        return;
+    }
+    JsonArray arr = doc["music"].to<JsonArray>();
+    for (int i = 0; i < count; i++) {
+        JsonObject e = arr.add<JsonObject>();
+        e["trackId"]   = music[i].track_id;
+        e["version"]   = music[i].version;
+        e["title"]     = music[i].title;
+        e["sha256"]    = music[i].sha256;
+        e["sizeBytes"] = music[i].size_bytes;
+        e["verified"]  = music[i].verified;
+    }
+}
+
+bool cs_index_music_enabled(JsonDocument &doc) {
+    return doc["musicEnabled"] | false;
+}

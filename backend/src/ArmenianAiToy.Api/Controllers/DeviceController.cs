@@ -91,7 +91,13 @@ public class DeviceController : ControllerBase
         {
             await _deviceService.UpdateFirmwareReportAsync(deviceId, request, DateTime.UtcNow);
         }
-        return Ok(new { ok = true, deviceId, serverTimeUtc = DateTime.UtcNow });
+        // Slice E — the toy has no wall clock, so the SERVER tells it whether
+        // the bedtime window is active right now; the firmware caches the
+        // last-known value between heartbeats. Additive field: legacy builds
+        // ignore it.
+        var inBedtimeWindow = await _deviceService.IsDeviceInBedtimeWindowAsync(
+            deviceId, DateTime.UtcNow);
+        return Ok(new { ok = true, deviceId, serverTimeUtc = DateTime.UtcNow, inBedtimeWindow });
     }
 
     // Store-and-forward upload of story playback events. The toy plays stories
@@ -229,6 +235,8 @@ public class DeviceController : ControllerBase
         return Ok(manifest.Build() with
         {
             StoryIntroEnabled = device?.StoryIntroEnabled ?? true,
+            // Slice E — bedtime-music opt-in rides the same manifest.
+            BedtimeMusicEnabled = device?.BedtimeMusicEnabled ?? false,
         });
     }
 
@@ -253,11 +261,32 @@ public class DeviceController : ControllerBase
         [FromServices] ContentSyncOptions options,
         [FromServices] ILogger<DeviceController> logger,
         [FromQuery] string? storyId = null,
-        [FromQuery] string? clip = null)
+        [FromQuery] string? clip = null,
+        [FromQuery] string? trackId = null)
     {
         if (!options.Enabled)
         {
             return NotFound(new { error = "No content available." });
+        }
+
+        // Slice E — trackId selects a MUSIC track (separate namespace from
+        // stories; same lookup-key-only contract, no traversal surface).
+        if (!string.IsNullOrWhiteSpace(trackId))
+        {
+            var track = options.ResolveMusic().FirstOrDefault(m =>
+                string.Equals(m.TrackId, trackId, StringComparison.OrdinalIgnoreCase));
+            if (track is null || string.IsNullOrWhiteSpace(track.AudioPath))
+            {
+                return NotFound(new { error = "No content available." });
+            }
+            if (!Path.IsPathRooted(track.AudioPath) || !System.IO.File.Exists(track.AudioPath))
+            {
+                logger.LogWarning(
+                    "Content audio path missing or not absolute for track {TrackId}: {AudioPath}",
+                    track.TrackId, track.AudioPath);
+                return NotFound(new { error = "No content available." });
+            }
+            return PhysicalFile(track.AudioPath, "audio/mpeg", enableRangeProcessing: true);
         }
 
         var stories = options.ResolveStories();

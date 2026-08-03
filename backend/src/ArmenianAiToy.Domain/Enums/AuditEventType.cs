@@ -57,6 +57,17 @@ public enum AuditEventType
     /// state (enabled: bool). Written only when the flag actually flips.</summary>
     ParentDeviceStoryIntroSet,
 
+    /// <summary>Slice E — a parent toggled bedtime music on a linked
+    /// device. Metadata carries the post-change state (enabled: bool).
+    /// Written only when the flag actually flips.</summary>
+    ParentBedtimeMusicSet,
+
+    /// <summary>Slice F — a parent submitted a custom-story request (idea
+    /// text or book-page photo). Metadata carries the bounded type and a
+    /// has-photo bool only — never the request text (parent-authored free
+    /// text stays on the request row, not in audit).</summary>
+    ParentStoryRequestSubmitted,
+
     /// <summary>A parent attached to a device via the legacy API-key link path
     /// (POST /api/parents/devices/link) — distinct from the single-use claim-code
     /// path (ParentDeviceClaimed). ActorParentId = the linker; TargetDeviceId =
