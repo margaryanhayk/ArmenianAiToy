@@ -963,8 +963,8 @@
       bedtime_music_label: { en: 'Music at bedtime hours', ru: 'Музыка в часы сна', hy: 'Երաժշտություն քնի ժամերին' },
       bedtime_music_needs_window: { en: 'set a bedtime window first', ru: 'сначала задайте часы сна', hy: 'նախ սահմանեք քնի ժամերը' },
       bedtime_music_needs_tracks: { en: 'no music available yet', ru: 'музыки пока нет', hy: 'երաժշտություն դեռ չկա' },
-      flag_on: { en: 'On ✓', ru: 'Вкл ✓', hy: 'Միացված ✓' },
-      flag_off: { en: 'Off', ru: 'Выкл', hy: 'Անջատված' },
+      flag_on: { en: 'On ✓ — tap to turn off', ru: 'Вкл ✓ — нажмите, чтобы выключить', hy: 'Միացված ✓ — սեղմեք անջատելու համար' },
+      flag_off: { en: 'Off — tap to turn on', ru: 'Выкл — нажмите, чтобы включить', hy: 'Անջատված — սեղմեք միացնելու համար' },
       view_music: { en: '🎵 Music →', ru: '🎵 Музыка →', hy: '🎵 Երաժշտություն →' },
       music_title: { en: '🎵 Music', ru: '🎵 Музыка', hy: '🎵 Երաժշտություն' },
       no_music_yet: { en: 'No music tracks are published yet.', ru: 'Музыкальных треков пока нет.', hy: 'Երաժշտական ձայնագրություններ դեռ չկան։' },
@@ -1093,6 +1093,9 @@
       // so the Story-plays list shows names instead of ids.
       modeFilter: null,
       storyTitles: null,
+      // Monotonic id of the newest conversations fetch — replies from
+      // superseded requests are dropped (see loadSummaries).
+      summariesRequestId: 0,
       backFromDetail: null,
       lastSummariesPageSize: 0,
       lastFlaggedPageSize: 0,
@@ -2915,7 +2918,14 @@
         + '&offset=' + state.offset
         + (state.modeFilter ? '&mode=' + encodeURIComponent(state.modeFilter) : '');
 
+      // Stale-response guard: switching tabs fires a new fetch while the
+      // previous one is still in flight. Without this, an OLDER reply landing
+      // last overwrites the new tab's state — which is how an empty tab's
+      // "No conversations recorded" message ended up under a list of rows
+      // (owner-reported 2026-08-03). Only the newest request may render.
+      var reqId = ++state.summariesRequestId;
       authedFetch(url).then(function (data) {
+        if (reqId !== state.summariesRequestId) return;   // superseded
         var rows = (data && data.conversations) || [];
         state.lastSummariesPageSize = rows.length;
         if (rows.length === 0) {
@@ -2933,6 +2943,7 @@
         updatePager('newerBtn', 'olderBtn', 'summariesPagerInfo', state.offset, rows.length);
       }).catch(function (err) {
         if (err && err.status === 401) return;
+        if (reqId !== state.summariesRequestId) return;   // superseded
         state.lastSummariesPageSize = 0;
         setStatus('summariesStatus', 'Error: ' + (err && err.message ? err.message : 'failed'), 'err');
         updatePager('newerBtn', 'olderBtn', 'summariesPagerInfo', state.offset, 0);
