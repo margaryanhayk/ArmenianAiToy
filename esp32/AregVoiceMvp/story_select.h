@@ -250,3 +250,80 @@ void story_select_clear_failed();
 /// child's place in the rotation.
 bool story_select_pick(const CsStory *eligible, int count,
                        char *out_story_id, size_t out_len);
+
+// ---- welcome flow ---------------------------------------------------
+
+/// Resolves EXACTLY `voice_id` to its cached device-global clip
+/// (/voice/<id>-v<n>.mp3). Same never-a-different-file contract as
+/// story_select_resolve_path: requires a VERIFIED index entry and the
+/// file on the card at the recorded size. Returns false otherwise —
+/// which the welcome flow treats as "this line does not exist yet" and
+/// simply skips, so a half-synced card degrades quietly instead of
+/// going silent mid-sentence.
+bool voice_clip_resolve_path(const char *voice_id, char *out, size_t out_len);
+
+/// Picks the next power-on greeting: round-robin over the index's
+/// verified `voice` entries whose id starts with "greet-", skipping the
+/// one stored in NVS (namespace `aregvoice`, key `last_greet`), and
+/// resolves its cache path into `out_path`.
+///
+/// Never-repeat-the-last-one holds by construction, exactly as the story
+/// and music cursors do: with one greeting it returns that one, with N it
+/// returns the entry AFTER the previous, wrapping. Returns false when no
+/// usable greeting exists — a toy with no greetings simply stays silent
+/// at boot, which is the pre-welcome behavior.
+///
+/// The cursor advances on pick. A greeting is three seconds long; unlike
+/// a story, a rare skipped one costs the child nothing, so this does not
+/// carry the story path's started-gate.
+bool voice_clip_next_greeting(char *out_path, size_t out_len);
+
+/// One of the four parent mode switches as cached on the card (index root
+/// `storyEnabled` / `gameEnabled` / `riddleEnabled` / `curiosityEnabled`),
+/// selected by `mode`: 's' | 'g' | 'r' | 'c'.
+///
+/// Absent index, pre-v4 card, or an unrecognised letter → true, matching
+/// the shipped server-side default. A toy must never silently stop
+/// offering stories because its card predates this field.
+///
+/// These do NOT enforce anything — the backend chat gate remains the
+/// enforcement point. They exist so the toy never offers a child
+/// something that will then be refused.
+bool story_select_mode_enabled(char mode);
+
+// ---- "already heard" set (welcome flow) -----------------------------
+//
+// The toy cannot ask the server which stories a child has heard: the
+// story-play report queue DELETES each event from NVS once the backend
+// has accepted it, so the only surviving device-side memory is the
+// single `last_id` cursor. This set is the device's own record, kept so
+// the welcome flow can offer a story the child has NOT heard yet.
+//
+// Stored as ONE whole-set NVS blob (namespace `aregheard`), the same
+// shape story_report uses for its queue — Preferences keys are capped at
+// 15 characters and a key per story would multiply flash wear for no
+// gain. Bounded to CS_MAX_STORIES with drop-OLDEST on overflow, so with
+// a library larger than the bound it behaves as a sliding
+// "recently heard" window rather than a lifetime record. That is the
+// right product behavior, not a limitation: a child re-hearing a
+// favourite from months ago is fine.
+
+/// True when `story_id` is in the heard set.
+bool story_heard_contains(const char *story_id);
+
+/// Adds `story_id` to the heard set. No-op when already present (so it
+/// does not re-write flash) or when the id is invalid.
+///
+/// Call this ONLY once playback has genuinely started, under the same
+/// gate as story_select_save_last — a story that resolved but never made
+/// a sound has not been heard.
+void story_heard_mark(const char *story_id);
+
+/// Number of ids currently in the heard set.
+int story_heard_count();
+
+/// Empties the heard set. Deliberately NOT called in production: when
+/// every eligible story has been heard the welcome flow speaks the
+/// "shall I tell it again?" line instead of quietly forgetting. Exists
+/// for the bench and for a future factory-reset gesture.
+void story_heard_clear();

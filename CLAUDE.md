@@ -44,7 +44,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2308 tests)
+dotnet test                                     # Run all tests (2319 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2250,10 +2250,81 @@ starts a story. The Armenian intra-word marks ՞ ՛ ՜ are stripped, mirroring
 `ModeDetector.NormalizeForMatch` (duplicated, not exposed — that file sits on
 the chat gate's hot path and is HIGH risk).
 
-**Still to land** (firmware): the voice-clip sync + index schema v3→v4, the
-NVS "already heard" set, honest boot-time pause state, and
-`handle_welcome_flow()` itself. Nothing changes for a child until that last
-piece ships, so every backend slice above is safe to deploy on its own.
+### Firmware half (compile-verified; NOT yet bench-verified)
+
+`handle_welcome_flow()` runs at the END of `setup()`, after the
+hold-to-reprovision gesture has had its chance. Shape copied from
+`handle_post_story_flow` — play a clip, open a listening window, record,
+upload, act — so there is **no new state enum, no new LED vocabulary, no state
+machine**. Full behaviour table and bench procedure in
+`esp32/AregVoiceMvp/README.md` § "Welcome flow".
+
+- **Index schema v3 → v4**: root `voice[]` + the four mode flags. A superset
+  like every previous bump, so a v3 card parses as "no voice clips, every mode
+  enabled" and **no card ever has to be wiped**. Pinned by
+  `test_index_v3_forward_compatible`.
+- **`CS_MAX_CLIPS` 5 → 7** (the `offer`/`reoffer` slots), **`CS_MAX_VOICE` 32**.
+- Three new NVS namespaces: `aregvoice` (greeting cursor), `aregheard` (which
+  stories were heard — needed because `story_report` DELETES each play event
+  once the backend accepts it, leaving only `last_id`), and `aregstate`
+  (last-known pause/bedtime, written only on change).
+- **The heard-set write is under the same `started` gate as the rotation
+  cursor.** A story that resolved but made no sound has not been heard;
+  recording it would stop the toy offering a story the child never got.
+- **The boot greeting honors pause honestly.** `voice_state_restore()` seeds
+  the flags from NVS in `setup()`, and one best-effort heartbeat runs just
+  before the greeting when online. Without both, a toy off for a week would
+  greet a child whose parent paused it six days ago.
+
+**RAM is the live constraint here — measure it, don't estimate.** The first
+draft (`CS_MAX_VOICE` 48, a table per function) took free RAM from 188,048 B to
+110,512 B, which is too little on a board that also wants 40–50 KB for a TLS
+handshake during audio. Shipped: 157,680 B free, recovered by shrinking
+`CS_MAX_VOICE`, sharing one voice scratch table, sharing ONE eligible-story
+table between the offer loop and `story_pick_for_session`, and building only the
+chosen greeting's path. The same `CS_MAX_CLIPS` bump separately overflowed the
+**test bench** build by 130 KB (eleven test functions each held their own
+`static CsStory[CS_MAX_STORIES]`); they now share scratch buffers.
+
+**Scope fork taken (owner-approved):** game / riddle / curiosity are **offered**
+by the ask clip but route to a story, because the toy holds no offline content
+for them. Reviving the complete-but-never-flashed `handle_record_upload_playback()`
+(`AregVoiceMvp.ino`) for the online chat path is a separate slice with its own
+bench session.
+
+### The Armenian (`backend/content/voice-clips/`)
+
+Text only — nothing at runtime reads that folder; it is the reviewable source
+the MP3s are rendered from. `armenian-story-master`-reviewed 2026-08-04, still
+**pending the owner's listen test**.
+
+Four findings from that review are now product rules, pinned by
+`VoiceClipTextTests`:
+
+- **Companion-boundary lines were rejected.** The line the reviewer drew:
+  feelings or awareness during the child's *absence* («I was waiting for you»,
+  «I was thinking about you») and unconditional availability («I'm here whenever
+  you want», «as always») fail the MODES.md "not an emotional companion" rule.
+  Present-moment gladness («Ուրախ եմ քեզ տեսնել») passes. Eight greetings were
+  rewritten on this basis.
+- **A greeting must not ask a question** — the ask clip plays immediately after
+  it, and two questions in a row loses a four-year-old. Caught on greet-19.
+- **`say-again` is byte-identical to `ArmenianVoiceReplyGuard.ClarificationResponse`.**
+  One "I didn't hear you" sentence across the whole product; a child should not
+  be talked to by two different characters.
+- **Never splice «-ը» onto a story title.** Every shipped title already ends in
+  the definite article, so «Խոսող ձուկը»-ը stutters. The ending hangs on the
+  classifier instead: «Ուզո՞ւմ ես լսել «{Title}» հեքիաթը։» — which also works
+  for every future title without a per-title rule.
+
+The file also carries the TTS watch-word list for the listen test. «Ողջու՛յն»
+opens 12 of the 24 greetings, so render ONE and check it before batching — one
+bad pattern would otherwise poison half the set.
+
+**Not shipped yet:** the rendered MP3s and the `ContentSync:Voice` config
+entries. Until those exist the manifest carries no voice clips, the toy finds
+none on its card, and the flow degrades to exactly the pre-welcome behaviour —
+so every slice above is safe to deploy on its own.
 
 ## The voice Areg speaks in (`OpenAI:TtsVoice`)
 

@@ -1,0 +1,57 @@
+{
+  "_comment": "armenian-story-master reviewed 2026-08-04; PENDING the owner's listen test. Nothing at runtime reads this file — it is the reviewable source for the MP3s synced to the toy's /voice directory. See README.md in this folder.",
+  "_toneRules": "Areg is a play leader and storyteller, NOT a friend or emotional companion. Warm, short, unhurried. No baby voice. A greeting must not ask a question — the ask- clip plays right after it. Rejected in review as companion-boundary violations: feelings or awareness during the child's ABSENCE ('I was waiting for you', 'I was thinking about you') and unconditional availability ('I'm here whenever you want', 'as always'). Present-moment gladness is fine.",
+  "_sayAgainInvariant": "say-again MUST stay byte-identical to ArmenianVoiceReplyGuard.ClarificationResponse. One 'I didn't hear you' phrase across the whole product; pinned by VoiceClipTextTests.",
+  "clips": [
+    { "voiceId": "greet-01", "text": "Բարև՛, ես Արեգն եմ։" },
+    { "voiceId": "greet-02", "text": "Բարև՛ քեզ։ Ես այստեղ եմ։" },
+    { "voiceId": "greet-03", "text": "Ողջու՛յն։ Ուրախ եմ, որ եկար։" },
+    { "voiceId": "greet-04", "text": "Բարև՛։ Արթնացա ու պատրաստ եմ։" },
+    { "voiceId": "greet-05", "text": "Ողջու՛յն, փոքրիկ ընկեր։" },
+    { "voiceId": "greet-06", "text": "Բարև՛։ Լա՜վ է, որ նորից հանդիպեցինք։" },
+    { "voiceId": "greet-07", "text": "Ողջու՛յն։ Արի՛ մի լավ բան անենք միասին։" },
+    { "voiceId": "greet-08", "text": "Բարև՛։ Այսօր մի հետաքրքիր բան կանենք։" },
+    { "voiceId": "greet-09", "text": "Ողջու՛յն։ Ես Արեգն եմ, շատ հեքիաթներ գիտեմ։" },
+    { "voiceId": "greet-10", "text": "Բարև՛։ Ահա և ես։" },
+    { "voiceId": "greet-11", "text": "Ողջու՛յն։ Հարմար նստի՛ր։" },
+    { "voiceId": "greet-12", "text": "Բարև՛։ Պատրաստ եմ սկսելու։" },
+    { "voiceId": "greet-13", "text": "Ողջու՛յն։ Եկ մի քիչ զվարճանանք։" },
+    { "voiceId": "greet-14", "text": "Բարև՛։ Մի լավ բան եմ մտածել։" },
+    { "voiceId": "greet-15", "text": "Ողջու՛յն։ Ուրախ եմ քեզ տեսնել։" },
+    { "voiceId": "greet-16", "text": "Բարև՛։ Եկ միասին խաղանք։" },
+    { "voiceId": "greet-17", "text": "Ողջու՛յն։ Խաղալու ժամանակն է։" },
+    { "voiceId": "greet-18", "text": "Բարև՛։ Ես Արեգն եմ՝ հեքիաթներ պատմողը։" },
+    { "voiceId": "greet-19", "text": "Ողջու՛յն։ Եկ սկսենք։" },
+    { "voiceId": "greet-20", "text": "Բարև՛։ Նոր օր, նոր հեքիաթ։" },
+    { "voiceId": "greet-21", "text": "Ողջու՛յն։ Ի՜նչ լավ օր է։" },
+    { "voiceId": "greet-22", "text": "Բարև՛։ Հեքիաթներն արդեն սպասում են։" },
+    { "voiceId": "greet-23", "text": "Ողջու՛յն։ Ուրախ եմ, որ նորից միասին ենք։" },
+    { "voiceId": "greet-24", "text": "Բարև՛։ Այսօր հեքիաթի օր է։" },
+
+    { "voiceId": "ask-sgrc", "text": "Ի՞նչ անենք։ Կարող ենք հեքիաթ լսել, խաղալ, հանելուկ գուշակել կամ մի բան հարցնել։" },
+    { "voiceId": "ask-any", "text": "Ի՞նչ անենք։ Ասա՛, լսում եմ։" },
+    { "voiceId": "say-again", "text": "Կներե՛ս, լավ չլսեցի։ Կրկնի՞ր, խնդրում եմ։" },
+    { "voiceId": "just-story", "text": "Լա՛վ, եկ մի հեքիաթ լսենք։" }
+  ],
+  "_perStoryTemplates": {
+    "_comment": "Rendered per story with the curated title substituted, as the intro clip already is. These are clip kinds on the story (offer / reoffer), not entries above. NEVER splice «-ը» onto the title: every shipped title already ends in the definite article, so «Խոսող ձուկը»-ը stutters. The ending hangs on the classifier «հեքիաթ» instead, which works for every present and future title.",
+    "offer": "Ուզո՞ւմ ես լսել «{Title}» հեքիաթը։",
+    "reoffer": "«{Title}» հեքիաթն արդեն լսել ենք։ Ուզո՞ւմ ես նորից լսել։"
+  },
+  "_ttsWatchWords": {
+    "_comment": "What to listen for on the eleven_v3 render. «Ողջու՛յն» opens 12 of the 24 greetings — render ONE and verify it before batching, or one bad pattern poisons half the set.",
+    "words": [
+      "Ողջու՛յն — ջ-ու-յն cluster plus a mid-word ՛",
+      "Բարև՛ — և ligature plus stress mark",
+      "Լա՜վ (greet-06), Ի՜նչ (greet-21) — ՜ handling unverified; fall back to plain «Լավ օր է» on greet-21 if it misreads",
+      "Արեգն եմ — ն-ե liaison",
+      "Հեքիաթներն արդեն (greet-22) — ն-ա junction",
+      "զվարճանանք (greet-13) — զվ onset plus ճ",
+      "Ուզո՞ւմ (both templates) — ՞ inside the word, rising intonation",
+      "գուշակել, հանելուկ (ask-sgrc)",
+      "նստի՛ր (greet-11) — նստ onset",
+      "Կներե՛ս, լավ չլսեցի (say-again) — չլ cluster",
+      "In titles: Հուռին (ռ trill), Արքայադուստրը (-ստր- cluster), սիսեռահատիկը (length plus ռ)"
+    ]
+  }
+}

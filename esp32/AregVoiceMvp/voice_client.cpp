@@ -17,6 +17,9 @@
 #include "device_creds.h"   // Phase C   — NVS-backed device identity
 #include "ota_foundation.h" // Proof 2 — AREG_FW_* identity + running-partition label
 #include "ota_state.h"      // OTA apply — lastOtaStatus for the heartbeat report
+#include "content_sync_rules.h"  // cs_copy_bounded — bounded intent-token copy
+
+#include <Preferences.h>    // welcome flow — persisted last-known pause/bedtime
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -104,6 +107,13 @@ static bool s_in_bedtime_window = false;
 // fully silent even for local SD playback (pause used to gate only online
 // chat). Defaults false; cached between heartbeats like the bedtime flag.
 static bool s_is_paused = false;
+
+// Welcome flow — both flags above are also mirrored into NVS so the boot
+// greeting can honor them BEFORE the first heartbeat of a power-on. Own
+// namespace, per the same isolation rule as aregstory / aregmusic / aregota.
+static constexpr const char *kStatePrefsNamespace  = "aregstate";
+static constexpr const char *kStatePrefsPausedKey  = "paused";
+static constexpr const char *kStatePrefsBedtimeKey = "bedtime";
 
 // The story every in-story backend call is grounded in. Empty means "use the
 // compile-time configured story", which is the pre-selection behavior. Once
@@ -282,8 +292,27 @@ void voice_send_heartbeat() {
         const String resp = http.getString();
         JsonDocument doc;
         if (deserializeJson(doc, resp) == DeserializationError::Ok) {
-            s_in_bedtime_window = doc["inBedtimeWindow"] | false;
-            s_is_paused = doc["isPaused"] | false;
+            const bool bedtime = doc["inBedtimeWindow"] | false;
+            const bool paused  = doc["isPaused"] | false;
+            // Welcome flow — persist ONLY on a real change. The heartbeat
+            // fires every ~60 s, so writing unconditionally would be
+            // ~1,440 flash writes a day for a value that rarely moves.
+            //
+            // Why persist at all: the boot greeting has to decide whether
+            // to speak BEFORE the first heartbeat of this power-on, and
+            // these were RAM-only statics defaulting to false. A toy
+            // powered off for a week would otherwise greet a child whose
+            // parent paused it six days ago.
+            if (bedtime != s_in_bedtime_window || paused != s_is_paused) {
+                Preferences prefs;
+                if (prefs.begin(kStatePrefsNamespace, /*readOnly=*/false)) {
+                    prefs.putBool(kStatePrefsPausedKey, paused);
+                    prefs.putBool(kStatePrefsBedtimeKey, bedtime);
+                    prefs.end();
+                }
+            }
+            s_in_bedtime_window = bedtime;
+            s_is_paused = paused;
         }
     }
     http.end();
@@ -299,6 +328,80 @@ bool voice_in_bedtime_window() {
 
 bool voice_is_paused() {
     return s_is_paused;
+}
+
+void voice_state_restore() {
+    Preferences prefs;
+    if (!prefs.begin(kStatePrefsNamespace, /*readOnly=*/true)) {
+        return;   // never provisioned — the false defaults stand
+    }
+    s_is_paused         = prefs.getBool(kStatePrefsPausedKey, false);
+    s_in_bedtime_window = prefs.getBool(kStatePrefsBedtimeKey, false);
+    prefs.end();
+    Serial.printf("[state] restored paused=%d bedtime=%d\n",
+                  s_is_paused ? 1 : 0, s_in_bedtime_window ? 1 : 0);
+    Serial.flush();
+}
+
+// -------------------------------------------------------------
+// Welcome flow — POST the child's spoken menu answer and read back the
+// single bounded intent token. Deliberately NOT a VoiceTurnResult: this
+// endpoint returns a tiny JSON body, never audio, so there is no PSRAM
+// buffer to own or release.
+//
+// Every failure path yields "unknown", because the toy's handling for
+// "I didn't understand" is already the graceful one — a second failure
+// mode on the device would be dead weight.
+// -------------------------------------------------------------
+bool voice_post_voice_intent(const uint8_t *payload, size_t length,
+                             const char *expect, char *out_intent,
+                             size_t out_len) {
+    if (out_intent == nullptr || out_len == 0) {
+        return false;
+    }
+    out_intent[0] = '\0';
+    if (payload == nullptr || length == 0 || !voice_wifi_is_connected()) {
+        return false;
+    }
+
+    // Same URL-derivation trick as the heartbeat: no new config constant.
+    String url = AREG_BACKEND_URL;
+    url.replace("/api/chat/audio", "/api/devices/voice-intent");
+    url += "?expect=";
+    url += (expect != nullptr && expect[0] != '\0') ? expect : "mode";
+
+    HTTPClient http;
+    http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
+    http.setTimeout(AREG_HTTP_READ_MS);
+    if (!areg_http_begin(http, url)) {
+        Serial.println("[welcome] intent http.begin failed");
+        Serial.flush();
+        return false;
+    }
+    http.addHeader("Content-Type", "audio/wav");
+    add_device_auth_headers(http);
+
+    const int status = http.POST((uint8_t *)payload, length);
+    if (status != 200) {
+        http.end();
+        Serial.printf("[welcome] intent status=%d\n", status);
+        Serial.flush();
+        return false;
+    }
+    const String resp = http.getString();
+    http.end();
+
+    JsonDocument doc;
+    if (deserializeJson(doc, resp) != DeserializationError::Ok) {
+        Serial.println("[welcome] intent parse failed");
+        Serial.flush();
+        return false;
+    }
+    const char *intent = doc["intent"] | "";
+    if (intent[0] == '\0') {
+        return false;
+    }
+    return cs_copy_bounded(out_intent, out_len, intent);
 }
 
 int voice_post_story_plays(const char *json_body) {

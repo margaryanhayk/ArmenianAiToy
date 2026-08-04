@@ -154,6 +154,15 @@
 // hold to answer. No press in this window → quiet close (never force an answer).
 #define AREG_REFLECTION_LISTEN_MS 8000
 
+// --- Welcome flow (power-on greeting + spoken menu) ----------
+// The toy greets the child at power-on, asks what they want to do (only
+// the modes the parent left enabled), and offers a story by name. Every
+// line it speaks is a pre-rendered clip synced to /voice on the SD card,
+// so it works offline; only HEARING the child needs the network.
+#define AREG_WELCOME_LISTEN_MS   8000   // listening window, ms
+#define AREG_WELCOME_MAX_TRIES   2      // mis-hears before it just starts a story
+#define AREG_WELCOME_MAX_OFFERS  2      // stories offered by name before it plays one
+
 // --- Audio parameters ----------------------------------------
 #define AREG_SAMPLE_RATE_HZ     16000  // Whisper-friendly, bandwidth-friendly
 #define AREG_SAMPLE_BITS        16     // linear PCM

@@ -28,6 +28,16 @@ void check(bool condition, const char *name) {
     Serial.flush();
 }
 
+// Shared parse targets. Every test declared its own
+// `static CsStory out[CS_MAX_STORIES]` until CS_MAX_CLIPS grew from 5 to
+// 7 for the welcome flow's offer lines: eleven copies of a table that had
+// just gained ~2.7 KB each overflowed DRAM and the bench build stopped
+// linking. Tests run strictly one after another, so one set of buffers is
+// all that was ever needed.
+CsStory g_story_scratch[CS_MAX_STORIES];
+CsStory g_story_scratch2[CS_MAX_STORIES];   // for round-trip compares
+CsVoice g_voice_scratch[CS_MAX_VOICE];
+
 const char *kShaA = "4ba0969646dfcb34ede49b3c82ac234a55299ab6789354f0ccbc6beb64f7e631";
 const char *kShaB = "b1b0969646dfcb34ede49b3c82ac234a55299ab6789354f0ccbc6beb64f7e631";
 const char *kShaC = "c2c0969646dfcb34ede49b3c82ac234a55299ab6789354f0ccbc6beb64f7e631";
@@ -164,7 +174,7 @@ void test_manifest_three_stories() {
     add_item(arr, "little-cloud", 1, kShaB, 446880, "/api/devices/content-file?storyId=little-cloud");
     add_item(arr, "hedgehog-apple", 2, kShaC, 333333, "/api/devices/content-file?storyId=hedgehog-apple");
 
-    static CsStory out[CS_MAX_STORIES];
+    CsStory *out = g_story_scratch;
     CsManifestStats st{};
     const int n = cs_manifest_parse(doc["stories"].as<JsonArrayConst>(),
                                     out, CS_MAX_STORIES, &st);
@@ -192,7 +202,7 @@ void test_manifest_legacy_single_story() {
     JsonArray arr = doc["stories"].to<JsonArray>();
     add_item(arr, "anban-huri", 1, kShaA, 4654560, "/api/devices/content-file");
 
-    static CsStory out[CS_MAX_STORIES];
+    CsStory *out = g_story_scratch;
     CsManifestStats st{};
     const int n = cs_manifest_parse(doc["stories"].as<JsonArrayConst>(),
                                     out, CS_MAX_STORIES, &st);
@@ -204,7 +214,7 @@ void test_manifest_legacy_single_story() {
 void test_manifest_empty() {
     JsonDocument doc;
     doc["stories"].to<JsonArray>();
-    static CsStory out[CS_MAX_STORIES];
+    CsStory *out = g_story_scratch;
     CsManifestStats st{};
     const int n = cs_manifest_parse(doc["stories"].as<JsonArrayConst>(),
                                     out, CS_MAX_STORIES, &st);
@@ -223,7 +233,7 @@ void test_manifest_invalid_item_does_not_block_siblings() {
     add_item(arr, "no-url", 1, kShaB, 1000, "");                 // empty url
     add_item(arr, "good-two", 1, kShaC, 2000, "/u");
 
-    static CsStory out[CS_MAX_STORIES];
+    CsStory *out = g_story_scratch;
     CsManifestStats st{};
     const int n = cs_manifest_parse(doc["stories"].as<JsonArrayConst>(),
                                     out, CS_MAX_STORIES, &st);
@@ -240,7 +250,7 @@ void test_manifest_disabled_item_skipped() {
     add_item(arr, "on-one", 1, kShaA, 1000, "/u", true);
     add_item(arr, "off-one", 1, kShaB, 1000, "/u", false);
 
-    static CsStory out[CS_MAX_STORIES];
+    CsStory *out = g_story_scratch;
     CsManifestStats st{};
     const int n = cs_manifest_parse(doc["stories"].as<JsonArrayConst>(),
                                     out, CS_MAX_STORIES, &st);
@@ -256,7 +266,7 @@ void test_manifest_duplicates() {
     add_item(arr, "anban-huri", 2, kShaB, 222, "/second");   // exact duplicate id
     add_item(arr, "other-story", 1, kShaC, 333, "/third");
 
-    static CsStory out[CS_MAX_STORIES];
+    CsStory *out = g_story_scratch;
     CsManifestStats st{};
     const int n = cs_manifest_parse(doc["stories"].as<JsonArrayConst>(),
                                     out, CS_MAX_STORIES, &st);
@@ -278,7 +288,7 @@ void test_manifest_truncation() {
         add_item(arr, id, 1, kShaA, 1000 + i, "/u");
     }
 
-    static CsStory out[CS_MAX_STORIES];
+    CsStory *out = g_story_scratch;
     CsManifestStats st{};
     const int n = cs_manifest_parse(doc["stories"].as<JsonArrayConst>(),
                                     out, CS_MAX_STORIES, &st);
@@ -332,7 +342,7 @@ void test_index_round_trip_three() {
     JsonDocument reparsed;
     check(deserializeJson(reparsed, json) == DeserializationError::Ok, "index_reparses");
 
-    static CsStory back[CS_MAX_STORIES];
+    CsStory *back = g_story_scratch2;
     int schema = 0;
     const int n = cs_index_parse(reparsed, back, CS_MAX_STORIES, &schema);
     check(schema == 2, "index_round_trip_schema");
@@ -366,7 +376,7 @@ void test_index_legacy_migration() {
     JsonDocument doc;
     check(deserializeJson(doc, legacy) == DeserializationError::Ok, "legacy_index_parses");
 
-    static CsStory out[CS_MAX_STORIES];
+    CsStory *out = g_story_scratch;
     int schema = 0;
     const int n = cs_index_parse(doc, out, CS_MAX_STORIES, &schema);
 
@@ -382,7 +392,7 @@ void test_index_legacy_migration() {
 }
 
 void test_index_malformed_and_hostile() {
-    static CsStory out[CS_MAX_STORIES];
+    CsStory *out = g_story_scratch;
     int schema = 0;
 
     // Legacy object missing the file field.
@@ -470,6 +480,215 @@ void test_copy_bounded() {
     check(strlen(dst) == sizeof(dst) - 1, "copy_bounded_nul_terminates");
 }
 
+// ---- welcome flow: voice clips, mode flags, offer kinds (schema v4) ----
+
+void test_clip_kinds_and_bounds() {
+    check(cs_is_valid_clip_kind("intro"), "clipkind_intro");
+    check(cs_is_valid_clip_kind("question2"), "clipkind_question2");
+    check(cs_is_valid_clip_kind("offer"), "clipkind_offer");
+    check(cs_is_valid_clip_kind("reoffer"), "clipkind_reoffer");
+
+    check(!cs_is_valid_clip_kind("Intro"), "clipkind_rejects_uppercase");
+    check(!cs_is_valid_clip_kind("../x"), "clipkind_rejects_traversal");
+    // The name the backend deliberately did NOT use, because it is 11
+    // characters against a 10-character bound.
+    check(!cs_is_valid_clip_kind("offer-again"), "clipkind_rejects_offer_again");
+
+    char path[CS_MAX_PATH_LEN];
+    check(cs_build_clip_cache_path(path, sizeof(path), "anban-huri", 2, "offer")
+              && strcmp(path, "/stories/anban-huri-v2-offer.mp3") == 0,
+          "clip_path_offer");
+    check(cs_build_clip_cache_path(path, sizeof(path), "anban-huri", 2, "reoffer")
+              && strcmp(path, "/stories/anban-huri-v2-reoffer.mp3") == 0,
+          "clip_path_reoffer");
+
+    // A story may now legitimately carry all seven kinds at once.
+    JsonDocument doc;
+    JsonArray arr = doc["stories"].to<JsonArray>();
+    add_item(arr, "anban-huri", 1, kShaA, 100, "/u");
+    JsonArray clips = arr[0]["clips"].to<JsonArray>();
+    const char *kinds[] = {"intro", "question", "question1", "question2",
+                           "summary", "offer", "reoffer"};
+    for (int i = 0; i < 7; i++) {
+        JsonObject c = clips.add<JsonObject>();
+        c["kind"]      = kinds[i];
+        c["sha256"]    = kShaB;
+        c["sizeBytes"] = 10 + i;
+    }
+    CsStory *out = g_story_scratch;
+    CsManifestStats stats{};
+    const int n = cs_manifest_parse(doc["stories"].as<JsonArrayConst>(),
+                                    out, CS_MAX_STORIES, &stats);
+    check(n == 1 && out[0].clip_count == 7, "story_carries_all_seven_clip_kinds");
+}
+
+void test_voice_manifest_parse() {
+    JsonDocument doc;
+    JsonArray arr = doc["voice"].to<JsonArray>();
+    auto add_voice = [&](const char *id, int version, const char *sha,
+                         long size, bool enabled) {
+        JsonObject o = arr.add<JsonObject>();
+        o["voiceId"]   = id;
+        o["version"]   = version;
+        o["sha256"]    = sha;
+        o["sizeBytes"] = size;
+        o["enabled"]   = enabled;
+    };
+    add_voice("greet-01", 1, kShaA, 100, true);
+    add_voice("", 1, kShaB, 100, true);              // no id
+    add_voice("bad-sha", 1, "xx", 100, true);        // bad sha
+    add_voice("no-size", 1, kShaB, 0, true);         // no size
+    add_voice("greet-01", 2, kShaC, 200, true);      // duplicate
+    add_voice("off-clip", 1, kShaB, 100, false);     // disabled
+    add_voice("ask-any", 1, kShaC, 300, true);
+
+    CsVoice *out = g_voice_scratch;
+    const int n = cs_manifest_parse_voice(doc["voice"].as<JsonArrayConst>(),
+                                          out, CS_MAX_VOICE);
+    check(n == 2, "voice_manifest_keeps_only_valid");
+    check(strcmp(out[0].voice_id, "greet-01") == 0 && out[0].size_bytes == 100,
+          "voice_manifest_duplicate_keeps_first");
+    check(strcmp(out[1].voice_id, "ask-any") == 0, "voice_manifest_keeps_ask_any");
+
+    check(cs_voice_is_greeting("greet-01"), "voice_greeting_prefix_matches");
+    check(!cs_voice_is_greeting("ask-any"), "voice_greeting_prefix_excludes_ask");
+    check(!cs_voice_is_greeting("greeting-01"), "voice_greeting_prefix_is_exact");
+
+    char path[CS_MAX_PATH_LEN];
+    check(cs_build_voice_cache_path(path, sizeof(path), "greet-01", 3)
+              && strcmp(path, "/voice/greet-01-v3.mp3") == 0,
+          "voice_cache_path");
+    check(!cs_build_voice_cache_path(path, sizeof(path), "../x", 1),
+          "voice_cache_path_rejects_traversal");
+    check(cs_build_voice_temp_path(path, sizeof(path), "greet-01", 3)
+              && strcmp(path, "/tmp/v-greet-01-v3.mp3.part") == 0,
+          "voice_temp_path_prefixed");
+}
+
+void test_voice_manifest_truncation() {
+    JsonDocument doc;
+    JsonArray arr = doc["voice"].to<JsonArray>();
+    for (int i = 0; i < CS_MAX_VOICE + 5; i++) {
+        char id[24];
+        snprintf(id, sizeof(id), "greet-%02d", i);
+        JsonObject o = arr.add<JsonObject>();
+        o["voiceId"]   = id;
+        o["version"]   = 1;
+        o["sha256"]    = kShaA;
+        o["sizeBytes"] = 100;
+        o["enabled"]   = true;
+    }
+    CsVoice *out = g_voice_scratch;
+    const int n = cs_manifest_parse_voice(doc["voice"].as<JsonArrayConst>(),
+                                          out, CS_MAX_VOICE);
+    check(n == CS_MAX_VOICE, "voice_manifest_truncates_without_overrun");
+}
+
+void test_ask_voice_id() {
+    char id[16];
+    check(cs_build_ask_voice_id(id, sizeof(id), true, true, true, true)
+              && strcmp(id, "ask-sgrc") == 0, "ask_id_all_four");
+    check(cs_build_ask_voice_id(id, sizeof(id), true, false, false, false)
+              && strcmp(id, "ask-s") == 0, "ask_id_story_only");
+    // Fixed s,g,r,c order — otherwise the backend would have to ship every
+    // permutation instead of 15 combinations.
+    check(cs_build_ask_voice_id(id, sizeof(id), false, false, true, true)
+              && strcmp(id, "ask-rc") == 0, "ask_id_fixed_letter_order");
+    check(cs_build_ask_voice_id(id, sizeof(id), true, false, true, false)
+              && strcmp(id, "ask-sr") == 0, "ask_id_skips_disabled");
+    // Nothing enabled → no honest prompt exists; the caller must not fall
+    // back to something that offers a mode the parent switched off.
+    check(!cs_build_ask_voice_id(id, sizeof(id), false, false, false, false),
+          "ask_id_refuses_when_nothing_enabled");
+    char tiny[4];
+    check(!cs_build_ask_voice_id(tiny, sizeof(tiny), true, true, true, true),
+          "ask_id_refuses_on_truncation");
+    // Every id it can produce must be a legal id (it becomes an SD path).
+    check(cs_is_valid_story_id("ask-sgrc"), "ask_id_is_a_valid_id");
+}
+
+void test_index_v4_round_trip() {
+    static CsStory stories[1];
+    memset(stories, 0, sizeof(stories));
+    cs_copy_bounded(stories[0].story_id, sizeof(stories[0].story_id), "anban-huri");
+    cs_copy_bounded(stories[0].sha256, sizeof(stories[0].sha256), kShaA);
+    cs_copy_bounded(stories[0].cache_path, sizeof(stories[0].cache_path),
+                    "/stories/anban-huri-v1.mp3");
+    stories[0].version    = 1;
+    stories[0].size_bytes = 100;
+    stories[0].verified   = true;
+
+    static CsVoice voice[2];
+    memset(voice, 0, sizeof(voice));
+    cs_copy_bounded(voice[0].voice_id, sizeof(voice[0].voice_id), "greet-01");
+    cs_copy_bounded(voice[0].sha256, sizeof(voice[0].sha256), kShaB);
+    voice[0].version = 1; voice[0].size_bytes = 10; voice[0].verified = true;
+    cs_copy_bounded(voice[1].voice_id, sizeof(voice[1].voice_id), "just-story");
+    cs_copy_bounded(voice[1].sha256, sizeof(voice[1].sha256), kShaC);
+    voice[1].version = 2; voice[1].size_bytes = 20; voice[1].verified = true;
+
+    JsonDocument idx;
+    cs_index_build(idx, stories, 1, "anban-huri", true);
+    cs_index_add_voice(idx, voice, 2);
+    cs_index_add_modes(idx, true, false, true, false);
+
+    String serialized;
+    serializeJson(idx, serialized);
+    JsonDocument reread;
+    check(deserializeJson(reread, serialized) == DeserializationError::Ok,
+          "index_v4_serializes");
+    check((reread["schemaVersion"] | 0) == 4, "index_v4_schema_version");
+
+    CsVoice *back = g_voice_scratch;
+    const int n = cs_index_parse_voice(reread, back, CS_MAX_VOICE);
+    check(n == 2 && strcmp(back[0].voice_id, "greet-01") == 0
+              && back[0].verified && back[1].version == 2,
+          "index_v4_voice_round_trip");
+
+    check(cs_index_mode_enabled(reread, "storyEnabled"), "index_v4_mode_story_on");
+    check(!cs_index_mode_enabled(reread, "gameEnabled"), "index_v4_mode_game_off");
+    check(cs_index_mode_enabled(reread, "riddleEnabled"), "index_v4_mode_riddle_on");
+    check(!cs_index_mode_enabled(reread, "curiosityEnabled"), "index_v4_mode_curiosity_off");
+}
+
+// KEYSTONE: a card written by the PREVIOUS firmware must keep working.
+// v4 is a superset, so a v3 document has to parse as "no voice clips,
+// every mode enabled" — never as "no modes", which would leave a toy
+// silently unable to offer anything after a downgrade or a stale card.
+void test_index_v3_forward_compatible() {
+    static CsStory stories[1];
+    memset(stories, 0, sizeof(stories));
+    cs_copy_bounded(stories[0].story_id, sizeof(stories[0].story_id), "anban-huri");
+    cs_copy_bounded(stories[0].sha256, sizeof(stories[0].sha256), kShaA);
+    cs_copy_bounded(stories[0].cache_path, sizeof(stories[0].cache_path),
+                    "/stories/anban-huri-v1.mp3");
+    stories[0].version = 1; stories[0].size_bytes = 100; stories[0].verified = true;
+
+    JsonDocument idx;
+    cs_index_build(idx, stories, 1, "anban-huri", true);
+    idx["schemaVersion"] = 3;          // pretend it was written by the old build
+    String serialized;
+    serializeJson(idx, serialized);
+
+    JsonDocument reread;
+    deserializeJson(reread, serialized);
+
+    CsVoice *back = g_voice_scratch;
+    check(cs_index_parse_voice(reread, back, CS_MAX_VOICE) == 0,
+          "v3_index_yields_no_voice_clips");
+    check(cs_index_mode_enabled(reread, "storyEnabled")
+              && cs_index_mode_enabled(reread, "gameEnabled")
+              && cs_index_mode_enabled(reread, "riddleEnabled")
+              && cs_index_mode_enabled(reread, "curiosityEnabled"),
+          "v3_index_treats_every_mode_as_enabled");
+
+    // And the stories still parse — the card is not wiped by a bump.
+    CsStory *out = g_story_scratch;
+    int schema = 0;
+    check(cs_index_parse(reread, out, CS_MAX_STORIES, &schema) == 1,
+          "v3_index_stories_still_parse");
+}
+
 void run_all() {
     s_pass = 0;
     s_fail = 0;
@@ -496,6 +715,12 @@ void run_all() {
     test_index_legacy_migration();
     test_index_malformed_and_hostile();
     test_already_current_metadata();
+    test_clip_kinds_and_bounds();
+    test_voice_manifest_parse();
+    test_voice_manifest_truncation();
+    test_ask_voice_id();
+    test_index_v4_round_trip();
+    test_index_v3_forward_compatible();
     test_copy_bounded();
 
     Serial.printf("[cs-test] heap after=%u\n", (unsigned)ESP.getFreeHeap());

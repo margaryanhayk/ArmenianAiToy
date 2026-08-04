@@ -77,6 +77,26 @@ bool voice_in_bedtime_window();
 // between heartbeats (staleness bounded to one interval).
 bool voice_is_paused();
 
+// Welcome flow — seeds voice_is_paused() / voice_in_bedtime_window() from
+// NVS with the last values the server reported. Call EARLY in setup(),
+// before anything can make a sound: the boot greeting has to decide
+// whether to speak before this power-on's first heartbeat lands, and
+// without this both flags read false. A toy powered off for a week would
+// otherwise greet a child whose parent paused it six days ago.
+void voice_state_restore();
+
+// Welcome flow — POST the child's recorded menu answer to
+// /api/devices/voice-intent and read back the single intent token
+// ("story" | "game" | "riddle" | "curiosity" | "calm" | "yes" | "no" |
+// "unknown"). Returns false on any failure (offline, non-200, unparseable),
+// which the caller treats exactly as "unknown". `expect` is "mode" or
+// "yesno" and scopes the server's speech-recognition bias to the answers
+// that are actually possible. The URL is derived from AREG_BACKEND_URL, so
+// no new config constant.
+bool voice_post_voice_intent(const uint8_t *payload, size_t length,
+                             const char *expect, char *out_intent,
+                             size_t out_len);
+
 // Story-play reporting (store-and-forward) — POST a pre-composed JSON body
 // to /api/devices/story-plays with the device-auth headers. Returns the HTTP
 // status (negative on transport failure / offline). The URL is derived from

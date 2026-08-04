@@ -82,3 +82,32 @@ void cs_index_add_music(JsonDocument &doc, const CsMusic *music, int count,
 
 /// Reads the root `musicEnabled` flag (absent → false; music is opt-in).
 bool cs_index_music_enabled(JsonDocument &doc);
+
+// ---- welcome flow (index schema v4) --------------------------------
+
+/// Parses the manifest's `voice` array — the device-global spoken clips
+/// (greetings, menu prompts, fallback lines). Validated per item, dedupe
+/// keeps first. Returns the accepted count.
+int cs_manifest_parse_voice(JsonArrayConst voice, CsVoice *out, int max_out);
+
+/// Reads the index's `voice` array (absent on every pre-v4 card → 0,
+/// never an error).
+int cs_index_parse_voice(JsonDocument &doc, CsVoice *out, int max_out);
+
+/// Appends the voice section to an index document ALREADY built by
+/// cs_index_build. Separate call for the same reason cs_index_add_music
+/// is separate: cs_index_build's signature, callers and tests stay
+/// untouched.
+void cs_index_add_voice(JsonDocument &doc, const CsVoice *voice, int count);
+
+/// Appends the four parent mode flags to an index document. Cached on the
+/// card so the "what shall we do?" prompt offers only permitted modes even
+/// with no network.
+void cs_index_add_modes(JsonDocument &doc, bool story, bool game,
+                        bool riddle, bool curiosity);
+
+/// Reads one root mode flag by its key ("storyEnabled", "gameEnabled",
+/// "riddleEnabled", "curiosityEnabled"). Absent (every pre-v4 card) →
+/// true, matching the shipped server-side default; a toy must never
+/// silently stop offering stories because its card predates this field.
+bool cs_index_mode_enabled(JsonDocument &doc, const char *key);

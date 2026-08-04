@@ -392,3 +392,245 @@ bool story_select_pick(const CsStory *eligible, int count,
                                        excluded, s_failed_count,
                                        out_story_id, out_len);
 }
+
+// ---- welcome flow ---------------------------------------------------
+
+namespace {
+
+constexpr const char *kVoicePrefsNamespace = "aregvoice";
+constexpr const char *kVoicePrefsLastKey   = "last_greet";
+
+// ONE scratch table shared by both voice-clip readers below. They are
+// never re-entrant (both are called from the single blocking welcome
+// flow), and a table each would cost ~4 KB of .bss for nothing.
+CsVoice s_voice_scratch[CS_MAX_VOICE];
+
+/// Opens + parses the index into `doc`. Shared by every welcome-flow
+/// reader below, all of which need the whole document rather than the
+/// story array the story path already has a loader for.
+bool load_index_doc(JsonDocument &doc) {
+    if (!audio_sd_available() || !SD.exists(kIndexPath)) {
+        return false;
+    }
+    File f = SD.open(kIndexPath, FILE_READ);
+    if (!f) {
+        return false;
+    }
+    const DeserializationError err = deserializeJson(doc, f);
+    f.close();
+    return err == DeserializationError::Ok;
+}
+
+}  // namespace
+
+bool voice_clip_resolve_path(const char *voice_id, char *out, size_t out_len) {
+    if (out == NULL || out_len == 0) {
+        return false;
+    }
+    out[0] = '\0';
+    if (!cs_is_valid_story_id(voice_id)) {
+        return false;
+    }
+    JsonDocument doc;
+    if (!load_index_doc(doc)) {
+        return false;
+    }
+
+    const int raw = cs_index_parse_voice(doc, s_voice_scratch, CS_MAX_VOICE);
+    for (int i = 0; i < raw; i++) {
+        const CsVoice *clip = &s_voice_scratch[i];
+        if (!cs_story_ids_equal(clip->voice_id, voice_id)) {
+            continue;
+        }
+        if (!clip->verified || clip->size_bytes <= 0) {
+            return false;
+        }
+        char path[CS_MAX_PATH_LEN];
+        if (!cs_build_voice_cache_path(path, sizeof(path),
+                                       clip->voice_id, clip->version)) {
+            return false;
+        }
+        // The card has to agree with the index — a clip file can vanish
+        // independently of the entry that describes it.
+        if (sd_file_size(path) != clip->size_bytes) {
+            return false;
+        }
+        return cs_copy_bounded(out, out_len, path);
+    }
+    return false;   // never a different clip's path
+}
+
+bool voice_clip_next_greeting(char *out_path, size_t out_len) {
+    if (out_path == NULL || out_len == 0) {
+        return false;
+    }
+    out_path[0] = '\0';
+    JsonDocument doc;
+    if (!load_index_doc(doc)) {
+        return false;
+    }
+
+    const int raw = cs_index_parse_voice(doc, s_voice_scratch, CS_MAX_VOICE);
+
+    // Eligible = a greeting id + verified + the file on the card at the
+    // recorded size. Same three-part rule the story and music selectors
+    // use; index metadata alone is never enough.
+    //
+    // Only the INDICES are kept — an array of built paths here would be
+    // ~3 KB of stack in a function called from the boot path, and the
+    // chosen path is cheap to rebuild once at the end.
+    int eligible[CS_MAX_VOICE];
+    int n = 0;
+    for (int i = 0; i < raw && n < CS_MAX_VOICE; i++) {
+        const CsVoice *clip = &s_voice_scratch[i];
+        if (!cs_voice_is_greeting(clip->voice_id)) continue;
+        if (!clip->verified || clip->size_bytes <= 0) continue;
+        char path[CS_MAX_PATH_LEN];
+        if (!cs_build_voice_cache_path(path, sizeof(path),
+                                       clip->voice_id, clip->version)) {
+            continue;
+        }
+        if (sd_file_size(path) != clip->size_bytes) continue;
+        eligible[n++] = i;
+    }
+    if (n == 0) {
+        return false;   // no greetings yet — the toy stays silent at boot
+    }
+
+    char last_id[CS_MAX_STORY_ID_LEN + 1] = "";
+    Preferences prefs;
+    if (prefs.begin(kVoicePrefsNamespace, /*readOnly=*/true)) {
+        prefs.getString(kVoicePrefsLastKey, last_id, sizeof(last_id));
+        prefs.end();
+    }
+    int prev_pos = -1;
+    for (int k = 0; k < n; k++) {
+        if (cs_story_ids_equal(s_voice_scratch[eligible[k]].voice_id, last_id)) {
+            prev_pos = k;
+            break;
+        }
+    }
+    // Unknown/absent previous → first. Otherwise the one AFTER it,
+    // wrapping — which is what makes "never the same greeting twice in a
+    // row" true by construction rather than by retrying.
+    const CsVoice *pick = &s_voice_scratch[eligible[(prev_pos >= 0) ? (prev_pos + 1) % n : 0]];
+
+    if (prefs.begin(kVoicePrefsNamespace, /*readOnly=*/false)) {
+        prefs.putString(kVoicePrefsLastKey, pick->voice_id);
+        prefs.end();
+    }
+    Serial.printf("[welcome] greeting %s\n", pick->voice_id);
+    Serial.flush();
+    return cs_build_voice_cache_path(out_path, out_len,
+                                     pick->voice_id, pick->version);
+}
+
+bool story_select_mode_enabled(char mode) {
+    const char *key = NULL;
+    switch (mode) {
+        case 's': key = "storyEnabled";     break;
+        case 'g': key = "gameEnabled";      break;
+        case 'r': key = "riddleEnabled";    break;
+        case 'c': key = "curiosityEnabled"; break;
+        default:  return true;   // unknown letter — never invent a refusal
+    }
+    JsonDocument doc;
+    if (!load_index_doc(doc)) {
+        return true;   // no card / no index → the shipped default (on)
+    }
+    return cs_index_mode_enabled(doc, key);
+}
+
+// ---- "already heard" set --------------------------------------------
+
+namespace {
+
+constexpr const char *kHeardPrefsNamespace = "aregheard";
+constexpr const char *kHeardPrefsKey       = "ids";
+
+// One fixed-size blob, mirroring story_report's whole-queue persistence.
+struct HeardSet {
+    char ids[CS_MAX_STORIES][CS_MAX_STORY_ID_LEN + 1];
+    int  count;
+};
+
+void heard_load(HeardSet *set) {
+    memset(set, 0, sizeof(*set));
+    Preferences prefs;
+    if (!prefs.begin(kHeardPrefsNamespace, /*readOnly=*/true)) {
+        return;   // never provisioned — an empty set, not an error
+    }
+    const size_t read = prefs.getBytes(kHeardPrefsKey, set, sizeof(*set));
+    prefs.end();
+    // A short or oversized read means a downgrade, corruption, or a
+    // hand-written key. Treat it as empty rather than trusting it — the
+    // worst outcome is the toy offering a story that was already heard.
+    if (read != sizeof(*set) || set->count < 0 || set->count > CS_MAX_STORIES) {
+        memset(set, 0, sizeof(*set));
+    }
+}
+
+void heard_save(const HeardSet *set) {
+    Preferences prefs;
+    if (!prefs.begin(kHeardPrefsNamespace, /*readOnly=*/false)) {
+        Serial.println("[welcome] NVS unavailable — heard set not persisted");
+        Serial.flush();
+        return;   // never blocks playback
+    }
+    prefs.putBytes(kHeardPrefsKey, set, sizeof(*set));
+    prefs.end();
+}
+
+}  // namespace
+
+bool story_heard_contains(const char *story_id) {
+    if (!cs_is_valid_story_id(story_id)) {
+        return false;
+    }
+    HeardSet set;
+    heard_load(&set);
+    for (int i = 0; i < set.count; i++) {
+        if (cs_story_ids_equal(set.ids[i], story_id)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void story_heard_mark(const char *story_id) {
+    if (!cs_is_valid_story_id(story_id)) {
+        return;
+    }
+    HeardSet set;
+    heard_load(&set);
+    for (int i = 0; i < set.count; i++) {
+        if (cs_story_ids_equal(set.ids[i], story_id)) {
+            return;   // already known — do not re-write flash
+        }
+    }
+    if (set.count >= CS_MAX_STORIES) {
+        // Drop the OLDEST. The set is a sliding window once the library
+        // outgrows the bound, which is the honest product behavior.
+        for (int i = 1; i < CS_MAX_STORIES; i++) {
+            memcpy(set.ids[i - 1], set.ids[i], sizeof(set.ids[0]));
+        }
+        set.count = CS_MAX_STORIES - 1;
+    }
+    cs_copy_bounded(set.ids[set.count], sizeof(set.ids[0]), story_id);
+    set.count++;
+    heard_save(&set);
+    Serial.printf("[welcome] heard %s (%d known)\n", story_id, set.count);
+    Serial.flush();
+}
+
+int story_heard_count() {
+    HeardSet set;
+    heard_load(&set);
+    return set.count;
+}
+
+void story_heard_clear() {
+    HeardSet set;
+    memset(&set, 0, sizeof(set));
+    heard_save(&set);
+}

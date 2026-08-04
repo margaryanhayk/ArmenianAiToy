@@ -227,6 +227,12 @@ static uint32_t s_story_offset = 0;
 // rather than a new state flag.
 static char s_current_story_id[CS_MAX_STORY_ID_LEN + 1] = "";
 
+// --- Welcome flow: the child chose this story out loud -------
+// One-shot. Set with s_current_story_id just before handle_story_session,
+// consumed (and cleared) by story_pick_for_session so the very next press
+// goes back to the normal rotation.
+static bool s_story_preselected = false;
+
 // --- Failure clip playback ----------------------------------
 static void play_canned_failure_clip() {
     if (canned_clip_mp3_len < 8) {
@@ -604,6 +610,344 @@ static void handle_post_story_flow() {
     led_for_state(ST_IDLE);
 }
 
+// ---------------------------------------------------------------
+// Welcome flow — the toy's opening.
+//
+// Greet → "what shall we do?" → the child answers OUT LOUD → offer a
+// story by name → "yes" → play it.
+//
+// Shape is copied from handle_post_story_flow above (play a clip, open a
+// listening window, record, upload, act) rather than invented: that shape
+// is already shipped and hardware-verified, and reusing it means no new
+// state enum, no new LED vocabulary, and no state machine — this is a
+// blocking call from the IDLE branch exactly like a story session.
+//
+// EVERYTHING the toy says here is a pre-rendered clip from its SD card,
+// so speaking works with no network, no cost and no delay. Only HEARING
+// the child needs the cloud.
+//
+// Owner decision: the child chooses by VOICE only. So there is no button
+// menu anywhere below. When the toy is offline, or mishears twice, it
+// does not open a second way to choose — it says one short line and
+// starts a story, which is exactly what a press did before this existed.
+// ---------------------------------------------------------------
+
+static void handle_story_session();   // defined below; the flow ends in it
+
+// The ONE eligible-story table in the sketch (~10 KB), shared by the
+// welcome flow's offer loop and story_pick_for_session. They are never
+// live at the same time: welcome_offer_story finishes with it — it has
+// already copied the chosen id into s_current_story_id — before calling
+// handle_story_session, which is what reaches the other user. Anything
+// added AFTER that call must not expect this table to still hold the
+// offer pool.
+static CsStory s_eligible_stories[CS_MAX_STORIES];
+
+// Plays a device-global clip by id if it is on the card. Returns false
+// when the clip has not been synced yet, which every caller treats as
+// "skip this line" — a half-synced card degrades quietly instead of
+// going silent mid-sentence.
+static bool welcome_say(const char *voice_id) {
+    char path[CS_MAX_PATH_LEN];
+    if (!voice_clip_resolve_path(voice_id, path, sizeof(path))) {
+        Serial.printf("[welcome] clip %s not on card — skipping\n", voice_id);
+        Serial.flush();
+        return false;
+    }
+    transition_to(ST_PLAYING);
+    audio_speaker_begin();
+    audio_play_story_file(path, 0, nullptr, nullptr);
+    return true;
+}
+
+// Opens a listening window, records while the button is held, and posts
+// the answer. Fills `out_intent` with one of the eight bounded tokens.
+//
+// Returns false ONLY for silence — nobody pressed, or the press was too
+// short to be speech. Silence is not a failed attempt: at power-on it
+// usually means nobody is there, and a toy that keeps asking an empty
+// room is the opposite of what a parent wants.
+static bool welcome_listen(const char *expect, char *out_intent, size_t out_len) {
+    out_intent[0] = '\0';
+
+    Serial.printf("[welcome] listening (%s)\n", expect);
+    Serial.flush();
+    led_for_state(ST_RECORDING);          // the "your turn" cue
+    bool got_press = false;
+    const uint32_t listen_started = millis();
+    while (millis() - listen_started < AREG_WELCOME_LISTEN_MS) {
+        if (button_poll() == 'P') {
+            got_press = true;
+            break;
+        }
+        delay(AREG_BUTTON_POLL_MS);
+        esp_task_wdt_reset();
+    }
+    if (!got_press) {
+        Serial.println("[welcome] no answer — closing quietly");
+        Serial.flush();
+        return false;
+    }
+
+    transition_to(ST_RECORDING);
+    const size_t captured = record_question();
+    const uint32_t ms_held = (captured * 1000) / AREG_SAMPLE_RATE_HZ;
+    if (ms_held < AREG_MIN_RECORD_MS) {
+        Serial.printf("[welcome] answer too short (%u ms)\n", (unsigned)ms_held);
+        Serial.flush();
+        return false;
+    }
+
+    const size_t pcm_bytes = captured * sizeof(int16_t);
+    const size_t payload_bytes = 44 + pcm_bytes;
+    uint8_t *payload = (uint8_t *)heap_caps_malloc(payload_bytes, MALLOC_CAP_SPIRAM);
+    if (payload == nullptr) {
+        Serial.println("[welcome] payload alloc failed");
+        Serial.flush();
+        cs_copy_bounded(out_intent, out_len, "unknown");
+        return true;   // heard something, could not ask — counts as an attempt
+    }
+    audio_write_wav_header(payload, (uint32_t)captured);
+    memcpy(payload + 44, s_capture_buf, pcm_bytes);
+
+    transition_to(ST_UPLOADING);
+    audio_speaker_begin();
+    audio_play_thinking_earcon();   // immediate acoustic ack while we upload
+
+    if (!voice_post_voice_intent(payload, payload_bytes, expect,
+                                 out_intent, out_len)) {
+        cs_copy_bounded(out_intent, out_len, "unknown");
+    }
+    heap_caps_free(payload);
+    Serial.printf("[welcome] intent=%s\n", out_intent);
+    Serial.flush();
+    return true;
+}
+
+// Offers stories by name until the child says yes, then plays one.
+// Always ends by starting SOME story — falling silent after asking a
+// child what they want is worse than playing something.
+static void welcome_offer_story() {
+    // Filtered IN PLACE in the shared table: the offer pool is a subset
+    // of the eligible list, so a second CsStory[CS_MAX_STORIES] would be
+    // ~10 KB of .bss for nothing.
+    CsStory *pool = s_eligible_stories;
+    const int count = story_select_load_eligible(pool, CS_MAX_STORIES);
+    if (count <= 0) {
+        Serial.println("[welcome] no cached stories — falling through to the story session");
+        Serial.flush();
+        handle_story_session();
+        return;
+    }
+
+    // Prefer stories the child has not heard. When every one has been
+    // heard we do NOT quietly forget — we say so, with the reoffer line.
+    int pool_count = 0;
+    for (int i = 0; i < count; i++) {
+        if (!story_heard_contains(pool[i].story_id)) {
+            if (pool_count != i) pool[pool_count] = pool[i];
+            pool_count++;
+        }
+    }
+    const bool all_heard = (pool_count == 0);
+    if (all_heard) {
+        pool_count = count;   // nothing was removed, so the table is intact
+    }
+    Serial.printf("[welcome] offering from %d %s stories\n",
+                  pool_count, all_heard ? "already-heard" : "unheard");
+    Serial.flush();
+
+    char chosen[CS_MAX_STORY_ID_LEN + 1] = "";
+    for (int attempt = 0; attempt < AREG_WELCOME_MAX_OFFERS && pool_count > 0; attempt++) {
+        if (!story_select_pick(pool, pool_count, chosen, sizeof(chosen))) {
+            break;
+        }
+        char clip[CS_MAX_PATH_LEN];
+        const char *kind = all_heard ? CS_CLIP_KIND_REOFFER : CS_CLIP_KIND_OFFER;
+        if (!story_select_resolve_clip_path(chosen, kind, clip, sizeof(clip))) {
+            // No spoken offer rendered for this story yet. Never let a
+            // missing recording stop a child hearing a story: just play it.
+            Serial.printf("[welcome] no %s clip for %s — playing it\n", kind, chosen);
+            Serial.flush();
+            break;
+        }
+        transition_to(ST_PLAYING);
+        audio_speaker_begin();
+        audio_play_story_file(clip, 0, nullptr, nullptr);
+
+        if (!voice_wifi_is_connected()) {
+            break;   // cannot hear a yes — just play what we offered
+        }
+
+        char intent[16];
+        if (!welcome_listen("yesno", intent, sizeof(intent))) {
+            led_for_state(ST_IDLE);
+            return;   // silence — do not start a story into an empty room
+        }
+        if (strcmp(intent, "yes") == 0) {
+            break;
+        }
+        if (strcmp(intent, "no") != 0) {
+            break;   // not understood — stop asking and offer what we have
+        }
+        // A "no" — drop it from the pool and offer the next one.
+        for (int i = 0; i < pool_count; i++) {
+            if (cs_story_ids_equal(pool[i].story_id, chosen)) {
+                for (int j = i + 1; j < pool_count; j++) pool[j - 1] = pool[j];
+                pool_count--;
+                break;
+            }
+        }
+        chosen[0] = '\0';
+    }
+
+    if (chosen[0] == '\0') {
+        // Every offer was refused, or nothing resolved. Play the rotation's
+        // pick rather than leaving the child with nothing.
+        welcome_say(CS_VOICE_ID_JUST_STORY);
+        handle_story_session();
+        return;
+    }
+
+    s_story_offset = 0;
+    cs_copy_bounded(s_current_story_id, sizeof(s_current_story_id), chosen);
+    s_story_preselected = true;
+    handle_story_session();
+}
+
+static void handle_welcome_flow() {
+    // ---- preconditions: return SILENTLY, no sound, no LED change ----
+    // A paused toy is fully silent, and the greeting is the first thing
+    // that would break that promise. The pause flag is seeded from NVS in
+    // setup() and refreshed by a heartbeat just before this runs, so an
+    // offline toy still honors a pause set days ago.
+    if (voice_is_paused()) {
+        Serial.println("[welcome] toy is paused — staying silent");
+        Serial.flush();
+        return;
+    }
+    // Inside the bedtime window the toy's job is to be quiet (or play
+    // music on a press). A cheerful greeting at 21:30 is exactly the kind
+    // of thing that loses a parent's trust.
+    if (voice_in_bedtime_window()) {
+        Serial.println("[welcome] bedtime window — staying silent");
+        Serial.flush();
+        return;
+    }
+    if (!audio_sd_available()) {
+        return;   // every line lives on the card; there is nothing to say
+    }
+
+    // ---- 1. greeting ----
+    char greeting[CS_MAX_PATH_LEN];
+    if (voice_clip_next_greeting(greeting, sizeof(greeting))) {
+        transition_to(ST_PLAYING);
+        audio_speaker_begin();
+        // Barge-in allowed: an impatient child pressing during the hello
+        // should move things along, not be ignored.
+        audio_play_story_file(greeting, 0, story_barge_in_poll, nullptr);
+    }
+
+    // Story disabled at the device AND nothing else to offer → the
+    // greeting was the whole interaction. Never offer a mode the parent
+    // switched off, and never promise a story we are not allowed to tell.
+    const bool story_ok     = story_select_mode_enabled('s');
+    const bool game_ok      = story_select_mode_enabled('g');
+    const bool riddle_ok    = story_select_mode_enabled('r');
+    const bool curiosity_ok = story_select_mode_enabled('c');
+    if (!story_ok && !game_ok && !riddle_ok && !curiosity_ok) {
+        Serial.println("[welcome] every mode disabled — greeting only");
+        Serial.flush();
+        led_for_state(ST_IDLE);
+        return;
+    }
+
+    // ---- 2. offline short-circuit ----
+    // Hearing the child needs the cloud and there is no offline path to
+    // it. Owner decision was voice-only, so the answer is not a second
+    // menu — it is one short line and a story.
+    if (!voice_wifi_is_connected()) {
+        Serial.println("[welcome] offline — going straight to a story");
+        Serial.flush();
+        if (story_ok) {
+            welcome_say(CS_VOICE_ID_JUST_STORY);
+            welcome_offer_story();
+        } else {
+            led_for_state(ST_IDLE);
+        }
+        return;
+    }
+
+    // ---- 3. ask, using the clip that names exactly the enabled modes ----
+    char ask_id[16];
+    char ask_path[CS_MAX_PATH_LEN];
+    bool asked = false;
+    if (cs_build_ask_voice_id(ask_id, sizeof(ask_id),
+                              story_ok, game_ok, riddle_ok, curiosity_ok)
+        && voice_clip_resolve_path(ask_id, ask_path, sizeof(ask_path))) {
+        Serial.printf("[welcome] ask %s\n", ask_id);
+        Serial.flush();
+        transition_to(ST_PLAYING);
+        audio_speaker_begin();
+        audio_play_story_file(ask_path, 0, nullptr, nullptr);
+        asked = true;
+    } else if (welcome_say(CS_VOICE_ID_ASK_ANY)) {
+        asked = true;
+    }
+    if (!asked) {
+        // No prompt is on the card yet. Do not interrogate a child with
+        // silence — just do the thing they most likely wanted.
+        Serial.println("[welcome] no ask clip — going straight to a story");
+        Serial.flush();
+        if (story_ok) welcome_offer_story(); else led_for_state(ST_IDLE);
+        return;
+    }
+
+    // ---- 4. listen, with exactly one retry ----
+    for (int attempt = 1; attempt <= AREG_WELCOME_MAX_TRIES; attempt++) {
+        char intent[16];
+        if (!welcome_listen("mode", intent, sizeof(intent))) {
+            led_for_state(ST_IDLE);
+            return;   // silence — never badger
+        }
+
+        if (strcmp(intent, "story") == 0) {
+            if (story_ok) { welcome_offer_story(); return; }
+            break;
+        }
+        // Calm is always available (MODES.md), and a bedtime cue must not
+        // open a menu — it should settle things down, which here means a
+        // story rather than a game.
+        if (strcmp(intent, "calm") == 0) {
+            break;
+        }
+        // game / riddle / curiosity: the toy holds NO offline content for
+        // these, and wiring them to the online chat path is its own slice
+        // with its own bench session. Until then, say so honestly by
+        // falling through to a story rather than pretending.
+        if (strcmp(intent, "game") == 0 || strcmp(intent, "riddle") == 0
+            || strcmp(intent, "curiosity") == 0) {
+            break;
+        }
+
+        // "unknown" — ask once more, then stop asking.
+        if (attempt < AREG_WELCOME_MAX_TRIES) {
+            welcome_say(CS_VOICE_ID_SAY_AGAIN);
+            continue;
+        }
+        break;
+    }
+
+    // Fell out: mis-heard twice, or asked for something we cannot yet do.
+    // One short line, then a story — the graceful default.
+    welcome_say(CS_VOICE_ID_JUST_STORY);
+    if (story_ok) {
+        welcome_offer_story();
+    } else {
+        led_for_state(ST_IDLE);
+    }
+}
+
 // One continuous story session.
 //
 // Streams the whole story from s_story_offset. A button press cuts the
@@ -626,7 +970,26 @@ static void handle_post_story_flow() {
 // false leaves s_current_story_id empty and the caller falls back to the
 // content pack, then the Wi-Fi stream — exactly the pre-selection chain.
 static bool story_pick_for_session(char *out, size_t out_len) {
-    static CsStory eligible[CS_MAX_STORIES];   // static: ~3.4 KB, not stack
+    // Welcome flow — the child already chose this story out loud, so honor
+    // that instead of the rotation. One-shot: cleared immediately, so a
+    // later press falls back to normal selection. Everything downstream
+    // (the started gate, the cursor, play reporting, the intro clip, the
+    // after-story dialogue) is untouched — which is why preselection is a
+    // flag rather than a second session function.
+    if (s_story_preselected && s_current_story_id[0] != '\0') {
+        s_story_preselected = false;
+        if (story_select_resolve_path(s_current_story_id, out, out_len)) {
+            Serial.printf("[welcome] playing chosen story %s\n", s_current_story_id);
+            Serial.flush();
+            return true;
+        }
+        Serial.printf("[welcome] chosen story %s did not resolve — normal selection\n",
+                      s_current_story_id);
+        Serial.flush();
+        s_current_story_id[0] = '\0';
+    }
+
+    CsStory *eligible = s_eligible_stories;   // shared table, never on the stack
     const int count = story_select_load_eligible(eligible, CS_MAX_STORIES);
     if (count <= 0) {
         Serial.println("[story] no eligible cached stories — using fallback chain");
@@ -808,6 +1171,11 @@ static void handle_story_session() {
                 selection_settled = true;
                 story_select_save_last(s_current_story_id);   // failure is logged + ignored
                 story_select_clear_failed();
+                // Welcome flow — same `started` gate, same reasoning: a
+                // story that resolved but made no sound has NOT been heard,
+                // and recording it would make the toy stop offering a story
+                // the child never got.
+                story_heard_mark(s_current_story_id);
             } else {
                 // Boot-scoped only: a reboot retries this story, which is
                 // safer than skipping it forever on one bad start.
@@ -1341,6 +1709,12 @@ void setup() {
     button_begin();
     DIAG_MARK(120, "button_initialised");
 
+    // Seed the last-known pause / bedtime state from NVS before anything
+    // can make a sound. Without this both read false at power-on, and a
+    // toy that has been off for a week would greet a child whose parent
+    // paused it six days ago.
+    voice_state_restore();
+
     // One-shot PSRAM allocation for the capture buffer.
     s_capture_buf = (int16_t *)heap_caps_malloc(
         AREG_RECORD_BUFFER_BYTES, MALLOC_CAP_SPIRAM);
@@ -1441,6 +1815,21 @@ void setup() {
     Serial.println("[boot] ready — press button to speak");
     Serial.flush();
     DIAG_MARK(150, "ready_idle");
+    transition_to(ST_IDLE);
+
+    // ---- the toy's opening ----
+    // Runs LAST in setup, after the provisioning gesture has had its
+    // chance (holding the button at boot must never be mistaken for an
+    // answer to a menu question).
+    //
+    // One best-effort heartbeat first: it is a ~200 ms POST that already
+    // exists, and it makes the greeting reflect the parent's CURRENT
+    // pause/bedtime state whenever the toy is online. Offline, the values
+    // voice_state_restore() seeded from NVS stand.
+    if (voice_wifi_is_connected()) {
+        voice_send_heartbeat();
+    }
+    handle_welcome_flow();
     transition_to(ST_IDLE);
 }
 

@@ -66,6 +66,22 @@ int s_music_previous_count = 0;
 int s_music_active_count   = 0;
 bool s_music_enabled = false;
 
+// Welcome flow — device-global spoken clips (greetings, menu prompts, the
+// two fallback lines) plus the four parent mode switches, all cached into
+// the index so the toy's opening works with no network.
+CsVoice s_voice_manifest[CS_MAX_VOICE];
+CsVoice s_voice_previous[CS_MAX_VOICE];
+CsVoice s_voice_active[CS_MAX_VOICE];
+int s_voice_manifest_count = 0;
+int s_voice_previous_count = 0;
+int s_voice_active_count   = 0;
+// Default TRUE for all four: a backend that does not send them, or a
+// pre-v4 card, must not silently stop the toy offering anything.
+bool s_mode_story     = true;
+bool s_mode_game      = true;
+bool s_mode_riddle    = true;
+bool s_mode_curiosity = true;
+
 // ---- small helpers (duplicated from ota_apply's file-locals by repo
 // convention: no shared util until a third caller) ----
 
@@ -190,8 +206,10 @@ void load_previous_index() {
     int schema = 0;
     s_previous_count = cs_index_parse(doc, s_previous, CS_MAX_STORIES, &schema);
     s_music_previous_count = cs_index_parse_music(doc, s_music_previous, CS_MAX_MUSIC);
-    Serial.printf("[content-sync] index v%d loaded entries=%d music=%d\n",
-                  schema, s_previous_count, s_music_previous_count);
+    s_voice_previous_count = cs_index_parse_voice(doc, s_voice_previous, CS_MAX_VOICE);
+    Serial.printf("[content-sync] index v%d loaded entries=%d music=%d voice=%d\n",
+                  schema, s_previous_count, s_music_previous_count,
+                  s_voice_previous_count);
     if (schema < 2 && s_previous_count > 0) {
         Serial.printf("[content-sync] legacy v1 index migrated (%s)\n",
                       s_previous[0].story_id);
@@ -231,6 +249,9 @@ bool write_index() {
     // stories are synced or indexed.
     cs_index_build(idx, s_active, s_active_count, AREG_STORY_ID, s_intro_enabled);
     cs_index_add_music(idx, s_music_active, s_music_active_count, s_music_enabled);
+    cs_index_add_voice(idx, s_voice_active, s_voice_active_count);
+    cs_index_add_modes(idx, s_mode_story, s_mode_game,
+                       s_mode_riddle, s_mode_curiosity);
 
     if (SD.exists(kIndexTmpPath)) {
         SD.remove(kIndexTmpPath);
@@ -599,6 +620,92 @@ void sync_music() {
     }
 }
 
+// ---- welcome-flow voice-clip sync ---------------------------------
+//
+// A direct copy of sync_music at clip granularity, and deliberately so:
+// three namespaces on one contract is easier to reason about than one
+// generalised sync with three shapes of caller. Same already-current
+// check, same download/verify/rename helper, same carry-forward (a clip
+// absent from one manifest is not retirement), same per-item isolation —
+// one failed greeting never costs the child the other twenty-three.
+void sync_voice() {
+    int already = 0, downloaded = 0, failed = 0;
+    for (int i = 0; i < s_voice_manifest_count; i++) {
+        CsVoice *clip = &s_voice_manifest[i];
+        char cache_path[CS_MAX_PATH_LEN];
+        if (!cs_build_voice_cache_path(cache_path, sizeof(cache_path),
+                                       clip->voice_id, clip->version)) {
+            failed++;
+            continue;
+        }
+
+        bool ok = false;
+        for (int p = 0; p < s_voice_previous_count; p++) {
+            const CsVoice *prev = &s_voice_previous[p];
+            if (cs_story_ids_equal(prev->voice_id, clip->voice_id)
+                && prev->version == clip->version
+                && prev->verified
+                && prev->size_bytes == clip->size_bytes
+                && hex_equals_ci(prev->sha256, clip->sha256)
+                && sd_file_size(cache_path) == clip->size_bytes) {
+                ok = true;
+                already++;
+                break;
+            }
+        }
+        if (!ok) {
+            char url[CS_MAX_URL_LEN];
+            snprintf(url, sizeof(url),
+                     "/api/devices/content-file?voiceId=%s", clip->voice_id);
+            char temp_path[CS_MAX_PATH_LEN];
+            char label[CS_MAX_STORY_ID_LEN + 8];
+            snprintf(label, sizeof(label), "v:%s", clip->voice_id);
+            if (cs_build_voice_temp_path(temp_path, sizeof(temp_path),
+                                         clip->voice_id, clip->version)) {
+                SD.mkdir("/voice");
+                ok = download_file_verified(label, url, temp_path, cache_path,
+                                            clip->size_bytes, clip->sha256);
+            }
+            if (ok) downloaded++; else failed++;
+        }
+
+        if (ok && s_voice_active_count < CS_MAX_VOICE) {
+            s_voice_active[s_voice_active_count] = *clip;
+            s_voice_active[s_voice_active_count].verified = true;
+            s_voice_active_count++;
+        }
+    }
+
+    // Carry forward verified clips the manifest did not mention.
+    for (int i = 0; i < s_voice_previous_count && s_voice_active_count < CS_MAX_VOICE; i++) {
+        const CsVoice *prev = &s_voice_previous[i];
+        if (!prev->verified) continue;
+        bool present = false;
+        for (int a = 0; a < s_voice_active_count; a++) {
+            if (cs_story_ids_equal(s_voice_active[a].voice_id, prev->voice_id)) {
+                present = true;
+                break;
+            }
+        }
+        if (present) continue;
+        char cache_path[CS_MAX_PATH_LEN];
+        if (!cs_build_voice_cache_path(cache_path, sizeof(cache_path),
+                                       prev->voice_id, prev->version)
+            || sd_file_size(cache_path) != prev->size_bytes) {
+            continue;
+        }
+        s_voice_active[s_voice_active_count++] = *prev;
+    }
+
+    if (s_voice_manifest_count > 0 || s_voice_active_count > 0) {
+        Serial.printf("[content-sync] voice summary offered=%d already=%d "
+                      "downloaded=%d failed=%d voice_active=%d\n",
+                      s_voice_manifest_count, already, downloaded, failed,
+                      s_voice_active_count);
+        Serial.flush();
+    }
+}
+
 // ---- the one sync attempt -----------------------------------------
 
 // All [content-sync] serial lines here are the bench PASS/FAIL evidence
@@ -614,6 +721,9 @@ void content_sync_run() {
     s_music_manifest_count = 0;
     s_music_previous_count = 0;
     s_music_active_count   = 0;
+    s_voice_manifest_count = 0;
+    s_voice_previous_count = 0;
+    s_voice_active_count   = 0;
 
     // ---- 1. Manifest ----
     HTTPClient http;
@@ -646,13 +756,27 @@ void content_sync_run() {
     s_music_enabled = doc["bedtimeMusicEnabled"] | false;
     s_music_manifest_count = cs_manifest_parse_music(
         doc["music"].as<JsonArrayConst>(), s_music_manifest, CS_MAX_MUSIC);
+    // Welcome flow — the four parent mode switches and the device-global
+    // spoken clips. Every field absent (a pre-welcome backend) means
+    // "every mode on, no clips", which is exactly the pre-welcome toy.
+    s_mode_story     = doc["storyEnabled"]     | true;
+    s_mode_game      = doc["gameEnabled"]      | true;
+    s_mode_riddle    = doc["riddleEnabled"]    | true;
+    s_mode_curiosity = doc["curiosityEnabled"] | true;
+    s_voice_manifest_count = cs_manifest_parse_voice(
+        doc["voice"].as<JsonArrayConst>(), s_voice_manifest, CS_MAX_VOICE);
     Serial.printf("[content-sync] manifest status=200 stories=%u introEnabled=%d "
-                  "music=%d musicEnabled=%d\n",
+                  "music=%d musicEnabled=%d voice=%d modes=%d%d%d%d\n",
                   stories.isNull() ? 0U : (unsigned)stories.size(),
                   s_intro_enabled ? 1 : 0,
-                  s_music_manifest_count, s_music_enabled ? 1 : 0);
+                  s_music_manifest_count, s_music_enabled ? 1 : 0,
+                  s_voice_manifest_count,
+                  s_mode_story ? 1 : 0, s_mode_game ? 1 : 0,
+                  s_mode_riddle ? 1 : 0, s_mode_curiosity ? 1 : 0);
     Serial.flush();
-    if ((stories.isNull() || stories.size() == 0) && s_music_manifest_count == 0) {
+    if ((stories.isNull() || stories.size() == 0)
+        && s_music_manifest_count == 0
+        && s_voice_manifest_count == 0) {
         // An empty manifest is NOT a retirement instruction. The index and
         // every cached MP3 are left exactly as they are.
         Serial.println("[content-sync] no content — existing cache untouched");
@@ -667,7 +791,8 @@ void content_sync_run() {
                       stats.offered, CS_MAX_STORIES, stats.truncated);
         Serial.flush();
     }
-    if (s_manifest_count == 0 && s_music_manifest_count == 0) {
+    if (s_manifest_count == 0 && s_music_manifest_count == 0
+        && s_voice_manifest_count == 0) {
         Serial.println("[content-sync] no valid items — existing cache untouched");
         Serial.flush();
         return;
@@ -732,9 +857,12 @@ void content_sync_run() {
     // ---- 4b. Bedtime music (Slice E) ----
     sync_music();
 
+    // ---- 4c. Welcome-flow spoken clips ----
+    sync_voice();
+
     // ---- 5. Index written LAST, once ----
     bool index_written = false;
-    if (s_active_count > 0 || s_music_active_count > 0) {
+    if (s_active_count > 0 || s_music_active_count > 0 || s_voice_active_count > 0) {
         index_written = write_index();
         if (!index_written) {
             // The previous index survives a failed replacement; every MP3

@@ -484,6 +484,117 @@ hardware:
 
 None of that has been run. Do not mark A6 DONE without recorded evidence.
 
+## Welcome flow — the toy's opening (`handle_welcome_flow`)
+
+Before this, the toy was **silent at power-on** and one button press always
+started or resumed a story. Now, at the end of `setup()`:
+
+```
+greeting  → "what shall we do?" → child answers OUT LOUD
+          → "Do you want to hear «X»?"   (a story they have not heard)
+          → or "We already heard «X» — shall I tell it again?"
+          → "yes" → the story plays, exactly as before
+```
+
+**Every line the toy speaks here is a pre-rendered MP3 from the SD card**
+(`/voice/<id>-v<n>.mp3`, synced by content_sync from the manifest's new
+`voice[]` array). Speaking therefore works offline, costs nothing, and adds no
+delay. Only **hearing** the child needs the network.
+
+Shape is copied from `handle_post_story_flow` — play a clip, open a listening
+window, record, upload, act — so there is **no new state enum, no new LED
+vocabulary and no state machine**. It is a blocking call from `setup()`, exactly
+like a story session is a blocking call from the IDLE branch.
+
+### Behaviour that is deliberate
+
+| Situation | What happens | Why |
+|---|---|---|
+| Toy is paused | **silent** — no greeting at all | A paused toy is fully silent; the greeting would be the first thing to break that promise |
+| Inside the bedtime window | **silent** | A cheerful hello at 21:30 loses a parent's trust |
+| No SD card | silent | Every line lives on the card |
+| No greetings synced yet | skips to the ask | A half-synced card degrades quietly, never mid-sentence |
+| Offline | one short line, then a story | Hearing the child needs the cloud, and the owner chose voice-only — so the fallback is a graceful DEFAULT, not a second menu |
+| Nobody answers | goes quiet | Silence usually means nobody is there. A toy that keeps asking an empty room is the opposite of what a parent wants |
+| Mis-heard | «say again» once, then a story | Two tries. A third reads as nagging to a five-year-old |
+| Child asks for game / riddle / curiosity | falls through to a story | The toy holds **no offline content** for these; wiring them to the online chat path is its own slice with its own bench session |
+| Every mode disabled | greeting only, then stop | Never promise something the parent switched off |
+| A story has no `offer` clip | plays it instead of offering | A missing recording must never be why a child hears nothing |
+| A press (not power-on) | unchanged — starts/resumes a story | A child who wants the next story should not be interrogated every time |
+
+### What it added on the device
+
+- **Index schema v3 → v4**: root `voice[]` plus the four parent mode flags
+  (`storyEnabled` / `gameEnabled` / `riddleEnabled` / `curiosityEnabled`).
+  A superset, like every previous bump — a v3 card parses as "no voice clips,
+  every mode enabled", so **no card ever has to be wiped**.
+- **`CS_MAX_CLIPS` 5 → 7** for the per-story `offer` / `reoffer` lines.
+- **`CS_MAX_VOICE` = 32** device-global clips.
+- **NVS `aregvoice`/`last_greet`** — the greeting rotation cursor.
+- **NVS `aregheard`/`ids`** — which stories have been heard, as one bounded
+  blob. Needed because `story_report` DELETES each play event once the backend
+  accepts it, so the only other surviving memory is the single `last_id`.
+  Written under the same `started` gate as the rotation cursor: a story that
+  resolved but made no sound has not been heard.
+- **NVS `aregstate`** — last-known pause / bedtime, written only on change.
+  Without it both read `false` at power-on and a toy that had been off for a
+  week would greet a child whose parent paused it six days ago.
+
+### RAM cost — measured, not estimated
+
+| Build | Globals | Free for locals |
+|---|---|---|
+| before the welcome flow | 139,632 B | 188,048 B |
+| first draft (`CS_MAX_VOICE` 48, per-function tables) | 217,168 B | **110,512 B** |
+| **shipped** | 170,000 B | **157,680 B** |
+
+The first draft was rejected on these numbers: ~110 KB leaves too little on a
+board that also wants 40–50 KB for a TLS handshake while audio is playing. The
+30 KB was recovered by dropping `CS_MAX_VOICE` to 32, sharing one voice scratch
+table between both readers, sharing ONE eligible-story table across the offer
+loop and `story_pick_for_session`, and building only the chosen greeting's path
+instead of all of them.
+
+`CS_MAX_CLIPS` 5 → 7 also broke the **test bench** build (`dram0_0_seg`
+overflowed by 130 KB) because eleven test functions each held their own
+`static CsStory[CS_MAX_STORIES]`. They now share one set of scratch buffers.
+
+### Bench verification — NOT yet run
+
+Nothing below has been observed on hardware. Compile-verified only.
+
+```
+[content-sync] manifest status=200 stories=... voice=28 modes=1111
+[content-sync] voice summary offered=28 already=0 downloaded=28 failed=0 voice_active=28
+[state] restored paused=0 bedtime=0
+[welcome] greeting greet-07
+[welcome] ask ask-sgrc
+[welcome] listening (mode)
+[welcome] intent=story
+[welcome] offering from 6 unheard stories
+[welcome] listening (yesno)
+[welcome] intent=yes
+[welcome] playing chosen story anban-huri
+[welcome] heard anban-huri (1 known)
+```
+
+By ear, in this order:
+
+1. power on → a greeting plays → the question follows → say «հեքիաթ» → it offers
+   an **unheard** story → say «այո» → it plays;
+2. power on again → a **different** greeting;
+3. unplug the router, power on → greeting, one short line, a story starts;
+4. pause the toy in the dashboard, power on → **silence**;
+5. hear every story, then power on → the «shall I tell it again?» line;
+6. press the button mid-session → the story pauses/resumes on the SAME story,
+   and the welcome flow does not re-run.
+
+The pure decision logic (clip kinds, ask-id composition, voice manifest parse,
+index v4 round-trip, **v3 forward compatibility**) is covered by
+`content_sync_test.cpp` under `-DAREG_CONTENT_SYNC_TEST_BENCH`. The NVS and SD
+halves — greeting rotation persistence, the heard set, the flow itself — are
+hardware-only, as the music and clip sync were before them.
+
 ## Known C1 limitations (deliberate, deferred)
 
 - Buffered response playback — streaming comes later.

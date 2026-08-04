@@ -382,3 +382,105 @@ void cs_index_add_music(JsonDocument &doc, const CsMusic *music, int count,
 bool cs_index_music_enabled(JsonDocument &doc) {
     return doc["musicEnabled"] | false;
 }
+
+// ---- welcome flow (index schema v4) --------------------------------
+
+int cs_manifest_parse_voice(JsonArrayConst voice, CsVoice *out, int max_out) {
+    if (out == nullptr || max_out <= 0 || voice.isNull()) {
+        return 0;
+    }
+    int count = 0;
+    for (JsonObjectConst item : voice) {
+        if (count >= max_out) {
+            // Truncation is reported by the caller's summary line, never
+            // fatal — the same posture an over-long story manifest gets.
+            break;
+        }
+        const char *voice_id = item["voiceId"]   | "";
+        const int   version  = item["version"]   | 1;
+        const char *sha256   = item["sha256"]    | "";
+        const long  size     = item["sizeBytes"] | 0L;
+        const bool  enabled  = item["enabled"]   | false;
+        if (!enabled || !cs_is_valid_story_id(voice_id)
+            || !cs_is_sha256_hex(sha256) || !cs_is_valid_size(size)) {
+            Serial.printf("[content-sync] voice item rejected (%s)\n", voice_id);
+            continue;
+        }
+        bool dup = false;
+        for (int i = 0; i < count; i++) {
+            if (cs_story_ids_equal(out[i].voice_id, voice_id)) { dup = true; break; }
+        }
+        if (dup) continue;
+        CsVoice *dst = &out[count];
+        memset(dst, 0, sizeof(*dst));
+        // A truncated id or hash would address the WRONG file, so
+        // truncation is rejected rather than stored.
+        if (!cs_copy_bounded(dst->voice_id, sizeof(dst->voice_id), voice_id)
+            || !cs_copy_bounded(dst->sha256, sizeof(dst->sha256), sha256)) {
+            continue;
+        }
+        dst->version    = cs_normalize_version(version);
+        dst->size_bytes = size;
+        dst->verified   = false;
+        count++;
+    }
+    return count;
+}
+
+int cs_index_parse_voice(JsonDocument &doc, CsVoice *out, int max_out) {
+    if (out == nullptr || max_out <= 0 || !doc["voice"].is<JsonArrayConst>()) {
+        return 0;
+    }
+    int count = 0;
+    for (JsonObjectConst e : doc["voice"].as<JsonArrayConst>()) {
+        if (count >= max_out) break;
+        const char *vid = e["voiceId"] | "";
+        const char *sha = e["sha256"]  | "";
+        if (!cs_is_valid_story_id(vid) || !cs_is_sha256_hex(sha)) {
+            continue;
+        }
+        CsVoice *dst = &out[count];
+        memset(dst, 0, sizeof(*dst));
+        if (!cs_copy_bounded(dst->voice_id, sizeof(dst->voice_id), vid)
+            || !cs_copy_bounded(dst->sha256, sizeof(dst->sha256), sha)) {
+            continue;
+        }
+        dst->version    = cs_normalize_version(e["version"] | 1);
+        dst->size_bytes = e["sizeBytes"] | 0L;
+        dst->verified   = e["verified"] | false;
+        count++;
+    }
+    return count;
+}
+
+void cs_index_add_voice(JsonDocument &doc, const CsVoice *voice, int count) {
+    if (voice == nullptr || count <= 0) {
+        return;
+    }
+    JsonArray arr = doc["voice"].to<JsonArray>();
+    for (int i = 0; i < count; i++) {
+        JsonObject e = arr.add<JsonObject>();
+        e["voiceId"]   = voice[i].voice_id;
+        e["version"]   = voice[i].version;
+        e["sha256"]    = voice[i].sha256;
+        e["sizeBytes"] = voice[i].size_bytes;
+        e["verified"]  = voice[i].verified;
+    }
+}
+
+void cs_index_add_modes(JsonDocument &doc, bool story, bool game,
+                        bool riddle, bool curiosity) {
+    doc["storyEnabled"]     = story;
+    doc["gameEnabled"]      = game;
+    doc["riddleEnabled"]    = riddle;
+    doc["curiosityEnabled"] = curiosity;
+}
+
+bool cs_index_mode_enabled(JsonDocument &doc, const char *key) {
+    if (key == nullptr) {
+        return true;
+    }
+    // Absent → true. A pre-v4 card, or a manifest from a backend that does
+    // not send the flags, must not silently stop the toy offering anything.
+    return doc[key] | true;
+}
