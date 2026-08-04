@@ -39,6 +39,23 @@
 //   manifest-snippet.json with sha256 + sizeBytes per file — paste-ready
 //   for the ContentSync config (remember to BUMP each story's Version,
 //   or devices will keep their cached copy).
+//
+// LEVEL THE OUTPUT BEFORE SHIPPING IT (2026-08-04)
+//   What comes back from the API sits near -27 LUFS. The renders the owner
+//   approved sit near -16.4 LUFS. That is ~11 dB, and on a phone speaker or
+//   the toy's small speaker the quiet version reads as thin and far away —
+//   the owner heard it as the voice quality being ruined. Levelling is not
+//   done in this tool (it has no audio dependency and stays that way), so it
+//   is a manual step per file, two-pass so the gain is measured not guessed:
+//
+//     ffmpeg -i in.mp3 -af loudnorm=I=-16.4:TP=-1.0:LRA=11:print_format=json -f null -
+//     ffmpeg -i in.mp3 -af "loudnorm=I=-16.4:TP=-1.0:LRA=11:measured_I=<input_i>:\
+//       measured_TP=<input_tp>:measured_LRA=<input_lra>:measured_thresh=<input_thresh>:\
+//       offset=<target_offset>:linear=true" -ar 44100 -ac 1 -c:a libmp3lame -b:a 192k out.mp3
+//
+//   192 kbps against a 128 kbps source keeps the extra MP3 generation cheap.
+//   Re-hash and re-measure AFTER levelling — the manifest describes the file
+//   that ships, not the one the API returned.
 // ---------------------------------------------------------------------
 
 using System.Security.Cryptography;
