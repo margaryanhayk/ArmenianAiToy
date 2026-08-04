@@ -30,6 +30,10 @@
 //                       menu prompts, fallbacks) from
 //                       backend/content/voice-clips/voice-clips.json. Needs no
 //                       --story: these belong to no story. One file per clip id.
+//   --only <name>       repeatable; render only these jobs, by output filename
+//                       without .mp3 (greet-01, anban-huri--offer, ...). SAMPLE
+//                       BEFORE YOU BATCH: the narrator voice is still interim,
+//                       so a full render is thrown away when it changes.
 //   --speed <x>         voice_settings.speed, ElevenLabs range 0.7–1.2 (default 1.0)
 //   --model <id>        default eleven_multilingual_v2
 //   --output <dir>      default %TEMP%/areg-elevenlabs-render
@@ -74,6 +78,7 @@ var storyIds = new List<string>();
 var all = false;
 var clips = false;
 var voiceClips = false;
+var only = new List<string>();
 var render = false;
 var confirmPaid = false;
 double speed = 1.0;
@@ -104,6 +109,7 @@ for (var i = 0; i < args.Length; i++)
         case "--all": all = true; break;
         case "--clips": clips = true; break;
         case "--voice-clips": voiceClips = true; break;
+        case "--only": only.Add(args[++i]); break;
         case "--render": render = true; break;
         case "--confirm-paid-api": confirmPaid = true; break;
         case "--speed": speed = double.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture); break;
@@ -248,6 +254,27 @@ foreach (var story in stories)
         jobs.Add(($"{story.Id}--reoffer.mp3", $"{story.Id} reoffer",
             [templates.Reoffer.Replace("{Title}", story.Title)]));
     }
+}
+
+// --only narrows the batch to named clip ids. This exists because the
+// narrator voice is still INTERIM: rendering the whole set in a voice that
+// is going to be replaced is work, money and listening time thrown away
+// twice. Sample first, batch once the voice is final.
+if (only.Count > 0)
+{
+    var wanted = new HashSet<string>(only, StringComparer.OrdinalIgnoreCase);
+    var before = jobs.Count;
+    jobs = jobs.Where(j =>
+        wanted.Contains(Path.GetFileNameWithoutExtension(j.FileName))
+        || wanted.Contains(j.Label)).ToList();
+    if (jobs.Count == 0)
+    {
+        Console.Error.WriteLine(
+            $"--only matched none of the {before} available job(s). Names are the "
+            + "output filename without .mp3, e.g. greet-01 or anban-huri--offer.");
+        return 2;
+    }
+    Console.WriteLine($"--only: {jobs.Count} of {before} job(s) selected.");
 }
 
 var totalChars = jobs.Sum(j => j.Chunks.Sum(c => c.Length));
