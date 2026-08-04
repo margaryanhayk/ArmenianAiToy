@@ -1,3 +1,4 @@
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Services;
 using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Domain.Enums;
@@ -127,12 +128,16 @@ public class ParentServiceUnlinkDeviceTests
     }
 
     [Fact]
-    public async Task UnlinkDeviceAsync_LastRemainingLink_DeletesDeviceAndCascadesSubtree()
+    public async Task UnlinkDeviceAsync_LastRemainingLink_ErasesFamilyData_ButKeepsTheToy()
     {
         var (service, db, conn) = await CreateServiceAsync();
         await using var _ = conn;
         var parentId = SeedParent(db);
         var (deviceId, childId, convId, msgId) = SeedDeviceWithChildAndConversation(db);
+        // Give the toy a claim code, as a real one has: the point of this
+        // test is that the code survives the unlink.
+        (await db.Set<Device>().FindAsync(deviceId))!.ClaimCodeHash =
+            DeviceApiKeyHasher.Hash("AREG-CLAIM-7H3K-9QXZ");
         db.Set<ParentDevice>().Add(new ParentDevice
         {
             ParentId = parentId, DeviceId = deviceId, LinkedAt = DateTime.UtcNow
@@ -151,17 +156,73 @@ public class ParentServiceUnlinkDeviceTests
         Assert.True(result);
         // ParentDevice link gone.
         Assert.Equal(0, await db.Set<ParentDevice>().CountAsync());
-        // Device orphaned → deleted; cascade FKs took the subtree.
-        Assert.Null(await db.Set<Device>().FindAsync(deviceId));
+        // Every trace of THIS FAMILY is erased.
         Assert.Null(await db.Set<Child>().FindAsync(childId));
         Assert.Null(await db.Set<Conversation>().FindAsync(convId));
         Assert.Null(await db.Set<Message>().FindAsync(msgId));
-        Assert.Equal(0, await db.Set<Device>().CountAsync());
         Assert.Equal(0, await db.Set<Child>().CountAsync());
         Assert.Equal(0, await db.Set<Conversation>().CountAsync());
         Assert.Equal(0, await db.Set<Message>().CountAsync());
+
+        // KEYSTONE: the TOY survives. Deleting the Device row here also
+        // destroyed its identity and its backend key, so the QR printed on
+        // the toy pointed at nothing and it could never be paired again.
+        var device = await db.Set<Device>().FindAsync(deviceId);
+        Assert.NotNull(device);
+        Assert.NotNull(device!.ClaimCodeHash);   // still pairable from its QR
+
+        // Back to factory settings for whoever pairs it next. The name is the
+        // important one — it is usually a child's name.
+        Assert.Equal(string.Empty, device.Name);
+        Assert.Null(device.ClaimedAt);
+        Assert.False(device.IsPaused);
+        Assert.Null(device.BedtimeStart);
+        Assert.Null(device.BedtimeEnd);
+        Assert.True(device.StoryEnabled);
+        Assert.True(device.StoryIntroEnabled);
+        Assert.False(device.BedtimeMusicEnabled);
+
         // Parent itself is unrelated to the unlink — still there.
         Assert.NotNull(await db.Set<Parent>().FindAsync(parentId));
+    }
+
+    [Fact]
+    public async Task UnlinkedToy_CanBePairedAgainFromItsQr_AndTheNewFamilySeesNothingOld()
+    {
+        var (service, db, conn) = await CreateServiceAsync();
+        await using var _ = conn;
+        var oldParent = SeedParent(db);
+        var (deviceId, _, _, _) = SeedDeviceWithChildAndConversation(db);
+        const string code = "AREG-CLAIM-7H3K-9QXZ";
+        var device = await db.Set<Device>().FindAsync(deviceId);
+        device!.ClaimCodeHash = DeviceApiKeyHasher.Hash(code);
+        db.Set<ParentDevice>().Add(new ParentDevice
+        {
+            ParentId = oldParent, DeviceId = deviceId, LinkedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        Assert.True(await service.UnlinkDeviceAsync(oldParent, deviceId));
+
+        // A different family buys / is given the toy and scans the same QR.
+        var newParent = Guid.NewGuid();
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = newParent, Email = "new@x.com", PasswordHash = "x",
+            RegisteredAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        // KEYSTONE: this is the whole point of the change — unlink is no
+        // longer a one-way door.
+        Assert.True(await service.ClaimDeviceAsync(newParent, deviceId, code));
+        Assert.True(await db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == newParent && pd.DeviceId == deviceId));
+
+        // ...and they inherit none of the previous family's data.
+        Assert.Equal(0, await db.Set<Child>().CountAsync());
+        Assert.Equal(0, await db.Set<Conversation>().CountAsync());
+        Assert.Equal(0, await db.Set<Message>().CountAsync());
     }
 
     [Fact]

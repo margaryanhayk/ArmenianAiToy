@@ -30,6 +30,7 @@ public class ChatControllerPath5Tests
         // default for Task<bool>), so the pause gate added in the B3 commit is a
         // no-op here and these Path-5 tests exercise the same code path as before.
         var deviceService = Substitute.For<IDeviceService>();
+        deviceService.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         // Cost-cap gate added in feature/openai-daily-cost-cap. Disabled here so
         // these Path-5 tests exercise the same code path as before (cap gate
         // never trips, no recording).
@@ -104,6 +105,7 @@ public class ChatControllerPath5Tests
         // mirrors the pause gate (SafetyFlag.Clean, canned text).
         var chatService = Substitute.For<IChatService>();
         var deviceService = Substitute.For<IDeviceService>();
+        deviceService.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
         deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
             .Returns(true);
@@ -138,6 +140,7 @@ public class ChatControllerPath5Tests
                 Arg.Any<Guid?>(), Arg.Any<string?>())
             .Returns(new ChatResponse("hi back", Guid.NewGuid(), Guid.NewGuid(), SafetyFlag.Clean));
         var deviceService = Substitute.For<IDeviceService>();
+        deviceService.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
         deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
             .Returns(false);
@@ -173,6 +176,7 @@ public class ChatControllerPath5Tests
                 Arg.Any<Guid?>(), Arg.Any<string?>())
             .Returns(new ChatResponse("ok", Guid.NewGuid(), Guid.NewGuid(), SafetyFlag.Clean));
         var deviceService = Substitute.For<IDeviceService>();
+        deviceService.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
         deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
             .Returns(false);
@@ -250,6 +254,7 @@ public class ChatControllerPath5Tests
                 Arg.Any<Guid?>(), Arg.Any<string?>())
             .Returns(new ChatResponse("shh", Guid.NewGuid(), Guid.NewGuid(), SafetyFlag.Clean));
         var deviceService = Substitute.For<IDeviceService>();
+        deviceService.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
         deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
             .Returns(false);
@@ -291,6 +296,7 @@ public class ChatControllerPath5Tests
                 Arg.Any<Guid?>(), Arg.Any<string?>())
             .Returns(new ChatResponse("ok", Guid.NewGuid(), Guid.NewGuid(), SafetyFlag.Clean));
         var deviceService = Substitute.For<IDeviceService>();
+        deviceService.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
         deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>())
             .Returns(false);

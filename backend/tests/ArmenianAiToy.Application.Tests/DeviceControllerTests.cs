@@ -22,6 +22,7 @@ public class DeviceControllerTests
         string? forceHeader = null)
     {
         var svc = Substitute.For<IDeviceService>();
+        svc.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var cfg = new ConfigurationBuilder()
             .AddInMemoryCollection(config.Select(p => new KeyValuePair<string, string?>(p.Key, p.Value)))
             .Build();

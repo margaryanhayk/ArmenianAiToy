@@ -38,6 +38,7 @@ public class DeviceAuthMiddlewareTests
     {
         var device = new Device { Id = Guid.NewGuid(), LastSeenAt = DateTime.UtcNow.AddMinutes(-5) };
         var svc = Substitute.For<IDeviceService>();
+        svc.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         svc.ValidateDeviceAsync(Arg.Any<Guid>(), Arg.Any<string>()).Returns(device);
 
         var order = new List<string>();
@@ -55,6 +56,7 @@ public class DeviceAuthMiddlewareTests
     {
         var device = new Device { Id = Guid.NewGuid(), LastSeenAt = DateTime.UtcNow }; // within throttle window
         var svc = Substitute.For<IDeviceService>();
+        svc.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         svc.ValidateDeviceAsync(Arg.Any<Guid>(), Arg.Any<string>()).Returns(device);
 
         var nextRan = false;
@@ -70,6 +72,7 @@ public class DeviceAuthMiddlewareTests
     {
         var device = new Device { Id = Guid.NewGuid(), LastSeenAt = DateTime.UtcNow.AddMinutes(-5) };
         var svc = Substitute.For<IDeviceService>();
+        svc.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         svc.ValidateDeviceAsync(Arg.Any<Guid>(), Arg.Any<string>()).Returns(device);
         svc.UpdateLastSeenAsync(device.Id).Returns(Task.FromException(new InvalidOperationException("db down")));
 
@@ -86,6 +89,7 @@ public class DeviceAuthMiddlewareTests
     public async Task InvalidCreds_Returns401_DoesNotCallNextOrRefresh()
     {
         var svc = Substitute.For<IDeviceService>();
+        svc.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         svc.ValidateDeviceAsync(Arg.Any<Guid>(), Arg.Any<string>()).Returns((Device?)null);
 
         var nextRan = false;

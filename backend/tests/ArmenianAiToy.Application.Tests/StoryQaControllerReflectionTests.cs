@@ -68,6 +68,7 @@ public class StoryQaControllerReflectionTests
         var childService = Substitute.For<IChildService>();
         childService.GetDefaultChildForDeviceAsync(Arg.Any<Guid>()).Returns((Child?)null);
         var deviceService = Substitute.For<IDeviceService>();
+        deviceService.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var library = new InMemoryCuratedStoryLibrary();
         var questions = new LibraryStoryQuestionService(aiChatClient);
         var env = Substitute.For<IWebHostEnvironment>();

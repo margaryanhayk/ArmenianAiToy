@@ -61,6 +61,7 @@ public class StoryQaControllerModerationTests
         var childService = Substitute.For<IChildService>();
         childService.GetDefaultChildForDeviceAsync(Arg.Any<Guid>()).Returns((Child?)null);
         var deviceService = Substitute.For<IDeviceService>();
+        deviceService.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var library = new InMemoryCuratedStoryLibrary();
         // Real question service over the substituted answer model, so we
         // can assert whether the GPT call happened from the controller's
@@ -622,6 +623,7 @@ public class StoryQaControllerModerationTests
         var childService = Substitute.For<IChildService>();
         childService.GetDefaultChildForDeviceAsync(Arg.Any<Guid>()).Returns((Child?)null);
         var deviceService = Substitute.For<IDeviceService>();
+        deviceService.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         deviceService.IsDevicePausedAsync(Arg.Any<Guid>()).Returns(false);
         deviceService.IsDeviceInBedtimeWindowAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(false);
         deviceService.IsModeEnabledForRequestAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), DetectedMode.Story)

@@ -304,6 +304,14 @@ public class AudioChatController : ControllerBase
     private async Task<IActionResult?> CheckGatesAndCostCapAsync(
         Guid deviceId, CancellationToken cancellationToken)
     {
+        // Runs FIRST, ahead of pause: a toy with no linked parent was
+        // unlinked and is waiting to be paired again from its QR, so nobody
+        // could see or stop what it says. Same canned resting clip as pause.
+        if (!await _deviceService.HasLinkedParentAsync(deviceId))
+        {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "unclaimed"));
+            return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
+        }
         if (await _deviceService.IsDevicePausedAsync(deviceId))
         {
             AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "paused"));

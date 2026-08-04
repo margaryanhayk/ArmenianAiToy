@@ -44,7 +44,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2231 tests)
+dotnet test                                     # Run all tests (2237 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2324,15 +2324,48 @@ online, and manage it. Backend + firmware are code-complete; the mobile app
 - **Wi-Fi credentials** — travel phone→toy only (BLE provisioning), never to
   the backend.
 
-**Pairing (Phase A.2).** `POST /api/parents/devices/claim`
-`{ deviceId, claimCode }` (parent-JWT, `[EnableRateLimiting("auth")]`). On
-success links the toy + consumes the code; **one uniform 400** for every
-failure (unknown device / already claimed / wrong code) — no existence leak.
-`Device.ClaimCodeHash` (PBKDF2 via `DeviceApiKeyHasher`, same as device keys) +
-`ClaimedAt`. The mint side is the provisioning-secret-gated
+**Pairing (Phase A.2, re-pairable since 2026-08-04).**
+`POST /api/parents/devices/claim` `{ deviceId, claimCode }` (parent-JWT,
+`[EnableRateLimiting("auth")]`). **One uniform 400** for every failure
+(unknown device / wrong code / seats full / revoked) — no existence leak.
+`Device.ClaimCodeHash` (PBKDF2 via `DeviceApiKeyHasher`, same as device keys)
++ `ClaimedAt`. The mint side is the provisioning-secret-gated
 `POST /api/devices/register`, whose `DeviceRegistrationResponse` carries
 `DeviceId`, `ApiKey`, `ClaimCode`, and a `QrPayload` (`{ deviceId, claim }`
 JSON) for the factory station's QR. Audited `ParentDeviceClaimed`.
+
+**The claim code is NOT consumed** (owner decision 2026-08-04). The QR is
+printed on the toy, so it has to keep working for the toy's whole life: a
+second parent joining, and re-pairing after an unlink. It used to be cleared
+on first use, which — together with the unlink cascade deleting the `Device`
+row — made unlink a one-way door that scrapped the toy.
+
+Three invariants replace single-use, all pinned by
+`ParentServiceClaimDeviceTests` / `ParentServiceUnlinkDeviceTests` /
+`ChatGateEvaluatorTests`:
+- **Seat limit, not secrecy.** `ParentService.MaxParentsPerDevice = 2` (both
+  parents in a household). A toy at its limit cannot be claimed, so copying
+  the QR off a toy that is already owned gets you nothing. Re-claiming a toy
+  you already hold is a no-op success and takes no second seat.
+- **A revoked toy is never claimable.** Revoke is the lost/stolen
+  kill-switch; if claiming reopened it, a thief could scan the QR and take
+  ownership. `IsRevoked` is deliberately NOT reset by unlink. Reversing it
+  stays a deliberate act by someone who already holds the toy, or an operator.
+- **A toy with zero linked parents goes quiet.**
+  `ChatGateEvaluator.GateDecision.Unclaimed` runs ahead of pause/bedtime/mode
+  on both the text and voice paths (`IDeviceService.HasLinkedParentAsync`),
+  because there is no parent who could see or stop it. Derived, not stored —
+  claiming wakes it on the next request with nothing to switch back on.
+
+**Unlink keeps the toy, erases the family.** The last-parent branch of
+`ParentService.UnlinkDeviceAsync` removes `Conversation` (Messages cascade),
+`Child`, `StoryPlay`, `StoryReflectionAnswer` and `DeviceCommand` explicitly,
+runs the C2.2a audio-blob cleanup, and resets the toy to factory settings
+(`Name` cleared — it is usually a child's name — plus `ClaimedAt`, pause,
+bedtime, the four mode flags, story-intro and bedtime-music). The `Device`
+row itself SURVIVES. The `ParentDeviceUnlinked` audit row still reports
+`orphan_cascaded: true`, which has always meant "the family subtree was
+erased"; the toy surviving does not change what was erased.
 
 **Presence.** `LinkedDeviceDto.IsOnline` is derived (reporting-only, nothing
 gated on it): `UtcNow - LastSeenAt < Presence:OnlineThresholdSeconds`

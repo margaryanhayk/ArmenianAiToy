@@ -18,9 +18,51 @@ public class ChatGateEvaluatorTests
         new(2026, 4, 24, 10, 0, 0, DateTimeKind.Utc);
 
     [Fact]
+    public async Task Evaluate_NoLinkedParent_ReturnsUnclaimed_AheadOfEveryOtherGate()
+    {
+        var device = Substitute.For<IDeviceService>();
+        var deviceId = Guid.NewGuid();
+        device.HasLinkedParentAsync(deviceId).Returns(false);
+        // Even with every other gate wide open, an unowned toy stays quiet.
+        device.IsDevicePausedAsync(deviceId).Returns(false);
+        device.IsDeviceInBedtimeWindowAsync(deviceId, FixedNowUtc).Returns(false);
+        device.IsModeEnabledForRequestAsync(deviceId, null, DetectedMode.Story).Returns(true);
+
+        var result = await ChatGateEvaluator.EvaluateAsync(
+            device, deviceId, "պատմիր հեքիաթ", childId: null, FixedNowUtc);
+
+        // KEYSTONE: a toy that has been unlinked has no parent who could see,
+        // pause or stop it. It must not keep talking to a child while it
+        // waits to be paired again.
+        Assert.Equal(ChatGateEvaluator.GateDecision.Unclaimed, result);
+        await device.DidNotReceiveWithAnyArgs().IsDevicePausedAsync(default);
+        await device.DidNotReceiveWithAnyArgs().IsDeviceInBedtimeWindowAsync(default, default);
+        await device.DidNotReceiveWithAnyArgs()
+            .IsModeEnabledForRequestAsync(default, default, default);
+    }
+
+    [Fact]
+    public async Task Evaluate_ClaimedAgain_WakesUpWithNoStoredFlagToClear()
+    {
+        var device = Substitute.For<IDeviceService>();
+        var deviceId = Guid.NewGuid();
+        // The only thing that changed is that a parent now holds the toy.
+        device.HasLinkedParentAsync(deviceId).Returns(true);
+        device.IsDevicePausedAsync(deviceId).Returns(false);
+        device.IsDeviceInBedtimeWindowAsync(deviceId, FixedNowUtc).Returns(false);
+        device.IsModeEnabledForRequestAsync(deviceId, null, DetectedMode.Story).Returns(true);
+
+        var result = await ChatGateEvaluator.EvaluateAsync(
+            device, deviceId, "պատմիր հեքիաթ", childId: null, FixedNowUtc);
+
+        Assert.Equal(ChatGateEvaluator.GateDecision.Allow, result);
+    }
+
+    [Fact]
     public async Task Evaluate_Paused_ReturnsPausedWithoutCheckingOtherGates()
     {
         var device = Substitute.For<IDeviceService>();
+        device.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var deviceId = Guid.NewGuid();
         device.IsDevicePausedAsync(deviceId).Returns(true);
 
@@ -38,6 +80,7 @@ public class ChatGateEvaluatorTests
     public async Task Evaluate_Bedtime_ReturnsBedtimeWithoutCheckingMode()
     {
         var device = Substitute.For<IDeviceService>();
+        device.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var deviceId = Guid.NewGuid();
         device.IsDevicePausedAsync(deviceId).Returns(false);
         device.IsDeviceInBedtimeWindowAsync(deviceId, FixedNowUtc).Returns(true);
@@ -54,6 +97,7 @@ public class ChatGateEvaluatorTests
     public async Task Evaluate_StoryDetected_DisabledMode_ReturnsModeDisabled()
     {
         var device = Substitute.For<IDeviceService>();
+        device.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var deviceId = Guid.NewGuid();
         device.IsDevicePausedAsync(deviceId).Returns(false);
         device.IsDeviceInBedtimeWindowAsync(deviceId, FixedNowUtc).Returns(false);
@@ -71,6 +115,7 @@ public class ChatGateEvaluatorTests
     public async Task Evaluate_StoryDetected_EnabledMode_ReturnsAllow()
     {
         var device = Substitute.For<IDeviceService>();
+        device.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var deviceId = Guid.NewGuid();
         device.IsDevicePausedAsync(deviceId).Returns(false);
         device.IsDeviceInBedtimeWindowAsync(deviceId, FixedNowUtc).Returns(false);
@@ -93,6 +138,7 @@ public class ChatGateEvaluatorTests
         // "conservative detector" contract the text path shipped
         // with.
         var device = Substitute.For<IDeviceService>();
+        device.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var deviceId = Guid.NewGuid();
         device.IsDevicePausedAsync(deviceId).Returns(false);
         device.IsDeviceInBedtimeWindowAsync(deviceId, FixedNowUtc).Returns(false);
@@ -113,6 +159,7 @@ public class ChatGateEvaluatorTests
         // into the evaluator must reach IsModeEnabledForRequestAsync
         // verbatim.
         var device = Substitute.For<IDeviceService>();
+        device.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var deviceId = Guid.NewGuid();
         var childId = Guid.NewGuid();
         device.IsDevicePausedAsync(deviceId).Returns(false);

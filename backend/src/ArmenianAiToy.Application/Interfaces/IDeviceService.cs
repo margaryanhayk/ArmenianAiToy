@@ -40,6 +40,13 @@ public interface IDeviceService
     Task AddStoryReflectionAnswerAsync(
         Guid deviceId, string storyId, int questionIndex,
         string answerText, Domain.Enums.SafetyFlag safetyFlag, DateTime nowUtc);
+    /// <summary>
+    /// True when at least one parent account is linked to this toy. False
+    /// means the toy has been unlinked and is waiting to be paired again
+    /// from its QR — see <c>ChatGateEvaluator.GateDecision.Unclaimed</c>.
+    /// </summary>
+    Task<bool> HasLinkedParentAsync(Guid deviceId);
+
     Task<bool> IsDevicePausedAsync(Guid deviceId);
     Task<bool> IsDeviceInBedtimeWindowAsync(Guid deviceId, DateTime nowUtc);
     Task<bool> IsDeviceModeEnabledAsync(Guid deviceId, DetectedMode mode);

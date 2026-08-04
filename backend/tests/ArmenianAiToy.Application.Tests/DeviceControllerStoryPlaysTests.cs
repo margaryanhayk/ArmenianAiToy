@@ -22,6 +22,7 @@ public class DeviceControllerStoryPlaysTests
     private static (DeviceController Controller, IDeviceService Service, Guid DeviceId) Create()
     {
         var service = Substitute.For<IDeviceService>();
+        service.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var controller = new DeviceController(service, Substitute.For<IConfiguration>());
         var http = new DefaultHttpContext();
         var deviceId = Guid.NewGuid();

@@ -42,6 +42,17 @@ public class ParentServiceAuthTests
             modelBuilder.Entity<Conversation>().Ignore(c => c.Device);
             modelBuilder.Entity<Conversation>().Ignore(c => c.Child);
             modelBuilder.Entity<Conversation>().Ignore(c => c.Messages);
+
+            // The last-parent unlink used to delete the Device row and let
+            // the FK cascade take the rest. It now keeps the toy and removes
+            // each per-family table explicitly, so this legacy auth-only
+            // context has to know about them for the query to resolve.
+            modelBuilder.Entity<Child>().HasKey(c => c.Id);
+            modelBuilder.Entity<Child>().Ignore(c => c.Device);
+            modelBuilder.Entity<Child>().Ignore(c => c.Conversations);
+            modelBuilder.Entity<StoryPlay>().HasKey(p => p.Id);
+            modelBuilder.Entity<StoryReflectionAnswer>().HasKey(a => a.Id);
+            modelBuilder.Entity<DeviceCommand>().HasKey(c => c.Id);
         }
     }
 

@@ -36,6 +36,7 @@ public class ChatControllerCostCapTests
     {
         var chatService = Substitute.For<IChatService>();
         var deviceService = Substitute.For<IDeviceService>();
+        deviceService.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var costMeter = new OpenAICostMeter();
         var opts = new OpenAIDailyCostCapOptions { Enabled = true, Default = CapUsd };
         configureOptions?.Invoke(opts);

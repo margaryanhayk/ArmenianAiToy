@@ -332,6 +332,22 @@ public class DeviceService : IDeviceService
         await _db.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// Whether any parent account currently holds this toy.
+    /// <para>
+    /// A toy with zero linked parents is nobody's: it has been unlinked and
+    /// is waiting to be paired again from its QR. It must not keep talking
+    /// to a child in that gap — there is no parent who could see, pause or
+    /// stop it. Claiming re-links it and it wakes up on the next request,
+    /// so this needs no stored flag and nothing for a parent to switch back
+    /// on.
+    /// </para>
+    /// </summary>
+    public async Task<bool> HasLinkedParentAsync(Guid deviceId)
+    {
+        return await _db.Set<ParentDevice>().AnyAsync(pd => pd.DeviceId == deviceId);
+    }
+
     public async Task<bool> IsDevicePausedAsync(Guid deviceId)
     {
         // Single-field read — avoids materializing the full Device row

@@ -378,12 +378,38 @@ public class ParentService : IParentService
     }
 
     /// <summary>
-    /// Phase A.2 — consumer pairing. Binds a device to the parent's account by
-    /// its single-use CLAIM CODE (from the QR), not its backend key. Returns
-    /// true ONLY on a fresh successful claim; every failure reason (unknown
-    /// device, no/already-used code, wrong code) returns false so the controller
-    /// surfaces ONE uniform error (no device-existence leak). On success the
-    /// code is CONSUMED (ClaimCodeHash cleared) so it can't be replayed.
+    /// How many parent accounts may hold one toy at the same time. Two, so
+    /// both parents in a household can watch and set the rules for the same
+    /// toy from their own phones.
+    /// </summary>
+    public const int MaxParentsPerDevice = 2;
+
+    /// <summary>
+    /// Consumer pairing. Binds a toy to the parent's account by the CLAIM CODE
+    /// in its QR — never its backend key. Returns true ONLY on a successful
+    /// claim; every failure reason (unknown device, wrong code, full, revoked)
+    /// returns false so the controller surfaces ONE uniform error and the
+    /// endpoint cannot be used to discover which device ids exist.
+    /// <para>
+    /// <b>The code is NOT consumed.</b> The QR is printed on the toy, so it
+    /// has to keep working for the toy's whole life: a second parent joining,
+    /// and the same family (or a new one) pairing it again after an unlink.
+    /// It used to be cleared on first use, which made unlink a one-way door —
+    /// the toy could never be paired again by anyone.
+    /// </para>
+    /// <para>
+    /// What stops a stranger who photographs the QR is the <b>seat limit</b>,
+    /// not secrecy: a toy that already has <see cref="MaxParentsPerDevice"/>
+    /// parents cannot be claimed at all. Someone who copies the code off a toy
+    /// you already own gets nothing. A toy nobody owns is claimable — which is
+    /// exactly the "unlinked, waiting to be paired again" case.
+    /// </para>
+    /// <para>
+    /// A REVOKED toy is never claimable. Revoke is the lost-or-stolen
+    /// kill-switch; if claiming re-opened it, a thief could simply scan the QR
+    /// and take ownership. Reversing a revoke stays a deliberate act by
+    /// someone who already holds the toy, or by an operator.
+    /// </para>
     /// </summary>
     public async Task<bool> ClaimDeviceAsync(Guid parentId, Guid deviceId, string claimCode)
     {
@@ -394,21 +420,30 @@ public class ParentService : IParentService
         if (device == null)
             return false;
 
-        // Claimable only if a claim code is currently set (unconsumed). A
-        // legacy/bench device or an already-claimed one has a null hash.
+        // A device provisioned before claim codes existed has no hash and is
+        // not claimable this way (the setup-card path covers those).
         if (!DeviceApiKeyHasher.IsHash(device.ClaimCodeHash))
+            return false;
+
+        // Lost/stolen kill-switch: never re-openable by scanning the QR.
+        if (device.IsRevoked)
             return false;
 
         // Constant-time verify, same discipline as the device key.
         if (!DeviceApiKeyHasher.Verify(claimCode, device.ClaimCodeHash))
             return false;
 
-        // Valid claim. Link if not already linked (idempotent), CONSUME the
-        // code (single-use), stamp ClaimedAt, audit.
+        // Re-claiming a toy you already hold is a no-op success, so a parent
+        // who scans twice is never told something went wrong.
         var alreadyLinked = await _db.Set<ParentDevice>()
             .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
         if (!alreadyLinked)
         {
+            var seatsTaken = await _db.Set<ParentDevice>()
+                .CountAsync(pd => pd.DeviceId == deviceId);
+            if (seatsTaken >= MaxParentsPerDevice)
+                return false;
+
             _db.Set<ParentDevice>().Add(new ParentDevice
             {
                 ParentId = parentId,
@@ -416,7 +451,7 @@ public class ParentService : IParentService
                 LinkedAt = DateTime.UtcNow
             });
         }
-        device.ClaimCodeHash = null;          // single-use: consume it
+
         device.ClaimedAt = DateTime.UtcNow;
         TrackAndAddAudit(AuditEvent.ParentDeviceClaimed(parentId, deviceId));
         await _db.SaveChangesAsync();
@@ -457,40 +492,76 @@ public class ParentService : IParentService
             return true;
         }
 
-        // C2.2a — orphan-cascade branch. Snapshot the conversation ids
-        // BEFORE the Device delete so the FK cascade doesn't erase the
-        // information we need to clean up audio. Counts only — no
-        // entity materialization beyond the bare id projection.
+        // Last parent gone. Everything this family produced is erased — but
+        // the TOY ITSELF survives.
+        //
+        // This branch used to delete the Device row and let the FK cascade
+        // take the subtree with it. That erased the toy's identity and its
+        // backend key along with the family's data, so the QR printed on the
+        // toy pointed at nothing: unlink was a one-way door and the toy was
+        // scrap until it went back to the factory. Keeping the Device row (and
+        // its claim code, see ClaimDeviceAsync) is what lets the same toy be
+        // paired again — by this family or a new one.
+        //
+        // Snapshot the conversation ids BEFORE the delete so the audio files
+        // can still be found. Counts only — no message content is loaded.
         var conversationIds = await _db.Set<Conversation>()
             .Where(c => c.DeviceId == deviceId)
             .Select(c => c.Id)
             .ToListAsync();
 
+        // Every per-family row hanging off this toy. Messages cascade from
+        // Conversation at the DB level; the rest are scoped by DeviceId.
+        _db.Set<Conversation>().RemoveRange(
+            _db.Set<Conversation>().Where(c => c.DeviceId == deviceId));
+        _db.Set<Child>().RemoveRange(
+            _db.Set<Child>().Where(c => c.DeviceId == deviceId));
+        _db.Set<StoryPlay>().RemoveRange(
+            _db.Set<StoryPlay>().Where(p => p.DeviceId == deviceId));
+        _db.Set<StoryReflectionAnswer>().RemoveRange(
+            _db.Set<StoryReflectionAnswer>().Where(a => a.DeviceId == deviceId));
+        _db.Set<DeviceCommand>().RemoveRange(
+            _db.Set<DeviceCommand>().Where(c => c.DeviceId == deviceId));
+
         var device = await _db.Set<Device>().FindAsync(deviceId);
         if (device != null)
         {
-            _db.Set<Device>().Remove(device);
+            // Back to factory settings for whoever pairs it next. The NAME
+            // matters most: "Anna's toy" is a child's name, and leaving it on
+            // the toy would hand it to the next family. IsRevoked is
+            // deliberately NOT reset — see ClaimDeviceAsync.
+            device.Name = string.Empty;
+            device.ClaimedAt = null;
+            device.IsPaused = false;
+            device.BedtimeStart = null;
+            device.BedtimeEnd = null;
+            device.StoryEnabled = true;
+            device.GameEnabled = true;
+            device.RiddleEnabled = true;
+            device.CuriosityEnabled = true;
+            device.StoryIntroEnabled = true;
+            device.BedtimeMusicEnabled = false;
         }
-        // DB-first: commit the device delete (and FK cascade through
-        // Children / Conversations / Messages / ParentDevices) before
-        // touching the filesystem.
+
+        // DB-first: commit the data wipe before touching the filesystem, so a
+        // blob-store failure can never roll back a parent's erase.
         await _db.SaveChangesAsync();
 
         var audio = await RunAudioCleanupAsync(conversationIds);
 
-        // orphanCascaded captures whether the device row was actually removed.
-        // In the rare "device already gone" race it stays false even though
-        // this was the last ParentDevice link.
+        // orphanCascaded still means "this unlink erased the family subtree",
+        // which is what the audit row has always recorded. The toy row
+        // surviving is not a change in what was erased.
         TrackAndAddAudit(AuditEvent.ParentDeviceUnlinked(
             parentId, deviceId,
-            orphanCascaded: device != null,
+            orphanCascaded: true,
             audioConversationsAttempted: audio.Attempted,
             audioFilesDeleted: audio.FilesDeleted,
             audioDeleteFailures: audio.Failures));
         await _db.SaveChangesAsync();
 
         _logger.LogInformation(
-            "Parent {ParentId} unlinked last link to device {DeviceId}; device and subtree deleted ({AudioFilesDeleted} audio files cleaned, {AudioDeleteFailures} failures)",
+            "Parent {ParentId} unlinked last link to device {DeviceId}; family data erased, toy kept and re-pairable ({AudioFilesDeleted} audio files cleaned, {AudioDeleteFailures} failures)",
             parentId, deviceId, audio.FilesDeleted, audio.Failures);
         return true;
     }

@@ -113,6 +113,8 @@ public class AudioChatControllerTests
         await db.Database.EnsureCreatedAsync();
 
         var deviceService = Substitute.For<IDeviceService>();
+
+        deviceService.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var chatService = Substitute.For<IChatService>();
         var transcription = Substitute.For<IAudioTranscriptionService>();
         var synthesis = Substitute.For<IAudioSynthesisService>();

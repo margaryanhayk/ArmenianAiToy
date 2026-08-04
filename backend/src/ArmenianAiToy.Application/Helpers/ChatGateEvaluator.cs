@@ -33,6 +33,12 @@ public static class ChatGateEvaluator
     {
         /// <summary>No gate tripped — caller should proceed with normal chat flow.</summary>
         Allow,
+        /// <summary>
+        /// No parent account holds this toy. It has been unlinked and is
+        /// waiting to be paired again from its QR, so there is nobody who
+        /// could see or stop what it says.
+        /// </summary>
+        Unclaimed,
         /// <summary>Parent has paused the device.</summary>
         Paused,
         /// <summary>Device is inside its configured bedtime window.</summary>
@@ -59,6 +65,12 @@ public static class ChatGateEvaluator
         Guid? childId,
         DateTime nowUtc)
     {
+        // Runs FIRST, ahead of pause. An unowned toy is not a parent
+        // preference that pause/bedtime could override — there is no parent
+        // at all. Everything below this line assumes somebody is watching.
+        if (!await deviceService.HasLinkedParentAsync(deviceId))
+            return GateDecision.Unclaimed;
+
         if (await deviceService.IsDevicePausedAsync(deviceId))
             return GateDecision.Paused;
 

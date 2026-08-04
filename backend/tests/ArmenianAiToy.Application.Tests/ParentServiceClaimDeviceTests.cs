@@ -61,7 +61,7 @@ public class ParentServiceClaimDeviceTests
     }
 
     [Fact]
-    public async Task ValidCode_Links_ConsumesCode_StampsClaimedAt_Audits()
+    public async Task ValidCode_Links_KeepsCode_StampsClaimedAt_Audits()
     {
         var (service, db) = CreateService();
         var (parentId, deviceId) = Seed(db);
@@ -71,7 +71,11 @@ public class ParentServiceClaimDeviceTests
         Assert.True(await db.Set<ParentDevice>()
             .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId));
         var device = await db.Set<Device>().FindAsync(deviceId);
-        Assert.Null(device!.ClaimCodeHash);          // consumed (single-use)
+        // KEYSTONE: the code is NOT consumed. The QR is printed on the toy, so
+        // it has to keep working — for a second parent, and for pairing the
+        // toy again after an unlink. Clearing it here made unlink a one-way
+        // door that no parent could reopen.
+        Assert.NotNull(device!.ClaimCodeHash);
         Assert.NotNull(device.ClaimedAt);
         var audit = Assert.Single(await db.Set<AuditEvent>().ToListAsync());
         Assert.Equal(AuditEventType.ParentDeviceClaimed, audit.EventType);
@@ -122,13 +126,78 @@ public class ParentServiceClaimDeviceTests
     }
 
     [Fact]
-    public async Task SingleUse_SecondClaimWithSameCode_Fails()
+    public async Task SecondParent_CanClaimSameToy_WithTheSameCode()
+    {
+        var (service, db) = CreateService();
+        var (mumId, deviceId) = Seed(db);
+        var dadId = Guid.NewGuid();
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = dadId, Email = "d@x.com", PasswordHash = "x", RegisteredAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        Assert.True(await service.ClaimDeviceAsync(mumId, deviceId, Code));
+        // Both parents in a household watch the same toy from their own
+        // phones, and the only thing either of them has is the QR on the toy.
+        Assert.True(await service.ClaimDeviceAsync(dadId, deviceId, Code));
+
+        Assert.Equal(2, await db.Set<ParentDevice>().CountAsync(pd => pd.DeviceId == deviceId));
+    }
+
+    [Fact]
+    public async Task ThirdParent_IsRefused_SeatLimitIsWhatProtectsTheCode()
+    {
+        var (service, db) = CreateService();
+        var (mumId, deviceId) = Seed(db);
+        var others = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        foreach (var id in others)
+        {
+            db.Set<Parent>().Add(new Parent
+            {
+                Id = id, Email = id + "@x.com", PasswordHash = "x", RegisteredAt = DateTime.UtcNow
+            });
+        }
+        await db.SaveChangesAsync();
+
+        Assert.True(await service.ClaimDeviceAsync(mumId, deviceId, Code));
+        Assert.True(await service.ClaimDeviceAsync(others[0], deviceId, Code));
+        // KEYSTONE: the code stays valid forever, so the seat limit — not
+        // secrecy — is what stops someone who photographed the QR of a toy
+        // that is already owned.
+        Assert.False(await service.ClaimDeviceAsync(others[1], deviceId, Code));
+
+        Assert.Equal(ParentService.MaxParentsPerDevice,
+            await db.Set<ParentDevice>().CountAsync(pd => pd.DeviceId == deviceId));
+    }
+
+    [Fact]
+    public async Task ReClaimingAToyYouAlreadyHold_IsANoOpSuccess_AndTakesNoSecondSeat()
     {
         var (service, db) = CreateService();
         var (parentId, deviceId) = Seed(db);
 
-        Assert.True(await service.ClaimDeviceAsync(parentId, deviceId, Code));   // consumes
-        // Same code again (e.g. a thief who photographed the QR) → rejected.
-        Assert.False(await service.ClaimDeviceAsync(Guid.NewGuid(), deviceId, Code));
+        Assert.True(await service.ClaimDeviceAsync(parentId, deviceId, Code));
+        // A parent who scans twice must not be told something went wrong.
+        Assert.True(await service.ClaimDeviceAsync(parentId, deviceId, Code));
+
+        Assert.Equal(1, await db.Set<ParentDevice>().CountAsync(pd => pd.DeviceId == deviceId));
+    }
+
+    [Fact]
+    public async Task RevokedToy_IsNeverClaimable_SoAThiefCannotScanTheQrAndTakeIt()
+    {
+        var (service, db) = CreateService();
+        var (parentId, deviceId) = Seed(db);
+        var device = await db.Set<Device>().FindAsync(deviceId);
+        device!.IsRevoked = true;
+        await db.SaveChangesAsync();
+
+        // KEYSTONE: revoke is the lost-or-stolen kill-switch. Now that the
+        // code survives a claim, letting a revoked toy be claimed would hand
+        // whoever holds it a way to reopen it by simply scanning the QR.
+        Assert.False(await service.ClaimDeviceAsync(parentId, deviceId, Code));
+        Assert.False(await db.Set<ParentDevice>().AnyAsync());
+        Assert.Empty(await db.Set<AuditEvent>().ToListAsync());
     }
 }

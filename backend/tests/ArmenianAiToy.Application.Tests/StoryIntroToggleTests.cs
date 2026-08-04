@@ -106,6 +106,7 @@ public class StoryIntroToggleTests
     public async Task ContentManifest_CarriesDeviceIntroFlag()
     {
         var deviceService = Substitute.For<IDeviceService>();
+        deviceService.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var deviceId = Guid.NewGuid();
         deviceService.GetDeviceAsync(deviceId).Returns(new Device
         {

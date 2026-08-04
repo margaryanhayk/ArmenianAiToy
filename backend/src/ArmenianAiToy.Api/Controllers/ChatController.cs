@@ -92,6 +92,13 @@ public class ChatController : ControllerBase
             _deviceService, deviceId, request.Message, request.ChildId, DateTime.UtcNow);
         switch (gate)
         {
+            // Nobody owns this toy — it was unlinked and is waiting to be
+            // paired again from its QR. The child hears the same calm resting
+            // line as a pause (a parent pairing it really does turn it back
+            // on); only the metric tag distinguishes the two.
+            case ChatGateEvaluator.GateDecision.Unclaimed:
+                AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "unclaimed"));
+                return Ok(new ChatResponse(PausedResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
             case ChatGateEvaluator.GateDecision.Paused:
                 AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "paused"));
                 return Ok(new ChatResponse(PausedResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));

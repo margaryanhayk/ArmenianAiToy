@@ -19,6 +19,7 @@ public class DeviceControllerOtaTests
     private static (DeviceController Controller, IDeviceService Device, Guid DeviceId) Create()
     {
         var device = Substitute.For<IDeviceService>();
+        device.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var controller = new DeviceController(device, Substitute.For<IConfiguration>());
         var deviceId = Guid.NewGuid();
         var http = new DefaultHttpContext();
