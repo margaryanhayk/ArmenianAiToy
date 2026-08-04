@@ -277,10 +277,16 @@ function DeviceCard({
 
       {childLine ? <Text style={styles.children}>{childLine}</Text> : null}
 
+      {/* The one thing a parent opens a toy to do. The rest are real, but
+          they are not why anyone comes here. */}
+      <Pressable style={styles.mainBtn} onPress={onOpen}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.mainBtnTitle}>💬 {t('see_activity')}</Text>
+          <Text style={styles.mainBtnSub}>{t('see_activity_sub')}</Text>
+        </View>
+        <Text style={styles.mainBtnChev}>›</Text>
+      </Pressable>
       <View style={styles.actionRow}>
-        <Pressable style={styles.activityBtn} onPress={onOpen}>
-          <Text style={styles.activityText}>{t('see_activity')}</Text>
-        </Pressable>
         <Pressable style={styles.settingsBtn} onPress={onSettings}>
           <Text style={styles.activityText}>{t('open_settings')}</Text>
         </Pressable>
@@ -376,6 +382,14 @@ const styles = StyleSheet.create({
   },
   children: { color: '#444', marginTop: 6 },
   actionRow: { flexDirection: 'row', marginTop: 10, gap: 8 },
+  mainBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#eef3fb', borderColor: '#a9c4e8', borderWidth: 2,
+    borderRadius: 10, paddingVertical: 14, paddingHorizontal: 14, marginTop: 12,
+  },
+  mainBtnTitle: { color: '#2c4a7a', fontWeight: '700', fontSize: 17 },
+  mainBtnSub: { color: '#5a6b85', fontSize: 12, marginTop: 2 },
+  mainBtnChev: { color: '#7f9bc4', fontSize: 22 },
   activityBtn: {
     flex: 1,
     backgroundColor: '#eef3fb',

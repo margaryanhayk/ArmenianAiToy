@@ -220,6 +220,21 @@
       transition: background 0.15s, border-color 0.15s;
     }
     .tile:hover { background: #f2ebff; border-color: #d3c2f0; }
+    /* The one thing a parent opens the toy page to do. The other three are
+       real, but they are not why anyone comes here — so they read as the
+       list under it rather than three equal siblings. */
+    .tile-main {
+      background: linear-gradient(135deg, #f5f0ff, #fdfbff);
+      border-color: #cbb8ec;
+      border-width: 2px;
+      padding: 18px 16px;
+      margin-bottom: 14px;
+    }
+    .tile-main:hover { background: #efe7ff; border-color: #b99ae8; }
+    .tile-main .ico { width: 46px; height: 46px; font-size: 26px; border-radius: 13px; }
+    .tile-main .t { font-size: 19px; font-weight: 700; color: #4b2e83; }
+    .tile-main .s { font-size: 13px; color: #6b5b8a; margin-top: 3px; }
+    .tile-main .chev { font-size: 22px; color: #9d86c9; }
     .tile .ico {
       width: 38px;
       height: 38px;
@@ -2516,10 +2531,10 @@
     // Shared card affordance: icon, title, one line of explanation, chevron.
     // Used by the toy page and the account page so the same idea does not
     // get two different looks.
-    function buildTile(icon, titleKey, subKey, onClick) {
+    function buildTile(icon, titleKey, subKey, onClick, isMain) {
       var b = document.createElement('button');
       b.type = 'button';
-      b.className = 'tile';
+      b.className = 'tile' + (isMain ? ' tile-main' : '');
       var ico = document.createElement('span');
       ico.className = 'ico';
       ico.textContent = icon;
@@ -2663,7 +2678,7 @@
       clearChildren(links);
       links.appendChild(buildTile('💬', 'tile_conversations', 'tile_conversations_sub', function () {
         openDevice(d.deviceId);
-      }));
+      }, true));
       links.appendChild(buildTile('📚', 'tile_library', 'tile_library_sub', function () {
         loadStoryLibrary(d.deviceId);
       }));

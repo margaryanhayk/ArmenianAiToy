@@ -67,7 +67,7 @@ type Entry = { en: string; ru: string; hy: string };
 const D = {
   // ---------- shared ----------
   back_toys: { en: '‹ Toys', ru: '‹ Игрушки', hy: '‹ Խաղալիքներ' },
-  back_activity: { en: '‹ Activity', ru: '‹ Активность', hy: '‹ Ակտիվություն' },
+  back_activity: { en: '‹ Conversations', ru: '‹ Разговоры', hy: '‹ Զրույցներ' },
   back_plain: { en: '‹ Back', ru: '‹ Назад', hy: '‹ Հետ' },
   save: { en: 'Save', ru: 'Сохранить', hy: 'Պահպանել' },
   cancel: { en: 'Cancel', ru: 'Отмена', hy: 'Չեղարկել' },
@@ -196,7 +196,12 @@ const D = {
     ru: 'Игрушек пока нет. Нажмите «＋ Добавить игрушку».',
     hy: 'Խաղալիքներ դեռ չկան։ Սեղմեք «＋ Ավելացնել խաղալիք»։',
   },
-  see_activity: { en: 'See activity →', ru: 'Активность →', hy: 'Ակտիվություն →' },
+  see_activity: { en: 'Conversations', ru: 'Разговоры', hy: 'Զրույցներ' },
+  see_activity_sub: {
+    en: 'What your child talked about',
+    ru: 'О чём говорил ваш ребёнок',
+    hy: 'Ինչի մասին է խոսել ձեր երեխան',
+  },
   open_settings: { en: 'Settings →', ru: 'Настройки →', hy: 'Կարգավորումներ →' },
   ph_toy_name: { en: 'Toy name', ru: 'Имя игрушки', hy: 'Խաղալիքի անուն' },
   revoke_access: { en: 'Revoke access', ru: 'Отозвать доступ', hy: 'Կասեցնել մուտքը' },
