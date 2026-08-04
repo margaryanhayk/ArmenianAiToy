@@ -23,7 +23,7 @@ internal static class NotificationEmailContent
     internal const string EmailVerificationSubject = "Հաստատեք Ձեր էլ. փոստը";
     internal const string DormancyWarningSubject = "Ձեր հաշիվը երկար ժամանակ անգործուն է";
     internal const string DormantDeviceWarningSubject = "Ձեր երեխայի խաղալիքը վերջերս չի օգտագործվել";
-    internal const string ToyJoinedSubject = "Ձեր խաղալիքին միացավ ևս մեկ ծնող";
+    internal const string ToyJoinedSubject = "Ձեր խաղալիքին միացել է ևս մեկ ծնող";
 
     internal static string BuildResetLink(string linkBase, string rawToken)
     {
@@ -143,9 +143,13 @@ internal static class NotificationEmailContent
         // parent in the household doing exactly what they should.
         return string.Join("\n\n", new[]
         {
-            $"Բարև։ Ձեր խաղալիքին՝ {deviceName}, կապակցվեց ևս մեկ ծնող։",
-            "Այժմ երկու ծնող կարող են տեսնել այս խաղալիքի զրույցները և փոխել կարգավորումները։",
-            "Եթե դա ձեր ընտանիքից չէր, բացեք ծնողական վահանակը, կասեցրեք խաղալիքի մուտքը և կապվեք մեզ հետ։"
+            $"Բարև։ «{deviceName}» խաղալիքին միացել է ևս մեկ ծնող։",
+            // The reassurance comes SECOND, before the "what to do" line.
+            // Without it the mail reads as an alarm, and in the ordinary
+            // case this is simply the other parent in the household.
+            "Ամենայն հավանականությամբ դա Ձեր ընտանիքի մյուս ծնողն է։",
+            "Այժմ նա նույնպես կարող է տեսնել այս խաղալիքի զրույցները և փոխել կարգավորումները։",
+            "Եթե դա Ձեր ընտանիքից չէ, բացեք ծնողական վահանակը, կասեցրեք խաղալիքի մուտքը և կապվեք մեզ հետ։"
         });
     }
 }

@@ -78,7 +78,7 @@ export default function StoryLibraryScreen({ deviceId, deviceName, onBack, onLog
       </Pressable>
       <Text style={styles.title}>{t('library_title')}</Text>
       <Text style={styles.sub}>
-        {t('on_this_toy')}: {deviceName || t('toy_word')}
+        {t('on_this_toy')}{t('label_sep')}{deviceName || t('toy_word')}
       </Text>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -88,7 +88,7 @@ export default function StoryLibraryScreen({ deviceId, deviceName, onBack, onLog
       ) : (
         stories.map((s) => {
           const meta: string[] = [];
-          if (s.author) meta.push(`${t('author_label')}: ${s.author}`);
+          if (s.author) meta.push(`${t('author_label')}${t('label_sep')}${s.author}`);
           if (s.minAge != null && s.maxAge != null) meta.push(`${s.minAge}–${s.maxAge}`);
           if (s.bedtimeSafe) meta.push(t('bedtime_safe'));
           const isOpen = !!open[s.storyId];
@@ -98,9 +98,11 @@ export default function StoryLibraryScreen({ deviceId, deviceName, onBack, onLog
             <View key={s.storyId} style={styles.card}>
               <Text style={styles.name}>📖 {s.title}</Text>
               {meta.length > 0 ? <Text style={styles.meta}>{meta.join(' · ')}</Text> : null}
-              {s.goal ? <Text style={styles.body}>{t('goal_label')}: {s.goal}</Text> : null}
+              {s.goal ? (
+                <Text style={styles.body}>{t('goal_label')}{t('label_sep')}{s.goal}</Text>
+              ) : null}
               {s.lesson ? (
-                <Text style={styles.lesson}>{t('lesson_label')}: {s.lesson}</Text>
+                <Text style={styles.lesson}>{t('lesson_label')}{t('label_sep')}{s.lesson}</Text>
               ) : null}
               <Text style={styles.counts}>
                 {tf('listened_count', { n: s.listenCount ?? 0, f: s.finishedCount ?? 0 })}
