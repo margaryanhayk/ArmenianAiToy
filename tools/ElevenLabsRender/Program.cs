@@ -69,12 +69,20 @@ var clips = false;
 var render = false;
 var confirmPaid = false;
 double speed = 1.0;
-var model = "eleven_multilingual_v2";
+// eleven_v3 is the ONLY model on this account that lists Armenian (hy).
+// GET /v1/models, 2026-08-04: multilingual_v2, flash_v2_5, turbo_v2_5,
+// turbo_v2 and flash_v2 all say no. Rendering Armenian through a model that
+// does not know the language is what produced the narration the owner
+// rejected on 2026-08-04 — it is not a voice or a clone problem, and no
+// amount of levelling or restitching can rescue it. Do not change this
+// default without checking the language list again.
+var model = "eleven_v3";
 var output = Path.Combine(Path.GetTempPath(), "areg-elevenlabs-render");
-// Small enough that no single request is anywhere near a length the API
-// might refuse or curtail. The five stories cut on 2026-08-03 all stopped
-// somewhere past 1,100 characters in a single request.
-var maxChunkChars = 700;
+// eleven_v3 accepts 5,000 characters per request, and every seam is a place
+// the delivery can jump — so chunk as LITTLE as the limit allows rather than
+// as much as possible. At 4,000 most stories render in a single request.
+// (The old 700 came from a truncation that was really a wrong-model problem.)
+var maxChunkChars = 4000;
 // A render shorter than this fraction of the expected duration is treated as
 // truncated and refused. Generous on purpose — it is there to catch a story
 // that stops in the middle, not to argue about a brisk delivery.
@@ -199,6 +207,9 @@ if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(voiceId))
     return 2;
 }
 
+// previous_text/next_text are a multilingual_v2-era feature; v3 refuses them.
+var supportsContext = !model.StartsWith("eleven_v3", StringComparison.OrdinalIgnoreCase);
+
 Directory.CreateDirectory(output);
 using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
 http.DefaultRequestHeaders.Add("xi-api-key", apiKey);
@@ -214,6 +225,11 @@ foreach (var job in jobs)
     var pieces = new List<byte[]>();
     for (var c = 0; c < job.Chunks.Count; c++)
     {
+        // At the default speed the request carries no voice_settings at all,
+        // so the voice's own saved settings apply — byte-for-byte the request
+        // shape of the probe the owner approved on 2026-08-04. Sending a
+        // settings object "just to set speed to 1.0" is not a no-op: it
+        // replaces the saved settings with whatever this object contains.
         var body = JsonSerializer.Serialize(new
         {
             text = job.Chunks[c],
@@ -221,15 +237,13 @@ foreach (var job in jobs)
             // Neighbouring text is sent as CONTEXT, not as speech: it is what
             // keeps the voice's pace and intonation continuous across a split
             // so a chunked story does not sound like separate takes stitched
-            // together.
-            previous_text = c > 0 ? job.Chunks[c - 1] : null,
-            next_text = c + 1 < job.Chunks.Count ? job.Chunks[c + 1] : null,
-            voice_settings = new
-            {
-                // Stability/similarity stay at the voice's own defaults (the
-                // clone was tuned when it was created); only speed is set.
-                speed,
-            },
+            // together. eleven_v3 rejects both fields outright
+            // ("Providing previous_text or next_text is not yet supported with
+            // the 'eleven_v3' model", HTTP 400), so on v3 the chunks are
+            // rendered blind and the seams are checked by ear instead.
+            previous_text = supportsContext && c > 0 ? job.Chunks[c - 1] : null,
+            next_text = supportsContext && c + 1 < job.Chunks.Count ? job.Chunks[c + 1] : null,
+            voice_settings = Math.Abs(speed - 1.0) < 0.001 ? null : new { speed },
         });
         using var response = await http.PostAsync(
             $"https://api.elevenlabs.io/v1/text-to-speech/{voiceId}",
