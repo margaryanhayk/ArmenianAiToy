@@ -8,6 +8,7 @@ using ArmenianAiToy.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace ArmenianAiToy.Api.Controllers;
@@ -578,6 +579,61 @@ public class InternalController : ControllerBase
     public Task<IActionResult> PauseDeviceAction(
         Guid deviceId, [FromBody] InternalDeviceActionRequest req, CancellationToken ct)
         => DeviceFlagActionAsync(deviceId, req, "device_pause", ct);
+
+    /// <summary>
+    /// Mint a FRESH pairing code (and QR payload) for an existing toy.
+    /// <para>
+    /// Every toy registered before 2026-08-04 either never had a claim code or
+    /// had it erased the first time it was paired, because claiming used to
+    /// consume it. Only a hash was ever stored, so those codes cannot be
+    /// recovered — which leaves those toys unable to use the re-pairing the
+    /// QR now supports. This is the way back for them.
+    /// </para>
+    /// <para>
+    /// The toy's IDENTITY and its device key are untouched, so nothing has to
+    /// be reflashed or re-provisioned: the operator prints the returned QR and
+    /// puts it on the toy. Any parent currently linked stays linked — this
+    /// mints a code, it does not unlink anyone.
+    /// </para>
+    /// <para>
+    /// The plaintext code is returned ONCE and is never logged or written to
+    /// the audit row. The console gate already sets <c>Cache-Control:
+    /// no-store</c> on every <c>/api/internal/*</c> response.
+    /// </para>
+    /// </summary>
+    [HttpPost("devices/{deviceId:guid}/claim-code")]
+    public async Task<IActionResult> IssueClaimCode(
+        Guid deviceId, [FromBody] InternalReasonRequest? req, CancellationToken ct)
+    {
+        if (req is null || string.IsNullOrWhiteSpace(req.Reason))
+            return BadRequest(new { error = "A reason is required for operator actions." });
+
+        var device = await _db.Devices.FirstOrDefaultAsync(d => d.Id == deviceId, ct);
+        if (device is null)
+            return NotFound(new { error = "Device not found." });
+
+        // Same generator and strength as the factory registration path:
+        // 128-bit, returned once, only the hash stored.
+        var claimCode = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+        device.ClaimCodeHash = DeviceApiKeyHasher.Hash(claimCode);
+
+        var op = HttpContext?.Items["InternalOperator"] as string ?? "unknown";
+        // Audit carries WHO and WHY — never the code. `value: true` matches
+        // the InternalConsoleAction shape used by the other operator actions.
+        _db.AuditEvents.Add(AuditEvent.InternalConsoleAction(
+            op, "device_claim_code_issued", deviceId, true, req.Reason.Trim()));
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogWarning(
+            "Operator {Operator} issued a new pairing code for device {DeviceId}: {Reason}",
+            op, deviceId, req.Reason.Trim());
+
+        // The exact JSON the toy's QR should encode — same shape the factory
+        // station prints, so the app's scanner needs no special case. The
+        // device key is NOT included.
+        var qrPayload = JsonSerializer.Serialize(new { deviceId = device.Id, claim = claimCode });
+        return Ok(new { deviceId = device.Id, claimCode, qrPayload });
+    }
 
     /// <summary>OTA foundation — BENCH/TEST enqueue of a device command so an
     /// operator can push e.g. <c>firmware_update</c> without editing the DB.

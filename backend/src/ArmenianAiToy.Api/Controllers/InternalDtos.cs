@@ -138,6 +138,10 @@ public sealed record InternalSessionRequest(string? Totp);
 // (revoked/paused); Reason is required and recorded in the audit row.
 public sealed record InternalDeviceActionRequest(bool Value, string Reason);
 
+/// <summary>An operator action that carries no value of its own — only the
+/// mandatory reason that every console action must record.</summary>
+public sealed record InternalReasonRequest(string Reason);
+
 /// <summary>Slice F — operator moves a story request through its
 /// lifecycle. Bounded status vocabulary validated at the action.</summary>
 public sealed record InternalStoryRequestStatusRequest(string? Status, string? Reason);

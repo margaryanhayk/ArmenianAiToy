@@ -463,6 +463,84 @@ public class InternalControllerTests
     }
 
     [Fact]
+    public async Task IssueClaimCode_MintsAWorkingCode_WithoutTouchingTheToysIdentityOrKey()
+    {
+        var db = NewDb();
+        var d = Dev();
+        d.ClaimCodeHash = null;        // the state every pre-2026-08-04 toy is in
+        db.Devices.Add(d);
+        await db.SaveChangesAsync();
+        var keyBefore = d.ApiKeyHash;
+
+        var res = await OpController(db).IssueClaimCode(
+            d.Id, new InternalReasonRequest("toy paired before codes were kept"), default);
+
+        var ok = Assert.IsType<OkObjectResult>(res);
+        var code = ok.Value!.GetType().GetProperty("claimCode")!.GetValue(ok.Value) as string;
+        Assert.False(string.IsNullOrWhiteSpace(code));
+
+        var after = await db.Devices.FindAsync(d.Id);
+        // KEYSTONE: the toy keeps its identity and its device key, so nothing
+        // has to be reflashed — the operator only prints a new QR.
+        Assert.Equal(d.Id, after!.Id);
+        Assert.Equal(keyBefore, after.ApiKeyHash);
+        // And the new code actually verifies against what was stored.
+        Assert.True(DeviceApiKeyHasher.Verify(code!, after.ClaimCodeHash));
+    }
+
+    [Fact]
+    public async Task IssueClaimCode_AuditRecordsWhoAndWhy_ButNeverTheCodeItself()
+    {
+        var db = NewDb();
+        var d = Dev();
+        db.Devices.Add(d);
+        await db.SaveChangesAsync();
+
+        var res = await OpController(db).IssueClaimCode(
+            d.Id, new InternalReasonRequest("replacement QR sticker"), default);
+
+        var ok = Assert.IsType<OkObjectResult>(res);
+        var code = (string)ok.Value!.GetType().GetProperty("claimCode")!.GetValue(ok.Value)!;
+        var audit = await db.AuditEvents.SingleAsync(
+            a => a.EventType == AuditEventType.InternalConsoleAction);
+        Assert.Null(audit.ActorParentId);              // operator -> console-only
+        Assert.Equal(d.Id, audit.TargetDeviceId);
+        Assert.Contains("alice-ops", audit.Metadata!);
+        Assert.Contains("replacement QR sticker", audit.Metadata!);
+        Assert.Contains("device_claim_code_issued", audit.Metadata!);
+        // KEYSTONE: the code travels to the operator exactly once, in the
+        // response body. An audit row is durable and widely readable, so a
+        // pairing secret must never land in it.
+        Assert.DoesNotContain(code, audit.Metadata!);
+    }
+
+    [Fact]
+    public async Task IssueClaimCode_MissingReason_Returns400_AndMintsNothing()
+    {
+        var db = NewDb();
+        var d = Dev();
+        d.ClaimCodeHash = null;
+        db.Devices.Add(d);
+        await db.SaveChangesAsync();
+
+        var res = await OpController(db).IssueClaimCode(
+            d.Id, new InternalReasonRequest("   "), default);
+
+        Assert.IsType<BadRequestObjectResult>(res);
+        Assert.Null((await db.Devices.FindAsync(d.Id))!.ClaimCodeHash);
+        Assert.False(await db.AuditEvents.AnyAsync());
+    }
+
+    [Fact]
+    public async Task IssueClaimCode_UnknownDevice_Returns404()
+    {
+        var db = NewDb();
+        var res = await OpController(db).IssueClaimCode(
+            Guid.NewGuid(), new InternalReasonRequest("x"), default);
+        Assert.IsType<NotFoundObjectResult>(res);
+    }
+
+    [Fact]
     public async Task RevokeDevice_Idempotent_AlreadyRevoked_WritesNoAudit()
     {
         var db = NewDb();

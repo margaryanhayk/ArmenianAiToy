@@ -380,6 +380,7 @@ window.openDevice = async function(id){
     const actions = d ? `<div class="row">
         <button ${revokeDanger} onclick="opAction('revoke','${id}',${!d.isRevoked})">${d.isRevoked?'Restore access':'Revoke (kill switch)'}</button>
         <button class="ghost" onclick="opAction('pause','${id}',${!d.isPaused})">${d.isPaused?'Resume':'Pause'}</button>
+        <button class="ghost" onclick="issueClaimCode('${id}')">New pairing code</button>
         <span class="mut">operator action — a reason is required and audit-logged</span>
       </div>` : '';
     main.innerHTML = `<div class="row"><button class="ghost" onclick="show('devices')">← devices</button>
@@ -411,6 +412,35 @@ window.opAction = async function(kind, id, value){
     await apiPost('/devices/'+id+'/'+kind, { value: value, reason: reason.trim() });
     _devices = (await api('/devices')).devices; // refresh cached flags
     openDevice(id);                             // re-render with the new state
+  } catch(e){ err(e.message); }
+};
+
+// Mint a fresh pairing code for an existing toy. Needed because every toy
+// registered before 2026-08-04 had its code erased on first pairing (claiming
+// used to consume it), and only a hash was ever stored — so those codes cannot
+// be recovered and those toys cannot use QR re-pairing without this.
+//
+// The toy's id and device key are untouched: nothing is reflashed, the
+// operator just prints the new QR. The code is shown ONCE — it is not stored
+// in plaintext anywhere and cannot be retrieved again.
+window.issueClaimCode = async function(id){
+  const reason = prompt(
+    'Reason for issuing a new pairing code\n(required — recorded in the audit log):', '');
+  if (reason === null) return;
+  if (!reason.trim()){ alert('A reason is required.'); return; }
+  try {
+    const r = await apiPost('/devices/'+id+'/claim-code', { reason: reason.trim() });
+    const main = document.getElementById('main');
+    const box = document.createElement('div');
+    box.className = 'row';
+    box.style.cssText = 'display:block;border:1px solid var(--ok);border-radius:8px;padding:12px;margin:10px 0';
+    box.innerHTML =
+      '<div><b>New pairing code — shown once.</b> Print it as a QR and put it on the toy.</div>'
+      + '<div class="mut" style="margin-top:6px">code</div>'
+      + '<div class="mono" style="font-size:18px;user-select:all">' + esc(r.claimCode) + '</div>'
+      + '<div class="mut" style="margin-top:8px">QR payload (encode this exact text)</div>'
+      + '<div class="mono" style="word-break:break-all;user-select:all">' + esc(r.qrPayload) + '</div>';
+    main.insertBefore(box, main.firstChild);
   } catch(e){ err(e.message); }
 };
 

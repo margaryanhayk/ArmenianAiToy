@@ -44,7 +44,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2237 tests)
+dotnet test                                     # Run all tests (2241 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2271,10 +2271,26 @@ the reset-by-email flow is not yet wired on that deployment:
   name, the parent id and the reason. No audit row (the row would
   carry no PII-free signal the log doesn't already have).
 
+A third action mints a fresh pairing code for an EXISTING toy:
+
+- `POST /api/internal/devices/{deviceId}/claim-code` body `{ reason }` →
+  `{ deviceId, claimCode, qrPayload }`. Every toy registered before
+  2026-08-04 either never had a claim code or had it erased on first pairing
+  (claiming used to consume it); only a hash was ever stored, so those codes
+  are unrecoverable and those toys cannot use the QR re-pairing added that
+  day. This is the way back. The toy's **identity and device key are
+  untouched** — nothing is reflashed or re-provisioned, the operator just
+  prints the returned QR. Currently-linked parents stay linked. The plaintext
+  code is returned ONCE, is never logged, and is never written to the audit
+  row (`InternalConsoleAction`, action `device_claim_code_issued`, carrying
+  operator + reason only). Pinned by `InternalControllerTests`
+  (`IssueClaimCode_*`, keystone: the code never reaches the audit metadata).
+
 400 on a missing/blank reason; 404 on unknown device. Pinned by
 `InternalControllerTests` (`RevokeDevice_*`, `PauseDeviceAction_*`). The
-`admin.html` device drill-down surfaces Revoke/Restore + Pause/Resume buttons
-(typed reason + confirm). **Only reversible actions** — destructive ones
+`admin.html` device drill-down surfaces Revoke/Restore + Pause/Resume +
+New-pairing-code buttons (typed reason + confirm; the code is displayed once
+in a copyable block). **Only reversible actions** — destructive ones
 (data deletion, story-draft promotion) remain deferred (see Out of scope).
 
 **Secret invariants (do not regress):** the response DTOs in
