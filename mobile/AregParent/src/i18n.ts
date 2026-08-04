@@ -76,6 +76,8 @@ const D = {
   // Label/value separator. Armenian uses ՝, not a Latin colon, so this
   // cannot live in the layout.
   label_sep: { en: ': ', ru: ': ', hy: '՝ ' },
+  show_password: { en: 'Show password', ru: 'Показать пароль', hy: 'Ցույց տալ գաղտնաբառը' },
+  hide_password: { en: 'Hide password', ru: 'Скрыть пароль', hy: 'Թաքցնել գաղտնաբառը' },
   toy_word: { en: 'Toy', ru: 'Игрушка', hy: 'Խաղալիք' },
   online: { en: 'Online', ru: 'В сети', hy: 'Առցանց' },
   offline: { en: 'Offline', ru: 'Не в сети', hy: 'Անցանց' },

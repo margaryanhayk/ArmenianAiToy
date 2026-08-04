@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import {
@@ -22,6 +21,7 @@ import {
 } from '../api';
 import { LANG_NAMES, LANGS, getLanguage, setLanguage, t, tf } from '../i18n';
 import { useLang } from '../useLang';
+import PasswordInput from '../PasswordInput';
 
 type Props = {
   onBack: () => void;
@@ -237,21 +237,19 @@ export default function AccountScreen({
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t('change_password_title')}</Text>
-        <TextInput
-          style={styles.input}
+        <PasswordInput
           placeholder={t('ph_current_pw')}
-          secureTextEntry
           value={curPw}
           onChangeText={setCurPw}
           editable={!busy}
+          autoComplete="current-password"
         />
-        <TextInput
-          style={styles.input}
+        <PasswordInput
           placeholder={t('ph_new_pw')}
-          secureTextEntry
           value={newPw}
           onChangeText={setNewPw}
           editable={!busy}
+          autoComplete="new-password"
         />
         <Pressable style={styles.primaryBtn} onPress={doChangePassword} disabled={busy}>
           <Text style={styles.primaryBtnText}>{t('update_password')}</Text>

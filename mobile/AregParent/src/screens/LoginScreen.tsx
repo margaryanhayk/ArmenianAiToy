@@ -13,6 +13,7 @@ import {
 import { errText, login, register } from '../api';
 import { LANG_NAMES, LANGS, getLanguage, setLanguage, t } from '../i18n';
 import { useLang } from '../useLang';
+import PasswordInput from '../PasswordInput';
 
 type Props = {
   onLoggedIn: (token: string) => void;
@@ -77,13 +78,12 @@ export default function LoginScreen({ onLoggedIn }: Props) {
         onChangeText={setEmail}
         editable={!busy}
       />
-      <TextInput
-        style={styles.input}
+      <PasswordInput
         placeholder={t('ph_password')}
-        secureTextEntry
         value={password}
         onChangeText={setPassword}
         editable={!busy}
+        autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
       />
 
       <Pressable

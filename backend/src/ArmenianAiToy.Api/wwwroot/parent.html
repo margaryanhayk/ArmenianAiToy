@@ -451,6 +451,29 @@
       line-height: 1.45;
     }
 
+    /* Show/hide control on every password box. Typing a password blind on a
+       phone keyboard is where most failed sign-ins come from, and the parent
+       has no other way to check what they typed. */
+    .pw-wrap { position: relative; margin-bottom: 12px; }
+    .pw-wrap input { margin-bottom: 0; padding-right: 52px; }
+    .pw-eye {
+      position: absolute;
+      right: 4px;
+      top: 4px;
+      bottom: 4px;
+      width: 44px;
+      min-height: 0;
+      padding: 0;
+      background: none;
+      border: none;
+      border-radius: 10px;
+      color: #5b3e8a;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .pw-eye:hover { background: #f2ebff; }
+
     .status { font-size: 13px; padding: 8px 0; min-height: 20px; }
     .status.err { color: #b3261e; }
     /* #9a8ab5 on white is ~3:1 — under the AA floor for body text, and this
@@ -1326,6 +1349,8 @@
       // Label/value separator. Armenian uses ՝, not a Latin colon, so this
       // cannot live in the layout.
       label_sep: { en: ': ', ru: ': ', hy: '՝ ' },
+      show_password: { en: 'Show password', ru: 'Показать пароль', hy: 'Ցույց տալ գաղտնաբառը' },
+      hide_password: { en: 'Hide password', ru: 'Скрыть пароль', hy: 'Թաքցնել գաղտնաբառը' },
       filter_show: { en: 'Show', ru: 'Показать', hy: 'Ցուցադրել' },
       filter_all: { en: 'All play', ru: 'Все занятия', hy: 'Ամեն ինչ' },
       aria_toy_views: { en: 'Toy views', ru: 'Разделы игрушки', hy: 'Խաղալիքի բաժիններ' },
@@ -5269,6 +5294,43 @@
       }
     }
 
+    // Put a show/hide control on every password box on the page, including
+    // the ones inside collapsed panels. Done by walking the DOM rather than
+    // by editing seven forms, so a password field added later gets it too.
+    function enhancePasswordFields() {
+      var inputs = document.querySelectorAll('input[type="password"]');
+      for (var i = 0; i < inputs.length; i++) {
+        (function (input) {
+          if (input.parentNode && input.parentNode.className === 'pw-wrap') return;
+          var wrap = document.createElement('div');
+          wrap.className = 'pw-wrap';
+          input.parentNode.insertBefore(wrap, input);
+          wrap.appendChild(input);
+
+          var eye = document.createElement('button');
+          eye.type = 'button';
+          eye.className = 'pw-eye';
+          eye.setAttribute('aria-pressed', 'false');
+          eye.textContent = '👁';
+          eye.title = t('show_password');
+          eye.setAttribute('aria-label', t('show_password'));
+          eye.addEventListener('click', function () {
+            var showing = input.getAttribute('type') === 'text';
+            // Toggling `type` keeps the value and the caret, and leaves
+            // autofill working — unlike replacing the element.
+            input.setAttribute('type', showing ? 'password' : 'text');
+            eye.textContent = showing ? '👁' : '🙈';
+            eye.setAttribute('aria-pressed', showing ? 'false' : 'true');
+            var label = showing ? t('show_password') : t('hide_password');
+            eye.title = label;
+            eye.setAttribute('aria-label', label);
+            input.focus();
+          });
+          wrap.appendChild(eye);
+        })(inputs[i]);
+      }
+    }
+
     (function initLang() {
       var sel = document.getElementById('langSelect');
       if (sel) {
@@ -5277,6 +5339,7 @@
       }
       applyStaticI18n();
       applyOptionI18n();
+      enhancePasswordFields();
     })();
 
     // ---------- home-screen install hint ----------
