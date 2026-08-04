@@ -103,4 +103,16 @@ public sealed class LoggingNotifier : INotifier
             false);
         return Task.FromResult(true);
     }
+
+    public Task SendToyJoinedByAnotherParentAsync(
+        string parentEmail, string deviceName, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Notification send-attempt: type={NotificationType}, email={Email}, device_name={DeviceName}, delivered={Delivered}",
+            "toy_joined_by_another_parent",
+            parentEmail,
+            deviceName,
+            false);
+        return Task.CompletedTask;
+    }
 }

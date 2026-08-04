@@ -46,6 +46,10 @@ public class ParentServiceEmailVerificationTests
             string parentEmail, string deviceName, DateTime lastSeenAtUtc,
             DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
             => Task.FromResult(true);
+        public Task SendToyJoinedByAnotherParentAsync(
+            string parentEmail, string deviceName,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     private sealed class CountingHasher

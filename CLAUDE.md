@@ -44,7 +44,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2241 tests)
+dotnet test                                     # Run all tests (2244 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2367,6 +2367,14 @@ Three invariants replace single-use, all pinned by
   kill-switch; if claiming reopened it, a thief could scan the QR and take
   ownership. `IsRevoked` is deliberately NOT reset by unlink. Reversing it
   stays a deliberate act by someone who already holds the toy, or an operator.
+- **The parents already holding a toy are told when someone joins.**
+  `INotifier.SendToyJoinedByAnotherParentAsync` fires once per existing
+  holder from `ClaimDeviceAsync`, after the commit, best-effort (a mail
+  failure must never undo a pairing that succeeded). Never on a re-claim by
+  the same parent and never on a refused claim. The message says WHAT
+  happened and WHAT TO DO, **never who joined** — the other parent's address
+  is not ours to hand out, and the action available is on the toy anyway.
+  This is what makes the seat limit something a parent can act on.
 - **A toy with zero linked parents goes quiet.**
   `ChatGateEvaluator.GateDecision.Unclaimed` runs ahead of pause/bedtime/mode
   on both the text and voice paths (`IDeviceService.HasLinkedParentAsync`),

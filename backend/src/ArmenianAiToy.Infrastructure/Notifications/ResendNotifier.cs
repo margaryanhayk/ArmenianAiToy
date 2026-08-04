@@ -146,6 +146,21 @@ public sealed class ResendNotifier : INotifier
             cancellationToken);
     }
 
+    public async Task SendToyJoinedByAnotherParentAsync(
+        string parentEmail,
+        string deviceName,
+        CancellationToken cancellationToken = default)
+    {
+        // Result deliberately discarded: the caller is completing a
+        // successful pairing and must not fail because mail did not go out.
+        // SendCoreAsync has already logged the outcome.
+        await SendCoreAsync(
+            "toy_joined_by_another_parent", parentEmail, deviceName,
+            NotificationEmailContent.ToyJoinedSubject,
+            NotificationEmailContent.BuildToyJoinedBody(deviceName),
+            cancellationToken);
+    }
+
     /// <summary>
     /// Shared send path for all four notification types. Returns
     /// <c>true</c> on a 2xx API response, <c>false</c> on a non-2xx

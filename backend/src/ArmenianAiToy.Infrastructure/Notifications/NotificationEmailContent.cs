@@ -23,6 +23,7 @@ internal static class NotificationEmailContent
     internal const string EmailVerificationSubject = "Հաստատեք Ձեր էլ. փոստը";
     internal const string DormancyWarningSubject = "Ձեր հաշիվը երկար ժամանակ անգործուն է";
     internal const string DormantDeviceWarningSubject = "Ձեր երեխայի խաղալիքը վերջերս չի օգտագործվել";
+    internal const string ToyJoinedSubject = "Ձեր խաղալիքին միացավ ևս մեկ ծնող";
 
     internal static string BuildResetLink(string linkBase, string rawToken)
     {
@@ -131,5 +132,20 @@ internal static class NotificationEmailContent
         }
         lines.Add("Եթե այլևս չեք օգտագործում այս սարքը, այս նամակը կարող եք անտեսել։");
         return string.Join("\n\n", lines);
+    }
+
+    internal static string BuildToyJoinedBody(string deviceName)
+    {
+        // Says WHAT happened and WHAT TO DO — never WHO joined. The other
+        // parent's address is not ours to hand out, and the recipient does
+        // not need it to act: the action is on the toy, not the person.
+        // Calm rather than alarming: in the ordinary case this is the second
+        // parent in the household doing exactly what they should.
+        return string.Join("\n\n", new[]
+        {
+            $"Բարև։ Ձեր խաղալիքին՝ {deviceName}, կապակցվեց ևս մեկ ծնող։",
+            "Այժմ երկու ծնող կարող են տեսնել այս խաղալիքի զրույցները և փոխել կարգավորումները։",
+            "Եթե դա ձեր ընտանիքից չէր, բացեք ծնողական վահանակը, կասեցրեք խաղալիքի մուտքը և կապվեք մեզ հետ։"
+        });
     }
 }

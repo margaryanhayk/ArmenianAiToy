@@ -41,6 +41,40 @@ public class ParentServiceClaimDeviceTests
         return (new ParentService(db, config, Substitute.For<ILogger<ParentService>>()), db);
     }
 
+    /// <summary>Records who was told that somebody joined their toy.</summary>
+    private sealed class RecordingNotifier : ArmenianAiToy.Application.Notifications.INotifier
+    {
+        public readonly List<(string Email, string DeviceName)> ToyJoined = new();
+        public Task SendPasswordResetAsync(string e, string t, CancellationToken c = default)
+            => Task.CompletedTask;
+        public Task<bool> SendDormancyWarningAsync(string e, DateTime? d, CancellationToken c = default)
+            => Task.FromResult(true);
+        public Task SendEmailVerificationAsync(string e, string t, CancellationToken c = default)
+            => Task.CompletedTask;
+        public Task<bool> SendDormantDeviceWarningAsync(
+            string e, string n, DateTime l, DateTime? d, CancellationToken c = default)
+            => Task.FromResult(true);
+        public Task SendToyJoinedByAnotherParentAsync(
+            string parentEmail, string deviceName, CancellationToken c = default)
+        {
+            ToyJoined.Add((parentEmail, deviceName));
+            return Task.CompletedTask;
+        }
+    }
+
+    private static (ParentService Service, TestDbContext Db, RecordingNotifier Notifier)
+        CreateServiceWithNotifier()
+    {
+        var db = new TestDbContext(new DbContextOptionsBuilder<TestDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+        var notifier = new RecordingNotifier();
+        var service = new ParentService(
+            db, Substitute.For<IConfiguration>(),
+            Substitute.For<ILogger<ParentService>>(),
+            hashPassword: null, notifier: notifier);
+        return (service, db, notifier);
+    }
+
     private static (Guid ParentId, Guid DeviceId) Seed(
         TestDbContext db, string? claimCode = Code)
     {
@@ -182,6 +216,58 @@ public class ParentServiceClaimDeviceTests
         Assert.True(await service.ClaimDeviceAsync(parentId, deviceId, Code));
 
         Assert.Equal(1, await db.Set<ParentDevice>().CountAsync(pd => pd.DeviceId == deviceId));
+    }
+
+    [Fact]
+    public async Task SecondParentJoining_TellsTheFirstOne_ButNeverTheJoinerThemselves()
+    {
+        var (service, db, notifier) = CreateServiceWithNotifier();
+        var (mumId, deviceId) = Seed(db);
+        var dadId = Guid.NewGuid();
+        db.Set<Parent>().Add(new Parent
+        {
+            Id = dadId, Email = "dad@x.com", PasswordHash = "x", RegisteredAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        // Mum pairs first — nobody held it before her, so nobody is told.
+        Assert.True(await service.ClaimDeviceAsync(mumId, deviceId, Code));
+        Assert.Empty(notifier.ToyJoined);
+
+        Assert.True(await service.ClaimDeviceAsync(dadId, deviceId, Code));
+
+        // KEYSTONE: the code lives on the toy for its whole life, so anyone
+        // who can hold the toy can join it. Being told is what makes the seat
+        // limit something a parent can act on.
+        var told = Assert.Single(notifier.ToyJoined);
+        Assert.Equal("p@x.com", told.Email);      // the parent who already had it
+        Assert.NotEqual("dad@x.com", told.Email); // never the one who just joined
+        Assert.Equal("Toy", told.DeviceName);
+    }
+
+    [Fact]
+    public async Task ReClaimingYourOwnToy_TellsNobody()
+    {
+        var (service, db, notifier) = CreateServiceWithNotifier();
+        var (parentId, deviceId) = Seed(db);
+
+        Assert.True(await service.ClaimDeviceAsync(parentId, deviceId, Code));
+        Assert.True(await service.ClaimDeviceAsync(parentId, deviceId, Code));
+
+        // Nothing changed hands, so there is nothing to report — a parent who
+        // scans their own toy twice must not email themselves an alarm.
+        Assert.Empty(notifier.ToyJoined);
+    }
+
+    [Fact]
+    public async Task RefusedClaim_TellsNobody()
+    {
+        var (service, db, notifier) = CreateServiceWithNotifier();
+        var (parentId, deviceId) = Seed(db);
+
+        Assert.False(await service.ClaimDeviceAsync(parentId, deviceId, "WRONG-CODE"));
+
+        Assert.Empty(notifier.ToyJoined);
     }
 
     [Fact]

@@ -139,4 +139,33 @@ public interface INotifier
         DateTime lastSeenAtUtc,
         DateTime? deleteAtUtc,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Tell a parent that somebody else has just paired a toy they already
+    /// hold. Called by <c>ParentService.ClaimDeviceAsync</c>, once per
+    /// already-linked parent, when a NEW link is added (never on a re-claim
+    /// of a toy the same parent already holds).
+    /// <para>
+    /// This exists because the pairing code lives on the toy for its whole
+    /// life: anyone who can hold the toy can join it. That is the intended
+    /// behaviour for the second parent in a household, but it means a parent
+    /// must be able to find out it happened. Being told is what makes the
+    /// seat limit something they can act on.
+    /// </para>
+    /// <para>
+    /// Returns <c>Task</c>, not <c>Task&lt;bool&gt;</c>: the caller is an
+    /// HTTP handler completing a successful pairing, and a mail failure must
+    /// never turn that into an error for the parent who just scanned. Failed
+    /// sends are swallowed into a structured log by the implementation.
+    /// </para>
+    /// <para>
+    /// <b>No cross-parent PII.</b> The joining parent's email address is NOT
+    /// a parameter and must never appear in the message — the recipient is
+    /// told that a second parent joined and which toy, nothing about who.
+    /// </para>
+    /// </summary>
+    Task SendToyJoinedByAnotherParentAsync(
+        string parentEmail,
+        string deviceName,
+        CancellationToken cancellationToken = default);
 }

@@ -788,6 +788,10 @@ public class RetentionPurgeServiceTests
             var delivered = DeviceDeliverResults.TryGetValue(parentEmail, out var v) ? v : true;
             return Task.FromResult(delivered);
         }
+        public Task SendToyJoinedByAnotherParentAsync(
+            string parentEmail, string deviceName,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     private sealed class NoOpNotifier : ArmenianAiToy.Application.Notifications.INotifier
@@ -805,6 +809,10 @@ public class RetentionPurgeServiceTests
             string parentEmail, string deviceName, DateTime lastSeenAtUtc,
             DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
             => Task.FromResult(true);
+        public Task SendToyJoinedByAnotherParentAsync(
+            string parentEmail, string deviceName,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     private static Guid SeedParent(

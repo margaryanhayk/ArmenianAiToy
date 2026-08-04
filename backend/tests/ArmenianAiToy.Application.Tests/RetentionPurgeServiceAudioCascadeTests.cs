@@ -70,6 +70,10 @@ public class RetentionPurgeServiceAudioCascadeTests
             string parentEmail, string deviceName, DateTime lastSeenAtUtc,
             DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
             => Task.FromResult(true);
+        public Task SendToyJoinedByAnotherParentAsync(
+            string parentEmail, string deviceName,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     private static async Task<Harness> CreateHarnessAsync(

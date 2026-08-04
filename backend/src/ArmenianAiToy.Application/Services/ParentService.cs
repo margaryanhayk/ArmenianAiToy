@@ -137,6 +137,9 @@ public class ParentService : IParentService
             string parentEmail, string deviceName, DateTime lastSeenAtUtc,
             DateTime? deleteAtUtc, CancellationToken cancellationToken = default)
             => Task.FromResult(true);
+        public Task SendToyJoinedByAnotherParentAsync(
+            string parentEmail, string deviceName, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     // Private no-op blob store — safe default for tests that construct
@@ -437,12 +440,22 @@ public class ParentService : IParentService
         // who scans twice is never told something went wrong.
         var alreadyLinked = await _db.Set<ParentDevice>()
             .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        // Captured BEFORE the new link is added: these are the parents who
+        // were already holding the toy and deserve to be told.
+        var existingHolders = new List<string>();
         if (!alreadyLinked)
         {
             var seatsTaken = await _db.Set<ParentDevice>()
                 .CountAsync(pd => pd.DeviceId == deviceId);
             if (seatsTaken >= MaxParentsPerDevice)
                 return false;
+
+            existingHolders = await _db.Set<ParentDevice>()
+                .Where(pd => pd.DeviceId == deviceId)
+                .Join(_db.Set<Parent>(), pd => pd.ParentId, p => p.Id, (pd, p) => p)
+                .Where(p => p.AnonymizedAt == null && p.Email != null && p.Email != "")
+                .Select(p => p.Email!)
+                .ToListAsync();
 
             _db.Set<ParentDevice>().Add(new ParentDevice
             {
@@ -456,6 +469,29 @@ public class ParentService : IParentService
         TrackAndAddAudit(AuditEvent.ParentDeviceClaimed(parentId, deviceId));
         await _db.SaveChangesAsync();
         _logger.LogInformation("Parent {ParentId} claimed device {DeviceId}", parentId, deviceId);
+
+        // Tell whoever already held this toy that somebody joined it. The code
+        // lives on the toy for its whole life, so anyone who can hold the toy
+        // can join — being told is what makes the seat limit something a
+        // parent can act on. Never says WHO joined: that address is not ours
+        // to hand out, and the action they can take is on the toy anyway.
+        //
+        // AFTER the commit and best-effort: the pairing has already succeeded
+        // and a mail problem must not undo it or surface as an error to the
+        // parent who just scanned.
+        var toyName = string.IsNullOrWhiteSpace(device.Name) ? "Areg" : device.Name;
+        foreach (var email in existingHolders)
+        {
+            try
+            {
+                await _notifier.SendToyJoinedByAnotherParentAsync(email, toyName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Could not notify an existing parent that device {DeviceId} was joined", deviceId);
+            }
+        }
         return true;
     }
 

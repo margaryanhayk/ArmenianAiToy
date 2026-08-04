@@ -337,6 +337,46 @@ public sealed class SmtpNotifier : INotifier
         }
     }
 
+    public async Task SendToyJoinedByAnotherParentAsync(
+        string parentEmail,
+        string deviceName,
+        CancellationToken cancellationToken = default)
+    {
+        var fromAddress = _config["Notifications:Smtp:FromAddress"] ?? "";
+
+        using var message = new MailMessage
+        {
+            From = new MailAddress(fromAddress),
+            Subject = NotificationEmailContent.ToyJoinedSubject,
+            Body = NotificationEmailContent.BuildToyJoinedBody(deviceName),
+            BodyEncoding = Encoding.UTF8,
+            SubjectEncoding = Encoding.UTF8,
+            IsBodyHtml = false
+        };
+        message.To.Add(parentEmail);
+
+        try
+        {
+            await _sendMail(message, cancellationToken);
+            _logger.LogInformation(
+                "Notification send-attempt: type={NotificationType}, email={Email}, device_name={DeviceName}, transport={Transport}, delivered={Delivered}",
+                "toy_joined_by_another_parent", parentEmail, deviceName, "smtp", true);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Swallowed: the parent who just scanned completed a successful
+            // pairing, and a mail failure must not turn that into an error
+            // for them.
+            _logger.LogWarning(ex,
+                "Notification send-attempt: type={NotificationType}, email={Email}, device_name={DeviceName}, transport={Transport}, delivered={Delivered}, error_category={ErrorCategory}",
+                "toy_joined_by_another_parent", parentEmail, deviceName, "smtp", false, ex.GetType().Name);
+        }
+    }
+
     // Default wire call. Pulls credentials / host / port off
     // IConfiguration on every send so a config reload (via a restart)
     // is picked up without recycling the singleton. Scoped registration
