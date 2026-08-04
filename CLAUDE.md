@@ -1971,7 +1971,20 @@ touches the backend, so the dashboard under-reported what the child heard.
   additive init-props).
 
 **C. Narration render tool** — `tools/ElevenLabsRender/` (raw HTTP, no new
-NuGet): renders narration at a chosen `voice_settings.speed` (0.7–1.2) and
+NuGet). **CHUNKED + LENGTH-CHECKED since 2026-08-04** after five of the eight
+shipped stories were found truncated (anban-huri: 3:52 of text had shipped as
+1:27 of audio; khosogh-dzuk played a quarter of itself). Root cause: those
+MP3s were rendered ad hoc BEFORE this tool existed — the tool was committed in
+`eecd03a`, 14 hours after the audio shipped in `33ca03c` — and nothing in the
+pipeline ever compared a story's audio length against its text. The story text
+was NOT edited afterwards; the render itself came back short and was saved
+without a check. Now: narration is split into `--max-chunk` (default 700)
+character requests on segment then sentence boundaries, each sent with
+`previous_text`/`next_text` so prosody stays continuous across a split; the
+concatenated result's real duration is parsed from the MP3 frames and compared
+against ~15 chars/second, and the tool EXITS NON-ZERO naming any file under 70%
+of expected rather than letting it become a manifest line. It also renders
+narration at a chosen `voice_settings.speed` (0.7–1.2) and
 the B5 clips (intro composed «Հեքիաթ՝ …։ Հեղինակ՝ …։», question =
 `reflectionQuestions[0]`, summary = `lesson ?? reflectionText`) in the
 ElevenLabs storyteller clone. DRY-RUN by default; paid render requires

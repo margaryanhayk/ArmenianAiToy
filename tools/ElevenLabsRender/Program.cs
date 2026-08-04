@@ -54,6 +54,14 @@ var confirmPaid = false;
 double speed = 1.0;
 var model = "eleven_multilingual_v2";
 var output = Path.Combine(Path.GetTempPath(), "areg-elevenlabs-render");
+// Small enough that no single request is anywhere near a length the API
+// might refuse or curtail. The five stories cut on 2026-08-03 all stopped
+// somewhere past 1,100 characters in a single request.
+var maxChunkChars = 700;
+// A render shorter than this fraction of the expected duration is treated as
+// truncated and refused. Generous on purpose — it is there to catch a story
+// that stops in the middle, not to argue about a brisk delivery.
+const double ShortRenderFloor = 0.70;
 
 for (var i = 0; i < args.Length; i++)
 {
@@ -66,6 +74,7 @@ for (var i = 0; i < args.Length; i++)
         case "--confirm-paid-api": confirmPaid = true; break;
         case "--speed": speed = double.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture); break;
         case "--model": model = args[++i]; break;
+        case "--max-chunk": maxChunkChars = int.Parse(args[++i]); break;
         case "--output": output = args[++i]; break;
         default:
             Console.Error.WriteLine($"Unknown option: {args[i]}");
@@ -93,17 +102,28 @@ if (stories.Count == 0)
     return 2;
 }
 
-// One render job = one output MP3.
-var jobs = new List<(string FileName, string Label, string Text)>();
+// One render job = one output MP3, rendered as one or more CHUNKS.
+//
+// Chunking exists because of what happened on 2026-08-03: the shipped
+// narration was rendered outside this tool, in one request per story, and
+// five of the eight came back cut — anban-huri 3:52 of text arrived as 1:27
+// of audio. Nothing checked, so truncated stories shipped and children heard
+// them stop partway. Splitting the text means no single request is anywhere
+// near a length the API might refuse or curtail, and the length check below
+// means a short result can never be written out again.
+var jobs = new List<(string FileName, string Label, List<string> Chunks)>();
 foreach (var story in stories)
 {
     if (!clips)
     {
-        // Narration: the segments verbatim, joined with a blank line —
-        // the same text the reviewed story file carries. Speed is in the
-        // filename so a two-speed comparison render can't mix files up.
-        var text = string.Join("\n\n", story.Segments.Select(s => s.Text));
-        jobs.Add(($"{story.Id}--narration--s{speed:0.0#}.mp3", $"{story.Id} narration", text));
+        // Narration: the segments verbatim — the same text the reviewed
+        // story file carries. Speed is in the filename so a two-speed
+        // comparison render can't mix files up.
+        var segments = story.Segments.Select(s => s.Text).ToList();
+        jobs.Add((
+            $"{story.Id}--narration--s{speed:0.0#}.mp3",
+            $"{story.Id} narration",
+            BuildChunks(segments, maxChunkChars)));
         continue;
     }
 
@@ -114,30 +134,34 @@ foreach (var story in stories)
     var intro = story.Author is null
         ? $"Հեքիաթ՝ «{story.Title}»։"
         : $"Հեքիաթ՝ «{story.Title}»։ Հեղինակ՝ {story.Author}։";
-    jobs.Add(($"{story.Id}--intro.mp3", $"{story.Id} intro", intro));
+    jobs.Add(($"{story.Id}--intro.mp3", $"{story.Id} intro", [intro]));
     if (story.ReflectionQuestions.Count > 0)
     {
-        jobs.Add(($"{story.Id}--question.mp3", $"{story.Id} question", story.ReflectionQuestions[0]));
+        jobs.Add(($"{story.Id}--question.mp3", $"{story.Id} question",
+            [story.ReflectionQuestions[0]]));
     }
     var summary = story.Lesson ?? story.ReflectionText;
     if (!string.IsNullOrWhiteSpace(summary))
     {
-        jobs.Add(($"{story.Id}--summary.mp3", $"{story.Id} summary", summary));
+        jobs.Add(($"{story.Id}--summary.mp3", $"{story.Id} summary", [summary]));
     }
 }
 
-var totalChars = jobs.Sum(j => j.Text.Length);
-Console.WriteLine($"Plan: {jobs.Count} file(s), {totalChars:N0} characters, speed={speed:0.0#}, model={model}");
+var totalChars = jobs.Sum(j => j.Chunks.Sum(c => c.Length));
+var totalRequests = jobs.Sum(j => j.Chunks.Count);
+Console.WriteLine($"Plan: {jobs.Count} file(s) in {totalRequests} request(s), {totalChars:N0} characters, speed={speed:0.0#}, model={model}");
 Console.WriteLine($"Output: {output}");
 Console.WriteLine();
 foreach (var job in jobs)
 {
-    Console.WriteLine($"  {job.FileName,-42} {job.Text.Length,6:N0} chars");
+    var chars = job.Chunks.Sum(c => c.Length);
+    Console.WriteLine(
+        $"  {job.FileName,-42} {chars,6:N0} chars in {job.Chunks.Count} chunk(s), expect ~{FormatDuration(ExpectedSeconds(chars))}");
     if (clips)
     {
         // Clip texts are short child-facing lines — print them in full so
         // the dry run doubles as the pre-render text review.
-        Console.WriteLine($"      «{job.Text}»");
+        Console.WriteLine($"      «{job.Chunks[0]}»");
     }
 }
 Console.WriteLine();
@@ -163,38 +187,82 @@ using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
 http.DefaultRequestHeaders.Add("xi-api-key", apiKey);
 
 var manifest = new List<object>();
+var shortRenders = new List<string>();
 foreach (var job in jobs)
 {
-    Console.WriteLine($"Rendering {job.Label} ({job.Text.Length:N0} chars)...");
-    var body = JsonSerializer.Serialize(new
+    var jobChars = job.Chunks.Sum(c => c.Length);
+    Console.WriteLine(
+        $"Rendering {job.Label} ({jobChars:N0} chars, {job.Chunks.Count} chunk(s))...");
+
+    var pieces = new List<byte[]>();
+    for (var c = 0; c < job.Chunks.Count; c++)
     {
-        text = job.Text,
-        model_id = model,
-        voice_settings = new
+        var body = JsonSerializer.Serialize(new
         {
-            // Stability/similarity stay at the voice's own defaults (the
-            // clone was tuned when it was created); only speed is set.
-            speed,
-        },
-    });
-    using var response = await http.PostAsync(
-        $"https://api.elevenlabs.io/v1/text-to-speech/{voiceId}",
-        new StringContent(body, Encoding.UTF8, "application/json"));
-    if (!response.IsSuccessStatusCode)
-    {
-        // Never print the response body wholesale (it can echo request
-        // details) — status + a bounded prefix is enough to diagnose.
-        var detail = await response.Content.ReadAsStringAsync();
-        Console.Error.WriteLine(
-            $"  FAILED: HTTP {(int)response.StatusCode} {detail[..Math.Min(detail.Length, 200)]}");
-        return 1;
+            text = job.Chunks[c],
+            model_id = model,
+            // Neighbouring text is sent as CONTEXT, not as speech: it is what
+            // keeps the voice's pace and intonation continuous across a split
+            // so a chunked story does not sound like separate takes stitched
+            // together.
+            previous_text = c > 0 ? job.Chunks[c - 1] : null,
+            next_text = c + 1 < job.Chunks.Count ? job.Chunks[c + 1] : null,
+            voice_settings = new
+            {
+                // Stability/similarity stay at the voice's own defaults (the
+                // clone was tuned when it was created); only speed is set.
+                speed,
+            },
+        });
+        using var response = await http.PostAsync(
+            $"https://api.elevenlabs.io/v1/text-to-speech/{voiceId}",
+            new StringContent(body, Encoding.UTF8, "application/json"));
+        if (!response.IsSuccessStatusCode)
+        {
+            // Never print the response body wholesale (it can echo request
+            // details) — status + a bounded prefix is enough to diagnose.
+            var detail = await response.Content.ReadAsStringAsync();
+            Console.Error.WriteLine(
+                $"  FAILED chunk {c + 1}/{job.Chunks.Count}: HTTP {(int)response.StatusCode} {detail[..Math.Min(detail.Length, 200)]}");
+            return 1;
+        }
+        var piece = await response.Content.ReadAsByteArrayAsync();
+        pieces.Add(piece);
+        Console.WriteLine(
+            $"    chunk {c + 1}/{job.Chunks.Count} {job.Chunks[c].Length,5:N0} chars -> {piece.LongLength,9:N0} B  {FormatDuration(Mp3Duration.Seconds(piece))}");
     }
-    var bytes = await response.Content.ReadAsByteArrayAsync();
+
+    // MP3 frames are self-contained, so same-encoder pieces concatenate
+    // without a container rewrite.
+    var bytes = pieces.SelectMany(p => p).ToArray();
+    var seconds = Mp3Duration.Seconds(bytes);
+    var expected = ExpectedSeconds(jobChars);
+
     var path = Path.Combine(output, job.FileName);
     await File.WriteAllBytesAsync(path, bytes);
     var sha = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-    manifest.Add(new { file = job.FileName, sha256 = sha, sizeBytes = bytes.LongLength });
-    Console.WriteLine($"  OK {bytes.LongLength:N0} B sha256={sha}");
+    manifest.Add(new
+    {
+        file = job.FileName,
+        sha256 = sha,
+        sizeBytes = bytes.LongLength,
+        seconds = Math.Round(seconds, 1),
+        chars = jobChars,
+    });
+    Console.WriteLine(
+        $"  OK {bytes.LongLength:N0} B  {FormatDuration(seconds)} (expected ~{FormatDuration(expected)})  sha256={sha}");
+
+    // The check that did not exist on 2026-08-03. A render that is far
+    // shorter than its text is a truncated story, and a truncated story is
+    // one a child hears stop in the middle — so it is called out here, by
+    // name, rather than quietly becoming a manifest line.
+    if (expected > 0 && seconds < expected * ShortRenderFloor)
+    {
+        var pct = (int)Math.Round(100 * seconds / expected);
+        Console.Error.WriteLine(
+            $"  *** TOO SHORT: {FormatDuration(seconds)} is only {pct}% of the ~{FormatDuration(expected)} this text needs. Do NOT ship this file.");
+        shortRenders.Add($"{job.FileName} ({pct}%)");
+    }
 }
 
 var snippetPath = Path.Combine(output, "manifest-snippet.json");
@@ -204,4 +272,134 @@ Console.WriteLine();
 Console.WriteLine($"Wrote {snippetPath} — paste sha256/sizeBytes into ContentSync config");
 Console.WriteLine("and BUMP each story's Version so devices re-download.");
 Console.WriteLine("Next gate: human listen test (tools/quality-evidence conventions).");
+
+if (shortRenders.Count > 0)
+{
+    Console.Error.WriteLine();
+    Console.Error.WriteLine(
+        $"REFUSING to call this a good render: {shortRenders.Count} file(s) came back short —");
+    foreach (var s in shortRenders) Console.Error.WriteLine($"  {s}");
+    Console.Error.WriteLine("Re-run those stories. Shipping them means a child hears the story stop.");
+    return 1;
+}
 return 0;
+
+// Roughly how long this much Armenian narration should take in this voice.
+// Calibrated against the renders that came back complete (14.7–15.7 chars per
+// second) and against the original full anban-huri render (14.2). Only used
+// to spot a render that is grossly short — never to reject a merely brisk one.
+static double ExpectedSeconds(int chars) => chars / 15.0;
+
+static string FormatDuration(double seconds) =>
+    $"{(int)(seconds / 60)}:{(int)(seconds % 60):00}";
+
+// Split a story's segments into request-sized chunks, preferring segment
+// boundaries (a segment is already a natural pause in the telling) and
+// falling back to sentence boundaries for any segment that is too long on
+// its own.
+static List<string> BuildChunks(List<string> segments, int maxChars)
+{
+    var chunks = new List<string>();
+    var current = new StringBuilder();
+
+    void Flush()
+    {
+        if (current.Length > 0)
+        {
+            chunks.Add(current.ToString().Trim());
+            current.Clear();
+        }
+    }
+
+    foreach (var segment in segments)
+    {
+        var text = segment.Trim();
+        if (text.Length == 0) continue;
+
+        foreach (var part in SplitToSentences(text, maxChars))
+        {
+            if (current.Length > 0 && current.Length + part.Length + 2 > maxChars) Flush();
+            if (current.Length > 0) current.Append("\n\n");
+            current.Append(part);
+        }
+    }
+    Flush();
+    return chunks;
+}
+
+// Armenian ends sentences with ։ (U+0589); the drafts also contain ASCII
+// periods, question and exclamation marks. Split after any of them.
+static List<string> SplitToSentences(string text, int maxChars)
+{
+    if (text.Length <= maxChars) return [text];
+    var parts = new List<string>();
+    var start = 0;
+    var lastBreak = -1;
+    for (var i = 0; i < text.Length; i++)
+    {
+        var ch = text[i];
+        if (ch is '։' or '.' or '?' or '!' or '՞' or '՜') lastBreak = i;
+        if (i - start + 1 >= maxChars)
+        {
+            var cut = lastBreak > start ? lastBreak + 1 : i + 1;
+            parts.Add(text[start..cut].Trim());
+            start = cut;
+            lastBreak = -1;
+        }
+    }
+    if (start < text.Length) parts.Add(text[start..].Trim());
+    return parts.Where(p => p.Length > 0).ToList();
+}
+
+/// <summary>
+/// Duration of an MPEG Layer III stream, by walking its frame headers.
+/// Deliberately dependency-free: the only question it has to answer is
+/// "is this audio roughly as long as the text implies", and a truncated
+/// story is never a close call.
+/// </summary>
+internal static class Mp3Duration
+{
+    private static readonly int[] V1L3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
+    private static readonly int[] V2L3 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];
+    private static readonly int[][] Rates =
+    [
+        [44100, 48000, 32000],   // MPEG 1
+        [22050, 24000, 16000],   // MPEG 2
+        [11025, 12000, 8000],    // MPEG 2.5
+    ];
+
+    public static double Seconds(byte[] data)
+    {
+        var i = 0;
+        if (data.Length > 10 && data[0] == 'I' && data[1] == 'D' && data[2] == '3')
+        {
+            i = 10 + (((data[6] & 0x7f) << 21) | ((data[7] & 0x7f) << 14)
+                      | ((data[8] & 0x7f) << 7) | (data[9] & 0x7f));
+        }
+        var total = 0.0;
+        while (i < data.Length - 4)
+        {
+            if (data[i] != 0xFF || (data[i + 1] & 0xE0) != 0xE0) { i++; continue; }
+            var ver = (data[i + 1] >> 3) & 0x03;     // 3 = MPEG1, 2 = MPEG2, 0 = MPEG2.5
+            var layer = (data[i + 1] >> 1) & 0x03;   // 1 = Layer III
+            var bIdx = (data[i + 2] >> 4) & 0x0F;
+            var sIdx = (data[i + 2] >> 2) & 0x03;
+            var pad = (data[i + 2] >> 1) & 0x01;
+            if (layer != 1 || bIdx is 0 or 15 || sIdx == 3 || ver == 1) { i++; continue; }
+
+            var (bitrate, rate, samples) = ver switch
+            {
+                3 => (V1L3[bIdx] * 1000, Rates[0][sIdx], 1152),
+                2 => (V2L3[bIdx] * 1000, Rates[1][sIdx], 576),
+                _ => (V2L3[bIdx] * 1000, Rates[2][sIdx], 576),
+            };
+            if (bitrate == 0 || rate == 0) { i++; continue; }
+
+            var frameLength = (samples / 8 * bitrate / rate) + pad;
+            if (frameLength <= 4) { i++; continue; }
+            total += (double)samples / rate;
+            i += frameLength;
+        }
+        return total;
+    }
+}
