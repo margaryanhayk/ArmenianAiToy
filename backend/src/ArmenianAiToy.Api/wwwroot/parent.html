@@ -124,6 +124,29 @@
       font-size: 12px;
       border: 1px solid transparent;
     }
+    /* Segmented choice (boy / girl). A native <select> here rendered as a
+       tiny grey system dropdown wedged between two full-width rounded
+       inputs — visually foreign to the rest of the form, and a small target
+       on a phone. Two buttons of equal width read as one control, show both
+       options at once, and clear the 44px thumb floor. */
+    .seg { display: flex; gap: 8px; margin-bottom: 12px; }
+    .seg button {
+      flex: 1 1 0;
+      min-height: 44px;
+      padding: 10px 12px;
+      font-size: 15px;
+      background: #ffffff;
+      border: 2px solid #e0d6f0;
+      border-radius: 12px;
+      color: #4b3b6e;
+      cursor: pointer;
+    }
+    .seg button[aria-checked="true"] {
+      background: #5b3e8a;
+      border-color: #5b3e8a;
+      color: #ffffff;
+      font-weight: 600;
+    }
     .chip-ok     { background: #e6f6ec; border-color: #b9e4c9; color: #1e7a45; }
     .chip-muted  { background: #f2f2f2; border-color: #dddddd; color: #666666; }
     .chip-warn   { background: #fef3c7; border-color: #e7c66a; color: #92400e; }
@@ -1323,6 +1346,7 @@
         hy: 'Areg-ը այս տվյալներով դիմում է երեխային անունով և ընտրում տարիքին համապատասխան հեքիաթներ։ Հայերենին պետք է նաև իմանալ՝ տղա է, թե աղջիկ։'
       },
       child_name_ph: { en: "Child's name", ru: 'Имя ребёнка', hy: 'Երեխայի անունը' },
+      gender_label: { en: 'Boy or girl', ru: 'Мальчик или девочка', hy: 'Տղա, թե աղջիկ' },
       gender_boy: { en: 'Boy', ru: 'Мальчик', hy: 'Տղա' },
       gender_girl: { en: 'Girl', ru: 'Девочка', hy: 'Աղջիկ' },
       birth_year: { en: 'Birth year (optional)', ru: 'Год рождения (необязательно)', hy: 'Ծննդյան տարի (ըստ ցանկության)' },
@@ -3477,33 +3501,64 @@
       why.style.cssText = 'font-size:12px;color:#6b5b8a;line-height:1.5;margin-bottom:10px;';
       form.appendChild(why);
 
+      // Every field gets a visible label. A placeholder disappears the moment
+      // something is typed, so a filled form was three unlabelled boxes —
+      // "2016" with nothing saying it is a birth year.
+      function addLabel(key, control) {
+        var id = 'ac-' + key + '-' + d.deviceId;
+        var l = document.createElement('label');
+        l.textContent = t(key);
+        l.setAttribute('for', id);
+        control.id = id;
+        form.appendChild(l);
+        form.appendChild(control);
+      }
+
       var nameInput = document.createElement('input');
       nameInput.type = 'text';
       nameInput.maxLength = 60;
       nameInput.placeholder = t('child_name_ph');
-      nameInput.setAttribute('aria-label', t('child_name_ph'));
-      form.appendChild(nameInput);
+      addLabel('child_name_ph', nameInput);
 
-      var genderSel = document.createElement('select');
-      genderSel.setAttribute('aria-label', t('gender_boy') + ' / ' + t('gender_girl'));
-      // The values are the Gender enum's ORDINALS (Boy=0, Girl=1). The API
-      // has no string-enum converter configured, so posting "Boy" is a 400 —
-      // found by actually calling the endpoint, not by reading the DTO.
+      // Boy/girl as a two-button segmented control rather than a dropdown:
+      // both options stay visible, each is a full-size tap target, and it
+      // matches the rest of the form instead of a grey system widget.
+      // Values are the Gender enum's ORDINALS (Boy=0, Girl=1) — the API has
+      // no string-enum converter, so posting "Boy" is a 400. Found by
+      // calling the endpoint, not by reading the DTO.
+      var genderLabel = document.createElement('label');
+      genderLabel.textContent = t('gender_label');
+      form.appendChild(genderLabel);
+
+      var seg = document.createElement('div');
+      seg.className = 'seg';
+      seg.setAttribute('role', 'radiogroup');
+      seg.setAttribute('aria-label', t('gender_label'));
+      var gender = '0';
+      var segButtons = [];
       [['0', t('gender_boy')], ['1', t('gender_girl')]].forEach(function (pair) {
-        var o = document.createElement('option');
-        o.value = pair[0];
-        o.textContent = pair[1];
-        genderSel.appendChild(o);
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = pair[1];
+        b.setAttribute('role', 'radio');
+        b.setAttribute('aria-checked', pair[0] === gender ? 'true' : 'false');
+        b.addEventListener('click', function () {
+          gender = pair[0];
+          segButtons.forEach(function (other) {
+            other.setAttribute('aria-checked', other === b ? 'true' : 'false');
+          });
+        });
+        segButtons.push(b);
+        seg.appendChild(b);
       });
-      form.appendChild(genderSel);
+      form.appendChild(seg);
 
       var yearInput = document.createElement('input');
       yearInput.type = 'number';
       yearInput.min = '1900';
       yearInput.max = String(new Date().getFullYear());
-      yearInput.placeholder = t('birth_year');
-      yearInput.setAttribute('aria-label', t('birth_year'));
-      form.appendChild(yearInput);
+      yearInput.placeholder = 'yyyy';
+      addLabel('birth_year', yearInput);
 
       var saveBtn = document.createElement('button');
       saveBtn.type = 'button';
@@ -3521,7 +3576,7 @@
         if (!name) { deviceStatus(t('child_name_required'), 'err'); nameInput.focus(); return; }
         var year = parseInt(yearInput.value, 10);
         saveBtn.disabled = true;
-        addChild(d.deviceId, name, genderSel.value, isNaN(year) ? null : year, function () {
+        addChild(d.deviceId, name, gender, isNaN(year) ? null : year, function () {
           saveBtn.disabled = false;
         });
       });
