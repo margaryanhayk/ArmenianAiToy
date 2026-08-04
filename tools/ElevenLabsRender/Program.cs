@@ -20,10 +20,16 @@
 //   dotnet run --project tools/ElevenLabsRender -- --story anban-huri --speed 0.9
 //   dotnet run --project tools/ElevenLabsRender -- --story anban-huri --speed 0.9 --render --confirm-paid-api
 //   dotnet run --project tools/ElevenLabsRender -- --all --clips --render --confirm-paid-api
+//   dotnet run --project tools/ElevenLabsRender -- --voice-clips --render --confirm-paid-api
 //
 // OPTIONS
 //   --story <id>        one story (repeatable) | --all = every embedded story
-//   --clips             render the intro/question/summary clips (default: narration)
+//   --clips             render a story's intro/question/summary AND the two
+//                       welcome-flow offer lines (default: narration)
+//   --voice-clips       render the DEVICE-GLOBAL welcome-flow lines (greetings,
+//                       menu prompts, fallbacks) from
+//                       backend/content/voice-clips/voice-clips.json. Needs no
+//                       --story: these belong to no story. One file per clip id.
 //   --speed <x>         voice_settings.speed, ElevenLabs range 0.7–1.2 (default 1.0)
 //   --model <id>        default eleven_multilingual_v2
 //   --output <dir>      default %TEMP%/areg-elevenlabs-render
@@ -61,11 +67,13 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ArmenianAiToy.Application.Stories;
 
 var storyIds = new List<string>();
 var all = false;
 var clips = false;
+var voiceClips = false;
 var render = false;
 var confirmPaid = false;
 double speed = 1.0;
@@ -95,6 +103,7 @@ for (var i = 0; i < args.Length; i++)
         case "--story": storyIds.Add(args[++i]); break;
         case "--all": all = true; break;
         case "--clips": clips = true; break;
+        case "--voice-clips": voiceClips = true; break;
         case "--render": render = true; break;
         case "--confirm-paid-api": confirmPaid = true; break;
         case "--speed": speed = double.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture); break;
@@ -121,10 +130,41 @@ var stories = all
     : storyIds.Select(id => library.GetById(id)
         ?? throw new InvalidOperationException($"Unknown story id '{id}'")).ToList();
 
-if (stories.Count == 0)
+// --voice-clips renders the DEVICE-GLOBAL welcome-flow lines (greetings,
+// menu prompts, the two fallback lines). They belong to no story, so this
+// mode does not need --story / --all.
+if (stories.Count == 0 && !voiceClips)
 {
     Console.Error.WriteLine("Nothing to render — pass --story <id> (repeatable) or --all.");
     return 2;
+}
+
+// The reviewable Armenian source for the welcome flow. Content, not a build
+// artifact, so it is found by walking up to the repo root rather than copied
+// to the output directory.
+VoiceClipFile? voiceClipFile = null;
+if (voiceClips || clips)
+{
+    var dir = new DirectoryInfo(AppContext.BaseDirectory);
+    while (dir is not null && !File.Exists(Path.Combine(
+               dir.FullName, "backend", "content", "voice-clips", "voice-clips.json")))
+    {
+        dir = dir.Parent;
+    }
+    if (dir is null)
+    {
+        Console.Error.WriteLine("Could not find backend/content/voice-clips/voice-clips.json.");
+        return 2;
+    }
+    voiceClipFile = JsonSerializer.Deserialize<VoiceClipFile>(
+        File.ReadAllText(Path.Combine(
+            dir.FullName, "backend", "content", "voice-clips", "voice-clips.json")),
+        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+    if (voiceClipFile?.Clips is null || voiceClipFile.Templates is null)
+    {
+        Console.Error.WriteLine("voice-clips.json is missing its clips or _perStoryTemplates.");
+        return 2;
+    }
 }
 
 // One render job = one output MP3, rendered as one or more CHUNKS.
@@ -137,8 +177,29 @@ if (stories.Count == 0)
 // near a length the API might refuse or curtail, and the length check below
 // means a short result can never be written out again.
 var jobs = new List<(string FileName, string Label, List<string> Chunks)>();
+
+// Welcome flow — the device-global lines. One file per clip id, named
+// <voiceId>.mp3 so Ship-StoryAudio.ps1 picks them up by id like everything
+// else. Each is one short sentence, so never more than one chunk.
+if (voiceClips)
+{
+    foreach (var clip in voiceClipFile!.Clips!)
+    {
+        if (string.IsNullOrWhiteSpace(clip.VoiceId) || string.IsNullOrWhiteSpace(clip.Text))
+        {
+            Console.Error.WriteLine($"Skipping a voice clip with no id or no text.");
+            continue;
+        }
+        jobs.Add(($"{clip.VoiceId}.mp3", clip.VoiceId, [clip.Text]));
+    }
+}
+
 foreach (var story in stories)
 {
+    if (voiceClips && !clips)
+    {
+        continue;   // --voice-clips alone renders only the device-global set
+    }
     if (!clips)
     {
         // Narration: the segments verbatim — the same text the reviewed
@@ -170,6 +231,23 @@ foreach (var story in stories)
     {
         jobs.Add(($"{story.Id}--summary.mp3", $"{story.Id} summary", [summary]));
     }
+
+    // Welcome flow — the spoken offers, which are what let the toy name a
+    // story out loud with no runtime TTS. The title goes in verbatim and the
+    // grammatical ending hangs on the classifier «հեքիաթ», NOT on the title:
+    // every shipped title already ends in the definite article, so splicing
+    // «-ը» onto it stutters.
+    var templates = voiceClipFile!.Templates!;
+    if (!string.IsNullOrWhiteSpace(templates.Offer))
+    {
+        jobs.Add(($"{story.Id}--offer.mp3", $"{story.Id} offer",
+            [templates.Offer.Replace("{Title}", story.Title)]));
+    }
+    if (!string.IsNullOrWhiteSpace(templates.Reoffer))
+    {
+        jobs.Add(($"{story.Id}--reoffer.mp3", $"{story.Id} reoffer",
+            [templates.Reoffer.Replace("{Title}", story.Title)]));
+    }
 }
 
 var totalChars = jobs.Sum(j => j.Chunks.Sum(c => c.Length));
@@ -182,7 +260,7 @@ foreach (var job in jobs)
     var chars = job.Chunks.Sum(c => c.Length);
     Console.WriteLine(
         $"  {job.FileName,-42} {chars,6:N0} chars in {job.Chunks.Count} chunk(s), expect ~{FormatDuration(ExpectedSeconds(chars))}");
-    if (clips)
+    if (clips || voiceClips)
     {
         // Clip texts are short child-facing lines — print them in full so
         // the dry run doubles as the pre-render text review.
@@ -418,6 +496,32 @@ static List<string> SplitToSentences(string text, int maxChars)
 /// derives from the bitrate, which is exact for CBR. Audio frames are copied
 /// byte for byte: this is a container repair, not a re-encode.
 /// </summary>
+/// <summary>
+/// Shape of <c>backend/content/voice-clips/voice-clips.json</c> — the
+/// reviewable Armenian source for the welcome flow. Only the fields this
+/// tool renders from are bound; the tone rules, watch words and comments in
+/// that file are for humans.
+/// </summary>
+internal sealed class VoiceClipFile
+{
+    public List<VoiceClipEntry>? Clips { get; set; }
+
+    [JsonPropertyName("_perStoryTemplates")]
+    public VoiceClipTemplates? Templates { get; set; }
+}
+
+internal sealed class VoiceClipEntry
+{
+    public string? VoiceId { get; set; }
+    public string? Text { get; set; }
+}
+
+internal sealed class VoiceClipTemplates
+{
+    public string? Offer { get; set; }
+    public string? Reoffer { get; set; }
+}
+
 internal static class Mp3Stitch
 {
     public static byte[] Join(IEnumerable<byte[]> pieces)
