@@ -83,14 +83,15 @@ public class VoiceClipTextTests
         Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
     }
 
-    // The firmware's CS_MAX_VOICE is 32 slots, and every slot costs ~384 bytes
-    // across three tables. A 33rd clip would be silently truncated off the
-    // manifest on the device.
+    // The firmware's CS_MAX_VOICE is 48 slots, and every slot costs ~384 bytes
+    // across three tables. A 49th clip would be silently truncated off the
+    // manifest on the device — the toy would just never play it, with nothing
+    // to show that a line went missing.
     [Fact]
     public void ClipCount_FitsTheFirmwareBound()
     {
-        Assert.True(Clips().Count <= 32,
-            $"{Clips().Count} clips exceeds CS_MAX_VOICE (32) — raise the bound "
+        Assert.True(Clips().Count <= 48,
+            $"{Clips().Count} clips exceeds CS_MAX_VOICE (48) — raise the bound "
             + "in content_sync_rules.h and re-measure free RAM on the bench first");
     }
 

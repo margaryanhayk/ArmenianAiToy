@@ -15,7 +15,7 @@ toy stays silent for free: there is no request to suppress.
 
 | id | what it says | count |
 |---|---|---|
-| `greet-01` … `greet-NN` | a power-on hello, rotated, never the same one twice running | 24 at launch |
+| `greet-01` … `greet-NN` | a power-on hello, rotated, never the same one twice running | 39 at launch |
 | `ask-sgrc`, `ask-s`, … | «what shall we do?», naming exactly the modes the parent left on. Letters in fixed order **s,g,r,c** | 2 at launch (see below) |
 | `ask-any` | the generic «what shall we do?», used when the exact combination has no recording | 1 |
 | `say-again` | «I didn't catch that» — spoken once, before the second and last try | 1 |
@@ -27,18 +27,52 @@ change**.
 
 ## Two counts that are deliberate, not lazy
 
-**24 greetings, not 100.** `CS_MAX_VOICE` is 32 slots and every slot costs
-~384 bytes across three firmware tables. The first draft used 48 and took the
-toy's free RAM from 188 KB to 110 KB — too little on a board that also wants
-40–50 KB for a TLS handshake while audio is playing. Rotation of 24 without
-repeats is indistinguishable from 100 to a five-year-old. Raising it is one line
-in `content_sync_rules.h` plus a bench heap re-measure.
+**39 greetings.** These are the owner's own set (2026-08-05), reviewed and
+ranked. ~70 were submitted; the rest were cut for asking a question (the ask
+clip plays right after — two questions in a row loses a small child), for
+crossing the companion boundary, for being calques, or for being near-duplicates
+of a line already in.
+
+The pool is **not** padded to fill the remaining slots, on the reviewer's
+advice: *a child notices two greetings that say the same thing sooner than a
+missing one*, so near-duplicates make the rotation feel smaller, not bigger.
+
+Sizing was measured, not guessed. `CS_MAX_VOICE` is 48 slots; every slot costs
+~384 bytes across three firmware tables:
+
+| slots | free RAM on the toy |
+|---|---|
+| 32 | 157,680 B |
+| **48** | **149,232 B** |
+| 64 | 140,784 B |
+
+An earlier draft landed at 110,512 B free — too little on a board that also
+wants 40–50 KB for a TLS handshake while audio is playing — but the cause was
+duplicated scratch tables, not the bound. With those shared, 48 is comfortable.
 
 **2 ask variants, not 15.** All 15 combinations of the four mode flags are
 *supported*; only `ask-sgrc` and `ask-any` are *shipped*. A parent disabling
 Story on a storytelling toy is rare, and Game / Riddle / Curiosity have no
 offline content yet, so any other combination falls back to `ask-any`. Add the
 missing ones when a real parent config needs them.
+
+## Two things that are NOT here, and why
+
+**Bedtime greetings.** The owner submitted a "calm & bedtime" group. The toy is
+deliberately **silent inside the parent's bedtime window** — a cheerful hello at
+21:30 is exactly what loses a parent's trust — so those lines would never play.
+The four that were not bedtime-specific were salvaged into the daytime pool; the
+rest are unused. Changing this means changing the silence rule, which is a
+product decision, not a content one.
+
+**Greetings that say the child's name.** «Բարև՛, Անի՛։ …» is lovely and does not
+work with pre-rendered clips: the manifest is static config shared by every toy,
+so a name-specific clip would have to be rendered per child and delivered only
+to that child's device. That needs per-device entitlement (deliberately deferred
+on the ContentSync contract) plus a render job triggered when a parent creates a
+child profile. Real work, real recurring API cost, and a new failure mode — a
+toy that greets the wrong child by name is worse than one that greets nobody by
+name. It is a good v2 feature, not a content edit.
 
 ## Per-story offer lines
 

@@ -2317,9 +2317,27 @@ Four findings from that review are now product rules, pinned by
   classifier instead: «Ուզո՞ւմ ես լսել «{Title}» հեքիաթը։» — which also works
   for every future title without a per-title rule.
 
+The greetings are the **owner's own set** (2026-08-05): ~70 submitted, 39
+shipped after review. The rest were cut for asking a question, crossing the
+companion boundary, being calques, or near-duplicating a line already in. The
+pool is deliberately **not padded** to fill the free slots — a child notices two
+greetings that say the same thing sooner than a missing one, so near-duplicates
+make the rotation feel smaller.
+
+Two groups the owner submitted are **not shipped, for product reasons**:
+
+- **Bedtime greetings** — the toy is silent inside the bedtime window, so they
+  would never play. The four that were not bedtime-specific were salvaged into
+  the daytime pool. Shipping the rest means changing the silence rule.
+- **Name greetings** («Բարև՛, Անի՛…») — the manifest is static config shared by
+  every toy, so a name-specific clip needs per-device entitlement (deferred on
+  the ContentSync contract) plus a render triggered on child-profile creation.
+  A v2 feature, not a content edit — and a toy that greets the wrong child by
+  name is worse than one that greets nobody by name.
+
 The file also carries the TTS watch-word list for the listen test. «Ողջու՛յն»
-opens 12 of the 24 greetings, so render ONE and check it before batching — one
-bad pattern would otherwise poison half the set.
+opens half the greetings, so render ONE and check it before batching — one bad
+pattern would otherwise poison half the set.
 
 **Not shipped yet:** the rendered MP3s and the `ContentSync:Voice` config
 entries. Until those exist the manifest carries no voice clips, the toy finds

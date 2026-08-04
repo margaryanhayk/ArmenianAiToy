@@ -150,27 +150,35 @@ struct CsMusic {
 // and its own index section, for the same reason music got one: these are
 // not stories and must never enter the story rotation.
 //
-// 32 slots holds the launch set — 24 greetings + ask-sgrc + ask-any +
-// say-again + just-story = 28 — with headroom. The manifest may legally
+// 48 slots holds the launch set — 39 greetings + ask-sgrc + ask-any +
+// say-again + just-story = 43 — with headroom. The manifest may legally
 // offer more; the existing truncate-and-report path handles it, the same
 // way an over-long story manifest is handled.
 //
-// Sizing is why this is 32 and not 48: CsVoice is ~128 bytes padded and
-// three tables live in content_sync.cpp (manifest / previous / active),
-// so every slot costs ~384 bytes of .bss. The first draft of this slice
-// used 48 and, with the other welcome-flow tables, took free RAM from
-// 188 KB to 110 KB — too little headroom on a board that also wants
-// ~40-50 KB for a TLS handshake during audio. Same reasoning kills a
-// title field: a device-global clip has no display surface anywhere on
-// the toy.
+// Every slot costs ~384 bytes of .bss (CsVoice is ~128 bytes padded and
+// three tables live in content_sync.cpp: manifest / previous / active).
+// MEASURED, not estimated, on the canonical FQBN:
 //
-// This is ALSO why only two "ask" variants ship at launch rather than
-// all 15 combinations of the four mode flags: a parent disabling Story
-// on a storytelling toy is rare, and the other three modes have no
-// offline content yet, so the missing variants fall back to the generic
-// ask-any. Raising this bound is one line plus a bench heap re-measure.
+//     32 slots -> 157,680 B free      48 slots -> 149,232 B free
+//     64 slots -> 140,784 B free
+//
+// The first draft of this slice used 48 slots AND a table per function
+// and landed at 110,512 B free — too little on a board that also wants
+// ~40-50 KB for a TLS handshake during audio. The bound was not the
+// problem; the duplicated tables were. With those shared, 48 is
+// comfortable. Same budget still kills a title field: a device-global
+// clip has no display surface anywhere on the toy.
+//
+// Do NOT pad the greeting pool just because slots are free. A child
+// notices two greetings that say the same thing sooner than a missing
+// one, so near-duplicates make the rotation feel SMALLER.
+//
+// Only two "ask" variants ship rather than all 15 combinations of the
+// four mode flags: a parent disabling Story on a storytelling toy is
+// rare, and the other three modes have no offline content yet, so the
+// missing variants fall back to the generic ask-any.
 #ifndef CS_MAX_VOICE
-#define CS_MAX_VOICE 32
+#define CS_MAX_VOICE 48
 #endif
 
 struct CsVoice {

@@ -529,7 +529,8 @@ like a story session is a blocking call from the IDLE branch.
   A superset, like every previous bump — a v3 card parses as "no voice clips,
   every mode enabled", so **no card ever has to be wiped**.
 - **`CS_MAX_CLIPS` 5 → 7** for the per-story `offer` / `reoffer` lines.
-- **`CS_MAX_VOICE` = 32** device-global clips.
+- **`CS_MAX_VOICE` = 48** device-global clips (39 greetings + 4 fixed lines,
+  with headroom).
 - **NVS `aregvoice`/`last_greet`** — the greeting rotation cursor.
 - **NVS `aregheard`/`ids`** — which stories have been heard, as one bounded
   blob. Needed because `story_report` DELETES each play event once the backend
@@ -545,15 +546,18 @@ like a story session is a blocking call from the IDLE branch.
 | Build | Globals | Free for locals |
 |---|---|---|
 | before the welcome flow | 139,632 B | 188,048 B |
-| first draft (`CS_MAX_VOICE` 48, per-function tables) | 217,168 B | **110,512 B** |
-| **shipped** | 170,000 B | **157,680 B** |
+| first draft (`CS_MAX_VOICE` 48, a table per function) | 217,168 B | **110,512 B** |
+| shared tables, `CS_MAX_VOICE` 32 | 170,000 B | 157,680 B |
+| **shipped** (`CS_MAX_VOICE` 48) | 178,448 B | **149,232 B** |
+| (`CS_MAX_VOICE` 64, measured for reference) | 186,896 B | 140,784 B |
 
 The first draft was rejected on these numbers: ~110 KB leaves too little on a
-board that also wants 40–50 KB for a TLS handshake while audio is playing. The
-30 KB was recovered by dropping `CS_MAX_VOICE` to 32, sharing one voice scratch
-table between both readers, sharing ONE eligible-story table across the offer
-loop and `story_pick_for_session`, and building only the chosen greeting's path
-instead of all of them.
+board that also wants 40–50 KB for a TLS handshake while audio is playing. But
+the bound was **not** the cause — the duplicated tables were. Recovered by
+sharing one voice scratch table between both readers, sharing ONE
+eligible-story table across the offer loop and `story_pick_for_session`, and
+building only the chosen greeting's path instead of all of them. With those
+fixed, 48 slots costs 8 KB against 32 and is comfortable.
 
 `CS_MAX_CLIPS` 5 → 7 also broke the **test bench** build (`dram0_0_seg`
 overflowed by 130 KB) because eleven test functions each held their own
