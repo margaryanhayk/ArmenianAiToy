@@ -421,7 +421,35 @@ app.UseMiddleware<DeviceAuthMiddleware>();
 
 // Serve static files (for web UI testing)
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        // The dashboard is ONE self-contained HTML file with no build step and
+        // no filename hashing, so a browser holding an old copy shows an old
+        // app — with no way for a parent to force it, least of all from a
+        // home-screen install where there is no address bar and no reload
+        // button. Nothing was sending Cache-Control at all, which leaves
+        // browsers free to guess a lifetime; an owner testing a deploy sat on
+        // a stale page twice and reasonably concluded nothing had shipped.
+        //
+        // "no-cache" does NOT mean "don't cache" — it means revalidate before
+        // reuse. The ETag already served makes that a 304 with an empty body,
+        // so the page stays fast and can never be stale.
+        var name = ctx.File.Name;
+        if (name.EndsWith(".html", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith(".webmanifest", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.Headers.CacheControl = "no-cache";
+        }
+        else
+        {
+            // Icons and the like are content-stable; let them sit in the
+            // cache for a day.
+            ctx.Context.Response.Headers.CacheControl = "public, max-age=86400";
+        }
+    }
+});
 
 // Superuser internal console API (/api/internal/*) — fail-closed bearer
 // gate, same pattern as the /metrics guard below (see InternalAdminAuth).
