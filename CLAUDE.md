@@ -2391,14 +2391,25 @@ persistence. Distinct from `POST /api/internal/story-qa-test` (operator
 console, admin-token gated, richer diagnostics) and from
 `POST /api/chat/story-qa` (the device voice path).
 
-**Development-only.** Outside Development every request is a **404**
-before validation — same fail-closed concealment posture as `/metrics`
-and `/api/internal/*`. An unauthenticated route that reaches GPT must not
-exist in a deployed image: it would be an open relay against the
-deployment's own OpenAI key, and it is outside the per-device daily cost
-cap (which keys on `X-Device-Id`). The bench is unaffected —
-`run-local.ps1` sets `ASPNETCORE_ENVIRONMENT=Development`, while every
-deploy runbook sets `Production`.
+**Development-only.** Outside Development every **well-formed** request is a
+**404** — the same fail-closed posture as `/metrics` and `/api/internal/*`. An
+unauthenticated route that reaches GPT must not exist in a deployed image: it
+would be an open relay against the deployment's own OpenAI key, and it is
+outside the per-device daily cost cap (which keys on `X-Device-Id`). The bench
+is unaffected — `run-local.ps1` sets `ASPNETCORE_ENVIRONMENT=Development`,
+while every deploy runbook sets `Production`.
+
+**Correction (verified against live prod, 2026-08-05):** this used to claim
+404 "before validation". It is not. `[ApiController]`'s automatic model
+validation runs BEFORE the action body, so a MALFORMED request gets ASP.NET's
+standard 400 naming the missing fields, and a bodyless one gets 415 —
+concealment is therefore not total, and a scanner can learn the route exists
+and what it expects. **The relay risk is still closed**: no valid request ever
+reaches the action, so no request can reach GPT (`{"storyId":…,"segmentIndex":…,
+"question":…}` → 404 in prod today). Making the concealment total would mean
+moving the environment check ahead of model binding (a filter or a middleware
+path check, as `/metrics` and `/api/internal/*` already do). Not done —
+recorded here so the gap is a known one rather than a doc that lies.
 
 **Dual moderation, mirroring the voice path.** `LibraryStoryQuestionService`
 has no moderation of its own (it takes only `IAiChatClient`), and
