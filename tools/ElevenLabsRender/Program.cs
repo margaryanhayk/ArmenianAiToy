@@ -259,8 +259,26 @@ foreach (var job in jobs)
         }
         var piece = await response.Content.ReadAsByteArrayAsync();
         pieces.Add(piece);
+        var pieceSeconds = Mp3Duration.Seconds(piece);
+        var pieceExpected = ExpectedSeconds(job.Chunks[c].Length);
         Console.WriteLine(
-            $"    chunk {c + 1}/{job.Chunks.Count} {job.Chunks[c].Length,5:N0} chars -> {piece.LongLength,9:N0} B  {FormatDuration(Mp3Duration.Seconds(piece))}");
+            $"    chunk {c + 1}/{job.Chunks.Count} {job.Chunks[c].Length,5:N0} chars -> {piece.LongLength,9:N0} B  {FormatDuration(pieceSeconds)}");
+
+        // Stop at the FIRST short chunk instead of paying for the rest of the
+        // story and discovering it at the end. eleven_v3 curtails its output
+        // around 1,200-1,400 characters however long the input is, so a chunk
+        // size that is too big burns the whole render — which is exactly how
+        // 2026-08-04 went. Aborting here costs one chunk, not twenty-six.
+        if (pieceExpected > 0 && pieceSeconds < pieceExpected * ShortRenderFloor)
+        {
+            var pct = (int)Math.Round(100 * pieceSeconds / pieceExpected);
+            Console.Error.WriteLine(
+                $"  *** chunk {c + 1} came back {FormatDuration(pieceSeconds)}, only {pct}% of the " +
+                $"~{FormatDuration(pieceExpected)} its {job.Chunks[c].Length:N0} characters need. " +
+                $"The model is curtailing its output — re-run with a smaller --max-chunk. " +
+                $"Stopping so the remaining chunks are not paid for.");
+            return 1;
+        }
     }
 
     // Frames are self-contained, but the WRAPPERS around them are not: every

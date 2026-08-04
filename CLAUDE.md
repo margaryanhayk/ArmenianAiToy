@@ -1970,6 +1970,14 @@ touches the backend, so the dashboard under-reported what the child heard.
   parent export (`ParentExportDevice.StoryPlays`/`ReflectionAnswers`,
   additive init-props).
 
+> **CORRECTED 2026-08-04 (end of day) — read § "Story narration pipeline"
+> below before trusting the paragraph that follows.** The truncation was NOT
+> "rendered ad hoc before the tool existed": `eleven_v3` is the only model on
+> the account that speaks Armenian, and it stops at ~1,200–1,400 characters of
+> OUTPUT however long the input is. The chunking added below is the right
+> mitigation; the root-cause story in it is wrong, and the `--max-chunk 700`
+> / `previous_text` details are stale (v3 rejects `previous_text`).
+
 **C. Narration render tool** — `tools/ElevenLabsRender/` (raw HTTP, no new
 NuGet). **CHUNKED + LENGTH-CHECKED since 2026-08-04** after five of the eight
 shipped stories were found truncated (anban-huri: 3:52 of text had shipped as
@@ -2104,6 +2112,57 @@ toggle + separate Music tab + music at bedtime hours on the toy.
   request form + admin queue) from the same plan are NOT implemented yet.
 - Item 6 decision recorded: content is paid, controls stay free; nothing
   billing-related is built.
+
+## Story narration pipeline (how audio reaches a child)
+
+Written 2026-08-04, after a day in which three separate defects each reached
+the owner's phone. The voice itself is expected to change (owner decision,
+same day — the final narrator will not be the owner's clone), so this pipeline
+is deliberately **provider-independent** at the last mile: it must accept "here
+are five MP3s" from a TTS service, a studio, or a person with a microphone.
+
+**Stage 1 — produce audio (optional, ElevenLabs only).**
+`tools/ElevenLabsRender/`. Three hard-won constraints live in its defaults:
+- **`eleven_v3` is the ONLY model on this account that speaks Armenian.**
+  `GET /v1/models` (2026-08-04): `multilingual_v2` (the previous default),
+  `flash_v2_5`, `turbo_v2_5`, `turbo_v2`, `flash_v2` — none list `hy`. Armenian
+  read by a model that does not know Armenian is what the owner rejected as
+  "rubbish"; it is not a clone problem and cannot be fixed downstream.
+  Re-check the language list before ever changing this default.
+- **v3 curtails output at ~1,200–1,400 characters** regardless of input length
+  (a 3,306-char story returned 1:29 of an expected 3:40). This — not a
+  transport fault — is why the 2026-08-03 narration is 1:20–1:40 long. Long
+  stories need ~800-character chunks. The tool aborts on the FIRST short chunk
+  so a bad `--max-chunk` costs one request, not twenty-six.
+- **v3 rejects `previous_text`/`next_text`** (HTTP 400 `unsupported_model`), so
+  chunks are rendered blind and seams are a listening question. At the default
+  speed the request carries **no `voice_settings` at all**, so the voice's own
+  saved settings apply — sending one "just to set speed 1.0" replaces them.
+
+**Stage 2 — check, repair, ship (any source).**
+`tools/story-audio/Ship-StoryAudio.ps1 -In <folder>` (needs ffmpeg/ffprobe;
+files named `<storyId>.mp3`). Every check corresponds to a defect that already
+reached a child's ears:
+| Check | Why it exists |
+|---|---|
+| more than one ID3 tag | pieces glued with their wrappers left in; iOS Safari believes the first length header and a 4-minute story stops at 0:34 |
+| duration vs `chars/15` (<70% fails) | the model curtailed the render and nothing compared audio against text |
+| integrated loudness vs **-16.4 LUFS** | a render came back 11 dB below the rest of the library; on the toy's speaker that is "thin, far away, bad quality" |
+| sha256 + size + **Version bump** | right bytes on disk with a stale manifest = every toy refuses the download; new bytes with the same Version = every toy keeps the old copy |
+
+`-Fix` repairs a COPY (one ffmpeg re-encode: decoding to PCM drops every stray
+tag and per-chunk header, two-pass `loudnorm` sets the level, 192 kbps against
+a 128 kbps source). `-Apply` then installs into `story-audio/`, patches
+`ContentSync:Stories` and bumps each `Version`. It refuses to install anything
+that still fails a check.
+
+**Stage 3 — the human listen test, always.** No tool can hear a bad join, a
+mispronounced name, or a voice that is simply wrong. Nothing ships to a child
+without someone listening end to end.
+
+**Levels are a library-wide contract.** -16.4 LUFS is the level of the
+narration the owner approved; a new story that ignores it makes half the
+library loud and half quiet, which is itself a quality complaint.
 
 ## Story Q&A text harness (`POST /api/story-qa-text`)
 
