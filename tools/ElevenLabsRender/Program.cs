@@ -232,9 +232,16 @@ foreach (var job in jobs)
             $"    chunk {c + 1}/{job.Chunks.Count} {job.Chunks[c].Length,5:N0} chars -> {piece.LongLength,9:N0} B  {FormatDuration(Mp3Duration.Seconds(piece))}");
     }
 
-    // MP3 frames are self-contained, so same-encoder pieces concatenate
-    // without a container rewrite.
-    var bytes = pieces.SelectMany(p => p).ToArray();
+    // Frames are self-contained, but the WRAPPERS around them are not: every
+    // ElevenLabs response opens with its own ID3v2 tag and its own Xing/"Info"
+    // header frame, and that header states the length of THAT CHUNK. Glued
+    // end to end (what this line used to do), a strict player reads the first
+    // header, believes a 4-minute story is 40 seconds long, and stops at the
+    // first chunk boundary — which is exactly what shipped on 2026-08-04 and
+    // what a parent heard as the voice being cut. Mp3Stitch drops the tags and
+    // the per-chunk headers, leaving one continuous constant-bitrate stream.
+    // Audio frames are copied untouched; nothing is re-encoded.
+    var bytes = Mp3Stitch.Join(pieces);
     var seconds = Mp3Duration.Seconds(bytes);
     var expected = ExpectedSeconds(jobChars);
 
@@ -352,6 +359,70 @@ static List<string> SplitToSentences(string text, int maxChars)
 }
 
 /// <summary>
+/// Joins the per-chunk MP3 responses of one render into a single stream that
+/// every player reaches the end of.
+///
+/// A naive concatenation keeps each chunk's ID3v2 tag and its Xing/"Info"
+/// header frame in the middle of the file. iOS Safari — and any decoder that
+/// trusts the first header it sees — then plays only the first chunk. Dropping
+/// both leaves a bare constant-bitrate frame stream whose duration a player
+/// derives from the bitrate, which is exact for CBR. Audio frames are copied
+/// byte for byte: this is a container repair, not a re-encode.
+/// </summary>
+internal static class Mp3Stitch
+{
+    public static byte[] Join(IEnumerable<byte[]> pieces)
+    {
+        var outp = new List<byte>();
+        foreach (var piece in pieces)
+        {
+            var i = 0;
+            while (i < piece.Length)
+            {
+                var tag = Id3Length(piece, i);
+                if (tag > 0) { i += tag; continue; }
+
+                var frame = Mp3Duration.FrameLength(piece, i);
+                if (frame > 0)
+                {
+                    if (!IsXingHeaderFrame(piece, i, frame)) outp.AddRange(piece[i..(i + frame)]);
+                    i += frame;
+                    continue;
+                }
+                i++;   // stray byte between frames; drop it
+            }
+        }
+        return outp.ToArray();
+    }
+
+    private static int Id3Length(byte[] b, int i)
+    {
+        if (i + 10 > b.Length || b[i] != 'I' || b[i + 1] != 'D' || b[i + 2] != '3') return 0;
+        if (b[i + 3] == 0xFF || b[i + 4] == 0xFF) return 0;
+        // The four size bytes are syncsafe — the high bit is always clear.
+        if (((b[i + 6] | b[i + 7] | b[i + 8] | b[i + 9]) & 0x80) != 0) return 0;
+        var size = ((b[i + 6] & 0x7f) << 21) | ((b[i + 7] & 0x7f) << 14)
+                   | ((b[i + 8] & 0x7f) << 7) | (b[i + 9] & 0x7f);
+        var footer = (b[i + 5] & 0x10) != 0 ? 10 : 0;
+        return 10 + size + footer;
+    }
+
+    private static bool IsXingHeaderFrame(byte[] b, int start, int frameLength)
+    {
+        // "Xing" (VBR) or "Info" (CBR) sits just past the side info, whose
+        // size depends on the MPEG version and channel mode. Scanning the
+        // frame head covers every layout without decoding the side info.
+        var end = Math.Min(start + Math.Min(frameLength, 64), b.Length) - 4;
+        for (var i = start + 4; i <= end; i++)
+        {
+            if (b[i] == 'X' && b[i + 1] == 'i' && b[i + 2] == 'n' && b[i + 3] == 'g') return true;
+            if (b[i] == 'I' && b[i + 1] == 'n' && b[i + 2] == 'f' && b[i + 3] == 'o') return true;
+        }
+        return false;
+    }
+}
+
+/// <summary>
 /// Duration of an MPEG Layer III stream, by walking its frame headers.
 /// Deliberately dependency-free: the only question it has to answer is
 /// "is this audio roughly as long as the text implies", and a truncated
@@ -379,27 +450,50 @@ internal static class Mp3Duration
         var total = 0.0;
         while (i < data.Length - 4)
         {
-            if (data[i] != 0xFF || (data[i + 1] & 0xE0) != 0xE0) { i++; continue; }
-            var ver = (data[i + 1] >> 3) & 0x03;     // 3 = MPEG1, 2 = MPEG2, 0 = MPEG2.5
-            var layer = (data[i + 1] >> 1) & 0x03;   // 1 = Layer III
-            var bIdx = (data[i + 2] >> 4) & 0x0F;
-            var sIdx = (data[i + 2] >> 2) & 0x03;
-            var pad = (data[i + 2] >> 1) & 0x01;
-            if (layer != 1 || bIdx is 0 or 15 || sIdx == 3 || ver == 1) { i++; continue; }
-
-            var (bitrate, rate, samples) = ver switch
-            {
-                3 => (V1L3[bIdx] * 1000, Rates[0][sIdx], 1152),
-                2 => (V2L3[bIdx] * 1000, Rates[1][sIdx], 576),
-                _ => (V2L3[bIdx] * 1000, Rates[2][sIdx], 576),
-            };
-            if (bitrate == 0 || rate == 0) { i++; continue; }
-
-            var frameLength = (samples / 8 * bitrate / rate) + pad;
-            if (frameLength <= 4) { i++; continue; }
-            total += (double)samples / rate;
+            var frameLength = FrameLength(data, i);
+            if (frameLength <= 0) { i++; continue; }
+            total += FrameSeconds(data, i);
             i += frameLength;
         }
         return total;
     }
+
+    /// <summary>
+    /// Byte length of the MPEG Layer III frame starting at <paramref name="i"/>,
+    /// or 0 when there is no valid frame there. Shared with Mp3Stitch so the
+    /// joiner and the duration check agree on what a frame is.
+    /// </summary>
+    public static int FrameLength(byte[] data, int i)
+    {
+        if (i + 4 > data.Length) return 0;
+        if (data[i] != 0xFF || (data[i + 1] & 0xE0) != 0xE0) return 0;
+        var ver = (data[i + 1] >> 3) & 0x03;     // 3 = MPEG1, 2 = MPEG2, 0 = MPEG2.5
+        var layer = (data[i + 1] >> 1) & 0x03;   // 1 = Layer III
+        var bIdx = (data[i + 2] >> 4) & 0x0F;
+        var sIdx = (data[i + 2] >> 2) & 0x03;
+        var pad = (data[i + 2] >> 1) & 0x01;
+        if (layer != 1 || bIdx is 0 or 15 || sIdx == 3 || ver == 1) return 0;
+
+        var (bitrate, rate, samples) = Layout(ver, bIdx, sIdx);
+        if (bitrate == 0 || rate == 0) return 0;
+
+        var frameLength = (samples / 8 * bitrate / rate) + pad;
+        return frameLength > 4 && i + frameLength <= data.Length ? frameLength : 0;
+    }
+
+    private static double FrameSeconds(byte[] data, int i)
+    {
+        var ver = (data[i + 1] >> 3) & 0x03;
+        var bIdx = (data[i + 2] >> 4) & 0x0F;
+        var sIdx = (data[i + 2] >> 2) & 0x03;
+        var (_, rate, samples) = Layout(ver, bIdx, sIdx);
+        return rate == 0 ? 0 : (double)samples / rate;
+    }
+
+    private static (int Bitrate, int Rate, int Samples) Layout(int ver, int bIdx, int sIdx) => ver switch
+    {
+        3 => (V1L3[bIdx] * 1000, Rates[0][sIdx], 1152),
+        2 => (V2L3[bIdx] * 1000, Rates[1][sIdx], 576),
+        _ => (V2L3[bIdx] * 1000, Rates[2][sIdx], 576),
+    };
 }
