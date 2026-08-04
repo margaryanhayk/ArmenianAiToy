@@ -214,6 +214,137 @@ export async function getConversation(conversationId: string): Promise<Conversat
   return data.conversation;
 }
 
+// ── Story plays, library, music, requests, activity ────────────────────
+// The screens the web dashboard already had and this app did not, so a
+// parent on a phone saw less than a parent on a laptop.
+
+export type StoryPlay = {
+  storyId: string;
+  finished: boolean;
+  source: string;
+  playedAtUtc: string;
+  timeIsApproximate: boolean;
+};
+
+export type StoryPlayTotal = { storyId: string; count: number; finishedCount: number };
+
+export type StoryPlaysResult = {
+  plays: StoryPlay[];
+  totals: StoryPlayTotal[];
+  total: number;
+};
+
+export type ReflectionAnswer = {
+  storyId: string;
+  questionIndex: number;
+  answerText: string;
+  safetyFlag: string;
+  createdAtUtc: string;
+};
+
+export type LibraryStory = {
+  storyId: string;
+  title: string;
+  author: string | null;
+  goal: string | null;
+  lesson: string | null;
+  bedtimeSafe: boolean | null;
+  minAge: number | null;
+  maxAge: number | null;
+  reflectionQuestions: string[];
+  reflectionConclusions: string[] | null;
+  listenCount: number;
+  finishedCount: number;
+  previewUrl: string | null;
+};
+
+export type MusicTrack = { trackId: string; title: string; previewUrl: string | null };
+
+export type StoryRequest = {
+  id: string;
+  type: string;
+  text: string;
+  hasPhoto: boolean;
+  status: string;
+  createdAtUtc: string;
+};
+
+export type AuditEntry = {
+  id: string;
+  timestamp: string;
+  eventType: string;
+  targetDeviceId: string | null;
+  targetChildId: string | null;
+  metadata: Record<string, unknown> | null;
+};
+
+/** GET /api/parents/devices/{id}/story-plays — what the child actually heard. */
+export function getStoryPlays(deviceId: string, limit = 100): Promise<StoryPlaysResult> {
+  return getJson<StoryPlaysResult>(
+    `/api/parents/devices/${encodeURIComponent(deviceId)}/story-plays?limit=${limit}&offset=0`,
+  );
+}
+
+/** GET /api/parents/devices/{id}/reflection-answers — the child's own words. */
+export async function getReflectionAnswers(
+  deviceId: string,
+  limit = 100,
+): Promise<{ answers: ReflectionAnswer[]; total: number }> {
+  const d = await getJson<{ answers?: ReflectionAnswer[]; total?: number }>(
+    `/api/parents/devices/${encodeURIComponent(deviceId)}/reflection-answers?limit=${limit}&offset=0`,
+  );
+  return { answers: d.answers ?? [], total: d.total ?? (d.answers?.length ?? 0) };
+}
+
+/**
+ * GET /api/parents/stories. `deviceId` scopes the listen counts to one toy;
+ * without it they cover every toy the parent has, which is a different
+ * number and has to be labelled as such on screen.
+ */
+export async function getStoryLibrary(deviceId?: string): Promise<LibraryStory[]> {
+  const q = deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : '';
+  const d = await getJson<{ stories?: LibraryStory[] }>(`/api/parents/stories${q}`);
+  return d.stories ?? [];
+}
+
+/** GET /api/parents/music — bedtime tracks, empty until any are published. */
+export async function getMusic(): Promise<MusicTrack[]> {
+  const d = await getJson<{ tracks?: MusicTrack[] }>('/api/parents/music');
+  return d.tracks ?? [];
+}
+
+/** GET /api/parents/story-requests — the parent's own custom-story asks. */
+export async function getStoryRequests(): Promise<StoryRequest[]> {
+  const d = await getJson<{ requests?: StoryRequest[] }>('/api/parents/story-requests');
+  return d.requests ?? [];
+}
+
+/** POST /api/parents/story-requests — multipart; photo is optional. */
+export async function submitStoryRequest(text: string): Promise<void> {
+  const form = new FormData();
+  form.append('text', text);
+  let res: Response;
+  try {
+    res = await fetch(url('/api/parents/story-requests'), {
+      method: 'POST',
+      headers: await authHeader(),   // no Content-Type: fetch sets the boundary
+      body: form,
+    });
+  } catch {
+    throw new ApiError('e_unreachable');
+  }
+  if (res.status === 401) throw new UnauthorizedError();
+  if (res.status !== 201) throw new ApiError('e_generic');
+}
+
+/** GET /api/parents/audit — this parent's own actions, newest first. */
+export async function getActivity(limit = 50): Promise<AuditEntry[]> {
+  const d = await getJson<{ events?: AuditEntry[] }>(
+    `/api/parents/audit?limit=${limit}&offset=0`,
+  );
+  return d.events ?? [];
+}
+
 async function mutate(path: string, method: 'POST' | 'PUT', body?: unknown): Promise<void> {
   let res: Response;
   try {

@@ -392,6 +392,141 @@ const D = {
     hy: 'Չհաջողվեց խաղալիքին ուղարկել Wi-Fi-ի տվյալները։',
   },
   back_settings: { en: '‹ Settings', ru: '‹ Настройки', hy: '‹ Կարգավորումներ' },
+
+  // ---------- story plays ----------
+  tile_plays: { en: 'Stories listened to', ru: 'Прослушанные сказки', hy: 'Լսած հեքիաթներ' },
+  plays_title: { en: 'Stories listened to', ru: 'Прослушанные сказки', hy: 'Լսած հեքիաթներ' },
+  no_plays: {
+    en: 'Nothing yet. The toy sends this when it is online.',
+    ru: 'Пока ничего. Игрушка отправит это, когда будет в сети.',
+    hy: 'Դեռ ոչինչ։ Խաղալիքը կուղարկի սա, երբ առցանց լինի։',
+  },
+  listened_count: {
+    en: 'Listened: {n} · to the end: {f}',
+    ru: 'Прослушано: {n} · до конца: {f}',
+    hy: 'Լսել է {n} անգամ · մինչև վերջ՝ {f}',
+  },
+  play_finished: { en: '✓ to the end', ru: '✓ до конца', hy: '✓ մինչև վերջ' },
+  play_partial: { en: 'stopped early', ru: 'не до конца', hy: 'ընդհատվել է' },
+  approx_time: { en: 'about', ru: 'примерно', hy: 'մոտավորապես' },
+  showing_recent: {
+    en: 'Showing the {n} most recent.',
+    ru: 'Показаны {n} последних.',
+    hy: 'Ցուցադրված են վերջին {n}-ը։',
+  },
+  child_answers: {
+    en: "Your child's answers",
+    ru: 'Ответы вашего ребёнка',
+    hy: 'Ձեր երեխայի պատասխանները',
+  },
+
+  // ---------- story library ----------
+  tile_library: { en: 'Story library', ru: 'Библиотека сказок', hy: 'Հեքիաթների գրադարան' },
+  library_title: { en: 'Story library', ru: 'Библиотека сказок', hy: 'Հեքիաթների գրադարան' },
+  no_stories: {
+    en: 'No stories yet. New ones appear here when we publish them.',
+    ru: 'Сказок пока нет. Новые появятся, когда мы их выпустим.',
+    hy: 'Հեքիաթներ դեռ չկան։ Նորերը կհայտնվեն, երբ հրապարակենք դրանք։',
+  },
+  on_this_toy: { en: 'On this toy', ru: 'На этой игрушке', hy: 'Այս խաղալիքով' },
+  author_label: { en: 'Author', ru: 'Автор', hy: 'Հեղինակ' },
+  goal_label: { en: 'About', ru: 'О сказке', hy: 'Հեքիաթի մասին' },
+  lesson_label: { en: 'What it teaches', ru: 'Чему учит', hy: 'Ինչ է սովորեցնում' },
+  bedtime_safe: { en: '🌙 good before sleep', ru: '🌙 подходит для сна', hy: '🌙 քնելուց առաջ' },
+  discuss_title: {
+    en: 'Talk about it with your child',
+    ru: 'Обсудите с ребёнком',
+    hy: 'Քննարկեք ձեր երեխայի հետ',
+  },
+
+  // ---------- music ----------
+  tile_music: { en: 'Music', ru: 'Музыка', hy: 'Երաժշտություն' },
+  tile_music_sub: {
+    en: 'Calm tunes for bedtime',
+    ru: 'Спокойная музыка для сна',
+    hy: 'Հանգիստ մեղեդիներ քնելու համար',
+  },
+  music_title: { en: 'Music', ru: 'Музыка', hy: 'Երաժշտություն' },
+  no_music: {
+    en: 'No music has been published yet.',
+    ru: 'Музыки пока нет.',
+    hy: 'Երաժշտություն դեռ չի հրապարակվել։',
+  },
+
+  // ---------- custom story requests ----------
+  tile_request: { en: 'Ask for a story', ru: 'Заказать сказку', hy: 'Պատվիրել հեքիաթ' },
+  tile_request_sub: {
+    en: 'We can make one for your child',
+    ru: 'Мы можем создать её для вашего ребёнка',
+    hy: 'Կարող ենք ստեղծել ձեր երեխայի համար',
+  },
+  request_title: { en: 'Ask for a story', ru: 'Заказать сказку', hy: 'Պատվիրել հեքիաթ' },
+  request_help: {
+    en: 'Describe the story you would like for your child. We read every request ourselves and record it in the storyteller’s voice.',
+    ru: 'Опишите сказку, которую хотели бы для вашего ребёнка. Мы сами читаем каждый запрос и озвучиваем его голосом сказочника.',
+    hy: 'Նկարագրեք հեքիաթը, որ կուզեիք ձեր երեխայի համար։ Ամեն հայտ ինքներս ենք կարդում և ձայնագրում հեքիաթասացի ձայնով։',
+  },
+  request_placeholder: {
+    en: 'For example: a story about a brave little goat…',
+    ru: 'Например: сказка про храброго козлёнка…',
+    hy: 'Օրինակ՝ հեքիաթ քաջ ուլիկի մասին…',
+  },
+  request_send: { en: 'Send', ru: 'Отправить', hy: 'Ուղարկել' },
+  request_sent: {
+    en: 'Sent. We will look at it soon.',
+    ru: 'Отправлено. Скоро посмотрим.',
+    hy: 'Ուղարկվեց։ Շուտով կդիտարկենք։',
+  },
+  e_request_empty: {
+    en: 'Please describe the story first.',
+    ru: 'Сначала опишите сказку.',
+    hy: 'Նախ նկարագրեք հեքիաթը։',
+  },
+  my_requests: { en: 'Your requests', ru: 'Ваши запросы', hy: 'Ձեր հայտերը' },
+  no_requests: {
+    en: 'You have not asked for a story yet.',
+    ru: 'Вы ещё не заказывали сказку.',
+    hy: 'Դուք դեռ հեքիաթ չեք պատվիրել։',
+  },
+  req_new: { en: 'received', ru: 'получен', hy: 'ստացված է' },
+  req_in_review: { en: 'in review', ru: 'рассматривается', hy: 'դիտարկվում է' },
+  req_delivered: { en: 'ready', ru: 'готово', hy: 'պատրաստ է' },
+  req_declined: { en: 'declined', ru: 'отклонён', hy: 'մերժված է' },
+
+  // ---------- activity ----------
+  tile_activity: { en: 'Your activity', ru: 'Ваша активность', hy: 'Ձեր գործողությունները' },
+  tile_activity_sub: {
+    en: 'Every change you have made',
+    ru: 'Все изменения, которые вы вносили',
+    hy: 'Բոլոր փոփոխությունները, որ դուք արել եք',
+  },
+  activity_title: { en: 'Your activity', ru: 'Ваша активность', hy: 'Ձեր գործողությունները' },
+  no_activity: {
+    en: 'Nothing here yet. When you change a setting or add a toy, it appears here.',
+    ru: 'Пока пусто. Когда вы измените настройку или добавите игрушку — появится здесь.',
+    hy: 'Այստեղ դեռ ոչինչ չկա։ Երբ փոխեք կարգավորում կամ ավելացնեք խաղալիք, դա կհայտնվի այստեղ։',
+  },
+  ev_account_deleted: { en: 'Account deleted', ru: 'Аккаунт удалён', hy: 'Հաշիվը ջնջվեց' },
+  ev_child_deleted: { en: 'Child profile removed', ru: 'Профиль ребёнка удалён', hy: 'Երեխայի պրոֆիլը հեռացվեց' },
+  ev_device_unlinked: { en: 'Toy removed', ru: 'Игрушка убрана', hy: 'Խաղալիքը հեռացվեց' },
+  ev_password_changed: { en: 'Password changed', ru: 'Пароль изменён', hy: 'Գաղտնաբառը փոխվեց' },
+  ev_pause_changed: { en: 'Toy paused or resumed', ru: 'Пауза включена или снята', hy: 'Խաղալիքը դադարեցվեց կամ շարունակվեց' },
+  ev_bedtime_set: { en: 'Quiet hours updated', ru: 'Часы сна обновлены', hy: 'Քնի ժամերը թարմացվեցին' },
+  ev_modes_set: { en: 'Modes updated', ru: 'Режимы обновлены', hy: 'Ռեժիմները թարմացվեցին' },
+  ev_child_modes_set: { en: "A child's modes updated", ru: 'Режимы ребёнка обновлены', hy: 'Երեխայի ռեժիմները թարմացվեցին' },
+  ev_conversation_deleted: { en: 'Conversation deleted', ru: 'Разговор удалён', hy: 'Զրույցը ջնջվեց' },
+  ev_google_signin: { en: 'Signed in with Google', ru: 'Вход через Google', hy: 'Մուտք Google-ով' },
+  ev_data_exported: { en: 'Data downloaded', ru: 'Данные скачаны', hy: 'Տվյալները ներբեռնվեցին' },
+  ev_reset_requested: { en: 'Password reset requested', ru: 'Запрошен сброс пароля', hy: 'Գաղտնաբառի վերականգնման հայտ' },
+  ev_reset_completed: { en: 'Password reset finished', ru: 'Сброс пароля завершён', hy: 'Գաղտնաբառի վերականգնումն ավարտվեց' },
+  ev_email_verified: { en: 'Email confirmed', ru: 'Почта подтверждена', hy: 'Էլ. փոստը հաստատվեց' },
+  ev_device_renamed: { en: 'Toy renamed', ru: 'Игрушка переименована', hy: 'Խաղալիքը վերանվանվեց' },
+  ev_device_claimed: { en: 'Toy added', ru: 'Игрушка добавлена', hy: 'Խաղալիքն ավելացվեց' },
+  ev_device_linked: { en: 'Toy added', ru: 'Игрушка добавлена', hy: 'Խաղալիքն ավելացվեց' },
+  ev_revocation_changed: { en: 'Toy access changed', ru: 'Доступ игрушки изменён', hy: 'Խաղալիքի մուտքը փոխվեց' },
+  ev_story_intro_set: { en: 'Spoken story intro changed', ru: 'Озвученное вступление изменено', hy: 'Հեքիաթի ձայնային սկիզբը փոխվեց' },
+  ev_bedtime_music_set: { en: 'Bedtime music changed', ru: 'Музыка для сна изменена', hy: 'Քնի ժամի երաժշտությունը փոխվեց' },
+  ev_story_requested: { en: 'Story requested', ru: 'Заказана сказка', hy: 'Պատվիրվեց հեքիաթ' },
   account_title: { en: 'Account', ru: 'Аккаунт', hy: 'Հաշիվ' },
   wifi_setup_mode: {
     en: 'Put the toy in setup mode — hold its button while turning it on for about 5 seconds — then search for it over Bluetooth.',

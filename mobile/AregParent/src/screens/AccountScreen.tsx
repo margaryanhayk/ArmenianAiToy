@@ -26,9 +26,18 @@ import { useLang } from '../useLang';
 type Props = {
   onBack: () => void;
   onLogout: () => void;
+  onOpenMusic: () => void;
+  onOpenRequest: () => void;
+  onOpenActivity: () => void;
 };
 
-export default function AccountScreen({ onBack, onLogout }: Props) {
+export default function AccountScreen({
+  onBack,
+  onLogout,
+  onOpenMusic,
+  onOpenRequest,
+  onOpenActivity,
+}: Props) {
   useLang();
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
@@ -174,6 +183,33 @@ export default function AccountScreen({ onBack, onLogout }: Props) {
         ) : null}
       </View>
 
+      {/* Account-wide, not per toy: music is the same for every toy, and
+          requests and the activity feed belong to the parent. */}
+      <Pressable style={styles.tile} onPress={onOpenActivity}>
+        <Text style={styles.tileIcon}>🕘</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.tileTitle}>{t('tile_activity')}</Text>
+          <Text style={styles.tileSub}>{t('tile_activity_sub')}</Text>
+        </View>
+        <Text style={styles.tileChev}>›</Text>
+      </Pressable>
+      <Pressable style={styles.tile} onPress={onOpenMusic}>
+        <Text style={styles.tileIcon}>🎵</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.tileTitle}>{t('tile_music')}</Text>
+          <Text style={styles.tileSub}>{t('tile_music_sub')}</Text>
+        </View>
+        <Text style={styles.tileChev}>›</Text>
+      </Pressable>
+      <Pressable style={styles.tile} onPress={onOpenRequest}>
+        <Text style={styles.tileIcon}>✍️</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.tileTitle}>{t('tile_request')}</Text>
+          <Text style={styles.tileSub}>{t('tile_request_sub')}</Text>
+        </View>
+        <Text style={styles.tileChev}>›</Text>
+      </Pressable>
+
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t('language')}</Text>
         <View style={styles.langRow}>
@@ -290,6 +326,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dangerBtnText: { color: '#a02622', fontWeight: '700' },
+  tile: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderWidth: 1, borderColor: '#e2e2e2', borderRadius: 10,
+    padding: 14, marginBottom: 10, backgroundColor: '#fafafa',
+    minHeight: 60,
+  },
+  tileIcon: { fontSize: 22 },
+  tileTitle: { fontSize: 15, fontWeight: '600', color: '#222' },
+  tileSub: { fontSize: 12, color: '#666', marginTop: 2 },
+  tileChev: { fontSize: 20, color: '#aaa' },
   langRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   langPill: {
     borderWidth: 1,

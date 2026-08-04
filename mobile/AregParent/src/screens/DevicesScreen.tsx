@@ -24,15 +24,21 @@ import { useLang } from '../useLang';
 
 type Props = {
   onLogout: () => void;
+  onLoaded: (devices: LinkedDevice[]) => void;
   onOpenDevice: (device: LinkedDevice) => void;
   onOpenSettings: (device: LinkedDevice) => void;
+  onOpenPlays: (device: LinkedDevice) => void;
+  onOpenLibrary: (device: LinkedDevice) => void;
   onOpenAccount: () => void;
 };
 
 export default function DevicesScreen({
   onLogout,
+  onLoaded,
   onOpenDevice,
   onOpenSettings,
+  onOpenPlays,
+  onOpenLibrary,
   onOpenAccount,
 }: Props) {
   useLang();
@@ -51,7 +57,10 @@ export default function DevicesScreen({
   const load = useCallback(async () => {
     setError(null);
     try {
-      setDevices(await getDevices());
+      const list = await getDevices();
+      setDevices(list);
+      // Handed up so the activity feed can name toys on its first paint.
+      onLoaded(list);
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         onLogout();
@@ -59,7 +68,7 @@ export default function DevicesScreen({
       }
       setError(errText(err, 'e_load'));
     }
-  }, [onLogout]);
+  }, [onLogout, onLoaded]);
 
   useEffect(() => {
     (async () => {
@@ -201,6 +210,8 @@ export default function DevicesScreen({
             onLogout={onLogout}
             onOpen={() => onOpenDevice(item)}
             onSettings={() => onOpenSettings(item)}
+            onPlays={() => onOpenPlays(item)}
+            onLibrary={() => onOpenLibrary(item)}
           />
         )}
         contentContainerStyle={devices.length === 0 ? styles.flexGrow : undefined}
@@ -216,6 +227,8 @@ function DeviceCard({
   onLogout,
   onOpen,
   onSettings,
+  onPlays,
+  onLibrary,
 }: {
   device: LinkedDevice;
   onRevoke: (d: LinkedDevice) => void;
@@ -223,6 +236,8 @@ function DeviceCard({
   onLogout: () => void;
   onOpen: () => void;
   onSettings: () => void;
+  onPlays: () => void;
+  onLibrary: () => void;
 }) {
   const [name, setName] = useState(device.deviceName ?? '');
   const [saving, setSaving] = useState(false);
@@ -268,6 +283,16 @@ function DeviceCard({
         </Pressable>
         <Pressable style={styles.settingsBtn} onPress={onSettings}>
           <Text style={styles.activityText}>{t('open_settings')}</Text>
+        </Pressable>
+      </View>
+      {/* Stories play from the toy's own memory, so they are never
+          conversations — they need their own way in. */}
+      <View style={styles.actionRow}>
+        <Pressable style={styles.activityBtn} onPress={onPlays}>
+          <Text style={styles.activityText}>{t('tile_plays')} →</Text>
+        </Pressable>
+        <Pressable style={styles.settingsBtn} onPress={onLibrary}>
+          <Text style={styles.activityText}>{t('tile_library')} →</Text>
         </Pressable>
       </View>
 
