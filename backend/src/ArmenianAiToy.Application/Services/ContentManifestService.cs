@@ -62,11 +62,42 @@ public sealed class ContentManifestService : IContentManifestService
         }
 
         var music = BuildMusic();
-        if (items.Count == 0 && music is null)
+        var voice = BuildVoice();
+        if (items.Count == 0 && music is null && voice is null)
         {
             return ContentManifestResponse.Empty();
         }
-        return new ContentManifestResponse(items) { Music = music };
+        return new ContentManifestResponse(items) { Music = music, Voice = voice };
+    }
+
+    /// <summary>Welcome-flow — per-clip validation, mirroring the music loop
+    /// exactly (drop only the offending clip; dedupe keeps the first; default
+    /// URL fill scoped by voiceId). Null when nothing valid is configured, so
+    /// the wire stays byte-identical for deployments with no voice clips.</summary>
+    private IReadOnlyList<ContentVoiceItem>? BuildVoice()
+    {
+        var items = new List<ContentVoiceItem>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var clip in _options.ResolveVoice())
+        {
+            if (string.IsNullOrWhiteSpace(clip.VoiceId)
+                || clip.SizeBytes <= 0
+                || !IsSha256Hex(clip.Sha256)
+                || !seen.Add(clip.VoiceId))
+            {
+                continue;
+            }
+            items.Add(new ContentVoiceItem(
+                VoiceId: clip.VoiceId,
+                Version: clip.Version < 1 ? 1 : clip.Version,
+                AudioUrl: string.IsNullOrWhiteSpace(clip.AudioUrl)
+                    ? $"{DefaultContentFileRoute}?voiceId={Uri.EscapeDataString(clip.VoiceId)}"
+                    : clip.AudioUrl,
+                Sha256: clip.Sha256.ToLowerInvariant(),
+                SizeBytes: clip.SizeBytes,
+                Enabled: true));
+        }
+        return items.Count == 0 ? null : items;
     }
 
     /// <summary>Slice E — per-track validation, mirroring the story loop

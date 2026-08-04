@@ -23,6 +23,7 @@ public class DeviceAuthMiddleware
         "/api/devices/firmware-image",
         "/api/devices/content-manifest",
         "/api/devices/content-file",
+        "/api/devices/voice-intent",
     ];
 
     // #034 — LastSeen is refreshed at most once per this interval per device.

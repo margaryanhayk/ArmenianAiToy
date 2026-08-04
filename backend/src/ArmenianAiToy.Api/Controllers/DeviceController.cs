@@ -1,11 +1,15 @@
 using ArmenianAiToy.Api.RateLimiting;
 using ArmenianAiToy.Api.Security;
+using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
+using ArmenianAiToy.Application.Telemetry;
+using ArmenianAiToy.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace ArmenianAiToy.Api.Controllers;
 
@@ -141,6 +145,205 @@ public class DeviceController : ControllerBase
         return Ok(new { accepted });
     }
 
+    /// <summary>
+    /// Welcome-flow — turns the child's spoken answer to a menu question into
+    /// ONE bounded intent token. The toy asks «ի՞նչ անենք» (or offers a story)
+    /// through a pre-rendered clip, records the reply, and posts the WAV here.
+    ///
+    /// <para>
+    /// <b>This is not, and must never become, a chat endpoint.</b> The response
+    /// is a single value from a closed 8-token set, so there is no field a
+    /// model output could travel through, and NO model is called: after STT the
+    /// classification is the deterministic keyword matcher
+    /// <see cref="ModeDetector"/> (or <see cref="WelcomeIntentDetector"/> for a
+    /// yes/no offer). One paid call per turn — speech-to-text — and nothing
+    /// else. Pinned by
+    /// <c>VoiceIntentTests.VoiceIntent_ResponseShape_IsBoundedTokenOnly</c>.
+    /// </para>
+    ///
+    /// <para>
+    /// Nothing is persisted. A one-word menu answer is not a conversation, and
+    /// writing one would create a retention/export surface for no parent value.
+    /// The transcript reaches moderation and the log, never the response.
+    /// </para>
+    ///
+    /// <para>
+    /// Gate chain and cost cap run BEFORE any paid call, exactly as
+    /// <c>StoryQaController.AnswerReflection</c> does. Every refusal is a
+    /// 200 with <c>unknown</c> rather than a status code: the firmware's
+    /// handling for "I didn't understand" is already the graceful default, so
+    /// a second failure branch on the device would be dead weight.
+    /// </para>
+    /// </summary>
+    [HttpPost("voice-intent")]
+    // #060 — cap the buffered audio body (the toy sends <= ~0.5 MB WAV).
+    [RequestSizeLimit(2_000_000)]
+    [EnableRateLimiting(ChatRateLimiter.PolicyName)]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(413)]
+    [ProducesResponseType(429)]
+    public async Task<IActionResult> VoiceIntent(
+        [FromServices] IAudioTranscriptionService transcription,
+        [FromServices] IModerationService moderation,
+        [FromServices] IChildService childService,
+        [FromServices] OpenAICostMeter costMeter,
+        [FromServices] IOptions<OpenAIDailyCostCapOptions> costCapOptions,
+        [FromServices] ILogger<DeviceController> logger,
+        [FromQuery] string expect = VoiceIntentExpectations.Mode,
+        CancellationToken cancellationToken = default)
+    {
+        var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
+        var yesNoQuestion = string.Equals(
+            expect, VoiceIntentExpectations.YesNo, StringComparison.OrdinalIgnoreCase);
+
+        // Gate chain pause > bedtime, before anything paid. A paused toy is
+        // silent anyway (the firmware never gets this far), but the server
+        // must not be the reason a paused device can still spend money.
+        if (await _deviceService.IsDevicePausedAsync(deviceId))
+        {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "paused"));
+            return VoiceIntentResult(VoiceIntents.Unknown);
+        }
+        if (await _deviceService.IsDeviceInBedtimeWindowAsync(deviceId, DateTime.UtcNow))
+        {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "bedtime"));
+            return VoiceIntentResult(VoiceIntents.Unknown);
+        }
+
+        var costCapOpts = costCapOptions.Value;
+        if (costCapOpts.Enabled)
+        {
+            var nowUtc = DateTime.UtcNow;
+            if (costCapOpts.Global > 0m && costMeter.IsGlobalOverCap(costCapOpts.Global, nowUtc))
+            {
+                AppMeter.OpenAICostCapTrip.Add(
+                    1, new KeyValuePair<string, object?>("kind", "voice_intent"));
+                return VoiceIntentResult(VoiceIntents.Unknown);
+            }
+            if (costMeter.IsOverCap(deviceId, costCapOpts.CapForDevice(deviceId), nowUtc))
+            {
+                AppMeter.OpenAICostCapTrip.Add(
+                    1, new KeyValuePair<string, object?>("kind", "voice_intent"));
+                return VoiceIntentResult(VoiceIntents.Unknown);
+            }
+        }
+
+        var inboundContentType = Request.ContentType;
+        if (string.IsNullOrWhiteSpace(inboundContentType))
+            inboundContentType = "audio/wav";
+
+        using var audioBuffer = new MemoryStream();
+        await Request.Body.CopyToAsync(audioBuffer, cancellationToken);
+        if (audioBuffer.Length == 0)
+        {
+            return BadRequest(new { error = "Audio body is required" });
+        }
+        var audioBytes = audioBuffer.ToArray();
+
+        // Voice → text. The bias prompt is scoped to what was actually asked;
+        // on a one-word answer from a five-year-old that is the single biggest
+        // accuracy lever we have, and it costs nothing.
+        string transcript;
+        try
+        {
+            using var sttStream = new MemoryStream(audioBytes, writable: false);
+            transcript = await transcription.TranscribeArmenianAsync(
+                sttStream,
+                inboundContentType!,
+                yesNoQuestion
+                    ? VoiceIntentExpectations.YesNoBiasPrompt
+                    : VoiceIntentExpectations.ModeBiasPrompt,
+                cancellationToken,
+                model: _config["Devices:VoiceIntentTranscriptionModel"]);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            // A transient STT failure is indistinguishable, to the child, from
+            // not being heard — and the toy already handles that.
+            logger.LogWarning(ex, "Voice-intent: STT failure for device {DeviceId}", deviceId);
+            return VoiceIntentResult(VoiceIntents.Unknown);
+        }
+
+        try
+        {
+            costMeter.Record(
+                deviceId,
+                OpenAICostEstimator.EstimateWhisperCostUsd(audioBytes.LongLength),
+                DateTime.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            // Metering must never be the reason a child's answer is dropped.
+            logger.LogWarning(ex, "Voice-intent: cost metering failed");
+        }
+
+        if (string.IsNullOrWhiteSpace(transcript))
+        {
+            return VoiceIntentResult(VoiceIntents.Unknown);
+        }
+
+        // Input moderation, fail-closed like everywhere else. An unsafe
+        // utterance can never select a mode — it reads as "not understood",
+        // which is also what the child experiences.
+        var inputModeration = await moderation.CheckContentAsync(transcript);
+        if (!inputModeration.IsSafe)
+        {
+            logger.LogWarning(
+                "Voice-intent blocked for device {DeviceId}. Categories: {Categories}",
+                deviceId, string.Join(", ", inputModeration.FlaggedCategories));
+            return VoiceIntentResult(VoiceIntents.Unknown);
+        }
+
+        if (yesNoQuestion)
+        {
+            return VoiceIntentResult(WelcomeIntentDetector.DetectYesNo(transcript) switch
+            {
+                YesNo.Yes => VoiceIntents.Yes,
+                YesNo.No => VoiceIntents.No,
+                _ => VoiceIntents.Unknown,
+            });
+        }
+
+        // Deterministic keyword classification — no model call. hasActiveStorySession
+        // is false by construction: the welcome flow runs before any story.
+        var mode = ModeDetector.Detect(transcript, history: null, hasActiveStorySession: false);
+        var intent = mode switch
+        {
+            DetectedMode.Story => VoiceIntents.Story,
+            DetectedMode.Game => VoiceIntents.Game,
+            DetectedMode.Riddle => VoiceIntents.Riddle,
+            DetectedMode.Curiosity => VoiceIntents.Curiosity,
+            DetectedMode.Calm => VoiceIntents.Calm,
+            _ => VoiceIntents.Unknown,
+        };
+
+        // Belt and braces over the manifest's client-side filtering: even if a
+        // toy asks with a stale mode list, a disabled mode is never returned.
+        var childId = (await childService.GetDefaultChildForDeviceAsync(deviceId))?.Id;
+        if (intent is VoiceIntents.Story or VoiceIntents.Game
+            or VoiceIntents.Riddle or VoiceIntents.Curiosity
+            && !await _deviceService.IsModeEnabledForRequestAsync(deviceId, childId, mode))
+        {
+            AppMeter.ChatGateTrip.Add(
+                1, new KeyValuePair<string, object?>("gate", "mode_disabled"));
+            intent = VoiceIntents.Unknown;
+        }
+
+        return VoiceIntentResult(intent);
+    }
+
+    /// <summary>The one and only shape this endpoint returns: a single
+    /// bounded token, no transcript, no confidence, no free text.</summary>
+    private OkObjectResult VoiceIntentResult(string intent)
+    {
+        AppMeter.VoiceIntentTurn.Add(
+            1, new KeyValuePair<string, object?>("intent", intent));
+        return Ok(new { intent });
+    }
+
     // Device polls its command queue. Device-authed (middleware). Returns only
     // this device's deliverable commands (Pending/Sent, not expired) and marks
     // Pending → Sent. The toy connects OUTBOUND only — there is no inbound
@@ -234,7 +437,8 @@ public class DeviceController : ControllerBase
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     public async Task<IActionResult> GetContentManifest(
-        [FromServices] IContentManifestService manifest)
+        [FromServices] IContentManifestService manifest,
+        [FromServices] IChildService childService)
     {
         // B3 — stamp this device's spoken-story-intro flag onto the static
         // manifest. Additive field: pre-B3 firmware ignores it; new firmware
@@ -243,11 +447,31 @@ public class DeviceController : ControllerBase
         // to the shipped default (ON).
         var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
         var device = await _deviceService.GetDeviceAsync(deviceId);
+
+        // Welcome-flow — the four parent mode switches, so the toy can ask
+        // "what shall we do?" offering ONLY what the parent left on. Resolved
+        // through IsModeEnabledForRequestAsync against the device's DEFAULT
+        // child, not the raw Device columns: a child-level override must be
+        // honored here too, or the toy would offer a mode and then be refused
+        // by the chat gate — worse for a child than never being offered it.
+        // The device has no child context, so "default child" is the honest
+        // approximation; the gate itself remains the enforcement point.
+        var defaultChild = await childService.GetDefaultChildForDeviceAsync(deviceId);
+        var childId = defaultChild?.Id;
+
         return Ok(manifest.Build() with
         {
             StoryIntroEnabled = device?.StoryIntroEnabled ?? true,
             // Slice E — bedtime-music opt-in rides the same manifest.
             BedtimeMusicEnabled = device?.BedtimeMusicEnabled ?? false,
+            StoryEnabled = await _deviceService.IsModeEnabledForRequestAsync(
+                deviceId, childId, DetectedMode.Story),
+            GameEnabled = await _deviceService.IsModeEnabledForRequestAsync(
+                deviceId, childId, DetectedMode.Game),
+            RiddleEnabled = await _deviceService.IsModeEnabledForRequestAsync(
+                deviceId, childId, DetectedMode.Riddle),
+            CuriosityEnabled = await _deviceService.IsModeEnabledForRequestAsync(
+                deviceId, childId, DetectedMode.Curiosity),
         });
     }
 
@@ -273,11 +497,35 @@ public class DeviceController : ControllerBase
         [FromServices] ILogger<DeviceController> logger,
         [FromQuery] string? storyId = null,
         [FromQuery] string? clip = null,
-        [FromQuery] string? trackId = null)
+        [FromQuery] string? trackId = null,
+        [FromQuery] string? voiceId = null)
     {
         if (!options.Enabled)
         {
             return NotFound(new { error = "No content available." });
+        }
+
+        // Welcome-flow — voiceId selects a device-global spoken clip
+        // (greeting / menu prompt / fallback line). Third namespace beside
+        // stories and music; same lookup-key-only contract, so it never
+        // reaches the filesystem and carries no traversal surface.
+        if (!string.IsNullOrWhiteSpace(voiceId))
+        {
+            var voiceClip = options.ResolveVoice().FirstOrDefault(v =>
+                string.Equals(v.VoiceId, voiceId, StringComparison.OrdinalIgnoreCase));
+            if (voiceClip is null || string.IsNullOrWhiteSpace(voiceClip.AudioPath))
+            {
+                return NotFound(new { error = "No content available." });
+            }
+            if (!Path.IsPathRooted(voiceClip.AudioPath)
+                || !System.IO.File.Exists(voiceClip.AudioPath))
+            {
+                logger.LogWarning(
+                    "Content audio path missing or not absolute for voice clip {VoiceId}: {AudioPath}",
+                    voiceClip.VoiceId, voiceClip.AudioPath);
+                return NotFound(new { error = "No content available." });
+            }
+            return PhysicalFile(voiceClip.AudioPath, "audio/mpeg", enableRangeProcessing: true);
         }
 
         // Slice E — trackId selects a MUSIC track (separate namespace from

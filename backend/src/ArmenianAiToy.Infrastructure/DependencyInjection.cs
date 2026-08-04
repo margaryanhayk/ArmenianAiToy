@@ -94,10 +94,15 @@ public static class DependencyInjection
             new OpenAIWhisperTranscriptionService(
                 whisperClient, openAiClient, whisperModel,
                 sp.GetRequiredService<ILogger<OpenAIWhisperTranscriptionService>>()));
+        // The speaking voice is config, not a literal — comparing voices for
+        // the Armenian listen test must not require a code change. Unset →
+        // "nova", exactly what shipped before the key existed.
+        var ttsVoice = config["OpenAI:TtsVoice"];
         services.AddSingleton<IAudioSynthesisService>(sp =>
             new OpenAITtsSynthesisService(
                 ttsClient,
-                sp.GetRequiredService<ILogger<OpenAITtsSynthesisService>>()));
+                sp.GetRequiredService<ILogger<OpenAITtsSynthesisService>>(),
+                ttsVoice));
         services.AddSingleton<IAudioBlobStore, LocalDiskAudioBlobStore>();
         // Slice F — custom-story-request photo storage (owner queue).
         services.AddSingleton<IStoryRequestPhotoStore,

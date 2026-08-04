@@ -52,6 +52,17 @@ public sealed class ContentSyncOptions
     /// owner adds rights-cleared tracks.</summary>
     public List<ContentSyncMusicOptions> Music { get; set; } = new();
 
+    /// <summary>Welcome-flow — device-global spoken clips (power-on
+    /// greetings, the "what shall we do?" prompts, the two fallback lines).
+    /// A THIRD namespace beside stories and music, for the same reason music
+    /// got its own: these are not stories and must never enter the story
+    /// rotation. Their ROLE is carried by the id, not by a field — the
+    /// firmware pattern-matches the <c>greet-</c> prefix and looks the rest
+    /// up by exact id, so adding greeting #25 is a config edit with no
+    /// firmware change. Empty by default; the toy is silent at boot until
+    /// the owner ships rendered clips.</summary>
+    public List<ContentSyncVoiceOptions> Voice { get; set; } = new();
+
     /// <summary>Legacy single-item: library story id (kebab-case).</summary>
     public string StoryId { get; set; } = string.Empty;
 
@@ -197,8 +208,40 @@ public sealed class ContentSyncOptions
             options.Music.Add(track);
         }
 
+        // Welcome-flow — hand-rolled voice-clip binding, same
+        // reachable-by-tests rule as the story and music arrays.
+        foreach (var child in section.GetSection("Voice").GetChildren())
+        {
+            var clip = new ContentSyncVoiceOptions
+            {
+                VoiceId = child["VoiceId"] ?? "",
+                AudioUrl = child["AudioUrl"] ?? "",
+                AudioPath = child["AudioPath"] ?? "",
+                Sha256 = child["Sha256"] ?? "",
+            };
+            if (int.TryParse(child["Version"], out var clipVersion)) clip.Version = clipVersion;
+            if (long.TryParse(child["SizeBytes"], out var clipSize)) clip.SizeBytes = clipSize;
+            options.Voice.Add(clip);
+        }
+
         return options;
     }
+
+    /// <summary>Welcome-flow — the configured device-global voice clips with
+    /// <see cref="AudioRoot"/> applied, mirroring <see cref="ResolveMusic"/>
+    /// (one resolution site for the manifest service AND content-file).</summary>
+    public IReadOnlyList<ContentSyncVoiceOptions> ResolveVoice()
+        => Voice
+            .Select(v => new ContentSyncVoiceOptions
+            {
+                VoiceId = v.VoiceId,
+                Version = v.Version,
+                AudioUrl = v.AudioUrl,
+                AudioPath = ResolveAudioPath(AudioRoot, v.AudioPath),
+                Sha256 = v.Sha256,
+                SizeBytes = v.SizeBytes,
+            })
+            .ToList();
 
     /// <summary>Slice E — the configured music set with
     /// <see cref="AudioRoot"/> applied, mirroring <see cref="ResolveStories"/>
@@ -342,10 +385,45 @@ public sealed class ContentSyncMusicOptions
 }
 
 /// <summary>
+/// Welcome-flow — one device-global spoken clip (a greeting, a menu prompt,
+/// or one of the two fallback lines). Same field discipline as
+/// <see cref="ContentSyncMusicOptions"/>, minus <c>Title</c>: a device-global
+/// clip has no display surface anywhere, and carrying a title would cost
+/// ~65 bytes per entry in three firmware-side tables for a field nothing
+/// reads.
+/// <para>
+/// <see cref="VoiceId"/> carries the clip's ROLE. Reserved ids:
+/// <c>greet-01</c>…<c>greet-NN</c> (the rotated power-on pool — the only
+/// PREFIX the firmware matches), <c>ask-</c> plus the enabled-mode letters in
+/// fixed order s,g,r,c (e.g. <c>ask-sgrc</c>, <c>ask-s</c>), <c>ask-any</c>
+/// (generic fallback), <c>say-again</c> (one mis-hear retry line), and
+/// <c>just-story</c> (the graceful default when the toy gives up asking).
+/// </para>
+/// </summary>
+public sealed class ContentSyncVoiceOptions
+{
+    /// <summary>Clip id (kebab-case, same allowlist as StoryId/TrackId).
+    /// Doubles as the lookup key for
+    /// <c>GET /api/devices/content-file?voiceId=</c> and as the SD filename
+    /// component, so it must be unique — the manifest service keeps the
+    /// first of any duplicate pair.</summary>
+    public string VoiceId { get; set; } = string.Empty;
+
+    /// <summary>Content version — bump when the audio changes, or every toy
+    /// keeps its cached copy (the SD filename embeds it).</summary>
+    public int Version { get; set; } = 1;
+
+    public string AudioUrl { get; set; } = string.Empty;
+    public string AudioPath { get; set; } = string.Empty;
+    public string Sha256 { get; set; } = string.Empty;
+    public long SizeBytes { get; set; }
+}
+
+/// <summary>
 /// One per-story clip. <see cref="Kind"/> is a bounded vocabulary
-/// (<c>intro</c> / <c>question</c> / <c>summary</c>) — the manifest service
-/// drops unknown kinds so a config typo can never push an arbitrary file
-/// role to the fleet.
+/// (<c>intro</c> / <c>question</c> / <c>summary</c> / <c>offer</c> / …) — the
+/// manifest service drops unknown kinds so a config typo can never push an
+/// arbitrary file role to the fleet.
 /// </summary>
 public sealed class ContentSyncClipOptions
 {
@@ -358,10 +436,25 @@ public sealed class ContentSyncClipOptions
     public const string KindQuestion1 = "question1";
     public const string KindQuestion2 = "question2";
 
-    public static readonly IReadOnlyList<string> AllowedKinds =
-        [KindIntro, KindQuestion, KindSummary, KindQuestion1, KindQuestion2];
+    /// <summary>Welcome-flow — the spoken offer lines, which are what let the
+    /// toy name a story out loud without any runtime TTS.
+    /// <c>offer</c> = «Ուզո՞ւմ ես լսել «X»-ը։» for a story the child has not
+    /// heard; <c>reoffer</c> = «Մենք արդեն լսել ենք «X»-ը…» when the whole
+    /// shelf has been heard.
+    /// <para>
+    /// Named <c>reoffer</c>, not <c>offer-again</c>, deliberately: the
+    /// firmware's <c>CS_CLIP_KIND_LEN</c> is 10 and "offer-again" is 11
+    /// characters, so the longer name would force a second bound bump and
+    /// grow every clip slot in five 16-entry tables.
+    /// </para></summary>
+    public const string KindOffer = "offer";
+    public const string KindReoffer = "reoffer";
 
-    /// <summary>Clip role: intro | question | summary.</summary>
+    public static readonly IReadOnlyList<string> AllowedKinds =
+        [KindIntro, KindQuestion, KindSummary, KindQuestion1, KindQuestion2,
+         KindOffer, KindReoffer];
+
+    /// <summary>Clip role: intro | question | summary | offer | reoffer.</summary>
     public string Kind { get; set; } = string.Empty;
 
     /// <summary>URL the device downloads from. Empty → the manifest service

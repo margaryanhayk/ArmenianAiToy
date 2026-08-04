@@ -264,6 +264,23 @@ public static class AppMeter
             description: "Count of in-story voice Q&A turns by outcome.");
 
     /// <summary>
+    /// Welcome-flow — one increment per <c>POST /api/devices/voice-intent</c>,
+    /// tagged with the intent actually returned. The tag's value space is
+    /// exactly <see cref="Helpers.VoiceIntents.All"/> (8 values), so it is
+    /// safe under the no-high-cardinality invariant. Do NOT add device_id or
+    /// the transcript here.
+    /// <para>
+    /// The ratio of <c>unknown</c> to everything else is the honest measure of
+    /// whether voice-only selection actually works for small children — the
+    /// one number worth watching after the first families.
+    /// </para>
+    /// </summary>
+    public static readonly Counter<long> VoiceIntentTurn =
+        Instance.CreateCounter<long>(
+            name: "aat_voice_intent_turn_total",
+            description: "Count of welcome-flow spoken menu answers by resolved intent.");
+
+    /// <summary>
     /// End-to-end duration (unit = <b>seconds</b>) of a voice Q&amp;A turn
     /// in <c>StoryQaController.Ask</c> — from just before Whisper STT
     /// through GPT, TTS, and bridge/recap composition. This is the metric

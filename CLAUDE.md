@@ -44,7 +44,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2244 tests)
+dotnet test                                     # Run all tests (2308 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2163,6 +2163,136 @@ without someone listening end to end.
 **Levels are a library-wide contract.** -16.4 LUFS is the level of the
 narration the owner approved; a new story that ignores it makes half the
 library loud and half quiet, which is itself a quality complaint.
+
+## Spoken welcome flow (owner request 2026-08-04) — backend half
+
+The toy was SILENT at power-on and a button press always started/resumed a
+story. This slice gives it an opening: a greeting, «what shall we do?» offering
+only parent-enabled modes, and a story offered **by name** — one the child has
+not heard, or «we already heard X, shall I tell it again?». Owner decisions:
+the child answers **by voice only** (no button menu was built), and this lands
+**before the first families**. Plan: `.claude/plans/when-we-chose-voice-parsed-dusk.md`.
+
+**Everything Areg says in this flow is a PRE-RENDERED MP3 on the SD card**, not
+runtime TTS: it works offline, costs nothing, adds no latency, and is in
+whichever voice we choose. Only *hearing* the child needs the network.
+
+**Voice-clip namespace (`ContentSync:Voice`)** — the THIRD content namespace
+beside stories and music, built on the identical contract (`ContentSyncVoiceOptions`
+→ `ResolveVoice()` → `ContentManifestService.BuildVoice()` → additive
+`Voice[]` on `ContentManifestResponse` → `GET /api/devices/content-file?voiceId=`).
+Per-item fail-closed validation, dedupe-keeps-first, default URL fill, and a
+null `Voice` field when nothing is configured so the wire is byte-identical for
+deployments without clips (pinned by `Manifest_NoVoiceClips_FieldStaysNull`).
+No `Title` — a device-global clip has no display surface anywhere, and the
+field would cost ~65 B/entry in three firmware tables for nothing.
+
+**The id carries the ROLE**, not a field: `greet-01`…`greet-NN` (the rotated
+power-on pool — the only PREFIX the firmware matches), `ask-` + the enabled-mode
+letters in fixed order s,g,r,c (`ask-sgrc`, `ask-s`, …, 15 variants),
+`ask-any`, `say-again`, `just-story`. Adding greeting #25 is therefore a config
+edit with no firmware change.
+
+**Two new per-story clip kinds** on the existing B2 clip vocabulary: `offer`
+(«Ուզո՞ւմ ես լսել «X»-ը։») and `reoffer` («Մենք արդեն լսել ենք «X»-ը…»). These
+are what let the toy speak a story's title with zero runtime TTS. Named
+`reoffer`, not `offer-again`, because the firmware's `CS_CLIP_KIND_LEN` is 10 —
+pinned by `AllowedClipKinds_AllFitTheFirmwareKindLength`.
+
+**Parent mode flags reach the device** for the first time. Four additive
+nullable fields on the content manifest, resolved through
+`DeviceService.IsModeEnabledForRequestAsync` against the device's **default
+child** — not the raw `Device` columns — so a per-child override reaches the
+toy too. Without that, the toy could offer Game and then be refused by the chat
+gate, which is worse for a child than never being offered it. These flags
+**enforce nothing**; the chat gate remains the enforcement point.
+
+**`POST /api/devices/voice-intent`** — device-authed (added to
+`DeviceAuthMiddleware`'s path list, so a revoked toy 401s), `chat`
+rate-limited, 2 MB body cap. Takes the child's recorded answer, returns
+**one token from a closed 8-value set**
+(`story|game|riddle|curiosity|calm|yes|no|unknown`).
+
+- **Never calls a model.** After STT, classification is the deterministic
+  keyword matcher `ModeDetector` (which already handles Whisper's Armenian
+  confusables, e.g. «բատմիր» for «պատմիր»), or the new pure
+  `WelcomeIntentDetector.DetectYesNo` for a yes/no offer. One paid call per
+  turn — speech-to-text — and nothing else.
+- **The bounded response IS the safety argument.** There is no field a model
+  output could travel through. Pinned by
+  `VoiceIntent_ResponseShape_IsBoundedTokenOnly`; do not add a transcript,
+  a confidence score, or a free-text field to this endpoint.
+- **Nothing is persisted.** A one-word menu answer is not a conversation, and
+  writing one would create a retention/export surface for no parent value.
+- Gate chain (pause → bedtime) and the daily cost cap run **before** STT, so a
+  gated turn cannot spend money (pinned by
+  `PausedDevice_ReturnsUnknown_AndNeverCallsTranscription`). Every refusal is a
+  200 with `unknown`, because the toy's "I didn't understand" handling is
+  already the graceful default.
+- Input-moderated fail-closed: an unsafe utterance can never select a mode.
+- A parent-disabled mode is never returned, belt-and-braces over the manifest's
+  client-side filtering. **Calm is exempt** — the MODES.md invariant that a
+  bedtime cue always reaches Calm handling.
+- Optional per-call STT model override via `Devices:VoiceIntentTranscriptionModel`
+  (same seam as `StoryQa:TranscriptionModel`), unset by default.
+- Metric `aat_voice_intent_turn_total{intent}` — bounded 8-value tag. The ratio
+  of `unknown` to everything else is the honest measure of whether voice-only
+  selection actually works for small children.
+
+**`WelcomeIntentDetector`** (`Application/Helpers`) — pure, no model. Yes/no in
+Armenian. Deliberately NOT part of `ChoiceNormalizer`, which explicitly refuses
+to map «այո»/«ոչ» because a bare yes is ambiguous in a two-option story branch;
+here the question really is binary. Negated phrases («չեմ ուզում») are matched
+and removed FIRST, so the «ուզում» inside a refusal can never read as consent
+(pinned by `DetectYesNo_NegationBeatsAffirmation`). A transcript carrying both
+a clear yes and a clear no is `Unknown` — the toy re-asks once, then just
+starts a story. The Armenian intra-word marks ՞ ՛ ՜ are stripped, mirroring
+`ModeDetector.NormalizeForMatch` (duplicated, not exposed — that file sits on
+the chat gate's hot path and is HIGH risk).
+
+**Still to land** (firmware): the voice-clip sync + index schema v3→v4, the
+NVS "already heard" set, honest boot-time pause state, and
+`handle_welcome_flow()` itself. Nothing changes for a child until that last
+piece ships, so every backend slice above is safe to deploy on its own.
+
+## The voice Areg speaks in (`OpenAI:TtsVoice`)
+
+Two voices exist in this product, and they are different by necessity:
+
+| What the child hears | Voice |
+|---|---|
+| The story itself | The owner's **ElevenLabs clone**, `eleven_v3`, pre-rendered into `story-audio/` |
+| Everything Areg himself says (answers, reactions, canned lines) | **OpenAI TTS**, live |
+
+**The clone cannot answer live and this is not a code problem.** `eleven_v3` is
+the only model on the account that speaks Armenian, and ElevenLabs states it
+cannot do real-time — the quality comes from a bigger model and a heavier
+codec. Their fast model (Flash v2.5, ~75 ms) supports 32 languages and Armenian
+is not one of them. Azure's newest zero-shot cloning model (MAI-Voice-2) covers
+15 languages; Armenian is not among those either. Re-check before assuming this
+is still true — ElevenLabs has said a real-time v3 is being built.
+
+So the design is **two voices on purpose**: the storyteller, and Areg. The
+mitigation for the seam is that in the welcome flow almost everything Areg says
+is *predictable*, and predictable text gets pre-rendered in whichever voice we
+like (see the voice-clip namespace above). Only a question a child invents
+mid-story genuinely needs live synthesis.
+
+`OpenAI:TtsVoice` (alloy | echo | fable | onyx | nova | shimmer) replaces what
+was a hardcoded `GeneratedSpeechVoice.Nova` literal, so comparing voices is a
+config flip rather than a code change and redeploy. Unset → `nova`, exactly
+what shipped before the key existed (pinned by `UnsetVoice_FallsBackToNova`).
+An unknown name degrades to nova with a loud warning rather than throwing —
+same posture as the Resend notifier config, and for the same reason: a typo in
+an optional voice setting must not take the site down at startup.
+
+**Open, owner-gated:** an Azure `hy-AM` implementation of `IAudioSynthesisService`
+(native Armenian voices `HaykNeural` / `AnahitNeural`, real-time, ~$16/1M chars
+≈ what OpenAI costs today) is NOT built. It is deliberately deferred until the
+owner has actually listened to samples and chosen — building a provider adapter
+for a voice nobody has heard would be speculative. The interface
+(`Application/Audio/IAudioSynthesisService.cs`) is already provider-neutral, so
+it is one class plus one DI line when the decision lands.
 
 ## Story Q&A text harness (`POST /api/story-qa-text`)
 

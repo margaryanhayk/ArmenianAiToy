@@ -119,7 +119,8 @@ public class StoryIntroToggleTests
         var manifest = Substitute.For<IContentManifestService>();
         manifest.Build().Returns(ContentManifestResponse.Empty());
 
-        var ok = Assert.IsType<OkObjectResult>(await controller.GetContentManifest(manifest));
+        var ok = Assert.IsType<OkObjectResult>(
+            await controller.GetContentManifest(manifest, Substitute.For<IChildService>()));
         var body = Assert.IsType<ContentManifestResponse>(ok.Value);
         Assert.False(body.StoryIntroEnabled);
     }

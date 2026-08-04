@@ -26,9 +26,41 @@ public sealed record ContentManifestResponse(
     /// stamped by the controller like <see cref="StoryIntroEnabled"/>.</summary>
     public bool? BedtimeMusicEnabled { get; init; }
 
+    /// <summary>Welcome-flow — device-global spoken clips (greetings, menu
+    /// prompts, fallback lines); firmware syncs them to /voice. Null until
+    /// the owner configures rendered clips, so the wire stays byte-identical
+    /// for deployments that have none, and pre-welcome firmware ignores it.</summary>
+    public IReadOnlyList<ContentVoiceItem>? Voice { get; init; }
+
+    /// <summary>Welcome-flow — the four parent mode switches, stamped by the
+    /// controller (device flag with the default child's override applied).
+    /// The toy caches them in its SD index so the "what shall we do?" prompt
+    /// offers only permitted modes even offline. Nullable so service-built
+    /// instances and older consumers are unaffected; the firmware treats an
+    /// absent field as enabled, matching the shipped server default.
+    /// <para>
+    /// These do NOT enforce anything — <c>DeviceService.IsModeEnabledForRequestAsync</c>
+    /// remains the gate. They exist so the toy never offers a child something
+    /// it will then refuse.
+    /// </para></summary>
+    public bool? StoryEnabled { get; init; }
+    public bool? GameEnabled { get; init; }
+    public bool? RiddleEnabled { get; init; }
+    public bool? CuriosityEnabled { get; init; }
+
     public static ContentManifestResponse Empty() =>
         new(Array.Empty<ContentStoryItem>());
 }
+
+/// <summary>Welcome-flow — one downloadable device-global spoken clip. No
+/// title: the id carries the role and nothing displays these.</summary>
+public sealed record ContentVoiceItem(
+    string VoiceId,
+    int Version,
+    string AudioUrl,
+    string Sha256,
+    long SizeBytes,
+    bool Enabled);
 
 /// <summary>Slice E — one downloadable bedtime-music track.</summary>
 public sealed record ContentMusicItem(

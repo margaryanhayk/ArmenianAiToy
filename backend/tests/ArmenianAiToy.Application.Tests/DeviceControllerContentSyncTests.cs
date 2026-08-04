@@ -44,7 +44,8 @@ public class DeviceControllerContentSyncTests
         });
         manifest.Build().Returns(response);
 
-        var result = await Controller().GetContentManifest(manifest);
+        var result = await Controller().GetContentManifest(
+            manifest, Substitute.For<IChildService>());
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var body = Assert.IsType<ContentManifestResponse>(ok.Value);
@@ -60,7 +61,8 @@ public class DeviceControllerContentSyncTests
         var manifest = Substitute.For<IContentManifestService>();
         manifest.Build().Returns(ContentManifestResponse.Empty());
 
-        var ok = Assert.IsType<OkObjectResult>(await Controller().GetContentManifest(manifest));
+        var ok = Assert.IsType<OkObjectResult>(
+            await Controller().GetContentManifest(manifest, Substitute.For<IChildService>()));
         var body = Assert.IsType<ContentManifestResponse>(ok.Value);
         Assert.Empty(body.Stories);
     }
