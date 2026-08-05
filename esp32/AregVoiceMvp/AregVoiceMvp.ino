@@ -32,6 +32,8 @@
 #include "content_sync_test.h" // content-sync decision-logic tests (AREG_CONTENT_SYNC_TEST_BENCH only)
 #include "sd_diag.h"           // standalone SD diagnostic (AREG_SD_DIAG_BENCH builds only)
 #include "sd_playback.h"       // cached-MP3 SD playback (AREG_SD_PLAYBACK_BENCH builds only)
+#include "answer_buttons.h"    // optional GREEN/RED answer buttons (no-op unless pins defined)
+#include "offline_quiz.h"      // offline true/false quiz (AREG_OFFLINE_QUIZ_BENCH builds only)
 
 #include "story_select.h"      // which cached story to play (index v2 + no-repeat)
 #include "story_report.h"      // story-play reporting (store-and-forward to backend)
@@ -1707,6 +1709,7 @@ void setup() {
     DIAG_MARK(115, "wdt_enabled");
 
     button_begin();
+    answer_buttons_begin();   // no-op unless AREG_PIN_BUTTON_YES/NO defined
     DIAG_MARK(120, "button_initialised");
 
     // Seed the last-known pause / bedtime state from NVS before anything
@@ -1956,6 +1959,14 @@ void loop() {
         // fallback Tests B/E/C by manipulating SD files + exercising the real
         // resolver/stream path, then restores. One shot, 30 s after boot.
         story_fallback_test_tick();
+#endif
+
+#ifdef AREG_OFFLINE_QUIZ_BENCH
+        // Offline true/false quiz (bench builds only): plays /quiz clips
+        // from SD, child answers with the GREEN/RED buttons, answers are
+        // verified against the clip filename. One quiz per boot, 30 s
+        // after boot, IDLE-only. Zero bytes of this in production.
+        offline_quiz_tick();
 #endif
 
         char ev = button_poll();

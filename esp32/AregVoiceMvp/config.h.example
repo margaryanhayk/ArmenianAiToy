@@ -122,6 +122,23 @@
 #define AREG_PIN_AMP_DATA       7
 // Button to GND, internal pullup
 #define AREG_PIN_BUTTON         0      // BOOT button is fine for bench
+// CAUTION: GPIO0 is a boot-mode strapping pin — held low across a power
+// cycle it blocks boot. Fine for bench; move to a safe pin (21/47) at
+// the next hardware revision.
+
+// --- Optional YES / NO answer buttons (3-button revision) ---
+// GREEN = yes/true, RED = no/false. Uncomment BOTH to compile the
+// answer-button support in (answer_buttons.{h,cpp}); leave commented
+// for the one-button build — everything folds to no-ops.
+// Recommended pins (2026-08-05 pin audit): 21 and 47 — free,
+// non-strapping, PSRAM-safe. Wire: pin → button → GND (internal pullup).
+// #define AREG_PIN_BUTTON_YES  21
+// #define AREG_PIN_BUTTON_NO   47
+
+// Offline quiz (bench flag -DAREG_OFFLINE_QUIZ_BENCH) answer window:
+// how long the toy waits for a GREEN/RED press after a question.
+// #define AREG_QUIZ_ANSWER_WINDOW_MS 10000UL
+
 // Onboard WS2812 RGB LED on S3-DevKitC-1
 #define AREG_PIN_LED            48
 
