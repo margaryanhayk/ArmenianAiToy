@@ -362,9 +362,25 @@ never as code, through a gated pipeline:
 
 ## 2. Game Mode
 
-**Purpose.** Run a short, structured play activity (clap-along, count-to,
-copy-the-sound, color-name, etc.). The child does something physical or
-verbal and Areg reacts.
+**Purpose.** Run a short, structured play activity where every child
+answer is a WORD the child says. The toy is blind and one-buttoned — it
+cannot observe a clap, a touch, or a found object — so the taxonomy is
+restricted to the three verifiable-or-honest types (v6, 2026-08-05):
+
+- `animal_sound` — «Հնչեցրու կատվի ձայնը։» Participation is praised;
+  the imitation itself is never graded (the toy cannot judge a moo).
+- `count_to` — «Հաշվենք մինչև հինգ։ Մեկ, երկու… շարունակիր։»
+- `yes_no_silly` — «Ձուկը թռչու՞մ է։» The child's yes/no is classified
+  deterministically (`WelcomeIntentDetector.DetectYesNo`) and passed to
+  the model, which must react honestly — celebration only when right,
+  a warm correction when wrong, no verdict when unclassifiable.
+
+Physical-action games (clap-along, body-part touch, color-find,
+copy-sound) are **structurally banned** — the prompt forbids asking for
+them and the `GAME_TYPE` whitelist (`ChatService.AllowedGameTypes`)
+rejects them at the storage site. They produced turns where the toy
+congratulated actions nobody observed, or invented facts about the
+child's room.
 
 **Tone.** Clear, direct, a notch more energetic than story mode. Short
 sentences. Brisk rhythm. Instruction first, then reaction. Celebrate
@@ -387,24 +403,48 @@ even shorter (one or two words). No long setup before the activity.
 - "And you are special to me" style language.
 
 **Output structure.**
-Plain Armenian text. No tail block. Short.
+Plain Armenian text, 1–3 short sentences (`game_too_long` retry at
+>200 chars, hard sentence cap 3 at Step 10e-voice). On `new_game` /
+`switch_game` turns the model appends an internal metadata block —
+`---` / `GAME_TYPE:<type>` / `GAME_DIFFICULTY:<1|2|3>` — which is
+parsed by `GameTailBlockParser`, validated against
+`ChatService.AllowedGameTypes` (off-taxonomy types are stripped but
+store no round), difficulty forced to 1 on fresh rounds, and never
+spoken. Continue/stop turns carry no block; leaks are stripped by
+`ResponseCleaner`.
 
 **Transitions.**
 - Game → Story: child asks for a story or game ends naturally.
 - Game → Calm: child shows tiredness or parent calm-down trigger.
 - Game → Curiosity: child asks a real off-topic question.
 
-**Code touch points (future).**
-- New `GameModePromptSection` constant alongside `StoryChoiceInstruction`.
-- `ModeDetector` already detects game intent (added in this batch).
-- `ChatService` would gate prompt section selection on detected mode.
-- `ResponseQualityGate` would skip story-only checks (subject mismatch,
-  CHOICE_A/B requirements) for game responses.
+**Code touch points (live).**
+- `ChatService.GameModeInstruction` — the prompt constant (v6).
+- `ChatService.BuildGameTurnDirective` — per-turn directive: turn kind,
+  round number, difficulty ladder (1→2 at turn 2, 2→3 at turn 5),
+  AVOID list, honest-reaction answer signal.
+- `ChatService.AllowedGameTypes` — the ENFORCED type whitelist.
+- `GameIntentDetector` — Switch/Stop/StartNew/Continue. Normalizes the
+  Armenian intra-word marks ՛ ՜ ՞ («Բա՛վ է» stops); negated switch
+  phrases («չեմ ուզում ուրիշ խաղ») are Stop; «վերջ» is whole-word only;
+  **Stop works with or without an active round** — a stop word never
+  starts a new game.
+- `GameTailBlockParser` — extraction; `GameSessions` — per-conversation
+  round state. The round is cleared when the mode leaves Game for any
+  non-Curiosity mode (a story/riddle detour abandons the round;
+  `RecentGameTypes` survives for variety). The quality-gate retry path
+  re-runs the parser (Game mirror of F-Rid-1) so a `game_too_long`
+  retry cannot orphan the round.
+- Voice path (`AudioChatController`): the parent-flag gate checks the
+  DETECTED mode post-STT — Game off blocks game requests over voice,
+  and Story off does not block them.
 
-**Test implications.**
-- New tests would mirror `StoryIntentTriggerTests` for game triggers.
-- Must verify the tail-block parser and choice-normalizer pipeline are
-  **not** invoked in game mode (no false story memory writes).
+**Tests.**
+- `GameIntentTests`, `GameTailBlockParserTests`, `GamePromptContentTests`
+  (v6 contract incl. removed-type absence + honesty), and
+  `GameLoopIntegrationTests` (loop, retry regression, round clearing,
+  whitelist, forced difficulty, stop-without-round, yes/no answer
+  signal). `AudioChatControllerTests` pin the per-mode voice gate.
 
 ---
 
@@ -611,7 +651,7 @@ These are constant across modes and must never drift:
 |------------------|------------------------|------------------------------------|---------------------------------------|---------------------|
 | Story — Legacy   | `ModeDetector` ✅      | `StoryChoiceInstruction` ✅         | universal + subject_mismatch ✅       | `PendingChoices` ✅ |
 | Story — Library  | wired behind `Story:Engine=library` ✅ (W1–W4: flag+DI 0f0676b, interrupt Q&A 18d0106, start/advance/ending af9d52d, repeat+start-cue polish fd5ed33) | n/a for segments (verbatim); bounded Q&A prompt via `LibraryStoryQuestionPromptBuilder` ✅ | `StoryAnswerFilter` + repair-once + canned fallback + output moderation ✅; Calm reflection-question suppression ⏳ | `LibraryStorySessionTracker` (sessions + recently-ended marker) via `LibraryStoryPlaybackService` ✅ |
-| Game             | `ModeDetector` ✅      | `GameModeInstruction` ✅            | `game_too_long` (>150 chars) ✅       | `ActiveModes` ✅    |
+| Game             | `ModeDetector` ✅      | `GameModeInstruction` ✅            | `game_too_long` (>200 chars) ✅       | `ActiveModes` ✅    |
 | Riddle           | `ModeDetector` ✅      | `RiddleModeInstruction` ✅          | universal ✅                          | `ActiveModes` ✅    |
 | Curiosity Window | `ModeDetector` ✅      | `CuriosityWindowInstruction` ✅     | `curiosity_question` / `too_long` ✅  | one-turn (choices preserved) |
 | Calm / Bedtime   | `ModeDetector` ✅      | `CalmModeInstruction` ✅            | `calm_question` / `exclamation` ✅    | terminal            |
