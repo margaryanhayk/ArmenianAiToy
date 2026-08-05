@@ -1,0 +1,33 @@
+{
+  "_comment": "DRAFTS pending owner listen test. Nothing at runtime reads this file — it is the reviewable source for the /quiz MP3s the offline true/false game plays from SD (esp32 offline_quiz.cpp). The answer is encoded in the RENDERED FILENAME (qNN-y.mp3 / qNN-n.mp3), which is what makes the game genuinely verifiable offline: the toy compares the GREEN/RED button press against the filename, no cloud, no model.",
+  "_toneRules": "Same register as game mode v6 yes_no_silly: singular «դու» child register, exactly ONE question mark per question, no paired «Հա՞, թե՞ ոչ» tag (the question alone invites the answer), nothing scary, no learning-goal lecture tone. Questions must be answerable by a 4-year-old from everyday knowledge — no trick questions, no regional knowledge.",
+  "_balance": "10 yes / 10 no, shuffled so the answers never alternate in a guessable pattern.",
+  "questions": [
+    { "id": "q01", "answer": "no",  "text": "Ձուկը թռչու՞մ է։" },
+    { "id": "q02", "answer": "yes", "text": "Կատուն մլավու՞մ է։" },
+    { "id": "q03", "answer": "no",  "text": "Արջը կարո՞ղ է թռչել։" },
+    { "id": "q04", "answer": "yes", "text": "Ձյունը սա՞ռն է։" },
+    { "id": "q05", "answer": "no",  "text": "Քարը կարելի՞ է ուտել։" },
+    { "id": "q06", "answer": "yes", "text": "Շունը հաչու՞մ է։" },
+    { "id": "q07", "answer": "no",  "text": "Կովը մլավու՞մ է։" },
+    { "id": "q08", "answer": "no",  "text": "Արևը գիշերը փայլու՞մ է։" },
+    { "id": "q09", "answer": "yes", "text": "Գորտը ցատկու՞մ է։" },
+    { "id": "q10", "answer": "no",  "text": "Փիղը փոքրի՞կ է։" },
+    { "id": "q11", "answer": "yes", "text": "Մեղուն մեղր սարքու՞մ է։" },
+    { "id": "q12", "answer": "no",  "text": "Ձմռանը շո՞գ է։" },
+    { "id": "q13", "answer": "yes", "text": "Թռչունները թևեր ունե՞ն։" },
+    { "id": "q14", "answer": "no",  "text": "Կատուն հաչու՞մ է։" },
+    { "id": "q15", "answer": "yes", "text": "Խնձորը ծառի վրա աճու՞մ է։" },
+    { "id": "q16", "answer": "no",  "text": "Նապաստակը դանդա՞ղ է վազում։" },
+    { "id": "q17", "answer": "yes", "text": "Աստղերն երկնքու՞մ են։" },
+    { "id": "q18", "answer": "no",  "text": "Մկնիկը փղից մե՞ծ է։" },
+    { "id": "q19", "answer": "yes", "text": "Անձրևն երկնքի՞ց է գալիս։" },
+    { "id": "q20", "answer": "yes", "text": "Բադիկը լողու՞մ է։" }
+  ],
+  "feedback": [
+    { "id": "win",   "text": "Ապրե՛ս, ճիշտ է։" },
+    { "id": "wrong", "text": "Ոչինչ, փորձի՛ր նորից։" },
+    { "id": "done",  "text": "Լավ խաղացինք։ Մյուս անգամ նորից կխաղանք։" }
+  ],
+  "_renderNote": "Render in the same voice as the welcome-flow clips. Filenames: /quiz/q01-n.mp3 (q01 answer=no), /quiz/q02-y.mp3, … /quiz/win.mp3, /quiz/wrong.mp3, /quiz/done.mp3. Sample ONE question and the three feedback lines for the owner's listen test BEFORE batch-rendering the set."
+}
