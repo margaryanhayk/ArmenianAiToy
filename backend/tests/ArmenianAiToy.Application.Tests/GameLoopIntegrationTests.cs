@@ -76,10 +76,10 @@ public class GameLoopIntegrationTests
     }
 
     private const string GameWithBlock =
-        "\u053e\u0561\u0583 \u057f\u0561\u0576\u0584 \u0574\u056b\u0561\u057d\u056b\u0576\u0589 \u0544\u0565\u056f, \u0565\u0580\u056f\u0578\u0582, \u0565\u0580\u0565\u0584\u0589\n---\nGAME_TYPE:clap_along\nGAME_DIFFICULTY:1";
+        "\u053e\u0561\u0583 \u057f\u0561\u0576\u0584 \u0574\u056b\u0561\u057d\u056b\u0576\u0589 \u0544\u0565\u056f, \u0565\u0580\u056f\u0578\u0582, \u0565\u0580\u0565\u0584\u0589\n---\nGAME_TYPE:animal_sound\nGAME_DIFFICULTY:1";
 
     private const string ColorGameWithBlock =
-        "\u0533\u057f\u056b\u0580 \u0574\u056b \u056f\u0561\u0580\u0574\u056b\u0580 \u0562\u0561\u0576\u0589\n---\nGAME_TYPE:color_find\nGAME_DIFFICULTY:1";
+        "\u0533\u057f\u056b\u0580 \u0574\u056b \u056f\u0561\u0580\u0574\u056b\u0580 \u0562\u0561\u0576\u0589\n---\nGAME_TYPE:count_to\nGAME_DIFFICULTY:1";
 
     [Fact]
     public async Task NewGame_StoresSessionAndStripsBlock()
@@ -94,7 +94,7 @@ public class GameLoopIntegrationTests
         Assert.DoesNotContain("---", result.Response);
         Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
         Assert.NotNull(state!.CurrentRound);
-        Assert.Equal("clap_along", state.CurrentRound!.GameType);
+        Assert.Equal("animal_sound", state.CurrentRound!.GameType);
         Assert.Equal(1, state.CurrentRound.Difficulty);
         Assert.Equal(0, state.CurrentRound.TurnsCompleted);
     }
@@ -127,7 +127,7 @@ public class GameLoopIntegrationTests
 
         await _aiClient.Received().GetCompletionAsync(
             Arg.Is<string>(s => s.Contains("GAME_TURN_KIND: continue")
-                && s.Contains("clap_along")),
+                && s.Contains("animal_sound")),
             Arg.Any<List<(string, string)>>());
 
         Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
@@ -169,15 +169,15 @@ public class GameLoopIntegrationTests
         await _aiClient.Received().GetCompletionAsync(
             Arg.Is<string>(s => s.Contains("GAME_TURN_KIND: switch_game")
                 && s.Contains("AVOID")
-                && s.Contains("clap_along")),
+                && s.Contains("animal_sound")),
             Arg.Any<List<(string, string)>>());
 
         Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
         Assert.NotNull(state!.CurrentRound);
-        Assert.Equal("color_find", state.CurrentRound!.GameType);
-        // Both types are tracked in RecentGameTypes (clap_along, color_find).
-        Assert.Contains("clap_along", state.RecentGameTypes);
-        Assert.Contains("color_find", state.RecentGameTypes);
+        Assert.Equal("count_to", state.CurrentRound!.GameType);
+        // Both types are tracked in RecentGameTypes (animal_sound, count_to).
+        Assert.Contains("animal_sound", state.RecentGameTypes);
+        Assert.Contains("count_to", state.RecentGameTypes);
     }
 
     [Fact]
@@ -259,7 +259,9 @@ public class GameLoopIntegrationTests
     [Fact]
     public async Task ContinueDirective_RotateCelebration()
     {
-        // v3: directive asks the model to rotate the celebration phrase.
+        // v6: the continue directive requires an HONEST reaction; when it
+        // does celebrate, the phrase must rotate (never the one used last
+        // turn).
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns(GameWithBlock);
         await _chatService.GetResponseAsync(_deviceId, "let's play");
@@ -271,7 +273,156 @@ public class GameLoopIntegrationTests
         await _chatService.GetResponseAsync(_deviceId, "ok");
 
         await _aiClient.Received().GetCompletionAsync(
-            Arg.Is<string>(s => s.Contains("Rotate the celebration phrase")),
+            Arg.Is<string>(s => s.Contains("REACT HONESTLY")
+                && s.Contains("rotate the phrase")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task RetryPath_PreservesGameTailBlock_AndStoresRound()
+    {
+        // Regression for the Game mirror of F-Rid-1: the quality-gate
+        // retry path must re-run GameTailBlockParser and update
+        // GameSessions when the retry carries the GAME_TYPE block.
+        // Before the fix, a game_too_long/latin_run retry orphaned the
+        // block — no round was stored, every later turn re-routed to
+        // new_game, and Stop was unreachable.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(
+                // Initial response — trips latin_run (4+ Latin letters),
+                // no usable tail block.
+                "Armenian text here mixed with english prose sentence.",
+                // Retry response — clean opener + proper tail block.
+                GameWithBlock);
+
+        var r = await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        Assert.Equal("game", r.Mode);
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
+        Assert.NotNull(state!.CurrentRound);
+        Assert.Equal("animal_sound", state.CurrentRound!.GameType);
+        // The visible reply must not leak the block.
+        Assert.DoesNotContain("GAME_TYPE", r.Response);
+    }
+
+    [Fact]
+    public async Task OffTaxonomyGameType_IsStrippedButStoresNoRound()
+    {
+        // The whitelist is enforced at the storage site: a model-invented
+        // type is stripped from the visible reply but never becomes a
+        // round (pre-fix it was stored, echoed into later directives, and
+        // written into the AVOID list).
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Խաղանք։\n---\nGAME_TYPE:memory_game\nGAME_DIFFICULTY:2");
+
+        var r = await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        Assert.DoesNotContain("memory_game", r.Response);
+        var has = ChatService.GameSessions.TryGetValue(_conversationId, out var state);
+        Assert.True(!has || state!.CurrentRound is null);
+    }
+
+    [Fact]
+    public async Task ModelChosenDifficulty_IsForcedTo1_OnFreshRound()
+    {
+        // The directive asks for "target: 1"; a model answering
+        // GAME_DIFFICULTY:3 must not pin the child at maximum — the
+        // ladder is ours to grow.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Հնչեցրու կատվի ձայնը։\n---\nGAME_TYPE:animal_sound\nGAME_DIFFICULTY:3");
+
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
+        Assert.Equal(1, state!.CurrentRound!.Difficulty);
+    }
+
+    [Fact]
+    public async Task LeavingGameForStory_ClearsRound_KeepsVarietyMemory()
+    {
+        // H4 regression: a story detour must abandon the in-flight round.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(GameWithBlock);
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var mid));
+        Assert.NotNull(mid!.CurrentRound);
+
+        // Story turn — leaves Game.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Մի անգամ մի նապաստակ կար։");
+        await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var after));
+        Assert.Null(after!.CurrentRound);
+        // Variety memory survives the detour.
+        Assert.Contains("animal_sound", after.RecentGameTypes);
+    }
+
+    [Fact]
+    public async Task LeavingGameForRiddle_ClearsRound_SoNextPlayStartsFresh()
+    {
+        // H4 regression, riddle path: pre-fix the clearing only ran on the
+        // Story/None branch — a riddle detour left the stale round alive,
+        // and a later «խաղանք» was read as CONTINUE of it instead of
+        // starting a new game.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(GameWithBlock);
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        // Riddle turn — leaves Game.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Կռահի՞ր, թե ինչ եմ մտածել։");
+        await _chatService.GetResponseAsync(_deviceId, "give me a riddle");
+
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var after));
+        Assert.Null(after!.CurrentRound);
+
+        // An explicit «խաղանք» now opens a NEW game, not round 2 of the
+        // abandoned one.
+        _aiClient.ClearReceivedCalls();
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(GameWithBlock);
+        await _chatService.GetResponseAsync(_deviceId, "խաղանք");
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("GAME_TURN_KIND: new_game")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task StopWord_WithNoActiveRound_ProducesStopTurn_NotNewGame()
+    {
+        // H1 regression: pre-fix, a stop word with no round fell through
+        // to StartNew — the child said «բավ է» and got a NEW game.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Լա՛վ, լավ խաղ էր։");
+
+        // No round exists; route into Game via an explicit game word plus
+        // the stop phrase (mirror of the real transcript «չեմ ուզում խաղալ»).
+        await _chatService.GetResponseAsync(_deviceId, "չեմ ուզում խաղալ");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("GAME_TURN_KIND: stop_game")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task ContinueDirective_YesNoRound_CarriesAnswerClassification()
+    {
+        // H2: on a yes_no_silly round the directive must carry the
+        // deterministic yes/no classification of the child's answer so
+        // the model can react honestly instead of celebrating blindly.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Ասա՛՝ ձուկը թռչու՞մ է։\n---\nGAME_TYPE:yes_no_silly\nGAME_DIFFICULTY:1");
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        _aiClient.ClearReceivedCalls();
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Հա՛, ճիշտ է՝ չի թռչում։");
+        await _chatService.GetResponseAsync(_deviceId, "ոչ");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("classified as NO")
+                && s.Contains("REACT HONESTLY")),
             Arg.Any<List<(string, string)>>());
     }
 

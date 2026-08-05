@@ -3,8 +3,15 @@ using ArmenianAiToy.Application.Services;
 namespace ArmenianAiToy.Application.Tests;
 
 /// <summary>
-/// Phase B3: presence-based guards on the Game prompt constant.
+/// Presence-based guards on the Game prompt constant.
 /// Reads ChatService.GameModeInstruction directly (internal).
+///
+/// v6 (2026-08-05) — the taxonomy was cut from seven types to the three a
+/// blind, one-button toy can actually run (animal_sound / count_to /
+/// yes_no_silly), the physical-action types were structurally banned, and
+/// an HONESTY block replaced unconditional celebration. Tests that pinned
+/// the removed types, the guessing opener, or the multi-turn-rhythm
+/// disclaimer were retired with the content they pinned.
 /// </summary>
 public class GamePromptContentTests
 {
@@ -20,10 +27,6 @@ public class GamePromptContentTests
     [Fact]
     public void Prompt_EnforcesVarietyViaAvoidList()
     {
-        // v2 — variety is no longer hand-waved as "rotate activity types";
-        // it is enforced deterministically by the AVOID list injected from
-        // GameSessions.RecentGameTypes. The prompt must instruct the model
-        // to honour that list on switch_game / new_game turns.
         Assert.Contains("AVOID", Prompt);
         Assert.Contains("recent ones", Prompt);
     }
@@ -32,8 +35,8 @@ public class GamePromptContentTests
     public void Prompt_ContainsArmenianExemplarTurns()
     {
         Assert.Contains("ARMENIAN EXEMPLAR TURNS", Prompt);
-        Assert.Contains("Ծափ տանք միասին", Prompt);
-        Assert.Contains("Դիպչիր քթիդ", Prompt);
+        Assert.Contains("Հնչեցրու կատվի ձայնը", Prompt);
+        Assert.Contains("Հաշվենք մինչև հինգ", Prompt);
     }
 
     [Fact]
@@ -62,15 +65,14 @@ public class GamePromptContentTests
     public void Prompt_ContainsChildResponseHandling()
     {
         Assert.Contains("CHILD RESPONSE HANDLING", Prompt);
-        Assert.Contains("wrong or partial", Prompt);
-        Assert.Contains("silence or off-topic", Prompt);
+        Assert.Contains("WRONG answer", Prompt);
+        Assert.Contains("cannot judge", Prompt);
     }
 
     [Fact]
     public void Prompt_DiscouragesOpenEndedQuestions()
     {
         Assert.Contains("Do NOT ask open-ended questions", Prompt);
-        Assert.Contains("no open-ended", Prompt);
     }
 
     [Fact]
@@ -86,7 +88,7 @@ public class GamePromptContentTests
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // Game Mode v2 — multi-turn loop directives
+    // Multi-turn loop directives
     // ─────────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -108,22 +110,50 @@ public class GamePromptContentTests
     [Fact]
     public void Prompt_LocksMetadataToNewOrSwitchTurns()
     {
-        // Continue / stop turns must explicitly forbid the tail block.
         Assert.Contains("DO NOT include any tail block", Prompt);
     }
 
     [Fact]
-    public void Prompt_LocksGameTypeWhitelist()
+    public void Prompt_LocksGameTypeWhitelist_ToThePlayableThree()
     {
+        // KEYSTONE (v6): only the three word-answer types remain. The four
+        // physical-action types were cut because the toy cannot observe a
+        // clap, a touch, or a found object — see the structural ban below.
         Assert.Contains("GAME TYPES", Prompt);
         Assert.Contains("animal_sound", Prompt);
-        Assert.Contains("color_find", Prompt);
-        Assert.Contains("clap_along", Prompt);
         Assert.Contains("count_to", Prompt);
-        Assert.Contains("body_part", Prompt);
-        Assert.Contains("copy_sound", Prompt);
         Assert.Contains("yes_no_silly", Prompt);
         Assert.Contains("Use ONLY these game types", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_DoesNotContainRemovedGameTypes()
+    {
+        // KEYSTONE (v6): the removed type tokens must be fully gone — a
+        // leftover mention is a path for the model to resurrect them.
+        Assert.DoesNotContain("color_find", Prompt);
+        Assert.DoesNotContain("clap_along", Prompt);
+        Assert.DoesNotContain("body_part", Prompt);
+        Assert.DoesNotContain("copy_sound", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_MatchesEnforcedWhitelist()
+    {
+        // The prompt's advisory list and the ChatService-enforced whitelist
+        // must not drift apart: every enforced type must be described.
+        foreach (var t in ChatService.AllowedGameTypes)
+        {
+            Assert.Contains(t, Prompt);
+        }
+    }
+
+    [Fact]
+    public void Prompt_BansPhysicalActionGames()
+    {
+        // KEYSTONE (v6): the structural ban — the toy is blind.
+        Assert.Contains("Do NOT ask the child to clap, jump, touch a", Prompt);
+        Assert.Contains("cannot know whether any", Prompt);
     }
 
     [Fact]
@@ -140,18 +170,16 @@ public class GamePromptContentTests
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // Game Mode v3 — variety, magic phrasing, round progression
+    // Variety, magic phrasing, round progression
     // ─────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Prompt_DeclaresPerTypeSubtypes()
     {
-        // Each game type must list a SUBTYPES clause so the model can rotate.
         Assert.Contains("subtypes:", Prompt);
-        // A representative subtype keyword per major type.
         Assert.Contains("farm", Prompt);          // animal_sound
         Assert.Contains("backward", Prompt);      // count_to
-        Assert.Contains("two-step combo", Prompt); // body_part
+        Assert.Contains("absurd swaps", Prompt);  // yes_no_silly
     }
 
     [Fact]
@@ -165,8 +193,8 @@ public class GamePromptContentTests
     public void Prompt_ContainsMagicPhrasingPolicy()
     {
         Assert.Contains("MAGIC PHRASING POLICY", Prompt);
-        Assert.Contains("\u057a\u0578\u0582\u0583-\u057a\u0578\u0582\u0583", Prompt);  // պուփ-պուփ
-        Assert.Contains("\u0532\u0580\u0561\u055b\u057e\u0578", Prompt);                // Բրա՛վո
+        Assert.Contains("պուփ-պուփ", Prompt);
+        Assert.Contains("Բրա՛վո", Prompt);
         Assert.Contains("baby-talk", Prompt);
     }
 
@@ -188,10 +216,20 @@ public class GamePromptContentTests
     }
 
     [Fact]
+    public void Prompt_RoundLadder_MatchesRuntimeHint_SubtypeSwitchAtRound2()
+    {
+        // v6 contradiction fix: the static ladder used to say Round 2 is
+        // "same game type" (no subtype change) while the runtime roundHint
+        // told Round 2 to switch the subtype. The ladder now matches the
+        // runtime: Round 2 switches the subtype.
+        Assert.Contains("Round 2: bump the energy a touch AND switch the SUBTYPE", Prompt);
+    }
+
+    [Fact]
     public void Prompt_ContainsSwitchGameOpenerExemplar()
     {
         Assert.Contains("SWITCH_GAME OPENER", Prompt);
-        Assert.Contains("\u053c\u0561\u057e, \u0576\u0578\u0580 \u056d\u0561\u0572", Prompt); // Լավ, նոր խաղ
+        Assert.Contains("Լավ, նոր խաղ", Prompt);
     }
 
     [Fact]
@@ -207,7 +245,7 @@ public class GamePromptContentTests
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // Game Mode v4 — STRICT NON-NEGOTIABLES + pinned opener patterns
+    // STRICT NON-NEGOTIABLES + pinned opener patterns
     // ─────────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -219,9 +257,6 @@ public class GamePromptContentTests
     [Fact]
     public void Prompt_RequiresExactlyOneChildActionPerTurn()
     {
-        // The weaker "One clear, simple instruction at a time" line was
-        // already present; v4 adds a stronger "EXACTLY ONE" rule that
-        // also forbids stacking "instruction + question" in one reply.
         Assert.Contains("EXACTLY ONE child action per turn", Prompt);
     }
 
@@ -233,6 +268,16 @@ public class GamePromptContentTests
     }
 
     [Fact]
+    public void Prompt_YesNoExemplar_HasSingleQuestionMark()
+    {
+        // v6 contradiction fix: the old yes/no exemplar «Ձուկը թռչու՞մ է։
+        // Հա՞, թե՞ ոչ։» carried three question marks against the
+        // max-one rule, and the model copied it verbatim in benchmark
+        // runs. The paired-tag shape must stay out of the prompt.
+        Assert.DoesNotContain("Հա՞, թե՞ ոչ", Prompt);
+    }
+
+    [Fact]
     public void Prompt_BansEndingTheGameAfterOneExchange()
     {
         Assert.Contains("NEVER end the game after a single exchange", Prompt);
@@ -240,23 +285,10 @@ public class GamePromptContentTests
     }
 
     [Fact]
-    public void Prompt_ContainsPinnedGuessingGameOpener()
-    {
-        // Required natural-Armenian opener pattern — pinned so a future
-        // refactor cannot silently drop the guessing-game exemplar.
-        Assert.Contains("OPENER PATTERNS", Prompt);
-        Assert.Contains("Ես մտածեցի մի բան, կռահի՞ր", Prompt); // Ես մտածեցի մի բան, կռահի՞ր
-    }
-
-    [Fact]
     public void Prompt_DoesNotContainBannedEmptyOpener()
     {
-        // The empty-filler opener «Ինչ ես ուզում անել» must not appear
-        // anywhere in the prompt — neither as an example nor inside the
-        // ban itself (the ban is worded abstractly so the literal phrase
-        // stays absent and this DoesNotContain holds).
         Assert.DoesNotContain(
-            "ինչ ես ուզում անել", // ինչ ես ուզում անել
+            "ինչ ես ուզում անել",
             Prompt,
             StringComparison.OrdinalIgnoreCase);
     }
@@ -264,29 +296,11 @@ public class GamePromptContentTests
     [Fact]
     public void Prompt_DoesNotContainFormalPluralAddress()
     {
-        // The formal-plural Armenian pronouns must not appear anywhere
-        // in the prompt — the ban is worded abstractly ("formal-plural
-        // address forms") so these literals stay out and the model is
-        // not even shown the banned form.
-        Assert.DoesNotContain("դուք", Prompt, StringComparison.OrdinalIgnoreCase);  // դուք / Դուք
-        Assert.DoesNotContain("Ձեզ", Prompt);                                            // Ձեզ
-        Assert.DoesNotContain("Ձեր", Prompt);                                            // Ձեր
-
-        // The replacement guidance — singular «դու» — must be present so
-        // the model has a positive target to swap to.
+        Assert.DoesNotContain("դուք", Prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Ձեզ", Prompt);
+        Assert.DoesNotContain("Ձեր", Prompt);
         Assert.Contains("«դու»", Prompt);
     }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // Game Mode v5 — cold-start mixing-types regression fix (GB05)
-    //
-    // Anchored on the 2026-05-17 live BenchmarkAll regression:
-    //   GameBenchmark GB05 turn 1 (user "play a game") produced
-    //   «Եկեք խաղանք մի փոքրիկ խաղ. դիպչիր քթիդ։ Հիմա՝ ծափ տանք երեք անգամ։»
-    // which stacked body_part + clap_along in one cold-start reply and
-    // opened with the formal-plural «Եկեք». Evidence:
-    //   tools/quality-evidence/areg-live-quality-validation-20260517.md
-    // ─────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Prompt_DeclaresColdStartOneTypeRule()
@@ -297,27 +311,16 @@ public class GamePromptContentTests
     }
 
     [Fact]
-    public void Prompt_PinsGoodColdStartBodyPartExemplar()
+    public void Prompt_PinsGoodColdStartExemplars_SingleActionEach()
     {
-        // The exact GOOD cold-start single-body_part shape the slice
-        // prompt asked for, pinned verbatim.
-        Assert.Contains("«Խաղանք մի փոքր խաղ։ Դիպչիր քթիդ։»", Prompt);
-    }
-
-    [Fact]
-    public void Prompt_BansBodyPartPlusClapAlongCombo()
-    {
-        // The most-common cold-start mixing pair, named explicitly.
-        Assert.Contains("NEVER combine body_part", Prompt);
-        Assert.Contains("clap_along («clap N times»)", Prompt);
+        Assert.Contains("«Խաղանք մի փոքր խաղ։ Հնչեցրու կատվի ձայնը։»", Prompt);
+        Assert.Contains("«Ասա՛՝ ձուկը թռչու՞մ է։»", Prompt);
     }
 
     [Fact]
     public void Prompt_BansPluralImperativeOpeners()
     {
         Assert.Contains("PLURAL-IMPERATIVE OPENERS", Prompt);
-        // Positive replacements — the model needs concrete first-person
-        // plural and direct-singular verb forms to swap to.
         Assert.Contains("«Խաղանք»", Prompt);
         Assert.Contains("«Հաշվենք»", Prompt);
         Assert.Contains("«Հնչեցրու»", Prompt);
@@ -326,31 +329,51 @@ public class GamePromptContentTests
     [Fact]
     public void Prompt_DoesNotContainPluralImperativeLiteralEkek()
     {
-        // The plural-you imperative «Եկեք» is the literal form that
-        // tripped GB05. The ban is worded abstractly so this literal
-        // never appears in the prompt body and the model is not even
-        // shown the banned shape.
-        Assert.DoesNotContain("Եկեք", Prompt);  // Եկեք
+        Assert.DoesNotContain("Եկեք", Prompt);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // v6 — honesty block (the toy is blind; praise must be earned)
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Prompt_DeclaresHonestyAbsolute()
+    {
+        // KEYSTONE (v6): the toy must never claim to observe a physical
+        // action and never celebrate an answer it did not understand.
+        Assert.Contains("HONESTY — ABSOLUTE", Prompt);
+        Assert.Contains("NEVER claim the child did", Prompt);
+        Assert.Contains("NEVER celebrate", Prompt);
     }
 
     [Fact]
-    public void Prompt_DeclaresExamplesShowMultiTurnRhythm()
+    public void Prompt_DoesNotContainRoomFactsCorrection()
     {
-        // Reconciles the OPENER PATTERNS / GAME TYPES Example two-action
-        // shapes with the "EXACTLY ONE child action per turn" rule from
-        // the prior v4 slice. Without this disclaimer the model could
-        // (and did, in GB05) copy the «Հիմա X ... Հիմա Y» template
-        // literally into a single reply.
-        Assert.Contains("EXAMPLES SHOW MULTI-TURN RHYTHM", Prompt);
+        // The old wrong-answer exemplar «Մոտ էր։ Գնդակը կարմիր է։» taught
+        // the model to assert facts about a room it cannot see.
+        Assert.DoesNotContain("Գնդակը կարմիր է", Prompt);
     }
 
     [Fact]
-    public void Prompt_BodyPartOpenerIsNowSingleAction()
+    public void Prompt_AnimalSound_IsParticipationPraiseOnly()
     {
-        // The OPENER PATTERNS body-part opener was a two-action stack
-        // («Դիպչիր քթիդ։ Հիմա՝ ականջիդ։»). Now single-action with an
-        // explicit "rotation comes on the next CONTINUE turn" hint.
-        Assert.Contains("Body-part opener: «Դիպչիր քթիդ։»", Prompt);
-        Assert.Contains("(single action;", Prompt);
+        // The toy cannot judge a moo. Participation is praised; the
+        // imitation is never graded.
+        Assert.Contains("praise the", Prompt);
+        Assert.Contains("PARTICIPATION", Prompt);
+        Assert.Contains("never grade", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_ContainsBadGoodPair_CelebratingWrongAnswer()
+    {
+        Assert.Contains("celebrating a wrong or unjudgeable answer", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_ContainsBadGoodPair_ClaimingToObserve()
+    {
+        Assert.Contains("claiming to observe", Prompt);
+        Assert.Contains("toy sees nothing", Prompt);
     }
 }

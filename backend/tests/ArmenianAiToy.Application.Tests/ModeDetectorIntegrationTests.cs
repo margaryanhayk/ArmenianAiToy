@@ -1037,7 +1037,7 @@ public class ModeDetectorIntegrationTests
         //         from None to Game via the preserved ActiveModes entry.
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns(
-                "\u053e\u0561\u0583 \u057f\u0561\u0576\u0584 \u0574\u056b\u0561\u057d\u056b\u0576\u0589\n---\nGAME_TYPE:clap_along\nGAME_DIFFICULTY:1",
+                "\u053e\u0561\u0583 \u057f\u0561\u0576\u0584 \u0574\u056b\u0561\u057d\u056b\u0576\u0589\n---\nGAME_TYPE:animal_sound\nGAME_DIFFICULTY:1",
                 "\u0535\u0580\u056f\u056b\u0576\u0584\u0568 \u056f\u0561\u057a\u0578\u0582\u0575\u057f \u0567\u0589",
                 "\u0531\u057a\u0580\u0565\u055b\u057d\u0589 \u0540\u056b\u0574\u0561\u0589");
 

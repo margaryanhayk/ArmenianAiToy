@@ -821,90 +821,75 @@ public class ChatService : IChatService
           turn, pick exactly ONE game type and exactly ONE child
           action that demonstrates it. Never stack two game
           types in the same reply. The temptation to "show
-          variety" by combining body_part with clap_along, or
-          count_to with color_find, is the most common cold-start
-          failure mode — variety lives in the SUBTYPE rotation
-          across turns, not in a single first reply.
-          GOOD cold-start (single body_part action):
-            «Խաղանք մի փոքր խաղ։ Դիպչիր քթիդ։»
-          GOOD cold-start (single clap_along action):
-            «Ծափ տանք երեք անգամ։ Մեկ, երկու, երեք։»
-          GOOD cold-start (single guessing-game hint):
-            «Ես մտածեցի մի բան, կռահի՞ր։ Մորթի ունի ու մլավում է։»
-        - NEVER combine body_part («touch your X») with
-          clap_along («clap N times») in the same reply. This is
-          the most common observed cold-start mixing pattern and
-          the rule names it explicitly. The same one-type
-          discipline applies to every other pair (animal_sound
-          + count_to, color_find + body_part, etc.).
+          variety" by combining animal_sound with count_to is
+          the most common cold-start failure mode — variety
+          lives in the SUBTYPE rotation across turns, not in a
+          single first reply.
+          GOOD cold-start (single animal_sound action):
+            «Խաղանք մի փոքր խաղ։ Հնչեցրու կատվի ձայնը։»
+          GOOD cold-start (single count_to action):
+            «Հաշվենք մինչև հինգ։ Մեկ, երկու… շարունակիր։»
+          GOOD cold-start (single yes_no_silly question):
+            «Ասա՛՝ ձուկը թռչու՞մ է։»
         - PLURAL-IMPERATIVE OPENERS — do NOT open a Game turn
           with a plural-you "let's" imperative addressed to a
           group; it lands as formal and breaks the singular
           child register. Open instead with the first-person
-          plural «-ենք» / «-անք» verb form («Խաղանք», «Ծափ տանք»,
-          «Հաշվենք») or a direct singular instruction to the
-          child («Դիպչիր», «Հնչեցրու», «Արի»).
-        - EXAMPLES SHOW MULTI-TURN RHYTHM, NOT A SINGLE REPLY:
-          the «Հիմա X ... Հիմա Y» shape that appears in the
-          OPENER PATTERNS and GAME TYPES Example lines shows
-          the instruction → child reaction → next instruction
-          rhythm ACROSS turns. In any single reply you produce,
-          follow the EXACTLY ONE child action rule — emit only
-          the FIRST half on cold-start; subsequent halves come
-          on their own CONTINUE turns.
+          plural «-ենք» / «-անք» verb form («Խաղանք», «Հաշվենք»)
+          or a direct singular instruction to the child
+          («Հնչեցրու», «Ասա», «Արի»).
+        - HONESTY — ABSOLUTE: the toy has NO eyes and NO way to
+          observe a physical action. NEVER claim the child did
+          or did not do something physical, NEVER state facts
+          about objects in the child's room, and NEVER celebrate
+          an answer you did not understand. The per-turn
+          directive tells you what the child's answer was — react
+          to THAT, honestly. Wrong answer → warmly say the
+          correct one in a few words, never scolding. Unclear
+          answer → no celebration, just lead on.
 
         OPENER PATTERNS — pinned exemplars. Use these patterns (vary
         the specific words) rather than empty "what do you want?"
         filler:
-        - Guessing game opener: «Ես մտածեցի մի բան, կռահի՞ր»
-          (followed by ONE hint, e.g. «չորս ոտք ունի, ճտճտում է»).
-        - Clap-along opener: «Ծափ տանք միասին։ Մեկ, երկու, երեք։»
-        - Find-the-object opener: «Նայիր շուրջդ։ Գտիր մի կարմիր բան։»
-        - Body-part opener: «Դիպչիր քթիդ։»  (single action; the
-          «Հիմա՝ ականջիդ» rotation comes on the next CONTINUE turn
-          after the child touches their nose, not stacked in this
-          reply)
-        - Yes/no silly opener: «Ձուկը թռչու՞մ է։ Հա՞, թե՞ ոչ։»
-        The opener is always an INSTRUCTION the child can act on
-        right now — never a meta-question about what game to play.
+        - Animal-sound opener: «Հնչեցրու կատվի ձայնը։»
+        - Counting opener: «Հաշվենք մինչև հինգ։ Մեկ, երկու… շարունակիր։»
+        - Yes/no silly opener: «Ասա՛՝ ձուկը թռչու՞մ է։»
+        The opener is always something the child can SAY right now —
+        never a meta-question about what game to play.
 
         GAME TYPES — pick ONE per round, age 4–7, no reading required.
-        Each type has SUBTYPES — vary the subtype across rounds so the
-        same game stays fresh:
+        These are the ONLY three types, chosen because every answer is a
+        WORD the child says — the toy has no eyes and no way to observe
+        a physical action, so games about doing (clapping, touching,
+        finding objects) are structurally banned. Each type has SUBTYPES
+        — vary the subtype across rounds so the same game stays fresh:
           - animal_sound   subtypes: farm (cow, sheep, pig), wild (lion, wolf, bear),
                                      forest (owl, frog, bird), water (fish, duck, whale).
-            Example: «Հնչեցրու կատվի ձայնը։ Հիմա՝ շան ձայնը։»
-          - color_find     subtypes: bare color, shape+color, size+color, texture
-                                     («փափուկ», «սառը», «փայլուն»).
-            Example: «Գտիր մի կարմիր բան։ Հիմա՝ կապույտ։»
-          - clap_along     subtypes: tempo (slow→fast), count pattern (1-2-3 / 1-2-3-4-5),
-                                     echo-the-pattern, claps-with-stomps.
-            Example: «Ծափ տանք միասին։ Մեկ, երկու, երեք։»
+            Example: «Հնչեցրու կատվի ձայնը։»
+            HONESTY: you cannot judge the imitation itself — praise the
+            child's PARTICIPATION («Վա՜յ, ինչ ձայն էր»), never grade it
+            as right or wrong.
           - count_to       subtypes: forward (1→5), backward (5→1), with fingers,
-                                     with claps, count things in the room.
+                                     continue-the-count («Մեկ, երկու… շարունակիր»).
             Example: «Հաշվենք մինչև հինգ։ Մեկ, երկու… շարունակիր։»
-          - body_part      subtypes: face parts, hands+feet, two-step combo
-                                     («քիթ, հետո՝ ականջ»), silly motion («ցատկիր»).
-            Example: «Դիպչիր քթիդ։ Հիմա՝ ականջիդ։»
-          - copy_sound     subtypes: animals, vehicles («բիբ-բիբ», «չու-չու»),
-                                     weather («շը-շը» անձրև), kitchen
-                                     («թազ-թազ», «շըշշ»).
-            Example: «Արա այսպես՝ բուուու։ Հիմա՝ սս-սս։»
           - yes_no_silly   subtypes: animal abilities («Ձուկը թռչու՞մ է»),
                                      food properties («Քարը կարո՞ղ ենք ուտել»),
                                      absurd swaps («Կատուն հաչու՞մ է»).
-            Example: «Ձուկը թռչու՞մ է։ Իսկ թռչունը՝ լողու՞մ։»
+            Example: «Ձուկը թռչու՞մ է։»
+            Exactly ONE question per turn — never a paired second
+            question, and never an appended yes-or-no tag question
+            after it (the question alone already invites the answer).
         Use ONLY these game types. Do NOT invent new types or mix two
-        types in one turn.
+        types in one turn. Do NOT ask the child to clap, jump, touch a
+        body part, or find an object — the toy cannot know whether any
+        of that happened.
 
         VARIETY POLICY — STRICT:
         - On a CONTINUE turn, pick a DIFFERENT subtype than the one the
           previous round used. Do NOT repeat the same subtype two rounds
           in a row inside the same game type.
         - Within a subtype, also rotate the specific item (different
-          animal, different color, different number, different body part).
-        - If the directive at the bottom names a round number ≥ 3,
-          definitely switch the subtype this turn.
+          animal, different number, different silly question).
 
         MAGIC PHRASING POLICY — small touches that make the game feel alive:
         - Allow tiny playful sound-words: «պուփ-պուփ», «թազ-թազ»,
@@ -926,15 +911,16 @@ public class ChatService : IChatService
           «Ճի՛շտ էր», «Հա՛, ճիշտ ճանապարհին ես».
         - Pick what fits the moment. Short. One per turn.
 
-        ROUND PROGRESSION — STRICT (the directive at the bottom of this
-        prompt names the round number):
+        ROUND PROGRESSION — STRICT. The directive at the bottom of this
+        prompt names the round number; the number counts the child's
+        answers inside the CURRENT activity (the opener itself is round
+        zero). Follow the directive's per-round hint exactly:
         - Round 1: set a friendly fun pace. Easy and inviting.
-        - Round 2: bump the energy a touch — slightly faster, a touch
-          more playful. Same game type.
-        - Round 3 or 4: switch the SUBTYPE inside this game type. Same
-          type, fresh angle.
+        - Round 2: bump the energy a touch AND switch the SUBTYPE —
+          same game type, fresh angle.
+        - Round 3 or 4: switch the SUBTYPE again.
         - Round 5+: add a tiny silly twist — a goofy sound, a swapped
-          word, a faster tempo, a count-by-twos.
+          word, a count-by-twos.
 
         NEW_GAME / SWITCH_GAME TURN — STRICT FORMAT:
         - 1 to 3 short Armenian sentences. Open with a clear, brisk
@@ -946,17 +932,20 @@ public class ChatService : IChatService
           age 4–7 simple).
         - After the prose, on its own lines, append exactly:
           ---
-          GAME_TYPE:<one of the seven types above>
+          GAME_TYPE:<one of the three types above>
           GAME_DIFFICULTY:<1|2|3>
         - Metadata is internal — never speak it aloud.
 
         CONTINUE TURN — STRICT FORMAT:
         - 1 to 3 short Armenian sentences, NO metadata block.
-        - First a tiny celebration of what the child just did
-          («Ապրե՛ս», «Հա՛, ճիշտ է», «Լավն ես») — exactly one short phrase.
+        - First, the HONEST reaction the directive's answer signal
+          calls for: a short celebration ONLY when the answer was
+          right (or, in animal_sound, when the child participated);
+          a warm few-word correction when it was wrong; no reaction
+          at all when it could not be judged.
         - Then ONE next round inside the SAME activity, slightly
-          varied (different color, different animal, faster tempo,
-          next number, etc.). Stay inside the type the directive names.
+          varied (different animal, next number, a new silly
+          question). Stay inside the type the directive names.
         - DO NOT include any tail block. DO NOT ask if the child wants
           to continue — just go.
 
@@ -972,30 +961,34 @@ public class ChatService : IChatService
           «Հե՜յ, քեզ հետ խաղալը ուրախ էր։ Կտեսնվենք»։
         - DO NOT include any tail block. DO NOT plead for more turns.
 
-        ARMENIAN EXEMPLAR TURNS — imperative, short, no open-ended
-        questions. These show the SHAPE; do NOT reuse them verbatim:
-        - Clap-along:      «Ծափ տանք միասին։ Մեկ, երկու, երեք։ Հիմա՝ ավելի արագ։»
-        - Animal sound:    «Հնչեցրու կատվի ձայնը։ Հիմա՝ շան ձայնը։ Ապրե՛ս։»
-        - Color-name:      «Նայիր շուրջդ։ Գտիր մի կարմիր բան։ Հիմա՝ կապույտ։»
-        - Body-part touch: «Դիպչիր քթիդ։ Հիմա՝ ականջիդ։ Ապրե՛ս։»
-        - Yes/no silly:    «Ձուկը թռչու՞մ է։ Հա՞, թե՞ ոչ։ Ապրե՛ս՝ ոչ։»
+        ARMENIAN EXEMPLAR TURNS — one action each, short. These show
+        the SHAPE; do NOT reuse them verbatim:
+        - Animal sound (opener):    «Հնչեցրու կատվի ձայնը։»
+        - Animal sound (continue):  «Վա՜յ, ինչ ձայն էր։ Հիմա՝ բուի ձայնը։»
+        - Counting (opener):        «Հաշվենք մինչև հինգ։ Մեկ, երկու… շարունակիր։»
+        - Counting (continue):      «Ապրե՛ս։ Հիմա հաշվենք հետ՝ հինգից մեկ։»
+        - Yes/no silly (opener):    «Ասա՛՝ ձուկը թռչու՞մ է։»
+        - Yes/no silly (continue, child was right):
+          «Հա՛, ճիշտ է՝ չի թռչում։ Իսկ կատուն հաչու՞մ է։»
+        - Yes/no silly (continue, child was wrong):
+          «Չէ՛, ձուկը լողում է։ Իսկ կատուն հաչու՞մ է։»
 
         RESPONSE SHAPES — BAD vs GOOD:
-        - BAD (storybook drift): «Պատկերացրու, որ մենք ծափ ենք
-          տալիս մի մեծ նվագախմբում, որտեղ բոլորը խաղում են միասին։»
-          GOOD (instruction-first): «Ծափ տանք երեք անգամ։ Մեկ, երկու, երեք։»
-        - BAD (verbose praise): «Դու այնքան հիանալի ծափ տվեցիր, ես շատ
+        - BAD (storybook drift): «Պատկերացրու, որ մենք երգում ենք
+          մի մեծ նվագախմբում, որտեղ բոլորը խաղում են միասին։»
+          GOOD (instruction-first): «Հնչեցրու կատվի ձայնը։»
+        - BAD (verbose praise): «Դու այնքան հիանալի պատասխանեցիր, ես շատ
           ուրախ եմ քեզ հետ խաղալ և միշտ կլինեմ քեզ հետ։»
-          GOOD (brisk celebration): «Ապրե՛ս։ Հիմա՝ ականջիդ դիպչիր։»
-        - BAD (lecture / learning-goal tone): «Հիմա սովորենք գույները։
-          Կարմիրը կարևոր գույն է, որովհետև...»
-          GOOD (playful, imperative): «Գտիր մի կարմիր բան։ Հիմա՝ կապույտ։»
+          GOOD (brisk celebration): «Ապրե՛ս։ Հիմա՝ բուի ձայնը։»
+        - BAD (lecture / learning-goal tone): «Հիմա սովորենք թվերը։
+          Հաշվելը կարևոր է, որովհետև...»
+          GOOD (playful, imperative): «Հաշվենք մինչև հինգ։ Մեկ, երկու…»
         - BAD (asking permission to continue): «Ուզու՞մ ես շարունակել։
           Թե՞ ուրիշ բան անենք։»
-          GOOD (just go): «Ապրե՛ս։ Հիմա՝ կանաչ բան գտիր։»
-        - BAD (mixing two types): «Ծափ տանք միասին։ Իսկ կատվի ձայնը
-          գիտե՞ս։ Հիմա՝ կարմիր գույն գտիր։»
-          GOOD (one type per turn): «Ծափ տանք միասին։ Մեկ, երկու, երեք։»
+          GOOD (just go): «Ապրե՛ս։ Հիմա հաշվենք մինչև տասը։»
+        - BAD (mixing two types): «Հնչեցրու կատվի ձայնը։ Իսկ հիմա
+          հաշվիր մինչև երեք։»
+          GOOD (one type per turn): «Հնչեցրու կատվի ձայնը։»
         - BAD (same subtype back-to-back): «Հնչեցրու կատվի ձայնը։»
           (turn 1) → «Հնչեցրու շան ձայնը։» (turn 2 — both farm-pet
           subtype, no rotation)
@@ -1004,15 +997,22 @@ public class ChatService : IChatService
         - BAD (mechanical praise repeat): «Ապրե՛ս։» (turn 1) →
           «Ապրե՛ս։» (turn 2) → «Ապրե՛ս։» (turn 3) — same word three times.
           GOOD (rotated): «Ապրե՛ս։» → «Բրա՛վո։» → «Հե՛յ, դու կարող ես։»
+        - BAD (celebrating a wrong or unjudgeable answer): the child
+          answered «չգիտեմ» and the reply opens «Ապրե՛ս»։
+          GOOD (honest, warm): «Ձուկը լողում է։ Իսկ կատուն հաչու՞մ է։»
+        - BAD (claiming to observe): «Տեսա, թե ինչ լավ արեցիր» — the
+          toy sees nothing; never say this shape.
 
         CHILD RESPONSE HANDLING (inside CONTINUE turn):
-        - On correct or participating: one short celebration
-          («Ապրե՛ս», «Հա՛, ճիշտ է», «Լավն ես»), then next round.
-        - On wrong or partial: one short, playful redirect — no
-          correction speech. Example: «Մոտ էր։ Գնդակը կարմիր է։
-          Հիմա՝ խնձորը գտիր։»
-        - On silence or off-topic: re-issue the SAME instruction once
-          in a simpler form. Do NOT re-explain, do NOT lecture.
+        - On a RIGHT answer (per the directive's answer signal): one
+          short celebration («Ապրե՛ս», «Հա՛, ճիշտ է»), then next round.
+        - In animal_sound, ANY reply is participation: a warm word for
+          joining in, never a verdict on the imitation.
+        - On a WRONG answer: warmly say the correct answer in a few
+          words — no lecture, no «ճիշտ չէ» coldness — then next round.
+        - On an answer you cannot judge: NO celebration, no verdict.
+          Re-issue the SAME question once in a simpler form, or move
+          to the next round. Do NOT re-explain, do NOT lecture.
 
         ARMENIAN LANGUAGE — STRICT:
         Use natural, spoken Eastern Armenian a child hears at home.
@@ -1788,6 +1788,27 @@ public class ChatService : IChatService
             ActiveModes.TryRemove(conversation.Id, out _);
         }
 
+        // Leaving Game for ANY non-Curiosity mode (Story, Riddle, Calm,
+        // None) abandons the in-flight round. Without this, a child who
+        // left a game for a story or riddle and later said «խաղանք» was
+        // read as CONTINUE of the stale round ("here's round 4 of
+        // animal_sound") instead of starting fresh — an explicit "let's
+        // play" could never open a new game while any stale round
+        // existed. RecentGameTypes is kept so the AVOID variety list
+        // still works across the detour. (Curiosity is a one-turn
+        // overlay and deliberately preserves the round — same contract
+        // as ActiveModes above.)
+        if (detectedMode is not DetectedMode.Game and not DetectedMode.Curiosity
+            && GameSessions.TryGetValue(conversation.Id, out var staleGame)
+            && staleGame.CurrentRound is not null)
+        {
+            GameSessions[conversation.Id] = staleGame with
+            {
+                CurrentRound = null,
+                UpdatedAt = DateTime.UtcNow,
+            };
+        }
+
         bool isStoryMode = detectedMode == DetectedMode.Story;
         if (isStoryMode)
         {
@@ -1962,9 +1983,11 @@ public class ChatService : IChatService
                 aiResponse, out var gameStripped, out var gType, out var gDifficulty))
         {
             aiResponse = gameStripped;
-            if (detectedMode == DetectedMode.Game && safetyFlag != SafetyFlag.Flagged)
+            if (detectedMode == DetectedMode.Game && safetyFlag != SafetyFlag.Flagged
+                && IsAllowedGameType(gType!))
             {
-                var newGameRound = new GameRound(gType!, gDifficulty, TurnsCompleted: 0);
+                var newGameRound = new GameRound(
+                    gType!, NormalizeNewRoundDifficulty(gDifficulty), TurnsCompleted: 0);
                 GameSessions.AddOrUpdate(
                     conversation.Id,
                     _ => new GameSessionState(
@@ -2211,6 +2234,47 @@ public class ChatService : IChatService
                                 _logger.LogInformation(
                                     "Riddle round stored on retry. ConversationId: {ConversationId}, Answer: {Answer}, Category: {Category}, Difficulty: {Difficulty}",
                                     conversation.Id, rrAnswer, rrCategory, rrDifficulty);
+                            }
+                        }
+
+                        // Game mirror of the F-Rid-1 fix above. Game is the
+                        // mode MOST likely to enter this retry branch — the
+                        // game_too_long quality trigger is Game-specific —
+                        // and without this block the retry's GAME_TYPE tail
+                        // was never parsed, so GameSessions got no
+                        // CurrentRound. From then on every turn re-routed to
+                        // new_game (a fresh game per turn, forever), and Stop
+                        // was unreachable until the GameIntent stop fix.
+                        // Mirrors the initial extraction at Step 10a-tris.
+                        if (GameTailBlockParser.TryExtract(
+                                retryResp, out var rGameStripped, out var rgType, out var rgDifficulty))
+                        {
+                            retryResp = rGameStripped;
+                            if (detectedMode == DetectedMode.Game
+                                && IsAllowedGameType(rgType!))
+                            {
+                                var retryGameRound = new GameRound(
+                                    rgType!, NormalizeNewRoundDifficulty(rgDifficulty), TurnsCompleted: 0);
+                                GameSessions.AddOrUpdate(
+                                    conversation.Id,
+                                    _ => new GameSessionState(
+                                        retryGameRound, new List<string> { rgType! }, DateTime.UtcNow),
+                                    (_, existing) =>
+                                    {
+                                        var recent = new List<string>(existing.RecentGameTypes);
+                                        if (!recent.Contains(rgType!, StringComparer.OrdinalIgnoreCase))
+                                            recent.Add(rgType!);
+                                        while (recent.Count > 3) recent.RemoveAt(0);
+                                        return existing with
+                                        {
+                                            CurrentRound = retryGameRound,
+                                            RecentGameTypes = recent,
+                                            UpdatedAt = DateTime.UtcNow,
+                                        };
+                                    });
+                                _logger.LogInformation(
+                                    "Game round stored on retry. ConversationId: {ConversationId}, Type: {Type}, Difficulty: {Difficulty}",
+                                    conversation.Id, rgType, rgDifficulty);
                             }
                         }
 
@@ -2556,6 +2620,31 @@ public class ChatService : IChatService
     }
 
     /// <summary>
+    /// The closed game-type taxonomy. This is the ENFORCED whitelist — the
+    /// prompt describes the same set, but the prompt is advisory and the
+    /// model has emitted off-taxonomy types. A block whose type is not in
+    /// this set is stripped from the visible reply but stores no round.
+    /// Keep in step with the GAME TYPES section of GameModeInstruction.
+    /// </summary>
+    internal static readonly string[] AllowedGameTypes =
+    [
+        "animal_sound", "count_to", "yes_no_silly",
+    ];
+
+    private static bool IsAllowedGameType(string gameType) =>
+        AllowedGameTypes.Contains(gameType, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A fresh round always starts at difficulty 1, whatever number the
+    /// model wrote in the tail block. The directive asks for "target: 1";
+    /// pre-fix, a model answering GAME_DIFFICULTY:3 pinned the child at
+    /// maximum difficulty for the whole activity, because the ladder grows
+    /// FROM the stored value. Difficulty is ours to ladder, not the
+    /// model's to choose.
+    /// </summary>
+    private static int NormalizeNewRoundDifficulty(int modelDifficulty) => 1;
+
+    /// <summary>
     /// Builds the per-turn Game Mode v2 directive injected at the end of the
     /// system prompt. Mirrors BuildRiddleTurnDirective: inspects the current
     /// game session and the child's message to decide which of the four
@@ -2571,16 +2660,23 @@ public class ChatService : IChatService
 
         var intent = GameIntentDetector.Detect(userMessage, hasActiveRound: current is not null);
 
-        if (intent == GameIntent.Stop && current is not null)
+        if (intent == GameIntent.Stop)
         {
-            GameSessions[conversationId] = state! with
+            // Stop is honored with or without an active round. Pre-fix, a
+            // stop word with no round fell through to StartNew — a child
+            // saying «բավ է» got a NEW game started at them. The warm
+            // goodbye is always the right reply to "enough".
+            if (hasSession && current is not null)
             {
-                CurrentRound = null,
-                UpdatedAt = DateTime.UtcNow,
-            };
+                GameSessions[conversationId] = state! with
+                {
+                    CurrentRound = null,
+                    UpdatedAt = DateTime.UtcNow,
+                };
+            }
             _logger.LogInformation(
                 "Game stop. ConversationId: {ConversationId}, Type: {Type}",
-                conversationId, current.GameType);
+                conversationId, current?.GameType ?? "(no active round)");
             return "\n\nGAME_TURN_KIND: stop_game\nThe child wants to stop playing. Produce the STOP_GAME TURN exactly as specified above.";
         }
 
@@ -2635,7 +2731,30 @@ public class ChatService : IChatService
             _logger.LogInformation(
                 "Game continue. ConversationId: {ConversationId}, Type: {Type}, Turns: {Turns}, Difficulty: {Diff}",
                 conversationId, bumped.GameType, newTurns, newDifficulty);
-            return $"\n\nGAME_TURN_KIND: continue\nThe child responded inside the active activity «{bumped.GameType}». This is round {newTurns} of this activity. Difficulty target: {newDifficulty}. {roundHint} Rotate the celebration phrase — do not reuse the one you used last turn. Produce the CONTINUE TURN exactly as specified above — brief celebration, then ONE next round inside the SAME game type «{bumped.GameType}». Do NOT include any tail block.";
+
+            // Honest-reaction directive. The pre-fix text hardcoded "brief
+            // celebration", which praised «ես չգիտեմ», noise, and plainly
+            // wrong answers alike. The model knows the correct answer to
+            // the question IT asked — tell it what the child said (for
+            // yes/no rounds, deterministically classified) and require an
+            // honest reaction instead of unconditional praise.
+            string answerSignal;
+            if (string.Equals(bumped.GameType, "yes_no_silly", StringComparison.OrdinalIgnoreCase))
+            {
+                var yn = WelcomeIntentDetector.DetectYesNo(userMessage);
+                answerSignal = yn switch
+                {
+                    YesNo.Yes => "The child's answer was classified as YES.",
+                    YesNo.No => "The child's answer was classified as NO.",
+                    _ => "The child's answer could not be classified as yes or no.",
+                };
+            }
+            else
+            {
+                answerSignal = "The child's reply is quoted in the conversation history.";
+            }
+
+            return $"\n\nGAME_TURN_KIND: continue\nThe child responded inside the active activity «{bumped.GameType}». {answerSignal} This is round {newTurns} of this activity. Difficulty target: {newDifficulty}. {roundHint} REACT HONESTLY: you know the correct answer to the question YOU asked — if the child's answer matches it, celebrate briefly (rotate the phrase, never the one you used last turn); if it is wrong, warmly say the correct answer in a few words, never scolding; if you cannot judge it, skip the celebration entirely and simply lead into the next round. NEVER celebrate an answer you did not understand, and NEVER claim the child did or did not perform a physical action — you cannot see or hear actions. Produce the CONTINUE TURN exactly as specified above — then ONE next round inside the SAME game type «{bumped.GameType}». Do NOT include any tail block.";
         }
 
         // Default: StartNew (or Continue fell through with no current round).
