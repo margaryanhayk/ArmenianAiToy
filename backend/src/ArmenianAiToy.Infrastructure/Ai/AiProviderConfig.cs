@@ -40,9 +40,14 @@ namespace ArmenianAiToy.Infrastructure.Ai;
 public static class AiProviderConfig
 {
     public const string OpenAI = "openai";
+    public const string ElevenLabs = "elevenlabs";
 
-    /// <summary>Every provider name with a real adapter behind it.</summary>
+    /// <summary>Providers valid for every capability key by default.</summary>
     public static readonly string[] Supported = [OpenAI];
+
+    /// <summary>TTS additionally supports ElevenLabs (the eleven_v3 clone
+    /// adapter, 2026-08-05 — the only capability with a second plug so far).</summary>
+    public static readonly string[] SupportedForTts = [OpenAI, ElevenLabs];
 
     public const string ChatKey = "AI:ChatProvider";
     public const string TranscriptionKey = "AI:TranscriptionProvider";
@@ -55,19 +60,27 @@ public static class AiProviderConfig
     /// anything else → throws with the offending key and value named.
     /// </summary>
     public static string Resolve(IConfiguration config, string key)
+        => Resolve(config, key, Supported);
+
+    /// <summary>
+    /// Per-capability overload: a provider name is only valid for a key
+    /// whose registration switch actually has a case for it — otherwise
+    /// the boot would "succeed" with a missing service and die later.
+    /// </summary>
+    public static string Resolve(IConfiguration config, string key, string[] supported)
     {
         var raw = config[key];
         if (string.IsNullOrWhiteSpace(raw)) return OpenAI;
 
         var value = raw.Trim().ToLowerInvariant();
-        foreach (var known in Supported)
+        foreach (var known in supported)
         {
             if (value == known) return known;
         }
 
         throw new InvalidOperationException(
-            $"{key} is '{raw}', which is not a supported AI provider. " +
-            $"Supported: {string.Join(", ", Supported)}. Adding a provider " +
-            "means writing its adapter first — see CLAUDE.md § AI provider seam.");
+            $"{key} is '{raw}', which is not a supported AI provider for this " +
+            $"capability. Supported: {string.Join(", ", supported)}. Adding a " +
+            "provider means writing its adapter first — see CLAUDE.md § AI provider seam.");
     }
 }

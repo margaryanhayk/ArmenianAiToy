@@ -49,7 +49,8 @@ public static class DependencyInjection
         // case in the switches below AFTER its adapter exists.
         var chatProvider = AiProviderConfig.Resolve(config, AiProviderConfig.ChatKey);
         var sttProvider = AiProviderConfig.Resolve(config, AiProviderConfig.TranscriptionKey);
-        var ttsProvider = AiProviderConfig.Resolve(config, AiProviderConfig.TtsKey);
+        var ttsProvider = AiProviderConfig.Resolve(
+            config, AiProviderConfig.TtsKey, AiProviderConfig.SupportedForTts);
         var moderationProvider = AiProviderConfig.Resolve(config, AiProviderConfig.ModerationKey);
 
         // OpenAI
@@ -123,6 +124,31 @@ public static class DependencyInjection
                         sp.GetRequiredService<ILogger<OpenAITtsSynthesisService>>(),
                         ttsVoice));
                 break;
+
+            case AiProviderConfig.ElevenLabs:
+            {
+                // The clone speaks live (owner decision 2026-08-05).
+                // Key/voice accept the app-style names first, then the env
+                // names the render tool already uses — same forgiving
+                // resolution as the Resend notifier, but the key and voice
+                // are HARD-REQUIRED: TTS is the toy's mouth, and a silent
+                // fallback would ship the wrong voice to a child.
+                var elApiKey = config["ElevenLabs:ApiKey"]
+                    ?? config["ELEVENLABS_API_KEY"]
+                    ?? throw new InvalidOperationException(
+                        "AI:TtsProvider is 'elevenlabs' but ElevenLabs:ApiKey / ELEVENLABS_API_KEY is not set.");
+                var elVoiceId = config["ElevenLabs:VoiceId"]
+                    ?? config["ELEVENLABS_VOICE_ID"]
+                    ?? throw new InvalidOperationException(
+                        "AI:TtsProvider is 'elevenlabs' but ElevenLabs:VoiceId / ELEVENLABS_VOICE_ID is not set.");
+                var elModelId = config["ElevenLabs:ModelId"] ?? "eleven_v3";
+                services.AddSingleton<IAudioSynthesisService>(sp =>
+                    new ElevenLabsTtsSynthesisService(
+                        openAiHttpClient, // reuse the warm pooled client — different host, same pool
+                        elApiKey, elVoiceId, elModelId,
+                        sp.GetRequiredService<ILogger<ElevenLabsTtsSynthesisService>>()));
+                break;
+            }
         }
         services.AddSingleton<IAudioBlobStore, LocalDiskAudioBlobStore>();
         // Slice F — custom-story-request photo storage (owner queue).
