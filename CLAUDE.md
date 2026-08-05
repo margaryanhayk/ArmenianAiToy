@@ -44,7 +44,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2350 tests)
+dotnet test                                     # Run all tests (2358 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2344,6 +2344,31 @@ pattern would otherwise poison half the set.
 entries. Until those exist the manifest carries no voice clips, the toy finds
 none on its card, and the flow degrades to exactly the pre-welcome behaviour —
 so every slice above is safe to deploy on its own.
+
+## AI provider seam (`AI:*Provider`, owner request 2026-08-05)
+
+Which vendor serves each AI capability is CONFIG, not code —
+`AiProviderConfig.Resolve` (`Infrastructure/Ai/`) reads four independent
+keys, all shipped `"openai"`: `AI:ChatProvider`, `AI:TranscriptionProvider`,
+`AI:TtsProvider`, `AI:ModerationProvider`. Bounded value space (today
+exactly `openai`); missing/empty → openai; an unknown value **throws at
+startup** — a typo must never silently fall back (same contract as
+`Notifications:Transport`). `AddInfrastructure` resolves all four up
+front and switches each interface registration (`IAiChatClient`,
+`IAudioTranscriptionService`, `IAudioSynthesisService`,
+`IModerationService`) on its provider. Model names WITHIN a provider are
+that provider's own keys (`OpenAI:ChatModel` gpt-4o /
+`:TranscriptionModel` whisper-1 / `:TtsModel` tts-1 / `:ModerationModel`
+omni-moderation-latest / `:TtsVoice` — all pre-existing, all
+env-var-flippable in prod). Adding a provider (e.g. Gemini) = write its
+adapter, add its name to `AiProviderConfig.Supported`, add a case to the
+relevant switch — the resolver refuses names with no adapter behind them.
+Invariants: moderation stays FAIL-CLOSED whatever vendor serves it
+(recommendation on record: keep moderation on OpenAI even when chat
+moves); capabilities switch independently (mixed-vendor configs are
+supported); **no provider/model flip reaches children without a
+benchmark run + the owner's Armenian listen test.** Pinned by
+`AiProviderConfigTests`.
 
 ## The voice Areg speaks in (`OpenAI:TtsVoice`)
 

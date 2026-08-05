@@ -9,6 +9,7 @@ using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Notifications;
 using ArmenianAiToy.Application.Services;
 using ArmenianAiToy.Application.Stories;
+using ArmenianAiToy.Infrastructure.Ai;
 using ArmenianAiToy.Infrastructure.Audio;
 using ArmenianAiToy.Infrastructure.Auth;
 using ArmenianAiToy.Infrastructure.Background;
@@ -40,6 +41,16 @@ public static class DependencyInjection
             options.UseSqlite(connectionString)
                    .AddInterceptors(new SqlitePragmaInterceptor()));
         services.AddScoped<DbContext>(sp => sp.GetRequiredService<AppDbContext>());
+
+        // AI provider seam (owner request 2026-08-05): which vendor serves
+        // each capability is config. All four resolve UP FRONT so a typo in
+        // any of them fails the boot loudly, not lazily. Today the bounded
+        // value space is exactly {openai}; a second provider lands as a new
+        // case in the switches below AFTER its adapter exists.
+        var chatProvider = AiProviderConfig.Resolve(config, AiProviderConfig.ChatKey);
+        var sttProvider = AiProviderConfig.Resolve(config, AiProviderConfig.TranscriptionKey);
+        var ttsProvider = AiProviderConfig.Resolve(config, AiProviderConfig.TtsKey);
+        var moderationProvider = AiProviderConfig.Resolve(config, AiProviderConfig.ModerationKey);
 
         // OpenAI
         var apiKey = config["OpenAI:ApiKey"]
@@ -90,19 +101,29 @@ public static class DependencyInjection
         // path (C1 voice + Q&A with no override) still uses whisperClient,
         // so shipped behavior is unchanged. See the StoryQa:TranscriptionModel
         // seam below.
-        services.AddSingleton<IAudioTranscriptionService>(sp =>
-            new OpenAIWhisperTranscriptionService(
-                whisperClient, openAiClient, whisperModel,
-                sp.GetRequiredService<ILogger<OpenAIWhisperTranscriptionService>>()));
+        switch (sttProvider)
+        {
+            case AiProviderConfig.OpenAI:
+                services.AddSingleton<IAudioTranscriptionService>(sp =>
+                    new OpenAIWhisperTranscriptionService(
+                        whisperClient, openAiClient, whisperModel,
+                        sp.GetRequiredService<ILogger<OpenAIWhisperTranscriptionService>>()));
+                break;
+        }
         // The speaking voice is config, not a literal — comparing voices for
         // the Armenian listen test must not require a code change. Unset →
         // "nova", exactly what shipped before the key existed.
         var ttsVoice = config["OpenAI:TtsVoice"];
-        services.AddSingleton<IAudioSynthesisService>(sp =>
-            new OpenAITtsSynthesisService(
-                ttsClient,
-                sp.GetRequiredService<ILogger<OpenAITtsSynthesisService>>(),
-                ttsVoice));
+        switch (ttsProvider)
+        {
+            case AiProviderConfig.OpenAI:
+                services.AddSingleton<IAudioSynthesisService>(sp =>
+                    new OpenAITtsSynthesisService(
+                        ttsClient,
+                        sp.GetRequiredService<ILogger<OpenAITtsSynthesisService>>(),
+                        ttsVoice));
+                break;
+        }
         services.AddSingleton<IAudioBlobStore, LocalDiskAudioBlobStore>();
         // Slice F — custom-story-request photo storage (owner queue).
         services.AddSingleton<IStoryRequestPhotoStore,
@@ -121,9 +142,26 @@ public static class DependencyInjection
         // OpenAI reliability for the rationale.
         services.AddSingleton<OpenAIReliabilityGate>();
 
-        // Adapters
-        services.AddScoped<IAiChatClient, OpenAIChatClientAdapter>();
-        services.AddScoped<IModerationService, OpenAIModerationAdapter>();
+        // Adapters — the interface each capability's provider switch
+        // governs. The OpenAI client singletons above stay registered
+        // unconditionally (cheap, and other OpenAI-served capabilities
+        // may still need them under a mixed-provider config).
+        switch (chatProvider)
+        {
+            case AiProviderConfig.OpenAI:
+                services.AddScoped<IAiChatClient, OpenAIChatClientAdapter>();
+                break;
+        }
+        // Recommendation (recorded, not enforced): keep moderation on
+        // OpenAI even when chat moves elsewhere — cross-vendor
+        // chat-vs-safety is a supported combination, and the fail-closed
+        // contract binds whichever vendor serves it.
+        switch (moderationProvider)
+        {
+            case AiProviderConfig.OpenAI:
+                services.AddScoped<IModerationService, OpenAIModerationAdapter>();
+                break;
+        }
 
         // Library Story engine (W1 — session lifecycle only, NOT wired
         // into live chat turns; ChatService routing is the separate,
