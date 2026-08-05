@@ -134,15 +134,15 @@ public static class DependencyInjection
                 // resolution as the Resend notifier, but the key and voice
                 // are HARD-REQUIRED: TTS is the toy's mouth, and a silent
                 // fallback would ship the wrong voice to a child.
-                var elApiKey = config["ElevenLabs:ApiKey"]
-                    ?? config["ELEVENLABS_API_KEY"]
+                // FirstNonEmpty, not ?? — same empty-string-in-appsettings
+                // trap as the Gemini key below.
+                var elApiKey = FirstNonEmpty(config["ElevenLabs:ApiKey"], config["ELEVENLABS_API_KEY"])
                     ?? throw new InvalidOperationException(
                         "AI:TtsProvider is 'elevenlabs' but ElevenLabs:ApiKey / ELEVENLABS_API_KEY is not set.");
-                var elVoiceId = config["ElevenLabs:VoiceId"]
-                    ?? config["ELEVENLABS_VOICE_ID"]
+                var elVoiceId = FirstNonEmpty(config["ElevenLabs:VoiceId"], config["ELEVENLABS_VOICE_ID"])
                     ?? throw new InvalidOperationException(
                         "AI:TtsProvider is 'elevenlabs' but ElevenLabs:VoiceId / ELEVENLABS_VOICE_ID is not set.");
-                var elModelId = config["ElevenLabs:ModelId"] ?? "eleven_v3";
+                var elModelId = FirstNonEmpty(config["ElevenLabs:ModelId"]) ?? "eleven_v3";
                 services.AddSingleton<IAudioSynthesisService>(sp =>
                     new ElevenLabsTtsSynthesisService(
                         openAiHttpClient, // reuse the warm pooled client — different host, same pool
@@ -185,11 +185,14 @@ public static class DependencyInjection
                 // (chat is the toy's brain; no silent fallback); accepts
                 // the app-style name first, then the GEMINI_API_KEY env
                 // name. Model defaults to the exact bake-off winner.
-                var gmKey = config["Gemini:ApiKey"]
-                    ?? config["GEMINI_API_KEY"]
+                // FirstNonEmpty, not ?? — appsettings ships the key as ""
+                // and an empty string is not null, so a bare ?? chain never
+                // reached the env fallback and the adapter got an empty key
+                // (Gemini answered 403 to every call; found in Gate 2).
+                var gmKey = FirstNonEmpty(config["Gemini:ApiKey"], config["GEMINI_API_KEY"])
                     ?? throw new InvalidOperationException(
                         "AI:ChatProvider is 'gemini' but Gemini:ApiKey / GEMINI_API_KEY is not set.");
-                var gmModel = config["Gemini:Model"] ?? "gemini-3-flash-preview";
+                var gmModel = FirstNonEmpty(config["Gemini:Model"]) ?? "gemini-3-flash-preview";
                 services.AddScoped<IAiChatClient>(sp =>
                     new GeminiChatClientAdapter(
                         openAiHttpClient, // warm pooled client, host-agnostic
@@ -418,5 +421,21 @@ public static class DependencyInjection
         services.AddHostedService<RetentionPurgeService>();
 
         return services;
+    }
+
+    /// <summary>
+    /// First value that is non-null and non-whitespace, else null.
+    /// Provider config keys ship as "" in appsettings, and an empty
+    /// string is not null — a bare ?? chain silently stops at the empty
+    /// value instead of reaching the env-var fallback (the Gate-2
+    /// Gemini-403 bug). Same contract ResendNotifier's resolvers use.
+    /// </summary>
+    private static string? FirstNonEmpty(params string?[] values)
+    {
+        foreach (var v in values)
+        {
+            if (!string.IsNullOrWhiteSpace(v)) return v;
+        }
+        return null;
     }
 }
