@@ -12,7 +12,18 @@ using System.Text.RegularExpressions;
 // empty for every scenario. This is what the generic ModeBenchmark cannot
 // do, and is the whole point of splitting Game out into its own tool.
 bool writeBaseline = args.Any(a => a == "--write-baseline");
-var positional = args.Where(a => !a.StartsWith("--")).ToArray();
+// Current source gates device registration behind Devices:ProvisioningSecret
+// (fail-closed). Pass it via --provisioning-secret <value> or the
+// AREG_PROVISIONING_SECRET env var; omit only against a Development server
+// with AllowOpenRegistration.
+string? provisioningSecret = Environment.GetEnvironmentVariable("AREG_PROVISIONING_SECRET");
+for (int argI = 0; argI < args.Length - 1; argI++)
+{
+    if (args[argI] == "--provisioning-secret") provisioningSecret = args[argI + 1];
+}
+var positional = args
+    .Where((a, i) => !a.StartsWith("--") && (i == 0 || args[i - 1] != "--provisioning-secret"))
+    .ToArray();
 var baseUrl = positional.Length > 0 ? positional[0] : "http://localhost:5000";
 var promptsPath = Path.Combine(AppContext.BaseDirectory, "prompts.json");
 var baselinePath = Path.Combine(AppContext.BaseDirectory, "baseline.json");
@@ -103,6 +114,34 @@ int continueVarietyLow = 0;
 int celebrationRepeat = 0;
 int askingPermission = 0;
 int mixingTypes = 0;
+int celebratedWrong = 0;
+
+// Parent + claim setup. Current source also gates chat behind a linked
+// parent (unclaimed-device gate), so every bench device must be CLAIMED.
+// ONE parent claims all of them: the auth endpoints share a 10/60s per-IP
+// rate bucket, and one register+login plus N claims stays inside it where
+// a parent-per-scenario would not.
+string? parentJwt = null;
+{
+    using var setupHttp = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(30) };
+    var email = $"gbench-{Guid.NewGuid():N}@example.invalid";
+    const string password = "gbench-Passw0rd!";
+    try
+    {
+        var reg = await setupHttp.PostAsJsonAsync("/api/parents/register",
+            new { email, password, acceptedTerms = true });
+        reg.EnsureSuccessStatusCode();
+        var login = await setupHttp.PostAsJsonAsync("/api/parents/login", new { email, password });
+        login.EnsureSuccessStatusCode();
+        var loginBody = await login.Content.ReadFromJsonAsync<ParentLoginShape>(jsonOpts);
+        parentJwt = loginBody?.Token;
+        Console.WriteLine($"Bench parent ready ({email})");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"WARN: bench-parent setup failed ({ex.Message}) — devices stay unclaimed; against current source every turn will be gated with the paused line.");
+    }
+}
 
 Console.WriteLine("ID    | Turns | OkN | Hard | Label");
 Console.WriteLine("------|-------|-----|------|--------------------------");
@@ -113,6 +152,9 @@ foreach (var scenario in scenarios)
 
     // Fresh HttpClient + device per scenario so GameSessions starts clean.
     using var http = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(60) };
+
+    if (!string.IsNullOrEmpty(provisioningSecret))
+        http.DefaultRequestHeaders.Add("X-Provisioning-Secret", provisioningSecret);
 
     DeviceReg device;
     try
@@ -133,6 +175,20 @@ foreach (var scenario in scenarios)
     }
     http.DefaultRequestHeaders.Add("X-Device-Id", device.DeviceId.ToString());
     http.DefaultRequestHeaders.Add("X-Api-Key", device.ApiKey);
+
+    // Claim the fresh device so the unclaimed gate lets chat through.
+    if (parentJwt is not null && !string.IsNullOrEmpty(device.ClaimCode))
+    {
+        using var claimReq = new HttpRequestMessage(HttpMethod.Post, "/api/parents/devices/claim")
+        {
+            Content = JsonContent.Create(new { deviceId = device.DeviceId, claimCode = device.ClaimCode }),
+        };
+        claimReq.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", parentJwt);
+        var claimResp = await http.SendAsync(claimReq);
+        if (!claimResp.IsSuccessStatusCode)
+            Console.WriteLine($"WARN: claim failed for {scenario.Id} (HTTP {(int)claimResp.StatusCode}) — turns may be gated.");
+    }
 
     int sTurnsOk = 0;
     bool sHardFail = false;
@@ -252,6 +308,22 @@ foreach (var scenario in scenarios)
         }
         prevResponse = text;
 
+        // celebrated_wrong (game v6 honesty check): this child turn is
+        // marked wrong/unjudgeable in prompts.json — a reply that OPENS
+        // with a celebration is the toy praising an answer it should not.
+        // Head-window only: an honest correction may legitimately contain
+        // «Հա՛, ճիշտ է՝ …» later in the sentence, but never first.
+        if (turn.Wrong)
+        {
+            var head = text.Length > 20 ? text[..20] : text;
+            if (celebrationPhrases.Any(p => head.Contains(p)))
+            {
+                turnResult.CelebratedWrong = true;
+                celebratedWrong++;
+                weakCases.Add($"{scenario.Id} turn '{turn.User}': celebrated a wrong/unjudgeable answer");
+            }
+        }
+
         // celebration_repeat: pick the first matching celebration; flag if same as previous
         var celebration = celebrationPhrases.FirstOrDefault(p => text.Contains(p));
         if (celebration is not null && celebration == prevCelebration)
@@ -289,6 +361,7 @@ Console.WriteLine($"  Variety low:          {continueVarietyLow}");
 Console.WriteLine($"  Celebration repeat:   {celebrationRepeat}");
 Console.WriteLine($"  Asking permission:    {askingPermission}");
 Console.WriteLine($"  Mixing types:         {mixingTypes}");
+Console.WriteLine($"  Celebrated wrong:     {celebratedWrong}");
 
 // --- Save results ---
 var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
@@ -347,6 +420,7 @@ var current = new GameMetrics
     CelebrationRepeat = celebrationRepeat,
     AskingPermission = askingPermission,
     MixingTypes = mixingTypes,
+    CelebratedWrong = celebratedWrong,
     Placeholder = false,
     PromptsCount = scenarios.Count,
     PromptsSha256 = promptsSha256,
@@ -386,6 +460,7 @@ if (File.Exists(baselinePath))
             Console.WriteLine($"    celebration_repeat:  {Delta(baseline.CelebrationRepeat, current.CelebrationRepeat)}");
             Console.WriteLine($"    asking_permission:   {Delta(baseline.AskingPermission, current.AskingPermission)}");
             Console.WriteLine($"    mixing_types:        {Delta(baseline.MixingTypes, current.MixingTypes)}");
+            Console.WriteLine($"    celebrated_wrong:    {Delta(baseline.CelebratedWrong, current.CelebratedWrong)}");
         }
         else if (baseline is not null && baseline.Placeholder)
         {
@@ -509,6 +584,16 @@ record Scenario
 record TurnPrompt
 {
     public string User { get; init; } = "";
+
+    /// <summary>Marks this child turn as a wrong or unjudgeable answer —
+    /// a reply that OPENS with a celebration counts as celebrated_wrong
+    /// (game v6 honesty contract).</summary>
+    public bool Wrong { get; init; }
+}
+
+record ParentLoginShape
+{
+    public string Token { get; init; } = "";
 }
 
 record ChatResponse
@@ -527,6 +612,7 @@ record DeviceReg
 {
     public Guid DeviceId { get; init; }
     public string ApiKey { get; init; } = "";
+    public string? ClaimCode { get; init; }
 }
 
 record GameMetrics
@@ -542,6 +628,7 @@ record GameMetrics
     public int CelebrationRepeat { get; init; }
     public int AskingPermission { get; init; }
     public int MixingTypes { get; init; }
+    public int CelebratedWrong { get; init; }
     public bool Placeholder { get; init; }
     // D1-F2: prompt-set identity. PromptsSha256 is null on legacy baselines
     // that pre-date the field; a null/empty value triggers the same
@@ -575,6 +662,7 @@ record TurnResult
     public bool AskedPermission { get; set; }
     public bool MixedTypes { get; set; }
     public bool CelebrationRepeat { get; set; }
+    public bool CelebratedWrong { get; set; }
     public double? JaccardWithPrev { get; set; }
     public string? Error { get; set; }
 }
