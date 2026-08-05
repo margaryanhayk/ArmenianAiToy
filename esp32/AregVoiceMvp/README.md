@@ -517,7 +517,7 @@ like a story session is a blocking call from the IDLE branch.
 | Offline | one short line, then a story | Hearing the child needs the cloud, and the owner chose voice-only — so the fallback is a graceful DEFAULT, not a second menu |
 | Nobody answers | goes quiet | Silence usually means nobody is there. A toy that keeps asking an empty room is the opposite of what a parent wants |
 | Mis-heard | «say again» once, then a story | Two tries. A third reads as nagging to a five-year-old |
-| Child asks for game / riddle / curiosity | falls through to a story | The toy holds **no offline content** for these; wiring them to the online chat path is its own slice with its own bench session |
+| Child asks for game / riddle / curiosity | **opens the online chat session** (`handle_online_chat_session`) | The child's own recorded utterance is POSTed to `/api/chat/audio` — the backend's ModeDetector routes it and speaks the opener. Loop: play reply → press-to-talk within `AREG_CHAT_LISTEN_MS` (default 12 s) → upload → play, until silence closes it quietly. Turn cap `AREG_CHAT_SESSION_MAX_TURNS` (default 30) bounds cost. Parent gates re-checked server-side every turn. **NOT yet bench-verified on hardware.** |
 | Every mode disabled | greeting only, then stop | Never promise something the parent switched off |
 | A story has no `offer` clip | plays it instead of offering | A missing recording must never be why a child hears nothing |
 | A press (not power-on) | unchanged — starts/resumes a story | A child who wants the next story should not be interrogated every time |

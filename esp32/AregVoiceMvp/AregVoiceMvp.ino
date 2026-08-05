@@ -669,8 +669,18 @@ static bool welcome_say(const char *voice_id) {
 // short to be speech. Silence is not a failed attempt: at power-on it
 // usually means nobody is there, and a toy that keeps asking an empty
 // room is the opposite of what a parent wants.
-static bool welcome_listen(const char *expect, char *out_intent, size_t out_len) {
+// keep_payload / keep_len: when non-null, ownership of the recorded WAV
+// payload transfers to the caller on a successful listen (so the child's
+// own words can open an online chat session — see
+// handle_online_chat_session). Caller frees with heap_caps_free. Pass
+// nullptr/nullptr for the original post-and-free behavior. Not default
+// arguments on purpose: the Arduino auto-prototype generator mishandles
+// them.
+static bool welcome_listen(const char *expect, char *out_intent, size_t out_len,
+                           uint8_t **keep_payload, size_t *keep_len) {
     out_intent[0] = '\0';
+    if (keep_payload != nullptr) *keep_payload = nullptr;
+    if (keep_len != nullptr) *keep_len = 0;
 
     Serial.printf("[welcome] listening (%s)\n", expect);
     Serial.flush();
@@ -720,10 +730,116 @@ static bool welcome_listen(const char *expect, char *out_intent, size_t out_len)
                                  out_intent, out_len)) {
         cs_copy_bounded(out_intent, out_len, "unknown");
     }
-    heap_caps_free(payload);
+    if (keep_payload != nullptr) {
+        // Ownership transfers — the caller will open an online chat
+        // session with the child's own recorded words.
+        *keep_payload = payload;
+        if (keep_len != nullptr) *keep_len = payload_bytes;
+    } else {
+        heap_caps_free(payload);
+    }
     Serial.printf("[welcome] intent=%s\n", out_intent);
     Serial.flush();
     return true;
+}
+
+// --- Online multi-turn chat session (game / riddle / curiosity) -----
+// The welcome flow lands here when the child asked for a mode the toy
+// holds no offline content for. The recorded utterance itself opens the
+// session — POSTed to /api/chat/audio, where the backend's ModeDetector
+// routes «խաղանք» to Game (or riddle/curiosity) and speaks the opener.
+// Then the loop is: play reply → press-to-talk within the listen window
+// → upload → play, until the child stops answering. Silence closes the
+// session quietly (never badger); the turn cap bounds cost. The parent
+// gates (pause / bedtime / per-mode flags) are enforced server-side on
+// every single turn.
+//
+// Takes ownership of `payload` (PSRAM); frees it on every path.
+
+#ifndef AREG_CHAT_LISTEN_MS
+#define AREG_CHAT_LISTEN_MS 12000UL       // child's window to answer, ms
+#endif
+#ifndef AREG_CHAT_SESSION_MAX_TURNS
+#define AREG_CHAT_SESSION_MAX_TURNS 30    // cost-bound per session
+#endif
+
+static void handle_online_chat_session(uint8_t *payload, size_t payload_len) {
+    for (int turn_no = 1; turn_no <= AREG_CHAT_SESSION_MAX_TURNS; turn_no++) {
+        transition_to(ST_UPLOADING);
+        audio_speaker_begin();
+        audio_play_thinking_earcon();   // immediate acoustic ack while we upload
+
+        VoiceTurnResult turn = voice_upload_turn(payload, payload_len);
+        heap_caps_free(payload);
+        payload = nullptr;
+        if (!turn.ok) {
+            Serial.printf("[chat] upload failed (http=%d)\n", turn.http_status);
+            Serial.flush();
+            voice_release_last_response();
+            transition_to(ST_ERROR);
+            play_canned_failure_clip();
+            break;
+        }
+
+        transition_to(ST_PLAYING);
+        const bool played = audio_play_mp3_buffer(
+            turn.response_bytes, turn.response_length);
+        voice_release_last_response();
+        if (!played) {
+            Serial.println("[chat] decoder error");
+            Serial.flush();
+            transition_to(ST_ERROR);
+            play_canned_failure_clip();
+            break;
+        }
+        if (turn.continue_more) {
+            // Library-autoplay marker on a chat session — games and
+            // riddles are not library stories; log and ignore.
+            Serial.println("[chat] unexpected continue flag — ignoring");
+        }
+
+        // The child's turn: press-to-talk within the window, else the
+        // session is over. Longer window than the welcome menu — a game
+        // answer may need a moment's thought.
+        Serial.printf("[chat] turn %d played — listening\n", turn_no);
+        Serial.flush();
+        led_for_state(ST_RECORDING);
+        bool got_press = false;
+        const uint32_t started = millis();
+        while (millis() - started < AREG_CHAT_LISTEN_MS) {
+            if (button_poll() == 'P') { got_press = true; break; }
+            delay(AREG_BUTTON_POLL_MS);
+            esp_task_wdt_reset();
+        }
+        if (!got_press) {
+            Serial.println("[chat] no answer — session over");
+            Serial.flush();
+            break;
+        }
+
+        transition_to(ST_RECORDING);
+        const size_t captured = record_question();
+        const uint32_t ms_held = (captured * 1000) / AREG_SAMPLE_RATE_HZ;
+        if (ms_held < AREG_MIN_RECORD_MS) {
+            Serial.printf("[chat] answer too short (%u ms) — session over\n",
+                          (unsigned)ms_held);
+            Serial.flush();
+            break;
+        }
+        const size_t pcm_bytes = captured * sizeof(int16_t);
+        payload_len = 44 + pcm_bytes;
+        payload = (uint8_t *)heap_caps_malloc(payload_len, MALLOC_CAP_SPIRAM);
+        if (payload == nullptr) {
+            Serial.println("[chat] payload alloc failed — session over");
+            Serial.flush();
+            break;
+        }
+        audio_write_wav_header(payload, (uint32_t)captured);
+        memcpy(payload + 44, s_capture_buf, pcm_bytes);
+        // Loop continues: upload this answer as the next turn.
+    }
+    if (payload != nullptr) heap_caps_free(payload);
+    led_for_state(ST_IDLE);
 }
 
 // Offers stories by name until the child says yes, then plays one.
@@ -782,7 +898,7 @@ static void welcome_offer_story() {
         }
 
         char intent[16];
-        if (!welcome_listen("yesno", intent, sizeof(intent))) {
+        if (!welcome_listen("yesno", intent, sizeof(intent), nullptr, nullptr)) {
             led_for_state(ST_IDLE);
             return;   // silence — do not start a story into an empty room
         }
@@ -908,12 +1024,15 @@ static void handle_welcome_flow() {
     // ---- 4. listen, with exactly one retry ----
     for (int attempt = 1; attempt <= AREG_WELCOME_MAX_TRIES; attempt++) {
         char intent[16];
-        if (!welcome_listen("mode", intent, sizeof(intent))) {
+        uint8_t *heard = nullptr;
+        size_t heard_len = 0;
+        if (!welcome_listen("mode", intent, sizeof(intent), &heard, &heard_len)) {
             led_for_state(ST_IDLE);
             return;   // silence — never badger
         }
 
         if (strcmp(intent, "story") == 0) {
+            if (heard != nullptr) heap_caps_free(heard);
             if (story_ok) { welcome_offer_story(); return; }
             break;
         }
@@ -921,17 +1040,25 @@ static void handle_welcome_flow() {
         // open a menu — it should settle things down, which here means a
         // story rather than a game.
         if (strcmp(intent, "calm") == 0) {
+            if (heard != nullptr) heap_caps_free(heard);
             break;
         }
-        // game / riddle / curiosity: the toy holds NO offline content for
-        // these, and wiring them to the online chat path is its own slice
-        // with its own bench session. Until then, say so honestly by
-        // falling through to a story rather than pretending.
+        // game / riddle / curiosity → the ONLINE chat session. The
+        // child's own recorded words open it (the backend's ModeDetector
+        // routes the transcript; the game engine, riddle engine, and the
+        // Curiosity window all live server-side). The voice-intent call
+        // above already confirmed the parent left this mode enabled —
+        // and the backend re-checks per turn anyway.
         if (strcmp(intent, "game") == 0 || strcmp(intent, "riddle") == 0
             || strcmp(intent, "curiosity") == 0) {
-            break;
+            if (heard != nullptr) {
+                handle_online_chat_session(heard, heard_len);
+                return;
+            }
+            break;   // alloc edge — fall to the graceful default story
         }
 
+        if (heard != nullptr) heap_caps_free(heard);
         // "unknown" — ask once more, then stop asking.
         if (attempt < AREG_WELCOME_MAX_TRIES) {
             welcome_say(CS_VOICE_ID_SAY_AGAIN);
