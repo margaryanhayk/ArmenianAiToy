@@ -115,6 +115,12 @@ public class AudioChatControllerTests
         var deviceService = Substitute.For<IDeviceService>();
 
         deviceService.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
+        // B2: the voice path now gates the DETECTED mode's parent flag
+        // post-STT. Default every mode to enabled so existing tests
+        // exercise the pre-fix happy path; gate tests override per-mode.
+        deviceService.IsModeEnabledForRequestAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<DetectedMode>())
+            .Returns(true);
         var chatService = Substitute.For<IChatService>();
         var transcription = Substitute.For<IAudioTranscriptionService>();
         var synthesis = Substitute.For<IAudioSynthesisService>();
@@ -318,14 +324,21 @@ public class AudioChatControllerTests
     }
 
     [Fact]
-    public async Task AudioChat_StoryDisabled_ReturnsCannedClip_NoSttNoLlm()
+    public async Task AudioChat_StoryDisabled_StoryRequest_ReturnsCannedClip_NoLlm()
     {
+        // B2 contract: the mode gate moved AFTER STT (the mode cannot be
+        // known before the child's words are). A story-cued transcript on
+        // a Story-disabled device gets the canned mode-disabled clip and
+        // never reaches ChatService.
         await using var h = await CreateAsync();
         h.DeviceService.IsDevicePausedAsync(h.DeviceId).Returns(false);
         h.DeviceService.IsDeviceInBedtimeWindowAsync(h.DeviceId, Arg.Any<DateTime>())
             .Returns(false);
         h.DeviceService.IsModeEnabledForRequestAsync(
             h.DeviceId, (Guid?)null, DetectedMode.Story).Returns(false);
+        h.Transcription.TranscribeArmenianAsync(
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns("պատմիր հեքիաթ");
         h.Synthesis.SynthesizeArmenianAsync(
                 Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new AudioSynthesisResult(TtsMp3, MimeMp3));
@@ -333,10 +346,64 @@ public class AudioChatControllerTests
         var result = await h.Controller.Chat(CancellationToken.None);
 
         Assert.IsType<FileContentResult>(result);
-        await h.Transcription.DidNotReceiveWithAnyArgs()
-            .TranscribeArmenianAsync(default!, default!, default);
         await h.ChatService.DidNotReceiveWithAnyArgs().GetResponseAsync(
             default, default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task AudioChat_GameDisabled_GameRequest_ReturnsCannedClip_NoLlm()
+    {
+        // B2 KEYSTONE: the parent's Game=off switch must HOLD over voice.
+        // Pre-fix, only Story was ever checked, so a game request ran as
+        // long as Story was enabled.
+        await using var h = await CreateAsync();
+        h.DeviceService.IsDevicePausedAsync(h.DeviceId).Returns(false);
+        h.DeviceService.IsDeviceInBedtimeWindowAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(false);
+        h.DeviceService.IsModeEnabledForRequestAsync(
+            h.DeviceId, (Guid?)null, DetectedMode.Game).Returns(false);
+        h.Transcription.TranscribeArmenianAsync(
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns("խաղանք");
+        h.Synthesis.SynthesizeArmenianAsync(
+                Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisResult(TtsMp3, MimeMp3));
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        await h.ChatService.DidNotReceiveWithAnyArgs().GetResponseAsync(
+            default, default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task AudioChat_StoryDisabled_GameRequest_ProceedsToChat()
+    {
+        // B2 KEYSTONE: Story=off must NOT block a game request — pre-fix
+        // it silenced every mode over voice.
+        await using var h = await CreateAsync();
+        h.DeviceService.IsDevicePausedAsync(h.DeviceId).Returns(false);
+        h.DeviceService.IsDeviceInBedtimeWindowAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(false);
+        h.DeviceService.IsModeEnabledForRequestAsync(
+            h.DeviceId, (Guid?)null, DetectedMode.Story).Returns(false);
+        h.DeviceService.IsModeEnabledForRequestAsync(
+            h.DeviceId, (Guid?)null, DetectedMode.Game).Returns(true);
+        h.Transcription.TranscribeArmenianAsync(
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns("խաղանք");
+        h.ChatService.GetResponseAsync(h.DeviceId, "խաղանք")
+            .Returns(new ChatResponse(
+                "Հնչեցրու կատվի ձայնը։", Guid.NewGuid(), Guid.NewGuid(),
+                SafetyFlag.Clean, Mode: "game"));
+        h.Synthesis.SynthesizeArmenianAsync(
+                Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisResult(TtsMp3, MimeMp3));
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        await h.ChatService.Received(1).GetResponseAsync(h.DeviceId, "խաղանք");
     }
 
     [Fact]

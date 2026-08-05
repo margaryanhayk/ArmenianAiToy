@@ -155,6 +155,30 @@ public class AudioChatController : ControllerBase
             return StatusCode(502, new { error = "AI service unavailable. Please try again." });
         }
 
+        // Per-mode parent-flag gate on the DETECTED mode (B2 fix). Same
+        // conservative single-message detection as ChatGateEvaluator's
+        // mode step on the text path (history: null, no story session):
+        // a definitive Story/Game/Riddle/Curiosity call is checked against
+        // the parent's per-device / per-child flags; Calm and ambiguous
+        // detections pass through. This is what makes the parent's
+        // Game=off switch HOLD over voice — pre-fix, only Story was ever
+        // checked, so any other mode ran regardless of its flag, and a
+        // Story-only off silenced every mode. STT has already been paid
+        // for at this point; that is the unavoidable cost of not knowing
+        // the mode until the child's words are known.
+        var voiceDetectedMode = ModeDetector.Detect(
+            transcript, history: null, hasActiveStorySession: false);
+        if (voiceDetectedMode is DetectedMode.Story
+                or DetectedMode.Game
+                or DetectedMode.Riddle
+                or DetectedMode.Curiosity
+            && !await _deviceService.IsModeEnabledForRequestAsync(
+                deviceId, childId: null, voiceDetectedMode))
+        {
+            AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "mode_disabled"));
+            return await CannedResultAsync(CannedVoiceClips.ModeDisabledKey, cancellationToken);
+        }
+
         // Text → existing ChatService pipeline, unchanged.
         ChatResponseShape chatResult;
         string ttsText;
@@ -252,7 +276,9 @@ public class AudioChatController : ControllerBase
         // Autoplay-continue is paid TTS too — it MUST honor the same gates +
         // cost cap as a normal turn, or a client could re-POST X-Areg-Continue
         // on a paused / bedtime / over-cap device for unmetered speech.
-        var gated = await CheckGatesAndCostCapAsync(deviceId, cancellationToken);
+        // A library segment IS story content, so Story is the mode to gate.
+        var gated = await CheckGatesAndCostCapAsync(
+            deviceId, cancellationToken, modeToGate: DetectedMode.Story);
         if (gated is not null)
         {
             return gated;
@@ -302,7 +328,8 @@ public class AudioChatController : ControllerBase
     /// canned-clip result to short-circuit, or null to proceed. Zero upstream
     /// cost.</summary>
     private async Task<IActionResult?> CheckGatesAndCostCapAsync(
-        Guid deviceId, CancellationToken cancellationToken)
+        Guid deviceId, CancellationToken cancellationToken,
+        DetectedMode? modeToGate = null)
     {
         // Runs FIRST, ahead of pause: a toy with no linked parent was
         // unlinked and is waiting to be paired again from its QR, so nobody
@@ -322,8 +349,17 @@ public class AudioChatController : ControllerBase
             AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "bedtime"));
             return await CannedResultAsync(CannedVoiceClips.BedtimeKey, cancellationToken);
         }
-        // C1 voice is Story-only; other modes over voice land in a later phase.
-        if (!await _deviceService.IsModeEnabledForRequestAsync(deviceId, childId: null, DetectedMode.Story))
+        // Per-mode parent-flag gate (B2 fix). The old code hardcoded a
+        // Story-only check here — which BYPASSED the parent's Game /
+        // Riddle / Curiosity switches on voice (any utterance ran as long
+        // as Story was on) and BLOCKED every mode when Story alone was
+        // off. The chat path now passes null here (no transcript exists
+        // yet at this pre-STT point) and gates the DETECTED mode after
+        // STT instead; the autoplay-continue path passes Story explicitly
+        // (a library segment IS story content, and no STT ever runs
+        // there).
+        if (modeToGate is { } gateMode
+            && !await _deviceService.IsModeEnabledForRequestAsync(deviceId, childId: null, gateMode))
         {
             AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "mode_disabled"));
             return await CannedResultAsync(CannedVoiceClips.ModeDisabledKey, cancellationToken);
