@@ -1,0 +1,134 @@
+using ArmenianAiToy.Infrastructure.Ai;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using NSubstitute;
+using System.Net;
+using System.Text;
+using System.Text.Json;
+
+namespace ArmenianAiToy.Application.Tests;
+
+/// <summary>
+/// Pins the Gemini chat adapter's wire contract (fake handler, no
+/// network) and the chat-capability seam extension.
+/// </summary>
+public class GeminiChatClientAdapterTests
+{
+    private sealed class FakeHandler : HttpMessageHandler
+    {
+        public HttpRequestMessage? LastRequest;
+        public string? LastBody;
+        public HttpStatusCode Status = HttpStatusCode.OK;
+        public string ResponseJson =
+            "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Բարև՛ ձեզ\"},{\"text\":\"։\"}]}}]}";
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken ct)
+        {
+            LastRequest = request;
+            LastBody = request.Content is null
+                ? null
+                : await request.Content.ReadAsStringAsync(ct);
+            return new HttpResponseMessage(Status)
+            {
+                Content = new StringContent(ResponseJson, Encoding.UTF8, "application/json"),
+            };
+        }
+    }
+
+    private static (GeminiChatClientAdapter Svc, FakeHandler Handler) Create()
+    {
+        var handler = new FakeHandler();
+        var svc = new GeminiChatClientAdapter(
+            new HttpClient(handler), "test-key", "gemini-3-flash-preview",
+            Substitute.For<ILogger<GeminiChatClientAdapter>>());
+        return (svc, handler);
+    }
+
+    [Fact]
+    public async Task PostsToModelUrl_WithKeyHeader_SystemInstruction_AndThinkingOff()
+    {
+        var (svc, h) = Create();
+
+        var reply = await svc.GetCompletionAsync(
+            "SYSTEM RULES",
+            new List<(string, string)> { ("user", "խաղանք") });
+
+        Assert.Equal("Բարև՛ ձեզ։", reply); // multi-part join
+        Assert.Equal(
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
+            h.LastRequest!.RequestUri!.ToString());
+        Assert.Equal("test-key", h.LastRequest.Headers.GetValues("x-goog-api-key").Single());
+
+        using var doc = JsonDocument.Parse(h.LastBody!);
+        Assert.Equal("SYSTEM RULES",
+            doc.RootElement.GetProperty("system_instruction")
+                .GetProperty("parts")[0].GetProperty("text").GetString());
+        // KEYSTONE: thinking disabled — measured thinking-mode TTFT (~7s)
+        // is unusable on the toy; the bake-off ran fast mode.
+        Assert.Equal(0,
+            doc.RootElement.GetProperty("generationConfig")
+                .GetProperty("thinkingConfig").GetProperty("thinkingBudget").GetInt32());
+    }
+
+    [Fact]
+    public async Task History_MapsAssistantToModelRole()
+    {
+        var (svc, h) = Create();
+
+        await svc.GetCompletionAsync("S", new List<(string, string)>
+        {
+            ("user", "Ա"), ("assistant", "Բ"), ("user", "Գ"),
+        });
+
+        using var doc = JsonDocument.Parse(h.LastBody!);
+        var contents = doc.RootElement.GetProperty("contents");
+        Assert.Equal(3, contents.GetArrayLength());
+        Assert.Equal("user", contents[0].GetProperty("role").GetString());
+        Assert.Equal("model", contents[1].GetProperty("role").GetString());
+        Assert.Equal("user", contents[2].GetProperty("role").GetString());
+    }
+
+    [Fact]
+    public async Task NonSuccess_Throws_StatusOnly_NeverTheKey()
+    {
+        var (svc, h) = Create();
+        h.Status = HttpStatusCode.TooManyRequests;
+        h.ResponseJson = "{\"error\":{\"message\":\"quota\"}}";
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(
+            () => svc.GetCompletionAsync("S", new List<(string, string)> { ("user", "x") }));
+
+        Assert.Contains("429", ex.Message);
+        Assert.DoesNotContain("test-key", ex.Message);
+    }
+
+    // ── Seam extension ──────────────────────────────────────────────
+
+    private static IConfiguration Config(string key, string value) =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [key] = value })
+            .Build();
+
+    [Fact]
+    public void Seam_ChatKey_AcceptsGemini()
+    {
+        Assert.Equal(AiProviderConfig.Gemini,
+            AiProviderConfig.Resolve(
+                Config(AiProviderConfig.ChatKey, "Gemini"),
+                AiProviderConfig.ChatKey,
+                AiProviderConfig.SupportedForChat));
+    }
+
+    [Fact]
+    public void Seam_TtsKey_StillRejectsGemini()
+    {
+        // KEYSTONE: gemini has a CHAT adapter only — accepting it for TTS
+        // would boot with no IAudioSynthesisService.
+        Assert.Throws<InvalidOperationException>(() =>
+            AiProviderConfig.Resolve(
+                Config(AiProviderConfig.TtsKey, "gemini"),
+                AiProviderConfig.TtsKey,
+                AiProviderConfig.SupportedForTts));
+    }
+}

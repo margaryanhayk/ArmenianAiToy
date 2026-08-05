@@ -41,13 +41,18 @@ public static class AiProviderConfig
 {
     public const string OpenAI = "openai";
     public const string ElevenLabs = "elevenlabs";
+    public const string Gemini = "gemini";
 
     /// <summary>Providers valid for every capability key by default.</summary>
     public static readonly string[] Supported = [OpenAI];
 
     /// <summary>TTS additionally supports ElevenLabs (the eleven_v3 clone
-    /// adapter, 2026-08-05 — the only capability with a second plug so far).</summary>
+    /// adapter, 2026-08-05).</summary>
     public static readonly string[] SupportedForTts = [OpenAI, ElevenLabs];
+
+    /// <summary>Chat additionally supports Gemini (owner bake-off decision
+    /// 2026-08-06 — GeminiChatClientAdapter).</summary>
+    public static readonly string[] SupportedForChat = [OpenAI, Gemini];
 
     public const string ChatKey = "AI:ChatProvider";
     public const string TranscriptionKey = "AI:TranscriptionProvider";

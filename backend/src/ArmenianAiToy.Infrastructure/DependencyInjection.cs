@@ -47,7 +47,8 @@ public static class DependencyInjection
         // any of them fails the boot loudly, not lazily. Today the bounded
         // value space is exactly {openai}; a second provider lands as a new
         // case in the switches below AFTER its adapter exists.
-        var chatProvider = AiProviderConfig.Resolve(config, AiProviderConfig.ChatKey);
+        var chatProvider = AiProviderConfig.Resolve(
+            config, AiProviderConfig.ChatKey, AiProviderConfig.SupportedForChat);
         var sttProvider = AiProviderConfig.Resolve(config, AiProviderConfig.TranscriptionKey);
         var ttsProvider = AiProviderConfig.Resolve(
             config, AiProviderConfig.TtsKey, AiProviderConfig.SupportedForTts);
@@ -177,6 +178,25 @@ public static class DependencyInjection
             case AiProviderConfig.OpenAI:
                 services.AddScoped<IAiChatClient, OpenAIChatClientAdapter>();
                 break;
+
+            case AiProviderConfig.Gemini:
+            {
+                // Owner bake-off decision 2026-08-06. Key hard-required
+                // (chat is the toy's brain; no silent fallback); accepts
+                // the app-style name first, then the GEMINI_API_KEY env
+                // name. Model defaults to the exact bake-off winner.
+                var gmKey = config["Gemini:ApiKey"]
+                    ?? config["GEMINI_API_KEY"]
+                    ?? throw new InvalidOperationException(
+                        "AI:ChatProvider is 'gemini' but Gemini:ApiKey / GEMINI_API_KEY is not set.");
+                var gmModel = config["Gemini:Model"] ?? "gemini-3-flash-preview";
+                services.AddScoped<IAiChatClient>(sp =>
+                    new GeminiChatClientAdapter(
+                        openAiHttpClient, // warm pooled client, host-agnostic
+                        gmKey, gmModel,
+                        sp.GetRequiredService<ILogger<GeminiChatClientAdapter>>()));
+                break;
+            }
         }
         // Recommendation (recorded, not enforced): keep moderation on
         // OpenAI even when chat moves elsewhere — cross-vendor
