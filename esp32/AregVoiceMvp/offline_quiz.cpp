@@ -20,7 +20,7 @@ namespace {
 
 constexpr uint32_t kStartMs       = 30000UL;  // 30 s arm delay (monitor attach)
 constexpr uint32_t kStatusEveryMs = 5000UL;
-constexpr int      kMaxQuestions  = 20;
+constexpr int      kMaxQuestions  = 60;   // q01..q60 scanned; gaps are fine
 
 #ifndef AREG_QUIZ_ANSWER_WINDOW_MS
 #define AREG_QUIZ_ANSWER_WINDOW_MS 10000UL   // how long to wait for a press
