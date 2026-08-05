@@ -117,6 +117,30 @@ public class ModeDetectorTests
         Assert.Equal(DetectedMode.Game, ModeDetector.Detect(message, EmptyHistory));
     }
 
+    [Theory]
+    [InlineData("խաղը սկսենք")]        // "let's start the game" — inflected form
+    [InlineData("խաղեր գիտե՞ս")]       // "do you know games" — plural
+    [InlineData("խաղալիք ունեմ")]      // "I have a toy" — derived form
+    public void Game_KhaghTokenPrefix_DetectsGame(string message)
+    {
+        // Bare-stem coverage now comes from the token-prefix check, not a
+        // raw substring — inflected forms must keep working.
+        Assert.Equal(DetectedMode.Game, ModeDetector.Detect(message, EmptyHistory));
+    }
+
+    [Theory]
+    [InlineData("Խաղող եմ ուզում")]     // "I want grapes"
+    [InlineData("խաղողի հյութ")]        // "grape juice"
+    [InlineData("Գիշերը խաղաղ էր")]     // "the night was peaceful"
+    [InlineData("խաղաղություն")]        // "peace"
+    public void Game_GrapesAndPeaceful_DoNotTriggerGame(string message)
+    {
+        // KEYSTONE: «խաղող» (grapes) and «խաղաղ» (peaceful) begin with the
+        // same three letters as «խաղ» (game). The old bare-substring trigger
+        // started a game at a child asking for grapes.
+        Assert.NotEqual(DetectedMode.Game, ModeDetector.Detect(message, EmptyHistory));
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // Riddle mode
     // ─────────────────────────────────────────────────────────────────────

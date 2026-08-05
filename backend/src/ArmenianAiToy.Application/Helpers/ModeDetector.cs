@@ -72,7 +72,11 @@ public static class ModeDetector
         "let's play a game",
         "\u056d\u0561\u0572\u0561\u0576\u0584",                   // խաղանք (let's play)
         "\u056d\u0561\u0572\u0561\u056c",                          // խաղալ (to play)
-        "խաղ",                                     // խաղ + space (bare stem — catches նոր խաղ, ուրիշ խաղ, մի խաղ, etc.)
+        // NOTE: the bare stem «խաղ» is deliberately NOT in this list — as a
+        // substring it fires inside «խաղող» (grapes) and «խաղաղ» (peaceful).
+        // Bare-stem coverage (նոր խաղ, մի խաղ, խաղը, խաղեր, խաղալիք…) comes
+        // from the token-prefix check in HasGameCue, which excludes those
+        // two word families explicitly.
         "\u056d\u0561\u0572 \u056f\u0561",                         // խաղ կա (there is a game)
         "khaghank",
         "khaghal",
@@ -188,7 +192,7 @@ public static class ModeDetector
 
         // Priority 4: Explicit triggers in the current message.
         if (hasStoryCue) return DetectedMode.Story;
-        if (ContainsAny(lower, GameTriggers)) return DetectedMode.Game;
+        if (HasGameCue(lower)) return DetectedMode.Game;
         if (ContainsAny(lower, RiddleTriggers)) return DetectedMode.Riddle;
 
         // Priority 5: Mode trigger in the last 2 user messages.
@@ -200,7 +204,7 @@ public static class ModeDetector
 
             var hLower = NormalizeForMatch(history[i].Content);
             if (ContainsAny(hLower, StoryTriggers)) return DetectedMode.Story;
-            if (ContainsAny(hLower, GameTriggers)) return DetectedMode.Game;
+            if (HasGameCue(hLower)) return DetectedMode.Game;
             if (ContainsAny(hLower, RiddleTriggers)) return DetectedMode.Riddle;
             checkedCount++;
         }
@@ -255,6 +259,37 @@ public static class ModeDetector
     {
         for (int i = 0; i < needles.Length; i++)
             if (lower.Contains(needles[i])) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Game-cue detection: the explicit trigger list, plus any token that
+    /// STARTS with the stem «խաղ» (game) — which covers the inflected and
+    /// derived forms a child actually says (խաղը, խաղեր, խաղալիք, մի խաղ…)
+    /// — while explicitly excluding the two unrelated word families that
+    /// begin with the same three letters: «խաղող» (grapes) and «խաղաղ»
+    /// (peaceful). The old bare-substring "խաղ" trigger routed «Խաղող եմ
+    /// ուզում» (I want grapes) into Game mode.
+    /// </summary>
+    private static bool HasGameCue(string lower)
+    {
+        if (ContainsAny(lower, GameTriggers)) return true;
+
+        int i = 0;
+        while (i < lower.Length)
+        {
+            if (!char.IsLetter(lower[i])) { i++; continue; }
+            int start = i;
+            while (i < lower.Length && char.IsLetter(lower[i])) i++;
+            int len = i - start;
+            if (len >= 3 && string.CompareOrdinal(lower, start, "խաղ", 0, 3) == 0)
+            {
+                bool excluded = len >= 5
+                    && (string.CompareOrdinal(lower, start, "խաղող", 0, 5) == 0
+                        || string.CompareOrdinal(lower, start, "խաղաղ", 0, 5) == 0);
+                if (!excluded) return true;
+            }
+        }
         return false;
     }
 
