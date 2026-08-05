@@ -31,12 +31,15 @@ public static class GameIntentDetector
         "urish khagh", "nor khagh",
     ];
 
+    // «վերջ» is deliberately NOT in this list — it is matched as a whole
+    // word below, because as a substring it fires inside «վերջին» /
+    // «վերջապես» («one last time» must not stop the game).
     private static readonly string[] StopTriggers =
     [
         "stop", "stop playing", "i'm done", "im done", "i am done",
         "no more", "that's enough", "thats enough", "enough",
         "i don't want to play", "i dont want to play",
-        "բավ է", "բավական է", "վերջ", "չեմ ուզում", "չեմ ուզում խաղալ",
+        "բավ է", "բավական է", "չեմ ուզում", "չեմ ուզում խաղալ",
         "այլևս չեմ ուզում", "հոգնեցի", "հերիք է",
         "bav e", "verj", "chem uzum",
     ];
@@ -49,17 +52,37 @@ public static class GameIntentDetector
         "khaghank", "khaghal", "khagha",
     ];
 
+    /// <summary>
+    /// A switch phrase inside a refusal is a refusal: «չեմ ուզում ուրիշ
+    /// խաղ» ("I don't want another game") must never be read as a request
+    /// for another game. Mirrors WelcomeIntentDetector's negation-first
+    /// contract.
+    /// </summary>
+    private static readonly string[] NegationMarkers =
+    [
+        "չեմ", "չենք",
+        "don't", "dont", "do not",
+    ];
+
     public static GameIntent Detect(string? userMessage, bool hasActiveRound)
     {
-        var lower = (userMessage ?? string.Empty).Trim().ToLowerInvariant();
+        var lower = NormalizeForMatch(userMessage);
+
+        bool hasSwitch = ContainsAny(lower, SwitchTriggers);
+        bool hasNegation = ContainsAny(lower, NegationMarkers);
+        bool hasStop = ContainsAny(lower, StopTriggers)
+            || ContainsWholeWord(lower, "վերջ");
 
         // Switch wins even mid-round — child wants something different.
-        if (ContainsAny(lower, SwitchTriggers)) return GameIntent.SwitchGame;
+        // Unless the switch phrase sits inside a negation, in which case
+        // the child is declining, not requesting — that is a Stop.
+        if (hasSwitch) return hasNegation ? GameIntent.Stop : GameIntent.SwitchGame;
 
-        // Stop wins mid-round only — without an active round there is
-        // nothing to stop.
-        if (hasActiveRound && ContainsAny(lower, StopTriggers))
-            return GameIntent.Stop;
+        // Stop works with or without an active round. A child saying
+        // "enough" or "I don't want to play" must get a warm goodbye —
+        // never a new game started at them. (Pre-fix behavior gated Stop
+        // on hasActiveRound, which made every no-round stop a StartNew.)
+        if (hasStop) return GameIntent.Stop;
 
         // An explicit "let's play" with no active round opens a fresh game.
         // With an active round it's just engagement — let Continue handle it.
@@ -72,11 +95,54 @@ public static class GameIntentDetector
         return hasActiveRound ? GameIntent.Continue : GameIntent.StartNew;
     }
 
+    /// <summary>
+    /// Lowercase + trim + strip the Armenian intra-word marks ՞ ՛ ՜.
+    /// Armenian writes emphasis and question marks INSIDE the word
+    /// («Բա՛վ է», «Վե՛րջ»), so without this the most natural emphatic
+    /// "enough!" never matches a plain trigger. Deliberately duplicated
+    /// from ModeDetector's private normalizer rather than widening that
+    /// HIGH-risk file's surface — same decision WelcomeIntentDetector
+    /// documents. Keep the three marks in step across all three copies.
+    /// </summary>
+    private static string NormalizeForMatch(string? message)
+    {
+        var lower = (message ?? string.Empty).Trim().ToLowerInvariant();
+        if (lower.IndexOf('՞') < 0
+            && lower.IndexOf('՛') < 0
+            && lower.IndexOf('՜') < 0)
+        {
+            return lower;
+        }
+        return lower
+            .Replace("՞", string.Empty)
+            .Replace("՛", string.Empty)
+            .Replace("՜", string.Empty);
+    }
+
     private static bool ContainsAny(string lower, string[] needles)
     {
         for (int i = 0; i < needles.Length; i++)
         {
             if (lower.Contains(needles[i])) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// True when <paramref name="word"/> occurs bounded by non-letters
+    /// (or string edges). Used for triggers that are substrings of common
+    /// unrelated words.
+    /// </summary>
+    private static bool ContainsWholeWord(string lower, string word)
+    {
+        int idx = 0;
+        while ((idx = lower.IndexOf(word, idx, StringComparison.Ordinal)) >= 0)
+        {
+            bool startOk = idx == 0 || !char.IsLetter(lower[idx - 1]);
+            int end = idx + word.Length;
+            bool endOk = end >= lower.Length || !char.IsLetter(lower[end]);
+            if (startOk && endOk) return true;
+            idx = idx + 1;
         }
         return false;
     }
