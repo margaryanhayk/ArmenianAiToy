@@ -47,8 +47,11 @@
   "feedback": [
     { "id": "win-vardan",  "voice": "vardan", "text": "Տեսա՞ր, ես ճիշտ էի։ Ապրե՛ս, որ ինձ ընտրեցիր։" },
     { "id": "win-katrin",  "voice": "katrin", "text": "Ճի՛շտ է, ես էի ճիշտ։ Ապրե՛ս, լավ գտար։" },
+    { "id": "lose-vardan", "voice": "vardan", "text": "Վա՜յ, սխալվեցի… Այս անգամ Կատրինն էր ճիշտ։" },
+    { "id": "lose-katrin", "voice": "katrin", "text": "Օ՜, այս անգամ Վարդանն էր ճիշտ։ Լա՛վ էր, Վարդա՛ն։" },
     { "id": "wrong-areg",  "voice": "areg",   "text": "Ոչինչ, լսի՛ր նորից ու փորձի՛ր։" },
     { "id": "done-areg",   "voice": "areg",   "text": "Լավ խաղացինք։ Մյուս անգամ նորից կխաղանք։" }
   ],
+  "_feedbackFlow": "Owner rule 2026-08-05: after every answer someone REACTS. Child right → win-{winner} (happy). Child wrong → lose-{picked} (the kid they chose admits it, warm-sad — the clones carry sad-comforted samples) then wrong-areg. Needs a small firmware addition: the quiz engine picks the feedback clip from the expected suffix + correctness (4 character clips instead of the single win/wrong pair).",
   "_renderNote": "Each round renders as ONE MP3: Vardan line → Katrin line → Areg judge line (three voices spliced; use the Ship-StoryAudio re-encode so no multi-ID3 stitch bug). Filename: vk01-n.mp3 (katrin right = RED), vk02-y.mp3 (vardan right = GREEN)… Feedback clips per speaker. Sample ONE round for the owner listen test before batch."
 }
