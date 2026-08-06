@@ -37,9 +37,8 @@
     {
       "storyId": "sutasan",
       "afterLine": "— Ճշմարիտ եմ ասում՝ մի կոտ ոսկին տուր։",
-      "endingText": "Թագավորը նայում է գյուղացուն, նայում է դատարկ կոտին ու հանկարծ սկսում է ծիծաղել։ — Ա՛յ խելոք մարդ,— ասում է,— քո սուտը այնպիսի սուտ էր, որ ես ո՛չ «սուտ է» կարող էի ասել, ո՛չ՝ «ճշմարիտ է»։ Դու հաղթեցիր քո խելքով, այլ քո խելքով։ Հրամայում է կոտը լցնել ոսկով։ Գյուղացին կոտը շալակին՝ ուրախ-ուրախ գնում է տուն՝ ճամփին երգելով։ Իսկ թագավորը այդ օրվանից իր դուռը բաց է պահում ամեն խելոք մարդու առաջ, որ խելոք խոսք լսի։ Որովհետև սուրը կտրում է, զորքը հոգնում է, իսկ խելքը միշտ ճամփա է բացում։",
-      "note": "The canonical text stops on the trap itself; this ending closes the loop — the king laughs, names the cleverness out loud, and pays. Keeps the lesson (wit over power) and the tale's good humor; the king loses gracefully, so there is no gloating for a child to copy. «—» em-dash dialogue matches the story file.",
-      "_ownerReviewNote": "Editing slip flagged to owner 2026-08-07: the sentence reads «Դու հաղթեցիր քո խելքով, այլ քո խելքով։» (same phrase twice). Awaiting his choice before render."
+      "endingText": "Թագավորը նայում է գյուղացուն, նայում է դատարկ կոտին ու հանկարծ սկսում է ծիծաղել։ — Ա՛յ խելոք մարդ,— ասում է,— քո սուտը այնպիսի սուտ էր, որ ես ո՛չ «սուտ է» կարող էի ասել, ո՛չ՝ «ճշմարիտ է»։ Դու հաղթեցիր ոչ սրով, ոչ զորքով, այլ քո խելքով։ Հրամայում է կոտը լցնել ոսկով։ Գյուղացին կոտը շալակին՝ ուրախ-ուրախ գնում է տուն՝ ճամփին երգելով։ Իսկ թագավորը այդ օրվանից իր դուռը բաց է պահում ամեն խելոք մարդու առաջ, որ խելոք խոսք լսի։ Որովհետև սուրը կտրում է, զորքը հոգնում է, իսկ խելքը միշտ ճամփա է բացում։",
+      "note": "The canonical text stops on the trap itself; this ending closes the loop — the king laughs, names the cleverness out loud, and pays. Keeps the lesson (wit over power) and the tale's good humor; the king loses gracefully, so there is no gloating for a child to copy. «—» em-dash dialogue matches the story file."
     },
     {
       "storyId": "sutlik-orskan",
