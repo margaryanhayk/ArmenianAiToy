@@ -11,6 +11,26 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 - **Armenian-first.** All child-facing output is in Armenian.
 - **Safety-first.** Dual moderation (input + output). Never bypass safety checks.
 - **Parent-trust-first.** No emotional companion behavior. No open-ended chat.
+  **The Absence Test** (standing rule, formalized during the welcome-flow
+  content review — see § Spoken welcome flow): a child-facing line must
+  stay true if Areg were powered off between sessions. Feelings or
+  awareness during the child's *absence* («I was waiting for you», «I
+  was thinking about you») and unconditional availability («I'm here
+  whenever you want») fail this test and are rejected; present-moment
+  gladness on reconnect («Ուրախ եմ քեզ տեսնել») passes.
+- **Same-commit dashboard rule** (owner rule, in force since the
+  2026-08-06/07 content-depth batch): every child-facing feature ships
+  its parent-dashboard counterpart in the same slice — backend, firmware,
+  and `parent.html` land together rather than the dashboard trailing as a
+  follow-up.
+- **Game honesty.** In Game mode the toy may claim only what it actually
+  measured — a button color/press, a count, a timestamp, a duration, or
+  something the child said in this conversation. It must never claim to
+  have observed a physical action (clap, touch, found object) it cannot
+  sense, and never wrongly claim a contradiction it isn't sure of.
+  Enforced by `ChatService.AllowedGameTypes` (online — see the Game mode
+  v6 note under Key files) and by the offline firmware games' own
+  honesty rules (see § Content-depth batch below).
 - **Bounded conversation.** Five modes only — Story, Game, Riddle, Curiosity Window, Calm/Bedtime. Never free-form AI chat. Full spec in `.claude/MODES.md`.
 - **Tone rules (summary — full rules in `.claude/MODES.md`):**
   - Story mode: warm, slightly unhurried, quiet sense of magic. 3–5 sentences + choice block.
@@ -38,13 +58,24 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
   and any text edit now costs a re-render + fresh listen test. It is NOT
   runtime-served until a human promotes it to approved `Stories/Content/`.
   No other folklore titles may be added without a new owner decision.
+  **Name spelling correction (owner decision C, 2026-08-07):** the two
+  dative-form leftovers spelling the girl's name «Հուռնի» were corrected
+  to «Հուռուն» in the runtime-served
+  `backend/src/ArmenianAiToy.Application/Stories/Content/anban-huri.story.json`
+  text (the story's own reflection question already declines the name
+  that way). The name itself is pinned as «Հուռի» / «Հուռին», never
+  «Հուռնի». **The shipped narration audio still says «Հուռնի» in those
+  two moments — it was not re-rendered for this fix**, so the spoken
+  story and its written text now disagree in exactly two spots until a
+  future re-render picks up the correction (recorded in the
+  variant-endings content notes as a flag for that re-render).
 
 ## Build & Test
 
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2411 tests)
+dotnet test                                     # Run all tests (2484 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -183,7 +214,7 @@ Two resolution paths:
 - `ChoiceNormalizer.cs` — heuristic child input → option_a/option_b/unknown
 - `TailBlockParser.cs` — extracts/strips `---\nCHOICE_A:...\nCHOICE_B:...` from AI responses
 - `ModeDetector.cs` — 5-mode detection (Story/Game/Riddle/Curiosity/Calm) with priority rules. Game cue is a token-prefix match on the stem «խաղ» with explicit «խաղող» (grapes) / «խաղաղ» (peaceful) exclusions — never a bare substring.
-- **Game mode v6 (2026-08-05)** — taxonomy cut to the types a blind one-button toy can run (`animal_sound` / `count_to` / `yes_no_silly`, plus `make_it_small` added 2026-08-06 — Armenian diminutive play, celebrate-the-attempt / model-the-form / never grade or drill; enforced by `ChatService.AllowedGameTypes`, not just prompt prose), honest-reaction directive (yes/no answers classified via `WelcomeIntentDetector.DetectYesNo`; celebration only when earned; the toy never claims to observe a physical action), stop-anytime (`GameIntentDetector`: stop words work without an active round, «Բա՛վ է» emphatic forms normalize, negated switch = stop), retry path preserves the game tail block (Game mirror of F-Rid-1), round cleared on mode exit, model-chosen difficulty overridden to 1 on fresh rounds. Voice path gates the DETECTED mode's parent flag post-STT (Story-only gate removed). Full contract in `.claude/MODES.md` § 2. `tools/GameBenchmark` runs against current source via `--provisioning-secret` (bench parent register/claim flow); `baseline.json` re-captured 2026-08-06 vs a local Gemini server with the four-type prompt (9/9 scenarios, 29/29 turns, zero weak cases).
+- **Game mode v6 (2026-08-05)** — taxonomy cut to the types a blind one-button toy can run (`animal_sound` / `count_to` / `yes_no_silly`, plus `make_it_small` added 2026-08-06 — Armenian diminutive play, celebrate-the-attempt / model-the-form / never grade or drill — and `guess_what` added 2026-08-07, owner request "real akinator for kids" — the toy asks one yes/no question per turn to guess something the CHILD is thinking of, must guess by ~question 7-8, and on a loss asks what it was, accepts the answer, and — only if it clearly contradicts an earlier answer — adds exactly ONE playful honest line before celebrating the child's win, never a scold or a list of mismatches; enforced by `ChatService.AllowedGameTypes`, not just prompt prose), honest-reaction directive (yes/no answers classified via `WelcomeIntentDetector.DetectYesNo`; celebration only when earned; the toy never claims to observe a physical action), stop-anytime (`GameIntentDetector`: stop words work without an active round, «Բա՛վ է» emphatic forms normalize, negated switch = stop), retry path preserves the game tail block (Game mirror of F-Rid-1), round cleared on mode exit, model-chosen difficulty overridden to 1 on fresh rounds. Voice path gates the DETECTED mode's parent flag post-STT (Story-only gate removed). Full contract in `.claude/MODES.md` § 2. `tools/GameBenchmark` runs against current source via `--provisioning-secret` (bench parent register/claim flow); `baseline.json` re-captured 2026-08-07 vs a local Gemini server with the five-type prompt (11/11 scenarios, 46/46 turns, zero weak cases).
 - `ModeDetectorTests.cs`, `ModeDetectorIntegrationTests.cs` — mode detection and ChatService integration tests
 - `ChoiceNormalizerTests.cs`, `ChoiceHandoffTests.cs` — story choice pipeline tests
 
@@ -3386,6 +3417,130 @@ TLS (Stage A runs over the HTTP LAN bench; `ota_http_begin()` in
   `DeviceCommands` audit history unchanged. Pinned by
   `DeviceOtaHealthTests` (keystone: `failed:sha256_mismatch` + fresh
   heartbeat → `ok`) and the `Devices_*OtaHealth*` endpoint tests.
+
+## Content-depth batch (owner batch, 2026-08-06/07) — serial, parent toggles, dashboard, offline games
+
+A run of owner-picked items shipped as separate same-day slices, each
+following the same-commit dashboard rule (backend + firmware + `parent.html`
+land together — see § Product Constraints). Test count grew across the
+batch to the current **2484** (see § Build & Test); some of the batch's
+commits are content-only (Armenian text edits) and add no tests.
+
+**Serial support (Tsivik plays in order).** The owner picked a serial as
+one of the batch items and confirmed it runs offline with a hero name
+chosen by the team.
+- Backend: additive `SeriesId`/`SeriesIndex`/`SeriesTitle` on
+  `ContentSyncStoryOptions`/`ContentStoryItem`, projected onto the content
+  manifest and `GET /api/parents/stories`. **Both-or-neither validation** —
+  a half-set series field drops only those fields, the story itself stays
+  in rotation (this is the OPPOSITE of the `AltOf` rule below, on purpose).
+  Absent series fields = wire byte-identical for non-serial deployments.
+- Firmware: index schema v4 → v5 (superset — a v4 card parses as
+  all-standalone, no card ever needs wiping). A serial episode is eligible
+  only as the **lowest-unheard index of its series**, and only if no
+  sibling episode was heard this boot. **Documented limitation: the "one
+  new episode per day" gate is a per-BOOT RAM latch, not a calendar day —
+  a reboot resets it.** Real day-based gating would need a server
+  day-signal slice; not built. New clip kind `serialnext`, played at
+  natural end before the post-story flow (which returns early offline and
+  would otherwise swallow the line).
+- Dashboard: the parent story library groups a series under its real
+  name (Tsivik), «մաս» rather than a TV-episode calque, with episodes
+  collapsed behind a details disclosure and a next-up chip derived from
+  listen counts.
+- Not yet bench-run on real hardware (compile-verified only, per the
+  firmware README): play reporting for a serial episode end-to-end, the
+  v4→v5 index upgrade, and the daily-latch behavior across a real reboot.
+
+**Parent toggles — story pauses + variant endings.** Both features are now
+parent-controlled, default ON.
+- `Device.StoryPausesEnabled` / `Device.VariantEndingsEnabled` (migration
+  `AddStoryFeatureToggles`). **The EF scaffolder emitted `defaultValue:
+  false` for both columns — hand-corrected to `true`** before it shipped;
+  left as-is, every existing toy would have silently had both features
+  turned off while the entity, DTO, manifest, and dashboard all claimed
+  ON. Noted directly in the migration file as a trap for future
+  scaffolds.
+- `PUT /api/parents/devices/{id}/story-pauses` and
+  `PUT /api/parents/devices/{id}/variant-endings` (pause-shaped: parent-JWT,
+  ownership-checked, silent 404 on miss), audited `ParentDeviceStoryPausesSet`
+  / `ParentDeviceVariantEndingsSet` (`AuditEventType`, `AuditEvent.cs`) on
+  real flips only. Both flags are reset to their ON default by the
+  unlink factory-reset (§ Consumer platform). Both fields are additive on
+  the content manifest and on `LinkedDeviceDto`.
+- ContentSync gains `AltOf` — an alternate ending is a variant of an
+  existing story, never a rotation member on its own. **Invalid `AltOf`
+  drops the WHOLE item** — deliberately the inverse of the `SeriesId`
+  both-or-neither rule above: a half-configured alternate ending must
+  never enter rotation and be told to a child as though it were the
+  complete story. Alt entries are filtered out of the parent story
+  library.
+- Firmware: index v5 → v6 carries per-story `alt_of`; on a repeat listen
+  with the toggle on and a verified alt cached, `story_select` resolves
+  the alternate file instead. `story_pauses_enabled()` on the firmware
+  side is plumbing + an accessor only — actual mid-story pause playback
+  wiring is a later render-batch slice, not built yet.
+- Dashboard: two new toggles with plain-parent explanatory notes, audit-
+  feed labels for the two new event types, aria-labels added across four
+  adjacent switches.
+
+**Parent dashboard — "Talk about it tonight" + reflection journal.**
+Client-side additions to `parent.html` only — no new backend endpoints;
+built entirely on data the dashboard already fetches.
+- A "Talk about it tonight" card and a weekly digest on the toy page,
+  rolled up client-side from existing story-play and reflection-answer
+  data (`resolveTonightOffer` helper).
+- A "What they said" reflection journal view with a pager, showing the
+  child's saved reflection answers.
+- Describe-never-grade discipline carried over from the rest of the
+  parent surface: a quiet week reads as rest, a toy with zero plays shows
+  no cards, and there are no streaks or countdowns anywhere in this view.
+
+**Firmware — offline games engine.** `esp32/AregVoiceMvp/offline_games.{h,cpp}`,
+gated behind `-DAREG_OFFLINE_GAMES_BENCH` (production build is byte-identical
+— compile-verified, not yet bench-run on hardware):
+- **Mind-reader** — a 4-deep binary-tree yes/no walk by clip id, the toy
+  guessing an animal the child is thinking of (no mic, no network, no RAM
+  table — the tree is implicit in the clip ids).
+- **Two-player buzzer** — first button press wins the round; the toy
+  addresses colors, never names, and never announces a loser; reuses the
+  existing `/quiz` clip bank.
+- **Button Simon** — a grow-from-2 tone-sequence echo game, ceiling 6,
+  within-session ramp only (nothing persisted, so a new session always
+  starts at length 2).
+- Shipped alongside a real pre-existing bug fix in `offline_quiz.cpp`'s
+  `play_clip()`: it treated `audio_play_story_file`'s INTERRUPTED return as
+  success, so a question that played to its natural end returned false and
+  the quiz's answer window never opened. Fixed by checking the `out_started`
+  flag instead — the same success contract story selection already uses.
+- Firmware honesty rule for every offline game: **the toy claims only what
+  the buttons measured** («Ես հաշվեցի ձեր սեղմումները»); the mic is off in
+  all three games, so no clip may claim to have heard the child (see §
+  Product Constraints, Game honesty).
+
+**Content drafts (text only — nothing at runtime reads these folders yet;
+owner review + a sample-first listen test gates any render):**
+- `backend/content/offline-games/` — 90 draft clip texts across the five
+  offline games above (78 in the initial pass, +12 when the two-player
+  buzzer grew from 6 to 18 clips so a 5-round session never repeats a
+  line). The owner has since made a 34-line correction pass on wording
+  (calque fixes, tree-branch corrections, stress-mark placement) — text
+  review is in progress, not yet complete or listen-tested.
+- `backend/content/variant-endings/` — 10 alternate story endings, one per
+  runtime-served story, each grafting after the story's existing final
+  line. The owner has reviewed/corrected 7 of the 10 directly and decided
+  the remaining 2 individually (kept the original draft for one, picked
+  option A for another); the file's own `_status` field still reads
+  "DRAFTS … pending the owner's text review, then the sample-first listen
+  test" and no render has happened — do not treat this as fully approved
+  for render yet.
+- `backend/content/serial-hero/` — the six-episode Tsivik day-story serial
+  («Ծիվիկի մեծ ճանապարհը»), an original character (not folklore, not
+  Katrin/Vardan). The owner picked the serial concept and confirmed the
+  offline shape and hero name (which is why the backend/firmware plumbing
+  above already shipped), but the episode TEXT itself is still in DRAFTS
+  status pending the owner's text review and listen test — no render, no
+  manifest entry yet.
 
 ## Key Design Decisions
 

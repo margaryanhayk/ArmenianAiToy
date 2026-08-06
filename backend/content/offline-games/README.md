@@ -1,14 +1,18 @@
-# Offline games — clip texts (drafts)
+# Offline games — clip texts (owner-reviewed)
 
 Armenian TEXT source for five new offline SD-card games. **Nothing at
 runtime reads this folder** — same convention as `../quiz-questions/` and
 `../voice-clips/`: the Armenian lives here so it is reviewable in one place
-and a diff shows honestly what changed. The firmware slices for these games
-do not exist yet; text comes first so the owner reviews words, not renders.
+and a diff shows honestly what changed. The firmware engine for
+these games shipped 2026-08-07 (`esp32/AregVoiceMvp/offline_games.{h,cpp}`,
+bench-flagged, not yet hardware-run); text came first so the owner reviewed
+words, not renders.
 
-**Status: DRAFTS.** armenian-story-master authored + self-reviewed
-2026-08-06. Pending the owner's text review, then the sample-first listen
-test (see `_renderNote` in the JSON), then per-game firmware slices.
+**Status: OWNER-REVIEWED 2026-08-07.** armenian-story-master authored
+2026-08-06; the owner then rewrote 34 lines himself (frog «կռկռ-կռկռ» over the
+Russian calque, goose «ղա-ղա» reassigned, one mind-reader branch re-cut with
+its leaves swapped) and approved the 12 buzzer variety lines. Remaining gates:
+the sample-first listen test (see `_renderNote` in the JSON), then the render.
 
 ## The five games and their id schemes
 

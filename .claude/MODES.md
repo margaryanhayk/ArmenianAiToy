@@ -365,8 +365,9 @@ never as code, through a gated pipeline:
 **Purpose.** Run a short, structured play activity where every child
 answer is a WORD the child says. The toy is blind and one-buttoned — it
 cannot observe a clap, a touch, or a found object — so the taxonomy is
-restricted to the four verifiable-or-honest types (v6, 2026-08-05;
-fourth type added 2026-08-06, owner-approved):
+restricted to the five verifiable-or-honest types (v6, 2026-08-05;
+fourth type added 2026-08-06; fifth type added 2026-08-07 — all
+owner-approved):
 
 - `animal_sound` — «Հնչեցրու կատվի ձայնը։» Participation is praised;
   the imitation itself is never graded (the toy cannot judge a moo).
@@ -383,6 +384,27 @@ fourth type added 2026-08-06, owner-approved):
   repeat-after-me drilled (not a teacher) — the toy models the
   standard form in its own next sentence instead. Benchmark-verified
   2026-08-06 (9/9 scenarios, 29/29 turns, zero weak cases).
+- `guess_what` — «Գուշակիր» (owner request, "real akinator for kids"),
+  added 2026-08-07. Roles are REVERSED: the CHILD thinks of an animal,
+  everyday object, food, or fairy-tale character and keeps it secret;
+  the toy asks exactly one yes/no question per turn (never an open
+  question — the child can only answer «հա»/«ոչ»), tracks its own
+  questions from conversation history so it never repeats one, and must
+  make a real guess by roughly question 7-8. A confirmed guess is
+  celebrated in one line, no gloating about how it was worked out. On a
+  loss the toy gives up warmly, asks what the secret was, accepts
+  whatever the child names, and — ONLY if that reveal clearly
+  contradicts one of the child's own earlier answers — adds exactly ONE
+  playful, honest line naming the mismatch (never a list, never a
+  question, never a scold) before celebrating the CHILD's win. The toy
+  may claim only what the child actually said in this conversation,
+  never something about the room or what the child was thinking; an
+  uncertain contradiction is never claimed. One secret spans many turns,
+  so the VARIETY POLICY's per-round subtype rotation does not apply
+  mid-secret — instead each question probes a different property (what
+  it is → where it lives → what it does → how big) than the previous
+  one. Benchmark-verified 2026-08-07 (11/11 scenarios, 46/46 turns, zero
+  weak cases).
 
 Physical-action games (clap-along, body-part touch, color-find,
 copy-sound) are **structurally banned** — the prompt forbids asking for
