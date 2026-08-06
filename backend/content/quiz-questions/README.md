@@ -37,3 +37,12 @@ batch-rendering.
 
 TTS watch words: «մլավում», «թռչում/Թռչունները», «ցատկում», «Ձմռանը»,
 «երկնքու՞մ/երկնքի՞ց», the «սա՞ռն է» junction.
+
+**TTS rule learned 2026-08-06 (owner listen test):** the voice
+SWALLOWS the euphonic final ն of the definite article before a
+vowel-initial word — «Աստղերն երկնքում» came out as bare «աստղեր».
+In TTS-bound text prefer the full «-ը» form («Աստղերը երկնքում»)
+even where book grammar wants «-ն». q17/q19 fixed accordingly;
+check any «-ն + vowel» junction at sample time before batch renders
+(the VK rounds vk04 «Փիղն ամենամեծ» and vk09 «Նապաստակն…» carry the
+same pattern — listen for the ն in their v1 renders).
