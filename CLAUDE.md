@@ -44,7 +44,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2391 tests)
+dotnet test                                     # Run all tests (2397 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2403,6 +2403,23 @@ moves); capabilities switch independently (mixed-vendor configs are
 supported); **no provider/model flip reaches children without a
 benchmark run + the owner's Armenian listen test.** Pinned by
 `AiProviderConfigTests`.
+
+**Gemini-side safety (owner approval 2026-08-06).** Two invariants on
+`GeminiChatClientAdapter`, pinned by `GeminiChatClientAdapterTests`:
+- Every request carries `safetySettings` for all four harm categories
+  (harassment / hate / sexually-explicit / dangerous) at
+  `Gemini:SafetyThreshold` — default `BLOCK_LOW_AND_ABOVE` (strictest).
+  Bounded value space excludes `BLOCK_NONE`; an unknown value refuses
+  boot (`ResolveSafetyThreshold`). This is the vendor-side layer UNDER
+  the product's dual OpenAI moderation, not a replacement.
+- A Gemini safety block (prompt-level `promptFeedback.blockReason`, or
+  candidate `finishReason` SAFETY/PROHIBITED_CONTENT/BLOCKLIST/SPII/
+  IMAGE_SAFETY) returns the calm `SafetyFallbackResponse` line (default
+  «Արի, մի հեքիաթ սկսենք։») instead of throwing — before this, a block
+  surfaced to the child as the sanitized 502 "service unavailable". The
+  fallback still flows through output moderation and persists as a
+  normal assistant reply. Non-safety failures keep throwing (Path-5 /
+  reliability-gate semantics unchanged).
 
 ## The voice Areg speaks in (`OpenAI:TtsVoice`)
 

@@ -48,10 +48,58 @@ public class GeminiChatClientAdapter : IAiChatClient
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
 
+    /// <summary>Default per-request Gemini safety threshold (owner
+    /// approval 2026-08-06). Strictest blocking tier — children's
+    /// product. Configurable DOWN via <c>Gemini:SafetyThreshold</c> only
+    /// within <see cref="AllowedSafetyThresholds"/>; BLOCK_NONE is
+    /// deliberately not representable.</summary>
+    public const string DefaultSafetyThreshold = "BLOCK_LOW_AND_ABOVE";
+
+    /// <summary>Bounded value space for <c>Gemini:SafetyThreshold</c>.
+    /// A typo must refuse boot (same posture as AiProviderConfig), and
+    /// BLOCK_NONE is excluded so no config value can switch Gemini's own
+    /// safety filter off.</summary>
+    public static readonly string[] AllowedSafetyThresholds =
+        { "BLOCK_LOW_AND_ABOVE", "BLOCK_MEDIUM_AND_ABOVE", "BLOCK_ONLY_HIGH" };
+
+    /// <summary>Mirrors ChatService's <c>SafetyFallbackResponse</c>
+    /// default — the calm Armenian line a child hears instead of an
+    /// error when a reply is withheld.</summary>
+    public const string DefaultSafetyFallbackText = "Արի, մի հեքիաթ սկսենք։";
+
+    /// <summary>The four Gemini harm categories the request pins. Kept
+    /// as a field so tests can assert the wire body covers all of them.</summary>
+    public static readonly string[] SafetyCategories =
+    {
+        "HARM_CATEGORY_HARASSMENT",
+        "HARM_CATEGORY_HATE_SPEECH",
+        "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        "HARM_CATEGORY_DANGEROUS_CONTENT",
+    };
+
+    /// <summary>Resolve + validate <c>Gemini:SafetyThreshold</c>.
+    /// Null/empty → the strict default; a value outside
+    /// <see cref="AllowedSafetyThresholds"/> throws — boot must refuse a
+    /// typo rather than silently weaken child safety (BLOCK_NONE is not
+    /// in the allowed set on purpose).</summary>
+    public static string ResolveSafetyThreshold(string? configured)
+    {
+        if (string.IsNullOrWhiteSpace(configured)) return DefaultSafetyThreshold;
+        if (Array.IndexOf(AllowedSafetyThresholds, configured) < 0)
+        {
+            throw new InvalidOperationException(
+                $"Gemini:SafetyThreshold '{configured}' is not supported. " +
+                $"Allowed: {string.Join(", ", AllowedSafetyThresholds)}.");
+        }
+        return configured;
+    }
+
     private readonly HttpClient _http;
     private readonly string _apiKey;
     private readonly string _model;
     private readonly int? _thinkingBudget;
+    private readonly string _safetyThreshold;
+    private readonly string _safetyFallbackText;
     private readonly OpenAI.OpenAIReliabilityGate? _gate;
     private readonly ILogger<GeminiChatClientAdapter> _logger;
 
@@ -61,7 +109,9 @@ public class GeminiChatClientAdapter : IAiChatClient
         string model,
         ILogger<GeminiChatClientAdapter> logger,
         OpenAI.OpenAIReliabilityGate? gate = null,
-        int? thinkingBudget = null)
+        int? thinkingBudget = null,
+        string? safetyThreshold = null,
+        string? safetyFallbackText = null)
     {
         _http = http;
         _apiKey = apiKey;
@@ -74,6 +124,10 @@ public class GeminiChatClientAdapter : IAiChatClient
         // model, where omitting it means ~7 s thinking-mode TTFT).
         _model = string.IsNullOrWhiteSpace(model) ? "gemini-3.6-flash" : model;
         _thinkingBudget = thinkingBudget;
+        _safetyThreshold = string.IsNullOrWhiteSpace(safetyThreshold)
+            ? DefaultSafetyThreshold : safetyThreshold;
+        _safetyFallbackText = string.IsNullOrWhiteSpace(safetyFallbackText)
+            ? DefaultSafetyFallbackText : safetyFallbackText;
         _logger = logger;
         _gate = gate;
     }
@@ -106,17 +160,27 @@ public class GeminiChatClientAdapter : IAiChatClient
             contents.Add(new { role = geminiRole, parts = new[] { new { text = content } } });
         }
 
+        // Gemini's OWN safety filter, pinned on every request (owner
+        // approval 2026-08-06). Belt-and-braces UNDER the product's dual
+        // OpenAI moderation — this is the vendor-side layer that stops
+        // an unsafe candidate from ever being generated, in whatever
+        // language, before our output moderation even sees it.
+        var safetySettings = Array.ConvertAll(
+            SafetyCategories, c => new { category = c, threshold = _safetyThreshold });
+
         object body = _thinkingBudget is { } tb
             ? new
             {
                 system_instruction = new { parts = new[] { new { text = systemPrompt } } },
                 contents,
+                safetySettings,
                 generationConfig = new { thinkingConfig = new { thinkingBudget = tb } },
             }
             : new
             {
                 system_instruction = new { parts = new[] { new { text = systemPrompt } } },
                 contents,
+                safetySettings,
             };
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
@@ -145,8 +209,45 @@ public class GeminiChatClientAdapter : IAiChatClient
         }
 
         using var doc = JsonDocument.Parse(json);
-        var parts = doc.RootElement
-            .GetProperty("candidates")[0]
+        var root = doc.RootElement;
+
+        // Safety block, prompt level: no candidates at all, reason in
+        // promptFeedback.blockReason. Before 2026-08-06 this path threw
+        // (missing-property) and the child heard the sanitized 502
+        // ("service unavailable") — wrong voice for a safety refusal.
+        // A block is a VALID outcome: return the same calm Armenian
+        // fallback ChatService uses, which then flows through output
+        // moderation and persists as a normal assistant reply.
+        if (!root.TryGetProperty("candidates", out var candidates)
+            || candidates.ValueKind != JsonValueKind.Array
+            || candidates.GetArrayLength() == 0)
+        {
+            var blockReason =
+                root.TryGetProperty("promptFeedback", out var pf)
+                && pf.TryGetProperty("blockReason", out var br)
+                    ? br.GetString() : "no_candidates";
+            _logger.LogWarning(
+                "Gemini blocked the prompt (reason {Reason}, model {Model}); returning the safety fallback",
+                blockReason, _model);
+            return _safetyFallbackText;
+        }
+
+        // Safety block, candidate level: generation was cut off by the
+        // safety filter (or a related content policy) — same calm
+        // fallback. Non-safety finish reasons (STOP, MAX_TOKENS, …)
+        // fall through to normal parsing.
+        var candidate = candidates[0];
+        var finishReason = candidate.TryGetProperty("finishReason", out var fr)
+            ? fr.GetString() : null;
+        if (finishReason is "SAFETY" or "PROHIBITED_CONTENT" or "BLOCKLIST" or "SPII" or "IMAGE_SAFETY")
+        {
+            _logger.LogWarning(
+                "Gemini withheld the reply (finishReason {Reason}, model {Model}); returning the safety fallback",
+                finishReason, _model);
+            return _safetyFallbackText;
+        }
+
+        var parts = candidate
             .GetProperty("content")
             .GetProperty("parts");
         var sb = new System.Text.StringBuilder();

@@ -149,4 +149,114 @@ public class GeminiChatClientAdapterTests
                 AiProviderConfig.TtsKey,
                 AiProviderConfig.SupportedForTts));
     }
+
+    // ── Gemini-side safety (owner approval 2026-08-06) ───────────────
+
+    [Fact]
+    public async Task EveryRequest_CarriesSafetySettings_AllFourCategories_StrictDefault()
+    {
+        var (svc, h) = Create();
+
+        await svc.GetCompletionAsync(
+            "SYSTEM", new List<(string, string)> { ("user", "պատմիր հեքիաթ") });
+
+        using var doc = JsonDocument.Parse(h.LastBody!);
+        var settings = doc.RootElement.GetProperty("safetySettings");
+        var byCategory = settings.EnumerateArray().ToDictionary(
+            s => s.GetProperty("category").GetString()!,
+            s => s.GetProperty("threshold").GetString()!);
+
+        // KEYSTONE: all four harm categories pinned at the strictest
+        // blocking tier on the wire — Gemini's own filter is never left
+        // at vendor defaults for a children's product.
+        Assert.Equal(GeminiChatClientAdapter.SafetyCategories.Length, byCategory.Count);
+        foreach (var category in GeminiChatClientAdapter.SafetyCategories)
+        {
+            Assert.Equal("BLOCK_LOW_AND_ABOVE", byCategory[category]);
+        }
+    }
+
+    [Fact]
+    public async Task CandidateSafetyBlock_ReturnsCalmFallback_NotAThrow()
+    {
+        var (svc, h) = Create();
+        // Real block shape: candidate present, finishReason=SAFETY, no
+        // content.parts.
+        h.ResponseJson = "{\"candidates\":[{\"finishReason\":\"SAFETY\",\"safetyRatings\":[]}]}";
+
+        var reply = await svc.GetCompletionAsync(
+            "SYSTEM", new List<(string, string)> { ("user", "x") });
+
+        // KEYSTONE: a safety block is a VALID outcome — the child hears
+        // the same calm Armenian line ChatService's own safety paths
+        // speak, never the sanitized 502.
+        Assert.Equal(GeminiChatClientAdapter.DefaultSafetyFallbackText, reply);
+    }
+
+    [Fact]
+    public async Task PromptLevelBlock_NoCandidates_ReturnsCalmFallback()
+    {
+        var (svc, h) = Create();
+        h.ResponseJson = "{\"promptFeedback\":{\"blockReason\":\"SAFETY\"}}";
+
+        var reply = await svc.GetCompletionAsync(
+            "SYSTEM", new List<(string, string)> { ("user", "x") });
+
+        Assert.Equal(GeminiChatClientAdapter.DefaultSafetyFallbackText, reply);
+    }
+
+    [Fact]
+    public async Task ConfiguredFallbackText_IsSpokenOnBlock()
+    {
+        var handler = new FakeHandler
+        {
+            ResponseJson = "{\"candidates\":[{\"finishReason\":\"PROHIBITED_CONTENT\"}]}",
+        };
+        var svc = new GeminiChatClientAdapter(
+            new HttpClient(handler), "test-key", "m",
+            Substitute.For<ILogger<GeminiChatClientAdapter>>(),
+            safetyFallbackText: "Խաղա՞նք միասին։");
+
+        var reply = await svc.GetCompletionAsync(
+            "SYSTEM", new List<(string, string)> { ("user", "x") });
+
+        Assert.Equal("Խաղա՞նք միասին։", reply);
+    }
+
+    [Fact]
+    public void ResolveSafetyThreshold_EmptyIsStrictDefault_UnknownRefusesBoot_BlockNoneRefused()
+    {
+        Assert.Equal("BLOCK_LOW_AND_ABOVE",
+            GeminiChatClientAdapter.ResolveSafetyThreshold(null));
+        Assert.Equal("BLOCK_LOW_AND_ABOVE",
+            GeminiChatClientAdapter.ResolveSafetyThreshold(""));
+        Assert.Equal("BLOCK_MEDIUM_AND_ABOVE",
+            GeminiChatClientAdapter.ResolveSafetyThreshold("BLOCK_MEDIUM_AND_ABOVE"));
+
+        // KEYSTONE: no config value can switch Gemini's filter off, and
+        // a typo refuses boot instead of silently weakening safety.
+        Assert.Throws<InvalidOperationException>(
+            () => GeminiChatClientAdapter.ResolveSafetyThreshold("BLOCK_NONE"));
+        Assert.Throws<InvalidOperationException>(
+            () => GeminiChatClientAdapter.ResolveSafetyThreshold("block_low_and_above"));
+    }
+
+    [Fact]
+    public async Task CustomThreshold_ReachesTheWire()
+    {
+        var handler = new FakeHandler();
+        var svc = new GeminiChatClientAdapter(
+            new HttpClient(handler), "test-key", "m",
+            Substitute.For<ILogger<GeminiChatClientAdapter>>(),
+            safetyThreshold: "BLOCK_MEDIUM_AND_ABOVE");
+
+        await svc.GetCompletionAsync(
+            "SYSTEM", new List<(string, string)> { ("user", "x") });
+
+        using var doc = JsonDocument.Parse(handler.LastBody!);
+        foreach (var s in doc.RootElement.GetProperty("safetySettings").EnumerateArray())
+        {
+            Assert.Equal("BLOCK_MEDIUM_AND_ABOVE", s.GetProperty("threshold").GetString());
+        }
+    }
 }

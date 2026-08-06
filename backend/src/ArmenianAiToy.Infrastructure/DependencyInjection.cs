@@ -214,6 +214,17 @@ public static class DependencyInjection
                 var gmModel = FirstNonEmpty(config["Gemini:Model"]) ?? "gemini-3.6-flash";
                 int? gmThinking = int.TryParse(
                     FirstNonEmpty(config["Gemini:ThinkingBudget"]), out var tb) ? tb : null;
+                // Gemini-side safety filter (owner approval 2026-08-06):
+                // strictest tier by default; the bounded value space
+                // excludes BLOCK_NONE, and an unknown value refuses boot
+                // — a typo must never silently weaken child safety.
+                var gmSafety = GeminiChatClientAdapter.ResolveSafetyThreshold(
+                    FirstNonEmpty(config["Gemini:SafetyThreshold"]));
+                // Same calm Armenian line ChatService's own safety paths
+                // speak, so a Gemini-side block sounds identical to an
+                // app-side one.
+                var gmFallback = FirstNonEmpty(config["SafetyFallbackResponse"])
+                    ?? GeminiChatClientAdapter.DefaultSafetyFallbackText;
                 // Own provider-tagged gate instance: same retry/breaker
                 // semantics as OpenAI's, separate breaker state, and the
                 // gate counters carry provider="gemini". Singleton so the
@@ -230,7 +241,9 @@ public static class DependencyInjection
                         gmKey, gmModel,
                         sp.GetRequiredService<ILogger<GeminiChatClientAdapter>>(),
                         sp.GetRequiredService<GeminiGateHolder>().Gate,
-                        gmThinking));
+                        gmThinking,
+                        gmSafety,
+                        gmFallback));
                 break;
             }
         }
