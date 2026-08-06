@@ -34,6 +34,7 @@
 #include "sd_playback.h"       // cached-MP3 SD playback (AREG_SD_PLAYBACK_BENCH builds only)
 #include "answer_buttons.h"    // optional GREEN/RED answer buttons (no-op unless pins defined)
 #include "offline_quiz.h"      // offline true/false quiz (AREG_OFFLINE_QUIZ_BENCH builds only)
+#include "offline_games.h"     // mind-reader / buzzer / Simon (AREG_OFFLINE_GAMES_BENCH builds only)
 
 #include "story_select.h"      // which cached story to play (index v2 + no-repeat)
 #include "story_report.h"      // story-play reporting (store-and-forward to backend)
@@ -2094,6 +2095,15 @@ void loop() {
         // verified against the clip filename. One quiz per boot, 30 s
         // after boot, IDLE-only. Zero bytes of this in production.
         offline_quiz_tick();
+#endif
+
+#ifdef AREG_OFFLINE_GAMES_BENCH
+        // Offline games (bench builds only): mind-reader / two-player
+        // buzzer / button Simon, all from /games clips on SD with the
+        // GREEN/RED buttons. One game per boot, 30 s after boot, IDLE-only;
+        // which one is a build-time pick (AREG_OFFLINE_GAMES_PICK). Zero
+        // bytes of this in production.
+        offline_games_tick();
 #endif
 
         char ev = button_poll();

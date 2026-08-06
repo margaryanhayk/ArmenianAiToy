@@ -42,7 +42,14 @@ bool play_clip(const char *path) {
         return false;
     }
     audio_speaker_begin();
-    return audio_play_story_file(path, 0, nullptr, nullptr);
+    // audio_play_story_file's return means INTERRUPTED — with no
+    // barge-in seam a clip that plays to natural end returns false,
+    // which made every successfully played question read as a failed
+    // clip and the quiz never opened its answer window. Success is
+    // "playback genuinely began", same contract offline_games uses.
+    bool started = false;
+    audio_play_story_file(path, 0, nullptr, nullptr, &started);
+    return started;
 }
 
 // Wait up to the answer window for a GREEN/RED press. Returns 'Y', 'N',

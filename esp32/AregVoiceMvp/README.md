@@ -599,6 +599,119 @@ index v4 round-trip, **v3 forward compatibility**) is covered by
 halves — greeting rotation persistence, the heard set, the flow itself — are
 hardware-only, as the music and clip sync were before them.
 
+## Offline games (`offline_games.{h,cpp}`)
+
+Three more fully-offline SD games beside the true/false quiz — no Wi-Fi, no
+STT, no model, **no mic** — built on the same primitives as
+`offline_quiz.{h,cpp}`: pre-rendered Armenian MP3s, the GREEN/RED answer
+buttons, the same answer window, and the same loop discipline (clip → answer
+window → feedback → re-ask **once** → quiet exit; never badger).
+
+Gated behind **`-DAREG_OFFLINE_GAMES_BENCH`**, exactly like the quiz, so a
+production image compiles **zero bytes** of it and stays byte-identical.
+It also needs `AREG_PIN_BUTTON_YES` / `AREG_PIN_BUTTON_NO` in `config.h`;
+with the flag but no pins it logs once and does nothing.
+
+| game | id family | flow |
+|---|---|---|
+| mind-reader | `intro`, `q-root`/`q-<path>`, `g-<4 bits>`, `win`, `lose` | child thinks of one of 16 animals; the toy walks a 4-deep yes/no tree and guesses, then GREEN = right / RED = wrong |
+| two-player buzzer | `intro`, `go`, `win-green`, `win-red`, `end-both`, `close` | a question clip from the existing `/quiz` bank plays, then `go`; the **first press** takes the round; 5 rounds, then the both-celebrated close |
+| button Simon | `intro`, `your-turn`, `level-up-1..3`, `miss`, `best`, `done` (+ `tone-green` / `tone-red`) | the toy plays a tone sequence, the child echoes it on the buttons; length grows 2 → 6 |
+
+**The Armenian source of truth is `backend/content/offline-games/game-clips.json`**
+— that file's `id` scheme is the contract this module resolves against.
+Nothing in the firmware invents an id, and a clip that is not on the card is
+a logged no-op, so a partly-rendered card degrades instead of crashing.
+
+### SD layout
+
+```
+<AREG_GAMES_CLIP_DIR>/<game-key>/<clip-id>.mp3
+/games/mind-reader/q-root.mp3
+/games/who-first/win-green.mp3
+/games/button-simon/level-up-2.mp3
+```
+
+The per-game subdirectory is **not cosmetic**: four of the five games in
+`game-clips.json` each define a clip called `intro`, so a flat
+`/games/<id>.mp3` layout would collide. The game key is the JSON's own
+top-level key, so no new naming vocabulary is introduced. Root and subdir
+names are all `#define`s (overridable in `config.h`) so the layout can move
+without touching the code.
+
+### Design notes that are product rules, not style
+
+- **The mind-reader tree is implicit in the clip ids.** GREEN/yes appends
+  `1`, RED/no appends `0`; a node's id is the path so far, a guess leaf's id
+  is the full 4-bit path. There is no node table and no animal table in RAM —
+  the entire tree state is a **5-byte path string**.
+- **The buzzer has no notion of player identity.** It knows only which
+  *button* was pressed first and plays that *colour's* celebration. There is
+  no loser branch to take, and no clip names a child.
+- **The buzzer never reveals the quiz answer.** The question clip is only
+  something to listen to while the players wait for «Հիմա՛»; the round is
+  about speed, not correctness, so the `-y`/`-n` suffix is read and
+  discarded.
+- **A round nobody pressed in is passed over in silence.** There is no clip
+  for a dead round and inventing one would be the toy commenting on children.
+  Two silent rounds in a row ends the game quietly. The `end-both` / `close`
+  clips are skipped entirely when zero rounds were played, so the toy never
+  says «Ես հաշվեցի ձեր սեղմումները» about zero presses.
+- **Simon's ramp is within-session only.** Nothing is persisted; every
+  session starts at length 2 again. A wrong press ends the session with the
+  warm `miss` clip and the reached length is the result — no score is stored
+  and none is announced as a failure.
+- Every claim in these games is derived from **measured button presses**. The
+  mic is off in all three, so nothing may claim to have heard the child.
+
+### Entry points and how a game starts
+
+```c
+void offline_games_tick();              // one game per boot, 30 s after boot, IDLE-only
+void offline_games_run_mindreader();
+void offline_games_run_buzzer();
+void offline_games_run_simon();
+```
+
+`offline_games_tick()` is called from the IDLE branch of `loop()`, the same
+shape as `offline_quiz_tick` / `sd_playback_tick`. Which game it runs is a
+**build-time** pick, `-DAREG_OFFLINE_GAMES_PICK=1|2|3` (1 = mind-reader,
+2 = buzzer, 3 = Simon; default 1).
+
+Runtime game **selection UX is deliberately not invented here** — every
+option (a long-press cycle, a spoken menu clip, a third button) adds either
+an input gesture or an LED meaning the toy does not have today, and the rule
+for this slice was no new state machine and no new LED vocabulary. Until that
+decision is made at the bench, choosing a game is exactly like choosing which
+bench harness is compiled in.
+
+### Build
+
+```
+arduino-cli compile --fqbn "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc" --build-property "compiler.cpp.extra_flags=-DAREG_OFFLINE_GAMES_BENCH -DAREG_OFFLINE_GAMES_PICK=1" ".\esp32\AregVoiceMvp"
+```
+
+### Open for bench day
+
+- **Nothing here has run on hardware.** Compile-verified only.
+- **The clips do not exist yet.** `game-clips.json` is still owner-review +
+  listen-test pending, and no MP3 has been rendered. Every game therefore
+  logs `clip missing` and exits quietly on today's card — correct
+  degradation, but it also means none of the three can be bench-tested
+  before the renders land.
+- **Simon needs two tone clips that the JSON does not yet list**
+  (`tone-green` / `tone-red`). There is no parameterised tone helper in
+  `audio_io` (`audio_play_thinking_earcon` is one fixed 440 Hz earcon and
+  `synth_write_tone` is file-static), so the two tones are short clips like
+  everything else. They are non-verbal — no Armenian text to review, just two
+  renders to add.
+- The mind-reader `replay` clip is **not** played: honouring the invitation
+  it makes needs the selection gesture above.
+- Button-edge handling is inherited from the quiz verbatim: a press that
+  happens *during* clip playback is not queued, because the answer buttons
+  are only polled inside an answer window. Whether that feels wrong to a
+  four-year-old is a listening question for the bench, not a code question.
+
 ## Known C1 limitations (deliberate, deferred)
 
 - Buffered response playback — streaming comes later.

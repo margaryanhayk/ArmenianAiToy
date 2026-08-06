@@ -136,8 +136,33 @@
 // #define AREG_PIN_BUTTON_NO   47
 
 // Offline quiz (bench flag -DAREG_OFFLINE_QUIZ_BENCH) answer window:
-// how long the toy waits for a GREEN/RED press after a question.
+// how long the toy waits for a GREEN/RED press after a question. The
+// offline games (-DAREG_OFFLINE_GAMES_BENCH) deliberately share this same
+// knob — one "how long does a child get to press" number product-wide.
 // #define AREG_QUIZ_ANSWER_WINDOW_MS 10000UL
+
+// Offline games (bench flag -DAREG_OFFLINE_GAMES_BENCH). Clips live at
+// <dir>/<game-key>/<clip-id>.mp3; the game key is the top-level key in
+// backend/content/offline-games/game-clips.json. The per-game subdir is
+// required, not cosmetic — four games there each define an `intro` clip.
+// #define AREG_GAMES_CLIP_DIR       "/games"
+// #define AREG_GAMES_DIR_MINDREADER "mind-reader"
+// #define AREG_GAMES_DIR_BUZZER     "who-first"
+// #define AREG_GAMES_DIR_SIMON      "button-simon"
+//
+// Which game a bench build runs: 1 = mind-reader, 2 = buzzer, 3 = Simon.
+// Runtime selection UX is a bench-day decision (see the README) — until
+// then the game is a build-time pick, like any other bench harness.
+// #define AREG_OFFLINE_GAMES_PICK 1
+//
+// Button Simon ramp — WITHIN-SESSION ONLY, nothing is persisted, so every
+// session starts at the floor again (explicit product rule).
+// #define AREG_SIMON_START_LEN    2
+// #define AREG_SIMON_MAX_LEN      6
+// #define AREG_SIMON_TONE_GAP_MS  250UL
+//
+// Two-player buzzer: rounds before the closing clips.
+// #define AREG_BUZZER_ROUNDS 5
 
 // Onboard WS2812 RGB LED on S3-DevKitC-1
 #define AREG_PIN_LED            48
