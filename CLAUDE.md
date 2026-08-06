@@ -44,7 +44,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2382 tests)
+dotnet test                                     # Run all tests (2391 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -625,6 +625,40 @@ parent claim.
 params, no async prepared exports, no zip format, no email
 delivery, no signed URLs, no dashboard button. The endpoint is
 callable today with any parent JWT.
+
+## Backups (Tier-1 slice, 2026-08-06)
+
+First backup layer in the repo. Two halves, one shared helper
+(`Infrastructure/Data/SqliteDatabaseSnapshot.cs` — decides "is this a
+file-backed SQLite DB" and issues the `VACUUM INTO` with the path as a
+bound parameter):
+
+- **On-volume daily snapshots** —
+  `Infrastructure/Background/DatabaseBackupService.cs`, a plain
+  `BackgroundService` beside `RetentionPurgeService`. Each tick writes
+  `areg-backup-YYYYMMDD.db` (default dir: `backups/` beside the live DB
+  = `/data/backups` on Railway) and keeps the newest 7. **Opt-OUT**:
+  `Backup:Database:Enabled` only disables on the literal `false` —
+  a children's product silently running without backups is the failure
+  mode this exists to kill. One snapshot per UTC day (restart/redeploy
+  churn-proof); writes to `.part` then moves so a crash never leaves a
+  truncated `.db` a restore would trust; prune only ever matches
+  `areg-backup-*.db`. Knobs: `RunIntervalHours` (default 24, floor 1),
+  `KeepCount` (default 7, clamp 1–60), `DirectoryPath`. Non-SQLite /
+  in-memory hosts idle harmlessly. This half guards against corruption
+  and bad writes, NOT volume loss — snapshots share the volume.
+- **Offsite pull** — `GET /api/internal/backup` (see § Internal
+  console): stream a fresh snapshot to any machine. This is the only
+  defense against losing the volume itself; the operator habit (weekly
+  pull, or a cron from any laptop) is the remaining human half.
+- **Residual risk (documented, deliberate):** audio blobs
+  (`/data/audio-blobs`) are NOT covered — child voice recordings are
+  the non-regenerable part; object-storage migration is a later slice.
+
+Pinned by `DatabaseBackupTests` (keystones: snapshot bytes carry the
+`SQLite format 3` header; prune touches only backup-named files;
+explicit-disable writes nothing; in-memory provider never throws;
+endpoint 404s uniformly on non-SQLite and audits each pull).
 
 ## Retention
 
@@ -2552,6 +2586,11 @@ phase. Endpoints under `/api/internal/`:
   (`ActorParentId == null`) that parents can never see.
 - `GET /whoami` — the resolved console operator identity (accountability; the
   dashboard shows "operator: …" in the header). No data exposure.
+- `GET /backup` — streams a fresh `VACUUM INTO` snapshot of the live SQLite
+  DB (Tier-1 backup slice 2026-08-06). The OFFSITE half of § Backups below;
+  uniform 404 on non-SQLite/in-memory hosts; each successful pull writes one
+  `InternalConsoleAccess` audit row (a whole-DB read is the most
+  audit-worthy read on the console). Temp snapshot is `DeleteOnClose`.
 
 Pagination guard mirrors the parent endpoints (`offset < 0` / `limit < 1`
 → 400; `limit` clamped to 100).
