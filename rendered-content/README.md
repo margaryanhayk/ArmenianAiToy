@@ -19,3 +19,25 @@ pairs; repeated lines rendered once and spliced.
 Source texts: `backend/content/{quiz-questions,voice-clips,vardan-katrin-games}/`.
 Re-render pipeline: eleven_v3, voices areg-storyteller / katrin-v3 /
 vardan-v2 (ids in the project memory).
+
+## Offline-game renders (2026-08-07)
+
+| Folder | Files | SD destination | Note |
+|---|---|---|---|
+| `offline-games/<game>/` | 90 | `/games/<game>/` | Subfoldered because four games each define a clip called `intro` — the firmware resolves `/games/<game-key>/<id>.mp3`. |
+| `vk-games/` (+15 new) | 31 | `/quiz/` | Vardan-vs-Katrin reaction VARIANTS (`win-vardan-1..3` etc.) — the firmware rotates them so a reaction never repeats twice running. |
+
+Rendered from the owner-reviewed texts in
+`backend/content/{offline-games,vardan-katrin-games}/`, eleven_v3,
+voices areg-storyteller / katrin-v3 / vardan-v2. All 105 verified as
+real MP3s (ID3/frame header + size floor); zero failures.
+
+> **NOT the launch set (owner decision 2026-08-07).** These are
+> accepted as a working library so the toy can be bench-tested. Before
+> the first families get toys, every child-facing clip gets an
+> EXPRESSIVE re-render — emotional delivery, not merely correct
+> Armenian — followed by a full listen test. Do not treat these files
+> as final.
+
+Two clips the firmware wants that are NOT here yet: Simon's two tone
+sounds (`tone-green` / `tone-red`) — non-verbal, no Armenian to review.
