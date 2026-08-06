@@ -557,6 +557,157 @@ public class GameLoopIntegrationTests
         Assert.True(!has || state!.CurrentRound is null);
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // guess_what — the fifth taxonomy member (2026-08-06). Same loop
+    // machinery, reversed roles: the child holds the secret. These pin that
+    // the type-agnostic loop actually carries it, including the yes/no
+    // answer signal the guessing turn depends on.
+    // ─────────────────────────────────────────────────────────────────────
+
+    private const string GuessWhatWithBlock =
+        "Հիմա ես կգուշակեմ։ Մտածի՛ր մի կենդանի։\n---\nGAME_TYPE:guess_what\nGAME_DIFFICULTY:1";
+
+    [Fact]
+    public async Task GuessWhat_IsAcceptedByTheWhitelist_AndStoresARound()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(GuessWhatWithBlock);
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        Assert.Equal("game", result.Mode);
+        Assert.DoesNotContain("GAME_TYPE", result.Response);
+        Assert.DoesNotContain("guess_what", result.Response);
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
+        Assert.Equal("guess_what", state!.CurrentRound!.GameType);
+        Assert.Equal(0, state.CurrentRound.TurnsCompleted);
+    }
+
+    [Fact]
+    public async Task GuessWhat_ModelChosenDifficulty_IsForcedTo1_OnFreshRound()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Հիմա ես կգուշակեմ։\n---\nGAME_TYPE:guess_what\nGAME_DIFFICULTY:3");
+
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
+        Assert.Equal(1, state!.CurrentRound!.Difficulty);
+    }
+
+    [Fact]
+    public async Task GuessWhat_ChildYesNo_IsClassifiedIntoTheContinueDirective()
+    {
+        // KEYSTONE: every child turn in this game answers a yes/no question
+        // the toy asked, so the directive must carry the deterministic
+        // classification — the same v6 signal yes_no_silly uses. Without it
+        // the model has to re-read a one-word Armenian answer itself.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(GuessWhatWithBlock);
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        _aiClient.ClearReceivedCalls();
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Ձա՞յն է հանում։");
+        await _chatService.GetResponseAsync(_deviceId, "հա");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("GAME_TURN_KIND: continue")
+                && s.Contains("guess_what")
+                && s.Contains("classified as YES")),
+            Arg.Any<List<(string, string)>>());
+
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
+        Assert.Equal(1, state!.CurrentRound!.TurnsCompleted);
+    }
+
+    [Fact]
+    public async Task GuessWhat_ChildNamesTheThing_IsUnclassifiable_NotAYes()
+    {
+        // The loss ending asks «Իսկ ի՞նչ էր, ասա՛» and the child answers
+        // with a noun. That must never be reported as a YES — the prompt's
+        // GUESS_WHAT section owns the reading, the signal stays honest.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(GuessWhatWithBlock);
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        _aiClient.ClearReceivedCalls();
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Կատո՜ւ։ Ապրե՛ս, դու ինձ հաղթեցիր։");
+        await _chatService.GetResponseAsync(_deviceId, "կատու");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("GAME_TURN_KIND: continue")
+                && s.Contains("could not be classified as yes or no")),
+            Arg.Any<List<(string, string)>>());
+    }
+
+    [Fact]
+    public async Task GuessWhat_StopWord_EndsTheGame_AndClearsTheRound()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(GuessWhatWithBlock);
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        _aiClient.ClearReceivedCalls();
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Լա՛վ, լավ խաղ էր։");
+        await _chatService.GetResponseAsync(_deviceId, "բավ է");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("GAME_TURN_KIND: stop_game")),
+            Arg.Any<List<(string, string)>>());
+
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
+        Assert.Null(state!.CurrentRound);
+    }
+
+    [Fact]
+    public async Task GuessWhat_LeavingGameForStory_ClearsRound_KeepsVarietyMemory()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(GuessWhatWithBlock);
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Մի անգամ մի նապաստակ կար։");
+        await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var after));
+        Assert.Null(after!.CurrentRound);
+        Assert.Contains("guess_what", after.RecentGameTypes);
+    }
+
+    [Fact]
+    public async Task GuessWhat_RetryPath_PreservesTheGameTailBlock()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(
+                "Armenian text here mixed with english prose sentence.",
+                GuessWhatWithBlock);
+
+        var r = await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        Assert.Equal("game", r.Mode);
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
+        Assert.Equal("guess_what", state!.CurrentRound!.GameType);
+        Assert.DoesNotContain("GAME_TYPE", r.Response);
+    }
+
+    [Fact]
+    public async Task NearMissGuessType_IsStillRejected_ByTheClosedWhitelist()
+    {
+        // Exact-match whitelist: «guess_the_thing» is not a type.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Խաղանք։\n---\nGAME_TYPE:guess_the_thing\nGAME_DIFFICULTY:1");
+
+        var r = await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        Assert.DoesNotContain("guess_the_thing", r.Response);
+        var has = ChatService.GameSessions.TryGetValue(_conversationId, out var state);
+        Assert.True(!has || state!.CurrentRound is null);
+    }
+
     [Fact]
     public async Task GameResponse_NeverCarriesStoryChoices()
     {

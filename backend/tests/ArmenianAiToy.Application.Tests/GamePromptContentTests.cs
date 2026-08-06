@@ -132,6 +132,7 @@ public class GamePromptContentTests
         Assert.Contains("count_to", Prompt);
         Assert.Contains("yes_no_silly", Prompt);
         Assert.Contains("make_it_small", Prompt);
+        Assert.Contains("guess_what", Prompt);
         Assert.Contains("Use ONLY these game types", Prompt);
     }
 
@@ -158,13 +159,15 @@ public class GamePromptContentTests
     }
 
     [Fact]
-    public void EnforcedWhitelist_IsExactlyTheFourPlayableTypes()
+    public void EnforcedWhitelist_IsExactlyTheFivePlayableTypes()
     {
         // KEYSTONE: the taxonomy is CLOSED. Growing it is a product
         // decision (each type must be answerable by a WORD on a blind,
-        // one-button toy), never an incidental edit.
+        // one-button toy), never an incidental edit. guess_what joined on
+        // 2026-08-06 on exactly that footing — the child answers «հա» or
+        // «ոչ», and finally names the thing.
         Assert.Equal(
-            new[] { "animal_sound", "count_to", "yes_no_silly", "make_it_small" },
+            new[] { "animal_sound", "count_to", "yes_no_silly", "make_it_small", "guess_what" },
             ChatService.AllowedGameTypes);
     }
 
@@ -461,5 +464,152 @@ public class GamePromptContentTests
     {
         Assert.Contains("grading / repeat-after-me drilling", Prompt);
         Assert.Contains("model the little word and move on", Prompt);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // guess_what — «Գուշակիր», the real Akinator (2026-08-06). The roles
+    // reverse: the child holds the secret and the toy does the guessing.
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Prompt_GuessWhat_DeclaresTheReversedMechanic()
+    {
+        // The one game where the child is not answering a quiz — the toy is.
+        Assert.Contains("GUESS_WHAT", Prompt);
+        Assert.Contains("The CHILD thinks of one thing and keeps it secret", Prompt);
+        Assert.Contains("The roles are REVERSED here", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_GuessWhat_BoundsTheDomainsAndStatesThemAloud()
+    {
+        // A child who may think of anything at all is a child the toy will
+        // never guess — so the four domains are named in the opener.
+        Assert.Contains("animal, everyday", Prompt);
+        Assert.Contains("fairy-tale character", Prompt);
+        Assert.Contains("State the four domains in your opener", Prompt);
+        Assert.Contains("«Հիմա ես կգուշակեմ, թե ինչ ես մտածել։", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_GuessWhat_RequiresExactlyOneYesNoQuestionPerTurn()
+    {
+        // KEYSTONE: the child can only answer «հա» or «ոչ». An open
+        // question is unanswerable in this game.
+        Assert.Contains("EXACTLY ONE yes/no question per turn", Prompt);
+        Assert.Contains("question plus a guess in the same turn", Prompt);
+        Assert.Contains("never ask an open question", Prompt);
+        Assert.Contains("open question inside guess_what", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_GuessWhat_ForbidsRepeatingItsOwnQuestions()
+    {
+        // History is the only memory this game has — there is no round
+        // store for the questions already asked.
+        Assert.Contains("TRACK YOUR OWN QUESTIONS from the conversation history", Prompt);
+        Assert.Contains("Never ask the same question twice", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_GuessWhat_PinsTheGuessDeadline()
+    {
+        // KEYSTONE: a 4–7-year-old loses the thread long before a perfect
+        // binary search would finish. Guessing early and being wrong is the
+        // cheaper failure.
+        Assert.Contains("COUNT YOUR QUESTIONS", Prompt);
+        Assert.Contains("MUST say a real guess by roughly question 7 or 8", Prompt);
+        Assert.Contains("asking a ninth question is not", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_GuessWhat_DeclaresTheLossRevealAsk()
+    {
+        // KEYSTONE (owner-specified ending): the toy gives up, ASKS what it
+        // was, and accepts whatever comes back.
+        Assert.Contains("LOSS ENDING", Prompt);
+        Assert.Contains("«Հանձնվում եմ։ Իսկ ի՞նչ էր, ասա՛։»", Prompt);
+        Assert.Contains("Whatever they name, ACCEPT it", Prompt);
+        Assert.Contains("never re-open the", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_GuessWhat_LimitsTheContradictionToASingleLine()
+    {
+        // KEYSTONE: the honest teach-line is ONE line, only when the child's
+        // own earlier answer is clearly contradicted, and never a question.
+        Assert.Contains("ONLY IF the thing the child named clearly contradicts", Prompt);
+        Assert.Contains("exactly ONE playful", Prompt);
+        Assert.Contains("one, never two, never a", Prompt);
+        Assert.Contains("«Հե՜յ-հե՜յ, բայց դու ասացիր՝ ձայն չի հանում։»", Prompt);
+        Assert.Contains("If nothing clearly contradicts, say NO such line at all", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_GuessWhat_FramesLosingAsTheChildsWin()
+    {
+        Assert.Contains("«Ապրե՛ս, դու ինձ հաղթեցիր։»", Prompt);
+        Assert.Contains("Losing is the child's victory", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_GuessWhat_UsesTheWinAgainstAPersonVerb_NotTheCalque()
+    {
+        // KEYSTONE (armenian-linguistic-reviewer, 2026-08-06): «շահեցիր»
+        // is winning a PRIZE; beating a person is «հաղթեցիր». The first
+        // draft shipped the calque in every loss-ending exemplar, and the
+        // model copied it verbatim in the benchmark — so the toy said it
+        // out loud in the one line a child hears after beating Areg.
+        Assert.Contains("հաղթեցիր", Prompt);
+        Assert.Contains("NEVER «շահեցիր»", Prompt);
+        Assert.DoesNotContain("դու ինձ շահեցիր", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_GuessWhat_NeverShamesAndClaimsOnlyWhatTheChildSaid()
+    {
+        // KEYSTONE: the v6 honesty posture, carried into the one game where
+        // the toy could be tempted to argue with a five-year-old.
+        Assert.Contains("You may only claim what the CHILD SAID", Prompt);
+        Assert.Contains("A wrongly-claimed contradiction is worse than none", Prompt);
+        Assert.Contains("shame, never scold", Prompt);
+        Assert.Contains("Never invent a rule the child broke", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_GuessWhat_ResolvesTheSubtypeRotationContradiction()
+    {
+        // One secret spans many turns, so the runtime's "switch the SUBTYPE"
+        // hint cannot mean "switch the domain" here — it means ask about a
+        // different property.
+        Assert.Contains("EXCEPTION for guess_what", Prompt);
+        Assert.Contains("domain does NOT rotate mid-secret", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_GuessWhat_BansCelebrationOpenersMidGuessing()
+    {
+        // KEYSTONE: benchmark GB10 caught «Շա՛տ լավ։ Իսկ դա հաչո՞ւմ է։» —
+        // a celebration word opening a plain guessing turn, where the
+        // child has achieved nothing yet. The praise belongs to the end.
+        Assert.Contains("NEVER OPEN A GUESSING TURN WITH A CELEBRATION WORD", Prompt);
+        Assert.Contains("Nothing has", Prompt);
+        Assert.Contains("neutral acknowledgement", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_GuessWhat_HasNoRightOrWrongAnswerToReactTo()
+    {
+        // The child's «հա»/«ոչ» describes the toy's question, not the
+        // child's knowledge — celebrating it would be praise for nothing.
+        Assert.Contains("there is no right or wrong answer to react to", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_GuessWhat_ContainsBadGoodPair_InterrogatingOnContradiction()
+    {
+        Assert.Contains("interrogating / accusing on a contradiction", Prompt);
+        Assert.Contains("a demand that the child explain", Prompt);
+        Assert.Contains("turns play into a cross-examination", Prompt);
     }
 }
