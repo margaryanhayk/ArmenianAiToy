@@ -205,7 +205,18 @@ public class AudioChatController : ControllerBase
             return StatusCode(502, new { error = "AI service unavailable. Please try again." });
         }
 
-        // Text → voice via TTS.
+        // Text → voice via TTS. Streaming-capable providers (ElevenLabs)
+        // take the pass-through path below — first audio byte reaches the
+        // device in ~1 s instead of after full synthesis (3-5 s measured),
+        // which is what makes the storyteller clone viable as the LIVE
+        // voice. Buffered providers (OpenAI) keep the original path.
+        if (_synthesis is IStreamingAudioSynthesisService streamer)
+        {
+            return await StreamTtsPassThroughAsync(
+                streamer, ttsText, transcript, chatResult, audioBytes,
+                inboundContentType!, autoContinue, deviceId, cancellationToken);
+        }
+
         AudioSynthesisResult tts;
         try
         {
@@ -261,6 +272,103 @@ public class AudioChatController : ControllerBase
             Response.Headers["X-Areg-Continue"] = "1";
         }
         return File(tts.Content, tts.MimeType);
+    }
+
+    /// <summary>
+    /// Streaming TTS pass-through (the C2+ item C1 deferred): reads the
+    /// provider's live audio stream and writes it to the response
+    /// chunk-by-chunk while teeing into memory, so the device can start
+    /// playback at first byte. After the stream completes, both blobs are
+    /// persisted exactly as on the buffered path. A failure BEFORE the
+    /// first byte still returns the sanitized 502; a failure MID-STREAM
+    /// cannot change the status line (headers already sent) — the
+    /// truncated MP3 fails the device's decoder, which shows the existing
+    /// canned failure, and no truncated blob is persisted.
+    /// </summary>
+    private async Task<IActionResult> StreamTtsPassThroughAsync(
+        IStreamingAudioSynthesisService streamer,
+        string ttsText,
+        string transcript,
+        ChatResponseShape chatResult,
+        byte[] childAudioBytes,
+        string childContentType,
+        bool autoContinue,
+        Guid deviceId,
+        CancellationToken cancellationToken)
+    {
+        AudioSynthesisStreamResult stream;
+        try
+        {
+            stream = await streamer.SynthesizeArmenianStreamAsync(ttsText, cancellationToken);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Audio chat: TTS stream start failure for Device {DeviceId}", deviceId);
+            return StatusCode(502, new { error = "AI service unavailable. Please try again." });
+        }
+
+        // Cost recording — same best-effort contract as the buffered path
+        // (runs before the response body so an estimator bug can never
+        // corrupt a stream in flight).
+        if (_costCapOptions.Value.Enabled)
+        {
+            try
+            {
+                var sttCost = OpenAICostEstimator.EstimateWhisperCostUsd(childAudioBytes.LongLength);
+                var chatCost = OpenAICostEstimator.EstimateChatCostUsd(transcript, chatResult.Text);
+                var ttsCost = OpenAICostEstimator.EstimateTtsCostUsd(ttsText);
+                _costMeter.Record(deviceId, sttCost + chatCost + ttsCost, DateTime.UtcNow);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "OpenAI cost-cap: audio cost-record failure (suppressed). DeviceId={DeviceId}",
+                    deviceId);
+            }
+        }
+
+        using (stream)
+        {
+            if (autoContinue)
+            {
+                Response.Headers["X-Areg-Continue"] = "1";
+            }
+            Response.ContentType = stream.MimeType;
+            Response.StatusCode = 200;
+
+            var tee = new MemoryStream();
+            var buffer = new byte[8192];
+            try
+            {
+                int read;
+                while ((read = await stream.AudioStream.ReadAsync(
+                    buffer.AsMemory(0, buffer.Length), cancellationToken)) > 0)
+                {
+                    await Response.Body.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                    tee.Write(buffer, 0, read);
+                }
+                await Response.Body.FlushAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Audio chat: TTS stream aborted mid-flight for Device {DeviceId}", deviceId);
+                return new EmptyResult(); // truncated — do not persist
+            }
+
+            await PersistAudioPathsAsync(
+                conversationId: chatResult.ConversationId,
+                assistantMessageId: chatResult.AssistantMessageId,
+                childAudio: childAudioBytes,
+                childContentType: childContentType,
+                assistantAudio: new AudioSynthesisResult(tee.ToArray(), stream.MimeType),
+                cancellationToken);
+
+            return new EmptyResult();
+        }
     }
 
     /// <summary>

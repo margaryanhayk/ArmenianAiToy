@@ -102,7 +102,8 @@ public class AudioChatControllerTests
     private static async Task<Harness> CreateAsync(
         Action<Harness>? configure = null,
         byte[]? inboundBody = null,
-        string inboundContentType = "audio/wav")
+        string inboundContentType = "audio/wav",
+        bool streamingSynthesis = false)
     {
         var conn = new SqliteConnection("Data Source=:memory:");
         await conn.OpenAsync();
@@ -123,7 +124,13 @@ public class AudioChatControllerTests
             .Returns(true);
         var chatService = Substitute.For<IChatService>();
         var transcription = Substitute.For<IAudioTranscriptionService>();
-        var synthesis = Substitute.For<IAudioSynthesisService>();
+        // streamingSynthesis: a multi-interface sub so the controller's
+        // `is IStreamingAudioSynthesisService` feature-detect fires and
+        // the pass-through path runs. Plain sub = buffered path, keeping
+        // every pre-streaming test on the exact code it always covered.
+        var synthesis = streamingSynthesis
+            ? Substitute.For<IAudioSynthesisService, IStreamingAudioSynthesisService>()
+            : Substitute.For<IAudioSynthesisService>();
         var blobStore = new InMemoryBlobStore();
         var canned = new CannedVoiceClips(synthesis);
         var logger = Substitute.For<ILogger<AudioChatController>>();
@@ -764,6 +771,64 @@ public class AudioChatControllerTests
             .Single(c => c.GetMethodInfo().Name == nameof(IAudioSynthesisService.SynthesizeArmenianAsync))
             .GetArguments()[0]!;
         Assert.Equal(story, ttsArg);
+    }
+
+    [Fact]
+    public async Task AudioChat_StreamingProvider_PassesThrough_AndPersistsBlob()
+    {
+        // Streaming pass-through KEYSTONE: with a streaming-capable
+        // provider the reply bytes flow to the response as they arrive,
+        // the content type is the stream's MIME, and the assistant blob
+        // is persisted from the teed copy — same C2.1 replay contract as
+        // the buffered path.
+        await using var h = await CreateAsync(streamingSynthesis: true);
+        WireHappyPath(h);
+        ((IStreamingAudioSynthesisService)h.Synthesis)
+            .SynthesizeArmenianStreamAsync(AssistantText, Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisStreamResult(new MemoryStream(TtsMp3), MimeMp3));
+        var responseBody = new MemoryStream();
+        h.Controller.HttpContext.Response.Body = responseBody;
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<EmptyResult>(result);
+        Assert.Equal(TtsMp3, responseBody.ToArray());
+        Assert.Equal(MimeMp3, h.Controller.HttpContext.Response.ContentType);
+        // Assistant blob persisted from the tee (path ends {msgId}.mp3).
+        Assert.Contains(h.BlobStore.Written,
+            kv => kv.Key.EndsWith(".mp3") && kv.Value.Bytes.SequenceEqual(TtsMp3));
+        // Buffered synthesis was never called — the stream carried it all.
+        await h.Synthesis.DidNotReceiveWithAnyArgs().SynthesizeArmenianAsync(default!, default);
+    }
+
+    private sealed class ExplodingStream : MemoryStream
+    {
+        private int _reads;
+        public ExplodingStream(byte[] head) : base(head) { }
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
+        {
+            if (_reads++ >= 1) throw new IOException("upstream died mid-stream");
+            return base.ReadAsync(buffer, ct);
+        }
+    }
+
+    [Fact]
+    public async Task AudioChat_StreamDiesMidFlight_NoTruncatedBlobPersisted()
+    {
+        // Mid-stream upstream death: headers already sent, so no 502 is
+        // possible — but a TRUNCATED assistant blob must never be
+        // persisted (a parent replaying it would hear a cut-off reply).
+        await using var h = await CreateAsync(streamingSynthesis: true);
+        WireHappyPath(h);
+        ((IStreamingAudioSynthesisService)h.Synthesis)
+            .SynthesizeArmenianStreamAsync(AssistantText, Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisStreamResult(new ExplodingStream(TtsMp3), MimeMp3));
+        h.Controller.HttpContext.Response.Body = new MemoryStream();
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<EmptyResult>(result);
+        Assert.DoesNotContain(h.BlobStore.Written, kv => kv.Key.EndsWith(".mp3"));
     }
 
     [Fact]
