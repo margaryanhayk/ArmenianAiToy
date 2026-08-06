@@ -192,7 +192,9 @@ public static class DependencyInjection
                 var gmKey = FirstNonEmpty(config["Gemini:ApiKey"], config["GEMINI_API_KEY"])
                     ?? throw new InvalidOperationException(
                         "AI:ChatProvider is 'gemini' but Gemini:ApiKey / GEMINI_API_KEY is not set.");
-                var gmModel = FirstNonEmpty(config["Gemini:Model"]) ?? "gemini-3-flash-preview";
+                var gmModel = FirstNonEmpty(config["Gemini:Model"]) ?? "gemini-3.6-flash";
+                int? gmThinking = int.TryParse(
+                    FirstNonEmpty(config["Gemini:ThinkingBudget"]), out var tb) ? tb : null;
                 // Own provider-tagged gate instance: same retry/breaker
                 // semantics as OpenAI's, separate breaker state, and the
                 // gate counters carry provider="gemini". Singleton so the
@@ -208,7 +210,8 @@ public static class DependencyInjection
                         openAiHttpClient, // warm pooled client, host-agnostic
                         gmKey, gmModel,
                         sp.GetRequiredService<ILogger<GeminiChatClientAdapter>>(),
-                        sp.GetRequiredService<GeminiGateHolder>().Gate));
+                        sp.GetRequiredService<GeminiGateHolder>().Gate,
+                        gmThinking));
                 break;
             }
         }

@@ -51,6 +51,7 @@ public class GeminiChatClientAdapter : IAiChatClient
     private readonly HttpClient _http;
     private readonly string _apiKey;
     private readonly string _model;
+    private readonly int? _thinkingBudget;
     private readonly OpenAI.OpenAIReliabilityGate? _gate;
     private readonly ILogger<GeminiChatClientAdapter> _logger;
 
@@ -59,11 +60,20 @@ public class GeminiChatClientAdapter : IAiChatClient
         string apiKey,
         string model,
         ILogger<GeminiChatClientAdapter> logger,
-        OpenAI.OpenAIReliabilityGate? gate = null)
+        OpenAI.OpenAIReliabilityGate? gate = null,
+        int? thinkingBudget = null)
     {
         _http = http;
         _apiKey = apiKey;
-        _model = string.IsNullOrWhiteSpace(model) ? "gemini-3-flash-preview" : model;
+        // Default moved to the STABLE flash (2026-08-06): the -preview
+        // endpoint 503'd on ~17% of raw requests during baseline capture
+        // (Google-side overload), while 3.6-flash answered clean at
+        // ~1.4 s. NOTE the API drift: 3.6 REJECTS thinkingConfig with
+        // HTTP 400 — thinking is omitted unless Gemini:ThinkingBudget is
+        // explicitly configured (needed only for the older preview
+        // model, where omitting it means ~7 s thinking-mode TTFT).
+        _model = string.IsNullOrWhiteSpace(model) ? "gemini-3.6-flash" : model;
+        _thinkingBudget = thinkingBudget;
         _logger = logger;
         _gate = gate;
     }
@@ -96,12 +106,18 @@ public class GeminiChatClientAdapter : IAiChatClient
             contents.Add(new { role = geminiRole, parts = new[] { new { text = content } } });
         }
 
-        var body = new
-        {
-            system_instruction = new { parts = new[] { new { text = systemPrompt } } },
-            contents,
-            generationConfig = new { thinkingConfig = new { thinkingBudget = 0 } },
-        };
+        object body = _thinkingBudget is { } tb
+            ? new
+            {
+                system_instruction = new { parts = new[] { new { text = systemPrompt } } },
+                contents,
+                generationConfig = new { thinkingConfig = new { thinkingBudget = tb } },
+            }
+            : new
+            {
+                system_instruction = new { parts = new[] { new { text = systemPrompt } } },
+                contents,
+            };
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
         cts.CancelAfter(RequestTimeout);

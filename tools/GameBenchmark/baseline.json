@@ -1,8 +1,8 @@
 {
-  "TotalScenarios": 6,
-  "ScenariosOk": 6,
-  "TurnsTotal": 20,
-  "TurnsOk": 20,
+  "TotalScenarios": 9,
+  "ScenariosOk": 9,
+  "TurnsTotal": 29,
+  "TurnsOk": 29,
   "WeakCases": 0,
   "LeakedTail": 0,
   "LatinRun": 0,
@@ -10,7 +10,8 @@
   "CelebrationRepeat": 0,
   "AskingPermission": 0,
   "MixingTypes": 0,
+  "CelebratedWrong": 0,
   "Placeholder": false,
-  "PromptsCount": 6,
-  "PromptsSha256": "74e6e5a63628c73e4947954afc01c76e613c9fbd7106c1477c39c7daebf7ce8a"
+  "PromptsCount": 9,
+  "PromptsSha256": "3e0fb46c538b90bd1fdd3f959363f69377630b51753253fdcaf377f7eebbff1b"
 }

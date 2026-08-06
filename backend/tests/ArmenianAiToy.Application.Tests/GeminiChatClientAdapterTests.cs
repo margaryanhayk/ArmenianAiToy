@@ -64,8 +64,26 @@ public class GeminiChatClientAdapterTests
         Assert.Equal("SYSTEM RULES",
             doc.RootElement.GetProperty("system_instruction")
                 .GetProperty("parts")[0].GetProperty("text").GetString());
-        // KEYSTONE: thinking disabled — measured thinking-mode TTFT (~7s)
-        // is unusable on the toy; the bake-off ran fast mode.
+        // KEYSTONE (2026-08-06): NO thinkingConfig by default — the
+        // stable 3.6-flash line REJECTS it with HTTP 400. It is sent
+        // only when Gemini:ThinkingBudget is explicitly configured
+        // (needed for older preview models where omitting it means
+        // ~7 s thinking-mode TTFT).
+        Assert.False(doc.RootElement.TryGetProperty("generationConfig", out _));
+    }
+
+    [Fact]
+    public async Task ExplicitThinkingBudget_IsSent()
+    {
+        var handler = new FakeHandler();
+        var svc = new GeminiChatClientAdapter(
+            new HttpClient(handler), "test-key", "gemini-3-flash-preview",
+            Substitute.For<ILogger<GeminiChatClientAdapter>>(),
+            gate: null, thinkingBudget: 0);
+
+        await svc.GetCompletionAsync("S", new List<(string, string)> { ("user", "x") });
+
+        using var doc = JsonDocument.Parse(handler.LastBody!);
         Assert.Equal(0,
             doc.RootElement.GetProperty("generationConfig")
                 .GetProperty("thinkingConfig").GetProperty("thinkingBudget").GetInt32());
