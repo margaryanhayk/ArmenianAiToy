@@ -44,6 +44,24 @@
       "katrin": "Չէ՜, մեղրը ծառի վրա է աճում, խնձորի պես։",
       "areg":   "Ո՞վ է ճիշտ՝ Վարդա՞նը — կանաչ, թե՞ Կատրինը — կարմիր։" }
   ],
+  "feedbackVariants": [
+    { "id": "win-vardan-1", "voice": "vardan", "text": "Տեսա՞ր, ես ճիշտ էի։ Ապրե՛ս, որ ինձ ընտրեցիր։" },
+    { "id": "win-vardan-2", "voice": "vardan", "text": "Հա՛, ես գիտեի։ Դու էլ գիտեիր, ապրե՛ս։" },
+    { "id": "win-vardan-3", "voice": "vardan", "text": "Ես միշտ գիտեմ։ Դե լա՛վ, այս անգամ իսկապես գիտեի։" },
+    { "id": "win-katrin-1", "voice": "katrin", "text": "Ճի՛շտ է, ես էի ճիշտ։ Ապրե՛ս, լավ գտար։" },
+    { "id": "win-katrin-2", "voice": "katrin", "text": "Այո՛, ես գիտեի։ Դու էլ իմացար, ապրե՛ս։" },
+    { "id": "win-katrin-3", "voice": "katrin", "text": "Տեսա՞ր, Վարդա՛ն։ Մենք միասին ճիշտ էինք։" },
+    { "id": "lose-vardan-1", "voice": "vardan", "text": "Վա՜յ, սխալվեցի… Այս անգամ Կատրինը ճիշտ էր։" },
+    { "id": "lose-vardan-2", "voice": "vardan", "text": "Էհ… Լավ, լավ, Կատրինը գիտեր։" },
+    { "id": "lose-vardan-3", "voice": "vardan", "text": "Օ՜, չստացվեց։ Մյուս անգամ ես կիմանամ։" },
+    { "id": "lose-katrin-1", "voice": "katrin", "text": "Օ՜, այս անգամ Վարդանը ճիշտ էր։ Լա՛վ էր, Վարդա՛ն։" },
+    { "id": "lose-katrin-2", "voice": "katrin", "text": "Վա՜յ, սխալվեցի։ Վարդա՛ն, դու գիտեիր։" },
+    { "id": "lose-katrin-3", "voice": "katrin", "text": "Իսկապե՞ս… Դե լավ, այս անգամ Վարդանը ճիշտ էր։" },
+    { "id": "wrong-areg-1", "voice": "areg", "text": "Ոչինչ, լսի՛ր նորից ու փորձի՛ր։" },
+    { "id": "wrong-areg-2", "voice": "areg", "text": "Բան չկա։ Լսի՛ր էլի մեկ անգամ։" },
+    { "id": "wrong-areg-3", "voice": "areg", "text": "Պատահում է։ Արի՛ մեկ անգամ էլ լսենք։" }
+  ],
+  "_variantsNote": "DRAFTS for the rotation rule (todo #14, owner 2026-08-05): the firmware rotates within each family (win-vardan-1/2/3…) so replays never repeat. armenian-story-master reviewed 2026-08-06 (8 lines fixed: -ն→-ը before vowel per the eleven_v3 swallow rule, «Հը՞մ»/«Չէ՞ որ…» openers replaced, «Մոտ էիր» dropped as false in a binary game, wrong-areg-3 made replay-consistent). PENDING owner listen test. Vardan's lines keep his proud-but-losing-gracefully character; Katrin celebrates WITH the child, never over Vardan.",
   "feedback": [
     { "id": "win-vardan",  "voice": "vardan", "text": "Տեսա՞ր, ես ճիշտ էի։ Ապրե՛ս, որ ինձ ընտրեցիր։" },
     { "id": "win-katrin",  "voice": "katrin", "text": "Ճի՛շտ է, ես էի ճիշտ։ Ապրե՛ս, լավ գտար։" },
