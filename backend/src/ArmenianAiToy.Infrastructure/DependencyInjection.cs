@@ -193,11 +193,22 @@ public static class DependencyInjection
                     ?? throw new InvalidOperationException(
                         "AI:ChatProvider is 'gemini' but Gemini:ApiKey / GEMINI_API_KEY is not set.");
                 var gmModel = FirstNonEmpty(config["Gemini:Model"]) ?? "gemini-3-flash-preview";
+                // Own provider-tagged gate instance: same retry/breaker
+                // semantics as OpenAI's, separate breaker state, and the
+                // gate counters carry provider="gemini". Singleton so the
+                // breaker window survives across scoped requests (the
+                // health endpoint's `openai` field keeps reading the
+                // OpenAI singleton only — naming drift noted).
+                services.AddSingleton(sp => new GeminiGateHolder(
+                    new OpenAIReliabilityGate(
+                        sp.GetRequiredService<ILogger<OpenAIReliabilityGate>>(),
+                        "gemini")));
                 services.AddScoped<IAiChatClient>(sp =>
                     new GeminiChatClientAdapter(
                         openAiHttpClient, // warm pooled client, host-agnostic
                         gmKey, gmModel,
-                        sp.GetRequiredService<ILogger<GeminiChatClientAdapter>>()));
+                        sp.GetRequiredService<ILogger<GeminiChatClientAdapter>>(),
+                        sp.GetRequiredService<GeminiGateHolder>().Gate));
                 break;
             }
         }

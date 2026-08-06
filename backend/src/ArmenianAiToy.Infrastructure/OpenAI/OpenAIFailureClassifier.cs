@@ -30,6 +30,20 @@ public static class OpenAIFailureClassifier
                 if (cre.Status >= 500 && cre.Status <= 599) return OpenAIFailureKind.UpstreamServerError;
                 return OpenAIFailureKind.Other;
 
+            // Raw-HttpClient adapters (Gemini) throw HttpRequestException
+            // with StatusCode populated — same status mapping as the SDK
+            // exception above. A null StatusCode (DNS/connect refusals)
+            // stays Other: connection failures are not provably transient
+            // and retrying them buys latency, not success.
+            case System.Net.Http.HttpRequestException hre when hre.StatusCode is not null:
+            {
+                var status = (int)hre.StatusCode.Value;
+                if (status == 429) return OpenAIFailureKind.RateLimited;
+                if (status == 401 || status == 403) return OpenAIFailureKind.AuthFailure;
+                if (status >= 500 && status <= 599) return OpenAIFailureKind.UpstreamServerError;
+                return OpenAIFailureKind.Other;
+            }
+
             case TimeoutException:
             case OperationCanceledException: // covers TaskCanceledException too
                 return OpenAIFailureKind.Timeout;

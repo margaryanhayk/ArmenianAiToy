@@ -46,6 +46,13 @@ public sealed class OpenAIReliabilityGate
     private readonly Func<TimeSpan, CancellationToken, Task> _delay;
     private readonly ILogger<OpenAIReliabilityGate> _logger;
 
+    // Which upstream this instance guards — the bounded `provider` tag on
+    // the gate's counters (openai | gemini). The class name predates the
+    // second provider; the mechanics are provider-neutral, and a rename
+    // would touch health wiring for zero behavior. Default keeps every
+    // existing caller and metric shape unchanged.
+    private readonly string _provider;
+
     private readonly object _stateLock = new();
     private readonly LinkedList<DateTimeOffset> _recentFailures = new();
     private DateTimeOffset? _openUntil;
@@ -61,6 +68,11 @@ public sealed class OpenAIReliabilityGate
         : this(TimeProvider.System, (ts, ct) => Task.Delay(ts, ct), logger)
     { }
 
+    /// <summary>Provider-tagged overload for a second upstream (Gemini).</summary>
+    public OpenAIReliabilityGate(ILogger<OpenAIReliabilityGate> logger, string provider)
+        : this(TimeProvider.System, (ts, ct) => Task.Delay(ts, ct), logger, provider)
+    { }
+
     /// <summary>
     /// Test-friendly constructor. Injects the clock and the delay
     /// function so the breaker window / open duration / backoff can all
@@ -69,11 +81,13 @@ public sealed class OpenAIReliabilityGate
     public OpenAIReliabilityGate(
         TimeProvider clock,
         Func<TimeSpan, CancellationToken, Task> delay,
-        ILogger<OpenAIReliabilityGate> logger)
+        ILogger<OpenAIReliabilityGate> logger,
+        string provider = "openai")
     {
         _clock = clock;
         _delay = delay;
         _logger = logger;
+        _provider = provider;
     }
 
     /// <summary>
@@ -122,7 +136,8 @@ public sealed class OpenAIReliabilityGate
 
             if (shortCircuit)
             {
-                AppMeter.ChatOpenAICircuitShortCircuit.Add(1);
+                AppMeter.ChatOpenAICircuitShortCircuit.Add(1,
+                    new KeyValuePair<string, object?>("provider", _provider));
                 throw new OpenAIReliabilityCircuitOpenException(
                     "OpenAI reliability gate is open; call short-circuited.");
             }
@@ -154,7 +169,8 @@ public sealed class OpenAIReliabilityGate
                 {
                     var kind = OpenAIFailureClassifier.Classify(ex);
                     AppMeter.ChatOpenAIFailure.Add(1,
-                        new KeyValuePair<string, object?>("kind", KindTag(kind)));
+                        new KeyValuePair<string, object?>("kind", KindTag(kind)),
+                        new KeyValuePair<string, object?>("provider", _provider));
                     lastException = ex;
                     lastKind = kind;
 
@@ -165,7 +181,8 @@ public sealed class OpenAIReliabilityGate
                         break;
 
                     var backoff = ComputeBackoff(kind, ex);
-                    AppMeter.ChatOpenAIRetry.Add(1);
+                    AppMeter.ChatOpenAIRetry.Add(1,
+                        new KeyValuePair<string, object?>("provider", _provider));
                     try
                     {
                         await _delay(backoff, ct).ConfigureAwait(false);
@@ -206,7 +223,8 @@ public sealed class OpenAIReliabilityGate
                     if (_recentFailures.Count >= TripThreshold)
                     {
                         _openUntil = now.Add(OpenDuration);
-                        AppMeter.ChatOpenAICircuitTrip.Add(1);
+                        AppMeter.ChatOpenAICircuitTrip.Add(1,
+                            new KeyValuePair<string, object?>("provider", _provider));
                         _logger.LogWarning(
                             "OpenAI reliability gate tripped: {Failures} failures within {WindowSeconds}s; " +
                             "opening for {OpenSeconds}s. last_kind={LastKind}",

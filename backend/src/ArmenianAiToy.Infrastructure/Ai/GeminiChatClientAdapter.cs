@@ -40,6 +40,10 @@ namespace ArmenianAiToy.Infrastructure.Ai;
 /// reply regardless of provider.
 /// </para>
 /// </summary>
+/// <summary>Typed holder so DI can register Gemini's gate instance
+/// without colliding with the OpenAI singleton of the same class.</summary>
+public sealed record GeminiGateHolder(OpenAI.OpenAIReliabilityGate Gate);
+
 public class GeminiChatClientAdapter : IAiChatClient
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
@@ -47,22 +51,41 @@ public class GeminiChatClientAdapter : IAiChatClient
     private readonly HttpClient _http;
     private readonly string _apiKey;
     private readonly string _model;
+    private readonly OpenAI.OpenAIReliabilityGate? _gate;
     private readonly ILogger<GeminiChatClientAdapter> _logger;
 
     public GeminiChatClientAdapter(
         HttpClient http,
         string apiKey,
         string model,
-        ILogger<GeminiChatClientAdapter> logger)
+        ILogger<GeminiChatClientAdapter> logger,
+        OpenAI.OpenAIReliabilityGate? gate = null)
     {
         _http = http;
         _apiKey = apiKey;
         _model = string.IsNullOrWhiteSpace(model) ? "gemini-3-flash-preview" : model;
         _logger = logger;
+        _gate = gate;
     }
 
-    public async Task<string> GetCompletionAsync(
+    public Task<string> GetCompletionAsync(
         string systemPrompt, List<(string Role, string Content)> messages)
+    {
+        // Same reliability semantics as the OpenAI adapter: retry-once on
+        // 429/5xx/timeout with jittered backoff, circuit breaker on
+        // repeated failure — via a provider-tagged gate instance. The
+        // classifier reads HttpRequestException.StatusCode, which
+        // SendAsync sets. Null gate (older tests) = direct call.
+        return _gate is null
+            ? CoreAsync(systemPrompt, messages, CancellationToken.None)
+            : _gate.RunAsync(
+                ct => CoreAsync(systemPrompt, messages, ct),
+                CancellationToken.None);
+    }
+
+    private async Task<string> CoreAsync(
+        string systemPrompt, List<(string Role, string Content)> messages,
+        CancellationToken outerCt)
     {
         var contents = new List<object>();
         foreach (var (role, content) in messages)
@@ -80,7 +103,8 @@ public class GeminiChatClientAdapter : IAiChatClient
             generationConfig = new { thinkingConfig = new { thinkingBudget = 0 } },
         };
 
-        using var cts = new CancellationTokenSource(RequestTimeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
+        cts.CancelAfter(RequestTimeout);
         using var req = new HttpRequestMessage(
             HttpMethod.Post,
             $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent");
@@ -96,7 +120,12 @@ public class GeminiChatClientAdapter : IAiChatClient
             _logger.LogWarning(
                 "Gemini chat non-success: HTTP {Status} (model {Model})",
                 (int)resp.StatusCode, _model);
-            throw new HttpRequestException($"Gemini chat returned HTTP {(int)resp.StatusCode}.");
+            // StatusCode set so the reliability gate's classifier can map
+            // 429/5xx to retryable kinds — message stays status-only.
+            throw new HttpRequestException(
+                $"Gemini chat returned HTTP {(int)resp.StatusCode}.",
+                inner: null,
+                statusCode: resp.StatusCode);
         }
 
         using var doc = JsonDocument.Parse(json);
