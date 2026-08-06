@@ -82,7 +82,8 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:8080 \
     DOTNET_RUNNING_IN_CONTAINER=true \
     DOTNET_USE_POLLING_FILE_WATCHER=false \
     Database__ConnectionString="Data Source=/data/armenian_ai_toy.db" \
-    Audio__BlobStoreRoot=/data/audio-blobs
+    Audio__BlobStoreRoot=/data/audio-blobs \
+    StoryAudio__CacheRoot=/data/story-audio-cache
 
 EXPOSE 8080
 

@@ -87,4 +87,63 @@ public class OpenAICostEstimatorTests
         Assert.True(OpenAICostEstimator.TtsUsdPerMillionChars > 0m);
         Assert.True(OpenAICostEstimator.CharsPerTokenEstimate > 0);
     }
+
+    [Fact]
+    public void ConfigureChatRates_ChangesEstimate_AndDefaultsMatchShippedOpenAIRates()
+    {
+        // Tier-1 fix pin (2026-08-06): the chat rates are configurable
+        // so the daily cap prices the ACTIVE provider, not gpt-4o
+        // fiction. Two halves in one test (shared static state — keep
+        // the restore in finally so parallel classes never see stray
+        // rates):
+        //   1. The shipped defaults are byte-identical to the historic
+        //      constants (2.50 / 10.00) — openai deployments unchanged.
+        //   2. Configuring gemini-style rates changes the estimate
+        //      proportionally.
+        var user = new string('a', 4000);      // 1000 tokens
+        var assistant = new string('b', 8000); // 2000 tokens
+        try
+        {
+            Assert.Equal(2.50m, OpenAICostEstimator.DefaultChatInputUsdPerMillionTokens);
+            Assert.Equal(10.00m, OpenAICostEstimator.DefaultChatOutputUsdPerMillionTokens);
+
+            OpenAICostEstimator.ConfigureChatRates(
+                OpenAICostEstimator.DefaultChatInputUsdPerMillionTokens,
+                OpenAICostEstimator.DefaultChatOutputUsdPerMillionTokens);
+            var openAiCost = OpenAICostEstimator.EstimateChatCostUsd(user, assistant);
+            // 1000/1M * 2.50 + 2000/1M * 10.00
+            Assert.Equal(0.0025m + 0.02m, openAiCost);
+
+            OpenAICostEstimator.ConfigureChatRates(0.50m, 3.00m);
+            var geminiCost = OpenAICostEstimator.EstimateChatCostUsd(user, assistant);
+            // 1000/1M * 0.50 + 2000/1M * 3.00
+            Assert.Equal(0.0005m + 0.006m, geminiCost);
+            Assert.True(geminiCost < openAiCost);
+        }
+        finally
+        {
+            OpenAICostEstimator.ConfigureChatRates(
+                OpenAICostEstimator.DefaultChatInputUsdPerMillionTokens,
+                OpenAICostEstimator.DefaultChatOutputUsdPerMillionTokens);
+        }
+    }
+
+    [Fact]
+    public void ConfigureChatRates_IgnoresNonPositiveRates()
+    {
+        // Zero/negative rates would price every call at $0 and the cap
+        // would never fire — the setter must refuse them.
+        try
+        {
+            OpenAICostEstimator.ConfigureChatRates(0m, -1m);
+            Assert.True(OpenAICostEstimator.ChatInputUsdPerMillionTokens > 0m);
+            Assert.True(OpenAICostEstimator.ChatOutputUsdPerMillionTokens > 0m);
+        }
+        finally
+        {
+            OpenAICostEstimator.ConfigureChatRates(
+                OpenAICostEstimator.DefaultChatInputUsdPerMillionTokens,
+                OpenAICostEstimator.DefaultChatOutputUsdPerMillionTokens);
+        }
+    }
 }

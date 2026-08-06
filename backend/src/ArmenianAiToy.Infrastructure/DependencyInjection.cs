@@ -54,6 +54,25 @@ public static class DependencyInjection
             config, AiProviderConfig.TtsKey, AiProviderConfig.SupportedForTts);
         var moderationProvider = AiProviderConfig.Resolve(config, AiProviderConfig.ModerationKey);
 
+        // Honest chat-cost rates for the ACTIVE brain (Tier-1 fix
+        // 2026-08-06): the per-device daily cap used to price every
+        // provider at gpt-4o token rates — fiction once chat moved to
+        // Gemini (~8x over). Explicit AI:ChatCostPerMTokensIn/Out win;
+        // otherwise the resolved provider picks its default. Gemini
+        // flash-class list price 2026-08 research: ~$0.30 in / $2.50
+        // out per 1M tokens; configured a touch high ($0.50 / $3.00),
+        // same fires-early posture as the estimator's own defaults.
+        // Re-check when Google publishes the gemini-3.6-flash list price.
+        var chatCostIn = TryParseDecimal(config["AI:ChatCostPerMTokensIn"])
+            ?? (chatProvider == AiProviderConfig.Gemini
+                ? 0.50m
+                : OpenAICostEstimator.DefaultChatInputUsdPerMillionTokens);
+        var chatCostOut = TryParseDecimal(config["AI:ChatCostPerMTokensOut"])
+            ?? (chatProvider == AiProviderConfig.Gemini
+                ? 3.00m
+                : OpenAICostEstimator.DefaultChatOutputUsdPerMillionTokens);
+        OpenAICostEstimator.ConfigureChatRates(chatCostIn, chatCostOut);
+
         // OpenAI
         var apiKey = config["OpenAI:ApiKey"]
             ?? throw new InvalidOperationException("OpenAI:ApiKey is required");
@@ -434,6 +453,11 @@ public static class DependencyInjection
         // RetentionPurgeService and CLAUDE.md § Retention.
         services.AddHostedService<RetentionPurgeService>();
 
+        // Daily SQLite VACUUM INTO snapshots + keep-7 pruning (Tier-1
+        // backup slice 2026-08-06). On by default; see the service
+        // xmldoc for config keys and the on-volume-only caveat.
+        services.AddHostedService<DatabaseBackupService>();
+
         return services;
     }
 
@@ -451,5 +475,21 @@ public static class DependencyInjection
             if (!string.IsNullOrWhiteSpace(v)) return v;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Invariant-culture decimal parse; null on empty/unparseable.
+    /// Config decimals must not depend on the host locale — "0.50"
+    /// has to mean the same number on an hy-AM Windows box and in
+    /// the Railway container.
+    /// </summary>
+    private static decimal? TryParseDecimal(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return decimal.TryParse(
+            value,
+            System.Globalization.NumberStyles.Number,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var d) ? d : null;
     }
 }

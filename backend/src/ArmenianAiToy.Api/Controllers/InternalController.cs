@@ -526,6 +526,61 @@ public class InternalController : ControllerBase
     public IActionResult WhoAmI()
         => Ok(new { @operator = HttpContext?.Items["InternalOperator"] as string ?? "unknown" });
 
+    /// <summary>
+    /// Stream a fresh, self-consistent snapshot of the live SQLite DB
+    /// (Tier-1 backup slice, 2026-08-06). This is the OFFSITE half of
+    /// the backup story: the <c>DatabaseBackupService</c> worker keeps
+    /// on-volume daily snapshots (corruption guard), and this endpoint
+    /// lets the operator pull a copy to any other machine — the only
+    /// defense against losing the volume itself. Same fail-closed
+    /// console gate as every <c>/api/internal/*</c> route; a non-SQLite
+    /// or in-memory host answers a uniform 404. Each successful pull
+    /// writes one <c>InternalConsoleAccess</c> audit row (the snapshot
+    /// contains every family's data — the most access-audit-worthy read
+    /// on the console).
+    /// </summary>
+    [HttpGet("backup")]
+    public async Task<IActionResult> DownloadBackup(CancellationToken ct)
+    {
+        if (!SqliteDatabaseSnapshot.IsSqliteFileDatabase(_db, out _))
+            return NotFound(new { error = "Backup not available." });
+
+        // Snapshot into a temp file; DeleteOnClose makes the OS clean
+        // it up when the response stream is disposed (success, client
+        // abort, or error alike).
+        var tempPath = Path.Combine(Path.GetTempPath(), $"areg-snapshot-{Guid.NewGuid():N}.db");
+        try
+        {
+            await SqliteDatabaseSnapshot.VacuumIntoAsync(_db, tempPath, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            TryDeleteFile(tempPath);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Backup snapshot failed");
+            TryDeleteFile(tempPath);
+            return NotFound(new { error = "Backup not available." });
+        }
+
+        await AuditAccessAsync("backup", null, 1, ct);
+
+        var stream = new FileStream(
+            tempPath, FileMode.Open, FileAccess.Read,
+            FileShare.Read | FileShare.Delete, 64 * 1024,
+            FileOptions.Asynchronous | FileOptions.DeleteOnClose);
+        return File(stream, "application/octet-stream",
+            $"areg-backup-{DateTime.UtcNow:yyyyMMdd-HHmmss}Z.db");
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); }
+        catch { /* best-effort temp cleanup */ }
+    }
+
     /// <summary>JIT session exchange (MFA). The operator's static token is the
     /// FIRST factor (validated by the gate to reach this path); a TOTP code is
     /// the SECOND factor when a secret is configured for this operator. On

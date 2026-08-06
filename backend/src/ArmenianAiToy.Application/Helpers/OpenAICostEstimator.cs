@@ -19,13 +19,39 @@ namespace ArmenianAiToy.Application.Helpers;
 /// </summary>
 public static class OpenAICostEstimator
 {
-    /// <summary>USD per 1M input tokens for the chat model
-    /// (approximate gpt-4o). Conservative; revise on model change.</summary>
-    public const decimal ChatInputUsdPerMillionTokens = 2.50m;
+    /// <summary>Shipped default chat input rate — approximate gpt-4o,
+    /// the price the cap was calibrated against (2026-05-18).</summary>
+    public const decimal DefaultChatInputUsdPerMillionTokens = 2.50m;
 
-    /// <summary>USD per 1M output tokens for the chat model
-    /// (approximate gpt-4o). Conservative; revise on model change.</summary>
-    public const decimal ChatOutputUsdPerMillionTokens = 10.00m;
+    /// <summary>Shipped default chat output rate — approximate gpt-4o.</summary>
+    public const decimal DefaultChatOutputUsdPerMillionTokens = 10.00m;
+
+    /// <summary>USD per 1M input tokens for the ACTIVE chat provider.
+    /// Defaults to the OpenAI rate; startup calls
+    /// <see cref="ConfigureChatRates"/> once with the resolved
+    /// provider's rates (Tier-1 fix 2026-08-06: with the brain on
+    /// Gemini, pricing chat at gpt-4o rates made the per-device daily
+    /// cap fire ~8x early — fiction, not conservatism).</summary>
+    public static decimal ChatInputUsdPerMillionTokens { get; private set; }
+        = DefaultChatInputUsdPerMillionTokens;
+
+    /// <summary>USD per 1M output tokens for the ACTIVE chat provider.
+    /// See <see cref="ChatInputUsdPerMillionTokens"/>.</summary>
+    public static decimal ChatOutputUsdPerMillionTokens { get; private set; }
+        = DefaultChatOutputUsdPerMillionTokens;
+
+    /// <summary>
+    /// Set the chat token rates for the active provider. Called exactly
+    /// once at startup (AddInfrastructure, right after the chat provider
+    /// resolves). Non-positive values are ignored — the cap must never
+    /// be configured off (zero rates would price every call at $0 and
+    /// the daily cap would never fire).
+    /// </summary>
+    public static void ConfigureChatRates(decimal inputUsdPerMillionTokens, decimal outputUsdPerMillionTokens)
+    {
+        if (inputUsdPerMillionTokens > 0m) ChatInputUsdPerMillionTokens = inputUsdPerMillionTokens;
+        if (outputUsdPerMillionTokens > 0m) ChatOutputUsdPerMillionTokens = outputUsdPerMillionTokens;
+    }
 
     /// <summary>USD per minute for Whisper transcription. Conservative;
     /// revise on transcription-model change.</summary>
