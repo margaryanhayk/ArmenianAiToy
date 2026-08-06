@@ -28,147 +28,569 @@
     "Ձեռքերը արա՞գ (ը-ա deliberate, per the -ը rule)",
     "Կանա՛չը կայծակի / Կարմի՛րը կայծակի (կ-կ alliteration — listen for a clean stop between the words)"
   ],
-
   "mind-reader": {
     "_title": "Working concept name was «Ո՞վ եմ ես», but the final mechanic is the reverse — the CHILD thinks of an animal, ARÉG guesses it. No clip speaks the game title, so the menu name is a free owner decision with zero re-render cost. Suggested spoken frame: «Ես կգուշակեմ»։",
     "_flow": "intro → q-root → 4 yes/no questions down the tree → guess clip → GREEN (right) = win, RED (wrong) = lose → replay-invite. GREEN/yes appends 1 to the path, RED/no appends 0. Node id = answer path so far (q-root, q-0, q-1, q-00…q-111); guess id = full 4-bit path (g-0000…g-1111). Convention set in intro: yes = green, no = red — questions themselves stay bare (quiz q01-q20 precedent).",
     "_animals": "16 animals, child-familiar: yes-branch (near people): բադ, հավ, կատու, շուն, կով, ձի, ոչխար, խոզ; no-branch (wild): արջ, գայլ, նապաստակ, աղվես, փիղ, առյուծ, կապիկ, օձ.",
     "clips": [
-      { "id": "intro", "speaker": "areg", "text": "Արի՛ խաղանք։ Մտքումդ մի կենդանի պահի՛ր, բայց մի՛ ասա։ Ես հարցեր կտամ ու կգուշակեմ։ Եթե հա՝ սեղմի՛ր կանաչը, եթե ոչ՝ կարմիրը։ Սկսում ենք։" },
-
-      { "id": "q-root", "speaker": "areg", "text": "Քո կենդանին մարդկանց մոտ ապրու՞մ է՝ տանը կամ գյուղում։", "note": "yes → ընտանի ճյուղ (1), no → վայրի ճյուղ (0)" },
-
-      { "id": "q-1",  "speaker": "areg", "text": "Քո կենդանին փո՞քր է՝ կարող ես գրկել։", "note": "yes → {բադ, հավ, կատու, շուն}, no → {կով, ձի, ոչխար, խոզ}" },
-      { "id": "q-0",  "speaker": "areg", "text": "Քո կենդանին անտառու՞մ է ապրում։", "note": "yes → {արջ, գայլ, նապաստակ, աղվես}, no → {փիղ, առյուծ, կապիկ, օձ}. Obligatory ն+ա junction — watch word." },
-
-      { "id": "q-11", "speaker": "areg", "text": "Քո կենդանին թևեր ունի՞։", "note": "yes → {բադ, հավ}, no → {կատու, շուն}" },
-      { "id": "q-10", "speaker": "areg", "text": "Քո կենդանին մեծ մարդուց բա՞րձր է։", "note": "yes → {կով, ձի}, no → {ոչխար, խոզ}" },
-      { "id": "q-01", "speaker": "areg", "text": "Քո կենդանին ուժե՞ղ է։", "note": "yes → {արջ, գայլ}, no → {նապաստակ, աղվես}. Obligatory ն+ու junction — watch word." },
-      { "id": "q-00", "speaker": "areg", "text": "Քո կենդանին շա՞տ մեծ է։", "note": "yes → {փիղ, առյուծ}, no → {կապիկ, օձ}" },
-
-      { "id": "q-111", "speaker": "areg", "text": "Քո կենդանին լողու՞մ է։", "note": "yes → բադ, no → հավ" },
-      { "id": "q-110", "speaker": "areg", "text": "Քո կենդանին մլավու՞մ է։", "note": "yes → կատու, no → շուն" },
-      { "id": "q-101", "speaker": "areg", "text": "Քո կենդանին կաթ տալի՞ս է։", "note": "yes → կով, no → ձի" },
-      { "id": "q-100", "speaker": "areg", "text": "Քո կենդանին փափուկ բուրդ ունի՞։", "note": "yes → ոչխար, no → խոզ" },
-      { "id": "q-011", "speaker": "areg", "text": "Քո կենդանին ամբողջ ձմեռը քնու՞մ է։", "note": "yes → արջ, no → գայլ" },
-      { "id": "q-010", "speaker": "areg", "text": "Քո կենդանին երկար ականջներ ունի՞։", "note": "yes → նապաստակ, no → աղվես" },
-      { "id": "q-001", "speaker": "areg", "text": "Քո կենդանին երկար կնճիթ ունի՞։", "note": "yes → փիղ, no → առյուծ" },
-      { "id": "q-000", "speaker": "areg", "text": "Քո կենդանին ոտքեր ունի՞։", "note": "yes → կապիկ, no → օձ" },
-
-      { "id": "g-1111", "speaker": "areg", "text": "Գիտե՜մ։ Դա բադ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ հա-հա-հա-հա" },
-      { "id": "g-1110", "speaker": "areg", "text": "Գիտե՜մ։ Դա հավ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ հա-հա-հա-ոչ" },
-      { "id": "g-1101", "speaker": "areg", "text": "Գիտե՜մ։ Դա կատու է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ հա-հա-ոչ-հա" },
-      { "id": "g-1100", "speaker": "areg", "text": "Գիտե՜մ։ Դա շուն է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ հա-հա-ոչ-ոչ" },
-      { "id": "g-1011", "speaker": "areg", "text": "Գիտե՜մ։ Դա կով է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ հա-ոչ-հա-հա" },
-      { "id": "g-1010", "speaker": "areg", "text": "Գիտե՜մ։ Դա ձի է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ հա-ոչ-հա-ոչ" },
-      { "id": "g-1001", "speaker": "areg", "text": "Գիտե՜մ։ Դա ոչխար է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ հա-ոչ-ոչ-հա" },
-      { "id": "g-1000", "speaker": "areg", "text": "Գիտե՜մ։ Դա խոզ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ հա-ոչ-ոչ-ոչ" },
-      { "id": "g-0111", "speaker": "areg", "text": "Գիտե՜մ։ Դա արջ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ ոչ-հա-հա-հա" },
-      { "id": "g-0110", "speaker": "areg", "text": "Գիտե՜մ։ Դա գայլ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ ոչ-հա-հա-ոչ" },
-      { "id": "g-0101", "speaker": "areg", "text": "Գիտե՜մ։ Դա նապաստակ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ ոչ-հա-ոչ-հա" },
-      { "id": "g-0100", "speaker": "areg", "text": "Գիտե՜մ։ Դա աղվես է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ ոչ-հա-ոչ-ոչ" },
-      { "id": "g-0011", "speaker": "areg", "text": "Գիտե՜մ։ Դա փիղ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ ոչ-ոչ-հա-հա" },
-      { "id": "g-0010", "speaker": "areg", "text": "Գիտե՜մ։ Դա առյուծ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ ոչ-ոչ-հա-ոչ" },
-      { "id": "g-0001", "speaker": "areg", "text": "Գիտե՜մ։ Դա կապիկ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ ոչ-ոչ-ոչ-հա" },
-      { "id": "g-0000", "speaker": "areg", "text": "Գիտե՜մ։ Դա օձ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "ուղի՝ ոչ-ոչ-ոչ-ոչ" },
-
-      { "id": "win", "speaker": "areg", "text": "Ուռա՜, գուշակեցի՛։ Դու լավ պատասխանեցիր՝ ես էլ գտա։", "note": "GREEN after a guess. Crediting the child's answers is honest — they are button presses the toy measured." },
-      { "id": "lose", "speaker": "areg", "text": "Վա՜յ, չգտա՛։ Դու ինձ հաղթեցի՛ր։ Ի՜նչ խորամանկ կենդանի էիր պահել մտքումդ։ Ապրե՛ս։", "note": "RED after a guess. The toy losing is delightful, never sour. It does NOT ask what the animal was — the mic is not listening." },
-      { "id": "replay", "speaker": "areg", "text": "Էլի՞ խաղանք։ Հա՝ կանաչ, ոչ՝ կարմիր։", "note": "Second sentence is the same spliced mapping line as the guess clips." }
+      {
+        "id": "intro",
+        "speaker": "areg",
+        "text": "Արի՛ խաղանք։ Մտքումդ մի կենդանի ընտրի՛ր, բայց անունը մի՛ ասա։ Ես քեզ հարցեր կտամ ու կփորձեմ գուշակել։ Եթե պատասխանդ «հա» է՝ սեղմի՛ր կանաչ կոճակը, իսկ եթե «ոչ» է՝ կարմիրը։ Սկսում ենք։"
+      },
+      {
+        "id": "q-root",
+        "speaker": "areg",
+        "text": "Քո կենդանին մարդկանց մո՞տ է ապրում՝ տանը կամ գյուղում։",
+        "note": "yes → ընտանի ճյուղ (1), no → վայրի ճյուղ (0)"
+      },
+      {
+        "id": "q-1",
+        "speaker": "areg",
+        "text": "Քո կենդանին փո՞քր է։ Կարո՞ղ ես նրան գրկել։",
+        "note": "yes → {բադ, հավ, կատու, շուն}, no → {կով, ձի, ոչխար, խոզ}"
+      },
+      {
+        "id": "q-0",
+        "speaker": "areg",
+        "text": "Քո կենդանին անտառո՞ւմ է ապրում։",
+        "note": "yes → {արջ, գայլ, նապաստակ, աղվես}, no → {փիղ, առյուծ, կապիկ, օձ}. Obligatory ն+ա junction — watch word."
+      },
+      {
+        "id": "q-11",
+        "speaker": "areg",
+        "text": "Քո կենդանին թևեր ունի՞։",
+        "note": "yes → {բադ, հավ}, no → {կատու, շուն}"
+      },
+      {
+        "id": "q-10",
+        "speaker": "areg",
+        "text": "Քո կենդանին մարդու բոյի՞ չափ է կամ ավելի բարձր։",
+        "note": "yes → {կով, ձի}, no → {ոչխար, խոզ}"
+      },
+      {
+        "id": "q-01",
+        "speaker": "areg",
+        "text": "Քո կենդանին ուժե՞ղ է։",
+        "note": "yes → {արջ, գայլ}, no → {նապաստակ, աղվես}. Obligatory ն+ու junction — watch word."
+      },
+      {
+        "id": "q-00",
+        "speaker": "areg",
+        "text": "Քո կենդանին շա՞տ մեծ է։",
+        "note": "yes → {փիղ, առյուծ}, no → {կապիկ, օձ}"
+      },
+      {
+        "id": "q-111",
+        "speaker": "areg",
+        "text": "Քո կենդանին լողո՞ւմ է։",
+        "note": "yes → բադ, no → հավ"
+      },
+      {
+        "id": "q-110",
+        "speaker": "areg",
+        "text": "Քո կենդանին մլավո՞ւմ է։",
+        "note": "yes → կատու, no → շուն"
+      },
+      {
+        "id": "q-101",
+        "speaker": "areg",
+        "text": "Քո կենդանին կաթ տալի՞ս է։",
+        "note": "yes → կով, no → ձի"
+      },
+      {
+        "id": "q-100",
+        "speaker": "areg",
+        "text": "Քո կենդանին խռխռացնո՞ւմ է։",
+        "note": "yes → ոչխար, no → խոզ"
+      },
+      {
+        "id": "q-011",
+        "speaker": "areg",
+        "text": "Քո կենդանին ձմռանը երկա՞ր է քնում։",
+        "note": "yes → արջ, no → գայլ"
+      },
+      {
+        "id": "q-010",
+        "speaker": "areg",
+        "text": "Քո կենդանին երկար ականջներ ունի՞։",
+        "note": "yes → նապաստակ, no → աղվես"
+      },
+      {
+        "id": "q-001",
+        "speaker": "areg",
+        "text": "Քո կենդանին երկար կնճիթ ունի՞։",
+        "note": "yes → փիղ, no → առյուծ"
+      },
+      {
+        "id": "q-000",
+        "speaker": "areg",
+        "text": "Քո կենդանին ոտքեր ունի՞։",
+        "note": "yes → կապիկ, no → օձ"
+      },
+      {
+        "id": "g-1111",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա բադ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ հա-հա-հա-հա"
+      },
+      {
+        "id": "g-1110",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա հավ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ հա-հա-հա-ոչ"
+      },
+      {
+        "id": "g-1101",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա կատու է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ հա-հա-ոչ-հա"
+      },
+      {
+        "id": "g-1100",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա շուն է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ հա-հա-ոչ-ոչ"
+      },
+      {
+        "id": "g-1011",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա կով է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ հա-ոչ-հա-հա"
+      },
+      {
+        "id": "g-1010",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա ձի է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ հա-ոչ-հա-ոչ"
+      },
+      {
+        "id": "g-1001",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա խոզ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ հա-ոչ-ոչ-հա"
+      },
+      {
+        "id": "g-1000",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա ոչխար է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ հա-ոչ-ոչ-ոչ"
+      },
+      {
+        "id": "g-0111",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա արջ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ ոչ-հա-հա-հա"
+      },
+      {
+        "id": "g-0110",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա գայլ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ ոչ-հա-հա-ոչ"
+      },
+      {
+        "id": "g-0101",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա նապաստակ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ ոչ-հա-ոչ-հա"
+      },
+      {
+        "id": "g-0100",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա աղվես է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ ոչ-հա-ոչ-ոչ"
+      },
+      {
+        "id": "g-0011",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա փիղ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ ոչ-ոչ-հա-հա"
+      },
+      {
+        "id": "g-0010",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա առյուծ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ ոչ-ոչ-հա-ոչ"
+      },
+      {
+        "id": "g-0001",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա կապիկ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ ոչ-ոչ-ոչ-հա"
+      },
+      {
+        "id": "g-0000",
+        "speaker": "areg",
+        "text": "Գիտե՜մ։ Դա օձ է։ Ճի՞շտ եմ։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "ուղի՝ ոչ-ոչ-ոչ-ոչ"
+      },
+      {
+        "id": "win",
+        "speaker": "areg",
+        "text": "Ուռա՜, գուշակեցի՛։ Դու լավ պատասխանեցիր, ես էլ գտա։",
+        "note": "GREEN after a guess. Crediting the child's answers is honest — they are button presses the toy measured."
+      },
+      {
+        "id": "lose",
+        "speaker": "areg",
+        "text": "Վա՜յ, չգտա։ Այս անգամ դու հաղթեցիր։ Ի՜նչ դժվար կենդանի էիր ընտրել։ Ապրե՛ս։",
+        "note": "RED after a guess. The toy losing is delightful, never sour. It does NOT ask what the animal was — the mic is not listening."
+      },
+      {
+        "id": "replay",
+        "speaker": "areg",
+        "text": "Էլի՞ խաղանք։ Հա՝ կանաչ, ոչ՝ կարմիր։",
+        "note": "Second sentence is the same spliced mapping line as the guess clips."
+      }
     ]
   },
-
   "who-first": {
     "_title": "«Ո՞վ առաջինը» — two-player buzzer: green player vs red player, fastest press takes the round.",
     "_flow": "intro → per round: one go-family clip (rotate go, go-2, go-3, go-4) → one clip from the winning color's family (rotate win-green/-2/-3 or win-red/-2/-3) → optionally one between-N energy line before the next round (rotate between-1..5) → end-both → close. Variant numbering follows the vardan-katrin feedbackVariants convention: the UNNUMBERED clip is variant 1 of its family (go ≡ go №1, win-green ≡ win-green №1), numbered ids continue the family, and the firmware rotation cursor walks them so replays never repeat. Round celebrations name only the WINNING color; no clip ever names a loser. The between-N lines deliberately never contain the word «հիմա» — a child primed to press on the trigger must never hear it outside a go clip.",
     "clips": [
-      { "id": "intro", "speaker": "areg", "text": "Սա երկու հոգու խաղ է։ Մեկդ սեղմում է կանաչը, մյուսդ՝ կարմիրը։ Երբ ասեմ «հիմա՛»՝ արագ սեղմե՛ք։ Տեսնենք՝ ով առաջինը կսեղմի։", "note": "The quoted trigger word must stay byte-identical to the go clip's «Հիմա՛»." },
-      { "id": "go", "speaker": "areg", "text": "Պատրա՛ստ… Հիմա՛։", "note": "Variant 1 of the go family. Render with a real beat of silence on the ellipsis — the pause IS the game." },
-      { "id": "go-2", "speaker": "areg", "text": "Մրցավա՜զք։ Պատրա՛ստ… Հիմա՛։", "note": "Racing framing. Tail «Պատրա՛ստ… Հիմա՛։» is word-for-word the go clip — splice. «Մրցավա՜զք» is a watch word (consonant cluster)." },
-      { "id": "go-3", "speaker": "areg", "text": "Ո՞վ է կայծակի պես արագ։ Պատրա՛ստ… Հիմա՛։", "note": "Lightning framing. Same spliced tail as go-2." },
-      { "id": "go-4", "speaker": "areg", "text": "Ականջները՝ պատրա՛ստ։ Մատները՝ կոճակներին… Հիմա՛։", "note": "Ears-ready framing. Shares only the final «Հիմա՛։» with the family — keep the ellipsis pause before it." },
-      { "id": "win-green", "speaker": "areg", "text": "Կանա՛չը առաջինը սեղմեց։ Ապրե՛ս, կանա՛չ։", "note": "Variant 1 of the win-green family. ը-ա junction deliberate per the -ը rule. Vocative to the color, never to a name." },
-      { "id": "win-green-2", "speaker": "areg", "text": "Կանա՛չը կայծակի պես սեղմեց։ Ապրե՛ս, կանա՛չ։", "note": "Closing «Ապրե՛ս, կանա՛չ։» is word-for-word identical across all three win-green variants — render once, splice." },
-      { "id": "win-green-3", "speaker": "areg", "text": "Այս անգամ կանա՛չը առաջինը հասավ։ Ապրե՛ս, կանա՛չ։", "note": "«Այս անգամ» = the round just played, so it is valid at any round, including the first. ը-ա junction deliberate." },
-      { "id": "win-red", "speaker": "areg", "text": "Կարմի՛րը առաջինը սեղմեց։ Ապրե՛ս, կարմի՛ր։", "note": "Variant 1 of the win-red family. Word-for-word parallel of win-green with only the color swapped." },
-      { "id": "win-red-2", "speaker": "areg", "text": "Կարմի՛րը կայծակի պես սեղմեց։ Ապրե՛ս, կարմի՛ր։", "note": "Parallel of win-green-2, only the color swapped. Closing «Ապրե՛ս, կարմի՛ր։» identical across all three win-red variants — splice." },
-      { "id": "win-red-3", "speaker": "areg", "text": "Այս անգամ կարմի՛րը առաջինը հասավ։ Ապրե՛ս, կարմի՛ր։", "note": "Parallel of win-green-3, only the color swapped. ը-ա junction deliberate." },
-      { "id": "between-1", "speaker": "areg", "text": "Դե՛, էլի մի անգամ։", "note": "Shortest between-round beat — keeps the pace up." },
-      { "id": "between-2", "speaker": "areg", "text": "Ձեռքերը արա՞գ են։ Կտեսնե՛նք։", "note": "ը-ա junction deliberate per the -ը rule — watch word. Rhetorical, needs no answer, claims nothing heard." },
-      { "id": "between-3", "speaker": "areg", "text": "Երկուսդ էլ կրա՛կ եք։ Շարունակում ենք։", "note": "Praises BOTH players between rounds — the no-loser rule in positive form." },
-      { "id": "between-4", "speaker": "areg", "text": "Ի՜նչ արագ էիք։ Հազիվ հասցրի հաշվել։", "note": "Honesty rule: counting presses is exactly what the toy measures. «Հազիվ հասցրի» is a watch word (սցր cluster)." },
-      { "id": "between-5", "speaker": "areg", "text": "Մատները պատրա՞ստ են։ Դե՛, առա՛ջ։", "note": "Rhetorical ready-check; the next go clip still owns the actual trigger." },
-      { "id": "end-both", "speaker": "areg", "text": "Խաղը ավարտվեց։ Ես հաշվեցի ձեր սեղմումները՝ երկուսդ էլ արագ էիք։", "note": "Honesty rule: claims only counted presses. ը-ա junction deliberate." },
-      { "id": "close", "speaker": "areg", "text": "Երկուսդ էլ լավ խաղացիք։ Մյուս անգամ նորից կխաղանք։", "note": "No-loser closing. Second sentence is byte-identical to the quiz done clip's closing sentence — splice." }
+      {
+        "id": "intro",
+        "speaker": "areg",
+        "text": "Սա երկու հոգու խաղ է։ Մեկդ սեղմում է կանաչը, մյուսդ՝ կարմիրը։ Երբ ասեմ «հիմա՛»՝ արագ սեղմե՛ք։ Տեսնենք՝ ով առաջինը կսեղմի։",
+        "note": "The quoted trigger word must stay byte-identical to the go clip's «Հիմա՛»."
+      },
+      {
+        "id": "go",
+        "speaker": "areg",
+        "text": "Պատրա՛ստ… Հիմա՛։",
+        "note": "Variant 1 of the go family. Render with a real beat of silence on the ellipsis — the pause IS the game."
+      },
+      {
+        "id": "go-2",
+        "speaker": "areg",
+        "text": "Մրցավա՜զք։ Պատրա՛ստ… Հիմա՛։",
+        "note": "Racing framing. Tail «Պատրա՛ստ… Հիմա՛։» is word-for-word the go clip — splice. «Մրցավա՜զք» is a watch word (consonant cluster)."
+      },
+      {
+        "id": "go-3",
+        "speaker": "areg",
+        "text": "Ո՞վ է կայծակի պես արագ։ Պատրա՛ստ… Հիմա՛։",
+        "note": "Lightning framing. Same spliced tail as go-2."
+      },
+      {
+        "id": "go-4",
+        "speaker": "areg",
+        "text": "Ականջները՝ պատրա՛ստ։ Մատները՝ կոճակներին… Հիմա՛։",
+        "note": "Ears-ready framing. Shares only the final «Հիմա՛։» with the family — keep the ellipsis pause before it."
+      },
+      {
+        "id": "win-green",
+        "speaker": "areg",
+        "text": "Կանա՛չը առաջինը սեղմեց։ Ապրե՛ս, կանա՛չ։",
+        "note": "Variant 1 of the win-green family. ը-ա junction deliberate per the -ը rule. Vocative to the color, never to a name."
+      },
+      {
+        "id": "win-green-2",
+        "speaker": "areg",
+        "text": "Կանա՛չը կայծակի պես սեղմեց։ Ապրե՛ս, կանա՛չ։",
+        "note": "Closing «Ապրե՛ս, կանա՛չ։» is word-for-word identical across all three win-green variants — render once, splice."
+      },
+      {
+        "id": "win-green-3",
+        "speaker": "areg",
+        "text": "Այս անգամ կանա՛չը առաջինը հասավ։ Ապրե՛ս, կանա՛չ։",
+        "note": "«Այս անգամ» = the round just played, so it is valid at any round, including the first. ը-ա junction deliberate."
+      },
+      {
+        "id": "win-red",
+        "speaker": "areg",
+        "text": "Կարմի՛րը առաջինը սեղմեց։ Ապրե՛ս, կարմի՛ր։",
+        "note": "Variant 1 of the win-red family. Word-for-word parallel of win-green with only the color swapped."
+      },
+      {
+        "id": "win-red-2",
+        "speaker": "areg",
+        "text": "Կարմի՛րը կայծակի պես սեղմեց։ Ապրե՛ս, կարմի՛ր։",
+        "note": "Parallel of win-green-2, only the color swapped. Closing «Ապրե՛ս, կարմի՛ր։» identical across all three win-red variants — splice."
+      },
+      {
+        "id": "win-red-3",
+        "speaker": "areg",
+        "text": "Այս անգամ կարմի՛րը առաջինը հասավ։ Ապրե՛ս, կարմի՛ր։",
+        "note": "Parallel of win-green-3, only the color swapped. ը-ա junction deliberate."
+      },
+      {
+        "id": "between-1",
+        "speaker": "areg",
+        "text": "Դե՛, էլի մի անգամ։",
+        "note": "Shortest between-round beat — keeps the pace up."
+      },
+      {
+        "id": "between-2",
+        "speaker": "areg",
+        "text": "Ձեռքերը արա՞գ են։ Կտեսնե՛նք։",
+        "note": "ը-ա junction deliberate per the -ը rule — watch word. Rhetorical, needs no answer, claims nothing heard."
+      },
+      {
+        "id": "between-3",
+        "speaker": "areg",
+        "text": "Երկուսդ էլ կրա՛կ եք։ Շարունակում ենք։",
+        "note": "Praises BOTH players between rounds — the no-loser rule in positive form."
+      },
+      {
+        "id": "between-4",
+        "speaker": "areg",
+        "text": "Ի՜նչ արագ էիք։ Հազիվ հասցրի հաշվել։",
+        "note": "Honesty rule: counting presses is exactly what the toy measures. «Հազիվ հասցրի» is a watch word (սցր cluster)."
+      },
+      {
+        "id": "between-5",
+        "speaker": "areg",
+        "text": "Մատները պատրա՞ստ են։ Դե՛, առա՛ջ։",
+        "note": "Rhetorical ready-check; the next go clip still owns the actual trigger."
+      },
+      {
+        "id": "end-both",
+        "speaker": "areg",
+        "text": "Խաղը ավարտվեց։ Ես հաշվեցի ձեր սեղմումները՝ երկուսդ էլ արագ էիք։",
+        "note": "Honesty rule: claims only counted presses. ը-ա junction deliberate."
+      },
+      {
+        "id": "close",
+        "speaker": "areg",
+        "text": "Երկուսդ էլ լավ խաղացիք։ Մյուս անգամ նորից կխաղանք։",
+        "note": "No-loser closing. Second sentence is byte-identical to the quiz done clip's closing sentence — splice."
+      }
     ]
   },
-
   "sound-detective": {
     "_title": "«Գուշակի՛ր ձայնը» — Katrin or Vardan makes an animal sound with the mouth; the child picks who it was with the buttons.",
     "_flow": "intro → per round: sound clip (kid voice) → ask clip (areg, speaks the green/red mapping) → button verified against answer (green→-y, red→-n, same engine as the quiz). Feedback reuses the shipped quiz clips verbatim (win/wrong/done) — no new feedback lines here. Balance 5 green / 5 red, no runs longer than 2, no strict alternation: g r r g g r g r r g.",
     "_mix": "Wrong options alternate plausibly-confusable (dog/wolf, sheep/goat, horse/donkey, hen/duck) and silly-funny (a fish talking, a buzzing lion, a crowing duck).",
     "clips": [
-      { "id": "intro", "speaker": "areg", "text": "Արի՛ խաղանք։ Կատրինը կամ Վարդանը կենդանու ձայն կհանի, դու էլ կգուշակես։ Լավ լսի՛ր՝ սկսում ենք։" },
-
-      { "id": "r01-sound", "speaker": "katrin", "text": "Մյաու-մյաու" },
-      { "id": "r01-ask", "speaker": "areg", "answer": "green", "text": "Ո՞վ էր դա՝ կատուն՝ կանաչ, թե՞ շունը՝ կարմիր։", "note": "Ճիշտ՝ կատու։ Silly wrong option — a meowing dog." },
-
-      { "id": "r02-sound", "speaker": "vardan", "text": "Հաֆ-հաֆ" },
-      { "id": "r02-ask", "speaker": "areg", "answer": "red", "text": "Ո՞վ էր դա՝ գայլը՝ կանաչ, թե՞ շունը՝ կարմիր։", "note": "Ճիշտ՝ շուն (հաչում է շունը, գայլը ոռնում է)։ Confusable pair — mirrored by r10. SAME TEXT as r10-ask: render once, splice; only the filename suffix differs." },
-
-      { "id": "r03-sound", "speaker": "katrin", "text": "Մու-մու" },
-      { "id": "r03-ask", "speaker": "areg", "answer": "red", "text": "Ո՞վ էր դա՝ ձին՝ կանաչ, թե՞ կովը՝ կարմիր։", "note": "Ճիշտ՝ կով։ Mildly silly wrong option — a mooing horse." },
-
-      { "id": "r04-sound", "speaker": "vardan", "text": "Ծուղրուղու" },
-      { "id": "r04-ask", "speaker": "areg", "answer": "green", "text": "Ո՞վ էր դա՝ աքլորը՝ կանաչ, թե՞ բադը՝ կարմիր։", "note": "Ճիշտ՝ աքլոր։ Silly wrong option — a crowing duck. Single-word onomatopoeia, not a pair — the Armenian rooster crow is one word." },
-
-      { "id": "r05-sound", "speaker": "katrin", "text": "Բե-բե" },
-      { "id": "r05-ask", "speaker": "areg", "answer": "green", "text": "Ո՞վ էր դա՝ ոչխարը՝ կանաչ, թե՞ այծը՝ կարմիր։", "note": "Ճիշտ՝ ոչխար («բե-բե»; այծը՝ «մե-մե»)։ Genuinely confusable — determinable by the բ/մ convention. Flag for owner: confirm the բե/մե split matches how the kids actually perform it BEFORE fixing the answer suffix." },
-
-      { "id": "r06-sound", "speaker": "vardan", "text": "Իա-իա" },
-      { "id": "r06-ask", "speaker": "areg", "answer": "red", "text": "Ո՞վ էր դա՝ ձին՝ կանաչ, թե՞ ավանակը՝ կարմիր։", "note": "Ճիշտ՝ ավանակ։ Confusable farm pair. «ավանակ» chosen over «էշ» — the latter doubles as an insult." },
-
-      { "id": "r07-sound", "speaker": "katrin", "text": "Կվա-կվա" },
-      { "id": "r07-ask", "speaker": "areg", "answer": "green", "text": "Ո՞վ էր դա՝ գորտը՝ կանաչ, թե՞ ձուկը՝ կարմիր։", "note": "Ճիշտ՝ գորտ։ Silly wrong option — a talking fish (fish are silent; a 4-year-old finds this hilarious)." },
-
-      { "id": "r08-sound", "speaker": "vardan", "text": "Բզզ-բզզ" },
-      { "id": "r08-ask", "speaker": "areg", "answer": "red", "text": "Ո՞վ էր դա՝ առյուծը՝ կանաչ, թե՞ մեղուն՝ կարմիր։", "note": "Ճիշտ՝ մեղու։ Silly wrong option — a buzzing lion." },
-
-      { "id": "r09-sound", "speaker": "katrin", "text": "Ղա-ղա" },
-      { "id": "r09-ask", "speaker": "areg", "answer": "red", "text": "Ո՞վ էր դա՝ հավը՝ կանաչ, թե՞ բադը՝ կարմիր։", "note": "Ճիշտ՝ բադ։ Confusable poultry pair." },
-
-      { "id": "r10-sound", "speaker": "vardan", "text": "Ուու-ուու" },
-      { "id": "r10-ask", "speaker": "areg", "answer": "green", "text": "Ո՞վ էր դա՝ գայլը՝ կանաչ, թե՞ շունը՝ կարմիր։", "note": "Ճիշտ՝ գայլ (ոռնոցը գայլինն է)։ Educational mirror of r02: same ask audio, opposite answer — the child learns bark vs howl." }
+      {
+        "id": "intro",
+        "speaker": "areg",
+        "text": "Արի՛ խաղանք։ Կատրինը կամ Վարդանը կենդանու ձայն կանի, իսկ դու կգուշակես, թե որ կենդանին է։ Լա՛վ լսիր։ Սկսում ենք։"
+      },
+      {
+        "id": "r01-sound",
+        "speaker": "katrin",
+        "text": "Մյաու-մյաու։"
+      },
+      {
+        "id": "r01-ask",
+        "speaker": "areg",
+        "answer": "green",
+        "text": "Ո՞վ էր դա՝ կատուն՝ կանաչ, թե՞ շունը՝ կարմիր։",
+        "note": "Ճիշտ՝ կատու։ Silly wrong option — a meowing dog."
+      },
+      {
+        "id": "r02-sound",
+        "speaker": "vardan",
+        "text": "Հաֆ-հաֆ։"
+      },
+      {
+        "id": "r02-ask",
+        "speaker": "areg",
+        "answer": "red",
+        "text": "Ո՞վ էր դա՝ գայլը՝ կանաչ, թե՞ շունը՝ կարմիր։",
+        "note": "Ճիշտ՝ շուն (հաչում է շունը, գայլը ոռնում է)։ Confusable pair — mirrored by r10. SAME TEXT as r10-ask: render once, splice; only the filename suffix differs."
+      },
+      {
+        "id": "r03-sound",
+        "speaker": "katrin",
+        "text": "Մու-մու։"
+      },
+      {
+        "id": "r03-ask",
+        "speaker": "areg",
+        "answer": "red",
+        "text": "Ո՞վ էր դա՝ ձին՝ կանաչ, թե՞ կովը՝ կարմիր։",
+        "note": "Ճիշտ՝ կով։ Mildly silly wrong option — a mooing horse."
+      },
+      {
+        "id": "r04-sound",
+        "speaker": "vardan",
+        "text": "Ծուղրուղո՜ւ։"
+      },
+      {
+        "id": "r04-ask",
+        "speaker": "areg",
+        "answer": "green",
+        "text": "Ո՞վ էր դա՝ աքլորը՝ կանաչ, թե՞ բադը՝ կարմիր։",
+        "note": "Ճիշտ՝ աքլոր։ Silly wrong option — a crowing duck. Single-word onomatopoeia, not a pair — the Armenian rooster crow is one word."
+      },
+      {
+        "id": "r05-sound",
+        "speaker": "katrin",
+        "text": "Բե՜-բե՜։"
+      },
+      {
+        "id": "r05-ask",
+        "speaker": "areg",
+        "answer": "green",
+        "text": "Ո՞վ էր դա՝ ոչխարը՝ կանաչ, թե՞ այծը՝ կարմիր։",
+        "note": "Ճիշտ՝ ոչխար («բե-բե»; այծը՝ «մե-մե»)։ Genuinely confusable — determinable by the բ/մ convention. Flag for owner: confirm the բե/մե split matches how the kids actually perform it BEFORE fixing the answer suffix."
+      },
+      {
+        "id": "r06-sound",
+        "speaker": "vardan",
+        "text": "Իա՜-իա՜։"
+      },
+      {
+        "id": "r06-ask",
+        "speaker": "areg",
+        "answer": "red",
+        "text": "Ո՞վ էր դա՝ ձին՝ կանաչ, թե՞ ավանակը՝ կարմիր։",
+        "note": "Ճիշտ՝ ավանակ։ Confusable farm pair. «ավանակ» chosen over «էշ» — the latter doubles as an insult."
+      },
+      {
+        "id": "r07-sound",
+        "speaker": "katrin",
+        "text": "Կռկռ-կռկռ։"
+      },
+      {
+        "id": "r07-ask",
+        "speaker": "areg",
+        "answer": "green",
+        "text": "Ո՞վ էր դա՝ գորտը՝ կանաչ, թե՞ ձուկը՝ կարմիր։",
+        "note": "Ճիշտ՝ գորտ։ Silly wrong option — a talking fish (fish are silent; a 4-year-old finds this hilarious)."
+      },
+      {
+        "id": "r08-sound",
+        "speaker": "vardan",
+        "text": "Բզզ-բզզ։"
+      },
+      {
+        "id": "r08-ask",
+        "speaker": "areg",
+        "answer": "red",
+        "text": "Ո՞վ էր դա՝ առյուծը՝ կանաչ, թե՞ մեղուն՝ կարմիր։",
+        "note": "Ճիշտ՝ մեղու։ Silly wrong option — a buzzing lion."
+      },
+      {
+        "id": "r09-sound",
+        "speaker": "katrin",
+        "text": "Ղա՜-ղա՜։"
+      },
+      {
+        "id": "r09-ask",
+        "speaker": "areg",
+        "answer": "red",
+        "text": "Ո՞վ էր դա՝ սագը՝ կանաչ, թե՞ հավը՝ կարմիր։",
+        "note": "Ճիշտ՝ բադ։ Confusable poultry pair."
+      },
+      {
+        "id": "r10-sound",
+        "speaker": "vardan",
+        "text": "Ուո՜ւ-ուո՜ւ։"
+      },
+      {
+        "id": "r10-ask",
+        "speaker": "areg",
+        "answer": "green",
+        "text": "Ո՞վ էր դա՝ գայլը՝ կանաչ, թե՞ շունը՝ կարմիր։",
+        "note": "Ճիշտ՝ գայլ (ոռնոցը գայլինն է)։ Educational mirror of r02: same ask audio, opposite answer — the child learns bark vs howl."
+      }
     ]
   },
-
   "button-simon": {
     "_title": "«Կրկնի՛ր իմ հետևից» — the toy plays a tone sequence (each button has its own tone), the child repeats it on the buttons; the sequence grows each round.",
     "_flow": "intro → play tones → your-turn → child presses → correct: level-up-1/2/3 (rotate) → longer sequence · miss: miss clip → replay the SAME sequence once → new personal best: best clip · session end: done. Correctness and best-streak are pure button data — every claim here is honest by construction.",
     "clips": [
-      { "id": "intro", "speaker": "areg", "text": "Ամեն կոճակ մի ձայն ունի։ Ես կնվագեմ, դու լավ լսի՛ր։ Հետո նույնը կրկնի՛ր կոճակներով։ Ամեն անգամ մի քիչ ավելի երկար կլինի։" },
-      { "id": "your-turn", "speaker": "areg", "text": "Հիմա դու՛։" },
-      { "id": "level-up-1", "speaker": "areg", "text": "Ապրե՛ս, ճիշտ է։ Հիմա՝ ավելի երկար։", "note": "First sentence is byte-identical to the quiz win clip — splice. Grading is allowed here: the press is objectively verified." },
-      { "id": "level-up-2", "speaker": "areg", "text": "Ճի՛շտ կրկնեցիր։ Լսի՛ր հաջորդը։" },
-      { "id": "level-up-3", "speaker": "areg", "text": "Ի՜նչ լավ ես հիշում։ Էլի մի ձայն եմ ավելացնում։", "note": "Memory claim is honest — it is derived from the measured presses." },
-      { "id": "miss", "speaker": "areg", "text": "Օ՜, այս անգամ չստացվեց։ Ոչինչ, փորձի՛ր նորից։", "note": "Warm, zero shame. Second sentence is byte-identical to the quiz wrong clip — splice. Presumes the same sequence replays once (quiz-loop convention)." },
-      { "id": "best", "speaker": "areg", "text": "Ուռա՜։ Այսքան երկար շարք դեռ չէիր կրկնել։ Ապրե՛ս։", "note": "Personal best — derived from stored press counts, honest." },
-      { "id": "done", "speaker": "areg", "text": "Լավ խաղացինք։ Մյուս անգամ նորից կխաղանք։", "note": "Byte-identical to the quiz done clip — reuse that render." }
+      {
+        "id": "intro",
+        "speaker": "areg",
+        "text": "Ամեն կոճակ մի ձայն ունի։ Ես կնվագեմ, իսկ դու լավ լսի՛ր։ Հետո նույն հերթականությունը կրկնի՛ր կոճակներով։ Ամեն անգամ շարքը մի փոքր ավելի երկար կլինի։"
+      },
+      {
+        "id": "your-turn",
+        "speaker": "areg",
+        "text": "Հիմա դու՛։"
+      },
+      {
+        "id": "level-up-1",
+        "speaker": "areg",
+        "text": "Ապրե՛ս, ճիշտ է։ Հիմա՝ ավելի երկար շարք։",
+        "note": "First sentence is byte-identical to the quiz win clip — splice. Grading is allowed here: the press is objectively verified."
+      },
+      {
+        "id": "level-up-2",
+        "speaker": "areg",
+        "text": "Ճի՛շտ կրկնեցիր։ Լսի՛ր հաջորդը։"
+      },
+      {
+        "id": "level-up-3",
+        "speaker": "areg",
+        "text": "Ի՜նչ լավ ես հիշում։ Եվս մի ձայն եմ ավելացնում։",
+        "note": "Memory claim is honest — it is derived from the measured presses."
+      },
+      {
+        "id": "miss",
+        "speaker": "areg",
+        "text": "Օ՜, այս անգամ չստացվեց։ Ոչինչ, նորից փորձի՛ր։",
+        "note": "Warm, zero shame. Second sentence is byte-identical to the quiz wrong clip — splice. Presumes the same sequence replays once (quiz-loop convention)."
+      },
+      {
+        "id": "best",
+        "speaker": "areg",
+        "text": "Ուռա՜։ Այսքան երկար շարք դեռ չէիր կրկնել։ Ապրե՛ս։",
+        "note": "Personal best — derived from stored press counts, honest."
+      },
+      {
+        "id": "done",
+        "speaker": "areg",
+        "text": "Լավ խաղացինք։ Մյուս անգամ նորից կխաղանք։",
+        "note": "Byte-identical to the quiz done clip — reuse that render."
+      }
     ]
   },
-
   "story-pauses": {
     "_title": "Shout-it-out story pauses — generic mid-story inserts: the narration pauses, Areg invites the child to shout, then resumes. Usable across ALL stories.",
     "_flow": "story pauses → shout-N plays → fixed silent beat (~3s, firmware-timed) → resume-N plays → narration continues. The mic is NOT listening: no clip claims to have heard, understood, or judged what the child said — the resumes are theatrical affirmations that work identically over an answer, a shout, or silence.",
     "clips": [
-      { "id": "shout-1", "speaker": "areg", "text": "Սպասի՛ր, սպասի՛ր… Ի՞նչ ասենք նրան։ Ասա՛ բարձր։", "note": "Insert where a character faces a choice. «Ասա՛ բարձր։» is identical across all four shout clips — render once, splice." },
-      { "id": "shout-2", "speaker": "areg", "text": "Իսկ դու ի՞նչ կանեիր։ Ասա՛ բարձր։", "note": "Universally applicable — works at any story beat." },
-      { "id": "shout-3", "speaker": "areg", "text": "Զգուշացրո՛ւ նրան։ Ասա՛ բարձր։", "note": "Insert only before MILD peril (a puddle, a closing door) — never before anything genuinely scary." },
-      { "id": "shout-4", "speaker": "areg", "text": "Գուշակի՛ր՝ ինչ կլինի հետո։ Ասա՛ բարձր։", "note": "Prediction beat — imperative, so no stacked question marks." },
-      { "id": "resume-1", "speaker": "areg", "text": "Այո՜, ճիշտ այդպես… Լսի՛ր, թե ինչ եղավ։", "note": "Generic theatrical affirmation — affirms nothing specific, safe over silence." },
-      { "id": "resume-2", "speaker": "areg", "text": "Հա՜, լավ միտք է… Շարունակենք։" },
-      { "id": "resume-3", "speaker": "areg", "text": "Ուրեմն, շարունակում ենք հեքիաթը։", "note": "Byte-identical to the canonical library resume line — reuse that render; one resume ritual across the whole product." },
-      { "id": "resume-4", "speaker": "areg", "text": "Դե՛, լսի՛ր շարունակությունը։" }
+      {
+        "id": "shout-1",
+        "speaker": "areg",
+        "text": "Սպասի՛ր, սպասի՛ր… Ի՞նչ ասենք նրան։ Ասա՛ բարձրաձայն։",
+        "note": "Insert where a character faces a choice. «Ասա՛ բարձր։» is identical across all four shout clips — render once, splice."
+      },
+      {
+        "id": "shout-2",
+        "speaker": "areg",
+        "text": "Իսկ դու ի՞նչ կանեիր։ Ասա՛ բարձրաձայն։",
+        "note": "Universally applicable — works at any story beat."
+      },
+      {
+        "id": "shout-3",
+        "speaker": "areg",
+        "text": "Արագ զգուշացրո՛ւ նրան։ Ասա՛ բարձրաձայն։",
+        "note": "Insert only before MILD peril (a puddle, a closing door) — never before anything genuinely scary."
+      },
+      {
+        "id": "shout-4",
+        "speaker": "areg",
+        "text": "Գուշակի՛ր՝ ի՞նչ կլինի հետո։ Ասա՛ բարձրաձայն։",
+        "note": "Prediction beat — imperative, so no stacked question marks."
+      },
+      {
+        "id": "resume-1",
+        "speaker": "areg",
+        "text": "Այո՜, հենց այդպես… Հիմա լսի՛ր, թե ինչ եղավ։",
+        "note": "Generic theatrical affirmation — affirms nothing specific, safe over silence."
+      },
+      {
+        "id": "resume-2",
+        "speaker": "areg",
+        "text": "Հա՜, լավ միտք է… Շարունակենք։"
+      },
+      {
+        "id": "resume-3",
+        "speaker": "areg",
+        "text": "Ուրեմն, շարունակում ենք հեքիաթը։",
+        "note": "Byte-identical to the canonical library resume line — reuse that render; one resume ritual across the whole product."
+      },
+      {
+        "id": "resume-4",
+        "speaker": "areg",
+        "text": "Դե՛, լսի՛ր շարունակությունը։"
+      }
     ]
   }
 }
