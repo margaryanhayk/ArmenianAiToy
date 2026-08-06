@@ -170,9 +170,15 @@ public sealed class ContentSyncOptions
                 AudioUrl = child["AudioUrl"] ?? "",
                 AudioPath = child["AudioPath"] ?? "",
                 Sha256 = child["Sha256"] ?? "",
+                SeriesId = child["SeriesId"] ?? "",
+                SeriesTitle = child["SeriesTitle"] ?? "",
             };
             if (int.TryParse(child["Version"], out var storyVersion)) story.Version = storyVersion;
             if (long.TryParse(child["SizeBytes"], out var storySize)) story.SizeBytes = storySize;
+            // Serial support — null (not 0) when unset, so the manifest can
+            // tell "no position configured" from "position zero", which is
+            // what the both-or-neither rule keys off.
+            if (int.TryParse(child["SeriesIndex"], out var seriesIndex)) story.SeriesIndex = seriesIndex;
 
             // B2 — hand-rolled clip binding, same reachable-by-tests rule as
             // the story array itself: a new field silently missing from this
@@ -287,6 +293,9 @@ public sealed class ContentSyncOptions
                     AudioPath = ResolveAudioPath(AudioRoot, s.AudioPath),
                     Sha256 = s.Sha256,
                     SizeBytes = s.SizeBytes,
+                    SeriesId = s.SeriesId,
+                    SeriesTitle = s.SeriesTitle,
+                    SeriesIndex = s.SeriesIndex,
                     Clips = s.Clips
                         .Select(c => new ContentSyncClipOptions
                         {
@@ -354,6 +363,48 @@ public sealed class ContentSyncStoryOptions
 
     /// <summary>Exact byte length of the MP3.</summary>
     public long SizeBytes { get; set; }
+
+    /// <summary>
+    /// Serial support — the series this story is an EPISODE of (e.g.
+    /// <c>tsivik</c>), or empty for an ordinary standalone story. Same
+    /// allowlist as <see cref="StoryId"/>: the device compares it as an id
+    /// and the firmware's validator refuses anything else.
+    /// <para>
+    /// Both-or-neither with <see cref="SeriesIndex"/> — a half-configured
+    /// pair drops BOTH fields (the story itself is kept and simply behaves
+    /// as a standalone), because a series member with no position is not
+    /// something the device can order.
+    /// </para>
+    /// </summary>
+    public string SeriesId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Serial support — the series' DISPLAY name («Ծիվիկ»), for the parent
+    /// dashboard's series card. Optional: when no episode of a series
+    /// supplies one, the dashboard falls back to a generic descriptor.
+    /// <para>
+    /// Configured per episode (the same string on each), because the config
+    /// shape is a flat story list and a separate series section would be a
+    /// second place for the pairing to drift out of. Set it or don't —
+    /// there is deliberately NO derivation from <see cref="SeriesId"/> (a
+    /// slug) or from the episode titles: a name a parent reads must be
+    /// authored, not guessed, the same rule the story <c>Author</c> field
+    /// follows.
+    /// </para>
+    /// <para>
+    /// Never sent to the device — the toy has no display surface, so this
+    /// stays off the SD index entirely.
+    /// </para>
+    /// </summary>
+    public string SeriesTitle { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Serial support — this episode's position within
+    /// <see cref="SeriesId"/>, 1-based. Indexes need NOT be contiguous:
+    /// the device only ever asks "which unheard member has the lowest
+    /// index", so gaps are harmless. Null for a standalone story.
+    /// </summary>
+    public int? SeriesIndex { get; set; }
 
     /// <summary>
     /// B2 — optional per-story CLIPS: short pre-rendered MP3s that travel
@@ -450,11 +501,19 @@ public sealed class ContentSyncClipOptions
     public const string KindOffer = "offer";
     public const string KindReoffer = "reoffer";
 
+    /// <summary>Serial support — the closing line a serial EPISODE ends on
+    /// («Շարունակությունը՝ վաղը»). Exactly 10 characters, which is
+    /// <c>CS_CLIP_KIND_LEN</c> on the nose — pinned by
+    /// <c>AllowedClipKinds_AllFitTheFirmwareKindLength</c>. Anything longer
+    /// would be silently truncated on the card and never resolve.</summary>
+    public const string KindSerialNext = "serialnext";
+
     public static readonly IReadOnlyList<string> AllowedKinds =
         [KindIntro, KindQuestion, KindSummary, KindQuestion1, KindQuestion2,
-         KindOffer, KindReoffer];
+         KindOffer, KindReoffer, KindSerialNext];
 
-    /// <summary>Clip role: intro | question | summary | offer | reoffer.</summary>
+    /// <summary>Clip role: intro | question | summary | offer | reoffer |
+    /// serialnext.</summary>
     public string Kind { get; set; } = string.Empty;
 
     /// <summary>URL the device downloads from. Empty → the manifest service

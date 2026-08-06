@@ -329,7 +329,11 @@ void test_index_round_trip_three() {
     String json;
     serializeJson(built, json);
     check(json.length() > 0, "index_serializes");
-    check(json.indexOf("\"schemaVersion\":2") >= 0, "index_has_schema_v2");
+    // Track the CONSTANT, not a literal. Written as a literal "2" this
+    // assertion silently rotted at the v3 and v4 bumps — what this test is
+    // actually about is the round trip, not which number is current.
+    check(json.indexOf("\"schemaVersion\":" + String(CS_INDEX_SCHEMA_VERSION)) >= 0,
+          "index_has_current_schema_version");
     check(json.indexOf("hedgehog-apple") >= 0, "index_contains_third_story");
 
     // Legacy compatibility mirror: the flat fields the three existing
@@ -345,7 +349,7 @@ void test_index_round_trip_three() {
     CsStory *back = g_story_scratch2;
     int schema = 0;
     const int n = cs_index_parse(reparsed, back, CS_MAX_STORIES, &schema);
-    check(schema == 2, "index_round_trip_schema");
+    check(schema == CS_INDEX_SCHEMA_VERSION, "index_round_trip_schema");
     check(n == 3, "index_round_trip_count");
     check(strcmp(back[0].story_id, "anban-huri") == 0, "index_round_trip_order_0");
     check(strcmp(back[2].story_id, "hedgehog-apple") == 0, "index_round_trip_order_2");
@@ -487,6 +491,12 @@ void test_clip_kinds_and_bounds() {
     check(cs_is_valid_clip_kind("question2"), "clipkind_question2");
     check(cs_is_valid_clip_kind("offer"), "clipkind_offer");
     check(cs_is_valid_clip_kind("reoffer"), "clipkind_reoffer");
+    check(cs_is_valid_clip_kind("serialnext"), "clipkind_serialnext");
+    // "serialnext" is exactly CS_CLIP_KIND_LEN, so the buffer must hold it
+    // without truncating — a clipped kind would never resolve on the card.
+    check(strlen(CS_CLIP_KIND_SERIALNEXT) == CS_CLIP_KIND_LEN,
+          "clipkind_serialnext_exactly_fills_the_bound");
+    check(!cs_is_valid_clip_kind("serial-next"), "clipkind_rejects_serial_next_hyphen");
 
     check(!cs_is_valid_clip_kind("Intro"), "clipkind_rejects_uppercase");
     check(!cs_is_valid_clip_kind("../x"), "clipkind_rejects_traversal");
@@ -501,6 +511,9 @@ void test_clip_kinds_and_bounds() {
     check(cs_build_clip_cache_path(path, sizeof(path), "anban-huri", 2, "reoffer")
               && strcmp(path, "/stories/anban-huri-v2-reoffer.mp3") == 0,
           "clip_path_reoffer");
+    check(cs_build_clip_cache_path(path, sizeof(path), "tsivik-ep1", 1, "serialnext")
+              && strcmp(path, "/stories/tsivik-ep1-v1-serialnext.mp3") == 0,
+          "clip_path_serialnext");
 
     // A story may now legitimately carry all seven kinds at once.
     JsonDocument doc;
@@ -637,7 +650,8 @@ void test_index_v4_round_trip() {
     JsonDocument reread;
     check(deserializeJson(reread, serialized) == DeserializationError::Ok,
           "index_v4_serializes");
-    check((reread["schemaVersion"] | 0) == 4, "index_v4_schema_version");
+    check((reread["schemaVersion"] | 0) == CS_INDEX_SCHEMA_VERSION,
+          "index_v4_schema_version");
 
     CsVoice *back = g_voice_scratch;
     const int n = cs_index_parse_voice(reread, back, CS_MAX_VOICE);
@@ -689,6 +703,109 @@ void test_index_v3_forward_compatible() {
           "v3_index_stories_still_parse");
 }
 
+// ---- serial episodes (schema v5) ------------------------------------
+
+void test_series_manifest_parse() {
+    JsonDocument doc;
+    JsonArray arr = doc["stories"].to<JsonArray>();
+    add_item(arr, "tsivik-ep1", 1, kShaA, 100, "/u");
+    arr[0]["seriesId"]    = "tsivik";
+    arr[0]["seriesIndex"] = 1;
+    // Half-set: an id with no position. Must degrade to a STANDALONE
+    // story, never to a half-set episode the selector cannot order.
+    add_item(arr, "tsivik-ep2", 1, kShaB, 100, "/u");
+    arr[1]["seriesId"] = "tsivik";
+    // Half-set the other way: a position with no id.
+    add_item(arr, "little-cloud", 1, kShaC, 100, "/u");
+    arr[2]["seriesIndex"] = 4;
+    // Malformed id (uppercase would become a second SD-visible series).
+    add_item(arr, "hedgehog-apple", 1, kShaA, 100, "/u");
+    arr[3]["seriesId"]    = "Tsivik";
+    arr[3]["seriesIndex"] = 2;
+    // Non-positive position.
+    add_item(arr, "khosogh-dzuk", 1, kShaB, 100, "/u");
+    arr[4]["seriesId"]    = "tsivik";
+    arr[4]["seriesIndex"] = 0;
+
+    CsStory *out = g_story_scratch;
+    CsManifestStats stats{};
+    const int n = cs_manifest_parse(doc["stories"].as<JsonArrayConst>(),
+                                    out, CS_MAX_STORIES, &stats);
+
+    // KEYSTONE: a bad series pairing drops the PAIRING, never the story.
+    check(n == 5, "series_bad_pairing_keeps_every_story");
+    check(cs_story_is_serial(&out[0]) && strcmp(out[0].series_id, "tsivik") == 0
+              && out[0].series_index == 1,
+          "series_valid_pair_stored");
+    check(!cs_story_is_serial(&out[1]), "series_id_without_index_is_standalone");
+    check(!cs_story_is_serial(&out[2]), "series_index_without_id_is_standalone");
+    check(!cs_story_is_serial(&out[3]), "series_uppercase_id_rejected");
+    check(!cs_story_is_serial(&out[4]), "series_zero_index_rejected");
+}
+
+void test_series_index_round_trip() {
+    static CsStory active[3];
+    fill(&active[0], "tsivik-ep1", 1, kShaA, 100);
+    cs_copy_bounded(active[0].series_id, sizeof(active[0].series_id), "tsivik");
+    active[0].series_index = 1;
+    fill(&active[1], "tsivik-ep6", 1, kShaB, 100);
+    cs_copy_bounded(active[1].series_id, sizeof(active[1].series_id), "tsivik");
+    active[1].series_index = 6;   // gaps are legal — only order matters
+    fill(&active[2], "anban-huri", 1, kShaC, 100);   // standalone
+
+    JsonDocument built;
+    cs_index_build(built, active, 3, "anban-huri");
+    check((built["schemaVersion"] | 0) == CS_INDEX_SCHEMA_VERSION,
+          "index_v5_schema_version");
+    // A standalone story writes NO series keys, so a serial-free library
+    // still produces the same index it produced before this slice.
+    check(!built["stories"][2]["seriesId"].is<const char *>(),
+          "index_standalone_writes_no_series_keys");
+
+    String json;
+    serializeJson(built, json);
+    JsonDocument reread;
+    check(deserializeJson(reread, json) == DeserializationError::Ok, "index_v5_reparses");
+
+    CsStory *back = g_story_scratch2;
+    int schema = 0;
+    const int n = cs_index_parse(reread, back, CS_MAX_STORIES, &schema);
+    check(n == 3 && schema == CS_INDEX_SCHEMA_VERSION, "index_v5_round_trip_count");
+    check(cs_story_is_serial(&back[0]) && back[0].series_index == 1,
+          "index_v5_series_round_trip_first");
+    check(cs_story_is_serial(&back[1]) && back[1].series_index == 6,
+          "index_v5_series_round_trip_gap_preserved");
+    check(!cs_story_is_serial(&back[2]), "index_v5_standalone_stays_standalone");
+}
+
+// KEYSTONE: a card written by the PREVIOUS firmware must keep working.
+// v5 is a superset, so a v4 document has to parse as "every story is
+// standalone" — the exact pre-serial behaviour — and never as an
+// unorderable half-set that could take stories out of the rotation.
+void test_index_v4_forward_compatible() {
+    static CsStory stories[1];
+    fill(&stories[0], "anban-huri", 1, kShaA, 100);
+
+    JsonDocument idx;
+    cs_index_build(idx, stories, 1, "anban-huri", true);
+    idx["schemaVersion"] = 4;          // pretend it was written by the old build
+    String serialized;
+    serializeJson(idx, serialized);
+
+    JsonDocument reread;
+    deserializeJson(reread, serialized);
+
+    CsStory *out = g_story_scratch;
+    int schema = 0;
+    check(cs_index_parse(reread, out, CS_MAX_STORIES, &schema) == 1,
+          "v4_index_stories_still_parse");
+    check(schema == 4, "v4_index_detected_as_v4");
+    check(!cs_story_is_serial(&out[0]), "v4_index_stories_are_standalone");
+    // And the v4 fields it DOES carry are untouched by the bump.
+    check(cs_index_intro_enabled(reread), "v4_index_intro_flag_still_read");
+    check(cs_index_mode_enabled(reread, "storyEnabled"), "v4_index_modes_still_default_on");
+}
+
 void run_all() {
     s_pass = 0;
     s_fail = 0;
@@ -721,6 +838,9 @@ void run_all() {
     test_ask_voice_id();
     test_index_v4_round_trip();
     test_index_v3_forward_compatible();
+    test_series_manifest_parse();
+    test_series_index_round_trip();
+    test_index_v4_forward_compatible();
     test_copy_bounded();
 
     Serial.printf("[cs-test] heap after=%u\n", (unsigned)ESP.getFreeHeap());

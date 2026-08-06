@@ -1374,6 +1374,24 @@
       bedtime_safe: { en: '🌙 bedtime-safe', ru: '🌙 подходит для сна', hy: '🌙 հարմար է քնելուց առաջ' },
       no_plays_yet: { en: 'No story plays reported yet. The toy uploads them when it is online.', ru: 'Прослушиваний пока нет. Игрушка отправит их, когда будет онлайн.', hy: 'Դեռ լսած հեքիաթներ չկան։ Խաղալիքը կուղարկի տվյալները, երբ առցանց լինի։' },
       discuss_with_child: { en: 'Discuss with your child', ru: 'Обсудите с ребёнком', hy: 'Զրուցեք հեքիաթի մասին ձեր երեխայի հետ' },
+      // Serial stories. The card's HEADLINE is the series' authored name
+      // («Ծիվիկ») when the manifest carries one — a generic descriptor in
+      // the slot where every sibling card shows a real story name reads as
+      // "the title failed to load". The descriptor below is a demoted
+      // subtitle. When no name is authored the descriptor is promoted back
+      // to the headline: a slug ("tsivik"), or a name guessed from the
+      // episode titles, would be worse than not naming it.
+      series_fallback_title: { en: 'Story in parts', ru: 'Сказка по частям', hy: 'Հեքիաթ մասերով' },
+      // No numeral in this string: Russian needs 2 части / 5 частей and
+      // this page has no plural machinery. The count rides the disclosure
+      // summary below as a bare "(6)", which agrees with nothing.
+      series_episodes: { en: 'Played in order', ru: 'По порядку', hy: 'Մասերը՝ հերթով' },
+      series_part: { en: 'Part {n}', ru: 'Часть {n}', hy: 'Մաս {n}' },
+      // No ordinal suffix: Armenian takes 1-ին but 2-րդ, and {n} is
+      // substituted literally with no per-number logic available here.
+      series_next: { en: 'Next: part {n}', ru: 'Дальше: часть {n}', hy: 'Հաջորդը՝ Մաս {n}' },
+      series_all_heard: { en: 'Every part has been heard.', ru: 'Все части прослушаны.', hy: 'Ամբողջ հեքիաթը լսված է։' },
+      series_show_parts: { en: 'Show the parts ({n})', ru: 'Показать части ({n})', hy: 'Տեսնել մասերը ({n})' },
       // "Talk about it tonight" card. An invitation, never a task: there
       // is no key here for "you haven't done this", and none for a count
       // or a streak — those turn a family evening into homework.
@@ -5818,8 +5836,14 @@
           return;
         }
         setStatus('libraryStatus', '', '');
-        stories.forEach(function (s) {
-          listEl.appendChild(buildLibraryCard(s));
+        groupLibraryStories(stories).forEach(function (group) {
+          // A series with only one shipped episode is not "a story in
+          // parts" yet — a card announcing parts around a lone episode
+          // reads as missing content, which is exactly what a serial looks
+          // like while it is still shipping part by part.
+          listEl.appendChild(group.series && group.items.length > 1
+            ? buildSeriesCard(group)
+            : buildLibraryCard(group.items[0]));
         });
       }).catch(function (err) {
         if (err && err.status === 401) return;
@@ -5828,13 +5852,159 @@
       });
     }
 
-    function buildLibraryCard(s) {
-      var card = document.createElement('div');
-      card.style.cssText = 'padding:14px;background:#faf7ff;border:1px solid #e4d9f7;border-radius:14px;margin:0 0 10px;';
+    // Serial stories arrive as ordinary library entries that happen to
+    // share a seriesId. Group them into ONE card so a parent sees "a story
+    // in six parts" rather than six unrelated cards that look like
+    // duplicates of each other.
+    //
+    // A group takes the position of its FIRST episode in the library's own
+    // order, so standalone stories keep their places around it.
+    function groupLibraryStories(stories) {
+      var out = [];
+      // Object.create(null): a seriesId is data, and a slug like
+      // "constructor" must not collide with an inherited property.
+      var bySeries = Object.create(null);
+      stories.forEach(function (s) {
+        if (!s.seriesId) { out.push({ series: null, items: [s] }); return; }
+        var key = String(s.seriesId).toLowerCase();
+        if (!bySeries[key]) {
+          bySeries[key] = { series: s.seriesId, items: [] };
+          out.push(bySeries[key]);
+        }
+        bySeries[key].items.push(s);
+      });
+      // Episodes are LISTED in the order the toy plays them, whatever
+      // order the manifest happened to use. Indexes may have gaps — only
+      // the relative order is meaningful.
+      out.forEach(function (g) {
+        if (!g.series) return;
+        g.items.sort(function (a, b) {
+          return (a.seriesIndex || 0) - (b.seriesIndex || 0);
+        });
+      });
+      return out;
+    }
 
+    // One place decides a part's number, so the label on an episode and the
+    // number in the "next" chip can never disagree. A seriesIndex of 0 is
+    // treated as absent by `||`, which would silently renumber a 0-based
+    // series, so the check is explicit.
+    function partNumber(s, i) {
+      return (typeof s.seriesIndex === 'number' && s.seriesIndex > 0)
+        ? s.seriesIndex
+        : (i + 1);
+    }
+
+    // The series' authored display name, or null. Taken from the first
+    // episode that carries one, so a config where only episode 1 names the
+    // series still works. Never derived from the seriesId slug and never
+    // guessed from the episode titles — a name a parent reads is authored
+    // content, the same rule the story Author field follows.
+    function seriesDisplayTitle(group) {
+      for (var i = 0; i < group.items.length; i++) {
+        var name = group.items[i].seriesTitle;
+        if (name && String(name).trim()) return String(name).trim();
+      }
+      return null;
+    }
+
+    function buildSeriesCard(group) {
+      var card = document.createElement('div');
+      card.style.cssText = 'padding:14px;background:#f4f0fb;border:1px solid #ded1f4;border-radius:14px;margin:0 0 10px;';
+
+      // Headline = the series' real name, sitting in the same slot and the
+      // same typography a standalone card gives a story title. Without an
+      // authored name the descriptor is promoted here instead, so the slot
+      // is never empty and never shows a slug.
+      var name = seriesDisplayTitle(group);
       var title = document.createElement('div');
       title.style.cssText = 'font-size:16px;font-weight:600;';
-      title.textContent = '📖 ' + s.title;
+      title.textContent = '📚 ' + (name || t('series_fallback_title'));
+      card.appendChild(title);
+
+      // Demoted descriptor. Only shown when the headline is a real name —
+      // otherwise it would repeat the line directly above it.
+      var meta = document.createElement('div');
+      meta.style.cssText = 'color:#6b5b8a;font-size:12px;margin:2px 0 6px;';
+      meta.textContent = name
+        ? t('series_fallback_title') + ' · ' + t('series_episodes')
+        : t('series_episodes');
+      card.appendChild(meta);
+
+      // Which part has not been heard yet, read off the listen counts
+      // already on this screen. This REPORTS; it does not control anything —
+      // the toy's own ordering runs on the device, offline, from its heard
+      // set, and plays reach us only when the toy is next online. Rendered
+      // as a status chip (this page's read-only idiom) so it cannot be
+      // mistaken for an up-next queue the parent is steering. Its scope is
+      // the scope line above the list: one toy, or across every toy.
+      var next = null;
+      for (var i = 0; i < group.items.length; i++) {
+        if (!(group.items[i].listenCount > 0)) { next = group.items[i]; break; }
+      }
+      var hint = document.createElement('div');
+      hint.style.cssText = 'font-size:15px;font-weight:600;margin:2px 0 6px;';
+      if (next) {
+        var badge = document.createElement('span');
+        badge.className = 'chip chip-info';
+        // White, not chip-info's #f5f0ff — that fill is invisible against
+        // this card's #f4f0fb.
+        badge.style.cssText = 'background:#ffffff;font-weight:600;vertical-align:middle;';
+        badge.textContent = tf('series_next', {
+          n: partNumber(next, group.items.indexOf(next))
+        });
+        hint.appendChild(badge);
+        var nextTitle = document.createElement('span');
+        nextTitle.style.cssText = 'vertical-align:middle;';
+        nextTitle.textContent = ' ' + next.title;
+        hint.appendChild(nextTitle);
+      } else {
+        var done = document.createElement('span');
+        done.className = 'chip chip-ok';
+        done.textContent = t('series_all_heard');
+        hint.appendChild(done);
+      }
+      card.appendChild(hint);
+
+      // Six episodes rendered flat make one card about five phone screens
+      // tall, and a parent looking for the NEXT library entry has to scroll
+      // past all of them — which defeats the grouping. Collapsed, the card
+      // says what it is at a glance; opened, each episode is exactly the
+      // card it would have been on its own. Disclosure, not truncation: an
+      // episode is never a second-class library entry.
+      var parts = document.createElement('details');
+      var partsSummary = document.createElement('summary');
+      // padding, not min-height: keeps the native disclosure marker while
+      // clearing the 44px thumb floor.
+      partsSummary.style.cssText = 'cursor:pointer;color:#5b3e8a;font-size:13px;padding:13px 0;';
+      partsSummary.textContent = tf('series_show_parts', { n: group.items.length });
+      parts.appendChild(partsSummary);
+      group.items.forEach(function (s, i) {
+        parts.appendChild(buildLibraryCard(s, tf('series_part', { n: partNumber(s, i) })));
+      });
+      card.appendChild(parts);
+      return card;
+    }
+
+    // `partLabel` is set only for an episode rendered INSIDE a series card:
+    // it prefixes the title and lightens the chrome so the episode reads as
+    // part of the group rather than as its own card. Everything below it —
+    // metadata, goal, lesson, counts, the discuss block, the preview — is
+    // identical either way, so a serial episode is never a second-class
+    // library entry.
+    function buildLibraryCard(s, partLabel) {
+      var card = document.createElement('div');
+      card.style.cssText = partLabel
+        ? 'padding:10px 12px;background:#fff;border:1px solid #e4d9f7;border-radius:12px;margin:6px 0 0;'
+        : 'padding:14px;background:#faf7ff;border:1px solid #e4d9f7;border-radius:14px;margin:0 0 10px;';
+
+      var title = document.createElement('div');
+      title.style.cssText = partLabel
+        ? 'font-size:14px;font-weight:600;'
+        : 'font-size:16px;font-weight:600;';
+      title.textContent = partLabel
+        ? partLabel + t('label_sep') + s.title
+        : '📖 ' + s.title;
       card.appendChild(title);
 
       var metaBits = [];

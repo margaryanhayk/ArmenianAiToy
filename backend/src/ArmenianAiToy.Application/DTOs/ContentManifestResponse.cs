@@ -92,6 +92,30 @@ public sealed record ContentStoryItem(
     /// positional parameter so existing constructor call sites compile
     /// unchanged.</summary>
     public IReadOnlyList<ContentClipItem>? Clips { get; init; }
+
+    /// <summary>Serial support — the series this story is an EPISODE of,
+    /// and its 1-based position in that series. BOTH are null for an
+    /// ordinary standalone story, which is every story shipped before this
+    /// slice — so the wire is byte-identical for non-serial deployments and
+    /// pre-serial firmware ignores the fields entirely.
+    /// <para>
+    /// Validated as a PAIR at manifest build: a series id that fails the id
+    /// allowlist, or a missing/non-positive index, drops BOTH fields and
+    /// leaves the story itself on the manifest as a standalone. A half-set
+    /// pair is not something the device can order, and dropping the story
+    /// over a metadata typo would take a working narration off the toy.
+    /// </para></summary>
+    public string? SeriesId { get; init; }
+
+    /// <inheritdoc cref="SeriesId" />
+    public int? SeriesIndex { get; init; }
+
+    /// <summary>Serial support — the series' authored DISPLAY name
+    /// («Ծիվիկ»), for the parent dashboard's series card. Null when the
+    /// pairing is invalid OR when no name was configured; the dashboard
+    /// then falls back to a generic descriptor rather than showing a slug.
+    /// The device never reads this — it has no display surface.</summary>
+    public string? SeriesTitle { get; init; }
 }
 
 /// <summary>One per-story clip. <c>Kind</c> is a bounded vocabulary

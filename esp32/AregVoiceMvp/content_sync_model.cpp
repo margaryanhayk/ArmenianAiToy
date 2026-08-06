@@ -112,6 +112,28 @@ int cs_manifest_parse(JsonArrayConst stories, CsStory *out, int max_out,
             continue;
         }
 
+        // Serial support — seriesId/seriesIndex travel together or not at
+        // all. The backend already enforces both-or-neither, but a card can
+        // be hand-edited and an old backend sends neither, so the rule is
+        // re-applied here: anything half-set or malformed leaves the entry
+        // as an ordinary standalone story rather than an episode with no
+        // position (which the selector could not order).
+        {
+            const char *series_id  = item["seriesId"]    | "";
+            const int   series_idx = item["seriesIndex"] | 0;
+            if (series_idx >= 1 && cs_is_valid_story_id(series_id)
+                && cs_copy_bounded(dst->series_id, sizeof(dst->series_id), series_id)) {
+                dst->series_index = series_idx;
+            } else {
+                dst->series_id[0] = '\0';
+                dst->series_index = 0;
+                if (series_id[0] != '\0' || series_idx != 0) {
+                    Serial.printf("[content-sync] %s series pairing ignored (id=%s idx=%d)\n",
+                                  dst->story_id, series_id, series_idx);
+                }
+            }
+        }
+
         // B2 — per-story clips. Same per-item fail-closed rule at clip
         // granularity: a bad clip is skipped and never takes the story or
         // its valid sibling clips with it. Duplicate kinds keep the first.
@@ -184,6 +206,22 @@ int cs_index_parse(JsonDocument &doc, CsStory *out, int max_out, int *out_schema
             dst->version    = cs_normalize_version(e["version"] | 1);
             dst->size_bytes = e["sizeBytes"] | 0L;
             dst->verified   = e["verified"] | false;
+
+            // v5 series pairing — absent on every pre-v5 card, which parses
+            // as "standalone story": exactly the pre-serial behaviour, so a
+            // card written by an older build never has to be wiped. Same
+            // both-or-neither rule the manifest parse applies.
+            {
+                const char *series_id  = e["seriesId"]    | "";
+                const int   series_idx = e["seriesIndex"] | 0;
+                if (series_idx < 1 || !cs_is_valid_story_id(series_id)
+                    || !cs_copy_bounded(dst->series_id, sizeof(dst->series_id), series_id)) {
+                    dst->series_id[0] = '\0';
+                    dst->series_index = 0;
+                } else {
+                    dst->series_index = series_idx;
+                }
+            }
 
             // v3 clips[] — absent on every v2 card, yielding clip_count 0
             // (story plays without intro/reflection, the pre-B2 behavior).
@@ -260,6 +298,13 @@ void cs_index_build(JsonDocument &doc, const CsStory *active, int count,
         e["sizeBytes"] = active[i].size_bytes;
         e["cachePath"] = active[i].cache_path;
         e["verified"]  = active[i].verified;
+        // Written only for real episodes, so a library with no serials
+        // produces a byte-identical index to the pre-v5 one apart from the
+        // schema number.
+        if (cs_story_is_serial(&active[i])) {
+            e["seriesId"]    = active[i].series_id;
+            e["seriesIndex"] = active[i].series_index;
+        }
         if (active[i].clip_count > 0) {
             JsonArray clips = e["clips"].to<JsonArray>();
             for (int k = 0; k < active[i].clip_count && k < CS_MAX_CLIPS; k++) {

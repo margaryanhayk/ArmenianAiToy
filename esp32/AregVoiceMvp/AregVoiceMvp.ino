@@ -1346,6 +1346,28 @@ static void handle_story_session() {
             if (started) {
                 story_report_on_finished();
             }
+            // Serial support — «Շարունակությունը՝ վաղը». Played BEFORE the
+            // reflection flow, not after: handle_post_story_flow() returns
+            // early on several ordinary paths (offline, no answer in the
+            // window), and a closing line the child usually never hears is
+            // worse than one that arrives a beat early. Self-gates twice —
+            // only for a real serial episode, and only when the clip is
+            // synced and verified — so it is a no-op for every standalone
+            // story and for any card that has not got the clip yet.
+            if (started) {
+                char episode_series[CS_MAX_STORY_ID_LEN + 1];
+                char serialnext_clip[CS_MAX_PATH_LEN];
+                if (story_series_of(active_story_id, episode_series, sizeof(episode_series))
+                    && story_select_resolve_clip_path(
+                           active_story_id, CS_CLIP_KIND_SERIALNEXT,
+                           serialnext_clip, sizeof(serialnext_clip))) {
+                    audio_speaker_begin();
+                    Serial.printf("[story] serial %s — next-episode clip (%s)\n",
+                                  episode_series, serialnext_clip);
+                    Serial.flush();
+                    audio_play_story_file(serialnext_clip, 0, nullptr, nullptr);
+                }
+            }
             // Slice 3: conclusion → reflection question → (online) listen for the
             // child's answer → warm acknowledgement. Self-gates on the SD pack,
             // so it is a no-op when playing the Wi-Fi stream.

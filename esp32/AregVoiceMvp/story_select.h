@@ -156,6 +156,69 @@ inline bool story_entry_eligible(const CsStory *e, long actual_size) {
     return actual_size >= 0 && actual_size == e->size_bytes;
 }
 
+// ---- pure serial-episode ordering -----------------------------------
+//
+// A serial («Ծիվիկ») is an ordinary set of stories that must be heard in
+// order, one new episode at a time. Nothing about download, caching or
+// playback changes — only which members of the set are OFFERED.
+
+/// May entry `i` be offered right now, given the whole candidate list?
+///
+/// `heard[k]` is "the child has already heard stories[k]" (the caller
+/// supplies it so this stays pure and testable). `latched` is the set of
+/// series ids that already had an episode START during this boot.
+///
+/// Rules:
+///   - a standalone story (no valid series pairing)  -> always allowed;
+///     the serial feature changes nothing for the rest of the library
+///   - an episode the child already heard            -> not allowed
+///   - an episode whose series is latched this boot  -> not allowed
+///     (this is the "one new episode at a time" gate)
+///   - an episode with an UNHEARD sibling at a lower index -> not allowed
+///     (that earlier episode is the one that is due)
+///   - otherwise                                     -> allowed
+///
+/// Indexes need not be contiguous — only the relative order matters — and
+/// a tie (two unheard members at the same index) blocks neither, so the
+/// list's own order decides, exactly as it does for duplicate story ids.
+inline bool story_series_member_allowed(const CsStory *stories, int count, int i,
+                                        const bool *heard,
+                                        const char *const *latched,
+                                        int latched_count) {
+    if (stories == NULL || i < 0 || i >= count) {
+        return false;
+    }
+    const CsStory *e = &stories[i];
+    if (!cs_story_is_serial(e)) {
+        return true;
+    }
+    if (heard != NULL && heard[i]) {
+        return false;
+    }
+    for (int j = 0; latched != NULL && j < latched_count; j++) {
+        if (latched[j] != NULL && cs_story_ids_equal(e->series_id, latched[j])) {
+            return false;
+        }
+    }
+    for (int j = 0; j < count; j++) {
+        if (j == i) {
+            continue;
+        }
+        const CsStory *other = &stories[j];
+        if (!cs_story_is_serial(other)
+            || !cs_story_ids_equal(other->series_id, e->series_id)) {
+            continue;
+        }
+        if (heard != NULL && heard[j]) {
+            continue;
+        }
+        if (other->series_index < e->series_index) {
+            return false;   // an earlier episode is still waiting its turn
+        }
+    }
+    return true;
+}
+
 // ---- index-backed API (implemented in story_select.cpp) -------------
 
 /// Loads every ELIGIBLE story from /content_index.json into `out`, in
@@ -172,6 +235,16 @@ inline bool story_entry_eligible(const CsStory *e, long actual_size) {
 /// Reads ONLY the v2 `stories[]` array; the legacy flat root fields are
 /// deliberately ignored here so a stale mirror can never override a
 /// valid v2 selection.
+///
+/// Serial episodes are additionally filtered by
+/// story_series_member_allowed, so every caller — the rotation, the
+/// welcome flow's spoken offer loop, the bench — sees the same "this is
+/// the episode that is due" answer without repeating the rule.
+///
+/// That filter is BEST-EFFORT, exactly like the failed-start exclusion:
+/// if applying it would leave nothing to play, it is ignored and the
+/// unfiltered list is returned. A card holding only a fully-heard serial
+/// must not make the toy go silent.
 int story_select_load_eligible(CsStory *out, int max_out);
 
 /// Story-aware cache-path resolver. Fills `out` with the cached MP3 path
@@ -327,3 +400,37 @@ int story_heard_count();
 /// "shall I tell it again?" line instead of quietly forgetting. Exists
 /// for the bench and for a future factory-reset gesture.
 void story_heard_clear();
+
+// ---- serial episodes: the boot-scoped "one new episode" latch --------
+//
+// HONEST LIMITATION, read this before relying on it: the toy has no wall
+// clock and no calendar. The gate below is per BOOT, not per day — a
+// reboot (or a battery pull) resets it and the next episode becomes
+// available immediately. It is the truthful v1 of "one episode a day":
+// the common case is a toy that stays powered through the day, where the
+// child gets one new episode and the series then waits.
+//
+// Real calendar gating needs a server day-signal, the same way
+// `inBedtimeWindow` already rides the heartbeat response. That is a
+// separate slice; nothing here invents a date the device does not have.
+
+/// Records that an episode of `series_id` started during this boot, which
+/// makes every other member of that series ineligible until reboot.
+/// Called automatically by story_heard_mark — a caller almost never needs
+/// this directly.
+void story_series_latch(const char *series_id);
+
+/// True when an episode of `series_id` already started this boot.
+bool story_series_is_latched(const char *series_id);
+
+/// Forgets every latch. Deliberately NOT called in production — it exists
+/// for the bench, so a diagnostic can run two selections in one boot.
+void story_series_clear_latches();
+
+/// Fills `out` with the series id `story_id` belongs to, reading the
+/// index. Returns false — leaving `out` empty — when the story is absent
+/// from the index or is an ordinary standalone story.
+///
+/// This is what lets the playback loop ask "was that a serial episode?"
+/// without the .ino carrying any series state of its own.
+bool story_series_of(const char *story_id, char *out, size_t out_len);

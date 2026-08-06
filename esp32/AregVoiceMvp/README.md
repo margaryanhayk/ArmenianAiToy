@@ -443,6 +443,63 @@ grounds `/api/chat/story-qa` and the reflection endpoint in whatever is
 playing, so a question asked during story B is not answered about story A.
 Empty restores the configured-story default.
 
+### Serial episodes («Ծիվիկ») — play in order, one at a time
+
+A serial is an ordinary set of `ContentSync:Stories` entries
+(`tsivik-ep1..ep6`) that carry two extra manifest fields, `seriesId` and
+`seriesIndex`. Nothing about download, caching, verification or playback
+changes — only **which members of the set are offered**.
+
+- **Index schema v4 → v5.** Per-story `seriesId` / `seriesIndex`, written
+  only for real episodes. Superset like every previous bump, so a v4 card
+  parses as "every story is standalone" — the exact pre-serial behaviour —
+  and **no card ever has to be wiped**. Pinned by
+  `test_index_v4_forward_compatible`.
+- **Both-or-neither.** An id without a positive index (or the reverse) is
+  stored as a standalone story, never as a half-set episode. The backend
+  applies the identical rule before the wire; the device re-applies it
+  because a card can be hand-edited. Nothing about a bad pairing drops the
+  *story* — a metadata typo must not take a working narration off a toy.
+- **Eligibility** (`story_series_member_allowed`, pure and bench-tested):
+  an episode is offered only when it is the **lowest-index NOT-heard**
+  member of its series. Indexes need not be contiguous; only order
+  matters. Standalone stories are completely unaffected.
+- **One new episode at a time** — a RAM latch, set when an episode is
+  marked heard, that makes every sibling of that series ineligible.
+- **After a serial episode ends naturally**, the toy plays the
+  `serialnext` clip («Շարունակությունը՝ վաղը») if it is synced and
+  verified. It plays **before** the reflection flow, not after, because
+  `handle_post_story_flow()` returns early on several ordinary paths
+  (offline, no answer in the listening window) and a closing line the
+  child usually never hears is worse than one arriving a beat early.
+- **Best-effort, never silence.** If the series rule would leave nothing
+  to play, it is ignored and the unfiltered list is used — the same
+  posture the failed-start exclusion takes. A card holding only a
+  fully-heard serial still plays.
+
+#### The "one a day" gate is per BOOT, not per day — read this
+
+The toy has **no wall clock and no calendar**. The latch above lives in
+RAM and is cleared by a reboot or a battery pull, after which the next
+episode becomes available immediately. That is the honest v1: on a toy
+that stays powered through the day (the common case) the child gets one
+new episode and the series then waits, which is the product behaviour the
+owner asked for. On a toy power-cycled repeatedly, it is not a daily gate
+at all.
+
+Real calendar gating needs a **server day-signal**, delivered the way
+`inBedtimeWindow` already rides the heartbeat response. That is a separate
+slice. Nothing in this one invents a date the device does not have, and
+nothing persists the latch — persisting it without a clock would mean
+never knowing when to expire it.
+
+#### Not covered by the bench tests
+
+`story_select_test.cpp` covers only the **pure** ordering rule. Still
+needs real hardware: the NVS heard-set read inside the filter, the boot
+latch surviving a real session, a real multi-episode sync, and the
+`serialnext` clip actually playing at the end of an episode.
+
 ### Feature flag: `AREG_STORY_SD_CACHE_FIRST` is GONE
 
 It previously gated the whole cache-first block, was **off by default**,

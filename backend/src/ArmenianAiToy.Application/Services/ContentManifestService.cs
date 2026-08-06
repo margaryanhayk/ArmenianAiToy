@@ -1,6 +1,7 @@
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace ArmenianAiToy.Application.Services;
 
@@ -12,8 +13,21 @@ public sealed class ContentManifestService : IContentManifestService
     public const string DefaultContentFileRoute = "/api/devices/content-file";
 
     private readonly ContentSyncOptions _options;
+    private readonly ILogger<ContentManifestService>? _logger;
 
-    public ContentManifestService(ContentSyncOptions options) => _options = options;
+    /// <summary>The logger is OPTIONAL (and the only logging in this class)
+    /// so the many <c>new ContentManifestService(options)</c> call sites in
+    /// tests keep compiling. It exists for exactly one message: a
+    /// half-configured series pair, which is otherwise invisible — the toy
+    /// would simply play the episodes as unordered standalones and nothing
+    /// would look broken.</summary>
+    public ContentManifestService(
+        ContentSyncOptions options,
+        ILogger<ContentManifestService>? logger = null)
+    {
+        _options = options;
+        _logger = logger;
+    }
 
     public ContentManifestResponse Build()
     {
@@ -48,6 +62,10 @@ public sealed class ContentManifestService : IContentManifestService
                 continue;
             }
 
+            // Computed ONCE per story: HasValidSeries logs on rejection, and
+            // asking it twice (once per field) would double every warning.
+            var hasSeries = HasValidSeries(story);
+
             items.Add(new ContentStoryItem(
                 StoryId: story.StoryId,
                 Version: story.Version < 1 ? 1 : story.Version,
@@ -58,6 +76,14 @@ public sealed class ContentManifestService : IContentManifestService
                 Enabled: true)
             {
                 Clips = BuildClips(story),
+                SeriesId = hasSeries ? story.SeriesId : null,
+                SeriesIndex = hasSeries ? story.SeriesIndex : null,
+                // Only on a valid pairing, and only when actually authored —
+                // an empty string on the wire would make the dashboard render
+                // a blank headline instead of falling back to its descriptor.
+                SeriesTitle = hasSeries && !string.IsNullOrWhiteSpace(story.SeriesTitle)
+                    ? story.SeriesTitle.Trim()
+                    : null,
             });
         }
 
@@ -166,6 +192,64 @@ public sealed class ContentManifestService : IContentManifestService
                 SizeBytes: clip.SizeBytes));
         }
         return clips.Count == 0 ? null : clips;
+    }
+
+    /// <summary>
+    /// Serial support — <c>seriesId</c> and <c>seriesIndex</c> are validated
+    /// as ONE unit and travel together or not at all.
+    /// <para>
+    /// Valid means: a series id passing the same allowlist a story id must
+    /// pass (lowercase ASCII, digits, <c>-</c>, <c>_</c>, bounded at 48),
+    /// AND a positive index. Anything else — a missing half, an uppercase
+    /// id, a zero/negative index — drops BOTH fields.
+    /// </para>
+    /// <para>
+    /// Note what is NOT dropped: the story. A metadata typo must not take a
+    /// working narration off the toy; the episode simply reverts to being an
+    /// ordinary standalone story in the rotation. Uniqueness of
+    /// <c>(seriesId, seriesIndex)</c> is deliberately not enforced here —
+    /// the device orders by index and keeps the first of a tie, exactly the
+    /// rule it already applies to duplicate story ids.
+    /// </para>
+    /// </summary>
+    private bool HasValidSeries(ContentSyncStoryOptions story)
+    {
+        var hasId = !string.IsNullOrWhiteSpace(story.SeriesId);
+        var hasIndex = story.SeriesIndex is > 0;
+        if (hasId && hasIndex && IsValidId(story.SeriesId))
+        {
+            return true;
+        }
+        if (hasId || story.SeriesIndex is not null)
+        {
+            _logger?.LogWarning(
+                "ContentSync story {StoryId}: series pairing dropped "
+                + "(seriesId='{SeriesId}', seriesIndex={SeriesIndex}); "
+                + "it will play as a standalone story.",
+                story.StoryId, story.SeriesId, story.SeriesIndex);
+        }
+        return false;
+    }
+
+    /// <summary>The firmware's <c>cs_is_valid_story_id</c> allowlist, kept
+    /// in step here: lowercase ASCII letters, digits, <c>-</c> and <c>_</c>,
+    /// 1..48 characters. Uppercase is rejected on both sides so one series
+    /// can never become two on a case-preserving SD card.</summary>
+    private static bool IsValidId(string? value)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length > 48)
+        {
+            return false;
+        }
+        foreach (var c in value)
+        {
+            var ok = c is >= 'a' and <= 'z' or >= '0' and <= '9' or '-' or '_';
+            if (!ok)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// <summary>A configured URL wins verbatim — that is what keeps the

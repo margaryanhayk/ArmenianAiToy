@@ -980,7 +980,10 @@ public class ParentController : ControllerBase
                     t?.Count ?? 0,
                     t?.FinishedCount ?? 0,
                     $"/api/parents/stories/{Uri.EscapeDataString(item.StoryId)}/audio",
-                    story?.ReflectionConclusions?.ToList());
+                    story?.ReflectionConclusions?.ToList(),
+                    item.SeriesId,
+                    item.SeriesIndex,
+                    item.SeriesTitle);
             }).ToList();
         }
         else

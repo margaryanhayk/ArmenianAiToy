@@ -362,6 +362,129 @@ void test_excluded_previous_still_rotates() {
           "excluded_previous_restarts_at_first_candidate");
 }
 
+// ---- serial episodes: pure ordering rule ----------------------------
+
+// Builds a three-episode series plus one standalone story, in the order
+// the index would hold them.
+void make_series(CsStory *list) {
+    make(&list[0], "tsivik-ep1");
+    cs_copy_bounded(list[0].series_id, sizeof(list[0].series_id), "tsivik");
+    list[0].series_index = 1;
+    make(&list[1], "tsivik-ep2");
+    cs_copy_bounded(list[1].series_id, sizeof(list[1].series_id), "tsivik");
+    list[1].series_index = 2;
+    make(&list[2], "tsivik-ep6");
+    cs_copy_bounded(list[2].series_id, sizeof(list[2].series_id), "tsivik");
+    list[2].series_index = 6;      // gaps are legal — only order matters
+    make(&list[3], "anban-huri");  // standalone
+}
+
+void test_series_only_the_lowest_unheard_is_offered() {
+    CsStory list[4];
+    make_series(list);
+    bool heard[4] = {false, false, false, false};
+
+    check(story_series_member_allowed(list, 4, 0, heard, nullptr, 0),
+          "series_first_episode_offered");
+    check(!story_series_member_allowed(list, 4, 1, heard, nullptr, 0),
+          "series_second_episode_waits");
+    check(!story_series_member_allowed(list, 4, 2, heard, nullptr, 0),
+          "series_last_episode_waits");
+    // KEYSTONE: the serial rule must change nothing for the rest of the
+    // library. A standalone story is always offered.
+    check(story_series_member_allowed(list, 4, 3, heard, nullptr, 0),
+          "series_standalone_story_unaffected");
+}
+
+void test_series_advances_as_episodes_are_heard() {
+    CsStory list[4];
+    make_series(list);
+    bool heard[4] = {true, false, false, false};   // ep1 done
+
+    check(!story_series_member_allowed(list, 4, 0, heard, nullptr, 0),
+          "series_heard_episode_not_reoffered");
+    check(story_series_member_allowed(list, 4, 1, heard, nullptr, 0),
+          "series_advances_to_second_episode");
+    check(!story_series_member_allowed(list, 4, 2, heard, nullptr, 0),
+          "series_still_holds_back_the_last");
+
+    // With the gap-indexed one the only unheard member, it becomes due —
+    // non-contiguous indexes must not strand an episode.
+    bool all_but_last[4] = {true, true, false, false};
+    check(story_series_member_allowed(list, 4, 2, all_but_last, nullptr, 0),
+          "series_gap_index_becomes_due");
+
+    // Whole series heard: nothing from it is offered. The best-effort
+    // fallback that keeps the toy from going silent lives in
+    // apply_series_rule (needs NVS), not in this pure rule.
+    bool everything[4] = {true, true, true, false};
+    check(!story_series_member_allowed(list, 4, 0, everything, nullptr, 0)
+              && !story_series_member_allowed(list, 4, 1, everything, nullptr, 0)
+              && !story_series_member_allowed(list, 4, 2, everything, nullptr, 0),
+          "series_fully_heard_offers_nothing");
+    check(story_series_member_allowed(list, 4, 3, everything, nullptr, 0),
+          "series_fully_heard_standalone_still_offered");
+}
+
+// KEYSTONE for the "one new episode at a time" gate: once an episode of a
+// series has started this boot, no sibling may follow it — otherwise a
+// child could sit through the whole serial in one afternoon.
+void test_series_boot_latch_blocks_the_next_episode() {
+    CsStory list[4];
+    make_series(list);
+    bool heard[4] = {true, false, false, false};   // ep1 played this boot
+    const char *latched[1] = {"tsivik"};
+
+    check(!story_series_member_allowed(list, 4, 1, heard, latched, 1),
+          "series_latch_blocks_next_episode");
+    check(story_series_member_allowed(list, 4, 3, heard, latched, 1),
+          "series_latch_does_not_touch_standalone_stories");
+
+    // A latch on a DIFFERENT series is irrelevant.
+    const char *other[1] = {"some-other-series"};
+    check(story_series_member_allowed(list, 4, 1, heard, other, 1),
+          "series_latch_is_per_series");
+}
+
+void test_series_malformed_pairings_are_standalone() {
+    CsStory list[3];
+    make(&list[0], "half-a");
+    cs_copy_bounded(list[0].series_id, sizeof(list[0].series_id), "tsivik");
+    list[0].series_index = 0;                     // id without a position
+    make(&list[1], "half-b");
+    list[1].series_index = 3;                     // position without an id
+    make(&list[2], "tsivik-ep1");
+    cs_copy_bounded(list[2].series_id, sizeof(list[2].series_id), "tsivik");
+    list[2].series_index = 1;
+    bool heard[3] = {false, false, false};
+
+    check(!cs_story_is_serial(&list[0]) && !cs_story_is_serial(&list[1]),
+          "series_half_set_pairs_are_not_serial");
+    // A half-set entry must not participate in ordering at all — it is an
+    // ordinary story that happens to have junk metadata.
+    check(story_series_member_allowed(list, 3, 0, heard, nullptr, 0)
+              && story_series_member_allowed(list, 3, 1, heard, nullptr, 0),
+          "series_half_set_pairs_always_offered");
+    check(story_series_member_allowed(list, 3, 2, heard, nullptr, 0),
+          "series_half_set_sibling_does_not_block_a_real_episode");
+}
+
+void test_series_bounds_and_nulls() {
+    CsStory list[4];
+    make_series(list);
+    bool heard[4] = {false, false, false, false};
+
+    check(!story_series_member_allowed(nullptr, 4, 0, heard, nullptr, 0),
+          "series_null_list_refused");
+    check(!story_series_member_allowed(list, 4, -1, heard, nullptr, 0),
+          "series_negative_index_refused");
+    check(!story_series_member_allowed(list, 4, 4, heard, nullptr, 0),
+          "series_out_of_range_index_refused");
+    // A null heard array means "nothing heard yet", not a crash.
+    check(story_series_member_allowed(list, 4, 0, nullptr, nullptr, 0),
+          "series_null_heard_array_tolerated");
+}
+
 void run_all() {
     s_pass = 0;
     s_fail = 0;
@@ -386,13 +509,21 @@ void run_all() {
     test_exclusion_two_story_prefers_playable();
     test_exclusion_matching_and_bounds();
     test_excluded_previous_still_rotates();
+    test_series_only_the_lowest_unheard_is_offered();
+    test_series_advances_as_episodes_are_heard();
+    test_series_boot_latch_blocks_the_next_episode();
+    test_series_malformed_pairings_are_standalone();
+    test_series_bounds_and_nulls();
 
     Serial.printf("[sel-test] TOTAL pass=%d fail=%d\n", s_pass, s_fail);
     Serial.println(s_fail == 0 ? "[sel-test] RESULT PASS" : "[sel-test] RESULT FAIL");
     Serial.println("[sel-test] NOT covered here (needs the hardware bench): real NVS "
                    "durability across a power cycle, real SD index reads, "
                    "story_select_load_eligible / _resolve_path end to end, and "
-                   "pause/resume in the live state machine.");
+                   "pause/resume in the live state machine. Serial episodes: "
+                   "only the PURE ordering rule is covered — the NVS heard-set "
+                   "read, the boot latch surviving a real session, and the "
+                   "serialnext clip actually playing all need the bench.");
     Serial.flush();
 }
 

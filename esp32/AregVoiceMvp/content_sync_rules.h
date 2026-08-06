@@ -89,12 +89,26 @@
 // reader treats their absence as the shipped default ("no clips",
 // "intro on", "no voice clips", "every mode enabled"), so no destructive
 // migration has ever been needed and a card never has to be wiped.
-#define CS_INDEX_SCHEMA_VERSION 4
+//
+// v5 = v4 plus the per-story seriesId/seriesIndex that let «Ծիվիկ»-style
+// episodes play in order. Same superset contract: a v4 card parses as "every
+// story is standalone", which is exactly the pre-serial behaviour.
+#define CS_INDEX_SCHEMA_VERSION 5
 
 // Per-story clip slots (intro / question / question1 / question2 /
-// summary / offer / reoffer). Fixed small array — an open-ended list
-// would multiply the three CS_MAX_STORIES tables' RAM for no product
-// reason.
+// summary / offer / reoffer / serialnext). Fixed small array — an
+// open-ended list would multiply the three CS_MAX_STORIES tables' RAM for
+// no product reason.
+//
+// NOT bumped to 8 when "serialnext" was added, deliberately. There are now
+// eight legal kinds but no story wants all eight: a serial EPISODE ships
+// intro/offer/reoffer/serialnext (4, or 6 with a summary + question), and a
+// standalone story never ships serialnext. A ninth slot would cost ~84 B ×
+// CS_MAX_STORIES × 5 tables ≈ 6.7 KB of .bss on a board that also wants
+// 40-50 KB free for a TLS handshake during audio. If a story ever DOES
+// configure eight kinds, the parse loop keeps the first seven in manifest
+// order and drops the eighth with no log — check here first if a clip
+// mysteriously never plays.
 //
 // 5 -> 7 for the welcome flow's spoken offer lines. Cost was computed,
 // not guessed: CsClip is ~84 bytes padded, so two extra slots add ~168 B
@@ -107,10 +121,11 @@
 #define CS_MAX_CLIPS 7
 #endif
 
-// Longest allowed kind is "question2" (9). The kind reaches an SD
-// filename, so it is allowlisted (below), not merely length-bounded.
-// This bound is why the welcome flow's second offer line is "reoffer"
-// and not "offer-again" (11) — the backend pins the same limit in
+// Longest allowed kind is "serialnext" (10) — exactly this bound, with no
+// slack left. The kind reaches an SD filename, so it is allowlisted
+// (below), not merely length-bounded. This bound is why the welcome flow's
+// second offer line is "reoffer" and not "offer-again" (11) — the backend
+// pins the same limit in
 // ContentSyncVoiceTests.AllowedClipKinds_AllFitTheFirmwareKindLength.
 #define CS_CLIP_KIND_LEN 10
 
@@ -260,6 +275,30 @@ struct CsStory {
     /// reflection, exactly the pre-B2 behavior.
     CsClip clips[CS_MAX_CLIPS];
     int    clip_count;
+
+    /// Serial support — the series this story is an EPISODE of, and its
+    /// 1-based position in it. EMPTY id + 0 index means a standalone
+    /// story, which is what every pre-v5 index and every non-serial
+    /// manifest item yields on parse.
+    ///
+    /// Both-or-neither, enforced at parse: an id without a positive index
+    /// (or the reverse) is stored as "standalone", never half-set. The
+    /// selector's ordering rule reads both, and a half-set pair would make
+    /// it order episodes by a position nobody supplied.
+    ///
+    /// Costs 49 + 4 bytes (56 padded) per CsStory, across every
+    /// CsStory[CS_MAX_STORIES] table in the image. MEASURED at the
+    /// canonical FQBN rather than estimated, the way the CS_MAX_STORIES and
+    /// CS_MAX_CLIPS bumps were:
+    ///
+    ///     production build   231,728 -> 229,144 B free   (-2,584)
+    ///     cs+sel test bench  185,624 -> 176,592 B free   (-9,032)
+    ///
+    /// The production figure is the one that matters — it is the build a
+    /// child's toy runs, and it still leaves far more than the ~40-50 KB a
+    /// TLS handshake wants during audio.
+    char series_id[CS_MAX_STORY_ID_LEN + 1];
+    int  series_index;
 };
 
 // ---- validation ---------------------------------------------------
@@ -292,6 +331,17 @@ inline bool cs_is_valid_story_id(const char *id) {
         }
     }
     return n > 0;
+}
+
+/// Serial support — true when this entry is an EPISODE of a series, i.e.
+/// BOTH halves are present and well-formed. Everything downstream asks
+/// this rather than testing the two fields separately, so "half-set" has
+/// exactly one meaning, in one place. A series id is validated by the same
+/// allowlist a story id is: it is compared as an id, and the backend
+/// (ContentManifestService) applies the identical rule before it ever
+/// reaches the wire.
+inline bool cs_story_is_serial(const CsStory *s) {
+    return s != NULL && s->series_index >= 1 && cs_is_valid_story_id(s->series_id);
 }
 
 /// Exactly 64 hex characters. A truncated or non-hex hash would make
@@ -390,13 +440,15 @@ inline bool cs_build_cache_path(char *out, size_t out_len,
 }
 
 /// Bounded clip-kind allowlist: exactly "intro", "question",
-/// "question1", "question2", "summary", "offer" or "reoffer"
-/// ("question" = dialogue question index 0; question1/2 are the
-/// reflection-dialogue follow-ups; offer/reoffer are the welcome flow's
-/// spoken story offers — "Ուզո՞ւմ ես լսել X" and "Մենք արդեն լսել ենք
-/// X…" — which are what let the toy say a story's TITLE aloud with no
-/// runtime TTS). The kind reaches an SD filename, so like story ids it is
-/// allowlisted — traversal characters are unrepresentable, not filtered.
+/// "question1", "question2", "summary", "offer", "reoffer" or
+/// "serialnext" ("question" = dialogue question index 0; question1/2 are
+/// the reflection-dialogue follow-ups; offer/reoffer are the welcome
+/// flow's spoken story offers — "Ուզո՞ւմ ես լսել X" and "Մենք արդեն լսել
+/// ենք X…" — which are what let the toy say a story's TITLE aloud with no
+/// runtime TTS; serialnext is the "Շարունակությունը՝ վաղը" line a serial
+/// EPISODE closes on). The kind reaches an SD filename, so like story ids
+/// it is allowlisted — traversal characters are unrepresentable, not
+/// filtered.
 inline bool cs_is_valid_clip_kind(const char *kind) {
     if (kind == NULL) {
         return false;
@@ -407,7 +459,8 @@ inline bool cs_is_valid_clip_kind(const char *kind) {
         || strcmp(kind, "question2") == 0
         || strcmp(kind, "summary") == 0
         || strcmp(kind, "offer") == 0
-        || strcmp(kind, "reoffer") == 0;
+        || strcmp(kind, "reoffer") == 0
+        || strcmp(kind, "serialnext") == 0;
 }
 
 /// Welcome-flow clip kinds, as constants so a caller never open-codes the
@@ -415,6 +468,11 @@ inline bool cs_is_valid_clip_kind(const char *kind) {
 /// simply skip the offer, which is the hardest kind of bug to see).
 #define CS_CLIP_KIND_OFFER   "offer"
 #define CS_CLIP_KIND_REOFFER "reoffer"
+
+/// Serial support — the closing line an EPISODE ends on
+/// («Շարունակությունը՝ վաղը»). Exactly CS_CLIP_KIND_LEN characters, so a
+/// longer name here would need the bound raised in lockstep on both sides.
+#define CS_CLIP_KIND_SERIALNEXT "serialnext"
 
 /// Clip kind for dialogue question `index` (0 → "question",
 /// 1 → "question1", 2 → "question2"); NULL for any other index.

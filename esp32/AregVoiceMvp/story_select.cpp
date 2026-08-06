@@ -91,6 +91,117 @@ int load_raw_index(CsStory *out, int max_out) {
 // table (~22 KB with the B2 clip slots) versus per-function statics.
 CsStory s_raw[CS_MAX_STORIES];
 
+// ---- heard set storage ---------------------------------------------
+//
+// Declared up here (rather than beside the story_heard_* API at the
+// bottom) because the serial-episode filter in
+// story_select_load_eligible needs the whole set in ONE read —
+// story_heard_contains would re-open NVS per candidate.
+
+constexpr const char *kHeardPrefsNamespace = "aregheard";
+constexpr const char *kHeardPrefsKey       = "ids";
+
+// One fixed-size blob, mirroring story_report's whole-queue persistence.
+struct HeardSet {
+    char ids[CS_MAX_STORIES][CS_MAX_STORY_ID_LEN + 1];
+    int  count;
+};
+
+void heard_load(HeardSet *set) {
+    memset(set, 0, sizeof(*set));
+    Preferences prefs;
+    if (!prefs.begin(kHeardPrefsNamespace, /*readOnly=*/true)) {
+        return;   // never provisioned — an empty set, not an error
+    }
+    const size_t read = prefs.getBytes(kHeardPrefsKey, set, sizeof(*set));
+    prefs.end();
+    // A short or oversized read means a downgrade, corruption, or a
+    // hand-written key. Treat it as empty rather than trusting it — the
+    // worst outcome is the toy offering a story that was already heard.
+    if (read != sizeof(*set) || set->count < 0 || set->count > CS_MAX_STORIES) {
+        memset(set, 0, sizeof(*set));
+    }
+}
+
+void heard_save(const HeardSet *set) {
+    Preferences prefs;
+    if (!prefs.begin(kHeardPrefsNamespace, /*readOnly=*/false)) {
+        Serial.println("[welcome] NVS unavailable — heard set not persisted");
+        Serial.flush();
+        return;   // never blocks playback
+    }
+    prefs.putBytes(kHeardPrefsKey, set, sizeof(*set));
+    prefs.end();
+}
+
+// ---- serial episodes ------------------------------------------------
+
+// Boot-scoped ONLY, by design — see the honest-limitation note in
+// story_select.h. RAM, never NVS: persisting it would need a clock to
+// know when to expire it, and the device has none.
+char s_series_latch[CS_MAX_STORIES][CS_MAX_STORY_ID_LEN + 1];
+int  s_series_latch_count = 0;
+
+/// Applies the serial ordering rule to an eligible list, IN PLACE, and
+/// returns the surviving count.
+///
+/// Best-effort, exactly like the failed-start exclusion: if the rule
+/// would leave nothing to play it is ignored entirely. A card holding
+/// only a fully-heard serial must not make the toy go silent.
+int apply_series_rule(CsStory *list, int count) {
+    if (list == NULL || count <= 0 || count > CS_MAX_STORIES) {
+        return count < 0 ? 0 : count;
+    }
+    bool any_serial = false;
+    for (int i = 0; i < count; i++) {
+        if (cs_story_is_serial(&list[i])) { any_serial = true; break; }
+    }
+    if (!any_serial) {
+        return count;   // a library with no serials pays nothing for this
+    }
+
+    HeardSet set;
+    heard_load(&set);            // ONE NVS read for the whole list
+    bool heard[CS_MAX_STORIES];
+    for (int i = 0; i < count; i++) {
+        heard[i] = false;
+        for (int k = 0; k < set.count; k++) {
+            if (cs_story_ids_equal(set.ids[k], list[i].story_id)) {
+                heard[i] = true;
+                break;
+            }
+        }
+    }
+
+    const char *latched[CS_MAX_STORIES];
+    for (int i = 0; i < s_series_latch_count && i < CS_MAX_STORIES; i++) {
+        latched[i] = s_series_latch[i];
+    }
+
+    bool keep[CS_MAX_STORIES];
+    int kept = 0;
+    for (int i = 0; i < count; i++) {
+        keep[i] = story_series_member_allowed(list, count, i, heard,
+                                              latched, s_series_latch_count);
+        if (keep[i]) kept++;
+    }
+    if (kept == 0) {
+        Serial.println("[story-select] series rule leaves nothing to play — ignoring it");
+        Serial.flush();
+        return count;
+    }
+    if (kept == count) {
+        return count;
+    }
+    int n = 0;
+    for (int i = 0; i < count; i++) {
+        if (keep[i]) list[n++] = list[i];
+    }
+    Serial.printf("[story-select] series rule: %d of %d stories offered\n", n, count);
+    Serial.flush();
+    return n;
+}
+
 }  // namespace
 
 int story_select_load_eligible(CsStory *out, int max_out) {
@@ -117,7 +228,10 @@ int story_select_load_eligible(CsStory *out, int max_out) {
         }
         out[count++] = raw[i];   // index order preserved
     }
-    return count;
+    // Serial support — the LAST step, so it filters a list that has
+    // already passed every card-agreement check. An episode whose file is
+    // missing was never a candidate, and must not block its successors.
+    return apply_series_rule(out, count);
 }
 
 bool story_select_resolve_path(const char *story_id, char *out, size_t out_len) {
@@ -542,46 +656,10 @@ bool story_select_mode_enabled(char mode) {
 }
 
 // ---- "already heard" set --------------------------------------------
-
-namespace {
-
-constexpr const char *kHeardPrefsNamespace = "aregheard";
-constexpr const char *kHeardPrefsKey       = "ids";
-
-// One fixed-size blob, mirroring story_report's whole-queue persistence.
-struct HeardSet {
-    char ids[CS_MAX_STORIES][CS_MAX_STORY_ID_LEN + 1];
-    int  count;
-};
-
-void heard_load(HeardSet *set) {
-    memset(set, 0, sizeof(*set));
-    Preferences prefs;
-    if (!prefs.begin(kHeardPrefsNamespace, /*readOnly=*/true)) {
-        return;   // never provisioned — an empty set, not an error
-    }
-    const size_t read = prefs.getBytes(kHeardPrefsKey, set, sizeof(*set));
-    prefs.end();
-    // A short or oversized read means a downgrade, corruption, or a
-    // hand-written key. Treat it as empty rather than trusting it — the
-    // worst outcome is the toy offering a story that was already heard.
-    if (read != sizeof(*set) || set->count < 0 || set->count > CS_MAX_STORIES) {
-        memset(set, 0, sizeof(*set));
-    }
-}
-
-void heard_save(const HeardSet *set) {
-    Preferences prefs;
-    if (!prefs.begin(kHeardPrefsNamespace, /*readOnly=*/false)) {
-        Serial.println("[welcome] NVS unavailable — heard set not persisted");
-        Serial.flush();
-        return;   // never blocks playback
-    }
-    prefs.putBytes(kHeardPrefsKey, set, sizeof(*set));
-    prefs.end();
-}
-
-}  // namespace
+//
+// Storage (HeardSet / heard_load / heard_save) lives in the anonymous
+// namespace at the top of this file, because the serial-episode filter
+// needs it before this point.
 
 bool story_heard_contains(const char *story_id) {
     if (!cs_is_valid_story_id(story_id)) {
@@ -621,6 +699,74 @@ void story_heard_mark(const char *story_id) {
     heard_save(&set);
     Serial.printf("[welcome] heard %s (%d known)\n", story_id, set.count);
     Serial.flush();
+
+    // Serial support — latch the SERIES, not the episode. The episode is
+    // already excluded by the heard set; latching the series is what stops
+    // the very next press walking straight into episode 2. Resolved from
+    // the index here so the playback loop never has to know about series.
+    char series[CS_MAX_STORY_ID_LEN + 1];
+    if (story_series_of(story_id, series, sizeof(series))) {
+        story_series_latch(series);
+    }
+}
+
+// ---- serial episodes -------------------------------------------------
+
+void story_series_latch(const char *series_id) {
+    if (!cs_is_valid_story_id(series_id)) {
+        return;
+    }
+    for (int i = 0; i < s_series_latch_count; i++) {
+        if (cs_story_ids_equal(s_series_latch[i], series_id)) {
+            return;   // already latched this boot
+        }
+    }
+    if (s_series_latch_count >= CS_MAX_STORIES) {
+        return;       // bounded; saturate rather than overrun
+    }
+    cs_copy_bounded(s_series_latch[s_series_latch_count],
+                    sizeof(s_series_latch[0]), series_id);
+    s_series_latch_count++;
+    Serial.printf("[story-select] series %s: next episode waits until reboot\n",
+                  series_id);
+    Serial.flush();
+}
+
+bool story_series_is_latched(const char *series_id) {
+    if (!cs_is_valid_story_id(series_id)) {
+        return false;
+    }
+    for (int i = 0; i < s_series_latch_count; i++) {
+        if (cs_story_ids_equal(s_series_latch[i], series_id)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void story_series_clear_latches() {
+    s_series_latch_count = 0;
+}
+
+bool story_series_of(const char *story_id, char *out, size_t out_len) {
+    if (out == NULL || out_len == 0) {
+        return false;
+    }
+    out[0] = '\0';
+    if (!cs_is_valid_story_id(story_id)) {
+        return false;
+    }
+    const int raw_count = load_raw_index(s_raw, CS_MAX_STORIES);
+    for (int i = 0; i < raw_count; i++) {
+        if (!cs_story_ids_equal(s_raw[i].story_id, story_id)) {
+            continue;
+        }
+        if (!cs_story_is_serial(&s_raw[i])) {
+            return false;   // found, but a standalone story
+        }
+        return cs_copy_bounded(out, out_len, s_raw[i].series_id);
+    }
+    return false;
 }
 
 int story_heard_count() {

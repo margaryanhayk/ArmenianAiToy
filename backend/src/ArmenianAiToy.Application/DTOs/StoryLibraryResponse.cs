@@ -30,4 +30,22 @@ public sealed record StoryLibraryItemDto(
     /// <c>ReflectionQuestions</c> (null for stories without authored
     /// conclusions). Drives the library card's "Discuss with your child"
     /// block — the same guide the toy speaks.</summary>
-    List<string>? ReflectionConclusions = null);
+    List<string>? ReflectionConclusions = null,
+    /// <summary>Serial support — the series this story is an EPISODE of and
+    /// its 1-based position, straight off the content manifest (already
+    /// validated as a pair there). Both null for a standalone story, which
+    /// is what the dashboard keys off to decide whether a card belongs in a
+    /// series group. Optional trailing parameters so every existing
+    /// construction site compiles unchanged.
+    /// <para>
+    /// Null on the metadata-only fallback branch too (content sync
+    /// disabled): the curated library carries no series metadata, and
+    /// inventing one from the story id would be a guess.
+    /// </para></summary>
+    string? SeriesId = null,
+    int? SeriesIndex = null,
+    /// <summary>The series' authored display name, used as the series
+    /// card's headline. Null when unconfigured — the dashboard then falls
+    /// back to a generic descriptor, because a slug or a name guessed from
+    /// the episode titles would be worse than not naming it.</summary>
+    string? SeriesTitle = null);
