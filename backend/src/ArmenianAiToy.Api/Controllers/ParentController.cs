@@ -591,6 +591,61 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Toggle the in-story pauses — the short beats where the narration stops
+    /// and waits for the child — on a linked device. ON by default. Exact
+    /// mirror of the story-intro toggle: parent-JWT, ownership-checked, silent
+    /// 404, idempotent (audit only on a real flip), 400 on a missing
+    /// body/flag. The toy picks the new value up on its next content-manifest
+    /// fetch and caches it so the toggle applies offline too.
+    /// </summary>
+    [HttpPut("devices/{deviceId}/story-pauses")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> SetDeviceStoryPauses(
+        Guid deviceId, [FromBody] DeviceStoryIntroRequest request)
+    {
+        if (request?.Enabled is null)
+            return BadRequest(new { error = "enabled (true/false) is required." });
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ok = await _parentService.SetDeviceStoryPausesAsync(
+            parentId, deviceId, request.Enabled.Value);
+        if (!ok)
+            return NotFound(new { error = "Device not found or not linked to this account." });
+        return Ok(new { storyPausesEnabled = request.Enabled.Value });
+    }
+
+    /// <summary>
+    /// Toggle variant endings on a linked device: whether a story the child
+    /// has already heard may end differently on a re-listen. ON by default.
+    /// Same shape as the story-pauses toggle. A device whose library ships no
+    /// alternate endings behaves identically either way — the toy falls back
+    /// to the base narration when no verified alt file is cached.
+    /// </summary>
+    [HttpPut("devices/{deviceId}/variant-endings")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> SetDeviceVariantEndings(
+        Guid deviceId, [FromBody] DeviceStoryIntroRequest request)
+    {
+        if (request?.Enabled is null)
+            return BadRequest(new { error = "enabled (true/false) is required." });
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ok = await _parentService.SetDeviceVariantEndingsAsync(
+            parentId, deviceId, request.Enabled.Value);
+        if (!ok)
+            return NotFound(new { error = "Device not found or not linked to this account." });
+        return Ok(new { variantEndingsEnabled = request.Enabled.Value });
+    }
+
+    /// <summary>
     /// Slice E: toggle bedtime music on a linked device. When ON, a button
     /// press during the device's bedtime window plays a calm Armenian music
     /// track (synced to the toy's SD card) instead of a story. Default OFF
@@ -958,7 +1013,14 @@ public class ParentController : ControllerBase
         var totals = (await _parentService.GetStoryPlayTotalsForParentAsync(parentId, deviceId))
             .ToDictionary(t => t.StoryId, StringComparer.OrdinalIgnoreCase);
 
-        var shipped = manifest.Build().Stories;
+        // Alternate-ending entries are filtered out: they are the tail of a
+        // story, not a story, and have no curated metadata of their own — a
+        // parent browsing the library would see a card with a blank title and
+        // no author. The variant is surfaced (when it becomes worth
+        // surfacing) as a property of its base story, never as a sibling.
+        var shipped = manifest.Build().Stories
+            .Where(s => string.IsNullOrEmpty(s.AltOf))
+            .ToList();
         List<StoryLibraryItemDto> items;
         if (shipped.Count > 0)
         {

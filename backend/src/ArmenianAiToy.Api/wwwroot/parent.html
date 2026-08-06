@@ -1442,6 +1442,10 @@
       request_status_delivered: { en: 'delivered', ru: 'готов', hy: 'պատրաստ է' },
       request_status_declined: { en: 'declined', ru: 'отклонён', hy: 'մերժված է' },
       story_intro_label: { en: 'Spoken story intro (title + author)', ru: 'Озвученное вступление (название + автор)', hy: 'Հեքիաթից առաջ ասել վերնագիրն ու հեղինակին' },
+      story_pauses_label: { en: 'Short pauses during a story', ru: 'Короткие паузы в сказке', hy: 'Կարճ դադարներ հեքիաթի ընթացքում' },
+      story_pauses_note: { en: 'The toy stops for a moment so your child can think and answer.', ru: 'Игрушка ненадолго останавливается, чтобы ребёнок мог подумать и ответить.', hy: 'Խաղալիքը մի պահ լռում է, որ երեխան հասցնի մտածել ու պատասխանել։' },
+      variant_endings_label: { en: 'A different ending when a story repeats', ru: 'Другая концовка, если сказка повторяется', hy: 'Այլ ավարտ, երբ հեքիաթը կրկին են լսում' },
+      variant_endings_note: { en: 'Only some stories have a second ending — the rest end the usual way. Both endings are written and checked in advance.', ru: 'Второй вариант есть не у всех сказок — остальные закончатся как обычно. Обе концовки написаны и проверены заранее.', hy: 'Ոչ բոլոր հեքիաթներն ունեն երկրորդ ավարտ, իսկ մնացածն ավարտվում են սովորականի պես։ Երկու ավարտն էլ նախապես գրված ու ստուգված են։' },
       bedtime_music_label: { en: 'Music at bedtime hours', ru: 'Музыка в часы сна', hy: 'Երաժշտություն քնի ժամերին' },
       bedtime_music_needs_window: { en: 'set a bedtime window first', ru: 'сначала задайте часы сна', hy: 'նախ սահմանեք քնի ժամերը' },
       bedtime_music_needs_tracks: { en: 'no music available yet', ru: 'музыки пока нет', hy: 'երաժշտություն դեռ չկա' },
@@ -1735,6 +1739,8 @@
       ev_device_linked: { en: 'Toy added', ru: 'Игрушка добавлена', hy: 'Խաղալիքն ավելացվեց' },
       ev_revocation_changed: { en: 'Toy access changed', ru: 'Доступ игрушки изменён', hy: 'Խաղալիքի մուտքը փոխվեց' },
       ev_story_intro_set: { en: 'Spoken story intro changed', ru: 'Озвученное вступление изменено', hy: 'Հեքիաթի վերնագրի հայտարարումը փոխվեց' },
+      ev_story_pauses_set: { en: 'Pauses during stories changed', ru: 'Паузы в сказках изменены', hy: 'Հեքիաթի դադարները փոխվեցին' },
+      ev_variant_endings_set: { en: 'Different endings changed', ru: 'Другие концовки изменены', hy: 'Այլ ավարտները փոխվեցին' },
       ev_bedtime_music_set: { en: 'Bedtime music changed', ru: 'Музыка для сна изменена', hy: 'Քնի ժամի երաժշտությունը փոխվեց' },
       ev_story_requested: { en: 'Story requested', ru: 'Заказана сказка', hy: 'Հեքիաթ պատվիրվեց' },
       m_turned_on: { en: 'turned on', ru: 'включено', hy: 'միացվեց' },
@@ -1892,6 +1898,8 @@
       ParentDeviceLinked: 'ev_device_linked',
       ParentDeviceRevocationChanged: 'ev_revocation_changed',
       ParentDeviceStoryIntroSet: 'ev_story_intro_set',
+      ParentDeviceStoryPausesSet: 'ev_story_pauses_set',
+      ParentDeviceVariantEndingsSet: 'ev_variant_endings_set',
       ParentBedtimeMusicSet: 'ev_bedtime_music_set',
       ParentStoryRequestSubmitted: 'ev_story_requested'
     };
@@ -3231,7 +3239,12 @@
             var btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'btn-ghost';
-            btn.style.cssText = 'font-size:13px;';
+            // nowrap + margin-left:auto pins the switch to one line at the
+            // row's right edge and hands the label all the remaining width.
+            // Without it, flex-shrink splits a narrow phone row between the
+            // two and the button fragments over 2-3 lines until it stops
+            // looking like a control. Also lines the switches up in a column.
+            btn.style.cssText = 'font-size:13px;white-space:nowrap;margin-left:auto;';
             // Grey the toggle (with a hint) when turning it ON would be
             // meaningless: no bedtime window set, or — for music — no tracks
             // published yet. Turning it OFF is always allowed.
@@ -3246,6 +3259,13 @@
               blockHint = t('bedtime_music_needs_tracks');
             }
             btn.textContent = current ? t('flag_on') : t('flag_off');
+            // The button's visible text ("On ✓ — tap to turn off") is now the
+            // accessible name of FOUR adjacent switches, so a screen-reader
+            // or voice-control user would hear the same name four times with
+            // no way to tell which setting they are on. Set before the
+            // early returns so every branch carries it; the whole row is
+            // rebuilt by openToy() after each save, so it cannot go stale.
+            btn.setAttribute('aria-label', t(labelKey) + ' — ' + btn.textContent);
             if (blockHint) {
               btn.disabled = true;
               btn.style.opacity = '0.5';
@@ -3296,10 +3316,38 @@
               });
             });
             row.appendChild(btn);
+            // opts.noteKey — a PERMANENT explanation under a switch that
+            // always works but whose effect a parent may never see. Greying
+            // such a switch out (the bedtime-music answer) would be a lie
+            // here: the setting IS applied, some stories simply have one
+            // ending. .ctl-hint is flex-basis:100%, so the note takes its own
+            // full-width line and never crowds the button.
+            if (opts.noteKey) {
+              var note = document.createElement('span');
+              note.className = 'ctl-hint';
+              note.textContent = t(opts.noteKey);
+              row.appendChild(note);
+            }
             return row;
           }
           listEl.appendChild(flagToggle('story_intro_label',
             d.storyIntroEnabled !== false, 'story-intro'));
+          // The two story-shaping toggles sit with the intro, not with the
+          // bedtime block: all three answer "what does a story sound like on
+          // this toy?", while bedtime answers "when may it speak at all?".
+          // Both default ON, so `!== false` (not `=== true`) — a device row
+          // from a backend that predates them must read as on, matching the
+          // manifest fallback and the column default.
+          listEl.appendChild(flagToggle('story_pauses_label',
+            d.storyPausesEnabled !== false, 'story-pauses',
+            { noteKey: 'story_pauses_note' }));
+          // Variant endings is the one switch here whose effect is invisible
+          // by design: with the toggle on, a story that has no second ending
+          // simply ends the way it always did. Without a standing note the
+          // only conclusion available to a parent is "it ignored my setting".
+          listEl.appendChild(flagToggle('variant_endings_label',
+            d.variantEndingsEnabled !== false, 'variant-endings',
+            { noteKey: 'variant_endings_note' }));
           // NOTE: the bedtime-music toggle is appended AFTER the bedtime
           // window row below — its hint tells the parent to set that window,
           // so the thing it points at must not be above it.
@@ -4966,6 +5014,8 @@
         case 'ParentDeviceRevocationChanged':
           return m.is_revoked ? t('m_access_off') : t('m_access_on');
         case 'ParentDeviceStoryIntroSet':
+        case 'ParentDeviceStoryPausesSet':
+        case 'ParentDeviceVariantEndingsSet':
         case 'ParentBedtimeMusicSet':
           return m.enabled ? t('m_turned_on') : t('m_turned_off');
         case 'ParentStoryRequestSubmitted':

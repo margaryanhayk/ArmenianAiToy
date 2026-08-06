@@ -172,6 +172,7 @@ public sealed class ContentSyncOptions
                 Sha256 = child["Sha256"] ?? "",
                 SeriesId = child["SeriesId"] ?? "",
                 SeriesTitle = child["SeriesTitle"] ?? "",
+                AltOf = child["AltOf"] ?? "",
             };
             if (int.TryParse(child["Version"], out var storyVersion)) story.Version = storyVersion;
             if (long.TryParse(child["SizeBytes"], out var storySize)) story.SizeBytes = storySize;
@@ -296,6 +297,7 @@ public sealed class ContentSyncOptions
                     SeriesId = s.SeriesId,
                     SeriesTitle = s.SeriesTitle,
                     SeriesIndex = s.SeriesIndex,
+                    AltOf = s.AltOf,
                     Clips = s.Clips
                         .Select(c => new ContentSyncClipOptions
                         {
@@ -405,6 +407,34 @@ public sealed class ContentSyncStoryOptions
     /// index", so gaps are harmless. Null for a standalone story.
     /// </summary>
     public int? SeriesIndex { get; set; }
+
+    /// <summary>
+    /// Variant endings — the story id this item is an ALTERNATE ENDING of
+    /// (e.g. <c>anban-huri</c> for an entry <c>anban-huri-alt</c>), or empty
+    /// for an ordinary story.
+    /// <para>
+    /// Each variant ships as a FULL alternate file assembled offline (the
+    /// approved base narration cut at the branch point, plus the new ending),
+    /// so the device never has to splice audio: it plays one file or the
+    /// other. The entry is an ordinary <c>ContentSync</c> story in every
+    /// other respect — its own id, sha, size and version.
+    /// </para>
+    /// <para>
+    /// An entry carrying this is NOT a rotation member on the device. It is
+    /// reachable only as the base story's variant, on a re-listen, with the
+    /// parent's variant-endings toggle on. An unparseable or self-referencing
+    /// value drops the whole item — see <c>ContentStoryItem.AltOf</c> for why
+    /// that is the opposite failure mode from the series pairing's.
+    /// </para>
+    /// <para>
+    /// The referenced base story is deliberately NOT required to be present
+    /// in the same config: the device fails closed (no base story cached ⇒
+    /// nothing ever asks for its variant), so an alt configured ahead of, or
+    /// after, its base is harmless rather than an ordering trap for whoever
+    /// edits the file.
+    /// </para>
+    /// </summary>
+    public string AltOf { get; set; } = string.Empty;
 
     /// <summary>
     /// B2 — optional per-story CLIPS: short pre-rendered MP3s that travel

@@ -57,6 +57,18 @@ public enum AuditEventType
     /// state (enabled: bool). Written only when the flag actually flips.</summary>
     ParentDeviceStoryIntroSet,
 
+    /// <summary>A parent toggled the in-story pauses (the beats where the
+    /// narration stops and waits for the child) on a linked device. Metadata
+    /// carries the post-change state (enabled: bool). Written only when the
+    /// flag actually flips.</summary>
+    ParentDeviceStoryPausesSet,
+
+    /// <summary>A parent toggled variant endings — the alternate ending a
+    /// re-listened story may get — on a linked device. Metadata carries the
+    /// post-change state (enabled: bool). Written only when the flag actually
+    /// flips.</summary>
+    ParentDeviceVariantEndingsSet,
+
     /// <summary>Slice E — a parent toggled bedtime music on a linked
     /// device. Metadata carries the post-change state (enabled: bool).
     /// Written only when the flag actually flips.</summary>

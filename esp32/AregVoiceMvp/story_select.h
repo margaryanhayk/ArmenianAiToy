@@ -266,10 +266,53 @@ bool story_select_resolve_path(const char *story_id, char *out, size_t out_len);
 bool story_select_resolve_clip_path(const char *story_id, const char *kind,
                                     char *out, size_t out_len);
 
+/// Variant-aware playback resolver — the one every playback path should
+/// call instead of story_select_resolve_path.
+///
+/// Resolves the ALTERNATE ENDING of `story_id` when ALL of these hold:
+///   - the parent's variant-endings toggle is on (index root
+///     `variantsEnabled`);
+///   - the child has heard this story before (it is in the `aregheard`
+///     set) — a FIRST listen always gets the authored ending;
+///   - the index holds an entry whose `altOf` is this story, and that
+///     entry passes every eligibility rule the base story must pass
+///     (verified, safe path, file present at the recorded size).
+/// Otherwise it falls back to story_select_resolve_path(story_id, …), so
+/// a card with no variants behaves exactly as it did before this slice.
+///
+/// The decision is deterministic for a given card + heard-set, which is
+/// what makes it safe on a RESUME: the same session re-resolves the same
+/// file, so a byte offset can never be applied to the wrong audio. The
+/// heard-set is only written at the natural END of a story, so a variant
+/// can never appear part-way through a first listen.
+///
+/// Sets `*out_is_variant` (when non-null) so the caller can log honestly.
+bool story_select_resolve_playback_path(const char *story_id,
+                                        char *out, size_t out_len,
+                                        bool *out_is_variant = NULL);
+
 /// B3 — the parent's spoken-story-intro toggle as cached on the card
 /// (index root `introEnabled`, written by content_sync from the
 /// manifest). Absent index / pre-v3 card → true, the shipped default.
 bool story_select_intro_enabled();
+
+/// The parent's IN-STORY PAUSES toggle as cached on the card (index root
+/// `pausesEnabled`). Absent index / pre-v6 card → true, the shipped
+/// default.
+///
+/// PLUMBING ONLY in this slice: nothing in the firmware reads this yet.
+/// The pause CLIPS it will gate are not authored, rendered or synced, so
+/// there is no playback to switch off. It exists now so the toggle
+/// travels the whole path — dashboard → audit → manifest → SD index →
+/// device — and can be verified end to end on the bench before any audio
+/// depends on it. The playback wiring lands with the clips.
+bool story_pauses_enabled();
+
+/// The parent's VARIANT ENDINGS toggle as cached on the card (index root
+/// `variantsEnabled`). Absent index / pre-v6 card → true, the shipped
+/// default. Unlike story_pauses_enabled this IS live — it is read by
+/// story_select_resolve_playback_path on every new story session.
+bool story_variant_endings_enabled();
 
 /// Slice E — the parent's bedtime-music opt-in as cached on the card
 /// (index root `musicEnabled`). Absent → false (music is opt-in).

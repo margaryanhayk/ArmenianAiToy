@@ -49,6 +49,16 @@ public interface IParentService
     /// only a real flip.</summary>
     Task<bool> SetDeviceStoryIntroAsync(Guid parentId, Guid deviceId, bool enabled);
 
+    /// <summary>In-story pauses toggle. Exact mirror of
+    /// <see cref="SetDeviceStoryIntroAsync"/> — ownership, silent false,
+    /// idempotent, audit only on a real flip.</summary>
+    Task<bool> SetDeviceStoryPausesAsync(Guid parentId, Guid deviceId, bool enabled);
+
+    /// <summary>Variant-endings toggle. Exact mirror of
+    /// <see cref="SetDeviceStoryIntroAsync"/> — ownership, silent false,
+    /// idempotent, audit only on a real flip.</summary>
+    Task<bool> SetDeviceVariantEndingsAsync(Guid parentId, Guid deviceId, bool enabled);
+
     /// <summary>Slice E bedtime-music toggle. Enabling REQUIRES a configured
     /// bedtime window (music only fires inside it — no window means it could
     /// never play). Disabling is always allowed.</summary>

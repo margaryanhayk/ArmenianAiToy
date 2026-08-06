@@ -1108,7 +1108,7 @@ static bool story_pick_for_session(char *out, size_t out_len) {
     // flag rather than a second session function.
     if (s_story_preselected && s_current_story_id[0] != '\0') {
         s_story_preselected = false;
-        if (story_select_resolve_path(s_current_story_id, out, out_len)) {
+        if (story_select_resolve_playback_path(s_current_story_id, out, out_len)) {
             Serial.printf("[welcome] playing chosen story %s\n", s_current_story_id);
             Serial.flush();
             return true;
@@ -1131,7 +1131,13 @@ static bool story_pick_for_session(char *out, size_t out_len) {
     if (!story_select_pick(eligible, count, chosen, sizeof(chosen))) {
         return false;
     }
-    if (!story_select_resolve_path(chosen, out, out_len)) {
+    // Variant-aware: on a RE-listen (this story already in the heard set),
+    // with the parent's variant-endings toggle on and an alt file cached and
+    // verified, this resolves the alternate ending instead of the base — so a
+    // favourite story does not become word-for-word predictable. Falls back
+    // to the base narration in every other case, which is every case on a
+    // card that ships no variants.
+    if (!story_select_resolve_playback_path(chosen, out, out_len)) {
         // Selected but unusable: refuse rather than quietly play a
         // different story than the one chosen.
         Serial.printf("[story] selected %s but it did not resolve — using fallback chain\n",
@@ -1172,8 +1178,12 @@ static void handle_story_session() {
         s_current_story_id[0] = '\0';
         cache_hit = story_pick_for_session(sd_cache_path, sizeof(sd_cache_path));
     } else if (s_current_story_id[0] != '\0') {
-        // RESUME: re-resolve the SAME story, never re-select.
-        cache_hit = story_select_resolve_path(
+        // RESUME: re-resolve the SAME story, never re-select. The variant
+        // decision is deterministic for a given card + heard-set, and the
+        // heard-set is only written at a story's natural END, so a resume
+        // always lands on the same FILE the session started on — the byte
+        // offset can never be applied to different audio mid-story.
+        cache_hit = story_select_resolve_playback_path(
             s_current_story_id, sd_cache_path, sizeof(sd_cache_path));
         if (cache_hit) {
             Serial.printf("[story] resuming %s at byte %u\n",

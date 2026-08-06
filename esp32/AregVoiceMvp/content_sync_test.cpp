@@ -806,6 +806,109 @@ void test_index_v4_forward_compatible() {
     check(cs_index_mode_enabled(reread, "storyEnabled"), "v4_index_modes_still_default_on");
 }
 
+// ---- variant endings (schema v6) ------------------------------------
+
+void test_variant_manifest_parse() {
+    JsonDocument doc;
+    JsonArray arr = doc["stories"].to<JsonArray>();
+    add_item(arr, "anban-huri", 1, kShaA, 100, "/u");           // ordinary
+    add_item(arr, "anban-huri-alt", 1, kShaB, 100, "/u");
+    arr[1]["altOf"] = "anban-huri";                             // valid variant
+    add_item(arr, "khosogh-dzuk", 1, kShaC, 100, "/u");
+    arr[2]["altOf"] = "Anban-Huri";                             // uppercase — refused
+    add_item(arr, "little-cloud", 1, kShaA, 100, "/u");
+    arr[3]["altOf"] = "little-cloud";                           // self-reference
+    add_item(arr, "hedgehog-apple", 1, kShaB, 100, "/u");
+    arr[4]["altOf"] = "../../etc";                              // traversal shape
+
+    CsStory *out = g_story_scratch;
+    CsManifestStats stats{};
+    const int n = cs_manifest_parse(doc["stories"].as<JsonArrayConst>(),
+                                    out, CS_MAX_STORIES, &stats);
+
+    // A bad altOf clears the FIELD here and never drops the story. (The
+    // backend drops such an item outright; on a hand-edited card the
+    // weaker response is the right one — the file is still a real story.)
+    check(n == 5, "variant_bad_alt_keeps_every_story");
+    check(!cs_story_is_variant(&out[0]), "variant_ordinary_story_is_not_a_variant");
+    check(cs_story_is_variant(&out[1])
+              && strcmp(out[1].alt_of, "anban-huri") == 0,
+          "variant_valid_alt_stored");
+    check(!cs_story_is_variant(&out[2]), "variant_uppercase_alt_rejected");
+    check(!cs_story_is_variant(&out[3]), "variant_self_reference_rejected");
+    check(!cs_story_is_variant(&out[4]), "variant_traversal_alt_rejected");
+}
+
+void test_variant_index_round_trip() {
+    static CsStory active[3];
+    fill(&active[0], "anban-huri", 1, kShaA, 100);            // ordinary
+    fill(&active[1], "anban-huri-alt", 1, kShaB, 100);
+    cs_copy_bounded(active[1].alt_of, sizeof(active[1].alt_of), "anban-huri");
+    fill(&active[2], "khosogh-dzuk", 1, kShaC, 100);          // ordinary
+
+    JsonDocument built;
+    cs_index_build(built, active, 3, "anban-huri");
+    cs_index_add_story_flags(built, /*pauses=*/false, /*variants=*/true);
+    check((built["schemaVersion"] | 0) == CS_INDEX_SCHEMA_VERSION,
+          "index_v6_schema_version");
+    // An ordinary story writes NO altOf key, so a variant-free library still
+    // produces the same index it produced before this slice.
+    check(!built["stories"][0]["altOf"].is<const char *>(),
+          "index_ordinary_writes_no_alt_key");
+
+    String json;
+    serializeJson(built, json);
+    JsonDocument reread;
+    check(deserializeJson(reread, json) == DeserializationError::Ok, "index_v6_reparses");
+
+    CsStory *back = g_story_scratch2;
+    int schema = 0;
+    const int n = cs_index_parse(reread, back, CS_MAX_STORIES, &schema);
+    check(n == 3 && schema == CS_INDEX_SCHEMA_VERSION, "index_v6_round_trip_count");
+    check(!cs_story_is_variant(&back[0]), "index_v6_ordinary_stays_ordinary");
+    check(cs_story_is_variant(&back[1])
+              && strcmp(back[1].alt_of, "anban-huri") == 0,
+          "index_v6_variant_round_trip");
+    // The two root flags survive independently — they are separate keys, and
+    // a copy/paste of the reader is the obvious way to make one shadow the
+    // other.
+    check(!cs_index_pauses_enabled(reread), "index_v6_pauses_flag_round_trip");
+    check(cs_index_variants_enabled(reread), "index_v6_variants_flag_round_trip");
+}
+
+// KEYSTONE: a card written by the PREVIOUS firmware must keep working.
+// v6 is a superset, so a v5 document has to parse as "no story is a variant,
+// both features on" — the exact pre-variant behaviour. Getting the flag
+// fallbacks backwards would silently strip the pauses and the alternate
+// endings from every toy whose card predates this build.
+void test_index_v5_forward_compatible() {
+    static CsStory stories[1];
+    fill(&stories[0], "anban-huri", 1, kShaA, 100);
+
+    JsonDocument idx;
+    cs_index_build(idx, stories, 1, "anban-huri", true);
+    idx["schemaVersion"] = 5;          // pretend it was written by the old build
+    String serialized;
+    serializeJson(idx, serialized);
+
+    JsonDocument reread;
+    deserializeJson(reread, serialized);
+
+    CsStory *out = g_story_scratch;
+    int schema = 0;
+    check(cs_index_parse(reread, out, CS_MAX_STORIES, &schema) == 1,
+          "v5_index_stories_still_parse");
+    check(schema == 5, "v5_index_detected_as_v5");
+    check(!cs_story_is_variant(&out[0]), "v5_index_stories_are_not_variants");
+    // Absent root flags default ON, matching the shipped server-side default.
+    check(cs_index_pauses_enabled(reread), "v5_index_pauses_defaults_on");
+    check(cs_index_variants_enabled(reread), "v5_index_variants_defaults_on");
+    // And the v5 fields it DOES carry are untouched by the bump.
+    check(cs_index_intro_enabled(reread), "v5_index_intro_flag_still_read");
+    check(cs_index_mode_enabled(reread, "storyEnabled"), "v5_index_modes_still_default_on");
+    check(!cs_story_is_serial(&out[0]), "v5_index_standalone_still_standalone");
+}
+
 void run_all() {
     s_pass = 0;
     s_fail = 0;
@@ -841,6 +944,9 @@ void run_all() {
     test_series_manifest_parse();
     test_series_index_round_trip();
     test_index_v4_forward_compatible();
+    test_variant_manifest_parse();
+    test_variant_index_round_trip();
+    test_index_v5_forward_compatible();
     test_copy_bounded();
 
     Serial.printf("[cs-test] heap after=%u\n", (unsigned)ESP.getFreeHeap());

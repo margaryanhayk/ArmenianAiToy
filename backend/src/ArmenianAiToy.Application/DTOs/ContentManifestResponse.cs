@@ -17,6 +17,19 @@ public sealed record ContentManifestResponse(
     /// value so the toggle applies offline.</summary>
     public bool? StoryIntroEnabled { get; init; }
 
+    /// <summary>The device's parent-set in-story-pauses flag, stamped by the
+    /// controller beside <see cref="StoryIntroEnabled"/> and cached in the
+    /// toy's SD index so it applies offline. Nullable for the same reason:
+    /// service-built instances and older consumers are unaffected, and an
+    /// absent field means the shipped default (ON).</summary>
+    public bool? StoryPausesEnabled { get; init; }
+
+    /// <summary>The device's parent-set variant-endings flag, stamped
+    /// alongside <see cref="StoryPausesEnabled"/>. Absent → ON, the shipped
+    /// default; a library with no alternate files behaves identically either
+    /// way.</summary>
+    public bool? VariantEndingsEnabled { get; init; }
+
     /// <summary>Slice E — bedtime music tracks (separate namespace from
     /// stories; firmware syncs them to /music). Null/empty until the owner
     /// configures rights-cleared tracks; pre-music firmware ignores it.</summary>
@@ -109,6 +122,29 @@ public sealed record ContentStoryItem(
 
     /// <inheritdoc cref="SeriesId" />
     public int? SeriesIndex { get; init; }
+
+    /// <summary>Variant endings — the story this item is an ALTERNATE
+    /// ENDING of. Null for an ordinary story, which is every story shipped
+    /// before this slice, so the wire is byte-identical for deployments that
+    /// ship no variants and pre-variant firmware ignores the field.
+    /// <para>
+    /// An alt entry is NOT a rotation member: the device syncs it like any
+    /// other file but never selects it, offers it by name, or counts it as
+    /// heard. It is reachable only by asking for the base story's variant on
+    /// a re-listen, with the parent's variant-endings toggle on.
+    /// </para>
+    /// <para>
+    /// Validated at manifest build against the same id allowlist a story id
+    /// must pass, plus a self-reference check. Note the failure mode is the
+    /// OPPOSITE of the series pairing's: an invalid <c>altOf</c> drops the
+    /// whole ITEM rather than just the field. Dropping only the field would
+    /// promote a half-story — narration that starts mid-way and ends
+    /// differently — into the rotation as if it were a story of its own,
+    /// which is a defect a child would hear. Dropping the item costs nothing
+    /// a child would otherwise get: the base story is untouched and simply
+    /// keeps its only ending.
+    /// </para></summary>
+    public string? AltOf { get; init; }
 
     /// <summary>Serial support — the series' authored DISPLAY name
     /// («Ծիվիկ»), for the parent dashboard's series card. Null when the

@@ -276,6 +276,40 @@ public class AuditEvent
         })
     };
 
+    /// <summary>A parent toggled the in-story pauses on a linked device.
+    /// Same envelope as <see cref="ParentDeviceStoryIntroSet"/>: post-change
+    /// flag only, written only on a real flip.</summary>
+    public static AuditEvent ParentDeviceStoryPausesSet(
+        Guid parentId, Guid deviceId, bool enabled) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDeviceStoryPausesSet,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            enabled = enabled
+        })
+    };
+
+    /// <summary>A parent toggled variant endings on a linked device. Same
+    /// envelope as <see cref="ParentDeviceStoryIntroSet"/>: post-change flag
+    /// only, written only on a real flip.</summary>
+    public static AuditEvent ParentDeviceVariantEndingsSet(
+        Guid parentId, Guid deviceId, bool enabled) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDeviceVariantEndingsSet,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            enabled = enabled
+        })
+    };
+
     public static AuditEvent ParentDeviceModeFlagsSet(
         Guid parentId, Guid deviceId,
         bool story, bool game, bool riddle, bool curiosity) => new()

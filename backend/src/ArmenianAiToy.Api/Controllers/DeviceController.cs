@@ -462,6 +462,11 @@ public class DeviceController : ControllerBase
         return Ok(manifest.Build() with
         {
             StoryIntroEnabled = device?.StoryIntroEnabled ?? true,
+            // The two story-shaping toggles ride the same manifest, with the
+            // same "missing device row falls back to the shipped default (ON)"
+            // rule as the intro flag above.
+            StoryPausesEnabled = device?.StoryPausesEnabled ?? true,
+            VariantEndingsEnabled = device?.VariantEndingsEnabled ?? true,
             // Slice E — bedtime-music opt-in rides the same manifest.
             BedtimeMusicEnabled = device?.BedtimeMusicEnabled ?? false,
             StoryEnabled = await _deviceService.IsModeEnabledForRequestAsync(

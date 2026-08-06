@@ -54,6 +54,16 @@ public sealed class ContentManifestService : IContentManifestService
                 continue;
             }
 
+            // Variant endings — checked BEFORE the dedupe, because an invalid
+            // altOf drops the ITEM rather than the field, and a dropped item
+            // must not consume its id and take a valid namesake down with it.
+            // See TryResolveAltOf for why this failure mode is inverted
+            // relative to the series pairing's.
+            if (!TryResolveAltOf(story, out var altOf))
+            {
+                continue;
+            }
+
             // storyId is the content-file lookup key, so a duplicate would
             // make that endpoint ambiguous. Keep the first and drop the rest
             // rather than serving an arbitrary one.
@@ -84,6 +94,7 @@ public sealed class ContentManifestService : IContentManifestService
                 SeriesTitle = hasSeries && !string.IsNullOrWhiteSpace(story.SeriesTitle)
                     ? story.SeriesTitle.Trim()
                     : null,
+                AltOf = altOf,
             });
         }
 
@@ -229,6 +240,64 @@ public sealed class ContentManifestService : IContentManifestService
                 story.StoryId, story.SeriesId, story.SeriesIndex);
         }
         return false;
+    }
+
+    /// <summary>
+    /// Variant endings — resolves an item's <c>altOf</c>, or refuses the item.
+    /// <para>
+    /// Returns true with <paramref name="altOf"/> null for an ordinary story
+    /// (nothing configured), and true with the trimmed id for a well-formed
+    /// variant. Returns FALSE — meaning "drop this whole item" — when a value
+    /// was configured but fails the story-id allowlist or names the item
+    /// itself.
+    /// </para>
+    /// <para>
+    /// The drop-the-item posture is deliberate, and the opposite of
+    /// <see cref="HasValidSeries"/>'s drop-the-field. It turns on what the
+    /// item IS. A serial episode is a whole story; stripping its position
+    /// leaves a story the child can still enjoy out of order, so keeping it is
+    /// the kinder failure. An alternate ending is NOT a whole story — it is
+    /// the tail of one, assembled to start mid-way. Stripping its
+    /// <c>altOf</c> would make the device treat it as an ordinary rotation
+    /// member and one day narrate half a story to a child as though it were
+    /// the whole thing. Refusing it costs nothing a child would otherwise
+    /// hear: the base story is untouched and keeps its only ending.
+    /// </para>
+    /// <para>
+    /// Existence of the referenced base story is NOT checked. The device
+    /// fails closed — it only ever looks up a variant BY the base story it is
+    /// already about to play — so a dangling reference is inert, and
+    /// enforcing it here would make config edits order-dependent for no
+    /// safety gain.
+    /// </para>
+    /// </summary>
+    private bool TryResolveAltOf(ContentSyncStoryOptions story, out string? altOf)
+    {
+        altOf = null;
+        var configured = story.AltOf?.Trim();
+        if (string.IsNullOrEmpty(configured))
+        {
+            return true;   // an ordinary story
+        }
+        if (!IsValidId(configured))
+        {
+            _logger?.LogWarning(
+                "ContentSync story {StoryId}: dropped — altOf='{AltOf}' is not a "
+                + "valid story id, and an alternate ending must never enter the "
+                + "rotation as a story of its own.",
+                story.StoryId, configured);
+            return false;
+        }
+        if (string.Equals(configured, story.StoryId?.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            _logger?.LogWarning(
+                "ContentSync story {StoryId}: dropped — altOf names the story "
+                + "itself, which has no meaning as a variant.",
+                story.StoryId);
+            return false;
+        }
+        altOf = configured;
+        return true;
     }
 
     /// <summary>The firmware's <c>cs_is_valid_story_id</c> allowlist, kept

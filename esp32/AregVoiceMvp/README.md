@@ -500,6 +500,75 @@ needs real hardware: the NVS heard-set read inside the filter, the boot
 latch surviving a real session, a real multi-episode sync, and the
 `serialnext` clip actually playing at the end of an episode.
 
+### Story feature toggles — in-story pauses + variant endings
+
+Two parent switches (`PUT /api/parents/devices/{id}/story-pauses` and
+`.../variant-endings`, both default ON) ride the content manifest as
+`storyPausesEnabled` / `variantEndingsEnabled` and are cached in the index
+root as `pausesEnabled` / `variantsEnabled`, so they apply offline exactly
+the way `introEnabled` does.
+
+- **Index schema v5 → v6.** The two root flags plus a per-story `altOf`,
+  written only for real variants. Superset like every previous bump: a v5
+  card parses as "no story is a variant, both features on" — the exact
+  pre-variant behaviour — so **no card ever has to be wiped**. Pinned by
+  `test_index_v5_forward_compatible`.
+- **`story_pauses_enabled()` is PLUMBING ONLY in this slice.** Nothing
+  reads it yet. The pause clips it will gate are not authored, rendered or
+  synced, so there is no playback to switch off. It exists now so the
+  toggle can be verified along its whole path — dashboard → audit →
+  manifest → SD index → device — before any audio depends on it. The
+  playback wiring lands with the clips.
+- **Variant endings ARE live.** Each variant ships as a FULL alternate
+  file (the approved base narration cut at the branch point plus the new
+  ending, assembled offline in the Ship-StoryAudio pipeline), configured as
+  an ordinary `ContentSync:Stories` entry carrying `altOf: <baseStoryId>`.
+  The device never splices audio — it opens one file or the other.
+- **A variant is NOT a rotation member.** `cs_story_is_variant()` excludes
+  it from `story_select_load_eligible`, so it can never be picked by the
+  rotation, offered by name in the welcome flow, or marked heard. A variant
+  file starts part-way through its story; if one reached
+  `story_select_pick` a child would be told half a story as though it were
+  the whole thing. That guard is the point of the field.
+- **Resolution** is `story_select_resolve_playback_path()`, which every
+  production playback path now calls instead of `story_select_resolve_path`.
+  It returns the variant only when the toggle is on **and** the story is
+  already in the `aregheard` set **and** an alt entry for it is cached,
+  verified, and on the card at the recorded size. Anything else falls back
+  to the base narration, so a card with no variants behaves exactly as
+  before this slice.
+- **A first listen always gets the authored ending** — the heard-set is
+  written only at a story's natural end, which is also what makes a RESUME
+  safe: the decision is deterministic for a given card + heard-set, so the
+  byte offset can never be applied to a different file mid-story.
+- **A present-but-unusable variant falls back**, it does not silence the
+  toy: the child still gets their story, just the ending they already know.
+
+Backend-side, an invalid `altOf` **drops the whole manifest item** rather
+than just the field — the opposite of the series pairing's failure mode,
+and deliberately so. See `ContentManifestService.TryResolveAltOf`.
+
+#### Not covered by the bench tests
+
+`content_sync_test.cpp` covers the manifest/index parse, the v5→v6
+forward-compat contract and the two root flags. Still needs real hardware:
+a real sync carrying an `altOf` entry, the heard-set gate across two real
+sessions, and a variant actually playing on the second listen.
+
+#### Measured size cost (canonical FQBN)
+
+| Build | Flash | Free RAM |
+|---|---|---|
+| production, before | 1,294,199 B | 229,144 B |
+| production, after | 1,294,983 B | 227,480 B |
+| cs-test bench, before | 1,324,763 B | 176,608 B |
+| cs-test bench, after | 1,328,859 B | 168,224 B |
+
+Production pays **+784 B flash / −1,664 B RAM** for the `alt_of` field
+across the CsStory tables — MEASURED, not estimated, per the rule the
+`CS_MAX_STORIES` and `CS_MAX_CLIPS` bumps set. 227 KB free still leaves far
+more than the ~40–50 KB a TLS handshake wants during audio.
+
 ### Feature flag: `AREG_STORY_SD_CACHE_FIRST` is GONE
 
 It previously gated the whole cache-first block, was **off by default**,

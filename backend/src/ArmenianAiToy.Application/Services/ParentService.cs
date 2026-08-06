@@ -576,6 +576,8 @@ public class ParentService : IParentService
             device.RiddleEnabled = true;
             device.CuriosityEnabled = true;
             device.StoryIntroEnabled = true;
+            device.StoryPausesEnabled = true;
+            device.VariantEndingsEnabled = true;
             device.BedtimeMusicEnabled = false;
         }
 
@@ -1357,6 +1359,73 @@ public class ParentService : IParentService
     }
 
     /// <summary>
+    /// Toggle the in-story pauses on a linked device — the beats where the
+    /// narration stops and waits for the child. Deliberate copy of
+    /// <see cref="SetDeviceStoryIntroAsync"/> rather than a shared
+    /// flag-setter taking a property selector: three near-identical
+    /// twelve-line methods read more plainly than one reflective helper, and
+    /// each carries its own audit factory anyway.
+    /// </summary>
+    public async Task<bool> SetDeviceStoryPausesAsync(Guid parentId, Guid deviceId, bool enabled)
+    {
+        var linked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!linked)
+            return false;
+
+        var device = await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == deviceId);
+        if (device == null)
+            return false;
+
+        if (device.StoryPausesEnabled == enabled)
+        {
+            // Idempotent: already in the requested state — no mutation, no
+            // audit row, parent still sees success.
+            return true;
+        }
+
+        device.StoryPausesEnabled = enabled;
+        TrackAndAddAudit(
+            AuditEvent.ParentDeviceStoryPausesSet(parentId, deviceId, enabled));
+        await _db.SaveChangesAsync();
+        _logger.LogInformation(
+            "Parent {ParentId} set device {DeviceId} storyPausesEnabled={Enabled}",
+            parentId, deviceId, enabled);
+        return true;
+    }
+
+    /// <summary>
+    /// Toggle variant endings on a linked device — whether a re-listened
+    /// story may end differently. Same shape as
+    /// <see cref="SetDeviceStoryPausesAsync"/>.
+    /// </summary>
+    public async Task<bool> SetDeviceVariantEndingsAsync(Guid parentId, Guid deviceId, bool enabled)
+    {
+        var linked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!linked)
+            return false;
+
+        var device = await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == deviceId);
+        if (device == null)
+            return false;
+
+        if (device.VariantEndingsEnabled == enabled)
+        {
+            return true;
+        }
+
+        device.VariantEndingsEnabled = enabled;
+        TrackAndAddAudit(
+            AuditEvent.ParentDeviceVariantEndingsSet(parentId, deviceId, enabled));
+        await _db.SaveChangesAsync();
+        _logger.LogInformation(
+            "Parent {ParentId} set device {DeviceId} variantEndingsEnabled={Enabled}",
+            parentId, deviceId, enabled);
+        return true;
+    }
+
+    /// <summary>
     /// Slice E — toggle bedtime music on a linked device. Same ownership +
     /// silent-false + idempotent shape as the story-intro toggle.
     /// </summary>
@@ -1604,6 +1673,8 @@ public class ParentService : IParentService
         )
         {
             StoryIntroEnabled = l.Device.StoryIntroEnabled,
+            StoryPausesEnabled = l.Device.StoryPausesEnabled,
+            VariantEndingsEnabled = l.Device.VariantEndingsEnabled,
             BedtimeMusicEnabled = l.Device.BedtimeMusicEnabled,
         }).ToList();
     }

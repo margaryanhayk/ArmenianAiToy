@@ -153,6 +153,28 @@ public class Device
     public bool BedtimeMusicEnabled { get; set; }
 
     /// <summary>
+    /// Parent toggle for the short pauses inside a story — the moments the
+    /// narration stops and gives the child a beat to think or answer. ON by
+    /// default (the pauses are part of the authored story experience, and a
+    /// child who has never heard them cannot ask for them). Delivered to the
+    /// toy in the content-manifest response and cached in its SD index, so
+    /// the toggle applies offline exactly like <see cref="StoryIntroEnabled"/>.
+    /// Shapes the story experience; never gates chat.
+    /// </summary>
+    public bool StoryPausesEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Parent toggle for variant endings — on a RE-listen, the toy may play
+    /// an alternate ending for a story the child has already heard, so a
+    /// favourite story does not become word-for-word predictable. ON by
+    /// default; a device whose library ships no alternate files behaves
+    /// identically either way, because the toy falls back to the base
+    /// narration whenever no verified alt file is cached. Same manifest +
+    /// SD-index delivery as <see cref="StoryPausesEnabled"/>.
+    /// </summary>
+    public bool VariantEndingsEnabled { get; set; } = true;
+
+    /// <summary>
     /// Timestamp of the most recent dormant-device warning email
     /// dispatched to this device's verified linked parents by the
     /// scheduled <c>WarnDormantDevicesAsync</c> pass. Null for

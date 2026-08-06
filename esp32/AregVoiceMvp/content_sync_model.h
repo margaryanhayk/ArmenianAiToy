@@ -111,3 +111,21 @@ void cs_index_add_modes(JsonDocument &doc, bool story, bool game,
 /// true, matching the shipped server-side default; a toy must never
 /// silently stop offering stories because its card predates this field.
 bool cs_index_mode_enabled(JsonDocument &doc, const char *key);
+
+// ---- story feature toggles (index schema v6) ------------------------
+
+/// Appends the two parent story-feature flags — in-story pauses and
+/// variant endings — to an index document ALREADY built by
+/// cs_index_build. A separate call for the same reason
+/// cs_index_add_music / cs_index_add_modes are separate: cs_index_build's
+/// signature, callers and tests stay untouched.
+void cs_index_add_story_flags(JsonDocument &doc, bool pauses, bool variants);
+
+/// Reads the root `pausesEnabled` flag. Absent (every pre-v6 card) → true,
+/// the shipped default.
+bool cs_index_pauses_enabled(JsonDocument &doc);
+
+/// Reads the root `variantsEnabled` flag. Absent (every pre-v6 card) →
+/// true, the shipped default. Harmless on a card with no alternate
+/// endings cached: nothing resolves, so the base narration plays.
+bool cs_index_variants_enabled(JsonDocument &doc);

@@ -59,6 +59,13 @@ public record LinkedDeviceDto(
     /// pre-existing constructor call sites/tests compile unchanged.</summary>
     public bool StoryIntroEnabled { get; init; } = true;
 
+    /// <summary>In-story pauses toggle (default ON). Same init-prop
+    /// discipline as <see cref="StoryIntroEnabled"/>.</summary>
+    public bool StoryPausesEnabled { get; init; } = true;
+
+    /// <summary>Variant-endings toggle (default ON).</summary>
+    public bool VariantEndingsEnabled { get; init; } = true;
+
     /// <summary>Slice E — bedtime-music opt-in (default OFF).</summary>
     public bool BedtimeMusicEnabled { get; init; }
 }

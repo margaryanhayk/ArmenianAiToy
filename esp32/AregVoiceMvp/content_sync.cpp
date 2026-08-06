@@ -55,6 +55,10 @@ int s_active_count   = 0;
 // B3 — the parent's spoken-story-intro toggle, from the manifest root.
 // Cached into the index so the last-known value applies offline.
 bool s_intro_enabled = true;
+// The two story-shaping parent toggles, from the manifest root. Cached into
+// the index alongside the intro flag so the last-known values apply offline.
+bool s_pauses_enabled   = true;
+bool s_variants_enabled = true;
 
 // Slice E — bedtime music: manifest/prev/active tables + the parent's
 // opt-in flag, all cached into the index like the intro toggle.
@@ -252,6 +256,7 @@ bool write_index() {
     cs_index_add_voice(idx, s_voice_active, s_voice_active_count);
     cs_index_add_modes(idx, s_mode_story, s_mode_game,
                        s_mode_riddle, s_mode_curiosity);
+    cs_index_add_story_flags(idx, s_pauses_enabled, s_variants_enabled);
 
     if (SD.exists(kIndexTmpPath)) {
         SD.remove(kIndexTmpPath);
@@ -752,6 +757,10 @@ void content_sync_run() {
     // B3 — per-device intro toggle rides the manifest; absent (pre-B3
     // backend) means the shipped default (ON).
     s_intro_enabled = doc["storyIntroEnabled"] | true;
+    // The two story-shaping toggles ride the same manifest root; absent (a
+    // pre-toggle backend) means the shipped default (both ON).
+    s_pauses_enabled   = doc["storyPausesEnabled"]    | true;
+    s_variants_enabled = doc["variantEndingsEnabled"] | true;
     // Slice E — bedtime-music opt-in + track list (absent → off/none).
     s_music_enabled = doc["bedtimeMusicEnabled"] | false;
     s_music_manifest_count = cs_manifest_parse_music(
@@ -766,13 +775,15 @@ void content_sync_run() {
     s_voice_manifest_count = cs_manifest_parse_voice(
         doc["voice"].as<JsonArrayConst>(), s_voice_manifest, CS_MAX_VOICE);
     Serial.printf("[content-sync] manifest status=200 stories=%u introEnabled=%d "
-                  "music=%d musicEnabled=%d voice=%d modes=%d%d%d%d\n",
+                  "music=%d musicEnabled=%d voice=%d modes=%d%d%d%d "
+                  "pauses=%d variants=%d\n",
                   stories.isNull() ? 0U : (unsigned)stories.size(),
                   s_intro_enabled ? 1 : 0,
                   s_music_manifest_count, s_music_enabled ? 1 : 0,
                   s_voice_manifest_count,
                   s_mode_story ? 1 : 0, s_mode_game ? 1 : 0,
-                  s_mode_riddle ? 1 : 0, s_mode_curiosity ? 1 : 0);
+                  s_mode_riddle ? 1 : 0, s_mode_curiosity ? 1 : 0,
+                  s_pauses_enabled ? 1 : 0, s_variants_enabled ? 1 : 0);
     Serial.flush();
     if ((stories.isNull() || stories.size() == 0)
         && s_music_manifest_count == 0

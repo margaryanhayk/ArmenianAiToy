@@ -134,6 +134,26 @@ int cs_manifest_parse(JsonArrayConst stories, CsStory *out, int max_out,
             }
         }
 
+        // Variant endings — altOf marks this entry as an ALTERNATE ENDING of
+        // another story. A malformed or self-referencing value is cleared to
+        // "ordinary story" rather than trusted. Note the backend DROPS such
+        // an item outright; clearing here is the weaker of the two responses
+        // and is only reachable via a hand-edited card, where refusing to
+        // parse the whole entry would be a harsher failure than the card
+        // owner expects.
+        {
+            const char *alt_of = item["altOf"] | "";
+            if (!cs_is_valid_story_id(alt_of)
+                || cs_story_ids_equal(alt_of, dst->story_id)
+                || !cs_copy_bounded(dst->alt_of, sizeof(dst->alt_of), alt_of)) {
+                dst->alt_of[0] = '\0';
+                if (alt_of[0] != '\0') {
+                    Serial.printf("[content-sync] %s altOf ignored (%s)\n",
+                                  dst->story_id, alt_of);
+                }
+            }
+        }
+
         // B2 — per-story clips. Same per-item fail-closed rule at clip
         // granularity: a bad clip is skipped and never takes the story or
         // its valid sibling clips with it. Duplicate kinds keep the first.
@@ -223,6 +243,19 @@ int cs_index_parse(JsonDocument &doc, CsStory *out, int max_out, int *out_schema
                 }
             }
 
+            // v6 altOf — absent on every pre-v6 card, which parses as "not a
+            // variant": exactly the pre-variant behaviour, so a card written
+            // by an older build never has to be wiped. Same validation the
+            // manifest parse applies.
+            {
+                const char *alt_of = e["altOf"] | "";
+                if (!cs_is_valid_story_id(alt_of)
+                    || cs_story_ids_equal(alt_of, dst->story_id)
+                    || !cs_copy_bounded(dst->alt_of, sizeof(dst->alt_of), alt_of)) {
+                    dst->alt_of[0] = '\0';
+                }
+            }
+
             // v3 clips[] — absent on every v2 card, yielding clip_count 0
             // (story plays without intro/reflection, the pre-B2 behavior).
             dst->clip_count = 0;
@@ -304,6 +337,12 @@ void cs_index_build(JsonDocument &doc, const CsStory *active, int count,
         if (cs_story_is_serial(&active[i])) {
             e["seriesId"]    = active[i].series_id;
             e["seriesIndex"] = active[i].series_index;
+        }
+        // Same rule for altOf: written only for real variants, so a library
+        // with no alternate endings produces a byte-identical index to the
+        // pre-v6 one apart from the schema number and the two root flags.
+        if (cs_story_is_variant(&active[i])) {
+            e["altOf"] = active[i].alt_of;
         }
         if (active[i].clip_count > 0) {
             JsonArray clips = e["clips"].to<JsonArray>();
@@ -528,4 +567,22 @@ bool cs_index_mode_enabled(JsonDocument &doc, const char *key) {
     // Absent → true. A pre-v4 card, or a manifest from a backend that does
     // not send the flags, must not silently stop the toy offering anything.
     return doc[key] | true;
+}
+
+// ---- story feature toggles (index schema v6) ------------------------
+
+void cs_index_add_story_flags(JsonDocument &doc, bool pauses, bool variants) {
+    doc["pausesEnabled"]   = pauses;
+    doc["variantsEnabled"] = variants;
+}
+
+bool cs_index_pauses_enabled(JsonDocument &doc) {
+    // Absent → true, matching the shipped server-side default. Both features
+    // are part of the authored story experience, so a card that predates the
+    // field must not silently strip them.
+    return doc["pausesEnabled"] | true;
+}
+
+bool cs_index_variants_enabled(JsonDocument &doc) {
+    return doc["variantsEnabled"] | true;
 }

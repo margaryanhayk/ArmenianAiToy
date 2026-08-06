@@ -216,6 +216,15 @@ int story_select_load_eligible(CsStory *out, int max_out) {
         if (!is_eligible(&raw[i])) {
             continue;
         }
+        // Variant endings — an alternate-ending file is NOT a rotation
+        // member. It starts part-way through its story, so letting one reach
+        // story_select_pick (or the welcome flow's offer loop, which reads
+        // this same list) would mean narrating half a story to a child as
+        // though it were the whole thing. Reachable only via
+        // story_select_resolve_playback_path, by the base story it belongs to.
+        if (cs_story_is_variant(&raw[i])) {
+            continue;
+        }
         bool dup = false;
         for (int j = 0; j < count; j++) {
             if (cs_story_ids_equal(out[j].story_id, raw[i].story_id)) {
@@ -262,6 +271,61 @@ bool story_select_resolve_path(const char *story_id, char *out, size_t out_len) 
         return cs_copy_bounded(out, out_len, raw[i].cache_path);
     }
     return false;
+}
+
+bool story_select_resolve_playback_path(const char *story_id,
+                                        char *out, size_t out_len,
+                                        bool *out_is_variant) {
+    if (out_is_variant != NULL) {
+        *out_is_variant = false;
+    }
+    if (out == NULL || out_len == 0) {
+        return false;
+    }
+    out[0] = '\0';
+    if (!cs_is_valid_story_id(story_id)) {
+        return false;
+    }
+
+    // Cheapest gates first: the parent toggle (one small index read), then
+    // the heard-set (one NVS read), and only then the index scan. A toy with
+    // the toggle off, or a child on a FIRST listen, pays almost nothing —
+    // which is every session until a story is heard twice.
+    if (story_variant_endings_enabled() && story_heard_contains(story_id)) {
+        const int raw_count = load_raw_index(s_raw, CS_MAX_STORIES);
+        for (int i = 0; i < raw_count; i++) {
+            if (!cs_story_is_variant(&s_raw[i])
+                || !cs_story_ids_equal(s_raw[i].alt_of, story_id)) {
+                continue;
+            }
+            // First match wins, mirroring the duplicate rule everywhere else
+            // on this card. A variant that is present but unusable (half
+            // synced, size mismatch, unverified) falls back to the base
+            // story rather than making the toy silent — the child still
+            // gets their story, just the ending they already know.
+            if (!is_eligible(&s_raw[i])) {
+                Serial.printf("[story-select] variant %s present but not usable\n",
+                              s_raw[i].story_id);
+                Serial.flush();
+                break;
+            }
+            if (cs_copy_bounded(out, out_len, s_raw[i].cache_path)) {
+                if (out_is_variant != NULL) {
+                    *out_is_variant = true;
+                }
+                Serial.printf("[story-select] %s heard before — playing variant %s\n",
+                              story_id, s_raw[i].story_id);
+                Serial.flush();
+                return true;
+            }
+            break;
+        }
+    }
+
+    // No variant wanted, none cached, or none usable — the authored story.
+    // This re-reads the index into s_raw, so the scratch table above being
+    // clobbered is expected and harmless.
+    return story_select_resolve_path(story_id, out, out_len);
 }
 
 bool story_select_resolve_clip_path(const char *story_id, const char *kind,
@@ -536,6 +600,30 @@ bool load_index_doc(JsonDocument &doc) {
 }
 
 }  // namespace
+
+// ---- story feature toggles (index schema v6) ------------------------
+//
+// Placed here rather than beside story_select_intro_enabled because they
+// use load_index_doc, which is declared just above. The intro/music
+// accessors predate that helper and open the file themselves; they are
+// left alone rather than refactored — this slice has no business
+// rewriting a working read path.
+
+bool story_pauses_enabled() {
+    JsonDocument doc;
+    if (!load_index_doc(doc)) {
+        return true;   // no card / no index — shipped default is ON
+    }
+    return cs_index_pauses_enabled(doc);
+}
+
+bool story_variant_endings_enabled() {
+    JsonDocument doc;
+    if (!load_index_doc(doc)) {
+        return true;   // no card / no index — shipped default is ON
+    }
+    return cs_index_variants_enabled(doc);
+}
 
 bool voice_clip_resolve_path(const char *voice_id, char *out, size_t out_len) {
     if (out == NULL || out_len == 0) {

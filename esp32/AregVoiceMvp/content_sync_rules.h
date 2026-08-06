@@ -93,7 +93,13 @@
 // v5 = v4 plus the per-story seriesId/seriesIndex that let «Ծիվիկ»-style
 // episodes play in order. Same superset contract: a v4 card parses as "every
 // story is standalone", which is exactly the pre-serial behaviour.
-#define CS_INDEX_SCHEMA_VERSION 5
+//
+// v6 = v5 plus the per-story altOf (alternate endings) and the two root
+// parent toggles pausesEnabled / variantsEnabled. Superset again: a v5 card
+// parses as "no story is a variant, both features on" — which is exactly the
+// pre-variant behaviour, because a toy with no alt files cached plays the
+// base narration whatever the toggles say.
+#define CS_INDEX_SCHEMA_VERSION 6
 
 // Per-story clip slots (intro / question / question1 / question2 /
 // summary / offer / reoffer / serialnext). Fixed small array — an
@@ -299,6 +305,30 @@ struct CsStory {
     /// TLS handshake wants during audio.
     char series_id[CS_MAX_STORY_ID_LEN + 1];
     int  series_index;
+
+    /// Variant endings — the story this entry is an ALTERNATE ENDING of.
+    /// EMPTY means an ordinary story, which is what every pre-v6 index and
+    /// every non-variant manifest item yields on parse.
+    ///
+    /// A non-empty alt_of changes what the entry IS, not just what it says
+    /// about itself: the entry is excluded from the rotation, never offered
+    /// by name in the welcome flow, and never marked heard. It is reachable
+    /// only through story_select_resolve_playback_path, which looks a variant
+    /// up BY the base story it is already about to play. Each variant is a
+    /// FULL alternate file (base narration cut at the branch point plus the
+    /// new ending, assembled offline), so playback is "open this file instead"
+    /// — the device never splices audio.
+    ///
+    /// Validated by the same allowlist a story id is, and refused when it
+    /// names the entry itself. The backend applies the identical rule before
+    /// it reaches the wire, but a card can be hand-edited, so it is re-applied
+    /// on parse.
+    ///
+    /// Costs 49 bytes (52 padded) per CsStory across every
+    /// CsStory[CS_MAX_STORIES] table in the image. MEASURED at the canonical
+    /// FQBN rather than estimated, the way the CS_MAX_STORIES, CS_MAX_CLIPS
+    /// and series bumps were — see the README's size table.
+    char alt_of[CS_MAX_STORY_ID_LEN + 1];
 };
 
 // ---- validation ---------------------------------------------------
@@ -342,6 +372,19 @@ inline bool cs_is_valid_story_id(const char *id) {
 /// reaches the wire.
 inline bool cs_story_is_serial(const CsStory *s) {
     return s != NULL && s->series_index >= 1 && cs_is_valid_story_id(s->series_id);
+}
+
+/// Variant endings — true when this entry is an ALTERNATE ENDING of another
+/// story rather than a story in its own right. Everything downstream asks
+/// this rather than testing alt_of directly, so "is a variant" has exactly
+/// one meaning, in one place.
+///
+/// This is the guard that keeps the rotation honest. A variant file starts
+/// PART-WAY through its story; if one ever reached story_select_pick, a child
+/// would be told half a story as though it were the whole thing. Every place
+/// that builds a playable list filters on it.
+inline bool cs_story_is_variant(const CsStory *s) {
+    return s != NULL && cs_is_valid_story_id(s->alt_of);
 }
 
 /// Exactly 64 hex characters. A truncated or non-hex hash would make
