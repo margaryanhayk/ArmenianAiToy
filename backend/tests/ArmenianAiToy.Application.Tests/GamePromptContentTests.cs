@@ -12,6 +12,12 @@ namespace ArmenianAiToy.Application.Tests;
 /// an HONESTY block replaced unconditional celebration. Tests that pinned
 /// the removed types, the guessing opener, or the multi-turn-rhythm
 /// disclaimer were retired with the content they pinned.
+///
+/// make_it_small (2026-08-06) — a FOURTH word-answer type joined the v6
+/// set: the toy names a familiar thing, the child makes it little with an
+/// Armenian diminutive (կատու→կատվիկ). It inherits the v6 honesty posture
+/// — the attempt is celebrated, the form is never graded, and the toy
+/// models the standard word instead of drilling the child.
 /// </summary>
 public class GamePromptContentTests
 {
@@ -114,15 +120,18 @@ public class GamePromptContentTests
     }
 
     [Fact]
-    public void Prompt_LocksGameTypeWhitelist_ToThePlayableThree()
+    public void Prompt_LocksGameTypeWhitelist_ToThePlayableSet()
     {
-        // KEYSTONE (v6): only the three word-answer types remain. The four
+        // KEYSTONE (v6): only word-answer types are allowed. The four
         // physical-action types were cut because the toy cannot observe a
         // clap, a touch, or a found object — see the structural ban below.
+        // make_it_small joined the set in 2026-08-06 on the same footing:
+        // the answer is a WORD the child says.
         Assert.Contains("GAME TYPES", Prompt);
         Assert.Contains("animal_sound", Prompt);
         Assert.Contains("count_to", Prompt);
         Assert.Contains("yes_no_silly", Prompt);
+        Assert.Contains("make_it_small", Prompt);
         Assert.Contains("Use ONLY these game types", Prompt);
     }
 
@@ -146,6 +155,17 @@ public class GamePromptContentTests
         {
             Assert.Contains(t, Prompt);
         }
+    }
+
+    [Fact]
+    public void EnforcedWhitelist_IsExactlyTheFourPlayableTypes()
+    {
+        // KEYSTONE: the taxonomy is CLOSED. Growing it is a product
+        // decision (each type must be answerable by a WORD on a blind,
+        // one-button toy), never an incidental edit.
+        Assert.Equal(
+            new[] { "animal_sound", "count_to", "yes_no_silly", "make_it_small" },
+            ChatService.AllowedGameTypes);
     }
 
     [Fact]
@@ -180,6 +200,7 @@ public class GamePromptContentTests
         Assert.Contains("farm", Prompt);          // animal_sound
         Assert.Contains("backward", Prompt);      // count_to
         Assert.Contains("absurd swaps", Prompt);  // yes_no_silly
+        Assert.Contains("home things", Prompt);   // make_it_small
     }
 
     [Fact]
@@ -375,5 +396,70 @@ public class GamePromptContentTests
     {
         Assert.Contains("claiming to observe", Prompt);
         Assert.Contains("toy sees nothing", Prompt);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // make_it_small — the diminutives game (2026-08-06)
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Prompt_MakeItSmall_DeclaresTheDiminutiveMechanic()
+    {
+        Assert.Contains("make_it_small", Prompt);
+        Assert.Contains("diminutive ending (-իկ / -ուկ / -ակ)", Prompt);
+        Assert.Contains("«Փոքրացրո՛ւ՝ կատու։»", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_MakeItSmall_BoundsTheWordSource()
+    {
+        // One base word per round, and only concrete child-familiar nouns
+        // that actually take a productive diminutive. An abstract noun or
+        // a proper name has no little form to reach for.
+        Assert.Contains("EXACTLY ONE base word per round", Prompt);
+        Assert.Contains("only CONCRETE nouns", Prompt);
+        Assert.Contains("NEVER abstract nouns, NEVER proper names", Prompt);
+        Assert.Contains("կատու→կատվիկ", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_MakeItSmall_CelebratesTheAttempt_NotTheAccuracy()
+    {
+        // KEYSTONE: the v6 honesty posture extended to the new type. Any
+        // recognizable diminutive shape earns the celebration — the toy is
+        // not scoring the morphology of a five-year-old.
+        Assert.Contains("celebrate ANY attempt that carries a diminutive", Prompt);
+        Assert.Contains("even when the form is not the standard one", Prompt);
+        Assert.Contains("celebrate the attempt,", Prompt);
+        Assert.Contains("never the accuracy", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_MakeItSmall_NeverGrades_AndNeverDrills()
+    {
+        // KEYSTONE: no verdict, no repeat-after-me. Areg is a play leader,
+        // not a teacher (MODES.md § 2).
+        Assert.Contains("NEVER tell the child the answer was", Prompt);
+        Assert.Contains("NEVER grade the form", Prompt);
+        Assert.Contains("NEVER ask the child to", Prompt);
+        Assert.Contains("you are not a teacher", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_MakeItSmall_ModelsTheStandardFormInstead()
+    {
+        // The toy never certifies the child's word as correct Armenian; it
+        // simply says the standard little word in its own next sentence.
+        Assert.Contains("Do NOT declare the", Prompt);
+        Assert.Contains("correct Armenian", Prompt);
+        Assert.Contains("model the standard word", Prompt);
+        Assert.Contains("say the little word yourself", Prompt);
+    }
+
+    [Fact]
+    public void Prompt_ContainsBadGoodPair_GradingAndDrilling()
+    {
+        Assert.Contains("grading / repeat-after-me drilling", Prompt);
+        Assert.Contains("model the little word and move on", Prompt);
     }
 }

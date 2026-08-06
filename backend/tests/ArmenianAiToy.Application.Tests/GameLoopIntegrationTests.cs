@@ -426,6 +426,137 @@ public class GameLoopIntegrationTests
             Arg.Any<List<(string, string)>>());
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // make_it_small — the fourth taxonomy member (2026-08-06). The v6 loop
+    // machinery is type-agnostic; these pin that it actually covers the new
+    // type rather than assuming it does.
+    // ─────────────────────────────────────────────────────────────────────
+
+    private const string MakeItSmallWithBlock =
+        "Փոքրացրո՛ւ՝ կատու։\n---\nGAME_TYPE:make_it_small\nGAME_DIFFICULTY:1";
+
+    [Fact]
+    public async Task MakeItSmall_IsAcceptedByTheWhitelist_AndStoresARound()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(MakeItSmallWithBlock);
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        Assert.Equal("game", result.Mode);
+        Assert.DoesNotContain("GAME_TYPE", result.Response);
+        Assert.DoesNotContain("make_it_small", result.Response);
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
+        Assert.Equal("make_it_small", state!.CurrentRound!.GameType);
+        Assert.Equal(0, state.CurrentRound.TurnsCompleted);
+    }
+
+    [Fact]
+    public async Task MakeItSmall_ModelChosenDifficulty_IsForcedTo1_OnFreshRound()
+    {
+        // The v6 difficulty override is type-agnostic — verify, don't assume.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Փոքրացրո՛ւ՝ կատու։\n---\nGAME_TYPE:make_it_small\nGAME_DIFFICULTY:3");
+
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
+        Assert.Equal(1, state!.CurrentRound!.Difficulty);
+    }
+
+    [Fact]
+    public async Task MakeItSmall_ChildAnswer_ContinuesInsideTheSameType()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(MakeItSmallWithBlock);
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        _aiClient.ClearReceivedCalls();
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Ապրե՛ս՝ կատվիկ։ Հիմա՝ արջ։");
+        await _chatService.GetResponseAsync(_deviceId, "կատվիկ");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("GAME_TURN_KIND: continue")
+                && s.Contains("make_it_small")
+                && s.Contains("REACT HONESTLY")),
+            Arg.Any<List<(string, string)>>());
+
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
+        Assert.Equal(1, state!.CurrentRound!.TurnsCompleted);
+    }
+
+    [Fact]
+    public async Task MakeItSmall_StopWord_EndsTheGame_AndClearsTheRound()
+    {
+        // Stop-anytime must cover the new type — the child gets a goodbye,
+        // not another base word.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(MakeItSmallWithBlock);
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        _aiClient.ClearReceivedCalls();
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Լա՛վ, լավ խաղ էր։");
+        await _chatService.GetResponseAsync(_deviceId, "բավ է");
+
+        await _aiClient.Received().GetCompletionAsync(
+            Arg.Is<string>(s => s.Contains("GAME_TURN_KIND: stop_game")),
+            Arg.Any<List<(string, string)>>());
+
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
+        Assert.Null(state!.CurrentRound);
+    }
+
+    [Fact]
+    public async Task MakeItSmall_LeavingGameForStory_ClearsRound_KeepsVarietyMemory()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(MakeItSmallWithBlock);
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Մի անգամ մի նապաստակ կար։");
+        await _chatService.GetResponseAsync(_deviceId, "tell me a story");
+
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var after));
+        Assert.Null(after!.CurrentRound);
+        Assert.Contains("make_it_small", after.RecentGameTypes);
+    }
+
+    [Fact]
+    public async Task MakeItSmall_RetryPath_PreservesTheGameTailBlock()
+    {
+        // Game mirror of F-Rid-1, on the new type: a retried opener must
+        // still land its round instead of losing the metadata block.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(
+                "Armenian text here mixed with english prose sentence.",
+                MakeItSmallWithBlock);
+
+        var r = await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        Assert.Equal("game", r.Mode);
+        Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
+        Assert.Equal("make_it_small", state!.CurrentRound!.GameType);
+        Assert.DoesNotContain("GAME_TYPE", r.Response);
+    }
+
+    [Fact]
+    public async Task NearMissGameType_IsStillRejected_ByTheClosedWhitelist()
+    {
+        // The whitelist is exact-match: a plausible-looking neighbour of a
+        // real type is not a real type.
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Խաղանք։\n---\nGAME_TYPE:make_small\nGAME_DIFFICULTY:1");
+
+        var r = await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        Assert.DoesNotContain("make_small", r.Response);
+        var has = ChatService.GameSessions.TryGetValue(_conversationId, out var state);
+        Assert.True(!has || state!.CurrentRound is null);
+    }
+
     [Fact]
     public async Task GameResponse_NeverCarriesStoryChoices()
     {

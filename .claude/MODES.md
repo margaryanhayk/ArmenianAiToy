@@ -365,7 +365,8 @@ never as code, through a gated pipeline:
 **Purpose.** Run a short, structured play activity where every child
 answer is a WORD the child says. The toy is blind and one-buttoned — it
 cannot observe a clap, a touch, or a found object — so the taxonomy is
-restricted to the three verifiable-or-honest types (v6, 2026-08-05):
+restricted to the four verifiable-or-honest types (v6, 2026-08-05;
+fourth type added 2026-08-06, owner-approved):
 
 - `animal_sound` — «Հնչեցրու կատվի ձայնը։» Participation is praised;
   the imitation itself is never graded (the toy cannot judge a moo).
@@ -374,6 +375,14 @@ restricted to the three verifiable-or-honest types (v6, 2026-08-05):
   deterministically (`WelcomeIntentDetector.DetectYesNo`) and passed to
   the model, which must react honestly — celebration only when right,
   a warm correction when wrong, no verdict when unclassifiable.
+- `make_it_small` — «Փոքրացրո՛ւ՝ կատու։» Armenian diminutive play:
+  the toy names a concrete child-familiar noun, the child makes it
+  little (-իկ/-ուկ/-ակ). ANY recognizable diminutive attempt is
+  celebrated; a no-attempt answer gets the toy warmly saying the
+  little word itself and moving on. Never graded, never
+  repeat-after-me drilled (not a teacher) — the toy models the
+  standard form in its own next sentence instead. Benchmark-verified
+  2026-08-06 (9/9 scenarios, 29/29 turns, zero weak cases).
 
 Physical-action games (clap-along, body-part touch, color-find,
 copy-sound) are **structurally banned** — the prompt forbids asking for

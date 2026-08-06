@@ -44,7 +44,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2397 tests)
+dotnet test                                     # Run all tests (2411 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -183,7 +183,7 @@ Two resolution paths:
 - `ChoiceNormalizer.cs` — heuristic child input → option_a/option_b/unknown
 - `TailBlockParser.cs` — extracts/strips `---\nCHOICE_A:...\nCHOICE_B:...` from AI responses
 - `ModeDetector.cs` — 5-mode detection (Story/Game/Riddle/Curiosity/Calm) with priority rules. Game cue is a token-prefix match on the stem «խաղ» with explicit «խաղող» (grapes) / «խաղաղ» (peaceful) exclusions — never a bare substring.
-- **Game mode v6 (2026-08-05)** — taxonomy cut to the three types a blind one-button toy can run (`animal_sound` / `count_to` / `yes_no_silly`; enforced by `ChatService.AllowedGameTypes`, not just prompt prose), honest-reaction directive (yes/no answers classified via `WelcomeIntentDetector.DetectYesNo`; celebration only when earned; the toy never claims to observe a physical action), stop-anytime (`GameIntentDetector`: stop words work without an active round, «Բա՛վ է» emphatic forms normalize, negated switch = stop), retry path preserves the game tail block (Game mirror of F-Rid-1), round cleared on mode exit, model-chosen difficulty overridden to 1 on fresh rounds. Voice path gates the DETECTED mode's parent flag post-STT (Story-only gate removed). Full contract in `.claude/MODES.md` § 2. NOTE: `tools/GameBenchmark` cannot run against current source (registration is provisioning-gated and bench devices are unclaimed) — its `baseline.json` predates those gates and is invalid, not merely stale; do not refresh it against a legacy binary.
+- **Game mode v6 (2026-08-05)** — taxonomy cut to the types a blind one-button toy can run (`animal_sound` / `count_to` / `yes_no_silly`, plus `make_it_small` added 2026-08-06 — Armenian diminutive play, celebrate-the-attempt / model-the-form / never grade or drill; enforced by `ChatService.AllowedGameTypes`, not just prompt prose), honest-reaction directive (yes/no answers classified via `WelcomeIntentDetector.DetectYesNo`; celebration only when earned; the toy never claims to observe a physical action), stop-anytime (`GameIntentDetector`: stop words work without an active round, «Բա՛վ է» emphatic forms normalize, negated switch = stop), retry path preserves the game tail block (Game mirror of F-Rid-1), round cleared on mode exit, model-chosen difficulty overridden to 1 on fresh rounds. Voice path gates the DETECTED mode's parent flag post-STT (Story-only gate removed). Full contract in `.claude/MODES.md` § 2. `tools/GameBenchmark` runs against current source via `--provisioning-secret` (bench parent register/claim flow); `baseline.json` re-captured 2026-08-06 vs a local Gemini server with the four-type prompt (9/9 scenarios, 29/29 turns, zero weak cases).
 - `ModeDetectorTests.cs`, `ModeDetectorIntegrationTests.cs` — mode detection and ChatService integration tests
 - `ChoiceNormalizerTests.cs`, `ChoiceHandoffTests.cs` — story choice pipeline tests
 

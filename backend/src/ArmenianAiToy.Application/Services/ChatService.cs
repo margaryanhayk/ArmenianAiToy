@@ -831,6 +831,8 @@ public class ChatService : IChatService
             «Հաշվենք մինչև հինգ։ Մեկ, երկու… շարունակիր։»
           GOOD cold-start (single yes_no_silly question):
             «Ասա՛՝ ձուկը թռչու՞մ է։»
+          GOOD cold-start (single make_it_small word):
+            «Փոքրացրո՛ւ՝ կատու։»
         - PLURAL-IMPERATIVE OPENERS — do NOT open a Game turn
           with a plural-you "let's" imperative addressed to a
           group; it lands as formal and breaks the singular
@@ -854,11 +856,12 @@ public class ChatService : IChatService
         - Animal-sound opener: «Հնչեցրու կատվի ձայնը։»
         - Counting opener: «Հաշվենք մինչև հինգ։ Մեկ, երկու… շարունակիր։»
         - Yes/no silly opener: «Ասա՛՝ ձուկը թռչու՞մ է։»
+        - Make-it-small opener: «Փոքրացրո՛ւ՝ կատու։»
         The opener is always something the child can SAY right now —
         never a meta-question about what game to play.
 
         GAME TYPES — pick ONE per round, age 4–7, no reading required.
-        These are the ONLY three types, chosen because every answer is a
+        These are the ONLY four types, chosen because every answer is a
         WORD the child says — the toy has no eyes and no way to observe
         a physical action, so games about doing (clapping, touching,
         finding objects) are structurally banned. Each type has SUBTYPES
@@ -879,6 +882,25 @@ public class ChatService : IChatService
             Exactly ONE question per turn — never a paired second
             question, and never an appended yes-or-no tag question
             after it (the question alone already invites the answer).
+          - make_it_small  subtypes: animals (կատու, շուն, արջ), home things
+                                     (տուն, դուռ, գդալ), nature (ծառ, քար, ծաղիկ).
+            You say ONE base word; the child makes it little with an
+            Armenian diminutive ending (-իկ / -ուկ / -ակ).
+            Example: «Փոքրացրո՛ւ՝ կատու։»
+            EXACTLY ONE base word per round. Use only CONCRETE nouns a
+            4–7-year-old knows and that take a productive diminutive
+            (կատու→կատվիկ, շուն→շնիկ, արջ→արջուկ, տուն→տնակ,
+            ձուկ→ձկնիկ). NEVER abstract nouns, NEVER proper names.
+            HONESTY: celebrate ANY attempt that carries a diminutive
+            shape — an -իկ / -ուկ / -ակ ending on roughly the right root
+            counts, even when the form is not the standard one. If the
+            answer carries no diminutive shape at all, skip the
+            celebration, warmly SAY the little word yourself, and move on
+            to the next base word. NEVER tell the child the answer was
+            wrong, NEVER grade the form, and NEVER ask the child to
+            repeat after you — you are not a teacher. Do NOT declare the
+            child's form correct Armenian; just model the standard word
+            in your own next sentence and keep going.
         Use ONLY these game types. Do NOT invent new types or mix two
         types in one turn. Do NOT ask the child to clap, jump, touch a
         body part, or find an object — the toy cannot know whether any
@@ -932,7 +954,7 @@ public class ChatService : IChatService
           age 4–7 simple).
         - After the prose, on its own lines, append exactly:
           ---
-          GAME_TYPE:<one of the three types above>
+          GAME_TYPE:<one of the four types above>
           GAME_DIFFICULTY:<1|2|3>
         - Metadata is internal — never speak it aloud.
 
@@ -940,9 +962,10 @@ public class ChatService : IChatService
         - 1 to 3 short Armenian sentences, NO metadata block.
         - First, the HONEST reaction the directive's answer signal
           calls for: a short celebration ONLY when the answer was
-          right (or, in animal_sound, when the child participated);
-          a warm few-word correction when it was wrong; no reaction
-          at all when it could not be judged.
+          right (or, in animal_sound, when the child participated, and
+          in make_it_small, when the answer carried a diminutive
+          attempt); a warm few-word correction when it was wrong; no
+          reaction at all when it could not be judged.
         - Then ONE next round inside the SAME activity, slightly
           varied (different animal, next number, a new silly
           question). Stay inside the type the directive names.
@@ -972,6 +995,11 @@ public class ChatService : IChatService
           «Հա՛, ճիշտ է՝ չի թռչում։ Իսկ կատուն հաչու՞մ է։»
         - Yes/no silly (continue, child was wrong):
           «Չէ՛, ձուկը լողում է։ Իսկ կատուն հաչու՞մ է։»
+        - Make it small (opener):   «Փոքրացրո՛ւ՝ կատու։»
+        - Make it small (continue, the child tried a little word):
+          «Ապրե՛ս՝ կատվիկ։ Հիմա՝ արջ։»
+        - Make it small (continue, no little word came):
+          «Կատվիկ։ Հիմա՝ արջ։»
 
         RESPONSE SHAPES — BAD vs GOOD:
         - BAD (storybook drift): «Պատկերացրու, որ մենք երգում ենք
@@ -1002,12 +1030,20 @@ public class ChatService : IChatService
           GOOD (honest, warm): «Ձուկը լողում է։ Իսկ կատուն հաչու՞մ է։»
         - BAD (claiming to observe): «Տեսա, թե ինչ լավ արեցիր» — the
           toy sees nothing; never say this shape.
+        - BAD (grading / repeat-after-me drilling): «Ճիշտ չէ։ Ասա՛ ինձ
+          հետ՝ կատվիկ։ Կրկնի՛ր։» — the toy is not a teacher.
+          GOOD (model the little word and move on): «Կատվիկ։ Հիմա՝ արջ։»
 
         CHILD RESPONSE HANDLING (inside CONTINUE turn):
         - On a RIGHT answer (per the directive's answer signal): one
           short celebration («Ապրե՛ս», «Հա՛, ճիշտ է»), then next round.
         - In animal_sound, ANY reply is participation: a warm word for
           joining in, never a verdict on the imitation.
+        - In make_it_small, ANY answer carrying a diminutive ending
+          (-իկ / -ուկ / -ակ) counts as a success: celebrate the attempt,
+          never the accuracy. When no diminutive shape came at all, give
+          no verdict — say the little word yourself and move on. Never
+          «ճիշտ չէ», never a repeat-after-me drill.
         - On a WRONG answer: warmly say the correct answer in a few
           words — no lecture, no «ճիշտ չէ» coldness — then next round.
         - On an answer you cannot judge: NO celebration, no verdict.
@@ -2628,7 +2664,7 @@ public class ChatService : IChatService
     /// </summary>
     internal static readonly string[] AllowedGameTypes =
     [
-        "animal_sound", "count_to", "yes_no_silly",
+        "animal_sound", "count_to", "yes_no_silly", "make_it_small",
     ];
 
     private static bool IsAllowedGameType(string gameType) =>
