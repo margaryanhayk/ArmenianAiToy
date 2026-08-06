@@ -427,6 +427,110 @@
       color: #c62828;
     }
 
+    /* "Talk about it tonight" — an OFFER, sitting above the Today panel:
+       the last story the child heard, its discussion question, and what
+       the child answered. Warmer than the Today panel on purpose, so it
+       reads as an invitation rather than another report. Never a nag: the
+       card is hidden entirely when the toy has reported no story plays. */
+    .tonight-card {
+      font-size: 13px;
+      color: #3f3060;
+      background: linear-gradient(135deg, #fff6ec, #fdfbff);
+      border: 1px solid #f0dfc8;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin: 0 0 10px;
+      line-height: 1.5;
+    }
+    .tonight-card h3 {
+      font-size: 13px;
+      font-weight: 600;
+      /* The page's existing warm brown (.chip-warn), not a new colour. */
+      color: #92400e;
+      margin: 0 0 6px;
+    }
+    .tonight-story { font-weight: 600; color: #2b1f47; }
+    .tonight-question { margin: 4px 0 0; }
+    .tonight-answer {
+      background: #fff;
+      border: 1px solid #f0e2cf;
+      border-radius: 8px;
+      padding: 6px 8px;
+      margin: 6px 0 0;
+      /* A child's answer arrives as one long transcribed run with no
+         spaces to break on — without this it pushes the phone layout
+         sideways. */
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+    .tonight-label { font-size: 12px; color: #6b5b8a; }
+    .tonight-answer .said {
+      /* A four-year-old can talk for twenty seconds, and the whole
+         transcript would push the Today panel and the conversation list
+         off the screen. The card is the offer; the full text lives one
+         tap away in "What they said". A browser without line-clamp shows
+         the answer in full, which is a safe failure. */
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .tonight-takeaway { font-size: 12px; color: #3a5a3a; margin-top: 6px; }
+
+    /* Weekly digest. Lilac like the Today panel — it is the same KIND of
+       thing (a read-only summary of a period), so it should not compete
+       with the warm tonight card sitting under it. Describes, never
+       grades: there is no styling here for a target, a streak or a
+       comparison with last week, because none of those are rendered. */
+    .week-card {
+      font-size: 13px;
+      color: #5b3e8a;
+      background: linear-gradient(135deg, #f5f0ff, #fdfbff);
+      border: 1px solid #e4d9f7;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin: 0 0 10px;
+      line-height: 1.5;
+    }
+    .week-card h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #5b3e8a;
+      margin: 0 0 6px;
+    }
+    .week-count { font-weight: 600; color: #2b1f47; }
+    .week-titles { font-size: 12px; margin-top: 2px; }
+    .week-said {
+      background: #fff;
+      border: 1px solid #e4d9f7;
+      border-radius: 8px;
+      padding: 6px 8px;
+      margin: 8px 0 0;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+    .week-label { font-size: 12px; color: #6b5b8a; }
+    .week-ask { margin-top: 8px; }
+    .week-quiet { font-style: italic; color: #6b5b8a; }
+    .week-footnote { font-size: 11px; color: #6b5b8a; margin-top: 6px; }
+
+    /* Reflection journal — one row per saved answer, newest first. */
+    .journal-row {
+      padding: 10px 0;
+      border-bottom: 1px solid #ece4f8;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .journal-row:last-child { border-bottom: none; }
+    .journal-meta { font-size: 12px; color: #6b5b8a; }
+    .journal-question { color: #5b3e8a; margin-top: 2px; }
+    .journal-answer {
+      margin-top: 2px;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+    .journal-takeaway { font-size: 12px; color: #3a5a3a; margin-top: 2px; }
+
     .pager-info {
       font-size: 12px;
       color: #6b5b8a;
@@ -1014,6 +1118,17 @@
         <button class="link" id="toyBackBtn" type="button" data-i18n="nav_toys">← Toys</button>
       </h2>
       <div id="toyHeader" style="margin:4px 0 12px;"></div>
+      <!-- The two story cards, both built client-side from endpoints the
+           dashboard already uses (story-plays, stories, reflection-answers)
+           in ONE pass — see loadToyStoryCards. They live on the toy page
+           rather than inside Conversations: that view is a record, this is
+           the toy's home, and two panels stacked above the conversation
+           list pushed the list itself below the fold on a phone.
+           Week first (what has been happening), then tonight (what to do
+           with it), then the tiles. Both stay hidden until there is
+           something real to show. -->
+      <section id="weekCard" class="week-card" hidden aria-live="polite"></section>
+      <section id="tonightCard" class="tonight-card" hidden aria-live="polite"></section>
       <!-- Content links for THIS toy (library / music / request a story).
            Populated by renderToyView; the request-form block is physically
            moved in here so its form and status live with it. -->
@@ -1137,6 +1252,35 @@
       <div id="libraryStatus" class="status muted" aria-live="polite"></div>
     </section>
 
+    <!-- Reflection journal — every answer the child has given after a
+         story, newest first, across all stories. The Story-plays view
+         shows the same answers mixed in among playback rows; this is the
+         place to just read what the child said, with the question that
+         was asked and the story's takeaway beside it.
+         Read-only: deletion of a child's words stays at the conversation
+         level, and no per-entry delete is offered here. -->
+    <section id="journalView" class="card" hidden>
+      <h2>
+        <button class="link" id="journalBackToToy" data-i18n-aria="nav_toy" data-i18n="nav_toy">← Toy</button>
+        <span data-i18n="journal_title">💭 What they said</span>
+      </h2>
+      <div id="journalDeviceContext" class="device-context"></div>
+      <!-- Said ONCE, here — not repeated on every row. Speech-to-text can
+           mangle a four-year-old's word, and a parent reading their
+           child's answers deserves to know that before they wonder. -->
+      <p class="inline-note" data-i18n="journal_note"></p>
+      <div id="journalList"></div>
+      <div id="journalStatus" class="status muted" aria-live="polite"></div>
+      <!-- A page of a child's own words must not be a dead end: the
+           endpoint already supports offset, so the older answers are
+           reachable rather than merely announced as existing. -->
+      <div class="pager">
+        <button id="journalNewerBtn" class="secondary" data-i18n="newer">← Newer</button>
+        <button id="journalOlderBtn" class="secondary" data-i18n="older">Older →</button>
+      </div>
+      <div id="journalPagerInfo" class="pager-info"></div>
+    </section>
+
     <!-- Music view (Slice E) — the bedtime tracks the toy can play. -->
     <section id="musicView" class="card" hidden>
       <h2>
@@ -1230,6 +1374,45 @@
       bedtime_safe: { en: '🌙 bedtime-safe', ru: '🌙 подходит для сна', hy: '🌙 հարմար է քնելուց առաջ' },
       no_plays_yet: { en: 'No story plays reported yet. The toy uploads them when it is online.', ru: 'Прослушиваний пока нет. Игрушка отправит их, когда будет онлайн.', hy: 'Դեռ լսած հեքիաթներ չկան։ Խաղալիքը կուղարկի տվյալները, երբ առցանց լինի։' },
       discuss_with_child: { en: 'Discuss with your child', ru: 'Обсудите с ребёнком', hy: 'Զրուցեք հեքիաթի մասին ձեր երեխայի հետ' },
+      // "Talk about it tonight" card. An invitation, never a task: there
+      // is no key here for "you haven't done this", and none for a count
+      // or a streak — those turn a family evening into homework.
+      tonight_title: { en: 'Talk about it tonight', ru: 'Поговорите об этом вечером', hy: 'Խոսեք այս մասին երեկոյան' },
+      // "Areg asked", not "Ask" — when the child has already answered, an
+      // instruction to ask reads as though nobody was listening. The card's
+      // own title carries the invitation; this line just reports.
+      tonight_ask: { en: 'Areg asked:', ru: 'Арег спросил:', hy: 'Արեգը հարցրեց՝' },
+      // Only English carries the child's name into the sentence. Armenian
+      // and Russian would need a case ending on a name we cannot decline,
+      // and a mangled name reads worse than none — the same rule the
+      // spoken voice clips follow for story titles.
+      tonight_answered_named: { en: 'What {name} answered:', ru: 'Что ответил ребёнок:', hy: 'Ահա երեխայի պատասխանը։' },
+      tonight_answered: { en: 'What your child answered:', ru: 'Что ответил ребёнок:', hy: 'Ահա երեխայի պատասխանը։' },
+      tonight_no_answer: { en: "Listened, but didn't answer this time.", ru: 'Послушал, но в этот раз не ответил.', hy: 'Լսեց, բայց այս անգամ չպատասխանեց։' },
+      // Weekly digest. Every key here DESCRIBES. There is deliberately no
+      // key for a comparison with last week, a target, a streak, or an
+      // encouragement — a parent should be able to read this and owe
+      // nothing. Same name rule as the tonight card: only English puts
+      // the child's name in the sentence.
+      week_title: { en: "{name}'s week", ru: 'Эта неделя', hy: 'Այս շաբաթը' },
+      week_title_generic: { en: 'This week', ru: 'Эта неделя', hy: 'Այս շաբաթը' },
+      week_stories: { en: 'Stories heard: {n}', ru: 'Прослушано сказок: {n}', hy: 'Լսած հեքիաթներ՝ {n}' },
+      week_quiet: { en: "Quiet week — the toy's been resting.", ru: 'Тихая неделя — игрушка отдыхала.', hy: 'Հանգիստ շաբաթ էր։ Խաղալիքը հանգստացել է։' },
+      week_said: { en: 'Something they said:', ru: 'Из ответов ребёнка:', hy: 'Ահա, ինչ ասաց երեխան։' },
+      // «երեկոյան», matching tonight_title — «այսօր» would say "today",
+      // which is a different thing from "tonight".
+      week_ask: { en: 'Ask tonight:', ru: 'Спросите сегодня вечером:', hy: 'Հարցրեք երեկոյան՝' },
+      week_footnote: { en: 'This week, from Sunday.', ru: 'Эта неделя, с воскресенья.', hy: 'Այս շաբաթը՝ կիրակիից։' },
+      // Reflection journal.
+      journal_title: { en: '💭 What they said', ru: '💭 Ответы ребёнка', hy: '💭 Երեխայի պատասխանները' },
+      journal_note: { en: 'As Areg heard it. The toy writes down what it understood, so a word can come out wrong.', ru: 'Так, как услышал Арег. Игрушка записывает то, что расслышала, поэтому слово может выйти неточным.', hy: 'Ինչպես Արեգն է լսել այն։ Խաղալիքը գրի է առնում լսածը, ուստի բառը կարող է սխալ ստացվել։' },
+      journal_empty: { en: 'No answers yet. They appear here after your child answers a story question.', ru: 'Ответов пока нет. Они появятся, когда ребёнок ответит на вопрос после сказки.', hy: 'Դեռ պատասխաններ չկան։ Դրանք կհայտնվեն, երբ երեխան պատասխանի հեքիաթի հարցին։' },
+      journal_no_answer: { en: "Listened, but didn't answer.", ru: 'Послушал, но не ответил.', hy: 'Լսեց, բայց չպատասխանեց։' },
+      journal_no_more: { en: 'No more answers.', ru: 'Больше ответов нет.', hy: 'Այլ պատասխաններ չկան։' },
+      journal_question_n: { en: 'Question {n}', ru: 'Вопрос {n}', hy: 'Հարց {n}' },
+      // Its own key rather than reusing plays_more: that string's Armenian
+      // counts «լսում» (listens), which is wrong over a list of answers.
+      answers_more: { en: 'Showing the {n} most recent answers.', ru: 'Показаны последние {n} ответов.', hy: 'Ցուցադրված են վերջին {n} պատասխանը։' },
       request_story: { en: '✍️ Request a story', ru: '✍️ Заказать сказку', hy: '✍️ Պատվիրել հեքիաթ' },
       request_story_help: { en: "Describe the story you'd like for your child — or attach a photo of a book page. We review every request by hand and record it in the storyteller's voice.", ru: 'Опишите сказку, которую хотели бы для вашего ребёнка. Каждый запрос мы читаем сами, а саму сказку озвучиваем голосом сказочника.', hy: 'Նկարագրեք այն հեքիաթը, որը կուզեիք ձեր երեխայի համար։ Ամեն պատվեր ինքներս ենք կարդում, իսկ հեքիաթը ձայնագրում ենք հեքիաթասացի ձայնով։' },
       request_story_text: { en: 'Your story idea', ru: 'Ваша идея сказки', hy: 'Ձեր հեքիաթի գաղափարը' },
@@ -1263,6 +1446,10 @@
       tile_conversations_sub: { en: 'What your child talked about', ru: 'О чём говорил ваш ребёнок', hy: 'Ինչի մասին է խոսել ձեր երեխան' },
       tile_library: { en: 'Story library', ru: 'Библиотека сказок', hy: 'Հեքիաթների գրադարան' },
       tile_library_sub: { en: 'What this toy can tell', ru: 'Что умеет рассказывать игрушка', hy: 'Ինչ կարող է պատմել այս խաղալիքը' },
+      tile_journal: { en: 'What they said', ru: 'Ответы ребёнка', hy: 'Երեխայի պատասխանները' },
+      // Explains the mechanism instead of restating the title — the
+      // subtitle is the one line that can teach what this place is.
+      tile_journal_sub: { en: 'After each story, Areg asks a question', ru: 'После каждой сказки Арег задаёт вопрос', hy: 'Ամեն հեքիաթից հետո Արեգը հարց է տալիս' },
       tile_music: { en: 'Music', ru: 'Музыка', hy: 'Երաժշտություն' },
       tile_music_sub: { en: 'Calm tunes for bedtime', ru: 'Спокойная музыка для сна', hy: 'Հանգիստ մեղեդիներ քնելու համար' },
       tile_request: { en: 'Request a story', ru: 'Заказать сказку', hy: 'Պատվիրել հեքիաթ' },
@@ -1471,7 +1658,7 @@
       badge_flagged: { en: '⚠ Noted', ru: '⚠ Отмечено', hy: '⚠ Նշվել է' },
       badge_needs_look: { en: '⚠ Needs a look: {n}', ru: '⚠ Требует внимания: {n}', hy: '⚠ Ուշադրության կարիք՝ {n}' },
       badge_needs_look_any: { en: '⚠ Needs a look', ru: '⚠ Требует внимания', hy: '⚠ Ուշադրության կարիք' },
-      legend_blocked: { en: 'The toy held this back. If your child said it, the toy did not answer as usual; if the toy said it, your child heard a safe reply instead.', ru: 'Игрушка задержала это. Если так сказал ребёнок — игрушка не ответила как обычно; если игрушка — ребёнок услышал вместо этого безопасный ответ.', hy: 'Խաղալիքը սա հետ է պահել։ Եթե դա ասել է ձեր երեխան, խաղալիքը սովորականի պես չի պատասխանել․ եթե խաղալիքն է ասել, ձեր երեխան փոխարենը լսել է անվտանգ պատասխան։' },
+      legend_blocked: { en: 'The toy held this back. If your child said it, the toy did not answer as usual; if the toy said it, your child heard a safe reply instead.', ru: 'Игрушка задержала это. Если так сказал ребёнок — игрушка не ответила как обычно; если игрушка — ребёнок услышал вместо этого безопасный ответ.', hy: 'Խաղալիքը սա հետ է պահել։ Եթե դա ասել է ձեր երեխան, խաղալիքը սովորականի պես չի պատասխանել։ Եթե խաղալիքն է ասել, ձեր երեխան փոխարենը լսել է անվտանգ պատասխան։' },
       legend_flagged: { en: 'Noted for you to see, but the play continued as normal.', ru: 'Отмечено, чтобы вы видели, но игра продолжилась как обычно.', hy: 'Նշվել է, որ դուք տեսնեք, բայց խաղը շարունակվել է սովորականի պես։' },
       legend_title: { en: 'What the marks mean', ru: 'Что означают отметки', hy: 'Ի՞նչ են նշանակում նշանները' },
       started_at: { en: 'Started {time}', ru: 'Начало: {time}', hy: 'Սկիզբ՝ {time}' },
@@ -1481,7 +1668,7 @@
       from_conversation: { en: 'from a conversation that started {time}', ru: 'из разговора, начатого {time}', hy: 'զրույցից, որը սկսվել է {time}' },
       no_flagged: { en: 'Nothing has needed a look on this toy. ✓', ru: 'На этой игрушке ничего не потребовало внимания. ✓', hy: 'Այս խաղալիքով ոչինչ ուշադրության կարիք չի ունեցել։ ✓' },
       no_more_flagged: { en: 'Nothing more to show.', ru: 'Больше показывать нечего.', hy: 'Ցուցադրելու այլ բան չկա։' },
-      stories_note: { en: 'Stories played from the toy’s own memory are not conversations — you will find them under Story plays.', ru: 'Сказки, сыгранные из памяти самой игрушки, не являются разговорами — они находятся в разделе «Прослушивания».', hy: 'Խաղալիքի մեջ պահված հեքիաթները զրույցներ չեն․ դրանք կգտնեք «Լսած հեքիաթներ» բաժնում։' },
+      stories_note: { en: 'Stories played from the toy’s own memory are not conversations — you will find them under Story plays.', ru: 'Сказки, сыгранные из памяти самой игрушки, не являются разговорами — они находятся в разделе «Прослушивания».', hy: 'Խաղալիքի մեջ պահված հեքիաթները զրույցներ չեն։ Դրանք կգտնեք «Լսած հեքիաթներ» բաժնում։' },
 
       // ---------- today panel ----------
       stat_conversations: { en: 'Conversations', ru: 'Разговоры', hy: 'Զրույցներ' },
@@ -1629,6 +1816,15 @@
       // so the Story-plays list shows names instead of ids.
       modeFilter: null,
       storyTitles: null,
+      // The whole library keyed by storyId — the tonight card and the
+      // reflection journal need the question and takeaway texts, not just
+      // the title. Cached per session like storyTitles; product content,
+      // so it is the same for every parent.
+      storyLibraryById: null,
+      // Which toy the two story cards on the toy page were built for, so
+      // the routine re-renders of that page don't refetch and flicker them.
+      toyCardsDeviceId: null,
+      journalOffset: 0,
       // Cached #storyRequestBlock node — it gets detached from the DOM each
       // time the toy page re-renders (see renderToyView).
       storyRequestBlock: null,
@@ -1704,7 +1900,8 @@
       var ids = ['loginView', 'signupView', 'resetRequestView', 'resetPasswordView',
                  'verifyEmailRequestView', 'verifyEmailCompleteView',
                  'devicesView', 'toyView', 'accountView', 'summariesView', 'flaggedView',
-                 'playsView', 'libraryView', 'musicView', 'detailView', 'auditView'];
+                 'playsView', 'libraryView', 'journalView', 'musicView',
+                 'detailView', 'auditView'];
       for (var i = 0; i < ids.length; i++) {
         var node = document.getElementById(ids[i]);
         if (node) node.hidden = (ids[i] !== viewId);
@@ -1799,7 +1996,7 @@
     // request must never paint: without this, opening toy A's flagged
     // list and then toy B's could leave A's messages under B's name.
     var reqSeq = { summaries: 0, flagged: 0, plays: 0, library: 0,
-                   music: 0, audit: 0, requests: 0 };
+                   music: 0, audit: 0, requests: 0, tonight: 0, journal: 0 };
     function nextReq(name) { return ++reqSeq[name]; }
     function isCurrentReq(name, id) { return reqSeq[name] === id; }
 
@@ -1919,6 +2116,13 @@
       state.auditOffset = 0;
       state.modeFilter = null;
       state.storyTitles = null;
+      state.storyLibraryById = null;
+      state.journalOffset = 0;
+      // Not just the marker — the CARDS. They hold a child's own words, and
+      // a second parent signing in on the same phone must never find them
+      // still on screen.
+      state.toyCardsDeviceId = null;
+      hideToyStoryCards();
       state.musicAvailable = undefined;
       state.detailConversationId = null;
       state.backFromDetail = null;
@@ -2729,6 +2933,10 @@
       // restored conversations instead of the toy page.
       setViewHash('toy', state.currentToyId);
 
+      // The week digest + tonight's conversation starter, above the tiles.
+      // Self-guarding against the repeat renders loadDevices triggers.
+      loadToyStoryCards(d.deviceId);
+
       // Content links for THIS toy — what the child can hear, plus the
       // request form (moved into the toy page, owner decision 2026-08-04).
       var links = document.getElementById('toyContentLinks');
@@ -2736,6 +2944,16 @@
       links.appendChild(buildTile('💬', 'tile_conversations', 'tile_conversations_sub', function () {
         openDevice(d.deviceId);
       }, true));
+      // Next to Conversations on purpose: these two are the record of the
+      // CHILD, while library / music / request below are the content the
+      // toy can play. Reached from here rather than the tab strip, which
+      // was deliberately cut back to three pills for phone width — and a
+      // distinct 💭 so it does not scan as a second Conversations tile.
+      links.appendChild(buildTile('💭', 'tile_journal', 'tile_journal_sub', function () {
+        state.currentDeviceId = d.deviceId;
+        state.journalOffset = 0;   // a fresh visit starts at the newest
+        loadReflectionJournal();
+      }));
       links.appendChild(buildTile('📚', 'tile_library', 'tile_library_sub', function () {
         loadStoryLibrary(d.deviceId);
       }));
@@ -4856,6 +5074,9 @@
       if (state.currentToyId) { openToy(state.currentToyId); } else { loadDevices(); }
     }
     document.getElementById('musicBackToDevices').addEventListener('click', backFromContentView);
+    document.getElementById('journalBackToToy').addEventListener('click', backFromContentView);
+    document.getElementById('journalOlderBtn').addEventListener('click', pageOlderJournal);
+    document.getElementById('journalNewerBtn').addEventListener('click', pageNewerJournal);
     document.getElementById('toggleStoryRequestBtn').addEventListener('click', function () {
       var f = document.getElementById('storyRequestForm');
       f.hidden = !f.hidden;
@@ -4966,18 +5187,31 @@
       return (state.storyTitles && state.storyTitles[id]) || id;
     }
 
-    // Loads the library once per session so the plays list can show story
-    // TITLES instead of ids. Failure is harmless — ids render instead.
+    // Loads the library once per session, keyed by storyId. The plays list
+    // needs only the titles; the tonight card and the reflection journal
+    // also need each story's reflection questions, its authored takeaways
+    // and its lesson. Failure is harmless everywhere — the callers fall
+    // back to raw ids and simply omit the texts they could not fetch.
+    // Deliberately unscoped (no ?deviceId): only the CONTENT fields are
+    // read from this cache, never the per-toy listen counts, which would
+    // change meaning if cached across toys.
+    function ensureStoryLibrary() {
+      if (state.storyLibraryById) return Promise.resolve(state.storyLibraryById);
+      return authedFetch('/api/parents/stories').then(function (data) {
+        var byId = {}, titles = {};
+        ((data && data.stories) || []).forEach(function (s) {
+          byId[s.storyId] = s;
+          titles[s.storyId] = s.title;
+        });
+        state.storyLibraryById = byId;
+        state.storyTitles = titles;
+        return byId;
+      }).catch(function () { return {}; });
+    }
+
     function ensureStoryTitles() {
       if (state.storyTitles) return Promise.resolve(state.storyTitles);
-      return authedFetch('/api/parents/stories').then(function (data) {
-        var map = {};
-        ((data && data.stories) || []).forEach(function (s) {
-          map[s.storyId] = s.title;
-        });
-        state.storyTitles = map;
-        return map;
-      }).catch(function () { return {}; });
+      return ensureStoryLibrary().then(function () { return state.storyTitles || {}; });
     }
 
     function loadStoryPlays() {
@@ -5085,7 +5319,10 @@
           var more = document.createElement('div');
           more.className = 'pager-info';
           more.style.textAlign = 'left';
-          more.textContent = tf('plays_more', { n: answers.length });
+          // answers_more, not plays_more: that string's Armenian counts
+          // «լսում» (listens), which is the wrong noun over a list of
+          // answers.
+          more.textContent = tf('answers_more', { n: answers.length });
           answersEl.appendChild(more);
         }
         answers.forEach(function (a) {
@@ -5102,6 +5339,437 @@
           answersEl.appendChild(row);
         });
       }).catch(function () { /* answers are additive — quiet failure */ });
+    }
+
+    // ---------- the toy page's two story cards ----------
+    // "Talk about it tonight" and the weekly digest, both client-side
+    // rollups over endpoints the dashboard already uses: the story-plays
+    // history, the story library and the saved reflection answers. No new
+    // backend surface — the same pattern the E1.1 Today panel used.
+    //
+    // ONE loader for both, deliberately: they read the same plays list and
+    // the same offer, so separate loaders would double the requests and
+    // let the two cards disagree about which story was last heard.
+    //
+    // Both are offers, not chores. Nothing here counts a streak, sets a
+    // target, or compares this week with the last one, and a toy that has
+    // reported no plays at all shows neither card.
+
+    // How recent a listen still counts as "tonight". A story heard three
+    // weeks ago is not tonight's conversation, and a card that never
+    // changes stops reading as an offer and starts reading as a reminder
+    // that the parent never took it.
+    var TONIGHT_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+    // One page of history is plenty: the tonight offer is within 3 days
+    // and the digest covers this week.
+    var TOY_CARDS_PAGE = 100;
+
+    // Midnight local on the most recent Sunday. LOCAL, not the device's
+    // zone: LinkedDeviceDto deliberately does not carry TimeZone (the E2.1
+    // slice left it out), so the phone's own clock is the only honest
+    // boundary available here. The footnote states the basis on screen.
+    function startOfWeekLocal() {
+      var d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - d.getDay());   // getDay(): 0 = Sunday
+      return d.getTime();
+    }
+
+    // The shared half of the tonight card: which story to talk about, and
+    // what the child said about it. Returns null when there is nothing
+    // honest to offer. The digest reuses this so the two cards can never
+    // name different stories.
+    function resolveTonightOffer(deviceId, library, plays) {
+      // Only a story heard to the END was followed by the after-story
+      // question. Offering the question for a story the child stopped
+      // part-way — and then reporting that they "didn't answer" — would
+      // describe a moment that never happened.
+      var play = null;
+      for (var i = 0; i < plays.length; i++) {
+        if (plays[i].finished) { play = plays[i]; break; }
+      }
+      if (play === null) return Promise.resolve(null);
+      var heardAt = Date.parse(play.playedAtUtc);
+      if (isFinite(heardAt) && (Date.now() - heardAt) > TONIGHT_MAX_AGE_MS) {
+        return Promise.resolve(null);
+      }
+      // Without the story we have no question and no takeaway, which
+      // leaves an offer with nothing in it.
+      var story = library[play.storyId] || null;
+      if (!story) return Promise.resolve(null);
+
+      var answersUrl = '/api/parents/devices/' + encodeURIComponent(deviceId)
+        + '/reflection-answers?storyId=' + encodeURIComponent(play.storyId)
+        + '&limit=1&offset=0';
+      // A missing answer is a normal outcome — a child may listen and say
+      // nothing — so this leg never fails the offer.
+      return authedFetch(answersUrl).catch(function () { return null; })
+        .then(function (ans) {
+          var answer = (ans && ans.answers && ans.answers[0]) || null;
+          // This endpoint returns the newest answer for the story EVER,
+          // not the one from this listen, and children re-hear favourites
+          // constantly. Printing last week's words under tonight's story
+          // would put them in the child's mouth. Skipped when the play
+          // time is only approximate — there is then nothing honest to
+          // compare against.
+          if (answer && !play.timeIsApproximate) {
+            var saidAt = Date.parse(answer.createdAtUtc);
+            if (isFinite(saidAt) && isFinite(heardAt) && saidAt < heardAt) {
+              answer = null;
+            }
+          }
+          return { deviceId: deviceId, play: play, story: story, answer: answer };
+        });
+    }
+
+    function loadToyStoryCards(deviceId) {
+      var tonightEl = document.getElementById('tonightCard');
+      var weekEl = document.getElementById('weekCard');
+      if (!tonightEl || !weekEl) return;
+      // Re-rendering the toy page is routine — every settings toggle calls
+      // loadDevices — and refetching both cards each time would flicker
+      // them off and on for no new information.
+      if (state.toyCardsDeviceId === deviceId) return;
+      hideToyStoryCards();
+      if (!deviceId) return;
+      state.toyCardsDeviceId = deviceId;
+      var reqId = nextReq('tonight');
+
+      var playsUrl = '/api/parents/devices/' + encodeURIComponent(deviceId)
+        + '/story-plays?limit=' + TOY_CARDS_PAGE + '&offset=0';
+      var answersUrl = '/api/parents/devices/' + encodeURIComponent(deviceId)
+        + '/reflection-answers?limit=' + TOY_CARDS_PAGE + '&offset=0';
+
+      ensureStoryLibrary().then(function (library) {
+        return authedFetch(playsUrl).then(function (data) {
+          var plays = (data && data.plays) || [];
+          // Never played anything: both cards stay away entirely rather
+          // than showing a row of zeroes to a family that has not started.
+          if (plays.length === 0) return null;
+          // The week's quoted answer is across all stories, so it needs
+          // the unfiltered feed. Additive — a failure costs the quote, not
+          // the digest.
+          return Promise.all([
+            resolveTonightOffer(deviceId, library, plays),
+            authedFetch(answersUrl).catch(function () { return null; })
+          ]).then(function (parts) {
+            return {
+              library: library,
+              plays: plays,
+              offer: parts[0],
+              answers: (parts[1] && parts[1].answers) || []
+            };
+          });
+        });
+      }).then(function (res) {
+        if (!isCurrentReq('tonight', reqId)) return;      // superseded
+        if (state.toyCardsDeviceId !== deviceId) return;  // moved on
+        if (!res) return;                                 // both stay hidden
+        if (res.offer) renderTonightCard(tonightEl, res.offer);
+        renderWeekCard(weekEl, deviceId, res.library, res.plays, res.answers, res.offer);
+      }).catch(function () {
+        // Quiet by design: an invitation that could not load is not
+        // something to report at a parent. Nothing else on the toy page
+        // depends on these two cards.
+        state.toyCardsDeviceId = null;   // let the next visit retry
+      });
+    }
+
+    function hideToyStoryCards() {
+      var ids = ['tonightCard', 'weekCard'];
+      for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (el) { el.hidden = true; clearChildren(el); }
+      }
+    }
+
+    function renderWeekCard(card, deviceId, library, plays, answers, offer) {
+      clearChildren(card);
+      var weekStart = startOfWeekLocal();
+      var name = childNameForDevice(deviceId);
+
+      var h = document.createElement('h3');
+      h.textContent = '📅 ' + (name ? tf('week_title', { name: name }) : t('week_title_generic'));
+      card.appendChild(h);
+
+      var heard = [], titles = [], seen = {};
+      for (var i = 0; i < plays.length; i++) {
+        var at = Date.parse(plays[i].playedAtUtc);
+        if (!isFinite(at) || at < weekStart) continue;
+        heard.push(plays[i]);
+        var id = plays[i].storyId;
+        if (id && !seen[id]) { seen[id] = true; titles.push(storyTitle(id)); }
+      }
+
+      // A week with nothing in it says exactly that and stops. A list of
+      // zeroes under a child's name reads as a report card.
+      if (heard.length === 0) {
+        var quiet = document.createElement('div');
+        quiet.className = 'week-quiet';
+        quiet.textContent = t('week_quiet');
+        card.appendChild(quiet);
+        card.hidden = false;
+        return;
+      }
+
+      var count = document.createElement('div');
+      count.className = 'week-count';
+      count.textContent = tf('week_stories', { n: heard.length });
+      card.appendChild(count);
+
+      if (titles.length > 0) {
+        var names = document.createElement('div');
+        names.className = 'week-titles';
+        names.textContent = '📖 ' + titles.join(' · ');
+        card.appendChild(names);
+      }
+
+      // One thing the child said THIS WEEK. An older answer under a week
+      // heading would be quietly untrue, so there is no fallback to one.
+      var quote = null;
+      for (var j = 0; j < answers.length; j++) {
+        var said = (typeof answers[j].answerText === 'string') ? answers[j].answerText.trim() : '';
+        if (!said) continue;
+        var when = Date.parse(answers[j].createdAtUtc);
+        if (isFinite(when) && when < weekStart) continue;
+        quote = said;
+        break;
+      }
+      if (quote) {
+        var box = document.createElement('div');
+        box.className = 'week-said';
+        var lbl = document.createElement('div');
+        lbl.className = 'week-label';
+        lbl.textContent = t('week_said');
+        var text = document.createElement('div');
+        // Untrusted child speech — textContent only.
+        text.textContent = '«' + quote + '»';
+        box.appendChild(lbl);
+        box.appendChild(text);
+        card.appendChild(box);
+      }
+
+      // The question to ask tonight. Suppressed when the tonight card is
+      // already on screen carrying the same question — the two cards sit
+      // one above the other, and printing it twice reads as a bug.
+      if (!offer) {
+        var lastPlayed = heard[0];   // plays come back newest-first
+        var lastStory = library[lastPlayed.storyId];
+        var qs = (lastStory && Array.isArray(lastStory.reflectionQuestions))
+          ? lastStory.reflectionQuestions : [];
+        if (qs[0]) {
+          var ask = document.createElement('div');
+          ask.className = 'week-ask';
+          ask.textContent = t('week_ask') + ' ' + qs[0];
+          card.appendChild(ask);
+        }
+      }
+
+      // The boundary is the phone's own week, not the toy's. Say so.
+      var foot = document.createElement('div');
+      foot.className = 'week-footnote';
+      foot.textContent = t('week_footnote');
+      card.appendChild(foot);
+      card.hidden = false;
+    }
+
+    function renderTonightCard(card, model) {
+      clearChildren(card);
+      var story = model.story;
+      var answer = model.answer;
+      // Answer against the question the toy actually asked, when we know
+      // which one that was; otherwise the story's opening question.
+      var qIndex = (answer && typeof answer.questionIndex === 'number' && answer.questionIndex >= 0)
+        ? answer.questionIndex : 0;
+      var questions = (story && Array.isArray(story.reflectionQuestions))
+        ? story.reflectionQuestions : [];
+      var conclusions = (story && Array.isArray(story.reflectionConclusions))
+        ? story.reflectionConclusions : [];
+      var question = questions[qIndex] || questions[0] || null;
+      var takeaway = conclusions[qIndex] || (story && story.lesson) || null;
+
+      var h = document.createElement('h3');
+      h.textContent = '🌙 ' + t('tonight_title');
+      card.appendChild(h);
+
+      var titleEl = document.createElement('div');
+      titleEl.className = 'tonight-story';
+      titleEl.textContent = '📖 ' + storyTitle(model.play.storyId);
+      card.appendChild(titleEl);
+
+      if (question) {
+        var qEl = document.createElement('div');
+        qEl.className = 'tonight-question';
+        qEl.textContent = t('tonight_ask') + ' ' + question;
+        card.appendChild(qEl);
+      }
+
+      var box = document.createElement('div');
+      var answerText = (answer && typeof answer.answerText === 'string')
+        ? answer.answerText.trim() : '';
+      if (answerText) {
+        box.className = 'tonight-answer';
+        var lbl = document.createElement('div');
+        lbl.className = 'tonight-label';
+        // From the model, not state.currentDeviceId: this card lives on
+        // the toy page, where the "current device" of the conversation
+        // views may be a different toy entirely.
+        var name = childNameForDevice(model.deviceId);
+        lbl.textContent = name
+          ? tf('tonight_answered_named', { name: name })
+          : t('tonight_answered');
+        var said = document.createElement('div');
+        said.className = 'said';
+        // A child's transcribed words are untrusted text — textContent
+        // only, never markup.
+        said.textContent = '«' + answerText + '»';
+        box.appendChild(lbl);
+        box.appendChild(said);
+      } else {
+        // Honest, and not a reproach: listening without answering is a
+        // perfectly good evening.
+        box.className = 'tonight-answer tonight-label';
+        box.textContent = t('tonight_no_answer');
+      }
+      card.appendChild(box);
+
+      if (takeaway) {
+        var tk = document.createElement('div');
+        tk.className = 'tonight-takeaway';
+        // lesson_label, not a second name for the same idea: the story
+        // library card already labels this exact text "What it teaches".
+        tk.textContent = t('lesson_label') + t('label_sep') + takeaway;
+        card.appendChild(tk);
+      }
+      card.hidden = false;
+    }
+
+    // Whose answer this is. Only when the toy has exactly ONE child on it:
+    // with siblings sharing a toy nobody can say which of them spoke, and
+    // naming the wrong child is worse than naming none.
+    function childNameForDevice(deviceId) {
+      var devices = state.lastDevicesResponse || [];
+      for (var i = 0; i < devices.length; i++) {
+        if (devices[i].deviceId === deviceId) {
+          var kids = devices[i].children || [];
+          return (kids.length === 1 && kids[0] && kids[0].name) ? kids[0].name : null;
+        }
+      }
+      return null;
+    }
+
+    // ---------- reflection journal ("What they said") ----------
+    // Every answer the child has given after a story, newest first, across
+    // all stories. One request: storyId on the reflection-answers endpoint
+    // is optional, so no per-story fan-out is needed.
+    // PAGE_SIZE, not a page of its own size: the shared updatePager helper
+    // computes the page number from PAGE_SIZE, so a different value here
+    // would print the wrong page number under the buttons.
+    var JOURNAL_PAGE = PAGE_SIZE;
+    function loadReflectionJournal() {
+      show('journalView');
+      setViewHash('journal', state.currentDeviceId);
+      renderDeviceContext('journalDeviceContext');
+      setStatus('journalStatus', t('busy_loading'), 'muted');
+      var listEl = document.getElementById('journalList');
+      clearChildren(listEl);
+
+      var deviceId = state.currentDeviceId;
+      var reqId = nextReq('journal');
+      // Chained on the library so every row can name its story and show
+      // the question that was asked — fired in parallel it usually won the
+      // race and printed raw story ids.
+      ensureStoryLibrary().then(function (library) {
+        return authedFetch('/api/parents/devices/' + encodeURIComponent(deviceId)
+          + '/reflection-answers?limit=' + JOURNAL_PAGE
+          + '&offset=' + state.journalOffset)
+          .then(function (data) { return { library: library, data: data }; });
+      }).then(function (res) {
+        if (!isCurrentReq('journal', reqId)) return;   // superseded
+        var answers = (res.data && res.data.answers) || [];
+        if (answers.length === 0) {
+          // Page 1 empty means there is nothing yet; a later page empty
+          // means the parent has simply reached the end.
+          setStatus('journalStatus',
+            state.journalOffset === 0 ? t('journal_empty') : t('journal_no_more'), 'muted');
+        } else {
+          setStatus('journalStatus', '', '');
+          answers.forEach(function (a) {
+            listEl.appendChild(buildJournalRow(a, res.library));
+          });
+        }
+        updatePager('journalNewerBtn', 'journalOlderBtn', 'journalPagerInfo',
+          state.journalOffset, answers.length);
+      }).catch(function (err) {
+        if (err && err.status === 401) return;
+        if (!isCurrentReq('journal', reqId)) return;
+        setStatus('journalStatus', friendlyError(err), 'err');
+      });
+    }
+
+    function pageOlderJournal() {
+      state.journalOffset += JOURNAL_PAGE;
+      loadReflectionJournal();
+    }
+
+    function pageNewerJournal() {
+      state.journalOffset = Math.max(0, state.journalOffset - JOURNAL_PAGE);
+      loadReflectionJournal();
+    }
+
+    function buildJournalRow(a, library) {
+      var story = library && library[a.storyId];
+      var qIndex = (typeof a.questionIndex === 'number' && a.questionIndex >= 0)
+        ? a.questionIndex : 0;
+      var questions = (story && Array.isArray(story.reflectionQuestions))
+        ? story.reflectionQuestions : [];
+      var conclusions = (story && Array.isArray(story.reflectionConclusions))
+        ? story.reflectionConclusions : [];
+
+      var row = document.createElement('div');
+      row.className = 'journal-row';
+
+      var meta = document.createElement('div');
+      meta.className = 'journal-meta';
+      meta.textContent = '📖 ' + storyTitle(a.storyId) + ' · ' + fmtTime(a.createdAtUtc);
+      // The same marker the Flagged view uses, as the same element — as
+      // bare grey text beside a child's own words it read like a typo.
+      if (a.safetyFlag && a.safetyFlag !== 'Clean') {
+        var flag = document.createElement('span');
+        flag.className = 'badge warn';
+        flag.textContent = t('badge_flagged');
+        meta.appendChild(document.createTextNode(' '));
+        meta.appendChild(flag);
+      }
+      row.appendChild(meta);
+
+      // The question the toy asked. Falls back to its number when the
+      // story is no longer in the library — a retired story's answers are
+      // still the child's words and still belong here.
+      var qEl = document.createElement('div');
+      qEl.className = 'journal-question';
+      qEl.textContent = questions[qIndex] || tf('journal_question_n', { n: qIndex + 1 });
+      row.appendChild(qEl);
+
+      var answerText = (typeof a.answerText === 'string') ? a.answerText.trim() : '';
+      var ans = document.createElement('div');
+      if (answerText) {
+        ans.className = 'journal-answer';
+        // Untrusted child speech — textContent only.
+        ans.textContent = '«' + answerText + '»';
+      } else {
+        ans.className = 'journal-answer journal-meta';
+        ans.textContent = t('journal_no_answer');
+      }
+      row.appendChild(ans);
+
+      if (conclusions[qIndex]) {
+        var tk = document.createElement('div');
+        tk.className = 'journal-takeaway';
+        tk.textContent = '→ ' + conclusions[qIndex];
+        row.appendChild(tk);
+      }
+      return row;
     }
 
     // deviceId scopes the listen counts to that toy (the library is opened
@@ -5508,6 +6176,10 @@
       if (acct) acct.value = getLang();
       applyStaticI18n();
       applyOptionI18n();
+      // The toy cards are built in JS and cached per toy, so without this
+      // a language switch would leave them in the previous language until
+      // the parent opened a different toy.
+      state.toyCardsDeviceId = null;
       try { rerenderActiveView(); } catch (e) { /* never block a switch */ }
     }
 
@@ -5607,6 +6279,7 @@
         flaggedView: loadFlagged,
         playsView: loadStoryPlays,
         libraryView: function () { loadStoryLibrary(state.libraryDeviceId); },
+        journalView: loadReflectionJournal,
         musicView: loadMusicLibrary,
         // Was missing: switching language with a conversation open left
         // that whole screen — speaker names, mode chips, counts — in the
@@ -5684,6 +6357,11 @@
           state.currentDeviceId = d; state.offset = 0; state.flaggedOffset = 0;
           state.currentToyId = d;
           primeDevicesThen(loadStoryPlays);
+        } else if (v === 'journal' && d) {
+          state.currentDeviceId = d;
+          state.currentToyId = d;
+          state.journalOffset = 0;
+          primeDevicesThen(loadReflectionJournal);
         } else if (v === 'library') {
           // The toy id now rides in the hash, so a refresh keeps the
           // listen counts scoped to the toy the parent opened it from.
