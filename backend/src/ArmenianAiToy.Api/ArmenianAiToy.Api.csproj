@@ -60,6 +60,14 @@
   -->
   <ItemGroup>
     <Content Include="story-audio\*.mp3" CopyToOutputDirectory="PreserveNewest" />
+    <!--
+      Game clips live in per-game SUBFOLDERS (story-audio/games/<key>/<clip>.mp3)
+      because four games each define a clip called "intro". The top-level glob
+      above does not recurse, so without this line the manifest advertises 92
+      clips the content-file endpoint then 404s — found exactly that way on the
+      bench, 2026-08-07.
+    -->
+    <Content Include="story-audio\games\**\*.mp3" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
