@@ -811,6 +811,12 @@ void sync_games(JsonArrayConst games) {
                 continue;
             }
             if (games_out_contains(out, g.game_key, g.clip_id)) {
+                // Field diagnostic 2026-08-07: a real boot skipped 91 of 92
+                // clips through this branch (summary counters proved it) and
+                // this was the only uncounted exit. Log WHAT it thinks it
+                // matched so the next serial capture settles it.
+                Serial.printf("[content-sync] game dup-skip %s/%s out_n=%u\n",
+                              g.game_key, g.clip_id, (unsigned)out.size());
                 continue;   // duplicate pair — keep the first, as everywhere
             }
 

@@ -655,14 +655,19 @@ void cs_index_append_game(JsonArray arr, const CsGame *game) {
         return;
     }
     JsonObject e = arr.add<JsonObject>();
-    // Assigning the char ARRAYS (which decay to char*, not const char*) is
-    // what makes ArduinoJson copy the bytes into the document's own pool.
-    // The caller reuses a single stack CsGame for every clip, so linking
-    // instead of copying would leave every entry pointing at the last one.
-    e["gameKey"]   = game->game_key;
-    e["clipId"]    = game->clip_id;
+    // FIELD BUG (2026-08-07, found on the real toy): the original comment
+    // here claimed the char arrays decay to `char*` and are therefore
+    // copied. They do NOT — `game` is a CONST pointer, so member access
+    // yields `const char*`, which ArduinoJson stores BY POINTER. Every
+    // appended entry then aliased the caller's single stack CsGame, so the
+    // dedupe check compared each new clip against ITSELF and skipped 91 of
+    // 92 game clips as "duplicates" (serial: dup-skip out_n=1, summary
+    // downloaded=1). const_cast to `char*` is the documented ArduinoJson
+    // way to force a byte copy into the document's own pool.
+    e["gameKey"]   = const_cast<char *>(game->game_key);
+    e["clipId"]    = const_cast<char *>(game->clip_id);
     e["version"]   = game->version;
-    e["sha256"]    = game->sha256;
+    e["sha256"]    = const_cast<char *>(game->sha256);
     e["sizeBytes"] = game->size_bytes;
     e["verified"]  = game->verified;
 }
