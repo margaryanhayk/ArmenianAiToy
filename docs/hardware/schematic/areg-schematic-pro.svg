@@ -1,0 +1,591 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2680" height="1780" viewBox="0 0 2680 1780">
+<rect width="2680" height="1780" fill="white"/>
+<text x="1340.0" y="44" font-size="30" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">AREG TOY — FULL ELECTRICAL SCHEMATIC (rev A)</text>
+<text x="1340.0" y="74" font-size="16" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">Single +3V3 rail  ·  net labels connect same-named points  ·  docs/hardware/schematic-spec.md carries the derivations</text>
+<rect x="60" y="130" width="760" height="300" fill="none" stroke="#777" stroke-width="1.6" stroke-dasharray="7 5"/>
+<rect x="60" y="104" width="317" height="26" fill="#eee" stroke="#777" stroke-width="1.2"/>
+<text x="70" y="123" font-size="16" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">A · POWER — battery to +3V3</text>
+<rect x="96" y="220" width="28" height="80" fill="white" stroke="black" stroke-width="2.4"/>
+<line x1="86" y1="208" x2="134" y2="208" stroke="black" stroke-width="2.2"/>
+<line x1="98" y1="196" x2="122" y2="196" stroke="black" stroke-width="2.2"/>
+<text x="110" y="324" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">BT1</text>
+<text x="110" y="341" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">3×AA (4.5→3.0 V)</text>
+<line x1="110" y1="196" x2="110" y2="180" stroke="black" stroke-width="2.2"/>
+<line x1="110" y1="180" x2="180" y2="180" stroke="black" stroke-width="2.2"/>
+<rect x="180" y="162" width="120" height="36" fill="white" stroke="black" stroke-width="2.2"/>
+<text x="240" y="185" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">Q1 DMG2301L</text>
+<text x="240" y="156" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">reverse block (P-FET)</text>
+<line x1="300" y1="180" x2="360" y2="180" stroke="black" stroke-width="2.2"/>
+<circle cx="360" cy="180" r="4" fill="black"/>
+<line x1="360" y1="188" x2="360" y2="194" stroke="black" stroke-width="2.2"/>
+<line x1="349" y1="194" x2="371" y2="194" stroke="black" stroke-width="2.2"/>
+<line x1="349" y1="200" x2="371" y2="200" stroke="black" stroke-width="2.2"/>
+<line x1="360" y1="200" x2="360" y2="206" stroke="black" stroke-width="2.2"/>
+<text x="375" y="201" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">C10 10µF</text>
+<line x1="360" y1="180" x2="360" y2="188" stroke="black" stroke-width="2.2"/>
+<line x1="360" y1="224" x2="360" y2="236" stroke="black" stroke-width="2.2"/>
+<line x1="346" y1="236" x2="374" y2="236" stroke="black" stroke-width="2.2"/>
+<line x1="351" y1="242" x2="369" y2="242" stroke="black" stroke-width="2.2"/>
+<line x1="356" y1="248" x2="364" y2="248" stroke="black" stroke-width="2.2"/>
+<line x1="360" y1="180" x2="420" y2="180" stroke="black" stroke-width="2.2"/>
+<rect x="420" y="120" width="190" height="120" fill="white" stroke="black" stroke-width="2.6"/>
+<text x="515.0" y="142" font-size="15" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">U4 TPS63802</text>
+<line x1="394" y1="168" x2="420" y2="168" stroke="black" stroke-width="2.2"/>
+<text x="426" y="173" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">VIN</text>
+<line x1="610" y1="168" x2="636" y2="168" stroke="black" stroke-width="2.2"/>
+<text x="604" y="173" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">VOUT</text>
+<text x="515" y="165" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">buck-boost</text>
+<text x="515" y="181" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">3.3 V · 2 A</text>
+<line x1="470" y1="120" x2="470" y2="92" stroke="black" stroke-width="2.2"/>
+<line x1="560" y1="120" x2="560" y2="92" stroke="black" stroke-width="2.2"/>
+<path d="M 470 92 A 15 15 0 0 1 500 92 A 15 15 0 0 1 530 92 A 15 15 0 0 1 560 92" fill="none" stroke="black" stroke-width="2.2"/>
+<text x="515" y="78" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">L1 1.5 µH</text>
+<line x1="515" y1="240" x2="515" y2="256" stroke="black" stroke-width="2.2"/>
+<line x1="515" y1="256" x2="515" y2="268" stroke="black" stroke-width="2.2"/>
+<line x1="501" y1="268" x2="529" y2="268" stroke="black" stroke-width="2.2"/>
+<line x1="506" y1="274" x2="524" y2="274" stroke="black" stroke-width="2.2"/>
+<line x1="511" y1="280" x2="519" y2="280" stroke="black" stroke-width="2.2"/>
+<line x1="394" y1="168" x2="394" y2="180" stroke="black" stroke-width="2.2"/>
+<line x1="636" y1="168" x2="676" y2="168" stroke="black" stroke-width="2.2"/>
+<circle cx="676" cy="168" r="4" fill="black"/>
+<line x1="676" y1="168" x2="676" y2="174" stroke="black" stroke-width="2.2"/>
+<line x1="665" y1="174" x2="687" y2="174" stroke="black" stroke-width="2.2"/>
+<line x1="665" y1="180" x2="687" y2="180" stroke="black" stroke-width="2.2"/>
+<line x1="676" y1="180" x2="676" y2="186" stroke="black" stroke-width="2.2"/>
+<text x="691" y="181" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">C11 100µF</text>
+<line x1="676" y1="186" x2="676" y2="198" stroke="black" stroke-width="2.2"/>
+<line x1="662" y1="198" x2="690" y2="198" stroke="black" stroke-width="2.2"/>
+<line x1="667" y1="204" x2="685" y2="204" stroke="black" stroke-width="2.2"/>
+<line x1="672" y1="210" x2="680" y2="210" stroke="black" stroke-width="2.2"/>
+<line x1="676" y1="168" x2="746" y2="168" stroke="black" stroke-width="2.2"/>
+<line x1="746" y1="168" x2="746" y2="154" stroke="black" stroke-width="2.2"/>
+<line x1="736" y1="154" x2="756" y2="154" stroke="black" stroke-width="2.2"/>
+<text x="746" y="148" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">+3V3</text>
+<text x="786" y="173" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">→ every +3V3 flag on this sheet</text>
+<rect x="60" y="500" width="760" height="330" fill="none" stroke="#777" stroke-width="1.6" stroke-dasharray="7 5"/>
+<rect x="60" y="474" width="548" height="26" fill="#eee" stroke="#777" stroke-width="1.2"/>
+<text x="70" y="493" font-size="16" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">B · USB-C input and protection (charging builds)</text>
+<rect x="120" y="560" width="150" height="210" fill="white" stroke="black" stroke-width="2.6"/>
+<text x="195.0" y="582" font-size="15" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">J1 USB-C</text>
+<line x1="270" y1="608.0" x2="296" y2="608.0" stroke="black" stroke-width="2.2"/>
+<text x="264" y="613.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">VBUS</text>
+<line x1="270" y1="658.0" x2="296" y2="658.0" stroke="black" stroke-width="2.2"/>
+<text x="264" y="663.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">CC1</text>
+<line x1="270" y1="708.0" x2="296" y2="708.0" stroke="black" stroke-width="2.2"/>
+<text x="264" y="713.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">CC2</text>
+<line x1="270" y1="758.0" x2="296" y2="758.0" stroke="black" stroke-width="2.2"/>
+<text x="264" y="763.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">GND</text>
+<line x1="296" y1="758.0" x2="310" y2="758.0" stroke="black" stroke-width="2.2"/>
+<line x1="310" y1="758.0" x2="310" y2="770.0" stroke="black" stroke-width="2.2"/>
+<line x1="296" y1="770.0" x2="324" y2="770.0" stroke="black" stroke-width="2.2"/>
+<line x1="301" y1="776.0" x2="319" y2="776.0" stroke="black" stroke-width="2.2"/>
+<line x1="306" y1="782.0" x2="314" y2="782.0" stroke="black" stroke-width="2.2"/>
+<rect x="304" y="649.0" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="332" y="644.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">R60</text>
+<text x="332" y="684.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">5.1 kΩ</text>
+<line x1="360" y1="658.0" x2="376" y2="658.0" stroke="black" stroke-width="2.2"/>
+<line x1="376" y1="658.0" x2="376" y2="670.0" stroke="black" stroke-width="2.2"/>
+<line x1="362" y1="670.0" x2="390" y2="670.0" stroke="black" stroke-width="2.2"/>
+<line x1="367" y1="676.0" x2="385" y2="676.0" stroke="black" stroke-width="2.2"/>
+<line x1="372" y1="682.0" x2="380" y2="682.0" stroke="black" stroke-width="2.2"/>
+<rect x="304" y="699.0" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="332" y="694.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">R61</text>
+<text x="332" y="734.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">5.1 kΩ</text>
+<line x1="360" y1="708.0" x2="376" y2="708.0" stroke="black" stroke-width="2.2"/>
+<line x1="376" y1="708.0" x2="376" y2="720.0" stroke="black" stroke-width="2.2"/>
+<line x1="362" y1="720.0" x2="390" y2="720.0" stroke="black" stroke-width="2.2"/>
+<line x1="367" y1="726.0" x2="385" y2="726.0" stroke="black" stroke-width="2.2"/>
+<line x1="372" y1="732.0" x2="380" y2="732.0" stroke="black" stroke-width="2.2"/>
+<text x="446" y="716.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">(two separate resistors —</text>
+<text x="446" y="732.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">never one shared)</text>
+<rect x="306" y="599.0" width="64" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="338" y="594.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">F1 PTC 0.5 A</text>
+<line x1="370" y1="608.0" x2="416" y2="608.0" stroke="black" stroke-width="2.2"/>
+<circle cx="416" cy="608.0" r="4" fill="black"/>
+<line x1="416" y1="608.0" x2="416" y2="642.0" stroke="black" stroke-width="2.2"/>
+<path d="M 404 642.0 L 428 642.0 L 416 664.0 Z" fill="none" stroke="black" stroke-width="2"/>
+<line x1="404" y1="664.0" x2="428" y2="664.0" stroke="black" stroke-width="2.2"/>
+<line x1="416" y1="666.0" x2="416" y2="678.0" stroke="black" stroke-width="2.2"/>
+<line x1="402" y1="678.0" x2="430" y2="678.0" stroke="black" stroke-width="2.2"/>
+<line x1="407" y1="684.0" x2="425" y2="684.0" stroke="black" stroke-width="2.2"/>
+<line x1="412" y1="690.0" x2="420" y2="690.0" stroke="black" stroke-width="2.2"/>
+<text x="446" y="652.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">D60 SMAJ5.0A + U5 TPD4S014</text>
+<text x="446" y="668.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">(surge + CC/D± ESD)</text>
+<line x1="416" y1="608.0" x2="476" y2="608.0" stroke="black" stroke-width="2.2"/>
+<rect x="476" y="568.0" width="170" height="80" fill="white" stroke="black" stroke-width="2.6"/>
+<text x="561.0" y="590.0" font-size="15" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">U6 TPS22918</text>
+<line x1="450" y1="616.0" x2="476" y2="616.0" stroke="black" stroke-width="2.2"/>
+<text x="482" y="621.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">IN</text>
+<line x1="646" y1="616.0" x2="672" y2="616.0" stroke="black" stroke-width="2.2"/>
+<text x="640" y="621.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">OUT</text>
+<text x="561" y="630.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">soft-start switch</text>
+<path d="M 672 608.0 L 686 616.0 L 672 624.0" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="692" y="621.0" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">VSYS  → U4 VIN (or BQ24074 on Li-ion)</text>
+<rect x="900" y="130" width="820" height="700" fill="none" stroke="#777" stroke-width="1.6" stroke-dasharray="7 5"/>
+<rect x="900" y="104" width="196" height="26" fill="#eee" stroke="#777" stroke-width="1.2"/>
+<text x="910" y="123" font-size="16" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">C · ESP32-S3 MCU</text>
+<rect x="1030" y="190" width="560" height="580" fill="white" stroke="black" stroke-width="2.6"/>
+<text x="1310.0" y="212" font-size="15" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">U1  ESP32-S3-WROOM-1-N16R8   (PCB antenna — keep-out: no copper / magnet / battery)</text>
+<line x1="1004" y1="238.0" x2="1030" y2="238.0" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="243.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">EN</text>
+<line x1="1004" y1="295.77777777777777" x2="1030" y2="295.77777777777777" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="300.77777777777777" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">IO0</text>
+<line x1="1004" y1="353.55555555555554" x2="1030" y2="353.55555555555554" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="358.55555555555554" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">IO3</text>
+<line x1="1004" y1="411.33333333333337" x2="1030" y2="411.33333333333337" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="416.33333333333337" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">IO45</text>
+<line x1="1004" y1="469.1111111111111" x2="1030" y2="469.1111111111111" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="474.1111111111111" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">IO46</text>
+<line x1="1004" y1="526.8888888888889" x2="1030" y2="526.8888888888889" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="531.8888888888889" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">IO18</text>
+<path d="M 1004 518.8888888888889 L 990 526.8888888888889 L 1004 534.8888888888889" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="984" y="531.8888888888889" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">BTN_MAIN</text>
+<line x1="1004" y1="584.6666666666667" x2="1030" y2="584.6666666666667" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="589.6666666666667" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">IO21</text>
+<path d="M 1004 576.6666666666667 L 990 584.6666666666667 L 1004 592.6666666666667" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="984" y="589.6666666666667" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">BTN_YES</text>
+<line x1="1004" y1="642.4444444444445" x2="1030" y2="642.4444444444445" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="647.4444444444445" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">IO47</text>
+<path d="M 1004 634.4444444444445 L 990 642.4444444444445 L 1004 650.4444444444445" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="984" y="647.4444444444445" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">BTN_NO</text>
+<line x1="1004" y1="700.2222222222222" x2="1030" y2="700.2222222222222" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="705.2222222222222" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">IO8</text>
+<path d="M 1004 692.2222222222222 L 990 700.2222222222222 L 1004 708.2222222222222" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="984" y="705.2222222222222" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">VOL_ADC</text>
+<line x1="1004" y1="758.0" x2="1030" y2="758.0" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="763.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">IO48</text>
+<path d="M 1004 750.0 L 990 758.0 L 1004 766.0" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="984" y="763.0" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">LED_DIN</text>
+<line x1="1590" y1="238.0" x2="1616" y2="238.0" stroke="black" stroke-width="2.2"/>
+<text x="1584" y="243.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">IO4</text>
+<path d="M 1616 230.0 L 1630 238.0 L 1616 246.0" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1636" y="243.0" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">MIC_SCK</text>
+<line x1="1590" y1="285.27272727272725" x2="1616" y2="285.27272727272725" stroke="black" stroke-width="2.2"/>
+<text x="1584" y="290.27272727272725" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">IO5</text>
+<path d="M 1616 277.27272727272725 L 1630 285.27272727272725 L 1616 293.27272727272725" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1636" y="290.27272727272725" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">MIC_WS</text>
+<line x1="1590" y1="332.54545454545456" x2="1616" y2="332.54545454545456" stroke="black" stroke-width="2.2"/>
+<text x="1584" y="337.54545454545456" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">IO6</text>
+<path d="M 1616 324.54545454545456 L 1630 332.54545454545456 L 1616 340.54545454545456" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1636" y="337.54545454545456" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">MIC_SD</text>
+<line x1="1590" y1="379.8181818181818" x2="1616" y2="379.8181818181818" stroke="black" stroke-width="2.2"/>
+<text x="1584" y="384.8181818181818" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">IO15</text>
+<path d="M 1616 371.8181818181818 L 1630 379.8181818181818 L 1616 387.8181818181818" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1636" y="384.8181818181818" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">AMP_BCLK</text>
+<line x1="1590" y1="427.0909090909091" x2="1616" y2="427.0909090909091" stroke="black" stroke-width="2.2"/>
+<text x="1584" y="432.0909090909091" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">IO16</text>
+<path d="M 1616 419.0909090909091 L 1630 427.0909090909091 L 1616 435.0909090909091" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1636" y="432.0909090909091" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">AMP_LRC</text>
+<line x1="1590" y1="474.3636363636364" x2="1616" y2="474.3636363636364" stroke="black" stroke-width="2.2"/>
+<text x="1584" y="479.3636363636364" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">IO7</text>
+<path d="M 1616 466.3636363636364 L 1630 474.3636363636364 L 1616 482.3636363636364" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1636" y="479.3636363636364" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">AMP_DIN</text>
+<line x1="1590" y1="521.6363636363636" x2="1616" y2="521.6363636363636" stroke="black" stroke-width="2.2"/>
+<text x="1584" y="526.6363636363636" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">IO17</text>
+<path d="M 1616 513.6363636363636 L 1630 521.6363636363636 L 1616 529.6363636363636" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1636" y="526.6363636363636" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">AMP_MUTE</text>
+<line x1="1590" y1="568.909090909091" x2="1616" y2="568.909090909091" stroke="black" stroke-width="2.2"/>
+<text x="1584" y="573.909090909091" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">IO10</text>
+<path d="M 1616 560.909090909091 L 1630 568.909090909091 L 1616 576.909090909091" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1636" y="573.909090909091" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">SD_CS</text>
+<line x1="1590" y1="616.1818181818182" x2="1616" y2="616.1818181818182" stroke="black" stroke-width="2.2"/>
+<text x="1584" y="621.1818181818182" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">IO11</text>
+<path d="M 1616 608.1818181818182 L 1630 616.1818181818182 L 1616 624.1818181818182" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1636" y="621.1818181818182" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">SD_MOSI</text>
+<line x1="1590" y1="663.4545454545455" x2="1616" y2="663.4545454545455" stroke="black" stroke-width="2.2"/>
+<text x="1584" y="668.4545454545455" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">IO12</text>
+<path d="M 1616 655.4545454545455 L 1630 663.4545454545455 L 1616 671.4545454545455" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1636" y="668.4545454545455" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">SD_SCK</text>
+<line x1="1590" y1="710.7272727272727" x2="1616" y2="710.7272727272727" stroke="black" stroke-width="2.2"/>
+<text x="1584" y="715.7272727272727" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">IO13</text>
+<path d="M 1616 702.7272727272727 L 1630 710.7272727272727 L 1616 718.7272727272727" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1636" y="715.7272727272727" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">SD_MISO</text>
+<line x1="1590" y1="758.0" x2="1616" y2="758.0" stroke="black" stroke-width="2.2"/>
+<text x="1584" y="763.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">IO9</text>
+<path d="M 1616 750.0 L 1630 758.0 L 1616 766.0" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1636" y="763.0" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">SD_CD</text>
+<line x1="1310" y1="190" x2="1310" y2="160" stroke="black" stroke-width="2.2"/>
+<line x1="1310" y1="160" x2="1310" y2="146" stroke="black" stroke-width="2.2"/>
+<line x1="1300" y1="146" x2="1320" y2="146" stroke="black" stroke-width="2.2"/>
+<text x="1310" y="140" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">+3V3</text>
+<line x1="1310" y1="175" x2="1390" y2="175" stroke="black" stroke-width="2.2"/>
+<line x1="1390" y1="175" x2="1390" y2="181" stroke="black" stroke-width="2.2"/>
+<line x1="1379" y1="181" x2="1401" y2="181" stroke="black" stroke-width="2.2"/>
+<line x1="1379" y1="187" x2="1401" y2="187" stroke="black" stroke-width="2.2"/>
+<line x1="1390" y1="187" x2="1390" y2="193" stroke="black" stroke-width="2.2"/>
+<text x="1405" y="188" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">C1 22µF + C2 100nF  (≤3 mm from pin 2)</text>
+<line x1="1390" y1="193" x2="1390" y2="205" stroke="black" stroke-width="2.2"/>
+<line x1="1376" y1="205" x2="1404" y2="205" stroke="black" stroke-width="2.2"/>
+<line x1="1381" y1="211" x2="1399" y2="211" stroke="black" stroke-width="2.2"/>
+<line x1="1386" y1="217" x2="1394" y2="217" stroke="black" stroke-width="2.2"/>
+<line x1="1310" y1="770" x2="1310" y2="795" stroke="black" stroke-width="2.2"/>
+<line x1="1310" y1="795" x2="1310" y2="807" stroke="black" stroke-width="2.2"/>
+<line x1="1296" y1="807" x2="1324" y2="807" stroke="black" stroke-width="2.2"/>
+<line x1="1301" y1="813" x2="1319" y2="813" stroke="black" stroke-width="2.2"/>
+<line x1="1306" y1="819" x2="1314" y2="819" stroke="black" stroke-width="2.2"/>
+<rect x="934" y="229.0" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="962" y="224.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">R1</text>
+<text x="962" y="264.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">10 kΩ</text>
+<line x1="934" y1="238.0" x2="918" y2="238.0" stroke="black" stroke-width="2.2"/>
+<line x1="918" y1="238.0" x2="918" y2="224.0" stroke="black" stroke-width="2.2"/>
+<line x1="908" y1="224.0" x2="928" y2="224.0" stroke="black" stroke-width="2.2"/>
+<text x="918" y="218.0" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">+3V3</text>
+<line x1="996" y1="244.0" x2="996" y2="250.0" stroke="black" stroke-width="2.2"/>
+<line x1="985" y1="250.0" x2="1007" y2="250.0" stroke="black" stroke-width="2.2"/>
+<line x1="985" y1="256.0" x2="1007" y2="256.0" stroke="black" stroke-width="2.2"/>
+<line x1="996" y1="256.0" x2="996" y2="262.0" stroke="black" stroke-width="2.2"/>
+<text x="1011" y="257.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">C3 1µF</text>
+<line x1="996" y1="238.0" x2="996" y2="244.0" stroke="black" stroke-width="2.2"/>
+<line x1="996" y1="262.0" x2="996" y2="274.0" stroke="black" stroke-width="2.2"/>
+<line x1="982" y1="274.0" x2="1010" y2="274.0" stroke="black" stroke-width="2.2"/>
+<line x1="987" y1="280.0" x2="1005" y2="280.0" stroke="black" stroke-width="2.2"/>
+<line x1="992" y1="286.0" x2="1000" y2="286.0" stroke="black" stroke-width="2.2"/>
+<rect x="934" y="286.77777777777777" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="962" y="281.77777777777777" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">R2</text>
+<text x="962" y="321.77777777777777" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">10 kΩ</text>
+<line x1="934" y1="295.77777777777777" x2="918" y2="295.77777777777777" stroke="black" stroke-width="2.2"/>
+<line x1="918" y1="295.77777777777777" x2="918" y2="281.77777777777777" stroke="black" stroke-width="2.2"/>
+<line x1="908" y1="281.77777777777777" x2="928" y2="281.77777777777777" stroke="black" stroke-width="2.2"/>
+<text x="918" y="275.77777777777777" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">+3V3</text>
+<text x="864" y="300.77777777777777" font-size="12" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">test pad only</text>
+<rect x="934" y="344.55555555555554" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="962" y="339.55555555555554" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">R3</text>
+<text x="962" y="379.55555555555554" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">10 kΩ</text>
+<line x1="934" y1="353.55555555555554" x2="918" y2="353.55555555555554" stroke="black" stroke-width="2.2"/>
+<line x1="918" y1="353.55555555555554" x2="918" y2="365.55555555555554" stroke="black" stroke-width="2.2"/>
+<line x1="904" y1="365.55555555555554" x2="932" y2="365.55555555555554" stroke="black" stroke-width="2.2"/>
+<line x1="909" y1="371.55555555555554" x2="927" y2="371.55555555555554" stroke="black" stroke-width="2.2"/>
+<line x1="914" y1="377.55555555555554" x2="922" y2="377.55555555555554" stroke="black" stroke-width="2.2"/>
+<rect x="934" y="402.33333333333337" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="962" y="397.33333333333337" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">R4</text>
+<text x="962" y="437.33333333333337" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">10 kΩ</text>
+<line x1="934" y1="411.33333333333337" x2="918" y2="411.33333333333337" stroke="black" stroke-width="2.2"/>
+<line x1="918" y1="411.33333333333337" x2="918" y2="423.33333333333337" stroke="black" stroke-width="2.2"/>
+<line x1="904" y1="423.33333333333337" x2="932" y2="423.33333333333337" stroke="black" stroke-width="2.2"/>
+<line x1="909" y1="429.33333333333337" x2="927" y2="429.33333333333337" stroke="black" stroke-width="2.2"/>
+<line x1="914" y1="435.33333333333337" x2="922" y2="435.33333333333337" stroke="black" stroke-width="2.2"/>
+<rect x="934" y="460.1111111111111" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="962" y="455.1111111111111" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">R5</text>
+<text x="962" y="495.1111111111111" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">10 kΩ</text>
+<line x1="934" y1="469.1111111111111" x2="918" y2="469.1111111111111" stroke="black" stroke-width="2.2"/>
+<line x1="918" y1="469.1111111111111" x2="918" y2="481.1111111111111" stroke="black" stroke-width="2.2"/>
+<line x1="904" y1="481.1111111111111" x2="932" y2="481.1111111111111" stroke="black" stroke-width="2.2"/>
+<line x1="909" y1="487.1111111111111" x2="927" y2="487.1111111111111" stroke="black" stroke-width="2.2"/>
+<line x1="914" y1="493.1111111111111" x2="922" y2="493.1111111111111" stroke="black" stroke-width="2.2"/>
+<rect x="1800" y="130" width="820" height="700" fill="none" stroke="#777" stroke-width="1.6" stroke-dasharray="7 5"/>
+<rect x="1800" y="104" width="119" height="26" fill="#eee" stroke="#777" stroke-width="1.2"/>
+<text x="1810" y="123" font-size="16" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">D · AUDIO</text>
+<rect x="1900" y="190" width="260" height="190" fill="white" stroke="black" stroke-width="2.6"/>
+<text x="2030.0" y="212" font-size="15" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">U3 INMP441 (mic)</text>
+<line x1="1874" y1="238.0" x2="1900" y2="238.0" stroke="black" stroke-width="2.2"/>
+<text x="1906" y="243.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">SCK</text>
+<path d="M 1874 230.0 L 1860 238.0 L 1874 246.0" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1854" y="243.0" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">MIC_SCK</text>
+<line x1="1874" y1="281.3333333333333" x2="1900" y2="281.3333333333333" stroke="black" stroke-width="2.2"/>
+<text x="1906" y="286.3333333333333" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">WS</text>
+<path d="M 1874 273.3333333333333 L 1860 281.3333333333333 L 1874 289.3333333333333" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1854" y="286.3333333333333" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">MIC_WS</text>
+<line x1="1874" y1="324.6666666666667" x2="1900" y2="324.6666666666667" stroke="black" stroke-width="2.2"/>
+<text x="1906" y="329.6666666666667" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">SD</text>
+<path d="M 1874 316.6666666666667 L 1860 324.6666666666667 L 1874 332.6666666666667" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1854" y="329.6666666666667" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">MIC_SD</text>
+<line x1="1874" y1="368.0" x2="1900" y2="368.0" stroke="black" stroke-width="2.2"/>
+<text x="1906" y="373.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">L/R</text>
+<line x1="1874" y1="368.0" x2="1860" y2="368.0" stroke="black" stroke-width="2.2"/>
+<line x1="1860" y1="368.0" x2="1860" y2="380.0" stroke="black" stroke-width="2.2"/>
+<line x1="1846" y1="380.0" x2="1874" y2="380.0" stroke="black" stroke-width="2.2"/>
+<line x1="1851" y1="386.0" x2="1869" y2="386.0" stroke="black" stroke-width="2.2"/>
+<line x1="1856" y1="392.0" x2="1864" y2="392.0" stroke="black" stroke-width="2.2"/>
+<text x="1900" y="405" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">L/R hard-wired to GND (required)</text>
+<line x1="2030" y1="190" x2="2030" y2="168" stroke="black" stroke-width="2.2"/>
+<circle cx="2030" cy="168" r="4" fill="black"/>
+<rect x="1932" y="159" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="1960" y="154" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">R20</text>
+<text x="1960" y="194" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">10 Ω</text>
+<line x1="1932" y1="168" x2="1916" y2="168" stroke="black" stroke-width="2.2"/>
+<line x1="1916" y1="168" x2="1916" y2="154" stroke="black" stroke-width="2.2"/>
+<line x1="1906" y1="154" x2="1926" y2="154" stroke="black" stroke-width="2.2"/>
+<text x="1916" y="148" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">+3V3</text>
+<line x1="2140" y1="168" x2="2140" y2="174" stroke="black" stroke-width="2.2"/>
+<line x1="2129" y1="174" x2="2151" y2="174" stroke="black" stroke-width="2.2"/>
+<line x1="2129" y1="180" x2="2151" y2="180" stroke="black" stroke-width="2.2"/>
+<line x1="2140" y1="180" x2="2140" y2="186" stroke="black" stroke-width="2.2"/>
+<text x="2155" y="181" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">C20 10µF + C21 100nF</text>
+<line x1="2030" y1="168" x2="2140" y2="168" stroke="black" stroke-width="2.2"/>
+<line x1="2140" y1="186" x2="2140" y2="198" stroke="black" stroke-width="2.2"/>
+<line x1="2126" y1="198" x2="2154" y2="198" stroke="black" stroke-width="2.2"/>
+<line x1="2131" y1="204" x2="2149" y2="204" stroke="black" stroke-width="2.2"/>
+<line x1="2136" y1="210" x2="2144" y2="210" stroke="black" stroke-width="2.2"/>
+<text x="1900" y="425" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">(alt part if EOL: Knowles SPH0645LM4H-B)</text>
+<rect x="1900" y="440" width="260" height="240" fill="white" stroke="black" stroke-width="2.6"/>
+<text x="2030.0" y="462" font-size="15" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">U2 MAX98357A (amp)</text>
+<line x1="1874" y1="488.0" x2="1900" y2="488.0" stroke="black" stroke-width="2.2"/>
+<text x="1906" y="493.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">BCLK</text>
+<path d="M 1874 480.0 L 1860 488.0 L 1874 496.0" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1854" y="493.0" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">AMP_BCLK</text>
+<line x1="1874" y1="533.0" x2="1900" y2="533.0" stroke="black" stroke-width="2.2"/>
+<text x="1906" y="538.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">LRC</text>
+<path d="M 1874 525.0 L 1860 533.0 L 1874 541.0" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1854" y="538.0" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">AMP_LRC</text>
+<line x1="1874" y1="578.0" x2="1900" y2="578.0" stroke="black" stroke-width="2.2"/>
+<text x="1906" y="583.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">DIN</text>
+<path d="M 1874 570.0 L 1860 578.0 L 1874 586.0" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1854" y="583.0" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">AMP_DIN</text>
+<line x1="1874" y1="623.0" x2="1900" y2="623.0" stroke="black" stroke-width="2.2"/>
+<text x="1906" y="628.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">SD_MODE</text>
+<path d="M 1874 615.0 L 1860 623.0 L 1874 631.0" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="1854" y="628.0" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">AMP_MUTE</text>
+<line x1="1874" y1="668.0" x2="1900" y2="668.0" stroke="black" stroke-width="2.2"/>
+<text x="1906" y="673.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">GAIN</text>
+<line x1="2160" y1="488.0" x2="2186" y2="488.0" stroke="black" stroke-width="2.2"/>
+<text x="2154" y="493.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">OUT+</text>
+<line x1="2160" y1="668.0" x2="2186" y2="668.0" stroke="black" stroke-width="2.2"/>
+<text x="2154" y="673.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">OUT-</text>
+<line x1="2030" y1="440" x2="2030" y2="416" stroke="black" stroke-width="2.2"/>
+<circle cx="2030" cy="416" r="4" fill="black"/>
+<line x1="2030" y1="416" x2="1980" y2="416" stroke="black" stroke-width="2.2"/>
+<line x1="1980" y1="416" x2="1980" y2="402" stroke="black" stroke-width="2.2"/>
+<line x1="1970" y1="402" x2="1990" y2="402" stroke="black" stroke-width="2.2"/>
+<text x="1980" y="396" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">+3V3</text>
+<line x1="2140" y1="416" x2="2140" y2="422" stroke="black" stroke-width="2.2"/>
+<line x1="2129" y1="422" x2="2151" y2="422" stroke="black" stroke-width="2.2"/>
+<line x1="2129" y1="428" x2="2151" y2="428" stroke="black" stroke-width="2.2"/>
+<line x1="2140" y1="428" x2="2140" y2="434" stroke="black" stroke-width="2.2"/>
+<text x="2155" y="429" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">C30 100nF + C31 22µF + C32 330µF</text>
+<line x1="2030" y1="416" x2="2140" y2="416" stroke="black" stroke-width="2.2"/>
+<line x1="2140" y1="434" x2="2140" y2="446" stroke="black" stroke-width="2.2"/>
+<line x1="2126" y1="446" x2="2154" y2="446" stroke="black" stroke-width="2.2"/>
+<line x1="2131" y1="452" x2="2149" y2="452" stroke="black" stroke-width="2.2"/>
+<line x1="2136" y1="458" x2="2144" y2="458" stroke="black" stroke-width="2.2"/>
+<rect x="1804" y="659.0" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="1832" y="654.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">R30</text>
+<text x="1832" y="694.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">gain-set</text>
+<line x1="1804" y1="668.0" x2="1788" y2="668.0" stroke="black" stroke-width="2.2"/>
+<text x="1782" y="673.0" font-size="12" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">value from SPL test:</text>
+<text x="1782" y="688.0" font-size="12" font-family="Arial,Helvetica,sans-serif" text-anchor="end" fill="black">0 dBFS ≤ 78 dB @ 50 cm</text>
+<rect x="2216" y="479.0" width="44" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="2238" y="474.0" font-size="12" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">FB1</text>
+<rect x="2216" y="659.0" width="44" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="2238" y="694.0" font-size="12" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">FB2</text>
+<line x1="2260" y1="488.0" x2="2306" y2="488.0" stroke="black" stroke-width="2.2"/>
+<line x1="2260" y1="668.0" x2="2306" y2="668.0" stroke="black" stroke-width="2.2"/>
+<line x1="2306" y1="488.0" x2="2306" y2="668.0" stroke="black" stroke-width="2.2"/>
+<rect x="2306" y="560.0" width="20" height="36" fill="white" stroke="black" stroke-width="2.2"/>
+<path d="M 2326 560.0 L 2358 538.0 L 2358 618.0 L 2326 596.0 Z" fill="none" stroke="black" stroke-width="2.2"/>
+<text x="2336" y="642.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">LS1  50 mm · 8 Ω · ≥88 dB/W/m</text>
+<text x="2336" y="658.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">sealed 50–100 cm³ chamber</text>
+<rect x="900" y="900" width="820" height="330" fill="none" stroke="#777" stroke-width="1.6" stroke-dasharray="7 5"/>
+<rect x="900" y="874" width="570" height="26" fill="#eee" stroke="#777" stroke-width="1.2"/>
+<text x="910" y="893" font-size="16" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">E · microSD (internal socket — child cannot reach)</text>
+<rect x="1030" y="960" width="300" height="230" fill="white" stroke="black" stroke-width="2.6"/>
+<text x="1180.0" y="982" font-size="15" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">J2 microSD — Molex 5031821852 (push-pull)</text>
+<line x1="1004" y1="1008.0" x2="1030" y2="1008.0" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="1013.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">CS</text>
+<path d="M 1004 1000.0 L 990 1008.0 L 1004 1016.0" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="984" y="1013.0" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">SD_CS</text>
+<line x1="1004" y1="1050.5" x2="1030" y2="1050.5" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="1055.5" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">CMD/MOSI</text>
+<path d="M 1004 1042.5 L 990 1050.5 L 1004 1058.5" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="984" y="1055.5" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">SD_MOSI</text>
+<line x1="1004" y1="1093.0" x2="1030" y2="1093.0" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="1098.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">CLK</text>
+<path d="M 1004 1085.0 L 990 1093.0 L 1004 1101.0" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="984" y="1098.0" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">SD_SCK</text>
+<line x1="1004" y1="1135.5" x2="1030" y2="1135.5" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="1140.5" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">DAT0/MISO</text>
+<path d="M 1004 1127.5 L 990 1135.5 L 1004 1143.5" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="984" y="1140.5" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">SD_MISO</text>
+<line x1="1004" y1="1178.0" x2="1030" y2="1178.0" stroke="black" stroke-width="2.2"/>
+<text x="1036" y="1183.0" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">CD</text>
+<path d="M 1004 1170.0 L 990 1178.0 L 1004 1186.0" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="984" y="1183.0" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">SD_CD</text>
+<line x1="1180" y1="960" x2="1180" y2="936" stroke="black" stroke-width="2.2"/>
+<line x1="1180" y1="936" x2="1180" y2="922" stroke="black" stroke-width="2.2"/>
+<line x1="1170" y1="922" x2="1190" y2="922" stroke="black" stroke-width="2.2"/>
+<text x="1180" y="916" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">+3V3</text>
+<line x1="1320" y1="940" x2="1320" y2="946" stroke="black" stroke-width="2.2"/>
+<line x1="1309" y1="946" x2="1331" y2="946" stroke="black" stroke-width="2.2"/>
+<line x1="1309" y1="952" x2="1331" y2="952" stroke="black" stroke-width="2.2"/>
+<line x1="1320" y1="952" x2="1320" y2="958" stroke="black" stroke-width="2.2"/>
+<text x="1335" y="953" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">C40 10µF + 100nF at the socket</text>
+<line x1="1180" y1="942" x2="1320" y2="942" stroke="black" stroke-width="2.2"/>
+<line x1="1320" y1="958" x2="1320" y2="970" stroke="black" stroke-width="2.2"/>
+<line x1="1306" y1="970" x2="1334" y2="970" stroke="black" stroke-width="2.2"/>
+<line x1="1311" y1="976" x2="1329" y2="976" stroke="black" stroke-width="2.2"/>
+<line x1="1316" y1="982" x2="1324" y2="982" stroke="black" stroke-width="2.2"/>
+<line x1="1180" y1="1190" x2="1180" y2="1212" stroke="black" stroke-width="2.2"/>
+<line x1="1180" y1="1212" x2="1180" y2="1224" stroke="black" stroke-width="2.2"/>
+<line x1="1166" y1="1224" x2="1194" y2="1224" stroke="black" stroke-width="2.2"/>
+<line x1="1171" y1="1230" x2="1189" y2="1230" stroke="black" stroke-width="2.2"/>
+<line x1="1176" y1="1236" x2="1184" y2="1236" stroke="black" stroke-width="2.2"/>
+<text x="1400" y="1030" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">R40–R43: 33 Ω series in each signal line</text>
+<text x="1400" y="1055" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">R44–R48: 10 kΩ → +3V3 pull-ups on</text>
+<text x="1400" y="1080" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">CS, CMD, DAT0, DAT1, DAT2</text>
+<text x="1400" y="1105" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">(floating DAT1/2 can flip the card out of SPI mode)</text>
+<text x="1400" y="1150" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">Card: 8 GB industrial/pSLC — consumer cards</text>
+<text x="1400" y="1166" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">corrupt on power-loss mid-write</text>
+<rect x="60" y="900" width="760" height="460" fill="none" stroke="#777" stroke-width="1.6" stroke-dasharray="7 5"/>
+<rect x="60" y="874" width="152" height="26" fill="#eee" stroke="#777" stroke-width="1.2"/>
+<text x="70" y="893" font-size="16" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">F · CONTROLS</text>
+<line x1="120" y1="960" x2="120" y2="946" stroke="black" stroke-width="2.2"/>
+<line x1="110" y1="946" x2="130" y2="946" stroke="black" stroke-width="2.2"/>
+<text x="120" y="940" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">+3V3</text>
+<rect x="120" y="951" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="148" y="946" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black"></text>
+<text x="148" y="986" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">10 kΩ</text>
+<circle cx="196" cy="960" r="4" fill="black"/>
+<rect x="216" y="951" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="244" y="946" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black"></text>
+<text x="244" y="986" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">1 kΩ</text>
+<line x1="196" y1="960" x2="216" y2="960" stroke="black" stroke-width="2.2"/>
+<line x1="272" y1="960" x2="300" y2="960" stroke="black" stroke-width="2.2"/>
+<path d="M 300 952 L 314 960 L 300 968" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="320" y="965" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">BTN_MAIN</text>
+<line x1="196" y1="960" x2="196" y2="982" stroke="black" stroke-width="2.2"/>
+<line x1="196" y1="982" x2="196" y2="988" stroke="black" stroke-width="2.2"/>
+<line x1="185" y1="988" x2="207" y2="988" stroke="black" stroke-width="2.2"/>
+<line x1="185" y1="994" x2="207" y2="994" stroke="black" stroke-width="2.2"/>
+<line x1="196" y1="994" x2="196" y2="1000" stroke="black" stroke-width="2.2"/>
+<text x="211" y="995" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">100nF</text>
+<line x1="196" y1="1000" x2="196" y2="1012" stroke="black" stroke-width="2.2"/>
+<line x1="182" y1="1012" x2="210" y2="1012" stroke="black" stroke-width="2.2"/>
+<line x1="187" y1="1018" x2="205" y2="1018" stroke="black" stroke-width="2.2"/>
+<line x1="192" y1="1024" x2="200" y2="1024" stroke="black" stroke-width="2.2"/>
+<line x1="196" y1="960" x2="196" y2="934" stroke="black" stroke-width="2.2"/>
+<line x1="196" y1="934" x2="300" y2="934" stroke="black" stroke-width="2.2"/>
+<line x1="300" y1="934" x2="330" y2="920" stroke="black" stroke-width="2.2"/>
+<line x1="330" y1="934" x2="344" y2="934" stroke="black" stroke-width="2.2"/>
+<line x1="344" y1="934" x2="344" y2="946" stroke="black" stroke-width="2.2"/>
+<line x1="330" y1="946" x2="358" y2="946" stroke="black" stroke-width="2.2"/>
+<line x1="335" y1="952" x2="353" y2="952" stroke="black" stroke-width="2.2"/>
+<line x1="340" y1="958" x2="348" y2="958" stroke="black" stroke-width="2.2"/>
+<text x="370" y="938" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">SW1  MAIN</text>
+<line x1="120" y1="1070" x2="120" y2="1056" stroke="black" stroke-width="2.2"/>
+<line x1="110" y1="1056" x2="130" y2="1056" stroke="black" stroke-width="2.2"/>
+<text x="120" y="1050" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">+3V3</text>
+<rect x="120" y="1061" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="148" y="1056" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black"></text>
+<text x="148" y="1096" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">10 kΩ</text>
+<circle cx="196" cy="1070" r="4" fill="black"/>
+<rect x="216" y="1061" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="244" y="1056" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black"></text>
+<text x="244" y="1096" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">1 kΩ</text>
+<line x1="196" y1="1070" x2="216" y2="1070" stroke="black" stroke-width="2.2"/>
+<line x1="272" y1="1070" x2="300" y2="1070" stroke="black" stroke-width="2.2"/>
+<path d="M 300 1062 L 314 1070 L 300 1078" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="320" y="1075" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">BTN_YES</text>
+<line x1="196" y1="1070" x2="196" y2="1092" stroke="black" stroke-width="2.2"/>
+<line x1="196" y1="1092" x2="196" y2="1098" stroke="black" stroke-width="2.2"/>
+<line x1="185" y1="1098" x2="207" y2="1098" stroke="black" stroke-width="2.2"/>
+<line x1="185" y1="1104" x2="207" y2="1104" stroke="black" stroke-width="2.2"/>
+<line x1="196" y1="1104" x2="196" y2="1110" stroke="black" stroke-width="2.2"/>
+<text x="211" y="1105" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">100nF</text>
+<line x1="196" y1="1110" x2="196" y2="1122" stroke="black" stroke-width="2.2"/>
+<line x1="182" y1="1122" x2="210" y2="1122" stroke="black" stroke-width="2.2"/>
+<line x1="187" y1="1128" x2="205" y2="1128" stroke="black" stroke-width="2.2"/>
+<line x1="192" y1="1134" x2="200" y2="1134" stroke="black" stroke-width="2.2"/>
+<line x1="196" y1="1070" x2="196" y2="1044" stroke="black" stroke-width="2.2"/>
+<line x1="196" y1="1044" x2="300" y2="1044" stroke="black" stroke-width="2.2"/>
+<line x1="300" y1="1044" x2="330" y2="1030" stroke="black" stroke-width="2.2"/>
+<line x1="330" y1="1044" x2="344" y2="1044" stroke="black" stroke-width="2.2"/>
+<line x1="344" y1="1044" x2="344" y2="1056" stroke="black" stroke-width="2.2"/>
+<line x1="330" y1="1056" x2="358" y2="1056" stroke="black" stroke-width="2.2"/>
+<line x1="335" y1="1062" x2="353" y2="1062" stroke="black" stroke-width="2.2"/>
+<line x1="340" y1="1068" x2="348" y2="1068" stroke="black" stroke-width="2.2"/>
+<text x="370" y="1048" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">SW2  YES (green)</text>
+<line x1="120" y1="1180" x2="120" y2="1166" stroke="black" stroke-width="2.2"/>
+<line x1="110" y1="1166" x2="130" y2="1166" stroke="black" stroke-width="2.2"/>
+<text x="120" y="1160" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">+3V3</text>
+<rect x="120" y="1171" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="148" y="1166" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black"></text>
+<text x="148" y="1206" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">10 kΩ</text>
+<circle cx="196" cy="1180" r="4" fill="black"/>
+<rect x="216" y="1171" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="244" y="1166" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black"></text>
+<text x="244" y="1206" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">1 kΩ</text>
+<line x1="196" y1="1180" x2="216" y2="1180" stroke="black" stroke-width="2.2"/>
+<line x1="272" y1="1180" x2="300" y2="1180" stroke="black" stroke-width="2.2"/>
+<path d="M 300 1172 L 314 1180 L 300 1188" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="320" y="1185" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">BTN_NO</text>
+<line x1="196" y1="1180" x2="196" y2="1202" stroke="black" stroke-width="2.2"/>
+<line x1="196" y1="1202" x2="196" y2="1208" stroke="black" stroke-width="2.2"/>
+<line x1="185" y1="1208" x2="207" y2="1208" stroke="black" stroke-width="2.2"/>
+<line x1="185" y1="1214" x2="207" y2="1214" stroke="black" stroke-width="2.2"/>
+<line x1="196" y1="1214" x2="196" y2="1220" stroke="black" stroke-width="2.2"/>
+<text x="211" y="1215" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">100nF</text>
+<line x1="196" y1="1220" x2="196" y2="1232" stroke="black" stroke-width="2.2"/>
+<line x1="182" y1="1232" x2="210" y2="1232" stroke="black" stroke-width="2.2"/>
+<line x1="187" y1="1238" x2="205" y2="1238" stroke="black" stroke-width="2.2"/>
+<line x1="192" y1="1244" x2="200" y2="1244" stroke="black" stroke-width="2.2"/>
+<line x1="196" y1="1180" x2="196" y2="1154" stroke="black" stroke-width="2.2"/>
+<line x1="196" y1="1154" x2="300" y2="1154" stroke="black" stroke-width="2.2"/>
+<line x1="300" y1="1154" x2="330" y2="1140" stroke="black" stroke-width="2.2"/>
+<line x1="330" y1="1154" x2="344" y2="1154" stroke="black" stroke-width="2.2"/>
+<line x1="344" y1="1154" x2="344" y2="1166" stroke="black" stroke-width="2.2"/>
+<line x1="330" y1="1166" x2="358" y2="1166" stroke="black" stroke-width="2.2"/>
+<line x1="335" y1="1172" x2="353" y2="1172" stroke="black" stroke-width="2.2"/>
+<line x1="340" y1="1178" x2="348" y2="1178" stroke="black" stroke-width="2.2"/>
+<text x="370" y="1158" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">SW3  NO (red)</text>
+<line x1="560" y1="960" x2="560" y2="946" stroke="black" stroke-width="2.2"/>
+<line x1="550" y1="946" x2="570" y2="946" stroke="black" stroke-width="2.2"/>
+<text x="560" y="940" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">+3V3</text>
+<rect x="551" y="970" width="18" height="70" fill="white" stroke="black" stroke-width="2"/>
+<line x1="560" y1="960" x2="560" y2="970" stroke="black" stroke-width="2.2"/>
+<line x1="560" y1="1040" x2="560" y2="1058" stroke="black" stroke-width="2.2"/>
+<line x1="560" y1="1058" x2="560" y2="1070" stroke="black" stroke-width="2.2"/>
+<line x1="546" y1="1070" x2="574" y2="1070" stroke="black" stroke-width="2.2"/>
+<line x1="551" y1="1076" x2="569" y2="1076" stroke="black" stroke-width="2.2"/>
+<line x1="556" y1="1082" x2="564" y2="1082" stroke="black" stroke-width="2.2"/>
+<path d="M 569 1005 L 594 1005" stroke="black" stroke-width="2" fill="none"/>
+<path d="M 588 999 L 594 1005 L 588 1011" stroke="black" stroke-width="2" fill="none"/>
+<text x="560" y="1090" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">RV1 10 kΩ lin DETENTED</text>
+<text x="560" y="1106" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">Bourns PTV09A-4020F-B103</text>
+<rect x="600" y="996" width="56" height="18" fill="white" stroke="black" stroke-width="2"/>
+<text x="628" y="991" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">R</text>
+<text x="628" y="1031" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">1 kΩ</text>
+<circle cx="676" cy="1005" r="4" fill="black"/>
+<line x1="656" y1="1005" x2="676" y2="1005" stroke="black" stroke-width="2.2"/>
+<line x1="676" y1="1005" x2="700" y2="1005" stroke="black" stroke-width="2.2"/>
+<path d="M 700 997 L 714 1005 L 700 1013" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="720" y="1010" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">VOL_ADC</text>
+<line x1="676" y1="1005" x2="676" y2="1027" stroke="black" stroke-width="2.2"/>
+<line x1="676" y1="1027" x2="676" y2="1033" stroke="black" stroke-width="2.2"/>
+<line x1="665" y1="1033" x2="687" y2="1033" stroke="black" stroke-width="2.2"/>
+<line x1="665" y1="1039" x2="687" y2="1039" stroke="black" stroke-width="2.2"/>
+<line x1="676" y1="1039" x2="676" y2="1045" stroke="black" stroke-width="2.2"/>
+<text x="691" y="1040" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">100nF</text>
+<line x1="676" y1="1045" x2="676" y2="1057" stroke="black" stroke-width="2.2"/>
+<line x1="662" y1="1057" x2="690" y2="1057" stroke="black" stroke-width="2.2"/>
+<line x1="667" y1="1063" x2="685" y2="1063" stroke="black" stroke-width="2.2"/>
+<line x1="672" y1="1069" x2="680" y2="1069" stroke="black" stroke-width="2.2"/>
+<line x1="560" y1="1180" x2="560" y2="1166" stroke="black" stroke-width="2.2"/>
+<line x1="550" y1="1166" x2="570" y2="1166" stroke="black" stroke-width="2.2"/>
+<text x="560" y="1160" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">+3V3</text>
+<rect x="520" y="1190" width="150" height="70" fill="white" stroke="black" stroke-width="2.2"/>
+<text x="595" y="1215" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" font-weight="bold" fill="black">D1 WS2812B</text>
+<text x="595" y="1235" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="black">status LED</text>
+<line x1="560" y1="1180" x2="560" y2="1190" stroke="black" stroke-width="2.2"/>
+<line x1="520" y1="1225" x2="480" y2="1225" stroke="black" stroke-width="2.2"/>
+<path d="M 480 1217 L 466 1225 L 480 1233" fill="none" stroke="black" stroke-width="1.8"/>
+<text x="460" y="1230" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="end" font-weight="bold" fill="black">LED_DIN</text>
+<line x1="595" y1="1260" x2="595" y2="1280" stroke="black" stroke-width="2.2"/>
+<line x1="595" y1="1280" x2="595" y2="1292" stroke="black" stroke-width="2.2"/>
+<line x1="581" y1="1292" x2="609" y2="1292" stroke="black" stroke-width="2.2"/>
+<line x1="586" y1="1298" x2="604" y2="1298" stroke="black" stroke-width="2.2"/>
+<line x1="591" y1="1304" x2="599" y2="1304" stroke="black" stroke-width="2.2"/>
+<text x="690" y="1225" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">via U8 74LVC1T45 shifter</text>
+<text x="690" y="1241" font-size="13" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">on 5 V builds only</text>
+<rect x="1800" y="900" width="820" height="460" fill="none" stroke="#777" stroke-width="1.6" stroke-dasharray="7 5"/>
+<rect x="1800" y="874" width="460" height="26" fill="#eee" stroke="#777" stroke-width="1.2"/>
+<text x="1810" y="893" font-size="16" font-family="Arial,Helvetica,sans-serif" text-anchor="start" font-weight="bold" fill="black">G · DESIGN RULES (why, in one line each)</text>
+<text x="1830" y="950" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">•  Buck-boost is mandatory: every battery chemistry crosses 3.3 V while discharging.</text>
+<text x="1830" y="990" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">•  No 5 V rail anywhere IF speaker measures ≥88 dB/W/m — sensitivity and rail are one decision.</text>
+<text x="1830" y="1030" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">•  The old "SD needs 5 V" was the hobby module's own regulator dropout — SD is a 3.3 V part.</text>
+<text x="1830" y="1070" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">•  Main button on IO18, never IO0: a child holding IO0 through power-on = download mode = "dead toy".</text>
+<text x="1830" y="1110" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">•  R30 (amp GAIN) is the hardware loudness ceiling — set by measurement, EN 71-1 limit 80 dB @ 50 cm.</text>
+<text x="1830" y="1150" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">•  Star ground: speaker return never shares copper with mic ground.</text>
+<text x="1830" y="1190" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">•  Antenna keep-out: no copper, no battery, no speaker magnet near the module antenna.</text>
+<text x="1830" y="1230" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">•  ADC1 only for the volume pot — ADC2 pins are dead while Wi-Fi is active.</text>
+<text x="1830" y="1270" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">•  No coin cell anywhere, by design (US toy-safety rule 16 CFR 1263).</text>
+<text x="1830" y="1310" font-size="14" font-family="Arial,Helvetica,sans-serif" text-anchor="start" fill="black">•  Net labels (▷ NAME) connect all same-named points — this is how EDA schematics avoid wire spaghetti.</text>
+</svg>
