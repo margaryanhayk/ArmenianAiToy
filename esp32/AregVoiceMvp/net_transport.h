@@ -34,6 +34,12 @@
 // because the live server 301s http -> https.
 bool areg_http_begin(HTTPClient &http, const String &url);
 
+// Hard-stop the shared TLS client. For error recovery in long download
+// bursts: when a keep-alive connection wedges (server closed it, socket
+// churn), the next begin() on a stopped client performs a clean fresh
+// handshake instead of inheriting a dead connection.
+void areg_net_reset();
+
 // True when this build talks TLS without verifying the server identity.
 bool areg_tls_is_insecure();
 

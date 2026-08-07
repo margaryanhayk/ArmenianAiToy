@@ -318,30 +318,46 @@ bool download_file_verified(const char *label, const char *url,
         SD.remove(temp_path);  // no resume in this slice — fresh .part
     }
 
-    HTTPClient dl;
-    if (!areg_http_begin(dl, resolve_url(url))) {
-        story_fail(label, "download_begin_failed");
-        return false;
-    }
-    // Field fix (2026-08-07, 92-clip games sync on the live toy): without
-    // reuse, every download closed and re-opened the shared TLS connection
-    // — one TCP+TLS handshake per file. ~30 files in, connects started
-    // failing intermittently (socket churn / TIME_WAIT exhaustion), and a
-    // run of slow failed connects — GET() blocks through connect+handshake
-    // WITHOUT feeding the watchdog — accumulated past the 60 s task
-    // watchdog: reset_reason=6/TASK_WDT, reboot loop. setReuse keeps the
-    // connection across end() (every content URL hits the same origin, so
-    // the whole sync now costs ONE handshake), and the wdt reset brackets
-    // the one remaining blocking phase.
+    // Field fix, second iteration (2026-08-07, 92-clip games sync on the
+    // live toy). Iteration 1 (setReuse on a per-call HTTPClient) still
+    // died after ~14 files: the LOCAL HTTPClient was destroyed per call,
+    // so its keep-alive never survived and every file paid a fresh
+    // TCP+TLS handshake — socket churn until connects failed. This
+    // object is now function-static: ONE client, ONE connection for the
+    // whole burst (every content URL hits the same origin). The wdt
+    // resets bracket the only phase that blocks without feeding it —
+    // that half of the fix already stopped the TASK_WDT reboot loop in
+    // the field (games summary line reached for the first time).
+    // On a connection-level failure (< 0), the wedged shared TLS client
+    // is hard-stopped and ONE retry runs on a clean handshake — the
+    // recovery Railway's idle-close otherwise turns into a failed file.
+    static HTTPClient dl;
     dl.setReuse(true);
-    voice_add_device_auth_headers(dl);
-    dl.setConnectTimeout(AREG_HTTP_CONNECT_MS);
-    dl.setTimeout(AREG_HTTP_READ_MS);
-    esp_task_wdt_reset();
-    const int dstatus = dl.GET();
-    esp_task_wdt_reset();
-    if (dstatus != 200) {
+    int dstatus = -1;
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        if (!areg_http_begin(dl, resolve_url(url))) {
+            story_fail(label, "download_begin_failed");
+            return false;
+        }
+        voice_add_device_auth_headers(dl);
+        dl.setConnectTimeout(AREG_HTTP_CONNECT_MS);
+        dl.setTimeout(AREG_HTTP_READ_MS);
+        esp_task_wdt_reset();
+        dstatus = dl.GET();
+        esp_task_wdt_reset();
+        if (dstatus == 200) {
+            break;
+        }
         dl.end();
+        if (dstatus >= 0) {
+            break;      // real HTTP status (404/429/...) — retrying won't help
+        }
+        Serial.printf("[content-sync] %s connect failed (%d) — resetting TLS, retrying\n",
+                      label, dstatus);
+        areg_net_reset();
+        delay(250);
+    }
+    if (dstatus != 200) {
         Serial.printf("[content-sync] %s download status=%d\n", label, dstatus);
         story_fail(label, "download_failed");
         return false;

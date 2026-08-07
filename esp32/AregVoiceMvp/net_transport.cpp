@@ -83,6 +83,10 @@ void areg_transport_log_policy() {
     Serial.flush();
 }
 
+void areg_net_reset() {
+    tls_client().stop();
+}
+
 bool areg_http_begin(HTTPClient &http, const String &url) {
     // The live server 301s http -> https (HSTS). Following redirects keeps
     // a stale http:// URL working instead of failing with a bare 301 that
