@@ -1,6 +1,6 @@
 # Shopping list — ONE toy (rev A, AA-battery build)
 
-Matches the full schematic (`schematic/areg-full-schematic.svg`).
+Matches the full schematic (`schematic/areg-schematic-pro.svg`).
 Quantities are for one toy plus nothing spare — order ×1.5 for a
 prototype run because you WILL burn parts.
 
