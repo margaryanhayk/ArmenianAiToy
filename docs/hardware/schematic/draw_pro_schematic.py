@@ -93,7 +93,7 @@ line(bx, by-64, bx, by-80); line(bx, by-80, bx+70, by-80)
 S.append(f'<rect x="{bx+70}" y="{by-98}" width="120" height="36" fill="white" stroke="black" stroke-width="2.2"/>')
 text(bx+130, by-75, 'Q1 DMG2301L', 13); text(bx+130, by-104, 'reverse block (P-FET)', 13)
 line(bx+190, by-80, bx+250, by-80); dot(bx+250, by-80)
-cap_v(bx+250, by-72, 'C10 10µF'); line(bx+250, by-80, bx+250, by-72); gnd(bx+250, by-54+18)
+cap_v(bx+250, by-72, 'C10\n10µF'); line(bx+250, by-80, bx+250, by-72); gnd(bx+250, by-54+18)
 line(bx+250, by-80, bx+310, by-80)
 # U4
 u4 = icbox(bx+310, by-140, 190, 120, 'U4 TPS63802', [('VIN', None)], [('VOUT', None)])
@@ -110,15 +110,17 @@ ox, oy = u4['VOUT']
 line(ox, oy, ox+40, oy); dot(ox+40, oy)
 cap_v(ox+40, oy, 'C11 100µF'); gnd(ox+40, oy+18)
 line(ox+40, oy, ox+110, oy)
-vdd(ox+110, oy); text(ox+150, oy+5, '→ every +3V3 flag on this sheet', 13, 'start')
+vdd(ox+110, oy); text(ox+110, oy+25, '→ every +3V3 flag\non this sheet', 12)
 
 # ---------------- B. USB-C (bottom-left) ----------------
 frame(60, 500, 760, 330, 'B · USB-C input and protection (charging builds)')
 j1 = icbox(120, 560, 150, 210, 'J1 USB-C', [], [('VBUS', None), ('CC1', None), ('CC2', None), ('GND', None)])
 x, y = j1['GND']; line(x, y, x+14, y); gnd(x+14, y)
-x, y = j1['CC1']; res_h(x+8, y, 'R60', '5.1 kΩ'); line(x+64, y, x+80, y); gnd(x+80, y)
-x, y = j1['CC2']; res_h(x+8, y, 'R61', '5.1 kΩ'); line(x+64, y, x+80, y); gnd(x+80, y)
-text(x+150, y+8, '(two separate resistors —\nnever one shared)', 13, 'start')
+x, y = j1['CC1']; res_h(x+8, y, '', ''); line(x+64, y, x+90, y); gnd(x+90, y)
+text(x+8, y+30, 'R60  5.1 kΩ', 13, 'start')
+x, y = j1['CC2']; res_h(x+8, y, '', ''); line(x+64, y, x+90, y); gnd(x+90, y)
+text(x+8, y+30, 'R61  5.1 kΩ', 13, 'start')
+text(x+132, y+5, '(two separate resistors — never one shared)', 13, 'start')
 x, y = j1['VBUS']
 S.append(f'<rect x="{x+10}" y="{y-9}" width="64" height="18" fill="white" stroke="black" stroke-width="2"/>')
 text(x+42, y-14, 'F1 PTC 0.5 A', 13)
@@ -126,15 +128,16 @@ line(x+74, y, x+120, y); dot(x+120, y)
 line(x+120, y, x+120, y+34)
 S.append(f'<path d="M {x+108} {y+34} L {x+132} {y+34} L {x+120} {y+56} Z" fill="none" stroke="black" stroke-width="2"/>')
 line(x+108, y+56, x+132, y+56); gnd(x+120, y+58)
-text(x+150, y+44, 'D60 SMAJ5.0A + U5 TPD4S014\n(surge + CC/D± ESD)', 13, 'start')
-line(x+120, y, x+180, y)
-u6 = icbox(x+180, y-40, 170, 80, 'U6 TPS22918', [('IN', None)], [('OUT', None)])
-text(x+265, y+22, 'soft-start switch', 13)
-ox2, oy2 = u6['OUT']; netflag(ox2, oy2, 'VSYS  → U4 VIN (or BQ24074 on Li-ion)', 'right')
+text(x+160, y+64, 'D60 SMAJ5.0A + U5 TPD4S014', 13, 'start')
+text(x+160, y+82, '(surge + CC/D± ESD)', 13, 'start')
+line(x+120, y, x+206, y)
+u6 = icbox(x+206, y-48, 180, 76, 'U6 TPS22918', [('IN', None)], [('OUT', None)])
+text(x+296, y+14, 'soft-start switch', 13)
+ox2, oy2 = u6['OUT']; netflag(ox2, oy2, 'VSYS → U4 VIN (or BQ24074 on Li-ion)', 'right')
 
 # ---------------- C. MCU (center) ----------------
 frame(900, 130, 820, 700, 'C · ESP32-S3 MCU')
-u1 = icbox(1030, 190, 560, 580, 'U1  ESP32-S3-WROOM-1-N16R8   (PCB antenna — keep-out: no copper / magnet / battery)',
+u1 = icbox(1030, 190, 560, 580, 'U1  ESP32-S3-WROOM-1-N16R8\n(PCB antenna — keep-out: no copper / magnet / battery)',
     [('EN', None), ('IO0', None), ('IO3', None), ('IO45', None), ('IO46', None),
      ('IO18', 'BTN_MAIN'), ('IO21', 'BTN_YES'), ('IO47', 'BTN_NO'), ('IO8', 'VOL_ADC'), ('IO48', 'LED_DIN')],
     [('IO4', 'MIC_SCK'), ('IO5', 'MIC_WS'), ('IO6', 'MIC_SD'),
@@ -142,12 +145,13 @@ u1 = icbox(1030, 190, 560, 580, 'U1  ESP32-S3-WROOM-1-N16R8   (PCB antenna — k
      ('IO10', 'SD_CS'), ('IO11', 'SD_MOSI'), ('IO12', 'SD_SCK'), ('IO13', 'SD_MISO'), ('IO9', 'SD_CD')])
 # 3V3 + decoupling at top
 line(1310, 190, 1310, 160); vdd(1310, 160)
-line(1310, 175, 1390, 175); cap_v(1390, 175, 'C1 22µF + C2 100nF  (≤3 mm from pin 2)'); gnd(1390, 193)
+line(1310, 175, 1650, 175); cap_v(1650, 175, ''); gnd(1650, 193)
+text(1635, 188, 'C1 22µF + C2 100nF  (≤3 mm from pin 2)', 13, 'end')
 # GND at bottom
 line(1310, 770, 1310, 795); gnd(1310, 795)
 # EN + straps
-x, y = u1['EN']; res_h(x-70, y, 'R1', '10 kΩ'); line(x-70, y, x-86, y); vdd(x-86, y)
-cap_v(x-8, y+6, 'C3 1µF'); line(x-8, y, x-8, y+6); gnd(x-8, y+24)
+x, y = u1['EN']; res_h(x-70, y, '', ''); text(x-30, y-14, 'R1  10 kΩ', 13); line(x-70, y, x-86, y); vdd(x-86, y)
+cap_v(x-8, y+6, ''); line(x-8, y, x-8, y+6); gnd(x-8, y+24); text(x-27, y+22, 'C3 1µF', 13, 'end')
 x, y = u1['IO0']; res_h(x-70, y, 'R2', '10 kΩ'); line(x-70, y, x-86, y); vdd(x-86, y); text(x-140, y+5, 'test pad only', 12, 'end')
 for pin, rn in [('IO3','R3'), ('IO45','R4'), ('IO46','R5')]:
     x, y = u1[pin]; res_h(x-70, y, rn, '10 kΩ'); line(x-70, y, x-86, y); gnd(x-86, y)
@@ -156,12 +160,13 @@ for pin, rn in [('IO3','R3'), ('IO45','R4'), ('IO46','R5')]:
 frame(1800, 130, 820, 700, 'D · AUDIO')
 mic = icbox(1900, 190, 260, 190, 'U3 INMP441 (mic)',
     [('SCK', 'MIC_SCK'), ('WS', 'MIC_WS'), ('SD', 'MIC_SD'), ('L/R', None)], [])
-x, y = mic['L/R']; line(x, y, x-14, y); gnd(x-14, y); text(1900, 405, 'L/R hard-wired to GND (required)', 13, 'start')
+x, y = mic['L/R']; line(x, y, x-14, y); gnd(x-14, y)
+text(2150, 340, 'L/R hard-wired to GND (required)', 12, 'end')
+text(2150, 358, '(alt part if EOL: Knowles SPH0645LM4H-B)', 12, 'end')
 # mic supply
 line(2030, 190, 2030, 168); dot(2030, 168)
-res_h(2030-98, 168, 'R20', '10 Ω'); line(2030-98, 168, 2030-114, 168); vdd(2030-114, 168)
+res_h(2030-98, 168, '', ''); text(1975, 154, 'R20  10 Ω', 13); line(2030-98, 168, 2030-114, 168); vdd(2030-114, 168)
 cap_v(2140, 168, 'C20 10µF + C21 100nF'); line(2030, 168, 2140, 168); gnd(2140, 186)
-text(1900, 425, '(alt part if EOL: Knowles SPH0645LM4H-B)', 13, 'start')
 
 amp = icbox(1900, 440, 260, 240, 'U2 MAX98357A (amp)',
     [('BCLK', 'AMP_BCLK'), ('LRC', 'AMP_LRC'), ('DIN', 'AMP_DIN'), ('SD_MODE', 'AMP_MUTE'), ('GAIN', None)],
@@ -171,7 +176,7 @@ line(2030, 440, 2030, 416); dot(2030, 416)
 line(2030, 416, 1980, 416); vdd(1980, 416)
 cap_v(2140, 416, 'C30 100nF + C31 22µF + C32 330µF'); line(2030, 416, 2140, 416); gnd(2140, 434)
 x, y = amp['GAIN']; res_h(x-70, y, 'R30', 'gain-set'); line(x-70, y, x-86, y)
-text(x-92, y+5, 'value from SPL test:\n0 dBFS ≤ 78 dB @ 50 cm', 12, 'end')
+text(2030, 706, 'R30 value from SPL test:  0 dBFS ≤ 78 dB @ 50 cm', 12)
 # speaker
 xp, yp = amp['OUT+']; xn, yn = amp['OUT-']
 S.append(f'<rect x="{xp+30}" y="{yp-9}" width="44" height="18" fill="white" stroke="black" stroke-width="2"/>'); text(xp+52, yp-14, 'FB1', 12)
@@ -185,10 +190,10 @@ text(sx+30, sy+64, 'LS1  50 mm · 8 Ω · ≥88 dB/W/m\nsealed 50–100 cm³ cha
 
 # ---------------- E. microSD (bottom center) ----------------
 frame(900, 900, 820, 330, 'E · microSD (internal socket — child cannot reach)')
-j2 = icbox(1030, 960, 300, 230, 'J2 microSD — Molex 5031821852 (push-pull)',
+j2 = icbox(1030, 960, 300, 230, 'J2 microSD\nMolex 5031821852 (push-pull)',
     [('CS', 'SD_CS'), ('CMD/MOSI', 'SD_MOSI'), ('CLK', 'SD_SCK'), ('DAT0/MISO', 'SD_MISO'), ('CD', 'SD_CD')], [])
 line(1180, 960, 1180, 936); vdd(1180, 936)
-cap_v(1320, 940, 'C40 10µF + 100nF at the socket'); line(1180, 942, 1320, 942); gnd(1320, 958)
+cap_v(1360, 942, 'C40 10µF + 100nF at the socket'); line(1180, 942, 1360, 942); gnd(1360, 960)
 line(1180, 1190, 1180, 1212); gnd(1180, 1212)
 text(1400, 1030, 'R40–R43: 33 Ω series in each signal line', 14, 'start')
 text(1400, 1055, 'R44–R48: 10 kΩ → +3V3 pull-ups on', 14, 'start')
@@ -217,7 +222,7 @@ S.append(f'<rect x="{551}" y="{970}" width="18" height="70" fill="white" stroke=
 line(560, 960, 560, 970); line(560, 1040, 560, 1058); gnd(560, 1058)
 S.append(f'<path d="M {569} {1005} L 594 1005" stroke="black" stroke-width="2" fill="none"/>')
 S.append(f'<path d="M 588 999 L 594 1005 L 588 1011" stroke="black" stroke-width="2" fill="none"/>')
-text(560, 1090, 'RV1 10 kΩ lin DETENTED\nBourns PTV09A-4020F-B103', 13)
+text(560, 1100, 'RV1 10 kΩ lin DETENTED\nBourns PTV09A-4020F-B103', 13)
 res_h(600, 1005, 'R', '1 kΩ'); dot(676, 1005); line(656, 1005, 676, 1005)
 line(676, 1005, 700, 1005); netflag(700, 1005, 'VOL_ADC', 'right')
 line(676, 1005, 676, 1027); cap_v(676, 1027, '100nF'); gnd(676, 1045)
