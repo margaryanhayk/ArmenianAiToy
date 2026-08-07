@@ -70,4 +70,19 @@
     <Content Include="story-audio\games\**\*.mp3" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!--
+    OTA firmware images shipped INSIDE the backend image, for the same
+    reason as story-audio above: GET /api/devices/firmware-image is
+    device-authed and streams from disk, so the .bin must exist next to
+    the app at runtime and must NOT be a public wwwroot file.
+    Unlike story-audio (resolved through ContentSync:AudioRoot, which is
+    app-relative), FirmwareUpdate:ImagePath is required to be ABSOLUTE by
+    DeviceController.GetFirmwareImage — so the deployment sets it by env
+    var (Railway: /app/firmware/areg-<ver>.bin; local bench: the full
+    Windows path). Copying it here is what makes that path exist.
+  -->
+  <ItemGroup>
+    <Content Include="firmware\*.bin" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
