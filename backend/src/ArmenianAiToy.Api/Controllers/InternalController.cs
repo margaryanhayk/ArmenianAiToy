@@ -731,6 +731,53 @@ public class InternalController : ControllerBase
         return Ok(new { commandId = cmd.Id, deviceId, type = cmd.Type, expiresAt = cmd.ExpiresAt });
     }
 
+    /// <summary>
+    /// Read this device's recent command rows — the operator half of the
+    /// enqueue endpoint above. Answers the two questions the OTA runbook
+    /// cannot answer without it: did the device ever POLL (Status leaves
+    /// Pending), and what did it ACK (Result / Error /
+    /// AckFirmwareVersion / AckDiagnosticsJson). A device that never polls
+    /// is running firmware without the OTA client, which is otherwise
+    /// indistinguishable from a device that is simply idle.
+    /// Read-only; newest first; no payload echo (an enqueued payload is
+    /// operator-supplied, not device data, and echoing it adds nothing).
+    /// </summary>
+    [HttpGet("devices/{deviceId:guid}/commands")]
+    public async Task<IActionResult> GetDeviceCommands(
+        Guid deviceId,
+        [FromQuery] int limit = 20,
+        CancellationToken ct = default)
+    {
+        if (limit < 1) return BadRequest(new { error = "limit must be >= 1." });
+        limit = Math.Min(limit, 100);
+
+        var deviceExists = await _db.Devices.AnyAsync(d => d.Id == deviceId, ct);
+        if (!deviceExists)
+            return NotFound(new { error = "Device not found." });
+
+        var rows = await _db.Set<DeviceCommand>()
+            .Where(c => c.DeviceId == deviceId)
+            .OrderByDescending(c => c.CreatedAt)
+            .Take(limit)
+            .Select(c => new
+            {
+                id = c.Id,
+                type = c.Type,
+                status = c.Status.ToString(),
+                createdAt = c.CreatedAt,
+                expiresAt = c.ExpiresAt,
+                sentAt = c.SentAt,
+                ackedAt = c.AckedAt,
+                result = c.Result,
+                error = c.Error,
+                ackFirmwareVersion = c.AckFirmwareVersion,
+                ackDiagnostics = c.AckDiagnosticsJson,
+            })
+            .ToListAsync(ct);
+
+        return Ok(new { deviceId, commands = rows });
+    }
+
     /// <summary>Owner recovery: set a parent's password (for a locked-out
     /// account when the reset-by-email flow isn't wired). Console-gated
     /// (fail-closed 404 unless an admin token is configured). Requires a
