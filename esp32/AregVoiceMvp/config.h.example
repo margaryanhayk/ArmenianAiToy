@@ -101,6 +101,35 @@
 #define AREG_STORY_RESUME_FUDGE_BYTES 8192
 #endif
 
+// --- Shout-it-out story pauses -------------------------------
+// Mid-story, Areg stops, invites the child to shout something, waits a
+// beat, and continues. Defaults live in story_pause.h; every value below
+// is optional and shown at its shipped setting. The FEATURE switch is not
+// here — it is the parent's own toggle, delivered on the content manifest
+// and cached in the SD index. There is deliberately no build-time way to
+// force pauses on for a device whose parent turned them off.
+//
+// Nothing is recorded during a pause: the mic stays off, no audio is
+// uploaded, no clip claims to have heard anything.
+//
+// #define AREG_STORY_PAUSE_HEAD_MS   45000UL  // never pause before this
+// #define AREG_STORY_PAUSE_TAIL_MS   30000UL  // never pause this close to the end
+// #define AREG_STORY_PAUSE_MIN_GAP_MS 45000UL // minimum spacing between two
+// #define AREG_STORY_PAUSE_BEAT_MS    3000UL  // the silent beat to shout into
+// #define AREG_STORY_PAUSE_MAX_PER_STORY 2    // hard ceiling per story
+//
+// Assumed narration byte rate, used only until a real one is measured
+// during the story. 24000 B/s = 192 kbps, the level Ship-StoryAudio.ps1
+// normalises the whole library to. Raise it only if the library's bitrate
+// rises — over-stating it moves pauses earlier (safe), under-stating it
+// moves them toward the ending (not safe).
+// #define AREG_STORY_PAUSE_BYTES_PER_SEC 24000UL
+//
+// Where the clips live and how many pairs exist. Changing these means the
+// content-sync config changed too; they are not free-form.
+// #define AREG_STORY_PAUSE_GAME_KEY "story-pauses"
+// #define AREG_STORY_PAUSE_VARIANTS 4
+
 // --- Device credentials (SECRET — fill in) -------------------
 // Get these once via POST /api/devices/register against the backend.
 // See README.md "First-run provisioning" for the curl invocation.

@@ -8,7 +8,10 @@
 
 #include <Arduino.h>
 
+#include "config.h"        // before story_pause.h: a bench override of a pause
+                           // knob must reach the test, not just the runtime
 #include "story_select.h"
+#include "story_pause.h"   // shout-it-out pause planning (pure half only)
 
 namespace {
 
@@ -485,6 +488,145 @@ void test_series_bounds_and_nulls() {
           "series_null_heard_array_tolerated");
 }
 
+// ---- shout-it-out story pauses (pure planning only) -----------------
+//
+// Only the arithmetic is testable here. Whether a pause SOUNDS right —
+// whether the beat is long enough for a four-year-old, whether the resume
+// line lands over silence — is a listening question, and whether the
+// estimated byte rate matches a real MP3 is a bench question. Both are
+// named in the not-covered note at the end of this file rather than
+// dressed up as assertions.
+
+// Bytes of a story that lasts `seconds` at the assumed library rate.
+uint32_t story_bytes_for(uint32_t seconds) {
+    return seconds * (uint32_t)AREG_STORY_PAUSE_BYTES_PER_SEC;
+}
+
+void test_pause_plan_long_story_gets_two() {
+    uint32_t at[AREG_STORY_PAUSE_MAX_PER_STORY];
+    const uint32_t four_min = story_bytes_for(240);
+    const int n = story_pause_plan(four_min, AREG_STORY_PAUSE_BYTES_PER_SEC,
+                                   at, AREG_STORY_PAUSE_MAX_PER_STORY);
+    check(n == 2, "pause_four_minute_story_plans_two");
+    check(at[0] < at[1], "pause_points_ascending");
+    // KEYSTONE — the two rules the feature exists to respect: never in the
+    // opening, never near the ending.
+    check(at[0] >= AREG_STORY_PAUSE_HEAD_MS, "pause_never_in_the_opening");
+    check(at[1] + AREG_STORY_PAUSE_TAIL_MS <= 240000UL, "pause_never_near_the_ending");
+    check(at[1] - at[0] >= AREG_STORY_PAUSE_MIN_GAP_MS, "pause_points_are_spaced");
+}
+
+void test_pause_plan_medium_story_gets_one() {
+    uint32_t at[AREG_STORY_PAUSE_MAX_PER_STORY];
+    // 2:00 — room for one pause that is neither too early nor too late,
+    // but not for two.
+    const int n = story_pause_plan(story_bytes_for(120),
+                                   AREG_STORY_PAUSE_BYTES_PER_SEC,
+                                   at, AREG_STORY_PAUSE_MAX_PER_STORY);
+    check(n == 1, "pause_two_minute_story_plans_one");
+    check(at[0] >= AREG_STORY_PAUSE_HEAD_MS
+              && at[0] + AREG_STORY_PAUSE_TAIL_MS <= 120000UL,
+          "pause_single_point_inside_the_guards");
+}
+
+void test_pause_plan_short_story_gets_none() {
+    uint32_t at[AREG_STORY_PAUSE_MAX_PER_STORY];
+    // 1:40 — head + tail already eat 75 s, leaving under one minimum gap.
+    check(story_pause_plan(story_bytes_for(100), AREG_STORY_PAUSE_BYTES_PER_SEC,
+                           at, AREG_STORY_PAUSE_MAX_PER_STORY) == 0,
+          "pause_short_story_plans_none");
+    // A story shorter than the guards themselves must not underflow into a
+    // huge window.
+    check(story_pause_plan(story_bytes_for(30), AREG_STORY_PAUSE_BYTES_PER_SEC,
+                           at, AREG_STORY_PAUSE_MAX_PER_STORY) == 0,
+          "pause_tiny_story_plans_none");
+}
+
+void test_pause_plan_bounds_and_nulls() {
+    uint32_t at[AREG_STORY_PAUSE_MAX_PER_STORY];
+    check(story_pause_plan(0, AREG_STORY_PAUSE_BYTES_PER_SEC, at, 2) == 0,
+          "pause_zero_size_plans_none");
+    check(story_pause_plan(story_bytes_for(240), 0, at, 2) == 0,
+          "pause_zero_rate_plans_none");
+    check(story_pause_plan(story_bytes_for(240), AREG_STORY_PAUSE_BYTES_PER_SEC,
+                           nullptr, 2) == 0,
+          "pause_null_output_plans_none");
+    check(story_pause_plan(story_bytes_for(240), AREG_STORY_PAUSE_BYTES_PER_SEC,
+                           at, 0) == 0,
+          "pause_zero_capacity_plans_none");
+    // A caller with room for one gets one, not a buffer overrun.
+    check(story_pause_plan(story_bytes_for(600), AREG_STORY_PAUSE_BYTES_PER_SEC,
+                           at, 1) == 1,
+          "pause_capacity_one_respected");
+    // A very long story still never exceeds the per-story ceiling.
+    check(story_pause_plan(story_bytes_for(3600), AREG_STORY_PAUSE_BYTES_PER_SEC,
+                           at, AREG_STORY_PAUSE_MAX_PER_STORY)
+              <= AREG_STORY_PAUSE_MAX_PER_STORY,
+          "pause_ceiling_holds_for_a_long_story");
+}
+
+void test_pause_next_at_selection() {
+    const uint32_t plan[2] = { 100000UL, 155000UL };
+
+    check(story_pause_next_at_ms(plan, 2, 0, 0, 0) == 100000UL,
+          "pause_next_from_story_start_is_the_first_point");
+    // A segment that opens PAST a point (a resume landed there) skips it.
+    check(story_pause_next_at_ms(plan, 2, 0, 0, 120000UL) == 155000UL,
+          "pause_point_behind_the_segment_is_skipped");
+    // KEYSTONE — the ceiling. Two fired means no third, ever.
+    check(story_pause_next_at_ms(plan, 2, AREG_STORY_PAUSE_MAX_PER_STORY,
+                                 100000UL, 0) == 0,
+          "pause_ceiling_blocks_a_third");
+    // Minimum spacing after a pause that already fired.
+    const uint32_t close[2] = { 100000UL, 110000UL };
+    check(story_pause_next_at_ms(close, 2, 1, 100000UL, 100000UL) == 0,
+          "pause_too_soon_after_the_last_one_is_refused");
+    // Nothing armed when a resume lands within the lead of the next point,
+    // so a resumed story never fires one instantly.
+    check(story_pause_next_at_ms(plan, 2, 0, 0, 99000UL) == 155000UL,
+          "pause_inside_the_lead_window_is_skipped");
+    check(story_pause_next_at_ms(nullptr, 2, 0, 0, 0) == 0,
+          "pause_null_plan_arms_nothing");
+    check(story_pause_next_at_ms(plan, 0, 0, 0, 0) == 0,
+          "pause_empty_plan_arms_nothing");
+}
+
+void test_pause_rate_measurement() {
+    // 24000 B over 1 s is the assumed rate — but a 1 s sample is too short
+    // to trust, so it is refused.
+    check(story_pause_measured_bytes_per_sec(0, 24000UL, 1000UL) == 0,
+          "pause_short_sample_refused");
+    // 100 s of a 192 kbps file.
+    check(story_pause_measured_bytes_per_sec(0, 2400000UL, 100000UL) == 24000UL,
+          "pause_measures_the_real_rate");
+    // Offsets are absolute, so a mid-file segment measures the same rate.
+    check(story_pause_measured_bytes_per_sec(1000000UL, 3400000UL, 100000UL) == 24000UL,
+          "pause_measurement_is_offset_relative");
+    check(story_pause_measured_bytes_per_sec(3400000UL, 1000000UL, 100000UL) == 0,
+          "pause_backwards_sample_refused");
+    // Nonsense rates (a stalled decoder, a corrupt clock) never replace a
+    // sane estimate.
+    check(story_pause_measured_bytes_per_sec(0, 1000UL, 100000UL) == 0,
+          "pause_implausibly_slow_sample_refused");
+    check(story_pause_measured_bytes_per_sec(0, 30000000UL, 100000UL) == 0,
+          "pause_implausibly_fast_sample_refused");
+}
+
+void test_pause_variant_rotation() {
+    check(story_pause_variant_of(0) == 1 && story_pause_variant_of(1) == 2
+              && story_pause_variant_of(2) == 3 && story_pause_variant_of(3) == 4,
+          "pause_variants_rotate_in_order");
+    check(story_pause_variant_of(4) == 1, "pause_variants_wrap");
+    // Every value is a real clip id (shout-1..shout-N), never a 0 or an
+    // out-of-range index that would build a path to a file that cannot exist.
+    bool in_range = true;
+    for (uint32_t c = 0; c < 32; c++) {
+        const int v = story_pause_variant_of(c);
+        if (v < 1 || v > AREG_STORY_PAUSE_VARIANTS) in_range = false;
+    }
+    check(in_range, "pause_variant_always_addresses_a_real_clip");
+}
+
 void run_all() {
     s_pass = 0;
     s_fail = 0;
@@ -514,6 +656,13 @@ void run_all() {
     test_series_boot_latch_blocks_the_next_episode();
     test_series_malformed_pairings_are_standalone();
     test_series_bounds_and_nulls();
+    test_pause_plan_long_story_gets_two();
+    test_pause_plan_medium_story_gets_one();
+    test_pause_plan_short_story_gets_none();
+    test_pause_plan_bounds_and_nulls();
+    test_pause_next_at_selection();
+    test_pause_rate_measurement();
+    test_pause_variant_rotation();
 
     Serial.printf("[sel-test] TOTAL pass=%d fail=%d\n", s_pass, s_fail);
     Serial.println(s_fail == 0 ? "[sel-test] RESULT PASS" : "[sel-test] RESULT FAIL");
@@ -523,7 +672,13 @@ void run_all() {
                    "pause/resume in the live state machine. Serial episodes: "
                    "only the PURE ordering rule is covered — the NVS heard-set "
                    "read, the boot latch surviving a real session, and the "
-                   "serialnext clip actually playing all need the bench.");
+                   "serialnext clip actually playing all need the bench. "
+                   "Story pauses: only the arithmetic is covered — arming "
+                   "against the real millis() clock, the barge-in seam "
+                   "actually stopping playback, resume landing on the same "
+                   "byte, whether the assumed 24000 B/s matches the real "
+                   "MP3s, and whether a 3 s beat is right for a child are "
+                   "ALL bench/listening questions.");
     Serial.flush();
 }
 

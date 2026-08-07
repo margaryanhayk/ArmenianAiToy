@@ -37,6 +37,7 @@
 #include "offline_games.h"     // mind-reader / buzzer / Simon (AREG_OFFLINE_GAMES_BENCH builds only)
 
 #include "story_select.h"      // which cached story to play (index v2 + no-repeat)
+#include "story_pause.h"       // shout-it-out pauses inside an SD story (parent-gated)
 #include "story_report.h"      // story-play reporting (store-and-forward to backend)
 #include "story_select_test.h" // selection tests (AREG_STORY_SELECT_TEST_BENCH only)
 #include <SD.h>            // FS.h + SD — read /content_index.json (already linked)
@@ -423,7 +424,17 @@ static void handle_record_upload_playback() {
 // fresh press edge DURING playback is a barge-in (the start press has
 // already been released by then).
 static bool story_barge_in_poll() {
-    return button_poll() == 'P';
+    // The child comes first: a real press is always a barge-in, and the
+    // button must be polled every iteration to keep its edge state fresh.
+    if (button_poll() == 'P') {
+        return true;
+    }
+    // A shout-it-out pause is a self-inflicted barge-in — same stop, same
+    // resume offset, no second decoder. story_pause_take_pending() is how
+    // the session loop tells the two apart afterwards. Returns false
+    // immediately whenever nothing is armed, which is every build/card/
+    // moment the feature is not active.
+    return story_pause_poll();
 }
 
 // Records the child's question while the button is held and returns the
@@ -1234,6 +1245,22 @@ static void handle_story_session() {
         }
     }
 
+    // Shout-it-out pauses. The whole gate chain collapses into one bool
+    // here, and every part of it is a reason a child should NOT be invited
+    // to shout:
+    //   - SD only. The pause needs the file's size to know where the
+    //     ending is, and a Wi-Fi stream cannot tell us that.
+    //   - the parent's toggle, cached in the index so it applies offline;
+    //   - the bedtime window (server-owned; the toy has no clock). A pause
+    //     invites shouting, which is the opposite of what 21:30 is for.
+    // Clips-on-the-card and story-long-enough are checked inside
+    // story_pause_session_begin. new_story = false on a resume, so the
+    // at-most-twice ceiling counts per STORY, not per press.
+    const bool pauses_ok = use_sd
+                           && !voice_in_bedtime_window()
+                           && story_pauses_enabled();
+    story_pause_session_begin(s_story_offset == 0, pauses_ok, sd_narration_path);
+
     // Story-audio access token (gap 1) — only the Wi-Fi stream needs it.
     static char story_token[256];
     bool have_token = use_sd
@@ -1258,6 +1285,9 @@ static void handle_story_session() {
         bool interrupted;
         bool started = false;
         bool stream_open_failed = false;
+        // Arm (or disarm) the next shout-it-out pause for THIS segment.
+        // A no-op unless the session gate above passed.
+        story_pause_segment_begin(s_story_offset);
         if (use_sd) {
             Serial.printf("[story] SD play from byte %u\n", (unsigned)s_story_offset);
             Serial.flush();
@@ -1388,6 +1418,20 @@ static void handle_story_session() {
         }
         s_story_offset = resume_offset;
         token_retry_used = false;  // a real segment played; allow a fresh retry later
+
+        // Shout-it-out pause: this stop was OUR timer, not the child. Play
+        // the invite, hold a short silent beat, play the resume line, then
+        // fall back into the same loop — which re-opens the SAME file at
+        // the SAME offset. Nothing else moves: s_current_story_id is
+        // untouched (so no re-selection), selection_settled and
+        // play_reported are already latched (so the rotation cursor, the
+        // heard-set and the play report cannot fire twice), and
+        // `interrupted` is true (so this is never mistaken for a natural
+        // end). The mic is never opened on this path.
+        if (story_pause_take_pending()) {
+            story_pause_run(s_story_offset);
+            continue;
+        }
 
         // Barge-in: capture the question while the button stays held.
         transition_to(ST_RECORDING);
@@ -1606,6 +1650,10 @@ static void handle_story_session() {
         }
         // Loop continues → auto-resume the story from s_story_offset.
     }
+    // Leave nothing armed behind: a clip played elsewhere (the welcome
+    // greeting, an offline game) shares this barge-in callback and must
+    // never be cut by a timer belonging to a story that stopped.
+    story_pause_disarm();
     transition_to(ST_IDLE);
 }
 

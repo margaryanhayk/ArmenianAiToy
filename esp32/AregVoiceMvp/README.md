@@ -513,12 +513,11 @@ the way `introEnabled` does.
   card parses as "no story is a variant, both features on" — the exact
   pre-variant behaviour — so **no card ever has to be wiped**. Pinned by
   `test_index_v5_forward_compatible`.
-- **`story_pauses_enabled()` is PLUMBING ONLY in this slice.** Nothing
-  reads it yet. The pause clips it will gate are not authored, rendered or
-  synced, so there is no playback to switch off. It exists now so the
-  toggle can be verified along its whole path — dashboard → audit →
-  manifest → SD index → device — before any audio depends on it. The
-  playback wiring lands with the clips.
+- **`story_pauses_enabled()` is LIVE** as of the shout-it-out slice — it
+  gates real playback now. (It shipped one slice earlier as plumbing only,
+  so the toggle could be verified along its whole path — dashboard → audit
+  → manifest → SD index → device — before any audio depended on it.) See
+  "Shout-it-out story pauses" below.
 - **Variant endings ARE live.** Each variant ships as a FULL alternate
   file (the approved base narration cut at the branch point plus the new
   ending, assembled offline in the Ship-StoryAudio pipeline), configured as
@@ -568,6 +567,107 @@ Production pays **+784 B flash / −1,664 B RAM** for the `alt_of` field
 across the CsStory tables — MEASURED, not estimated, per the rule the
 `CS_MAX_STORIES` and `CS_MAX_CLIPS` bumps set. 227 KB free still leaves far
 more than the ~40–50 KB a TLS handshake wants during audio.
+
+### Shout-it-out story pauses
+
+`story_pause.{h,cpp}` — compiled into every build. Mid-story the narration
+stops, Areg invites the child to shout something, a short silent beat
+passes, a resume line plays, and the SAME story continues from the SAME
+byte.
+
+**Nothing is heard, and that is the design.** The mic stays off, nothing is
+recorded, nothing is uploaded, no STT runs, and no clip claims to have
+heard, understood or judged anything. The four resume lines are theatrical
+affirmations that read identically over an answer, a shout, or complete
+silence — see the `_flow` note in
+`backend/content/offline-games/game-clips.json`. This is a deliberately
+UNVERIFIED participation feature; "improving" it by recording would change
+what the toy is.
+
+**Mechanism — no second decoder, no new state, no new LED colour.**
+`audio_play_story_file()` plays a whole file and already knows how to be
+cut mid-file and resumed from a byte offset (the barge-in seam the in-story
+Q&A uses). A pause is just a self-inflicted barge-in: `story_barge_in_poll`
+polls the button FIRST, then `story_pause_poll()`; the session loop tells
+the two apart afterwards with `story_pause_take_pending()` and, on a pause,
+plays the clips and `continue`s — re-opening the same file at the same
+offset through the ordinary resume path.
+
+**Gates, all of which must pass:**
+
+| Gate | Where |
+|---|---|
+| parent toggle `story_pauses_enabled()` (index root `pausesEnabled`) | `handle_story_session` |
+| NOT inside the bedtime window (`voice_in_bedtime_window()`) — a pause invites shouting, which is the opposite of what 21:30 is for | `handle_story_session` |
+| SD playback only (the Wi-Fi stream cannot report a file size, so the ending cannot be located) | `handle_story_session` |
+| both halves of the next shout/resume pair present on the card | `story_pause_session_begin` |
+| the story is long enough to hold a pause inside the guards | `story_pause_plan` |
+
+A missing clip **skips the pause silently** — never a gap in the story,
+never an error sound. With any gate failing, playback is bit-for-bit what
+it was before this feature existed.
+
+**Timing.** At most **2** pauses per story, never in the first **45 s**,
+never in the last **30 s**, at least **45 s** apart. Points are planned
+from the file's size and a byte rate: 24,000 B/s (192 kbps, the level
+`Ship-StoryAudio.ps1` normalises the library to) until the first pause
+measures the real one, after which the plan is rebuilt against the
+measured rate. The estimate deliberately errs HIGH, because over-stating
+the bitrate under-states the duration and moves pauses **earlier** — the
+safe direction. A 4-minute story gets pauses at ~1:40 and ~2:35; anything
+under ~1:45 gets none. Rotation over `shout-1..4` / `resume-1..4` is a
+boot-scoped RAM cursor (the same idiom as `offline_games`' level-up
+variants), so a re-listen is not identical.
+
+**What a pause cannot do** (verified by reading, not by bench):
+`s_current_story_id` is never touched, so no re-selection; `s_story_offset`
+takes the ordinary resume offset, so the same file continues at the same
+place; `selection_settled` and `play_reported` are already latched by the
+time a pause can fire, so the rotation cursor, the heard set and the
+story-play report cannot fire twice; `interrupted` is true, so a pause is
+never mistaken for a natural end; and the per-story ceiling survives a
+sticky-pause resume (`new_story == false` keeps the count).
+`story_pause_disarm()` runs when the session ends so a timer can never cut
+a clip played elsewhere.
+
+**Clips** are ordinary Games-namespace content-sync items at
+`/games/story-pauses/<id>.mp3`, built with `cs_build_game_cache_path()` —
+the same helper the sync writes them with, so one place knows the layout.
+
+#### Not covered by the bench tests
+
+`story_select_test.cpp` covers only the **arithmetic** (planning, the head
+and tail guards, the ceiling, spacing, rate measurement, variant
+rotation). **Everything else needs the bench or a listen**, and none of it
+has been run yet:
+
+- a pause actually firing against the real `millis()` clock during real
+  decode, and the barge-in seam stopping playback where expected;
+- resume landing on the same story at the same place, with the ~8 KB fudge
+  overlap sounding like a resume and not a skip;
+- whether 24,000 B/s matches the real shipped MP3s (if it does not, the
+  first pause of each story lands off-plan — the measurement only corrects
+  the second);
+- whether 3 s is the right beat for a four-year-old, and whether the
+  shout/resume clips read naturally over a *silent* child;
+- a button press DURING the invite or the beat is currently ignored (those
+  clips play with no barge-in poll, so a tap that is released before the
+  story resumes is lost). Deliberate — but only a bench session shows
+  whether children actually do that;
+- the bedtime gate uses the heartbeat-cached window, so it is up to one
+  heartbeat (~60 s) stale, exactly like bedtime music.
+
+#### Measured size cost (canonical FQBN)
+
+| Build | Flash | Free RAM |
+|---|---|---|
+| production, before | 1,295,059 B | 227,480 B |
+| production, after | 1,297,575 B | 227,336 B |
+| sel-test bench, before | 1,304,951 B | 227,464 B |
+| sel-test bench, after | 1,309,503 B | 227,320 B |
+
+Production pays **+2,516 B flash / −144 B RAM** (one 96-byte path scratch
+plus the session counters).
 
 ### Feature flag: `AREG_STORY_SD_CACHE_FIRST` is GONE
 
