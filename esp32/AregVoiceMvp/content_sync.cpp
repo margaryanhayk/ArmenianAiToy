@@ -802,128 +802,180 @@ bool find_previous_game(JsonArrayConst prev_games, const char *game_key,
     return false;
 }
 
-void sync_games(JsonArrayConst games) {
+void sync_games(JsonDocument &manifest_doc, JsonArrayConst games) {
     JsonArray out = s_games_index.to<JsonArray>();
     s_games_active_count = 0;
 
-    // The previous index is re-read here rather than carried in RAM from
-    // load_previous_index(): a parsed copy of ~90 entries is ~20 KB of heap
-    // and it is only needed for the length of this pass. The document is
-    // scoped to this function so it is freed before write_index() builds
-    // its own.
-    JsonDocument prev;
-    JsonArrayConst prev_games;
-    if (SD.exists(kIndexPath)) {
-        File f = SD.open(kIndexPath, FILE_READ);
-        if (f) {
-            const DeserializationError err = deserializeJson(prev, f);
-            f.close();
-            if (err == DeserializationError::Ok && prev["games"].is<JsonArrayConst>()) {
-                prev_games = prev["games"].as<JsonArrayConst>();
-            }
-        }
-    }
-
+    // TWO-PHASE since 1.1.6 (field failure 2026-08-07): downloading while
+    // the manifest doc, the previous-index doc AND the growing output doc
+    // were all alive left too little CONTIGUOUS internal heap for a TLS
+    // handshake (~45 KB) -- every connect failed with -1 from the very
+    // first file even on a clean session (already=14 downloaded=0
+    // failed=78). Phase A harvests everything needed into compact CsGame
+    // arrays in PSRAM (7.8 MB idle; TLS cannot use PSRAM but plain data
+    // can), appends already-current entries, then FREES both JSON docs.
+    // Phase B downloads with the internal heap ~50 KB lighter and far
+    // less fragmented.
     int offered = 0, invalid = 0, already = 0, downloaded = 0, failed = 0;
     int truncated = 0, carried = 0;
-    if (!games.isNull()) {
-        for (JsonObjectConst item : games) {
-            offered++;
-            if (s_games_active_count >= CS_MAX_GAMES) {
-                truncated++;
-                continue;   // reported below, never fatal
-            }
 
-            CsGame g;
-            if (!cs_manifest_read_game(item, &g)) {
-                invalid++;
-                continue;
-            }
-            if (games_out_contains(out, g.game_key, g.clip_id)) {
-                // Field diagnostic 2026-08-07: a real boot skipped 91 of 92
-                // clips through this branch (summary counters proved it) and
-                // this was the only uncounted exit. Log WHAT it thinks it
-                // matched so the next serial capture settles it.
-                Serial.printf("[content-sync] game dup-skip %s/%s out_n=%u\n",
-                              g.game_key, g.clip_id, (unsigned)out.size());
-                continue;   // duplicate pair — keep the first, as everywhere
-            }
-
-            char cache_path[CS_MAX_PATH_LEN];
-            if (!cs_build_game_cache_path(cache_path, sizeof(cache_path),
-                                          g.game_key, g.clip_id)) {
-                failed++;
-                continue;
-            }
-
-            bool ok = false;
-            CsGame p;
-            if (find_previous_game(prev_games, g.game_key, g.clip_id, &p)
-                && p.verified
-                && p.version == g.version
-                && p.size_bytes == g.size_bytes
-                && hex_equals_ci(p.sha256, g.sha256)
-                && sd_file_size(cache_path) == g.size_bytes) {
-                ok = true;
-                already++;
-            }
-
-            if (!ok) {
-                char url[CS_MAX_URL_LEN];
-                snprintf(url, sizeof(url),
-                         "/api/devices/content-file?gameKey=%s&clipId=%s",
-                         g.game_key, g.clip_id);
-                char temp_path[CS_MAX_PATH_LEN];
-                char dir_path[CS_MAX_PATH_LEN];
-                char label[2 * CS_MAX_STORY_ID_LEN + 8];
-                snprintf(label, sizeof(label), "g:%s/%s", g.game_key, g.clip_id);
-                if (cs_build_game_temp_path(temp_path, sizeof(temp_path),
-                                            g.game_key, g.clip_id)
-                    && cs_build_game_dir_path(dir_path, sizeof(dir_path),
-                                              g.game_key)) {
-                    // The per-game subdirectory must exist before the rename,
-                    // not just before the download — the .part file lives in
-                    // /tmp and only the promotion touches /games.
-                    ensure_dir(CS_GAMES_DIR);
-                    ensure_dir(dir_path);
-                    ok = download_file_verified(label, url, temp_path, cache_path,
-                                                g.size_bytes, g.sha256);
+    // ---- Phase A: harvest under the docs, then drop them ----
+    CsGame *work = nullptr;      // manifest items to download
+    CsGame *prevs = nullptr;     // previous-index entries (carry candidates)
+    int work_n = 0, prevs_n = 0;
+    {
+        JsonDocument prev;
+        JsonArrayConst prev_games;
+        if (SD.exists(kIndexPath)) {
+            File f = SD.open(kIndexPath, FILE_READ);
+            if (f) {
+                const DeserializationError err = deserializeJson(prev, f);
+                f.close();
+                if (err == DeserializationError::Ok
+                    && prev["games"].is<JsonArrayConst>()) {
+                    prev_games = prev["games"].as<JsonArrayConst>();
                 }
-                if (ok) downloaded++; else failed++;
             }
+        }
 
-            if (ok) {
-                g.verified = true;
-                cs_index_append_game(out, &g);
-                s_games_active_count++;
+        const size_t cap = CS_MAX_GAMES;
+        work = (CsGame *)heap_caps_malloc(cap * sizeof(CsGame),
+                                          MALLOC_CAP_SPIRAM);
+        prevs = (CsGame *)heap_caps_malloc(cap * sizeof(CsGame),
+                                           MALLOC_CAP_SPIRAM);
+        if (work == nullptr) work = (CsGame *)malloc(cap * sizeof(CsGame));
+        if (prevs == nullptr) prevs = (CsGame *)malloc(cap * sizeof(CsGame));
+        if (work == nullptr || prevs == nullptr) {
+            Serial.println("[content-sync] games: work-list alloc failed");
+            free(work);
+            free(prevs);
+            manifest_doc.clear();
+            return;
+        }
+
+        for (JsonObjectConst e : prev_games) {
+            if (prevs_n >= (int)cap) break;
+            if (cs_index_read_game(e, &prevs[prevs_n])) prevs_n++;
+        }
+
+        if (!games.isNull()) {
+            for (JsonObjectConst item : games) {
+                offered++;
+                if (s_games_active_count + work_n >= (int)cap) {
+                    truncated++;
+                    continue;   // reported below, never fatal
+                }
+                CsGame g;
+                if (!cs_manifest_read_game(item, &g)) {
+                    invalid++;
+                    continue;
+                }
+                bool dup = games_out_contains(out, g.game_key, g.clip_id);
+                for (int i = 0; !dup && i < work_n; i++) {
+                    dup = cs_game_pairs_equal(&work[i], g.game_key, g.clip_id);
+                }
+                if (dup) {
+                    continue;   // duplicate pair -- keep the first, as everywhere
+                }
+
+                char cache_path[CS_MAX_PATH_LEN];
+                if (!cs_build_game_cache_path(cache_path, sizeof(cache_path),
+                                              g.game_key, g.clip_id)) {
+                    failed++;
+                    continue;
+                }
+                bool have = false;
+                for (int i = 0; i < prevs_n; i++) {
+                    if (prevs[i].verified
+                        && cs_game_pairs_equal(&prevs[i], g.game_key, g.clip_id)
+                        && prevs[i].version == g.version
+                        && prevs[i].size_bytes == g.size_bytes
+                        && hex_equals_ci(prevs[i].sha256, g.sha256)
+                        && sd_file_size(cache_path) == g.size_bytes) {
+                        have = true;
+                        break;
+                    }
+                }
+                if (have) {
+                    already++;
+                    g.verified = true;
+                    cs_index_append_game(out, &g);
+                    s_games_active_count++;
+                } else {
+                    work[work_n++] = g;
+                }
             }
+        }
+        // prev JsonDocument dies here (scope) -- Phase B keeps only prevs[].
+    }
+    // The manifest document has no reader after this pass (verified at the
+    // call site) -- freeing it is what gives TLS its contiguous heap back.
+    manifest_doc.clear();
+    Serial.printf("[content-sync] games phase B: %d to download, heap=%u\n",
+                  work_n, (unsigned)ESP.getFreeHeap());
+
+    // ---- Phase B: download on a light heap ----
+    for (int w = 0; w < work_n; w++) {
+        CsGame &g = work[w];
+        char cache_path[CS_MAX_PATH_LEN];
+        if (!cs_build_game_cache_path(cache_path, sizeof(cache_path),
+                                      g.game_key, g.clip_id)) {
+            failed++;
+            continue;
+        }
+        char url[CS_MAX_URL_LEN];
+        snprintf(url, sizeof(url),
+                 "/api/devices/content-file?gameKey=%s&clipId=%s",
+                 g.game_key, g.clip_id);
+        char temp_path[CS_MAX_PATH_LEN];
+        char dir_path[CS_MAX_PATH_LEN];
+        char label[2 * CS_MAX_STORY_ID_LEN + 8];
+        snprintf(label, sizeof(label), "g:%s/%s", g.game_key, g.clip_id);
+        bool ok = false;
+        if (cs_build_game_temp_path(temp_path, sizeof(temp_path),
+                                    g.game_key, g.clip_id)
+            && cs_build_game_dir_path(dir_path, sizeof(dir_path),
+                                      g.game_key)) {
+            // The per-game subdirectory must exist before the rename,
+            // not just before the download -- the .part file lives in
+            // /tmp and only the promotion touches /games.
+            ensure_dir(CS_GAMES_DIR);
+            ensure_dir(dir_path);
+            ok = download_file_verified(label, url, temp_path, cache_path,
+                                        g.size_bytes, g.sha256);
+        }
+        if (ok) {
+            downloaded++;
+            g.verified = true;
+            cs_index_append_game(out, &g);
+            s_games_active_count++;
+        } else {
+            failed++;
         }
     }
 
-    // Carry forward verified clips the manifest did not mention. A clip
-    // absent from one manifest response is not a retirement instruction, and
-    // dropping its index entry would cost a needless re-download next boot.
-    for (JsonObjectConst e : prev_games) {
-        if (s_games_active_count >= CS_MAX_GAMES) {
-            break;
-        }
-        CsGame p;
-        if (!cs_index_read_game(e, &p) || !p.verified) {
-            continue;
-        }
-        if (games_out_contains(out, p.game_key, p.clip_id)) {
-            continue;
-        }
+    // Carry forward verified clips the manifest did not mention (or whose
+    // fresh download failed while a good previous copy is still on the
+    // card). A clip absent from one manifest response is not a retirement
+    // instruction, and dropping its index entry would cost a needless
+    // re-download next boot.
+    for (int i = 0; i < prevs_n; i++) {
+        if (s_games_active_count >= CS_MAX_GAMES) break;
+        CsGame &p = prevs[i];
+        if (!p.verified) continue;
+        if (games_out_contains(out, p.game_key, p.clip_id)) continue;
         char cache_path[CS_MAX_PATH_LEN];
         if (!cs_build_game_cache_path(cache_path, sizeof(cache_path),
                                       p.game_key, p.clip_id)
             || sd_file_size(cache_path) != p.size_bytes) {
-            continue;   // file gone or changed → drop from the index, keep the file
+            continue;   // file gone or changed -- drop from the index, keep the file
         }
         cs_index_append_game(out, &p);
         s_games_active_count++;
         carried++;
     }
+    free(work);
+    free(prevs);
 
     if (offered > 0 || s_games_active_count > 0) {
         Serial.printf("[content-sync] games summary offered=%d invalid=%d "
@@ -1104,7 +1156,7 @@ void content_sync_run() {
     sync_voice();
 
     // ---- 4d. Offline-game clips (streamed; no table) ----
-    sync_games(game_clips);
+    sync_games(doc, game_clips);   // frees the manifest doc internally
 
     // ---- 5. Index written LAST, once ----
     bool index_written = false;
