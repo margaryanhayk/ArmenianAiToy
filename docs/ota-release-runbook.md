@@ -413,3 +413,36 @@ pending and skips the greeting for that one boot; `story_report_tick()` and
 `esp_reset_reason()`, uptime, heap, wifi, rssi, sd, boots) so the NEXT failure
 is diagnosable without a cable — a reset reason of 4/5/6/7 means a panic or
 watchdog, i.e. look at the new code, not at the timing.
+
+**2026-08-07 — 1.1.2: OVER-THE-AIR UPDATE PROVEN END TO END.**
+
+```
+status  Acked | result ok | ackFirmwareVersion 1.1.2
+{"status":"ota_applied","version":"1.1.2","partition":"app1",
+ "bootDiag":{"rst":3,"up":4,"heap":124228,"wifi":3,"rssi":-43,"sd":1,"boots":1}}
+device fw 1.1.2 | lastOtaStatus confirmed | otaHealth ok
+```
+
+The toy downloaded, verified, flashed into app1, rebooted, checked in
+within 4 seconds and marked itself valid. No cable involved.
+
+Two real faults were cleared to get here, both worth remembering:
+
+1. **401, mistaken for a crash.** Three earlier rollbacks were the new
+   image failing to AUTHENTICATE, not failing to boot. The device
+   identity lived only in the compile-time config (`config.h`,
+   gitignored), which had been restored from a stale build cache. Fixed
+   by burning the identity into NVS (`AREG_PROVISION_IDENTITY_ONCE`) —
+   `device_creds` is NVS-first, so images now ship with PLACEHOLDER
+   credentials and carry no secret. An OTA image reaches every toy; it
+   must never contain one toy's identity.
+2. **Signature mismatch, working as designed.** The first signed
+   attempt was REFUSED (`manifest signature invalid`) because the
+   server's `FirmwareUpdate__SigningKey` did not match the
+   `AREG_MANIFEST_HMAC_KEY` compiled into the running image. The toy
+   refused before downloading anything. **Rule: during a key rotation,
+   sign with the key in the firmware that must ACCEPT the update — the
+   OLD one — and only switch after the new image reports in.**
+
+Content sync on the same boot: 8 stories already current, 43/43 voice
+clips present, game clips downloading with per-clip sha256 verified.
