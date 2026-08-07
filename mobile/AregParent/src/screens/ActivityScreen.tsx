@@ -55,6 +55,8 @@ const LABELS: Record<string, Key> = {
   ParentDeviceStoryIntroSet: 'ev_story_intro_set',
   ParentBedtimeMusicSet: 'ev_bedtime_music_set',
   ParentStoryRequestSubmitted: 'ev_story_requested',
+  ParentDeviceStoryPausesSet: 'ev_story_pauses_set',
+  ParentDeviceVariantEndingsSet: 'ev_variant_endings_set',
 };
 
 /**

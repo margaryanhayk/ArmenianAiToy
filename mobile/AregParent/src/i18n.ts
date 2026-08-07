@@ -536,6 +536,8 @@ const D = {
   ev_revocation_changed: { en: 'Toy access changed', ru: 'Доступ игрушки изменён', hy: 'Խաղալիքի մուտքը փոխվեց' },
   ev_story_intro_set: { en: 'Spoken story intro changed', ru: 'Озвученное вступление изменено', hy: 'Հեքիաթի վերնագրի հայտարարումը փոխվեց' },
   ev_bedtime_music_set: { en: 'Bedtime music changed', ru: 'Музыка для сна изменена', hy: 'Քնի ժամի երաժշտությունը փոխվեց' },
+  ev_story_pauses_set: { en: 'Story pauses changed', ru: 'Паузы в сказках изменены', hy: 'Հեքիաթի դադարները փոխվեցին' },
+  ev_variant_endings_set: { en: 'Alternate endings changed', ru: 'Альтернативные концовки изменены', hy: 'Այլընտրանքային ավարտները փոխվեցին' },
   ev_story_requested: { en: 'Story requested', ru: 'Заказана сказка', hy: 'Հեքիաթ պատվիրվեց' },
   account_title: { en: 'Account', ru: 'Аккаунт', hy: 'Հաշիվ' },
   wifi_setup_mode: {
