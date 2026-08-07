@@ -63,6 +63,18 @@ public sealed class ContentSyncOptions
     /// the owner ships rendered clips.</summary>
     public List<ContentSyncVoiceOptions> Voice { get; set; } = new();
 
+    /// <summary>Offline games — the pre-rendered Armenian clips the three
+    /// button games play from the card. A FOURTH namespace beside stories,
+    /// music and voice, for the same reason each of those got one: a game
+    /// clip must never enter the story rotation, and it is addressed by a
+    /// PAIR (game key + clip id) rather than a single id.
+    /// <para>
+    /// Empty by default. Until the owner configures rendered clips the
+    /// manifest's <c>games</c> field stays null and the toy's games degrade
+    /// exactly as they do today — a missing clip is a logged no-op.
+    /// </para></summary>
+    public List<ContentSyncGameOptions> Games { get; set; } = new();
+
     /// <summary>Legacy single-item: library story id (kebab-case).</summary>
     public string StoryId { get; set; } = string.Empty;
 
@@ -231,8 +243,46 @@ public sealed class ContentSyncOptions
             options.Voice.Add(clip);
         }
 
+        // Offline games — hand-rolled binding, same reachable-by-tests rule
+        // as the story, music and voice arrays. ~90 clips are configured
+        // here, so a silent binding bug would leave every unit test green
+        // while the toy's games stayed mute.
+        foreach (var child in section.GetSection("Games").GetChildren())
+        {
+            var gameClip = new ContentSyncGameOptions
+            {
+                GameKey = child["GameKey"] ?? "",
+                ClipId = child["ClipId"] ?? "",
+                AudioUrl = child["AudioUrl"] ?? "",
+                AudioPath = child["AudioPath"] ?? "",
+                Sha256 = child["Sha256"] ?? "",
+            };
+            if (int.TryParse(child["Version"], out var gameVersion)) gameClip.Version = gameVersion;
+            if (long.TryParse(child["SizeBytes"], out var gameSize)) gameClip.SizeBytes = gameSize;
+            options.Games.Add(gameClip);
+        }
+
         return options;
     }
+
+    /// <summary>Offline games — the configured game clips with
+    /// <see cref="AudioRoot"/> applied, mirroring <see cref="ResolveVoice"/>
+    /// (one resolution site for the manifest service AND content-file, so
+    /// they can never disagree about which file a (gameKey, clipId) pair
+    /// points at).</summary>
+    public IReadOnlyList<ContentSyncGameOptions> ResolveGames()
+        => Games
+            .Select(g => new ContentSyncGameOptions
+            {
+                GameKey = g.GameKey,
+                ClipId = g.ClipId,
+                Version = g.Version,
+                AudioUrl = g.AudioUrl,
+                AudioPath = ResolveAudioPath(AudioRoot, g.AudioPath),
+                Sha256 = g.Sha256,
+                SizeBytes = g.SizeBytes,
+            })
+            .ToList();
 
     /// <summary>Welcome-flow — the configured device-global voice clips with
     /// <see cref="AudioRoot"/> applied, mirroring <see cref="ResolveMusic"/>
@@ -492,6 +542,58 @@ public sealed class ContentSyncVoiceOptions
 
     /// <summary>Content version — bump when the audio changes, or every toy
     /// keeps its cached copy (the SD filename embeds it).</summary>
+    public int Version { get; set; } = 1;
+
+    public string AudioUrl { get; set; } = string.Empty;
+    public string AudioPath { get; set; } = string.Empty;
+    public string Sha256 { get; set; } = string.Empty;
+    public long SizeBytes { get; set; }
+}
+
+/// <summary>
+/// Offline games — one pre-rendered game clip. Same field discipline as
+/// <see cref="ContentSyncVoiceOptions"/>, but addressed by a PAIR: the game
+/// key and the clip id together.
+/// <para>
+/// The pair is not decoration. Four of the five games in
+/// <c>backend/content/offline-games/game-clips.json</c> each define a clip
+/// called <c>intro</c>, so a flat single-id namespace would collide. The
+/// firmware already resolves these as
+/// <c>/games/&lt;gameKey&gt;/&lt;clipId&gt;.mp3</c> (see
+/// <c>AREG_GAMES_CLIP_DIR</c> in <c>offline_games.cpp</c>) — this namespace
+/// exists to DELIVER that exact layout over Wi-Fi, not to invent a second
+/// one.
+/// </para>
+/// <para>
+/// Both halves reach an SD path — the key as a DIRECTORY name — so both are
+/// held to the same allowlist a story id must pass (lowercase ASCII, digits,
+/// <c>-</c>, <c>_</c>, bounded at 48). The manifest service drops any item
+/// that fails it.
+/// </para>
+/// <para>
+/// Note there is deliberately no <c>Title</c> and no version in the on-card
+/// FILENAME: the toy resolves a clip by its game key and clip id alone, and
+/// changing that would orphan every clip the games module already knows how
+/// to find. <see cref="Version"/> lives only on the wire and in the toy's
+/// index, which is what makes a re-render re-download.
+/// </para>
+/// </summary>
+public sealed class ContentSyncGameOptions
+{
+    /// <summary>The game's own top-level key from <c>game-clips.json</c>
+    /// (<c>mind-reader</c>, <c>who-first</c>, <c>sound-detective</c>,
+    /// <c>button-simon</c>, <c>story-pauses</c>). Becomes the SD
+    /// subdirectory name.</summary>
+    public string GameKey { get; set; } = string.Empty;
+
+    /// <summary>The clip's <c>id</c> from that game's clip list
+    /// (<c>intro</c>, <c>q-root</c>, <c>g-1010</c>, …). Becomes the SD
+    /// filename stem.</summary>
+    public string ClipId { get; set; } = string.Empty;
+
+    /// <summary>Content version — bump when the audio changes, or every toy
+    /// keeps its cached copy. Unlike stories/music/voice this does NOT reach
+    /// the filename; the device compares it in its index instead.</summary>
     public int Version { get; set; } = 1;
 
     public string AudioUrl { get; set; } = string.Empty;

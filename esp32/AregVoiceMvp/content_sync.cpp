@@ -79,6 +79,17 @@ CsVoice s_voice_active[CS_MAX_VOICE];
 int s_voice_manifest_count = 0;
 int s_voice_previous_count = 0;
 int s_voice_active_count   = 0;
+// Offline games — the ONLY namespace with no CsStory/CsMusic/CsVoice-shaped
+// tables. ~90 clips ship today; manifest/previous/active tables in the shape
+// sync_voice() uses would cost roughly 47 KB of .bss, which this board does
+// not have to spare (see CS_MAX_GAMES in content_sync_rules.h). Instead the
+// pass streams: one CsGame at a time, results appended straight into this
+// output array, and the previous index re-read from the card for the length
+// of the pass only. The document lives at file scope solely so write_index()
+// can attach it after sync_games() has returned; it is cleared as soon as
+// the index is on disk.
+JsonDocument s_games_index;
+int s_games_active_count = 0;
 // Default TRUE for all four: a backend that does not send them, or a
 // pre-v4 card, must not silently stop the toy offering anything.
 bool s_mode_story     = true;
@@ -254,6 +265,9 @@ bool write_index() {
     cs_index_build(idx, s_active, s_active_count, AREG_STORY_ID, s_intro_enabled);
     cs_index_add_music(idx, s_music_active, s_music_active_count, s_music_enabled);
     cs_index_add_voice(idx, s_voice_active, s_voice_active_count);
+    // Offline games — attached from the array sync_games() streamed into,
+    // which is still alive here and is cleared right after the write.
+    cs_index_add_games(idx, s_games_index.as<JsonArrayConst>());
     cs_index_add_modes(idx, s_mode_story, s_mode_game,
                        s_mode_riddle, s_mode_curiosity);
     cs_index_add_story_flags(idx, s_pauses_enabled, s_variants_enabled);
@@ -711,6 +725,181 @@ void sync_voice() {
     }
 }
 
+// ---- offline-game clip sync ---------------------------------------
+//
+// Same contract as sync_voice — already-current check against the previous
+// index plus the on-card size, else download / sha-verify / atomic rename
+// through the shared helper; per-item isolation, so one failed clip never
+// costs the child the other eighty-nine; carry-forward, because absence
+// from one manifest is not retirement.
+//
+// The IMPLEMENTATION differs in exactly one way, and it is the reason this
+// slice exists at all: there are ~90 clips, so nothing is held in a table.
+// The pass streams straight from the manifest document into the output
+// index array, and re-reads the previous index from the card instead of
+// keeping a parsed copy alive for the whole run. See CS_MAX_GAMES in
+// content_sync_rules.h for the .bss arithmetic that forced this.
+//
+// The other difference is on the card, not in RAM: a game clip's filename
+// carries NO version, because offline_games.cpp resolves it as
+// "/games/<key>/<clip>.mp3" and a versioned name would never be found. A
+// re-render therefore overwrites in place — which is safe here for the same
+// reason it is safe everywhere else in this file, because the existing copy
+// is only removed once a fully verified replacement is ready to take it.
+
+// Has this pair already been written to the output array this run?
+bool games_out_contains(JsonArrayConst out, const char *game_key,
+                        const char *clip_id) {
+    for (JsonObjectConst e : out) {
+        if (cs_story_ids_equal(e["gameKey"] | "", game_key)
+            && cs_story_ids_equal(e["clipId"] | "", clip_id)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Finds this pair in the previous index, or returns false.
+bool find_previous_game(JsonArrayConst prev_games, const char *game_key,
+                        const char *clip_id, CsGame *out) {
+    for (JsonObjectConst e : prev_games) {
+        if (!cs_index_read_game(e, out)) {
+            continue;
+        }
+        if (cs_game_pairs_equal(out, game_key, clip_id)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void sync_games(JsonArrayConst games) {
+    JsonArray out = s_games_index.to<JsonArray>();
+    s_games_active_count = 0;
+
+    // The previous index is re-read here rather than carried in RAM from
+    // load_previous_index(): a parsed copy of ~90 entries is ~20 KB of heap
+    // and it is only needed for the length of this pass. The document is
+    // scoped to this function so it is freed before write_index() builds
+    // its own.
+    JsonDocument prev;
+    JsonArrayConst prev_games;
+    if (SD.exists(kIndexPath)) {
+        File f = SD.open(kIndexPath, FILE_READ);
+        if (f) {
+            const DeserializationError err = deserializeJson(prev, f);
+            f.close();
+            if (err == DeserializationError::Ok && prev["games"].is<JsonArrayConst>()) {
+                prev_games = prev["games"].as<JsonArrayConst>();
+            }
+        }
+    }
+
+    int offered = 0, invalid = 0, already = 0, downloaded = 0, failed = 0;
+    int truncated = 0, carried = 0;
+    if (!games.isNull()) {
+        for (JsonObjectConst item : games) {
+            offered++;
+            if (s_games_active_count >= CS_MAX_GAMES) {
+                truncated++;
+                continue;   // reported below, never fatal
+            }
+
+            CsGame g;
+            if (!cs_manifest_read_game(item, &g)) {
+                invalid++;
+                continue;
+            }
+            if (games_out_contains(out, g.game_key, g.clip_id)) {
+                continue;   // duplicate pair — keep the first, as everywhere
+            }
+
+            char cache_path[CS_MAX_PATH_LEN];
+            if (!cs_build_game_cache_path(cache_path, sizeof(cache_path),
+                                          g.game_key, g.clip_id)) {
+                failed++;
+                continue;
+            }
+
+            bool ok = false;
+            CsGame p;
+            if (find_previous_game(prev_games, g.game_key, g.clip_id, &p)
+                && p.verified
+                && p.version == g.version
+                && p.size_bytes == g.size_bytes
+                && hex_equals_ci(p.sha256, g.sha256)
+                && sd_file_size(cache_path) == g.size_bytes) {
+                ok = true;
+                already++;
+            }
+
+            if (!ok) {
+                char url[CS_MAX_URL_LEN];
+                snprintf(url, sizeof(url),
+                         "/api/devices/content-file?gameKey=%s&clipId=%s",
+                         g.game_key, g.clip_id);
+                char temp_path[CS_MAX_PATH_LEN];
+                char dir_path[CS_MAX_PATH_LEN];
+                char label[2 * CS_MAX_STORY_ID_LEN + 8];
+                snprintf(label, sizeof(label), "g:%s/%s", g.game_key, g.clip_id);
+                if (cs_build_game_temp_path(temp_path, sizeof(temp_path),
+                                            g.game_key, g.clip_id)
+                    && cs_build_game_dir_path(dir_path, sizeof(dir_path),
+                                              g.game_key)) {
+                    // The per-game subdirectory must exist before the rename,
+                    // not just before the download — the .part file lives in
+                    // /tmp and only the promotion touches /games.
+                    ensure_dir(CS_GAMES_DIR);
+                    ensure_dir(dir_path);
+                    ok = download_file_verified(label, url, temp_path, cache_path,
+                                                g.size_bytes, g.sha256);
+                }
+                if (ok) downloaded++; else failed++;
+            }
+
+            if (ok) {
+                g.verified = true;
+                cs_index_append_game(out, &g);
+                s_games_active_count++;
+            }
+        }
+    }
+
+    // Carry forward verified clips the manifest did not mention. A clip
+    // absent from one manifest response is not a retirement instruction, and
+    // dropping its index entry would cost a needless re-download next boot.
+    for (JsonObjectConst e : prev_games) {
+        if (s_games_active_count >= CS_MAX_GAMES) {
+            break;
+        }
+        CsGame p;
+        if (!cs_index_read_game(e, &p) || !p.verified) {
+            continue;
+        }
+        if (games_out_contains(out, p.game_key, p.clip_id)) {
+            continue;
+        }
+        char cache_path[CS_MAX_PATH_LEN];
+        if (!cs_build_game_cache_path(cache_path, sizeof(cache_path),
+                                      p.game_key, p.clip_id)
+            || sd_file_size(cache_path) != p.size_bytes) {
+            continue;   // file gone or changed → drop from the index, keep the file
+        }
+        cs_index_append_game(out, &p);
+        s_games_active_count++;
+        carried++;
+    }
+
+    if (offered > 0 || s_games_active_count > 0) {
+        Serial.printf("[content-sync] games summary offered=%d invalid=%d "
+                      "already=%d downloaded=%d failed=%d truncated=%d "
+                      "carried=%d games_active=%d\n",
+                      offered, invalid, already, downloaded, failed, truncated,
+                      carried, s_games_active_count);
+        Serial.flush();
+    }
+}
+
 // ---- the one sync attempt -----------------------------------------
 
 // All [content-sync] serial lines here are the bench PASS/FAIL evidence
@@ -729,6 +918,8 @@ void content_sync_run() {
     s_voice_manifest_count = 0;
     s_voice_previous_count = 0;
     s_voice_active_count   = 0;
+    s_games_index.clear();
+    s_games_active_count = 0;
 
     // ---- 1. Manifest ----
     HTTPClient http;
@@ -774,20 +965,26 @@ void content_sync_run() {
     s_mode_curiosity = doc["curiosityEnabled"] | true;
     s_voice_manifest_count = cs_manifest_parse_voice(
         doc["voice"].as<JsonArrayConst>(), s_voice_manifest, CS_MAX_VOICE);
+    // Offline games — deliberately NOT parsed into a table here (there is
+    // none); the array is handed to sync_games() below and streamed.
+    JsonArrayConst game_clips = doc["games"].as<JsonArrayConst>();
+    const unsigned game_offered =
+        game_clips.isNull() ? 0U : (unsigned)game_clips.size();
     Serial.printf("[content-sync] manifest status=200 stories=%u introEnabled=%d "
-                  "music=%d musicEnabled=%d voice=%d modes=%d%d%d%d "
+                  "music=%d musicEnabled=%d voice=%d games=%u modes=%d%d%d%d "
                   "pauses=%d variants=%d\n",
                   stories.isNull() ? 0U : (unsigned)stories.size(),
                   s_intro_enabled ? 1 : 0,
                   s_music_manifest_count, s_music_enabled ? 1 : 0,
-                  s_voice_manifest_count,
+                  s_voice_manifest_count, game_offered,
                   s_mode_story ? 1 : 0, s_mode_game ? 1 : 0,
                   s_mode_riddle ? 1 : 0, s_mode_curiosity ? 1 : 0,
                   s_pauses_enabled ? 1 : 0, s_variants_enabled ? 1 : 0);
     Serial.flush();
     if ((stories.isNull() || stories.size() == 0)
         && s_music_manifest_count == 0
-        && s_voice_manifest_count == 0) {
+        && s_voice_manifest_count == 0
+        && game_offered == 0) {
         // An empty manifest is NOT a retirement instruction. The index and
         // every cached MP3 are left exactly as they are.
         Serial.println("[content-sync] no content — existing cache untouched");
@@ -803,7 +1000,7 @@ void content_sync_run() {
         Serial.flush();
     }
     if (s_manifest_count == 0 && s_music_manifest_count == 0
-        && s_voice_manifest_count == 0) {
+        && s_voice_manifest_count == 0 && game_offered == 0) {
         Serial.println("[content-sync] no valid items — existing cache untouched");
         Serial.flush();
         return;
@@ -871,9 +1068,13 @@ void content_sync_run() {
     // ---- 4c. Welcome-flow spoken clips ----
     sync_voice();
 
+    // ---- 4d. Offline-game clips (streamed; no table) ----
+    sync_games(game_clips);
+
     // ---- 5. Index written LAST, once ----
     bool index_written = false;
-    if (s_active_count > 0 || s_music_active_count > 0 || s_voice_active_count > 0) {
+    if (s_active_count > 0 || s_music_active_count > 0
+        || s_voice_active_count > 0 || s_games_active_count > 0) {
         index_written = write_index();
         if (!index_written) {
             // The previous index survives a failed replacement; every MP3
@@ -885,6 +1086,10 @@ void content_sync_run() {
     } else {
         Serial.println("[content-sync] nothing verified — index left unchanged");
     }
+    // The streamed games array is only needed until the index is on disk;
+    // releasing it here gives the ~90-entry document's heap back for the
+    // rest of the boot (a TLS handshake during audio wants 40-50 KB).
+    s_games_index.clear();
     Serial.flush();
 
     // ---- 6. Aggregate result (no credentials, no URLs, no headers) ----

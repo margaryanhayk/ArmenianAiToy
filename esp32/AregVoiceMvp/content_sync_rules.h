@@ -99,7 +99,14 @@
 // parses as "no story is a variant, both features on" — which is exactly the
 // pre-variant behaviour, because a toy with no alt files cached plays the
 // base narration whatever the toggles say.
-#define CS_INDEX_SCHEMA_VERSION 6
+//
+// v7 = v6 plus the root games[] section — the offline-game clips delivered
+// over Wi-Fi instead of by hand-copying the card. Superset again, and this
+// bump is the cheapest of the lot: NOTHING reads games[] except the sync
+// itself (offline_games.cpp resolves a clip purely by whether the file is
+// on the card), so a v6 card parses as "no game clips indexed" and the only
+// consequence is that the next sync re-downloads them.
+#define CS_INDEX_SCHEMA_VERSION 7
 
 // Per-story clip slots (intro / question / question1 / question2 /
 // summary / offer / reoffer / serialnext). Fixed small array — an
@@ -204,6 +211,49 @@ struct CsMusic {
 
 struct CsVoice {
     char voice_id[CS_MAX_STORY_ID_LEN + 1];  // same allowlist as story ids
+    int  version;
+    char sha256[65];
+    long size_bytes;
+    bool verified;
+};
+
+// Offline games — the pre-rendered clips the button games play from the
+// card. A FOURTH namespace beside stories, music and voice, and the only
+// one addressed by a PAIR: the game key AND the clip id. Four of the five
+// games in backend/content/offline-games/game-clips.json each define a clip
+// called `intro`, so the game key is what keeps them apart — on the wire and
+// as an SD subdirectory.
+//
+// THERE IS NO CsGame TABLE, and that is the whole design. ~90 clips ship
+// today; three CsGame[90] tables in the shape sync_voice() uses would cost
+// roughly 47 KB of .bss on a board that must keep 40-50 KB free for a TLS
+// handshake during audio — more than the welcome-flow slice's first draft
+// spent, and that draft had to be rewritten. So the games pass STREAMS:
+// content_sync.cpp holds one CsGame at a time and appends each result
+// straight into the output index array. This struct exists to give that one
+// item bounded, NUL-terminated storage (and, because its members are char
+// ARRAYS rather than const char*, ArduinoJson copies them into the index
+// document instead of linking to memory that is about to go away).
+//
+// The cap below bounds the INDEX, not RAM: a hostile or runaway manifest
+// must not grow the output document without limit. 160 leaves nearly 2x
+// headroom over the shipped 90.
+#ifndef CS_MAX_GAMES
+#define CS_MAX_GAMES 160
+#endif
+
+/// The games root. MUST stay equal to AREG_GAMES_CLIP_DIR in
+/// offline_games.cpp — that module resolves
+/// "<root>/<game-key>/<clip-id>.mp3" and this sync's whole purpose is to
+/// put files exactly where it already looks. Deliberately NOT #included
+/// from there: offline_games.cpp is bench-gated behind a different flag, so
+/// the two are kept in step by the round-trip assertion in
+/// content_sync_test.cpp instead.
+#define CS_GAMES_DIR "/games"
+
+struct CsGame {
+    char game_key[CS_MAX_STORY_ID_LEN + 1];  // same allowlist as story ids
+    char clip_id[CS_MAX_STORY_ID_LEN + 1];   // same allowlist as story ids
     int  version;
     char sha256[65];
     long size_bytes;
@@ -454,6 +504,17 @@ inline bool cs_story_ids_equal(const char *a, const char *b) {
     }
 }
 
+/// Offline games — true when a held clip is the one named by this
+/// (gameKey, clipId) pair. Everything downstream asks this rather than
+/// comparing the two fields separately, so "same clip" has one meaning in
+/// one place. Case-insensitive for the same reason cs_story_ids_equal is.
+inline bool cs_game_pairs_equal(const CsGame *g,
+                                const char *game_key, const char *clip_id) {
+    return g != NULL
+        && cs_story_ids_equal(g->game_key, game_key)
+        && cs_story_ids_equal(g->clip_id, clip_id);
+}
+
 // ---- path construction --------------------------------------------
 
 /// "/stories/<storyId>-v<version>.mp3".
@@ -633,6 +694,68 @@ inline bool cs_build_voice_temp_path(char *out, size_t out_len,
     char scratch[CS_MAX_PATH_LEN * 2];
     const int written = snprintf(scratch, sizeof(scratch),
                                  "/tmp/v-%s-v%d.mp3.part", voice_id, v);
+    if (written <= 0 || (size_t)written >= out_len || (size_t)written >= sizeof(scratch)) {
+        return false;
+    }
+    memcpy(out, scratch, (size_t)written + 1);
+    return true;
+}
+
+/// "/games/<gameKey>" — the per-game subdirectory, which must exist before
+/// a clip can be renamed into it.
+inline bool cs_build_game_dir_path(char *out, size_t out_len,
+                                   const char *game_key) {
+    if (out == NULL || out_len == 0 || !cs_is_valid_story_id(game_key)) {
+        return false;
+    }
+    char scratch[CS_MAX_PATH_LEN * 2];
+    const int written = snprintf(scratch, sizeof(scratch),
+                                 CS_GAMES_DIR "/%s", game_key);
+    if (written <= 0 || (size_t)written >= out_len || (size_t)written >= sizeof(scratch)) {
+        return false;
+    }
+    memcpy(out, scratch, (size_t)written + 1);
+    return true;
+}
+
+/// "/games/<gameKey>/<clipId>.mp3" — the EXACT path offline_games.cpp
+/// already builds (AREG_GAMES_CLIP_DIR "/%s/%s.mp3"). Same
+/// refuse-on-truncation contract as cs_build_cache_path.
+///
+/// NOTE the deliberate absence of "-v<version>". Stories, music and voice
+/// all embed their version in the filename; game clips must NOT, because
+/// the games module resolves a clip from its key and id alone and a
+/// versioned name would simply never be found. The version lives on the
+/// wire and in the index instead, which is what still makes a re-render
+/// re-download: the index entry stops matching, so the file is fetched and
+/// overwritten in place.
+inline bool cs_build_game_cache_path(char *out, size_t out_len,
+                                     const char *game_key, const char *clip_id) {
+    if (out == NULL || out_len == 0
+        || !cs_is_valid_story_id(game_key) || !cs_is_valid_story_id(clip_id)) {
+        return false;
+    }
+    char scratch[CS_MAX_PATH_LEN * 2];
+    const int written = snprintf(scratch, sizeof(scratch),
+                                 CS_GAMES_DIR "/%s/%s.mp3", game_key, clip_id);
+    if (written <= 0 || (size_t)written >= out_len || (size_t)written >= sizeof(scratch)) {
+        return false;
+    }
+    memcpy(out, scratch, (size_t)written + 1);
+    return true;
+}
+
+/// "/tmp/g-<gameKey>-<clipId>.mp3.part" ("g-" keeps a game part file from
+/// colliding with a story's, a music track's or a voice clip's).
+inline bool cs_build_game_temp_path(char *out, size_t out_len,
+                                    const char *game_key, const char *clip_id) {
+    if (out == NULL || out_len == 0
+        || !cs_is_valid_story_id(game_key) || !cs_is_valid_story_id(clip_id)) {
+        return false;
+    }
+    char scratch[CS_MAX_PATH_LEN * 2];
+    const int written = snprintf(scratch, sizeof(scratch),
+                                 "/tmp/g-%s-%s.mp3.part", game_key, clip_id);
     if (written <= 0 || (size_t)written >= out_len || (size_t)written >= sizeof(scratch)) {
         return false;
     }

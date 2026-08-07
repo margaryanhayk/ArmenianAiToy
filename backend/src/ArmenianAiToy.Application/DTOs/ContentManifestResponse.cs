@@ -45,6 +45,13 @@ public sealed record ContentManifestResponse(
     /// for deployments that have none, and pre-welcome firmware ignores it.</summary>
     public IReadOnlyList<ContentVoiceItem>? Voice { get; init; }
 
+    /// <summary>Offline games — the pre-rendered clips the button games play
+    /// from the card; firmware syncs them to
+    /// <c>/games/&lt;gameKey&gt;/&lt;clipId&gt;.mp3</c>. Null until the owner
+    /// configures rendered clips, so the wire stays byte-identical for
+    /// deployments that have none, and pre-games firmware ignores it.</summary>
+    public IReadOnlyList<ContentGameItem>? Games { get; init; }
+
     /// <summary>Welcome-flow — the four parent mode switches, stamped by the
     /// controller (device flag with the default child's override applied).
     /// The toy caches them in its SD index so the "what shall we do?" prompt
@@ -69,6 +76,20 @@ public sealed record ContentManifestResponse(
 /// title: the id carries the role and nothing displays these.</summary>
 public sealed record ContentVoiceItem(
     string VoiceId,
+    int Version,
+    string AudioUrl,
+    string Sha256,
+    long SizeBytes,
+    bool Enabled);
+
+/// <summary>Offline games — one downloadable game clip, addressed by the
+/// (gameKey, clipId) PAIR rather than a single id: four of the five games
+/// each ship a clip called <c>intro</c>, so the game key is what keeps them
+/// apart, both here and in the toy's <c>/games/&lt;gameKey&gt;/</c>
+/// subdirectory. No title — nothing displays these.</summary>
+public sealed record ContentGameItem(
+    string GameKey,
+    string ClipId,
     int Version,
     string AudioUrl,
     string Sha256,

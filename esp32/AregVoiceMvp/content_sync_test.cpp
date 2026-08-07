@@ -909,6 +909,220 @@ void test_index_v5_forward_compatible() {
     check(!cs_story_is_serial(&out[0]), "v5_index_standalone_still_standalone");
 }
 
+// ---- offline-game clips (schema v7) ---------------------------------
+
+// KEYSTONE: the built path must be byte-for-byte what offline_games.cpp
+// already resolves — AREG_GAMES_CLIP_DIR "/%s/%s.mp3". That module is
+// bench-gated behind a DIFFERENT flag, so the two cannot include each
+// other; this literal is the only thing keeping them in step. Sync the
+// clips to a path the games module does not look at and every game goes
+// silent while the sync reports a clean PASS.
+void test_game_paths() {
+    char path[CS_MAX_PATH_LEN];
+
+    check(cs_build_game_cache_path(path, sizeof(path), "mind-reader", "q-root")
+              && strcmp(path, "/games/mind-reader/q-root.mp3") == 0,
+          "game_cache_path_matches_offline_games_layout");
+    check(cs_build_game_cache_path(path, sizeof(path), "who-first", "win-green")
+              && strcmp(path, "/games/who-first/win-green.mp3") == 0,
+          "game_cache_path_second_game");
+
+    // No "-v<version>" anywhere in the name — deliberate; the games module
+    // resolves by key and id alone.
+    check(strstr(path, "-v") == NULL, "game_cache_path_carries_no_version");
+
+    check(cs_build_game_dir_path(path, sizeof(path), "button-simon")
+              && strcmp(path, "/games/button-simon") == 0,
+          "game_dir_path");
+    check(cs_build_game_temp_path(path, sizeof(path), "mind-reader", "g-1010")
+              && strcmp(path, "/tmp/g-mind-reader-g-1010.mp3.part") == 0,
+          "game_temp_path_prefixed_to_avoid_collisions");
+
+    // Both halves reach the path, so both are allowlisted — traversal is
+    // unrepresentable, not filtered.
+    check(!cs_build_game_cache_path(path, sizeof(path), "..", "q-root"),
+          "game_path_rejects_traversal_key");
+    check(!cs_build_game_cache_path(path, sizeof(path), "mind-reader", "../x"),
+          "game_path_rejects_traversal_clip");
+    check(!cs_build_game_cache_path(path, sizeof(path), "Mind-Reader", "q-root"),
+          "game_path_rejects_uppercase_key");
+    check(!cs_build_game_cache_path(path, sizeof(path), "mind-reader", ""),
+          "game_path_rejects_empty_clip");
+    check(!cs_build_game_cache_path(path, sizeof(path), "", "q-root"),
+          "game_path_rejects_empty_key");
+
+    // Refuse-on-truncation: a short buffer never yields a shortened path
+    // pointing at a different file.
+    char tiny[8];
+    check(!cs_build_game_cache_path(tiny, sizeof(tiny), "mind-reader", "q-root"),
+          "game_path_refuses_truncation");
+}
+
+void add_game_item(JsonArray arr, const char *key, const char *clip,
+                   int version, const char *sha, long size,
+                   bool enabled = true) {
+    JsonObject o = arr.add<JsonObject>();
+    o["gameKey"]   = key;
+    o["clipId"]    = clip;
+    o["version"]   = version;
+    o["sha256"]    = sha;
+    o["sizeBytes"] = size;
+    o["enabled"]   = enabled;
+}
+
+void test_game_manifest_read() {
+    JsonDocument doc;
+    JsonArray arr = doc.to<JsonArray>();
+    add_game_item(arr, "mind-reader", "q-root", 2, kShaA, 40000);
+    add_game_item(arr, "mind-reader", "bad", 1, "nothex", 40000);
+    add_game_item(arr, "MIND-READER", "q-1", 1, kShaB, 40000);   // uppercase key
+    add_game_item(arr, "mind-reader", "q/1", 1, kShaB, 40000);   // slash in id
+    add_game_item(arr, "who-first", "go", 1, kShaB, 0);          // no size
+    add_game_item(arr, "who-first", "intro", 1, kShaC, 40000, false);  // disabled
+
+    CsGame g;
+    int accepted = 0;
+    for (JsonObjectConst item : arr) {
+        if (cs_manifest_read_game(item, &g)) accepted++;
+    }
+    check(accepted == 1, "game_manifest_accepts_only_the_valid_item");
+
+    // And the accepted one round-trips its fields intact.
+    JsonDocument one;
+    JsonArray oneArr = one.to<JsonArray>();
+    add_game_item(oneArr, "sound-detective", "r01-sound", 3, kShaA, 51200);
+    check(cs_manifest_read_game(oneArr[0].as<JsonObjectConst>(), &g)
+              && strcmp(g.game_key, "sound-detective") == 0
+              && strcmp(g.clip_id, "r01-sound") == 0
+              && g.version == 3 && g.size_bytes == 51200
+              && !g.verified,
+          "game_manifest_fields_round_trip");
+}
+
+// KEYSTONE: the (gameKey, clipId) PAIR is the identity. Four of the five
+// games each ship a clip called "intro"; if anything compared clip ids
+// alone, three of those four would be treated as duplicates and quietly
+// never reach the card.
+void test_game_pair_is_the_identity() {
+    CsGame a{};
+    cs_copy_bounded(a.game_key, sizeof(a.game_key), "mind-reader");
+    cs_copy_bounded(a.clip_id, sizeof(a.clip_id), "intro");
+
+    check(cs_game_pairs_equal(&a, "mind-reader", "intro"), "game_pair_matches_itself");
+    check(cs_game_pairs_equal(&a, "MIND-READER", "INTRO"),
+          "game_pair_match_is_case_insensitive");
+    check(!cs_game_pairs_equal(&a, "who-first", "intro"),
+          "game_pair_same_clip_different_game_is_not_equal");
+    check(!cs_game_pairs_equal(&a, "mind-reader", "go"),
+          "game_pair_same_game_different_clip_is_not_equal");
+}
+
+void test_index_v7_games_round_trip() {
+    JsonDocument idx;
+    cs_index_build(idx, nullptr, 0, nullptr, true);
+
+    JsonDocument gamesDoc;
+    JsonArray games = gamesDoc.to<JsonArray>();
+    CsGame g{};
+    // Written from ONE reused struct, exactly as sync_games does — this is
+    // what proves cs_index_append_game copies rather than links. If it
+    // linked, all three entries would end up naming the last clip.
+    cs_copy_bounded(g.game_key, sizeof(g.game_key), "mind-reader");
+    cs_copy_bounded(g.clip_id, sizeof(g.clip_id), "intro");
+    cs_copy_bounded(g.sha256, sizeof(g.sha256), kShaA);
+    g.version = 1; g.size_bytes = 40000; g.verified = true;
+    cs_index_append_game(games, &g);
+
+    cs_copy_bounded(g.game_key, sizeof(g.game_key), "who-first");
+    cs_copy_bounded(g.sha256, sizeof(g.sha256), kShaB);
+    g.size_bytes = 50000;
+    cs_index_append_game(games, &g);            // same clip id, other game
+
+    cs_copy_bounded(g.game_key, sizeof(g.game_key), "button-simon");
+    cs_copy_bounded(g.clip_id, sizeof(g.clip_id), "your-turn");
+    cs_copy_bounded(g.sha256, sizeof(g.sha256), kShaC);
+    g.version = 4; g.size_bytes = 12345;
+    cs_index_append_game(games, &g);
+
+    cs_index_add_games(idx, games);
+
+    String serialized;
+    serializeJson(idx, serialized);
+    check(serialized.indexOf("\"schemaVersion\":" + String(CS_INDEX_SCHEMA_VERSION)) >= 0,
+          "index_v7_schema_version");
+
+    JsonDocument reread;
+    deserializeJson(reread, serialized);
+    JsonArrayConst back = reread["games"].as<JsonArrayConst>();
+    check(!back.isNull() && back.size() == 3, "index_v7_games_round_trip_count");
+
+    CsGame r;
+    check(cs_index_read_game(back[0].as<JsonObjectConst>(), &r)
+              && strcmp(r.game_key, "mind-reader") == 0
+              && strcmp(r.clip_id, "intro") == 0
+              && r.size_bytes == 40000 && r.verified,
+          "index_v7_first_entry_intact");
+    check(cs_index_read_game(back[1].as<JsonObjectConst>(), &r)
+              && strcmp(r.game_key, "who-first") == 0
+              && strcmp(r.clip_id, "intro") == 0
+              && r.size_bytes == 50000,
+          "index_v7_same_clip_id_other_game_kept_separately");
+    check(cs_index_read_game(back[2].as<JsonObjectConst>(), &r)
+              && strcmp(r.game_key, "button-simon") == 0
+              && strcmp(r.clip_id, "your-turn") == 0
+              && r.version == 4,
+          "index_v7_third_entry_intact");
+
+    // A hand-edited entry is not trusted just because it is already on the
+    // card — the same allowlist applies on the way back in.
+    JsonDocument hostile;
+    JsonObject bad = hostile.to<JsonObject>();
+    bad["gameKey"] = "../etc"; bad["clipId"] = "passwd"; bad["sha256"] = kShaA;
+    check(!cs_index_read_game(bad, &r),
+          "index_v7_rejects_hand_edited_traversal_entry");
+}
+
+// KEYSTONE: a card written by the PREVIOUS firmware must keep working. v7 is
+// a superset, so a v6 document has to parse as "no game clips indexed" — the
+// exact pre-games behaviour, whose only cost is that the next sync
+// re-downloads them.
+void test_index_v6_forward_compatible() {
+    static CsStory stories[1];
+    fill(&stories[0], "anban-huri", 1, kShaA, 100);
+
+    JsonDocument idx;
+    cs_index_build(idx, stories, 1, "anban-huri", true);
+    cs_index_add_story_flags(idx, true, true);
+    idx["schemaVersion"] = 6;          // pretend it was written by the old build
+    String serialized;
+    serializeJson(idx, serialized);
+
+    JsonDocument reread;
+    deserializeJson(reread, serialized);
+
+    CsStory *out = g_story_scratch;
+    int schema = 0;
+    check(cs_index_parse(reread, out, CS_MAX_STORIES, &schema) == 1,
+          "v6_index_stories_still_parse");
+    check(schema == 6, "v6_index_detected_as_v6");
+    check(reread["games"].isNull(), "v6_index_has_no_games_section");
+    // And every v6 field it DOES carry survives the bump untouched.
+    check(cs_index_intro_enabled(reread), "v6_index_intro_flag_still_read");
+    check(cs_index_pauses_enabled(reread), "v6_index_pauses_flag_still_read");
+    check(cs_index_variants_enabled(reread), "v6_index_variants_flag_still_read");
+    check(cs_index_mode_enabled(reread, "storyEnabled"), "v6_index_modes_still_default_on");
+
+    // Symmetrically: an index built with no game clips writes no games
+    // section at all, so a games-less deployment's card is byte-identical to
+    // a pre-v7 one apart from the schema number.
+    JsonDocument empty;
+    cs_index_build(empty, stories, 1, "anban-huri", true);
+    JsonDocument none;
+    JsonArray noneArr = none.to<JsonArray>();
+    cs_index_add_games(empty, noneArr);
+    check(empty["games"].isNull(), "no_game_clips_writes_no_games_section");
+}
+
 void run_all() {
     s_pass = 0;
     s_fail = 0;
@@ -947,6 +1161,11 @@ void run_all() {
     test_variant_manifest_parse();
     test_variant_index_round_trip();
     test_index_v5_forward_compatible();
+    test_game_paths();
+    test_game_manifest_read();
+    test_game_pair_is_the_identity();
+    test_index_v7_games_round_trip();
+    test_index_v6_forward_compatible();
     test_copy_bounded();
 
     Serial.printf("[cs-test] heap after=%u\n", (unsigned)ESP.getFreeHeap());

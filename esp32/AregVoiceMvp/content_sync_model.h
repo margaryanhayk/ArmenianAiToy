@@ -129,3 +129,34 @@ bool cs_index_pauses_enabled(JsonDocument &doc);
 /// true, the shipped default. Harmless on a card with no alternate
 /// endings cached: nothing resolves, so the base narration plays.
 bool cs_index_variants_enabled(JsonDocument &doc);
+
+// ---- offline-game clips (index schema v7) ---------------------------
+//
+// Item-at-a-time, unlike every other namespace here. The stories / music /
+// voice helpers fill a TABLE; these fill ONE CsGame, because ~90 game clips
+// would not fit in .bss three times over. See the CS_MAX_GAMES comment in
+// content_sync_rules.h for the numbers.
+
+/// Validates ONE manifest `games[]` item into `out`. Returns false (and
+/// logs the reject reason) for a disabled item, an id failing the
+/// allowlist on either half of the pair, a bad hash, or an out-of-range
+/// size. Never partially fills `out`.
+bool cs_manifest_read_game(JsonObjectConst item, CsGame *out);
+
+/// Validates ONE index `games[]` entry into `out`. Same allowlist and hash
+/// rules as the manifest reader — a card can be hand-edited, so nothing is
+/// trusted just because it was already written.
+bool cs_index_read_game(JsonObjectConst entry, CsGame *out);
+
+/// Appends one clip to an index `games` array. The CsGame's char ARRAYS
+/// are what make ArduinoJson COPY the strings rather than link to them —
+/// do not "simplify" this to take const char* parameters.
+void cs_index_append_game(JsonArray arr, const CsGame *game);
+
+/// Attaches a prepared `games` array (built with cs_index_append_game) to
+/// an index document ALREADY built by cs_index_build. Separate call for the
+/// same reason cs_index_add_music / cs_index_add_voice are separate.
+/// A null or empty array writes nothing, so a deployment with no game clips
+/// produces an index byte-identical to the pre-v7 one apart from the schema
+/// number.
+void cs_index_add_games(JsonDocument &doc, JsonArrayConst games);

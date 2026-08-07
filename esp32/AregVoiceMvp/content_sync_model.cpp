@@ -586,3 +586,90 @@ bool cs_index_pauses_enabled(JsonDocument &doc) {
 bool cs_index_variants_enabled(JsonDocument &doc) {
     return doc["variantsEnabled"] | true;
 }
+
+// ---- offline-game clips (index schema v7) ---------------------------
+
+bool cs_manifest_read_game(JsonObjectConst item, CsGame *out) {
+    if (out == nullptr) {
+        return false;
+    }
+    const char *game_key = item["gameKey"]   | "";
+    const char *clip_id  = item["clipId"]    | "";
+    const int   version  = item["version"]   | 1;
+    const char *sha256   = item["sha256"]    | "";
+    const long  size     = item["sizeBytes"] | 0L;
+    const bool  enabled  = item["enabled"]   | false;
+
+    // BOTH halves are allowlisted: the key becomes an SD DIRECTORY name and
+    // the clip id a filename stem, so '/', '..' and ':' must be
+    // unrepresentable rather than filtered.
+    if (!enabled || !cs_is_valid_story_id(game_key)
+        || !cs_is_valid_story_id(clip_id)
+        || !cs_is_sha256_hex(sha256) || !cs_is_valid_size(size)) {
+        Serial.printf("[content-sync] game item rejected (%s/%s)\n",
+                      game_key, clip_id);
+        return false;
+    }
+
+    memset(out, 0, sizeof(*out));
+    // A truncated id or hash would address the WRONG file, so truncation is
+    // rejected rather than stored.
+    if (!cs_copy_bounded(out->game_key, sizeof(out->game_key), game_key)
+        || !cs_copy_bounded(out->clip_id, sizeof(out->clip_id), clip_id)
+        || !cs_copy_bounded(out->sha256, sizeof(out->sha256), sha256)) {
+        memset(out, 0, sizeof(*out));
+        return false;
+    }
+    out->version    = cs_normalize_version(version);
+    out->size_bytes = size;
+    out->verified   = false;
+    return true;
+}
+
+bool cs_index_read_game(JsonObjectConst entry, CsGame *out) {
+    if (out == nullptr) {
+        return false;
+    }
+    const char *game_key = entry["gameKey"] | "";
+    const char *clip_id  = entry["clipId"]  | "";
+    const char *sha256   = entry["sha256"]  | "";
+    if (!cs_is_valid_story_id(game_key) || !cs_is_valid_story_id(clip_id)
+        || !cs_is_sha256_hex(sha256)) {
+        return false;
+    }
+    memset(out, 0, sizeof(*out));
+    if (!cs_copy_bounded(out->game_key, sizeof(out->game_key), game_key)
+        || !cs_copy_bounded(out->clip_id, sizeof(out->clip_id), clip_id)
+        || !cs_copy_bounded(out->sha256, sizeof(out->sha256), sha256)) {
+        memset(out, 0, sizeof(*out));
+        return false;
+    }
+    out->version    = cs_normalize_version(entry["version"] | 1);
+    out->size_bytes = entry["sizeBytes"] | 0L;
+    out->verified   = entry["verified"] | false;
+    return true;
+}
+
+void cs_index_append_game(JsonArray arr, const CsGame *game) {
+    if (game == nullptr || arr.isNull()) {
+        return;
+    }
+    JsonObject e = arr.add<JsonObject>();
+    // Assigning the char ARRAYS (which decay to char*, not const char*) is
+    // what makes ArduinoJson copy the bytes into the document's own pool.
+    // The caller reuses a single stack CsGame for every clip, so linking
+    // instead of copying would leave every entry pointing at the last one.
+    e["gameKey"]   = game->game_key;
+    e["clipId"]    = game->clip_id;
+    e["version"]   = game->version;
+    e["sha256"]    = game->sha256;
+    e["sizeBytes"] = game->size_bytes;
+    e["verified"]  = game->verified;
+}
+
+void cs_index_add_games(JsonDocument &doc, JsonArrayConst games) {
+    if (games.isNull() || games.size() == 0) {
+        return;
+    }
+    doc["games"].set(games);
+}

@@ -100,11 +100,61 @@ public sealed class ContentManifestService : IContentManifestService
 
         var music = BuildMusic();
         var voice = BuildVoice();
-        if (items.Count == 0 && music is null && voice is null)
+        var games = BuildGames();
+        if (items.Count == 0 && music is null && voice is null && games is null)
         {
             return ContentManifestResponse.Empty();
         }
-        return new ContentManifestResponse(items) { Music = music, Voice = voice };
+        return new ContentManifestResponse(items)
+        {
+            Music = music,
+            Voice = voice,
+            Games = games,
+        };
+    }
+
+    /// <summary>Offline games — per-clip validation, mirroring the voice loop
+    /// (drop only the offending clip; dedupe keeps the first; default URL
+    /// fill scoped by the pair). Null when nothing valid is configured, so
+    /// the wire stays byte-identical for deployments with no game clips.
+    /// <para>
+    /// BOTH halves of the pair are held to the id allowlist here, unlike the
+    /// story loop which only allowlists <c>seriesId</c>/<c>altOf</c>. The
+    /// reason is what they become on the card: the game key is a DIRECTORY
+    /// name and the clip id a filename stem, so a stray <c>/</c> or <c>..</c>
+    /// would be a path, not an id. The firmware re-applies the identical rule
+    /// on parse — a card can be hand-edited — but nothing invalid should ever
+    /// reach the wire in the first place.
+    /// </para></summary>
+    private IReadOnlyList<ContentGameItem>? BuildGames()
+    {
+        var items = new List<ContentGameItem>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var clip in _options.ResolveGames())
+        {
+            if (!IsValidId(clip.GameKey)
+                || !IsValidId(clip.ClipId)
+                || clip.SizeBytes <= 0
+                || !IsSha256Hex(clip.Sha256)
+                // The PAIR is the lookup key — one game's "intro" and
+                // another's are different clips, and must not collide.
+                || !seen.Add($"{clip.GameKey}/{clip.ClipId}"))
+            {
+                continue;
+            }
+            items.Add(new ContentGameItem(
+                GameKey: clip.GameKey,
+                ClipId: clip.ClipId,
+                Version: clip.Version < 1 ? 1 : clip.Version,
+                AudioUrl: string.IsNullOrWhiteSpace(clip.AudioUrl)
+                    ? $"{DefaultContentFileRoute}?gameKey={Uri.EscapeDataString(clip.GameKey)}"
+                      + $"&clipId={Uri.EscapeDataString(clip.ClipId)}"
+                    : clip.AudioUrl,
+                Sha256: clip.Sha256.ToLowerInvariant(),
+                SizeBytes: clip.SizeBytes,
+                Enabled: true));
+        }
+        return items.Count == 0 ? null : items;
     }
 
     /// <summary>Welcome-flow — per-clip validation, mirroring the music loop

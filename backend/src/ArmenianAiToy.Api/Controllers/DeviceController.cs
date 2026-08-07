@@ -503,11 +503,38 @@ public class DeviceController : ControllerBase
         [FromQuery] string? storyId = null,
         [FromQuery] string? clip = null,
         [FromQuery] string? trackId = null,
-        [FromQuery] string? voiceId = null)
+        [FromQuery] string? voiceId = null,
+        [FromQuery] string? gameKey = null,
+        [FromQuery] string? clipId = null)
     {
         if (!options.Enabled)
         {
             return NotFound(new { error = "No content available." });
+        }
+
+        // Offline games — the (gameKey, clipId) PAIR selects one game clip.
+        // Fourth namespace beside stories, music and voice; same
+        // lookup-key-only contract, so neither half ever reaches the
+        // filesystem and the pair carries no traversal surface. Half a pair
+        // matches nothing, which is the same uniform 404 as an unknown one.
+        if (!string.IsNullOrWhiteSpace(gameKey) || !string.IsNullOrWhiteSpace(clipId))
+        {
+            var gameClip = options.ResolveGames().FirstOrDefault(g =>
+                string.Equals(g.GameKey, gameKey, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(g.ClipId, clipId, StringComparison.OrdinalIgnoreCase));
+            if (gameClip is null || string.IsNullOrWhiteSpace(gameClip.AudioPath))
+            {
+                return NotFound(new { error = "No content available." });
+            }
+            if (!Path.IsPathRooted(gameClip.AudioPath)
+                || !System.IO.File.Exists(gameClip.AudioPath))
+            {
+                logger.LogWarning(
+                    "Content audio path missing or not absolute for game clip {GameKey}/{ClipId}: {AudioPath}",
+                    gameClip.GameKey, gameClip.ClipId, gameClip.AudioPath);
+                return NotFound(new { error = "No content available." });
+            }
+            return PhysicalFile(gameClip.AudioPath, "audio/mpeg", enableRangeProcessing: true);
         }
 
         // Welcome-flow — voiceId selects a device-global spoken clip
