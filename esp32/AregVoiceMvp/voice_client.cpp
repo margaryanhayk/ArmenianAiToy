@@ -168,6 +168,15 @@ bool voice_wifi_begin() {
     wifi_load_effective_creds();
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
+    // Modem power save (hardware review 2026-08-07): the firmware never
+    // sleeps, and IDLE at ~70 mA costs 4.6x the energy of actually telling
+    // a story. MIN_MODEM keeps the radio associated but dozes it between
+    // DTIM beacons (~100 ms wake granularity) — invisible to every existing
+    // flow: the heartbeat/command-poll cadence is 60 s, chat/OTA/sync are
+    // all device-initiated, and nothing here listens for unsolicited
+    // inbound traffic. Roughly halves idle current; the bigger light-sleep
+    // slice stays deliberately separate from any OTA release.
+    WiFi.setSleep(WIFI_PS_MIN_MODEM);
     WiFi.begin(s_wifi_ssid, s_wifi_pass);
     Serial.printf("[wifi] connecting to %s ...\n", s_wifi_ssid);
     const uint32_t timeout_ms = 20000;
