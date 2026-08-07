@@ -75,7 +75,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2484 tests)
+dotnet test                                     # Run all tests (2509 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2405,10 +2405,14 @@ The file also carries the TTS watch-word list for the listen test. «Ողջու�
 opens half the greetings, so render ONE and check it before batching — one bad
 pattern would otherwise poison half the set.
 
-**Not shipped yet:** the rendered MP3s and the `ContentSync:Voice` config
-entries. Until those exist the manifest carries no voice clips, the toy finds
-none on its card, and the flow degrades to exactly the pre-welcome behaviour —
-so every slice above is safe to deploy on its own.
+**SHIPPED 2026-08-07:** all 43 rendered clips are configured in
+`ContentSync:Voice` (see § Owner batch (2026-08-07) below) — the manifest
+now carries voice clips and the welcome flow can actually make a sound for
+the first time since it was written. Until this landed the config was
+empty and every welcome-flow slice above, though code-complete since
+2026-08-04, had never produced any audio; a boot that reached the greeting
+found nothing on its card and fell back to silence. Bench verification on
+real hardware is still open (see the firmware half above).
 
 ## AI provider seam (`AI:*Provider`, owner request 2026-08-05)
 
@@ -3056,14 +3060,15 @@ ZERO bytes of either** and stay byte-identical:
   `audio_sd_begin()` then raw `SD.begin` at 400 kHz/1/4/10 MHz, then
   read/write/verify/delete.
 
-**HARDWARE NOTE — the SD module must be powered from ESP 5V, not 3V3.** The
-bench SD module (WWZMDiB blue microSD board: onboard AMS1117 regulator +
-level shifter) browns out on 3.3 V — `SD.begin` fails at *every* SPI speed,
-which masquerades as a wiring/card fault. Moving its VCC to the board's 5V
-rail fixed it. Note the bench dev board (a USB-C ESP32-S3-DevKitC-1 clone)
-does **not** expose USB 5 V on any header pin (`5VIN` / J1-21 is input-only,
-reads ~0.14 V), so the module VCC was fed from an external 5 V source with a
-**shared ground** to the ESP. Final SD wiring:
+**HARDWARE NOTE — the SD module must be powered from ESP 5V, not 3V3 (on
+THIS bench module).** The bench SD module (WWZMDiB blue microSD board:
+onboard AMS1117 regulator + level shifter) browns out on 3.3 V — `SD.begin`
+fails at *every* SPI speed, which masquerades as a wiring/card fault. Moving
+its VCC to the board's 5V rail fixed it. Note the bench dev board (a USB-C
+ESP32-S3-DevKitC-1 clone) does **not** expose USB 5 V on any header pin
+(`5VIN` / J1-21 is input-only, reads ~0.14 V), so the module VCC was fed
+from an external 5 V source with a **shared ground** to the ESP. Final SD
+wiring for the current bench rig:
 
 | SD pin | ESP32-S3 |
 |--------|----------|
@@ -3073,6 +3078,17 @@ reads ~0.14 V), so the module VCC was fed from an external 5 V source with a
 | SCK    | GPIO12 |
 | DI (MOSI) | GPIO11 |
 | DO (MISO) | GPIO13 |
+
+**CORRECTED (hardware review, 2026-08-07) — the SD card itself does NOT
+want 5 V and never did.** Per `docs/hardware/power-tree.md` § 4, the
+brownout above was the bench breakout module's own AMS1117 dropout
+(1.1-1.3 V), not a property of microSD — a real microSD is a 3.3 V part.
+The production design (`docs/hardware/schematic-spec.md`) runs the SD
+socket off the single 3V3 rail with a proper capacitor at the socket, no
+5 V rail implied by SD at all. The wiring table above stays accurate for
+THIS bench module on THIS dev board; do not generalize it into a
+production requirement. See § Owner batch (2026-08-07) → Hardware dossier
+below for the full engineering dossier.
 
 **BUILD NOTE — always build with `FlashSize=8M,PartitionScheme=custom`.**
 The sketch ships a custom 8 MB dual-OTA `partitions.csv` with **3 MB OTA
@@ -3478,8 +3494,9 @@ parent-controlled, default ON.
 - Firmware: index v5 → v6 carries per-story `alt_of`; on a repeat listen
   with the toggle on and a verified alt cached, `story_select` resolves
   the alternate file instead. `story_pauses_enabled()` on the firmware
-  side is plumbing + an accessor only — actual mid-story pause playback
-  wiring is a later render-batch slice, not built yet.
+  side was plumbing + an accessor only at the time this batch shipped —
+  **the actual mid-story pause playback wiring landed in the following
+  batch; see § Owner batch (2026-08-07) → story pauses below.**
 - Dashboard: two new toggles with plain-parent explanatory notes, audit-
   feed labels for the two new event types, aria-labels added across four
   adjacent switches.
@@ -3541,6 +3558,204 @@ owner review + a sample-first listen test gates any render):**
   above already shipped), but the episode TEXT itself is still in DRAFTS
   status pending the owner's text review and listen test — no render, no
   manifest entry yet.
+  **CORRECTION (2026-08-07):** the sibling `backend/content/offline-games/`
+  bullet above is now stale — see § Owner batch (2026-08-07) → Games
+  ContentSync. The 90 drafted clip texts grew to **92 rendered clips**
+  (Simon's two non-verbal tone clips plus the owner's 34-line correction
+  pass) and are now SHIPPED and Wi-Fi-synced to the toy. The owner's
+  explicit caveat still applies: this is a WORKING library for **bench
+  testing only** — every clip gets an expressive re-render (acting, not
+  just correct pronunciation) plus a fresh listen test before launch.
+  `variant-endings/` and `serial-hero/` are unaffected by this batch and
+  remain in the draft status described above.
+
+## Owner batch (2026-08-07) — games over Wi-Fi, welcome voice shipped, story pauses play, OTA field-proven, hardware dossier
+
+A second same-day owner batch, landing directly on top of the
+content-depth batch above. Test count grew to the current **2509** (see
+§ Build & Test).
+
+**Games ContentSync namespace — the fourth namespace.** The 92 offline-game
+clips (see the correction above) now reach the toy the same way stories,
+music and voice clips do, instead of requiring hand-copying an SD card.
+- `ContentSync:Games` — an ordered list of `{ gameKey, clipId, version,
+  sha256, sizeBytes, audioPath/audioUrl }`. **Identity is the PAIR**
+  (`gameKey` + `clipId`), not the clip id alone — four of the five games
+  each ship a clip literally called `intro`, so a clip-id-only dedupe would
+  silently drop three of every four. Manifest field is `Games[]`, additive,
+  **null when unconfigured** so the wire stays byte-identical for
+  deployments without game clips (pinned by
+  `Manifest_NoGameClips_FieldStaysNull`).
+  `GET /api/devices/content-file?gameKey=&clipId=` — both halves are
+  lookup keys only, never filesystem paths; a half-pair or a
+  traversal-shaped pair gets the same uniform 404 as the other three
+  namespaces.
+  Both `gameKey` and `clipId` are held to the same allowlist as story ids
+  (`a-z0-9-_`, ≤48 chars) at manifest-build time — **stricter than the
+  story namespace**, because the game key becomes an SD **directory** name
+  (`/games/<key>/<clip>.mp3`).
+- Firmware: content-sync index schema **v6 → v7**. Downloads one clip at a
+  time (streamed, sha-verified) into `/games/<key>/<clip>.mp3` — the exact
+  layout `offline_games.cpp` already resolves. Deliberately does **not**
+  hold a `CsGame` table: three voice-shaped static tables at ~90 clips
+  would have cost ~47 KB of `.bss`, so static RAM is unchanged
+  (227,480 B free) and production flash is actually 72 B **smaller**.
+  No version suffix in the on-card filename (the offline-games code
+  resolves an exact path); the version lives on the wire and in the
+  index, so a re-render still re-downloads.
+- **Deliberately NOT built**: a parent-visible "clips synced on this toy"
+  count. The backend never learns what a device actually has on its card —
+  printing a server-config number labeled as the toy's own would be a
+  false statement about a child's device. The honest version needs the
+  device to report its verified index on the existing heartbeat; recorded
+  as a follow-up slice, not built here.
+- **Bug found and fixed on real hardware, same day** (`content_sync.cpp` /
+  `content_sync_model.cpp`): `cs_index_append_game` took a `const CsGame *`,
+  whose char-array members decay to `const char*` — which ArduinoJson
+  stores **by pointer**, not by copy (the code's own comment asserted the
+  opposite). Every appended index entry therefore aliased the single
+  caller-side stack `CsGame`, so the dedupe compared each new clip against
+  *itself* and rejected it as a duplicate: `offered=92 downloaded=1`,
+  exactly the field numbers a real boot showed. Fixed with `const_cast` to
+  force ArduinoJson's documented byte-copy path. The music/voice/story
+  appends copy from long-lived static tables and are safe by the same
+  logic — noted in the code, not changed. Verified on the cabled toy:
+  zero dup-skips, per-clip sha256-verified downloads streaming.
+- Pinned by `ContentSyncGamesTests` (config binding, pair-identity dedupe,
+  per-item validation, traversal-shaped ids, cross-game pair rejection,
+  the real `game-clips.json` ids against the firmware allowlist).
+
+**Welcome voice clips SHIPPED.** `ContentSync:Voice` now carries all 43
+rendered clips — see the correction in § Spoken welcome flow above. The
+`story-audio\**\*.mp3` csproj glob was also made fully recursive (it had
+already been widened once under fire for the games clips; the same 404
+pattern — manifest advertises a clip, `content-file` can't find it —
+recurred for voice and forced the second widening). 143 files now reach
+the publish output (8 stories + 92 game clips + 43 voice clips).
+
+**Story pauses actually play (`story_pause.{h,cpp}`).** Closes the last
+plumbing-only feature from the content-depth batch: during an SD story,
+Areg now genuinely stops at most twice, invites the child to shout
+something, waits ~3 s, plays a resume line, and continues the **same
+file from the same byte** — implemented as a self-inflicted barge-in
+through the existing resume seam (no second decoder, no new state enum,
+no new LED vocabulary).
+- Gates: parent toggle ON (`StoryPausesEnabled`), outside the bedtime
+  window (a pause invites shouting), SD playback only, **both halves** of
+  the next shout/resume clip pair verified on the card, story long enough
+  to have a window at all.
+- Timing: never in the first 45 s or last 30 s of the story, pauses at
+  least 45 s apart. Clips rotate over `shout-1..4` / `resume-1..4`
+  (`/games/story-pauses/<id>.mp3`, same rendered batch as the offline
+  games above) so a re-listen differs. A missing clip is a **silent
+  skip**, never a gap.
+- Verified (by reading, not on hardware): a pause cannot re-select the
+  story, cannot advance the rotation cursor or the heard-set, and is
+  never mistaken for a natural end. Production +2,516 B flash / -144 B
+  RAM.
+- **Honest limits, same as the firmware README**: nothing bench-run yet;
+  the pure tests (`story_select_test.cpp`) cover only the pause-planner
+  arithmetic; the first pause of each story relies on a 192 kbps
+  byte-rate assumption (deliberately biased so an error moves the pause
+  *earlier* — the safe direction — never later/missed); only the second
+  pause is planned against the story's actually-measured rate; a button
+  press during the shout invite is ignored by design.
+
+**OTA — proven end to end over the air, after a field-found identity bug.**
+The Proof-3 apply pipeline (see § Real OTA apply above) had never
+actually been exercised wirelessly; this batch is that first real rollout,
+and it did not go cleanly the first time.
+- **1.1.0**: release-packaging slice. Bench-verified against a local
+  server (manifest offer, HMAC signature, sha256 all matched), but found
+  a real defect first: the offer gate skips a device whose `BoardModel`
+  differs from the configured one, and the live toy reports **no** board —
+  a pinned `BoardModel` would have produced `updateAvailable:false` with
+  no error and no log, silently blocking the whole rollout. Config now
+  ships `BoardModel` empty with the reason recorded beside it.
+- **Field rollback #1 (1.1.0 → 1.0.1)**: the image downloaded, flashed,
+  and rebooted, then never checked in inside the 5-minute deadline — the
+  bootloader correctly rolled back. Root cause: `handle_welcome_flow()`
+  runs at the end of `setup()` and, on the ordinary path, plays a whole
+  3-4 minute story **without returning to `loop()`** — on the one boot
+  that decides confirm-vs-rollback, the deadline could expire before the
+  check-in was even attempted.
+- **1.1.1 fix**: `setup()` now runs an early check-in when an OTA outcome
+  is pending and skips the greeting for that one boot; `content_sync_tick()`
+  and `story_report_tick()` are held while an outcome is pending; deadline
+  raised 5 → 15 minutes (later documented as 300 s → 900 s); both acks now
+  carry `bootDiag` (reset reason, uptime, heap, wifi, rssi, sd, boot count)
+  so the next failure is diagnosable from the dashboard alone, without a
+  cable.
+- **Field rollback #2/#3 — the real fault**: still rolled back, this time
+  on `[heartbeat] status=401`. Root cause was **not** timing at all: the
+  restored `config.h` carried a **stale device identity** — a leftover
+  from an old build cache — so the toy had never actually been running
+  under its registered credentials. The toy's only credential copy lived
+  on the chip (keys are hashed server-side and therefore unrecoverable),
+  and it was overwritten mid-diagnosis, so the toy had to be
+  **re-registered**.
+- **Identity fix, structural**: a one-shot, triple-guarded NVS identity
+  burn (`AREG_PROVISION_IDENTITY_ONCE` — flag defined, NVS empty,
+  credentials not placeholders) so the identity survives any future
+  `config.h` loss. **OTA images are now built with PLACEHOLDER
+  credentials** — verified by binary inspection that no real device key
+  ever appears in the shipped image — because an OTA image reaches
+  *every* toy, and one toy's secret must never ride inside it.
+- **1.1.2 / 1.1.3**: applied **over the air, cleanly** —
+  download → flash → reboot → check-in (4 s) → `confirmed`. Backend
+  serves the unversioned `firmware/areg-current.bin` (so
+  `FirmwareUpdate:ImagePath` is set once, never per-release);
+  `docs/ota-release-runbook.md` carries the full field log above. 1.1.3
+  also carries the games-sync aliasing fix.
+- **New internal endpoint** `GET /api/internal/devices/{deviceId}/commands`
+  — read-only, operator-gated, newest first, no payload echo. The missing
+  read half of the existing enqueue endpoint: it answers whether a device
+  ever *polled* (`Status` leaves `Pending`) and what it *acked*, which is
+  what makes a device silently running pre-OTA firmware distinguishable
+  from one that is simply idle. Pagination `limit` clamped to 100, 404 on
+  unknown device.
+
+**Hardware dossier.** `.claude/agents/hardware-schematic-engineer.md` +
+`docs/hardware/{power-tree,schematic-spec,bom,open-questions}.md` — a
+persistent agent and a reviewed engineering dossier (rail tree, protection,
+derived component values, BOM, owner decisions + lab measurements still
+open), written after an earlier review's summary dropped the engineering
+chain behind a component recommendation. Two corrections that land
+directly on documentation elsewhere in this file:
+- **The SD-needs-5V note above is corrected**, not retracted — see the
+  updated HARDWARE NOTE in § Cloud→SD content sync (firmware half). The
+  brownout was the bench breakout module's own regulator, not a property
+  of microSD; the production schematic runs SD off the single 3V3 rail.
+- **GPIO0 is a production blocker on the current bench wiring.** The
+  bench build's MAIN button lives on GPIO0 (an ESP32 strapping pin — a
+  child holding it through a power-cycle forces download mode, which
+  looks exactly like a dead toy). `docs/hardware/schematic-spec.md` moves
+  the production MAIN button to **GPIO18**, leaving GPIO0 as a
+  10 kΩ-pulled factory test pad only. Not yet carried back into the bench
+  firmware pin map — still GPIO0 on the dev-kit bench today.
+- Full dossier (battery chemistry, speaker-sensitivity/rail-count
+  coupling, EU/RED certification path, BOM deltas) is scoped as owner
+  decisions + lab measurements, not yet closed — see
+  `docs/hardware/open-questions.md`.
+
+**Firmware power save.** `WiFi.setSleep(WIFI_PS_MIN_MODEM)` in
+`voice_wifi_begin()` — a hardware-review finding that the firmware never
+slept, and idle current (~70 mA) cost 4.6× the energy of actually telling
+a story. MIN_MODEM dozes the radio between DTIM beacons while staying
+associated; invisible to every existing flow (60 s heartbeat/poll cadence,
+all traffic device-initiated). Compiles clean; real verification is a PPK2
+current measurement plus a soak confirming heartbeat/command-poll latency
+is unchanged — neither run yet. **Deliberately shipped as its own release
+(1.1.4), never bundled with an OTA rollout** — the 1.1.0 field lesson
+above is that first-boot timing changes and OTA check-ins do not mix
+well; ships only after 1.1.3 has soaked.
+
+**Mobile app.** `ParentDeviceStoryPausesSet` / `ParentDeviceVariantEndingsSet`
+(from the content-depth batch's parent toggles) were showing as raw enum
+names in `mobile/AregParent`'s activity feed — flagged as an out-of-scope
+follow-up in that batch, closed here with trilingual labels
+(`mobile/AregParent/src/i18n.ts` + `ActivityScreen.tsx`) mirroring the
+dashboard's already-reviewed wording.
 
 ## Key Design Decisions
 
