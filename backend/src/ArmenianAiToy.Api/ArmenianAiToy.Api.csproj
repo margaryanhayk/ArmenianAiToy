@@ -59,7 +59,14 @@
     Windows bench and in the Linux container.
   -->
   <ItemGroup>
-    <Content Include="story-audio\*.mp3" CopyToOutputDirectory="PreserveNewest" />
+    <!--
+      Recursive on purpose. This glob was widened under fire twice: once for
+      story-audio/games/ and once for story-audio/voice/. Both times the
+      manifest advertised clips that content-file then 404'd, because a
+      non-recursive glob left them out of the publish output. Any future
+      namespace is covered now.
+    -->
+    <Content Include="story-audio\**\*.mp3" CopyToOutputDirectory="PreserveNewest" />
     <!--
       Game clips live in per-game SUBFOLDERS (story-audio/games/<key>/<clip>.mp3)
       because four games each define a clip called "intro". The top-level glob
@@ -67,7 +74,7 @@
       clips the content-file endpoint then 404s — found exactly that way on the
       bench, 2026-08-07.
     -->
-    <Content Include="story-audio\games\**\*.mp3" CopyToOutputDirectory="PreserveNewest" />
+
   </ItemGroup>
 
   <!--
