@@ -323,10 +323,23 @@ bool download_file_verified(const char *label, const char *url,
         story_fail(label, "download_begin_failed");
         return false;
     }
+    // Field fix (2026-08-07, 92-clip games sync on the live toy): without
+    // reuse, every download closed and re-opened the shared TLS connection
+    // — one TCP+TLS handshake per file. ~30 files in, connects started
+    // failing intermittently (socket churn / TIME_WAIT exhaustion), and a
+    // run of slow failed connects — GET() blocks through connect+handshake
+    // WITHOUT feeding the watchdog — accumulated past the 60 s task
+    // watchdog: reset_reason=6/TASK_WDT, reboot loop. setReuse keeps the
+    // connection across end() (every content URL hits the same origin, so
+    // the whole sync now costs ONE handshake), and the wdt reset brackets
+    // the one remaining blocking phase.
+    dl.setReuse(true);
     voice_add_device_auth_headers(dl);
     dl.setConnectTimeout(AREG_HTTP_CONNECT_MS);
     dl.setTimeout(AREG_HTTP_READ_MS);
+    esp_task_wdt_reset();
     const int dstatus = dl.GET();
+    esp_task_wdt_reset();
     if (dstatus != 200) {
         dl.end();
         Serial.printf("[content-sync] %s download status=%d\n", label, dstatus);
