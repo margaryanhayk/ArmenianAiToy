@@ -25,6 +25,7 @@
 #include "canned_clip.h"
 #include "diag.h"
 #include "wifi_creds.h"        // B.1 — NVS cred clear (factory reset gesture)
+#include "device_creds.h"      // NVS-first device identity (one-shot burn in setup)
 #include "ble_provisioning.h"  // B.2 — BLE provisioning (gated; no-op when flag off)
 #include "ota_foundation.h"    // Proof 2 — phone-home command poll (no OTA apply)
 #include "sd_bench.h"          // microSD hardware proof (AREG_SD_BENCH_TEST builds only)
@@ -1860,6 +1861,37 @@ void setup() {
     Serial.printf("[boot] backend = %s\n", AREG_BACKEND_BASE_URL);
     areg_transport_log_policy();
     Serial.flush();
+
+    // One-shot identity burn into NVS (2026-08-07). Why this exists:
+    // this toy has always authenticated with the COMPILE-TIME identity,
+    // so its credentials lived in exactly one place — the image on the
+    // chip — and `config.h` is gitignored. When that file was lost and
+    // restored from an old build cache it came back with a STALE device
+    // id, every new build 401'd, three OTA attempts rolled back, and the
+    // working key was destroyed by the next flash because a device key
+    // is only ever stored hashed server-side.
+    //
+    // device_creds is already NVS-first (see voice_client.cpp), so once
+    // the identity is in NVS it survives any config.h and every future
+    // image can ship WITHOUT a real credential in it — which also means
+    // one OTA image stops being one toy's secret.
+    //
+    // Guarded three ways: the flag must be defined, NVS must be empty
+    // (never overwrites a provisioned toy), and the compile-time id must
+    // not be the placeholder. Flash once with the flag, then drop it.
+#ifdef AREG_PROVISION_IDENTITY_ONCE
+    if (device_creds_present()) {
+        Serial.println("[device] identity already in NVS — burn skipped");
+    } else if (strcmp(AREG_DEVICE_ID, "YOUR_DEVICE_ID") == 0
+               || strcmp(AREG_DEVICE_API_KEY, "YOUR_DEVICE_API_KEY") == 0) {
+        Serial.println("[device] refusing to burn placeholder credentials");
+    } else {
+        device_creds_save(AREG_DEVICE_ID, AREG_DEVICE_API_KEY);
+        Serial.printf("[device] identity burned to NVS (id=%s)\n", AREG_DEVICE_ID);
+    }
+    Serial.flush();
+#endif
+
     // Diag: reset reason. Distinguishes power-on / EN / panic /
     // brownout / watchdog so a "monitor came back" after a hang
     // can be classified without guessing.
