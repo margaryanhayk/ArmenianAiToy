@@ -24,7 +24,8 @@ already exists.
    *inactive* slot, sha256-verified before finalize, and boots in
    `pending_verify`. It only becomes permanent after it successfully checks in
    with the backend. If it cannot check in within
-   `AREG_OTA_CHECKIN_DEADLINE_MS` (**5 minutes**, `config.h`), it self-
+   `AREG_OTA_CHECKIN_DEADLINE_MS` (**15 minutes** since 1.1.1 — 5 was
+   demonstrably too tight in the field, `config.h`), it self-
    invalidates and the bootloader rolls back to the old image automatically.
    **No human action is required for that rollback.**
 3. **Nothing is pushed by configuration alone.** Enabling the release only makes
@@ -138,7 +139,7 @@ Railway uses `__` for config nesting.
 | Variable | Value | Notes |
 |---|---|---|
 | `FirmwareUpdate__Enabled` | `true` | The go-live switch. Deliberately not in the repo. |
-| `FirmwareUpdate__ImagePath` | `/app/firmware/areg-1.1.0.bin` | **Must be absolute.** The endpoint 404s on a relative path. Update the filename every release. |
+| `FirmwareUpdate__ImagePath` | `/app/firmware/areg-current.bin` | **Must be absolute.** The endpoint 404s on a relative path. The shipped filename is deliberately NOT versioned, so this is set once and never again: a forgotten per-release edit serves the OLD image under the NEW manifest's sha, and the device rejects it. |
 | `FirmwareUpdate__SigningKey` | see § 8 | Secret. Never committed. |
 
 Already set from earlier work, needed here: `Internal__AdminToken` (or
@@ -168,7 +169,7 @@ Two things are genuinely unknown until tested:
   | ack `ok`, result `{"status":"manifest_checked"}`, no reboot, version stays `1.0.1` | **Skeleton only.** It checks the manifest and deliberately does not apply. This toy needs one cable flash. |
   | toy goes quiet ~1–3 min, then reappears reporting `1.1.0` | Apply client present, update took. |
   | ack `failed` with a named error (`manifest_sig_invalid`, `no_downgrade`, …) | Apply client present, a gate refused. Fix the cause and re-enqueue. |
-  | no ack at all after ~5 min | Not polling — offline, revoked, or no OTA client. |
+  | no ack at all after ~15 min | Not polling — offline, revoked, or no OTA client. |
 
 - **Which manifest HMAC key was compiled into it?** It was flashed in July and
   `config.h` was lost and reconstructed on 2026-08-06, so we cannot read it
@@ -300,7 +301,7 @@ v2, which is a separate, later, deliberate step.
 ## 9. Rollback
 
 **Automatic, and it is the main one.** A new image that boots but cannot check
-in with the backend within 5 minutes self-invalidates and the bootloader
+in with the backend within 15 minutes self-invalidates and the bootloader
 returns to the previous image. Power-cycling during that window does not
 defeat it. The old image then notices the version mismatch and acks
 `failed/rollback_no_checkin`. You do not have to do anything.
@@ -386,3 +387,29 @@ wrong-key requests to the image endpoint return 401.
 - **The version cannot be overridden from the build command line** because
   `config.h` uses a plain `#define` (§ 2). Switching those four lines to
   `#ifndef` would make `-D` work and make CI-built releases possible.
+
+## 11. Field log
+
+**2026-08-07 — 1.1.0, first real OTA to the owner's toy: ROLLED BACK (by design).**
+Command polled 41 s after enqueue, then silence (correct: no ack before
+reboot), then the OLD image acked `failed / rollback_no_checkin`,
+`{"status":"rolled_back","attemptedVersion":"1.1.0"}` at +5m41s.
+
+Proven for the first time on real hardware: the toy carries the REAL apply
+client, the download+flash+reboot path works, and the bootloader auto-rollback
+works. The toy was never bricked and never left the network.
+
+Root cause (best evidence): the new image never got to its check-in inside the
+old 5-minute deadline. `handle_welcome_flow()` runs at the END of `setup()` and
+on the ordinary path plays a whole 3-4 minute story WITHOUT returning to
+`loop()` — so on the one boot that decides confirm-vs-rollback, the deadline
+could expire before the first attempt. Content sync (which downloads the whole
+library inside a single `loop()` iteration) is the second candidate.
+
+Fixed in 1.1.1: `setup()` runs an early check-in when an OTA outcome is
+pending and skips the greeting for that one boot; `story_report_tick()` and
+`content_sync_tick()` are held while an outcome is pending; deadline raised to
+15 minutes; and both acks now carry a `bootDiag` block (`rst` =
+`esp_reset_reason()`, uptime, heap, wifi, rssi, sd, boots) so the NEXT failure
+is diagnosable without a cable — a reset reason of 4/5/6/7 means a panic or
+watchdog, i.e. look at the new code, not at the timing.

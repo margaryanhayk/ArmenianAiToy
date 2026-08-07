@@ -11,10 +11,13 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <esp_ota_ops.h>
+#include <WiFi.h>          // WiFi.status() / RSSI() for the boot diagnostics
+#include <esp_system.h>    // esp_reset_reason()
 
 #include "config.h"
 #include "net_transport.h"
 #include "voice_client.h"
+#include "audio_io.h"    // audio_sd_available() — one bootDiag field
 #include "ota_apply.h"   // real apply pipeline (reboots on success)
 #include "ota_state.h"   // persisted cross-reboot OTA state (NVS)
 
@@ -67,6 +70,45 @@ static bool dedup_contains(const char *id) {
 static void dedup_add(const char *id) {
     snprintf(s_handled_ids[s_handled_next], sizeof(s_handled_ids[0]), "%s", id);
     s_handled_next = (s_handled_next + 1) % kDedupSlots;
+}
+
+// -------------------------------------------------------------
+// Boot diagnostics carried on the OTA acks
+// -------------------------------------------------------------
+//
+// WHY: when 1.1.0 rolled back in the field (2026-08-07) the ONLY thing the
+// server learned was `failed / rollback_no_checkin` — which is the symptom,
+// not the cause. Everything that would have told us WHY (uptime reached, was
+// the link even up, did it panic) was on a serial cable nobody had attached.
+// This is the smallest payload that distinguishes the plausible causes:
+//
+//   rst   esp_reset_reason() — THE field. 1=POWERON 3=SW(ESP.restart)
+//         4=PANIC 5=INT_WDT 6=TASK_WDT 7=WDT 8=DEEPSLEEP 9=BROWNOUT.
+//         A 4/5/6/7 on the check-in or rollback ack means the new image was
+//         crash-looping; a 1/3 means it booted cleanly and was merely too
+//         slow — two completely different bugs that look identical today.
+//   up    seconds of uptime AT the ack (how far into the deadline we got).
+//   heap  free heap — a new image that boots but is starved shows here.
+//   wifi  WiFi.status() (3 = WL_CONNECTED) and rssi — was the link the
+//         problem, or the backend?
+//   sd    was the card mounted (the welcome flow and content sync both
+//         gate on it, and both are boot-time time sinks).
+//   boots check-in boots seen while REBOOTING (>1 = something reset us).
+//
+// Counts and enum values only: no ids, no credentials, no PII, and no
+// free-form text. Rendered ~70 chars, hard-capped by the caller's buffer,
+// and stored verbatim by the backend in AckDiagnosticsJson.
+static void boot_diag_json(char *out, size_t cap) {
+    snprintf(out, cap,
+             "{\"rst\":%d,\"up\":%lu,\"heap\":%lu,\"wifi\":%d,\"rssi\":%d,"
+             "\"sd\":%d,\"boots\":%u}",
+             (int)esp_reset_reason(),
+             (unsigned long)(millis() / 1000UL),
+             (unsigned long)ESP.getFreeHeap(),
+             (int)WiFi.status(),
+             (int)WiFi.RSSI(),
+             audio_sd_available() ? 1 : 0,
+             (unsigned)s_ota.boot_attempts);
 }
 
 // Derive an API URL from AREG_BACKEND_URL (same trick as the heartbeat /
@@ -220,6 +262,17 @@ static void ota_boot_init() {
     Serial.flush();
 }
 
+bool ota_outcome_pending() {
+    // Lazily do the same one-shot boot load ota_foundation_tick() does, so a
+    // caller in setup() (which runs BEFORE the first tick) gets a truthful
+    // answer. Needs no network.
+    if (!s_ota_loaded) {
+        s_ota_loaded = true;
+        ota_boot_init();
+    }
+    return s_ota.state == OTA_STATE_REBOOTING;
+}
+
 // While OTA_STATE_REBOOTING, this owns the tick (command polling is paused):
 //  * NEW image (pending_ver == ours): ack the original command from NVS; ONLY
 //    a 2xx ack marks the app valid (backend check-in IS the health gate). If
@@ -227,6 +280,22 @@ static void ota_boot_init() {
 //    bootloader rolls back.
 //  * OLD image (version mismatch → the bootloader rolled us back): record the
 //    rollback terminally and ack failed.
+//
+// FIELD EVIDENCE — 2026-08-07, owner's toy, 1.1.0 over the air. The device
+// polled, applied, and went silent (correct: no ack before reboot), and
+// ~5m41s later the OLD image acked `failed / rollback_no_checkin`. So the
+// download, the flash, and the bootloader rollback all worked; what failed
+// is that the NEW image never completed this check-in inside the deadline.
+// Two things were competing with it for the one loop that runs this
+// function, and BOTH are now gated (see AregVoiceMvp.ino):
+//   * content_sync_tick() arms at 180 s and downloads the whole library —
+//     stories plus ~4.6 MB of game clips — INSIDE ONE loop iteration, which
+//     freezes both the check-in retry AND the deadline test below;
+//   * handle_welcome_flow() runs at the end of setup() and can play a whole
+//     story before loop() is ever reached, so the FIRST attempt was minutes
+//     late (see the setup() guard).
+// The rule this encodes: on a first boot after an update, nothing
+// long-running runs until the image is confirmed.
 static void ota_checkin_tick() {
     const bool is_new_image =
         (strcmp(s_ota.pending_ver, AREG_FW_VERSION) == 0);
@@ -239,10 +308,13 @@ static void ota_checkin_tick() {
         snprintf(s_ota.last_error, sizeof(s_ota.last_error), "rollback_no_checkin");
         snprintf(s_ota.applied_cmd, sizeof(s_ota.applied_cmd), "%s", s_ota.cmd_id);
         ota_state_save(s_ota);
-        char diag[128];
+        char bd[144];
+        boot_diag_json(bd, sizeof(bd));
+        char diag[256];
         snprintf(diag, sizeof(diag),
-                 "{\"status\":\"rolled_back\",\"attemptedVersion\":\"%.15s\"}",
-                 s_ota.pending_ver);
+                 "{\"status\":\"rolled_back\",\"attemptedVersion\":\"%.15s\","
+                 "\"bootDiag\":%s}",
+                 s_ota.pending_ver, bd);
         // Best-effort: if this ack is lost, the re-delivered command re-acks
         // via the applied_cmd guard in handle_firmware_update.
         ack_command(s_ota.cmd_id, "failed", "rollback_no_checkin", diag);
@@ -268,10 +340,13 @@ static void ota_checkin_tick() {
     // Refresh presence + firmware report first (best-effort), then the ack
     // that decides validity.
     voice_send_heartbeat();
-    char diag[128];
+    char bd[144];
+    boot_diag_json(bd, sizeof(bd));
+    char diag[256];
     snprintf(diag, sizeof(diag),
-             "{\"status\":\"ota_applied\",\"version\":\"%.15s\",\"partition\":\"%s\"}",
-             AREG_FW_VERSION, ota_running_partition_label());
+             "{\"status\":\"ota_applied\",\"version\":\"%.15s\",\"partition\":\"%s\","
+             "\"bootDiag\":%s}",
+             AREG_FW_VERSION, ota_running_partition_label(), bd);
     if (ack_command(s_ota.cmd_id, "ok", nullptr, diag)) {
         if (esp_ota_mark_app_valid_cancel_rollback() == ESP_OK) {
             Serial.println("[ota] image marked VALID (confirmed)");

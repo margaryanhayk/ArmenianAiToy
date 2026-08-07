@@ -34,8 +34,21 @@
 
 // How long the NEW image may try to check in (ack the pending command)
 // before it self-invalidates and lets the bootloader roll back.
+//
+// This is measured from BOOT (millis()), not from the first attempt, so it
+// must exceed the WORST-CASE time from power-on to the first successful
+// backend call — not the typical one. On this device that path includes the
+// Wi-Fi join, the whole of setup(), and whatever the loop does before the
+// check-in gets a turn.
+//
+// 300000 (5 min) was demonstrably too tight: 1.1.0 rolled back in the field
+// on 2026-08-07 with `rollback_no_checkin` on a toy whose radio, flash and
+// bootloader all worked. Raised to 15 min. The cost of a longer deadline is
+// only that a genuinely broken image takes longer to roll back — and it
+// still rolls back; the cost of a short one is rolling back a HEALTHY image,
+// which is what actually happened.
 #ifndef AREG_OTA_CHECKIN_DEADLINE_MS
-#define AREG_OTA_CHECKIN_DEADLINE_MS 300000UL  // 5 min
+#define AREG_OTA_CHECKIN_DEADLINE_MS 900000UL  // 15 min
 #endif
 
 // Retry cadence for the post-reboot check-in ack.

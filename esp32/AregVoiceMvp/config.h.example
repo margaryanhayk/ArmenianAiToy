@@ -406,8 +406,13 @@
 #endif
 // How long the NEW image may retry its backend check-in (the final ack)
 // before it self-invalidates and the bootloader rolls back to the old image.
+// Measured from BOOT, so it must exceed the WORST-CASE time from power-on to
+// the first successful backend call (Wi-Fi join + all of setup() + whatever
+// the loop does first) — not the typical time. 300000 (5 min) was too tight:
+// 1.1.0 rolled back in the field on 2026-08-07 with `rollback_no_checkin`
+// despite a working radio, flash and bootloader.
 #ifndef AREG_OTA_CHECKIN_DEADLINE_MS
-#define AREG_OTA_CHECKIN_DEADLINE_MS 300000UL
+#define AREG_OTA_CHECKIN_DEADLINE_MS 900000UL
 #endif
 // Retry cadence for that post-reboot check-in ack.
 #ifndef AREG_OTA_ACK_RETRY_MS

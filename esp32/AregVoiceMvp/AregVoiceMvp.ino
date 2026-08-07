@@ -2028,6 +2028,37 @@ void setup() {
     DIAG_MARK(150, "ready_idle");
     transition_to(ST_IDLE);
 
+    // ---- first boot after an OTA: check in BEFORE anything else ----
+    // The check-in deadline is measured from BOOT, and everything below
+    // this line can take minutes: handle_welcome_flow() plays a greeting,
+    // opens a listening window, and on the ordinary path goes straight
+    // into handle_story_session() — a whole 3-4 minute story, its pauses,
+    // and the reflection dialogue — WITHOUT returning to loop(). So on the
+    // boot that decides confirm-vs-rollback, the very first check-in
+    // attempt was minutes late (2026-08-07: 1.1.0 rolled back with
+    // `rollback_no_checkin`). This is the earliest point in setup() where
+    // the radio is up and the device is in a defined state, so the attempt
+    // happens here.
+    //
+    // Only run when an outcome is actually pending: on an ordinary boot
+    // this is a cheap NVS read and changes nothing (in particular it must
+    // NOT pull the command poll forward, or a fresh firmware_update could
+    // start a download inside setup()).
+    if (ota_outcome_pending()) {
+        ota_foundation_tick();   // state==REBOOTING -> runs the check-in
+    }
+    if (ota_outcome_pending()) {
+        // Still unresolved (ack failed, or the link is not up yet). Skip
+        // the greeting THIS boot and hand the loop straight to the retry.
+        // One silent power-on beats rolling a healthy image back — and
+        // this only ever happens on the single boot after an update.
+        Serial.println("[ota] outcome still pending — skipping the greeting so "
+                       "the check-in owns the loop");
+        Serial.flush();
+        transition_to(ST_IDLE);
+        return;
+    }
+
     // ---- the toy's opening ----
     // Runs LAST in setup, after the provisioning gesture has had its
     // chance (holding the button at boot must never be mistaken for an
@@ -2117,19 +2148,50 @@ void loop() {
         // voice turn. NO firmware download/apply in this slice.
         ota_foundation_tick();
 
-        // Story-play reporting — upload queued play events (SD-cache plays
-        // never touch the backend, so without this the parent dashboard
-        // under-reports). Prompt after a story ends, else on the heartbeat
-        // cadence while anything is queued. IDLE-only, best-effort; events
-        // are deleted only after a server 2xx.
-        story_report_tick();
+        // FIRST BOOT AFTER AN UPDATE: the check-in owns the tick, and that
+        // means nothing long-running may run beside it.
+        //
+        // FIELD EVIDENCE (2026-08-07, owner's toy, 1.1.0 over the air): the
+        // device polled, applied and went quiet — correct, there is no ack
+        // before the reboot — and ~5m41s later the OLD image acked
+        // `failed / rollback_no_checkin` with
+        // {"status":"rolled_back","attemptedVersion":"1.1.0"}. Download,
+        // flash and bootloader rollback all worked. What did NOT happen is
+        // the new image finishing its check-in inside the deadline.
+        //
+        // content_sync_tick() is the most likely reason it never got the
+        // chance: it arms 180 s after boot and then downloads the WHOLE
+        // library — stories plus ~4.6 MB of game clips — inside a SINGLE
+        // loop iteration. While it is in there, ota_foundation_tick() above
+        // is not running, so neither the check-in retry nor the deadline
+        // test happens. story_report_tick() is smaller but is the same
+        // class of thing (a network upload before the verdict), so it is
+        // gated too. Both come back the moment the image is confirmed (or
+        // rolled back), which is one tick later in the normal case.
+        const bool ota_pending = ota_outcome_pending();
+        if (ota_pending) {
+            static bool s_logged_hold = false;
+            if (!s_logged_hold) {
+                s_logged_hold = true;
+                Serial.println("[ota] outcome pending — holding content sync and "
+                               "story-play upload until the image is confirmed");
+                Serial.flush();
+            }
+        } else {
+            // Story-play reporting — upload queued play events (SD-cache plays
+            // never touch the backend, so without this the parent dashboard
+            // under-reports). Prompt after a story ends, else on the heartbeat
+            // cadence while anything is queued. IDLE-only, best-effort; events
+            // are deleted only after a server 2xx.
+            story_report_tick();
 
 #ifdef AREG_CONTENT_SYNC_BENCH
-        // Cloud→SD story sync (bench builds only): one attempt per boot,
-        // once Wi-Fi + SD are both up. IDLE-only — a 4.6 MB download can
-        // never stall a voice turn. Zero bytes of this in production.
-        content_sync_tick();
+            // Cloud→SD story sync (bench builds only): one attempt per boot,
+            // once Wi-Fi + SD are both up. IDLE-only — a 4.6 MB download can
+            // never stall a voice turn. Zero bytes of this in production.
+            content_sync_tick();
 #endif
+        }
 
 #ifdef AREG_CONTENT_SYNC_TEST_BENCH
         // Content-sync decision-logic tests (bench builds only): pure

@@ -825,6 +825,112 @@ index v4 round-trip, **v3 forward compatibility**) is covered by
 halves — greeting rotation persistence, the heard set, the flow itself — are
 hardware-only, as the music and clip sync were before them.
 
+## OTA — surviving the first boot of a new image
+
+The apply pipeline (`ota_apply.{h,cpp}`) and the phone-home loop
+(`ota_foundation.{h,cpp}`) are documented in `docs/ota-release-runbook.md`.
+This section is about the one step that has actually bitten us: the **first
+boot after an update**, where the new image must reach the backend or the
+bootloader takes it away again.
+
+### Field result — 1.1.0 rolled back (2026-08-07)
+
+1.1.0 was pushed over the air to the owner's real toy. From the server's
+command row:
+
+- the device **polled** and picked the command up;
+- it then went **silent** — correct, and by design: there is **no ack before
+  the reboot**, so silence is what a successful apply looks like from outside;
+- **~5m41s later the OLD image acked** `failed` / `rollback_no_checkin` with
+  diagnostics `{"status":"rolled_back","attemptedVersion":"1.1.0"}`.
+
+So the download worked, the flash worked, the boot-partition switch worked,
+and the ESP-IDF **auto-rollback worked** — the first time that mechanism has
+been observed on this product. What failed is narrower: **1.1.0 never
+completed its post-boot check-in inside `AREG_OTA_CHECKIN_DEADLINE_MS`**, so
+it self-invalidated and the bootloader returned the toy to the working image.
+
+The toy was never bricked and the child never lost the toy. That is the
+design behaving as intended — but it also means an OTA cannot land until the
+first boot is survivable.
+
+### What changed
+
+**1. Nothing long-running runs before the check-in.** CLAUDE.md already said
+that while an OTA outcome is pending, command polling pauses and "the
+check-in owns the tick". That discipline now extends to the other two
+network jobs in the IDLE branch. While `ota_state` is `rebooting`
+(`ota_outcome_pending()`), `AregVoiceMvp.ino` skips:
+
+- `content_sync_tick()` — arms 180 s after boot and downloads the **whole**
+  library (stories plus ~4.6 MB of game clips) **inside one `loop()`
+  iteration**. While it is in there, `ota_foundation_tick()` is not running,
+  so neither the check-in retry nor the deadline test happens. This is the
+  most likely reason the check-in never got its turn.
+- `story_report_tick()` — much smaller, but the same class of thing (a
+  network upload before the verdict), so it is gated with it.
+
+Both resume the tick after the image is confirmed (or rolled back) — one
+tick later in the normal case. One `[ota] outcome pending — holding …` line
+is printed once per boot so the hold is visible on a monitor.
+
+**2. The check-in happens as early as `setup()` allows.** `handle_welcome_flow()`
+runs at the end of `setup()` and, on the ordinary path, goes straight into
+`handle_story_session()` — a 3–4 minute story, its pauses, and the reflection
+dialogue — **without ever returning to `loop()`**. On the boot that decides
+confirm-vs-rollback, that alone can consume the whole deadline before the
+first attempt is made. So `setup()` now, immediately after the Wi-Fi join:
+
+- calls `ota_foundation_tick()` **only when an outcome is pending** (an
+  ordinary boot pays one NVS read and behaves exactly as before — in
+  particular the command poll is *not* pulled forward, so a fresh
+  `firmware_update` can never start a download inside `setup()`);
+- if the outcome is *still* pending afterwards (ack failed, or the link is
+  not up yet), **skips the greeting for that one boot** and hands the loop
+  straight to the retry. One silent power-on beats rolling a healthy image
+  back, and it can only ever happen on the single boot after an update.
+
+**3. `AREG_OTA_CHECKIN_DEADLINE_MS` raised 300000 → 900000 (5 → 15 min).**
+The deadline is measured from **boot**, not from the first attempt, so it has
+to exceed the **worst-case** power-on → first successful backend call: Wi-Fi
+join, all of `setup()`, and whatever the loop does first. Five minutes was
+demonstrably too tight in the field. A longer deadline only makes a
+genuinely broken image take longer to roll back — it *still* rolls back;
+a short one rolls back a **healthy** image, which is what actually happened.
+Changed in `ota_apply.h` (header default), `config.h.example`, and the local
+`config.h`. Nothing else in the firmware assumes 5 minutes.
+
+**4. The next failure is diagnosable without a cable.** Both the check-in ack
+and the rollback ack now carry a compact `bootDiag` object (~70 chars, counts
+and enum values only — no ids, no credentials, no PII). The backend already
+stores `AckDiagnosticsJson` verbatim, so no backend change was needed.
+
+| field | meaning |
+|---|---|
+| `rst` | `esp_reset_reason()` — **the** field. 1=POWERON 3=SW 4=PANIC 5=INT_WDT 6=TASK_WDT 7=WDT 9=BROWNOUT. A 4/5/6/7 means the new image was crash-looping; a 1/3 means it booted cleanly and was merely slow. Those are different bugs that look identical today. |
+| `up` | uptime in seconds at the ack — how far into the deadline it got |
+| `heap` | free heap — a new image that boots but is starved shows here |
+| `wifi` / `rssi` | `WiFi.status()` (3 = connected) and signal — link problem or backend problem? |
+| `sd` | was the card mounted (welcome flow and content sync both gate on it, and both are boot-time time sinks) |
+| `boots` | check-in boots seen while `rebooting` (>1 = something reset us) |
+
+Example: `{"status":"rolled_back","attemptedVersion":"1.1.0","bootDiag":
+{"rst":1,"up":300,"heap":141552,"wifi":3,"rssi":-62,"sd":1,"boots":1}}`
+
+### Honest doubt
+
+**This has not been proven on hardware.** The changes are compile-verified
+only; the next OTA is the test. The evidence available (one server-side
+command row) does not distinguish "booted fine but was too slow" from
+"crashed and the bootloader rolled it back on the reset" — which is exactly
+why `rst` was added. If the next attempt still rolls back, `bootDiag` should
+say which of the two it is, and a `rst` of 4/5/6/7 would mean none of the
+gating above was the cause.
+
+Note also that `docs/ota-release-runbook.md` § 9 still states the 5-minute
+figure; it was left alone deliberately (this slice is firmware-only) and
+needs a one-line correction.
+
 ## Offline games (`offline_games.{h,cpp}`)
 
 Three more fully-offline SD games beside the true/false quiz — no Wi-Fi, no

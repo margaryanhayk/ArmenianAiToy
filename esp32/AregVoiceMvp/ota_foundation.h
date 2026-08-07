@@ -47,6 +47,17 @@
 // slot each device booted. Safe on any partition scheme.
 const char *ota_running_partition_label();
 
+// True while a just-applied image has NOT yet reached a verdict — the
+// persisted state is OTA_STATE_REBOOTING, so the post-boot check-in still
+// owns the tick and neither confirm nor rollback has happened.
+//
+// Callers use this to stand aside on the first boot after an update: while
+// it is true, NOTHING long-running may run (see the field evidence in
+// ota_foundation.cpp's ota_checkin_tick comment). Safe before the first
+// ota_foundation_tick() — it lazily performs the same one-shot boot-state
+// load, needs no network, and is a cheap RAM read afterwards.
+bool ota_outcome_pending();
+
 // Call every loop() iteration while IDLE (never during a voice turn).
 // Cheap no-op when Wi-Fi is down or between intervals. Behavior:
 //   * first call with Wi-Fi up  -> immediate boot poll,
