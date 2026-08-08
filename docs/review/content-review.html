@@ -1,0 +1,1264 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Areg — texts waiting for you</title>
+<style>
+:root{
+  --bg:#faf6ef; --ink:#241f1a; --muted:#6b6157; --card:#ffffff; --line:#e6dccc;
+  --accent:#8a5a2b; --accentbg:#f3e8d8; --ctx:#f6f2ea; --shadow:0 1px 2px rgba(60,45,25,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15130f; --ink:#ece5da; --muted:#a2988a; --card:#1e1b16; --line:#332c23;
+    --accent:#d9a86a; --accentbg:#2a2318; --ctx:#221e18; --shadow:none;
+  }
+}
+/* A viewer with its own light/dark toggle stamps data-theme on the root;
+   that choice must win over the OS preference in BOTH directions. */
+:root[data-theme="dark"]{
+  --bg:#15130f; --ink:#ece5da; --muted:#a2988a; --card:#1e1b16; --line:#332c23;
+  --accent:#d9a86a; --accentbg:#2a2318; --ctx:#221e18; --shadow:none;
+}
+:root[data-theme="light"]{
+  --bg:#faf6ef; --ink:#241f1a; --muted:#6b6157; --card:#ffffff; --line:#e6dccc;
+  --accent:#8a5a2b; --accentbg:#f3e8d8; --ctx:#f6f2ea; --shadow:0 1px 2px rgba(60,45,25,.06);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; padding:1.1rem 1rem 5rem; background:var(--bg); color:var(--ink);
+  font-family:"Noto Sans Armenian","Noto Serif Armenian","Arial Armenian","Sylfaen",
+    "Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  font-size:17px; line-height:1.6;
+}
+.wrap{max-width:42rem;margin:0 auto}
+h1{font-size:1.5rem;line-height:1.3;margin:.2rem 0 .6rem}
+h2{font-size:1.05rem;margin:0}
+.lede{color:var(--muted);margin:0 0 1rem}
+.callout{
+  background:var(--accentbg); border:1px solid var(--line); border-radius:14px;
+  padding:.85rem 1rem; margin:1rem 0 1.4rem;
+}
+.callout p{margin:.35rem 0}
+.callout strong{color:var(--accent)}
+details{
+  border:1px solid var(--line); border-radius:16px; background:var(--card);
+  margin:0 0 1rem; overflow:hidden; box-shadow:var(--shadow);
+}
+summary{
+  padding:1rem; cursor:pointer; list-style:none; display:block;
+}
+summary::-webkit-details-marker{display:none}
+summary .t{font-weight:650;font-size:1.08rem;display:block}
+summary .m{color:var(--muted);font-size:.9rem;display:block;margin-top:.2rem}
+summary .tap{color:var(--accent);font-size:.85rem;display:block;margin-top:.45rem}
+details[open] summary{border-bottom:1px solid var(--line)}
+details[open] summary .tap{display:none}
+.body{padding:0 1rem 1rem}
+.batchintro{color:var(--muted);margin:1rem 0 1.2rem;font-size:.96rem}
+.unlocks{
+  border-left:3px solid var(--accent); padding:.1rem 0 .1rem .8rem;
+  color:var(--muted); font-size:.94rem; margin:0 0 1.4rem;
+}
+.group{margin:1.8rem 0 .4rem;padding-top:.9rem;border-top:1px solid var(--line)}
+.group .gt{font-weight:650;font-size:1.12rem}
+.group .gm{color:var(--muted);font-size:.88rem}
+.item{padding:1.1rem 0;border-top:1px dashed var(--line)}
+.item:first-of-type{border-top:none}
+.head{display:flex;align-items:baseline;gap:.55rem;margin-bottom:.3rem}
+.num{
+  font-weight:700;color:var(--accent);background:var(--accentbg);
+  border-radius:999px;min-width:2.1rem;text-align:center;padding:.1rem .45rem;
+  font-size:.95rem;
+}
+.kind{font-weight:600}
+.what{margin:.15rem 0 .1rem;color:var(--ink);font-size:.95rem}
+.where{margin:.1rem 0 .7rem;color:var(--muted);font-size:.9rem}
+.hy{
+  font-size:1.22rem; line-height:1.85; margin:.55rem 0;
+}
+.who{
+  display:inline-block;color:var(--accent);font-size:.82rem;font-weight:700;
+  letter-spacing:.02em;margin-right:.45rem;vertical-align:.12em;
+}
+.ctx{background:var(--ctx);border-radius:12px;padding:.6rem .8rem;margin:.4rem 0 .8rem}
+.ctxlabel{display:block;color:var(--muted);font-size:.82rem;margin-bottom:.15rem}
+.ctxtext{color:var(--muted);font-size:1.08rem;line-height:1.7;margin:.1rem 0}
+.foot{color:var(--muted);font-size:.88rem;margin:.5rem 0 0}
+.closed li{margin-bottom:.9rem}
+.closed .n{font-weight:600}
+.closed .w{color:var(--muted);font-size:.9rem}
+footer{color:var(--muted);font-size:.9rem;margin-top:2rem;border-top:1px solid var(--line);padding-top:1rem}
+code{font-size:.85em;background:var(--ctx);padding:.08em .35em;border-radius:5px}
+</style>
+<div class="wrap">
+<h1>Texts waiting for you</h1>
+<p class="lede">158 items, in 4 batches. About 20 minutes of reading in total, and the shortest batch is 2 minutes — so one batch is a real thing you can finish tonight. None of these words are on the toy yet; they are all waiting on you.</p>
+<p class="lede">The four batches are below. Each one is closed until you tap it.</p>
+<div class="callout"><p><strong>How to answer:</strong> every item has a number. Reply with the numbers only — for example <em>“1–26 yes, 41 no, 55 change the wolf line”</em>. You do not have to do all four batches at once.</p><p>There is nothing to tick on this page and nothing is saved here — it is only paper, so it works with no internet.</p></div>
+<details id="b-vk">
+<summary><span class="t">Վարդանն ու Կատրինը — the judging game</span><span class="m">Items 1–26, 10 rounds + 16 reaction lines, about 2 min</span><span class="tap">Tap to open</span></summary>
+<div class="body">
+<p class="batchintro">Vardan claims something, Katrin contradicts him, Areg asks the child to judge with the buttons. Nothing is rendered yet - these are the words only. Balance is 5 rounds Vardan-right, 5 Katrin-right, so green is not always the wrong button.</p>
+<p class="unlocks"><strong>If you say yes:</strong> A yes lets us render one sample round in the kids' voices for your listen test, then the whole set.</p>
+<article class="item" id="i1">
+<div class="head"><span class="num">1</span><span class="kind">Խաղի փուլ vk01</span></div>
+<p class="what">One round - three voices spliced into a single MP3 on the card.</p>
+<p class="where">The toy plays the round, the child presses green or red to say who was right.</p>
+<p class="hy"><span class="who">Վարդան</span>Ես գիտեմ, ես գիտեմ։ Ձուկը թռչում է երկնքում։</p>
+<p class="hy"><span class="who">Կատրին</span>Չէ՛, Վարդա՛ն։ Ձուկը լողում է ջրում։</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է ճիշտ՝ Վարդա՞նը — կանաչ, թե՞ Կատրինը — կարմիր։</p>
+<p class="foot">Correct answer: Կատրինն է ճիշտ — ԿԱՐՄԻՐ կոճակ</p>
+</article>
+<article class="item" id="i2">
+<div class="head"><span class="num">2</span><span class="kind">Խաղի փուլ vk02</span></div>
+<p class="what">One round - three voices spliced into a single MP3 on the card.</p>
+<p class="where">The toy plays the round, the child presses green or red to say who was right.</p>
+<p class="hy"><span class="who">Վարդան</span>Կատուն մլավում է՝ մյա՛ու, մյա՛ու։</p>
+<p class="hy"><span class="who">Կատրին</span>Չէ՜, կատուն հաչում է՝ հաֆ-հաֆ։</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է ճիշտ՝ Վարդա՞նը — կանաչ, թե՞ Կատրինը — կարմիր։</p>
+<p class="foot">Correct answer: Վարդանն է ճիշտ — ԿԱՆԱՉ կոճակ</p>
+</article>
+<article class="item" id="i3">
+<div class="head"><span class="num">3</span><span class="kind">Խաղի փուլ vk03</span></div>
+<p class="what">One round - three voices spliced into a single MP3 on the card.</p>
+<p class="where">The toy plays the round, the child presses green or red to say who was right.</p>
+<p class="hy"><span class="who">Վարդան</span>Ձմռանը շատ շոգ է, կարելի է լողալ ծովում։</p>
+<p class="hy"><span class="who">Կատրին</span>Վարդա՛ն, ձմռանը ցուրտ է ու ձյուն է գալիս։</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է ճիշտ՝ Վարդա՞նը — կանաչ, թե՞ Կատրինը — կարմիր։</p>
+<p class="foot">Correct answer: Կատրինն է ճիշտ — ԿԱՐՄԻՐ կոճակ</p>
+</article>
+<article class="item" id="i4">
+<div class="head"><span class="num">4</span><span class="kind">Խաղի փուլ vk04</span></div>
+<p class="what">One round - three voices spliced into a single MP3 on the card.</p>
+<p class="where">The toy plays the round, the child presses green or red to say who was right.</p>
+<p class="hy"><span class="who">Վարդան</span>Փիղն ամենամեծ կենդանիներից է։</p>
+<p class="hy"><span class="who">Կատրին</span>Չէ՜, փիղը փոքրիկ է, մկնիկի չափ։</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է ճիշտ՝ Վարդա՞նը — կանաչ, թե՞ Կատրինը — կարմիր։</p>
+<p class="foot">Correct answer: Վարդանն է ճիշտ — ԿԱՆԱՉ կոճակ</p>
+</article>
+<article class="item" id="i5">
+<div class="head"><span class="num">5</span><span class="kind">Խաղի փուլ vk05</span></div>
+<p class="what">One round - three voices spliced into a single MP3 on the card.</p>
+<p class="where">The toy plays the round, the child presses green or red to say who was right.</p>
+<p class="hy"><span class="who">Վարդան</span>Մեկ ձեռքին յոթ մատ կա։ Ես հաշվել եմ։</p>
+<p class="hy"><span class="who">Կատրին</span>Հաշվի՛ր նորից, Վարդա՛ն։ Հինգ մատ կա։</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է ճիշտ՝ Վարդա՞նը — կանաչ, թե՞ Կատրինը — կարմիր։</p>
+<p class="foot">Correct answer: Կատրինն է ճիշտ — ԿԱՐՄԻՐ կոճակ</p>
+</article>
+<article class="item" id="i6">
+<div class="head"><span class="num">6</span><span class="kind">Խաղի փուլ vk06</span></div>
+<p class="what">One round - three voices spliced into a single MP3 on the card.</p>
+<p class="where">The toy plays the round, the child presses green or red to say who was right.</p>
+<p class="hy"><span class="who">Վարդան</span>Արևը շողում է ցերեկը։</p>
+<p class="hy"><span class="who">Կատրին</span>Չէ՜, արևը գիշերն է շողում, լուսինը՝ ցերեկը։</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է ճիշտ՝ Վարդա՞նը — կանաչ, թե՞ Կատրինը — կարմիր։</p>
+<p class="foot">Correct answer: Վարդանն է ճիշտ — ԿԱՆԱՉ կոճակ</p>
+</article>
+<article class="item" id="i7">
+<div class="head"><span class="num">7</span><span class="kind">Խաղի փուլ vk07</span></div>
+<p class="what">One round - three voices spliced into a single MP3 on the card.</p>
+<p class="where">The toy plays the round, the child presses green or red to say who was right.</p>
+<p class="hy"><span class="who">Վարդան</span>Քարից համեղ ապուր է ստացվում։ Ես կերել եմ։</p>
+<p class="hy"><span class="who">Կատրին</span>Վա՜յ, Վարդա՛ն, քարը չեն ուտում։</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է ճիշտ՝ Վարդա՞նը — կանաչ, թե՞ Կատրինը — կարմիր։</p>
+<p class="foot">Correct answer: Կատրինն է ճիշտ — ԿԱՐՄԻՐ կոճակ</p>
+</article>
+<article class="item" id="i8">
+<div class="head"><span class="num">8</span><span class="kind">Խաղի փուլ vk08</span></div>
+<p class="what">One round - three voices spliced into a single MP3 on the card.</p>
+<p class="where">The toy plays the round, the child presses green or red to say who was right.</p>
+<p class="hy"><span class="who">Վարդան</span>Գորտը ցատկում է՝ թը՛փ, թը՛փ։</p>
+<p class="hy"><span class="who">Կատրին</span>Չէ՜, գորտը թռչում է թևերով։</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է ճիշտ՝ Վարդա՞նը — կանաչ, թե՞ Կատրինը — կարմիր։</p>
+<p class="foot">Correct answer: Վարդանն է ճիշտ — ԿԱՆԱՉ կոճակ</p>
+</article>
+<article class="item" id="i9">
+<div class="head"><span class="num">9</span><span class="kind">Խաղի փուլ vk09</span></div>
+<p class="what">One round - three voices spliced into a single MP3 on the card.</p>
+<p class="where">The toy plays the round, the child presses green or red to say who was right.</p>
+<p class="hy"><span class="who">Վարդան</span>Նապաստակն ամենադանդաղ կենդանին է։</p>
+<p class="hy"><span class="who">Կատրին</span>Չէ՛, նապաստակն արագ է վազում, կրիան է դանդաղ։</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է ճիշտ՝ Վարդա՞նը — կանաչ, թե՞ Կատրինը — կարմիր։</p>
+<p class="foot">Correct answer: Կատրինն է ճիշտ — ԿԱՐՄԻՐ կոճակ</p>
+</article>
+<article class="item" id="i10">
+<div class="head"><span class="num">10</span><span class="kind">Խաղի փուլ vk10</span></div>
+<p class="what">One round - three voices spliced into a single MP3 on the card.</p>
+<p class="where">The toy plays the round, the child presses green or red to say who was right.</p>
+<p class="hy"><span class="who">Վարդան</span>Մեղուն մեղր է սարքում։</p>
+<p class="hy"><span class="who">Կատրին</span>Չէ՜, մեղրը ծառի վրա է աճում, խնձորի պես։</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է ճիշտ՝ Վարդա՞նը — կանաչ, թե՞ Կատրինը — կարմիր։</p>
+<p class="foot">Correct answer: Վարդանն է ճիշտ — ԿԱՆԱՉ կոճակ</p>
+</article>
+<article class="item" id="i11">
+<div class="head"><span class="num">11</span><span class="kind">win-vardan-1</span></div>
+<p class="what">Reaction line (Վարդան).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Վարդան</span>Տեսա՞ր, ես ճիշտ էի։ Ապրե՛ս, որ ինձ ընտրեցիր։</p>
+</article>
+<article class="item" id="i12">
+<div class="head"><span class="num">12</span><span class="kind">win-vardan-2</span></div>
+<p class="what">Reaction line (Վարդան).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Վարդան</span>Հա՛, ես գիտեի։ Դու էլ գիտեիր, ապրե՛ս։</p>
+</article>
+<article class="item" id="i13">
+<div class="head"><span class="num">13</span><span class="kind">win-vardan-3</span></div>
+<p class="what">Reaction line (Վարդան).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Վարդան</span>Ես միշտ գիտեմ։ Դե լա՛վ, այս անգամ իսկապես գիտեի։</p>
+</article>
+<article class="item" id="i14">
+<div class="head"><span class="num">14</span><span class="kind">win-katrin-1</span></div>
+<p class="what">Reaction line (Կատրին).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Կատրին</span>Ճի՛շտ է, ես էի ճիշտ։ Ապրե՛ս, լավ գտար։</p>
+</article>
+<article class="item" id="i15">
+<div class="head"><span class="num">15</span><span class="kind">win-katrin-2</span></div>
+<p class="what">Reaction line (Կատրին).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Կատրին</span>Այո՛, ես գիտեի։ Դու էլ իմացար, ապրե՛ս։</p>
+</article>
+<article class="item" id="i16">
+<div class="head"><span class="num">16</span><span class="kind">win-katrin-3</span></div>
+<p class="what">Reaction line (Կատրին).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Կատրին</span>Տեսա՞ր, Վարդա՛ն։ Մենք միասին ճիշտ էինք։</p>
+</article>
+<article class="item" id="i17">
+<div class="head"><span class="num">17</span><span class="kind">lose-vardan-1</span></div>
+<p class="what">Reaction line (Վարդան).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Վարդան</span>Վա՜յ, սխալվեցի… Այս անգամ Կատրինը ճիշտ էր։</p>
+</article>
+<article class="item" id="i18">
+<div class="head"><span class="num">18</span><span class="kind">lose-vardan-2</span></div>
+<p class="what">Reaction line (Վարդան).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Վարդան</span>Էհ… Լավ, լավ, Կատրինը գիտեր։</p>
+</article>
+<article class="item" id="i19">
+<div class="head"><span class="num">19</span><span class="kind">lose-vardan-3</span></div>
+<p class="what">Reaction line (Վարդան).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Վարդան</span>Օ՜, չստացվեց։ Մյուս անգամ ես կիմանամ։</p>
+</article>
+<article class="item" id="i20">
+<div class="head"><span class="num">20</span><span class="kind">lose-katrin-1</span></div>
+<p class="what">Reaction line (Կատրին).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Կատրին</span>Օ՜, այս անգամ Վարդանը ճիշտ էր։ Լա՛վ էր, Վարդա՛ն։</p>
+</article>
+<article class="item" id="i21">
+<div class="head"><span class="num">21</span><span class="kind">lose-katrin-2</span></div>
+<p class="what">Reaction line (Կատրին).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Կատրին</span>Վա՜յ, սխալվեցի։ Վարդա՛ն, դու գիտեիր։</p>
+</article>
+<article class="item" id="i22">
+<div class="head"><span class="num">22</span><span class="kind">lose-katrin-3</span></div>
+<p class="what">Reaction line (Կատրին).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Կատրին</span>Իսկապե՞ս… Դե լավ, այս անգամ Վարդանը ճիշտ էր։</p>
+</article>
+<article class="item" id="i23">
+<div class="head"><span class="num">23</span><span class="kind">wrong-areg-1</span></div>
+<p class="what">Reaction line (Արեգ).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Արեգ</span>Ոչինչ, լսի՛ր նորից ու փորձի՛ր։</p>
+</article>
+<article class="item" id="i24">
+<div class="head"><span class="num">24</span><span class="kind">wrong-areg-2</span></div>
+<p class="what">Reaction line (Արեգ).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Արեգ</span>Բան չկա։ Լսի՛ր էլի մեկ անգամ։</p>
+</article>
+<article class="item" id="i25">
+<div class="head"><span class="num">25</span><span class="kind">wrong-areg-3</span></div>
+<p class="what">Reaction line (Արեգ).</p>
+<p class="where">Plays right after the child answers. The toy rotates the numbered variants so a replay never repeats the same line.</p>
+<p class="hy"><span class="who">Արեգ</span>Պատահում է։ Արի՛ մեկ անգամ էլ լսենք։</p>
+</article>
+<article class="item" id="i26">
+<div class="head"><span class="num">26</span><span class="kind">done-areg</span></div>
+<p class="what">Closing line (Արեգ).</p>
+<p class="where">Plays once when the game session ends.</p>
+<p class="hy"><span class="who">Արեգ</span>Լավ խաղացինք։ Մյուս անգամ նորից կխաղանք։</p>
+</article>
+</div></details>
+<details id="b-quiz">
+<summary><span class="t">The offline quiz — 50 questions</span><span class="m">Items 27–79, 50 questions + 3 feedback lines, about 2 min</span><span class="tap">Tap to open</span></summary>
+<div class="body">
+<p class="batchintro">The three-button game the toy can play with no internet at all. The answer lives in the rendered file name, so the toy really checks the press - no cloud, no AI. q01-q20 are true/false; q21-q50 each speak their own green/red meaning, which is how the same two buttons also become counting, first-sound and comparison games.</p>
+<p class="unlocks"><strong>If you say yes:</strong> A yes lets us render one sample question plus the three feedback lines for your listen test, then the other 49.</p>
+<article class="item" id="i27">
+<div class="head"><span class="num">27</span><span class="kind">q01</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Ձուկը թռչու՞մ է։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i28">
+<div class="head"><span class="num">28</span><span class="kind">q02</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Կատուն մլավու՞մ է։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i29">
+<div class="head"><span class="num">29</span><span class="kind">q03</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Արջը կարո՞ղ է թռչել։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i30">
+<div class="head"><span class="num">30</span><span class="kind">q04</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Ձյունը սա՞ռն է։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i31">
+<div class="head"><span class="num">31</span><span class="kind">q05</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Քարը կարելի՞ է ուտել։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i32">
+<div class="head"><span class="num">32</span><span class="kind">q06</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Շունը հաչու՞մ է։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i33">
+<div class="head"><span class="num">33</span><span class="kind">q07</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Կովը մլավու՞մ է։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i34">
+<div class="head"><span class="num">34</span><span class="kind">q08</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Արևը գիշերը փայլու՞մ է։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i35">
+<div class="head"><span class="num">35</span><span class="kind">q09</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Գորտը ցատկու՞մ է։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i36">
+<div class="head"><span class="num">36</span><span class="kind">q10</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Փիղը փոքրի՞կ է։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i37">
+<div class="head"><span class="num">37</span><span class="kind">q11</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Մեղուն մեղր սարքու՞մ է։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i38">
+<div class="head"><span class="num">38</span><span class="kind">q12</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Ձմռանը շո՞գ է։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i39">
+<div class="head"><span class="num">39</span><span class="kind">q13</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Թռչունները թևեր ունե՞ն։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i40">
+<div class="head"><span class="num">40</span><span class="kind">q14</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Կատուն հաչու՞մ է։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i41">
+<div class="head"><span class="num">41</span><span class="kind">q15</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Խնձորը ծառի վրա աճու՞մ է։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i42">
+<div class="head"><span class="num">42</span><span class="kind">q16</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Նապաստակը դանդա՞ղ է վազում։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i43">
+<div class="head"><span class="num">43</span><span class="kind">q17</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Աստղերը երկնքու՞մ են։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i44">
+<div class="head"><span class="num">44</span><span class="kind">q18</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Մկնիկը փղից մե՞ծ է։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i45">
+<div class="head"><span class="num">45</span><span class="kind">q19</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Անձրևը երկնքի՞ց է գալիս։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i46">
+<div class="head"><span class="num">46</span><span class="kind">q20</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">True/false question. Green = yes, red = no (the intro teaches this).</p>
+<p class="hy"><span class="who">Արեգ</span>Բադիկը լողու՞մ է։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i47">
+<div class="head"><span class="num">47</span><span class="kind">q21</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Քանի՞ մատ կա մի ձեռքին։ Հինգ՝ կանաչ, յոթ՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i48">
+<div class="head"><span class="num">48</span><span class="kind">q22</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Քանի՞ ոտք ունի կատուն։ Երկուս՝ կանաչ, չորս՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i49">
+<div class="head"><span class="num">49</span><span class="kind">q23</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Քանի՞ աչք ունես։ Երկուս՝ կանաչ, հինգ՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i50">
+<div class="head"><span class="num">50</span><span class="kind">q24</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Քանի՞ արև կա երկնքում։ Շատ՝ կանաչ, մեկ՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i51">
+<div class="head"><span class="num">51</span><span class="kind">q25</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Քանի՞ անիվ ունի մեքենան։ Չորս՝ կանաչ, մեկ՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i52">
+<div class="head"><span class="num">52</span><span class="kind">q26</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Քանի՞ ականջ ունես։ Երեք՝ կանաչ, երկուս՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i53">
+<div class="head"><span class="num">53</span><span class="kind">q27</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Քանի՞ պոչ ունի շունը։ Մեկ՝ կանաչ, երեք՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i54">
+<div class="head"><span class="num">54</span><span class="kind">q28</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Քանի՞ թև ունի թռչունը։ Չորս՝ կանաչ, երկուս՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i55">
+<div class="head"><span class="num">55</span><span class="kind">q29</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Մեկից հետո ո՞ր թիվն է գալիս։ Երկուսը՝ կանաչ, հինգը՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i56">
+<div class="head"><span class="num">56</span><span class="kind">q30</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Քանի՞ քիթ ունես։ Երկուս՝ կանաչ, մեկ՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i57">
+<div class="head"><span class="num">57</span><span class="kind">q31</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞ր ձայնով է սկսվում «մուկ» բառը։ «Մ»՝ կանաչ, «Շ»՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i58">
+<div class="head"><span class="num">58</span><span class="kind">q32</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞ր ձայնով է սկսվում «շուն» բառը։ «Տ»՝ կանաչ, «Շ»՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i59">
+<div class="head"><span class="num">59</span><span class="kind">q33</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞ր ձայնով է սկսվում «արև» բառը։ «Ա»՝ կանաչ, «Բ»՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i60">
+<div class="head"><span class="num">60</span><span class="kind">q34</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞ր ձայնով է սկսվում «տուն» բառը։ «Կ»՝ կանաչ, «Տ»՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i61">
+<div class="head"><span class="num">61</span><span class="kind">q35</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞ր ձայնով է սկսվում «կատու» բառը։ «Կ»՝ կանաչ, «Մ»՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i62">
+<div class="head"><span class="num">62</span><span class="kind">q36</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>«Ձուկ» բառը «Ձ»-ո՞վ է սկսվում։ Հա՝ կանաչ, ոչ՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i63">
+<div class="head"><span class="num">63</span><span class="kind">q37</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>«Գիրք» բառը «Մ»-ո՞վ է սկսվում։ Հա՝ կանաչ, ոչ՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i64">
+<div class="head"><span class="num">64</span><span class="kind">q38</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞ր ձայնով է սկսվում «նապաստակ» բառը։ «Ն»՝ կանաչ, «Լ»՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i65">
+<div class="head"><span class="num">65</span><span class="kind">q39</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>«Ծառ» բառը «Բ»-ո՞վ է սկսվում։ Հա՝ կանաչ, ոչ՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i66">
+<div class="head"><span class="num">66</span><span class="kind">q40</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞ր ձայնով է սկսվում «փիղ» բառը։ «Ս»՝ կանաչ, «Փ»՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i67">
+<div class="head"><span class="num">67</span><span class="kind">q41</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է ավելի մեծ՝ փիղը՝ կանաչ, թե՞ մկնիկը՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i68">
+<div class="head"><span class="num">68</span><span class="kind">q42</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է ավելի արագ՝ կրիան՝ կանաչ, թե՞ նապաստակը՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i69">
+<div class="head"><span class="num">69</span><span class="kind">q43</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞րն է տաք՝ արևը՝ կանաչ, թե՞ ձյունը՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i70">
+<div class="head"><span class="num">70</span><span class="kind">q44</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է թռչում՝ ձուկը՝ կանաչ, թե՞ թռչունը՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i71">
+<div class="head"><span class="num">71</span><span class="kind">q45</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞րն է ավելի բարձր՝ սարը՝ կանաչ, թե՞ տունը՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i72">
+<div class="head"><span class="num">72</span><span class="kind">q46</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞րն է քաղցր՝ կիտրոնը՝ կանաչ, թե՞ մեղրը՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i73">
+<div class="head"><span class="num">73</span><span class="kind">q47</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է ապրում ջրում՝ ձուկը՝ կանաչ, թե՞ կատուն՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i74">
+<div class="head"><span class="num">74</span><span class="kind">q48</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞րն է գիշերը երկնքում՝ արևը՝ կանաչ, թե՞ լուսինը՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i75">
+<div class="head"><span class="num">75</span><span class="kind">q49</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞րն է սառը՝ ձյունը՝ կանաչ, թե՞ տաք թեյը՝ կարմիր։</p>
+<p class="foot">Correct answer: GREEN button</p>
+</article>
+<article class="item" id="i76">
+<div class="head"><span class="num">76</span><span class="kind">q50</span></div>
+<p class="what">Quiz question.</p>
+<p class="where">Choice question - the line itself names which button is which.</p>
+<p class="hy"><span class="who">Արեգ</span>Ո՞վ է մլավում՝ շունը՝ կանաչ, թե՞ կատուն՝ կարմիր։</p>
+<p class="foot">Correct answer: RED button</p>
+</article>
+<article class="item" id="i77">
+<div class="head"><span class="num">77</span><span class="kind">win</span></div>
+<p class="what">Feedback line.</p>
+<p class="where">Plays when the child pressed the right button.</p>
+<p class="hy"><span class="who">Արեգ</span>Ապրե՛ս, ճիշտ է։</p>
+</article>
+<article class="item" id="i78">
+<div class="head"><span class="num">78</span><span class="kind">wrong</span></div>
+<p class="what">Feedback line.</p>
+<p class="where">Plays when the child pressed the wrong one - then the same question is asked once more.</p>
+<p class="hy"><span class="who">Արեգ</span>Ոչինչ, փորձի՛ր նորից։</p>
+</article>
+<article class="item" id="i79">
+<div class="head"><span class="num">79</span><span class="kind">done</span></div>
+<p class="what">Feedback line.</p>
+<p class="where">Plays after the last question.</p>
+<p class="hy"><span class="who">Արեգ</span>Լավ խաղացինք։ Մյուս անգամ նորից կխաղանք։</p>
+</article>
+</div></details>
+<details id="b-stories">
+<summary><span class="t">The lessons and after-story questions on the 10 shipped stories</span><span class="m">Items 80–149, 7 short lines per story x 10 stories, about 4 min</span><span class="tap">Tap to open</span></summary>
+<div class="body">
+<p class="batchintro">The stories themselves are approved and already on the toy - none of that text is here. What is here is the newer layer around them: the one-line lesson, the goal shown to parents, and the two extra questions (plus all three takeaways) the toy uses for the after-story talk. The original first question of each story is already approved and is shown greyed, for context only.</p>
+<p class="unlocks"><strong>If you say yes:</strong> A yes lets these be rendered as the per-story summary and question clips, which is what makes the after-story talk work offline.</p>
+<div class="group"><div class="gt">Անբան Հուռին</div><div class="gm">Items 80–86</div></div>
+<article class="item" id="i80">
+<div class="head"><span class="num">80</span><span class="kind">Նպատակ (goal)</span></div>
+<p class="what">One line describing what the story is for.</p>
+<p class="where">PARENT-facing only - it appears on the story card in the parent dashboard. The child never hears it.</p>
+<p class="hy">Պատմել աշխատասիրության արժեքի մասին։</p>
+</article>
+<article class="item" id="i81">
+<div class="head"><span class="num">81</span><span class="kind">Դաս (lesson)</span></div>
+<p class="what">The closing thought of the story.</p>
+<p class="where">Spoken by the toy as the summary clip right after the story ends, and shown to parents on the story card.</p>
+<div class="ctx"><span class="ctxlabel">The story already ends with this line today:</span><p class="hy ctxtext">Ահա այսպիսին էր Անբան Հուռու զվարճալի հեքիաթը՝ գորտերով, ոսկու կտորով ու խորամանկ մայրիկով։</p></div>
+<p class="hy">Այս հեքիաթը հիշեցնում է, որ աշխատասիրությունը մարդուն դարձնում է օգտակար ու սիրելի, իսկ ծուլությունը ոչ մի բանի չի հասցնում։</p>
+</article>
+<article class="item" id="i82">
+<div class="head"><span class="num">82</span><span class="kind">Պատասխան 1-ին հարցին</span></div>
+<p class="what">What the toy says after the child answers question 1.</p>
+<p class="where">Question 1 is already approved and unchanged - shown here only so the new answer reads in context.</p>
+<div class="ctx"><span class="ctxlabel">Question 1 (already approved, not up for review):</span><p class="hy ctxtext">Ի՞նչ գտավ Հուռին գետի ջրում։</p></div>
+<p class="hy">Հուռին գտածը մեծ բան էր, բայց իսկական հարստությունը աշխատել իմանալն է։</p>
+</article>
+<article class="item" id="i83">
+<div class="head"><span class="num">83</span><span class="kind">Հարց 2</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 2 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Ինչո՞ւ էին Հուռուն անբան ասում։</p>
+</article>
+<article class="item" id="i84">
+<div class="head"><span class="num">84</span><span class="kind">Պատասխան 2-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 2, whatever the child said.</p>
+<p class="hy">Որովհետև նա ոչինչ անել չէր ուզում․ գործ անելը մեզ դարձնում է օգտակար ու սիրելի։</p>
+</article>
+<article class="item" id="i85">
+<div class="head"><span class="num">85</span><span class="kind">Հարց 3</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 3 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Իսկ դու ինչպե՞ս ես օգնում տանը։</p>
+</article>
+<article class="item" id="i86">
+<div class="head"><span class="num">86</span><span class="kind">Պատասխան 3-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 3, whatever the child said.</p>
+<p class="hy">Երբ օգնում ենք տանը, բոլորի սիրտը ուրախանում է։</p>
+</article>
+<div class="group"><div class="gt">Ոզնիկն ու խնձորը</div><div class="gm">Items 87–93</div></div>
+<article class="item" id="i87">
+<div class="head"><span class="num">87</span><span class="kind">Նպատակ (goal)</span></div>
+<p class="what">One line describing what the story is for.</p>
+<p class="where">PARENT-facing only - it appears on the story card in the parent dashboard. The child never hears it.</p>
+<p class="hy">Պատմել ընկերության և միասին անելու ուժի մասին։</p>
+</article>
+<article class="item" id="i88">
+<div class="head"><span class="num">88</span><span class="kind">Դաս (lesson)</span></div>
+<p class="what">The closing thought of the story.</p>
+<p class="where">Spoken by the toy as the summary clip right after the story ends, and shown to parents on the story card.</p>
+<div class="ctx"><span class="ctxlabel">The story already ends with this line today:</span><p class="hy ctxtext">Ընկերոջ հետ նույնիսկ ծանր խնձորը հեշտ է գլորվում։</p></div>
+<p class="hy">Ընկերոջ հետ ամեն դժվար գործ հեշտանում է, իսկ կիսված ուրախությունը կրկնապատկվում է։</p>
+</article>
+<article class="item" id="i89">
+<div class="head"><span class="num">89</span><span class="kind">Պատասխան 1-ին հարցին</span></div>
+<p class="what">What the toy says after the child answers question 1.</p>
+<p class="where">Question 1 is already approved and unchanged - shown here only so the new answer reads in context.</p>
+<div class="ctx"><span class="ctxlabel">Question 1 (already approved, not up for review):</span><p class="hy ctxtext">Իսկ դու ի՞նչ ես սիրում անել ընկերոջդ հետ։</p></div>
+<p class="hy">Ընկերոջ հետ ամեն ինչ ավելի ուրախ է։</p>
+</article>
+<article class="item" id="i90">
+<div class="head"><span class="num">90</span><span class="kind">Հարց 2</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 2 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Ինչպե՞ս ոզնիկը տարավ ծանր խնձորը։</p>
+</article>
+<article class="item" id="i91">
+<div class="head"><span class="num">91</span><span class="kind">Պատասխան 2-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 2, whatever the child said.</p>
+<p class="hy">Նապաստակի հետ միասին․ միասին դժվար գործերը հեշտանում են։</p>
+</article>
+<article class="item" id="i92">
+<div class="head"><span class="num">92</span><span class="kind">Հարց 3</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 3 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Ի՞նչ արեցին ընկերները խնձորի հետ։</p>
+</article>
+<article class="item" id="i93">
+<div class="head"><span class="num">93</span><span class="kind">Պատասխան 3-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 3, whatever the child said.</p>
+<p class="hy">Նրանք կիսվեցին․ կիսված համեղը կրկնակի համեղ է։</p>
+</article>
+<div class="group"><div class="gt">Խոսող ձուկը</div><div class="gm">Items 94–100</div></div>
+<article class="item" id="i94">
+<div class="head"><span class="num">94</span><span class="kind">Նպատակ (goal)</span></div>
+<p class="what">One line describing what the story is for.</p>
+<p class="where">PARENT-facing only - it appears on the story card in the parent dashboard. The child never hears it.</p>
+<p class="hy">Պատմել բարության և երախտագիտության մասին։</p>
+</article>
+<article class="item" id="i95">
+<div class="head"><span class="num">95</span><span class="kind">Դաս (lesson)</span></div>
+<p class="what">The closing thought of the story.</p>
+<p class="where">Spoken by the toy as the summary clip right after the story ends, and shown to parents on the story card.</p>
+<div class="ctx"><span class="ctxlabel">The story already ends with this line today:</span><p class="hy ctxtext">Ահա այսպես բարի մարդու լավությունը չկորավ՝ խոսող ձուկը եկավ ու օգնեց նրան։</p></div>
+<p class="hy">Բարի գործը երբեք չի կորչում․ լավություն արա, և լավությունը քեզ կվերադառնա։</p>
+</article>
+<article class="item" id="i96">
+<div class="head"><span class="num">96</span><span class="kind">Պատասխան 1-ին հարցին</span></div>
+<p class="what">What the toy says after the child answers question 1.</p>
+<p class="where">Question 1 is already approved and unchanged - shown here only so the new answer reads in context.</p>
+<div class="ctx"><span class="ctxlabel">Question 1 (already approved, not up for review):</span><p class="hy ctxtext">Ո՞վ էր գեղեցիկ երիտասարդ հյուրը։</p></div>
+<p class="hy">Դա հենց խոսող ձուկն էր, որ եկել էր շնորհակալություն ասելու։</p>
+</article>
+<article class="item" id="i97">
+<div class="head"><span class="num">97</span><span class="kind">Հարց 2</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 2 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Ինչո՞ւ ձկնորսը բաց թողեց ձկանը։</p>
+</article>
+<article class="item" id="i98">
+<div class="head"><span class="num">98</span><span class="kind">Պատասխան 2-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 2, whatever the child said.</p>
+<p class="hy">Որովհետև խղճաց․ բարի սիրտը միշտ ճիշտ ճանապարհ է ցույց տալիս։</p>
+</article>
+<article class="item" id="i99">
+<div class="head"><span class="num">99</span><span class="kind">Հարց 3</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 3 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Իսկ դու ե՞րբ ես մեկին լավություն արել։</p>
+</article>
+<article class="item" id="i100">
+<div class="head"><span class="num">100</span><span class="kind">Պատասխան 3-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 3, whatever the child said.</p>
+<p class="hy">Ամեն լավություն մի օր վերադառնում է․ բարին անելը երբեք չի մոռացվում։</p>
+</article>
+<div class="group"><div class="gt">Փոքրիկ ամպիկը</div><div class="gm">Items 101–107</div></div>
+<article class="item" id="i101">
+<div class="head"><span class="num">101</span><span class="kind">Նպատակ (goal)</span></div>
+<p class="what">One line describing what the story is for.</p>
+<p class="where">PARENT-facing only - it appears on the story card in the parent dashboard. The child never hears it.</p>
+<p class="hy">Պատմել բարության և օգնելու ուրախության մասին։</p>
+</article>
+<article class="item" id="i102">
+<div class="head"><span class="num">102</span><span class="kind">Դաս (lesson)</span></div>
+<p class="what">The closing thought of the story.</p>
+<p class="where">Spoken by the toy as the summary clip right after the story ends, and shown to parents on the story card.</p>
+<div class="ctx"><span class="ctxlabel">The story already ends with this line today:</span><p class="hy ctxtext">Երբ օգնում ենք ուրիշներին, մեր սիրտն էլ է ուրախանում։</p></div>
+<p class="hy">Երբ օգնում ենք ուրիշներին, մեր սիրտն էլ է ուրախանում։</p>
+</article>
+<article class="item" id="i103">
+<div class="head"><span class="num">103</span><span class="kind">Պատասխան 1-ին հարցին</span></div>
+<p class="what">What the toy says after the child answers question 1.</p>
+<p class="where">Question 1 is already approved and unchanged - shown here only so the new answer reads in context.</p>
+<div class="ctx"><span class="ctxlabel">Question 1 (already approved, not up for review):</span><p class="hy ctxtext">Իսկ դու ո՞ւմ ես սիրում օգնել։</p></div>
+<p class="hy">Օգնելը մեր սիրտն էլ է ուրախացնում։</p>
+</article>
+<article class="item" id="i104">
+<div class="head"><span class="num">104</span><span class="kind">Հարց 2</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 2 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Ինչո՞ւ էր ծաղիկը տխուր։</p>
+</article>
+<article class="item" id="i105">
+<div class="head"><span class="num">105</span><span class="kind">Պատասխան 2-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 2, whatever the child said.</p>
+<p class="hy">Նա ծարավ էր․ ուշադիր նայելով կարելի է տեսնել, թե ով ինչ կարիք ունի։</p>
+</article>
+<article class="item" id="i106">
+<div class="head"><span class="num">106</span><span class="kind">Հարց 3</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 3 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Ինչպե՞ս ամպիկը օգնեց ծաղկին։</p>
+</article>
+<article class="item" id="i107">
+<div class="head"><span class="num">107</span><span class="kind">Պատասխան 3-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 3, whatever the child said.</p>
+<p class="hy">Մի քիչ անձրև մաղեց․ փոքր օգնությունն էլ մեծ ուրախություն է բերում։</p>
+</article>
+<div class="group"><div class="gt">Պոչատ աղվեսը</div><div class="gm">Items 108–114</div></div>
+<article class="item" id="i108">
+<div class="head"><span class="num">108</span><span class="kind">Նպատակ (goal)</span></div>
+<p class="what">One line describing what the story is for.</p>
+<p class="where">PARENT-facing only - it appears on the story card in the parent dashboard. The child never hears it.</p>
+<p class="hy">Պատմել արարքների հետևանքների մասին։</p>
+</article>
+<article class="item" id="i109">
+<div class="head"><span class="num">109</span><span class="kind">Դաս (lesson)</span></div>
+<p class="what">The closing thought of the story.</p>
+<p class="where">Spoken by the toy as the summary clip right after the story ends, and shown to parents on the story card.</p>
+<div class="ctx"><span class="ctxlabel">The story already ends with this line today:</span><p class="hy ctxtext">Աղվեսը երկար աշխատեց, հերթով բոլորին օգնեց ու վերջում իր պոչը ետ ստացավ։</p></div>
+<p class="hy">Առանց թույլտվության ուրիշինը վերցնելը փորձանք է բերում․ ամեն արարք ունի իր հետևանքը։</p>
+</article>
+<article class="item" id="i110">
+<div class="head"><span class="num">110</span><span class="kind">Պատասխան 1-ին հարցին</span></div>
+<p class="what">What the toy says after the child answers question 1.</p>
+<p class="where">Question 1 is already approved and unchanged - shown here only so the new answer reads in context.</p>
+<div class="ctx"><span class="ctxlabel">Question 1 (already approved, not up for review):</span><p class="hy ctxtext">Ի՞նչ տվեց աղջիկը աղվեսին։</p></div>
+<p class="hy">Այդպես՝ քայլ առ քայլ, աղվեսը կարողացավ ուղղել իր արածը։</p>
+</article>
+<article class="item" id="i111">
+<div class="head"><span class="num">111</span><span class="kind">Հարց 2</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 2 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Ինչո՞ւ պառավը կտրեց աղվեսի պոչը։</p>
+</article>
+<article class="item" id="i112">
+<div class="head"><span class="num">112</span><span class="kind">Պատասխան 2-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 2, whatever the child said.</p>
+<p class="hy">Որովհետև աղվեսը առանց հարցնելու խմեց կաթը․ ուրիշինը վերցնելուց առաջ պետք է հարցնել։</p>
+</article>
+<article class="item" id="i113">
+<div class="head"><span class="num">113</span><span class="kind">Հարց 3</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 3 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Իսկ դու ի՞նչ կանեիր աղվեսի փոխարեն։</p>
+</article>
+<article class="item" id="i114">
+<div class="head"><span class="num">114</span><span class="kind">Պատասխան 3-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 3, whatever the child said.</p>
+<p class="hy">Ամենալավը՝ նախ հարցնել և թույլտվություն խնդրել։</p>
+</article>
+<div class="group"><div class="gt">Արքայադուստրը և սիսեռահատիկը</div><div class="gm">Items 115–121</div></div>
+<article class="item" id="i115">
+<div class="head"><span class="num">115</span><span class="kind">Նպատակ (goal)</span></div>
+<p class="what">One line describing what the story is for.</p>
+<p class="where">PARENT-facing only - it appears on the story card in the parent dashboard. The child never hears it.</p>
+<p class="hy">Պատմել նրբանկատության և ճշմարտության մասին։</p>
+</article>
+<article class="item" id="i116">
+<div class="head"><span class="num">116</span><span class="kind">Դաս (lesson)</span></div>
+<p class="what">The closing thought of the story.</p>
+<p class="where">Spoken by the toy as the summary clip right after the story ends, and shown to parents on the story card.</p>
+<div class="ctx"><span class="ctxlabel">The story already ends with this line today:</span><p class="hy ctxtext">Ահա այսպես փոքրիկ սիսեռը ցույց տվեց, թե ով է իսկական արքայադուստրը։</p></div>
+<p class="hy">Իսկականը թաքցնել չես կարող․ ճշմարտությունը միշտ երևում է։</p>
+</article>
+<article class="item" id="i117">
+<div class="head"><span class="num">117</span><span class="kind">Պատասխան 1-ին հարցին</span></div>
+<p class="what">What the toy says after the child answers question 1.</p>
+<p class="where">Question 1 is already approved and unchanged - shown here only so the new answer reads in context.</p>
+<div class="ctx"><span class="ctxlabel">Question 1 (already approved, not up for review):</span><p class="hy ctxtext">Ի՞նչ էր դրված ներքնակների տակ։</p></div>
+<p class="hy">Փոքրիկ սիսեռահատիկ․ երբեմն ամենափոքր բանն է ամենակարևորը։</p>
+</article>
+<article class="item" id="i118">
+<div class="head"><span class="num">118</span><span class="kind">Հարց 2</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 2 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Ինչպե՞ս իմացան, որ նա իսկական արքայադուստր է։</p>
+</article>
+<article class="item" id="i119">
+<div class="head"><span class="num">119</span><span class="kind">Պատասխան 2-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 2, whatever the child said.</p>
+<p class="hy">Նա զգաց սիսեռը բոլոր ներքնակների տակից․ իսկականը թաքցնել չես կարող։</p>
+</article>
+<article class="item" id="i120">
+<div class="head"><span class="num">120</span><span class="kind">Հարց 3</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 3 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Իսկ դու ի՞նչ ես անում, երբ ինչ-որ բան խանգարում է քնելդ։</p>
+</article>
+<article class="item" id="i121">
+<div class="head"><span class="num">121</span><span class="kind">Պատասխան 3-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 3, whatever the child said.</p>
+<p class="hy">Բոլորս էլ մեր զգացողություններն ունենք, և դրանք կարևոր են։</p>
+</article>
+<div class="group"><div class="gt">Սուտասանը</div><div class="gm">Items 122–128</div></div>
+<article class="item" id="i122">
+<div class="head"><span class="num">122</span><span class="kind">Նպատակ (goal)</span></div>
+<p class="what">One line describing what the story is for.</p>
+<p class="where">PARENT-facing only - it appears on the story card in the parent dashboard. The child never hears it.</p>
+<p class="hy">Պատմել խելքի և հնարամտության մասին։</p>
+</article>
+<article class="item" id="i123">
+<div class="head"><span class="num">123</span><span class="kind">Դաս (lesson)</span></div>
+<p class="what">The closing thought of the story.</p>
+<p class="where">Spoken by the toy as the summary clip right after the story ends, and shown to parents on the story card.</p>
+<div class="ctx"><span class="ctxlabel">The story already ends with this line today:</span><p class="hy ctxtext">Ահա այսպես խելացի խոսքով աղքատ գյուղացին հաղթեց թագավորին։</p></div>
+<p class="hy">Խելքն ու հնարամտությունը երբեմն ավելի զորավոր են, քան ուժը։</p>
+</article>
+<article class="item" id="i124">
+<div class="head"><span class="num">124</span><span class="kind">Պատասխան 1-ին հարցին</span></div>
+<p class="what">What the toy says after the child answers question 1.</p>
+<p class="where">Question 1 is already approved and unchanged - shown here only so the new answer reads in context.</p>
+<div class="ctx"><span class="ctxlabel">Question 1 (already approved, not up for review):</span><p class="hy ctxtext">Ի՞նչ էր ուզում գյուղացին թագավորից։</p></div>
+<p class="hy">Այո՛, և իր խելացի հնարքով նա հասավ իր ուզածին։</p>
+</article>
+<article class="item" id="i125">
+<div class="head"><span class="num">125</span><span class="kind">Հարց 2</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 2 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Ինչո՞ւ թագավորը չկարողացավ «սուտ է» ասել։</p>
+</article>
+<article class="item" id="i126">
+<div class="head"><span class="num">126</span><span class="kind">Պատասխան 2-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 2, whatever the child said.</p>
+<p class="hy">Որովհետև այդ դեպքում պարտքը պիտի վճարեր․ գյուղացու խելքը հաղթեց։</p>
+</article>
+<article class="item" id="i127">
+<div class="head"><span class="num">127</span><span class="kind">Հարց 3</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 3 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Իսկ դու ի՞նչ հնարամիտ բան ես մտածել երբևէ։</p>
+</article>
+<article class="item" id="i128">
+<div class="head"><span class="num">128</span><span class="kind">Պատասխան 3-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 3, whatever the child said.</p>
+<p class="hy">Խելքով ու հնարամտությամբ շատ դռներ են բացվում։</p>
+</article>
+<div class="group"><div class="gt">Սուտլիկ որսկանը</div><div class="gm">Items 129–135</div></div>
+<article class="item" id="i129">
+<div class="head"><span class="num">129</span><span class="kind">Նպատակ (goal)</span></div>
+<p class="what">One line describing what the story is for.</p>
+<p class="where">PARENT-facing only - it appears on the story card in the parent dashboard. The child never hears it.</p>
+<p class="hy">Զվարճացնել և զարգացնել երևակայությունը։</p>
+</article>
+<article class="item" id="i130">
+<div class="head"><span class="num">130</span><span class="kind">Դաս (lesson)</span></div>
+<p class="what">The closing thought of the story.</p>
+<p class="where">Spoken by the toy as the summary clip right after the story ends, and shown to parents on the story card.</p>
+<div class="ctx"><span class="ctxlabel">The story already ends with this line today:</span><p class="hy ctxtext">Այսպիսին էր սուտլիկ որսկանի զվարճալի պատմությունը՝ սկզբից մինչև վերջ հորինված։</p></div>
+<p class="hy">Երբեմն հեքիաթը պարզապես ուրախ խաղ է․ հորինելն ու ծիծաղելը նույնպես արվեստ են։</p>
+</article>
+<article class="item" id="i131">
+<div class="head"><span class="num">131</span><span class="kind">Պատասխան 1-ին հարցին</span></div>
+<p class="what">What the toy says after the child answers question 1.</p>
+<p class="where">Question 1 is already approved and unchanged - shown here only so the new answer reads in context.</p>
+<div class="ctx"><span class="ctxlabel">Question 1 (already approved, not up for review):</span><p class="hy ctxtext">Քանի՞ լիճ տեսան որսկանները ճանապարհին։</p></div>
+<p class="hy">Երեք լիճ, բայց բոլորն էլ հորինված էին․ դա էլ է խաղի մասը։</p>
+</article>
+<article class="item" id="i132">
+<div class="head"><span class="num">132</span><span class="kind">Հարց 2</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 2 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Ի՞նչն էր այս հեքիաթում ամենազվարճալին քեզ համար։</p>
+</article>
+<article class="item" id="i133">
+<div class="head"><span class="num">133</span><span class="kind">Պատասխան 2-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 2, whatever the child said.</p>
+<p class="hy">Հեքիաթը հենց դրա համար է՝ ծիծաղելու և զարմանալու։</p>
+</article>
+<article class="item" id="i134">
+<div class="head"><span class="num">134</span><span class="kind">Հարց 3</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 3 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Իսկ դու կարո՞ղ ես մի զվարճալի անհնար բան հորինել։</p>
+</article>
+<article class="item" id="i135">
+<div class="head"><span class="num">135</span><span class="kind">Պատասխան 3-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 3, whatever the child said.</p>
+<p class="hy">Հորինելը հրաշալի խաղ է, երբ բոլորը գիտեն, որ խաղ է։</p>
+</article>
+<div class="group"><div class="gt">Երեք խոզուկները</div><div class="gm">Items 136–142</div></div>
+<article class="item" id="i136">
+<div class="head"><span class="num">136</span><span class="kind">Նպատակ (goal)</span></div>
+<p class="what">One line describing what the story is for.</p>
+<p class="where">PARENT-facing only - it appears on the story card in the parent dashboard. The child never hears it.</p>
+<p class="hy">Պատմել ջանասիրության և հեռատեսության մասին։</p>
+</article>
+<article class="item" id="i137">
+<div class="head"><span class="num">137</span><span class="kind">Դաս (lesson)</span></div>
+<p class="what">The closing thought of the story.</p>
+<p class="where">Spoken by the toy as the summary clip right after the story ends, and shown to parents on the story card.</p>
+<div class="ctx"><span class="ctxlabel">The story already ends with this line today:</span><p class="hy ctxtext">Նուֆ-Նուֆը համբերությամբ աշխատեց, ու նրա ամուր տունը բոլոր եղբայրներին տաք պահեց։</p></div>
+<p class="hy">Համբերությամբ ու ջանասիրությամբ արվածը ամուր է լինում և պաշտպանում է փորձանքից։</p>
+</article>
+<article class="item" id="i138">
+<div class="head"><span class="num">138</span><span class="kind">Պատասխան 1-ին հարցին</span></div>
+<p class="what">What the toy says after the child answers question 1.</p>
+<p class="where">Question 1 is already approved and unchanged - shown here only so the new answer reads in context.</p>
+<div class="ctx"><span class="ctxlabel">Question 1 (already approved, not up for review):</span><p class="hy ctxtext">Ինչի՞ց էր շինել Նուֆ-Նուֆն իր տունը։</p></div>
+<p class="hy">Քարից․ ամուր արվածը պաշտպանում է փորձանքից։</p>
+</article>
+<article class="item" id="i139">
+<div class="head"><span class="num">139</span><span class="kind">Հարց 2</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 2 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Ինչո՞ւ ծղոտե և փայտե տները չդիմացան։</p>
+</article>
+<article class="item" id="i140">
+<div class="head"><span class="num">140</span><span class="kind">Պատասխան 2-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 2, whatever the child said.</p>
+<p class="hy">Շտապ ու թեթև արվածը հեշտ է քանդվում․ լավ գործի համար ժամանակ է պետք։</p>
+</article>
+<article class="item" id="i141">
+<div class="head"><span class="num">141</span><span class="kind">Հարց 3</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 3 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Իսկ դու ի՞նչ կուզեիր կառուցել։</p>
+</article>
+<article class="item" id="i142">
+<div class="head"><span class="num">142</span><span class="kind">Պատասխան 3-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 3, whatever the child said.</p>
+<p class="hy">Ինչ էլ որ կառուցես, համբերությամբ արվածը ամուր կլինի։</p>
+</article>
+<div class="group"><div class="gt">Ուլիկը</div><div class="gm">Items 143–149</div></div>
+<article class="item" id="i143">
+<div class="head"><span class="num">143</span><span class="kind">Նպատակ (goal)</span></div>
+<p class="what">One line describing what the story is for.</p>
+<p class="where">PARENT-facing only - it appears on the story card in the parent dashboard. The child never hears it.</p>
+<p class="hy">Պատմել զգուշության և մեծերին լսելու մասին։</p>
+</article>
+<article class="item" id="i144">
+<div class="head"><span class="num">144</span><span class="kind">Դաս (lesson)</span></div>
+<p class="what">The closing thought of the story.</p>
+<p class="where">Spoken by the toy as the summary clip right after the story ends, and shown to parents on the story card.</p>
+<div class="ctx"><span class="ctxlabel">The story already ends with this line today:</span><p class="hy ctxtext">Ուլիկը լավ գիտեր մայրիկի քաղցր ձայնն ու գայլին դուռը չբացեց։</p></div>
+<p class="hy">Մայրիկին լսելը փոքրիկին պահում է անվտանգ։</p>
+</article>
+<article class="item" id="i145">
+<div class="head"><span class="num">145</span><span class="kind">Պատասխան 1-ին հարցին</span></div>
+<p class="what">What the toy says after the child answers question 1.</p>
+<p class="where">Question 1 is already approved and unchanged - shown here only so the new answer reads in context.</p>
+<div class="ctx"><span class="ctxlabel">Question 1 (already approved, not up for review):</span><p class="hy ctxtext">Ինչո՞ւ Ուլիկը դուռը չբացեց գայլի առաջ։</p></div>
+<p class="hy">Որովհետև հիշում էր մայրիկի խոսքը․ զգուշությունը պահում է անվտանգ։</p>
+</article>
+<article class="item" id="i146">
+<div class="head"><span class="num">146</span><span class="kind">Հարց 2</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 2 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Ինչպե՞ս Ուլիկը հասկացավ, որ դռան մոտ մայրիկը չէ։</p>
+</article>
+<article class="item" id="i147">
+<div class="head"><span class="num">147</span><span class="kind">Պատասխան 2-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 2, whatever the child said.</p>
+<p class="hy">Ուշադիր լսեց․ ուշադրությունը մեզ օգնում է չսխալվել։</p>
+</article>
+<article class="item" id="i148">
+<div class="head"><span class="num">148</span><span class="kind">Հարց 3</span></div>
+<p class="what">A new question the toy asks after the story.</p>
+<p class="where">Round 3 of the after-story talk: the toy asks, listens, reacts, then says the takeaway below.</p>
+<p class="hy">Իսկ դու ի՞նչ կանես, եթե անծանոթ մեկը դուռը թակի։</p>
+</article>
+<article class="item" id="i149">
+<div class="head"><span class="num">149</span><span class="kind">Պատասխան 3-րդ հարցին</span></div>
+<p class="what">What the toy says after the child answers that question.</p>
+<p class="where">Spoken at the end of round 3, whatever the child said.</p>
+<p class="hy">Երբեք չբացես առանց մեծերի․ դա ամենաճիշտն է։</p>
+</article>
+</div></details>
+<details id="b-serial">
+<summary><span class="t">Ծիվիկի մեծ ճանապարհը — the six-episode serial</span><span class="m">Items 150–158, 6 episodes + 3 framing clips, about 12 min</span><span class="tap">Tap to open</span></summary>
+<div class="body">
+<p class="batchintro">An original hero, not folklore and not Katrin or Vardan. Tsivik is a small swallow who wants to see the sea with his own eyes; each episode is one day of the journey and stands on its own. This is the longest read on the page - about a story and a half of text. The chant is what a child will repeat, so it is worth reading that one twice.</p>
+<p class="unlocks"><strong>If you say yes:</strong> A yes lets us render the chant plus episode one as a sample for your listen test, then the other five.</p>
+<article class="item" id="i150">
+<div class="head"><span class="num">150</span><span class="kind">Ներածություն</span></div>
+<p class="what">The one-time introduction to the whole series.</p>
+<p class="where">Plays once, before episode one, or the first time a child meets the series. It also teaches the chant.</p>
+<p class="hy">Սա Ծիվիկի հեքիաթն է։ Ծիվիկը մի փոքրիկ ծիծեռնակ է, որը մի մեծ երազանք ունի՝ իր աչքերով տեսնել ծովը։ Ամեն օր նա մի քայլ է անում դեպի իր երազանքը՝ նոր ճանապարհներով ու նոր ընկերներով։ Երբ լսես՝ Ծիվի՛կ, Ծիվի՛կ, փոքրիկ թևեր, մեծ ճանապարհ,— իմացի՛ր՝ սկսվում է Ծիվիկի նոր օրը։</p>
+</article>
+<article class="item" id="i151">
+<div class="head"><span class="num">151</span><span class="kind">Կրկներգ</span></div>
+<p class="what">The six-word chant.</p>
+<p class="where">Identical before every single episode - rendered once and spliced. This is the line a child will hear most.</p>
+<p class="hy">Ծիվի՛կ, Ծիվի՛կ, փոքրիկ թևեր, մեծ ճանապարհ։</p>
+</article>
+<article class="item" id="i152">
+<div class="head"><span class="num">152</span><span class="kind">Փակում</span></div>
+<p class="what">The closing line.</p>
+<p class="where">Plays after every episode.</p>
+<p class="hy">Այսօրվա հեքիաթը այսքանն էր։ Շարունակությունը՝ վաղը։</p>
+</article>
+<article class="item" id="i153">
+<div class="head"><span class="num">153</span><span class="kind">Մաս 1 — Մեծ երազանքը</span></div>
+<p class="what">One episode, about four minutes spoken.</p>
+<p class="where">One episode per session: the toy offers the lowest episode the child has not heard yet, and only one new episode at a time.</p>
+<p class="hy">Մի գյուղում, հին տան կտուրի տակ, ապրում էր մի փոքրիկ ծիծեռնակ։ Անունը Ծիվիկ էր։ Ծիվիկը դեռ շատ փոքր էր, և նրա թևիկները նոր էին ամրանում։ Ամեն երեկո տատիկը թոռնիկների համար պատմում էր հեռավոր ծովի մասին։</p>
+<p class="hy">— Ծովը մեծ է ու կապույտ,— ասում էր տատիկը։</p>
+<p class="hy">— Ծովը երգում է՝ շը-շը, շը-շը։ Իսկ ալիքների վրա արևը փայլում է հազար ոսկե կայծիկով։ Ծիվիկը լսում էր ու փակում աչքերը։ Նա ամբողջ սրտով ուզում էր մի օր իր աչքերով տեսնել ծովը։ Մի առավոտ Ծիվիկը որոշեց փորձել իր թևիկները։</p>
+<p class="hy">— Այսօր կթռչեմ մինչև մեծ ընկուզենին,— ասաց նա։ Ընկուզենին կանգնած էր այգու վերջում՝ բարձր ու կանաչ։ Ծիվիկը թափ առավ, թռավ… ու ընկավ փափուկ խոտերի մեջ։ Մի պահ նստեց տխուր։ Բայց հետո հիշեց ծովի երգը՝ շը-շը, շը-շը։ Վեր կացավ, թափ տվեց փետուրները ու նորից փորձեց։</p>
+<p class="hy">Այս անգամ մի քիչ ավելի բարձր թռավ։ Երրորդ անգամ քամին եկավ օգնության, և Ծիվիկը հասավ ընկուզենու ամենավերին ճյուղին։</p>
+<p class="hy">— Հասա՜,— ուրախացավ Ծիվիկը։ Ճյուղից երևում էր ամբողջ գյուղը՝ տները, այգիները, արահետները։ Իսկ շա՜տ հեռվում, բլուրների ետևում, փայլում էր մի բարակ կապույտ գիծ։</p>
+<p class="hy">— Այնտե՞ղ է ծովը,— մտածեց Ծիվիկը, և նրա սրտիկը արագ-արագ բաբախեց։ Երեկոյան նա ամեն ինչ պատմեց տատիկին։</p>
+<p class="hy">— Տատի՛կ, ես ուզում եմ թռչել մինչև ծովը։ Տատիկը չծիծաղեց։ Նա գորովով նայեց Ծիվիկին ու ասաց․ — Ճանապարհը երկար է, բալի՛կս։ Բայց ամեն մեծ ճանապարհ սկսվում է մի փոքրիկ թռիչքից։ Դու այսօր արդեն թռար մինչև ընկուզենին։ Վաղը կթռչես մի քիչ ավելի հեռու։</p>
+<p class="hy">Օր օրի թևիկներդ կամրանան, ու մի օր ծովը կբացվի քո առաջ։ Ծիվիկը քնեց ուրախ սրտով։ Երազում նա տեսավ կապույտ ալիքներ ու ոսկե կայծիկներ։ Առավոտյան նա արդեն գիտեր, թե որտեղից պիտի սկսի։ Այգիներից այն կողմ հոսում էր մեծ գետը։ Բոլորը ասում էին, որ գետից այն կողմ դեռ ոչ մի փոքրիկ ծիծեռնակ չի թռել։</p>
+<p class="hy">Բայց Ծիվիկը չվախեցավ։ Չէ՞ որ մեծ ճանապարհը արդեն սկսված էր։ Ծիվիկը որոշեց՝ վաղը կթռչի մինչև գետը՝ տեսնելու, թե ինչ կա այնտեղ։</p>
+<p class="foot">Shown in blocks here so it reads on a phone. In the file it is one continuous text — not a word was changed.</p>
+</article>
+<article class="item" id="i154">
+<div class="head"><span class="num">154</span><span class="kind">Մաս 2 — Գետը և քամին</span></div>
+<p class="what">One episode, about four minutes spoken.</p>
+<p class="where">One episode per session: the toy offers the lowest episode the child has not heard yet, and only one new episode at a time.</p>
+<p class="hy">Առավոտյան Ծիվիկը թռավ այգիների վրայով ու հասավ մեծ գետին։ Գետը լայն էր, շա՜տ լայն։ Ջուրը հոսում էր արագ, իսկ վերևում քամին սուլում էր՝ վու-վու, վու-վու։ Ծիվիկը նստեց ափի քարին ու նայեց մյուս ափին։ Այնքա՜ն հեռու էր։</p>
+<p class="hy">— Իմ թևիկները փոքր են,— տխրեց Ծիվիկը։</p>
+<p class="hy">— Քամին ինձ կտանի։ Հանկարծ երկնքում մի մեծ ստվեր սահեց։ Դա ծեր արագիլն էր՝ երկար կտուցով ու հանգիստ, լայն թևերով։ Արագիլը իջավ ափին՝ Ծիվիկի կողքին։</p>
+<p class="hy">— Բարև՛, փոքրիկ ճամփորդ,— ասաց արագիլը։</p>
+<p class="hy">— Ինչո՞ւ ես տխուր։</p>
+<p class="hy">— Ուզում եմ թռչել գետի վրայով,— ասաց Ծիվիկը,— բայց քամին շատ ուժեղ է։ Արագիլը ժպտաց իր երկար կտուցով։</p>
+<p class="hy">— Ես քեզ մի գաղտնիք կասեմ։ Քամու հետ կռվել պետք չէ։ Քամու հետ պետք է ընկերանալ։ Բա՛ց արա թևիկներդ, թող քամին ինքը քեզ տանի։ Նայի՛ր ինձ։ Արագիլը թափ առավ, բացեց լայն թևերը ու առանց թափահարելու սահեց օդի մեջ՝ ինչպես նավակը ջրի վրա։</p>
+<p class="hy">Ծիվիկը ուշադիր նայում էր։ Հետո ինքն էլ թափ առավ, բացեց իր փոքրիկ թևիկները… և քամին վերցրեց նրան։ Սկզբում մի քիչ վախեցավ։ Բայց քամին տաք էր ու փափուկ, ինչպես տատիկի թևիկը։ Ծիվիկը սահում էր օդի մեջ, իսկ ներքևում փայլում էր գետը՝ արծաթե ձկնիկներով լի։</p>
+<p class="hy">— Թռչո՜ւմ եմ,— ծիծաղեց Ծիվիկը։</p>
+<p class="hy">— Իսկապե՜ս թռչում եմ։ Քամին նրան տարավ գետի վրայով՝ մեղմ օրորելով։ Եվ ահա նրա ոտիկները դիպան մյուս ափի տաք ավազին։ Ծիվիկը շրջվեց ու նայեց։ Գետը հիմա իր ետևում էր՝ լայն ու փայլուն։ Իսկ արագիլը երկնքից գլխով արեց նրան։</p>
+<p class="hy">— Ապրե՛ս, փոքրիկ ճամփորդ։ Հիշի՛ր՝ ուժեղը նա չէ, ով մեծ թևեր ունի։ Ուժեղը նա է, ով գիտի, թե երբ պետք է վստահել քամուն։ Ծիվիկը շնորհակալություն ասաց ու նայեց առաջ։ Ափից այն կողմ, մինչև հորիզոն, փռված էր մի ոսկեգույն արտ։ Ցորենի հասկերը օրորվում էին քամուց ու կամացուկ շրշում էին, կարծես մի երգ էին երգում։</p>
+<p class="hy">— Ի՞նչ է շշնջում այս արտը,— մտածեց Ծիվիկը։ Ծիվիկը որոշեց՝ վաղը կգնա լսելու ոսկե արտի երգը։</p>
+<p class="foot">Shown in blocks here so it reads on a phone. In the file it is one continuous text — not a word was changed.</p>
+</article>
+<article class="item" id="i155">
+<div class="head"><span class="num">155</span><span class="kind">Մաս 3 — Ոսկե արտի երգը</span></div>
+<p class="what">One episode, about four minutes spoken.</p>
+<p class="where">One episode per session: the toy offers the lowest episode the child has not heard yet, and only one new episode at a time.</p>
+<p class="hy">Առավոտյան Ծիվիկը թռավ ոսկեգույն արտի վրայով։ Ցորենի հասկերը շրշում էին քամուց, և ամբողջ արտը երգում էր մի կամաց, արևոտ երգ։ Հանկարծ Ծիվիկը լսեց մի ուրիշ ձայն։ Մի փոքրիկ, բարակ ձայն լալիս էր հասկերի արանքում։ Ծիվիկը իջավ ներքև։ Մի ցորենի հասկի վրա նստած էր մի փոքրիկ զատիկ՝ կարմիր, յոթ պուտիկով։</p>
+<p class="hy">— Ինչո՞ւ ես լալիս,— հարցրեց Ծիվիկը։</p>
+<p class="hy">— Ես Պուտիկն եմ,— ասաց զատիկը։</p>
+<p class="hy">— Քամին ինձ բերեց այստեղ, ու ես կորցրել եմ իմ վարդի թուփը։ Իմ տունը այնտեղ է, իսկ ես չգիտեմ, թե որ կողմում է։ Ծիվիկը մի պահ մտածեց։ Ծովը սպասում էր նրան այնտեղ՝ հեռվում։ Բայց Պուտիկը այստեղ էր՝ փոքրիկ ու մենակ։</p>
+<p class="hy">— Մի՛ վախեցիր,— ասաց Ծիվիկը։</p>
+<p class="hy">— Ես թռչել գիտեմ։ Բարձրից ամեն ինչ երևում է։ Հիմա կգտնենք քո տունը։ Ծիվիկը թափ առավ ու բարձրացավ երկինք։ Ներքևում փռված էր ամբողջ արտը՝ ոսկե ծովի նման։ Ահա արահետը։ Ահա հին ջրաղացը։ Իսկ ահա… ջրաղացի պատի տակ՝ մի կանաչ պարտեզ, իսկ պարտեզում՝ վարդի թփեր՝ վարդագույն ծաղիկներով։</p>
+<p class="hy">Ծիվիկը իջավ Պուտիկի մոտ։</p>
+<p class="hy">— Գտա՜։ Քո տունը ջրաղացի պարտեզում է։ Նստի՛ր մեջքիս, ամուր բռնվի՛ր։ Պուտիկը զգույշ բարձրացավ Ծիվիկի փափուկ մեջքին, ու նրանք թռան արտի վրայով։ Շուտով Պուտիկը տեսավ իր վարդի թուփը ու ուրախությունից ծափ տվեց իր փոքրիկ թաթիկներով։</p>
+<p class="hy">— Իմ տո՜ւնը։ Շնորհակալ եմ, Ծիվի՛կ։ Դու իմ ընկերն ես։ Պուտիկի քույրիկները դուրս թռան վարդի տերևների տակից ու շրջապատեցին նրանց։ Բոլորը ուրախ էին։ Իսկ ամենամեծ վարդի թերթիկի վրա Պուտիկի մայրիկը Ծիվիկի համար քաղցր ցող էր պահել։ Ծիվիկը խմեց ցողը ու զգաց, որ հոգնածությունը անցել է։</p>
+<p class="hy">Երեկոյան, երբ արևը իջնում էր, Ծիվիկը մտածեց․ «Այսօր ես ծովին չմոտեցա։ Բայց սիրտս այնպես լիքն է, կարծես մի ամբողջ ծով է մեջը»։ Ճանապարհին ընկեր գտնելը նույնպես մեծ բան է։ Իսկ Պուտիկը թևիկով ցույց տվեց հեռուն․ — Տեսնո՞ւմ ես այն մեծ սարը։</p>
+<p class="hy">Ամպերը գիշերում են նրա գագաթին։ Սարից այն կողմ, ասում են, փայլում է մի արծաթե հրաշք։ Ծիվիկը որոշեց՝ վաղը կբարձրանա ամպերի սարը՝ իր աչքով տեսնելու այդ հրաշքը։</p>
+<p class="foot">Shown in blocks here so it reads on a phone. In the file it is one continuous text — not a word was changed.</p>
+</article>
+<article class="item" id="i156">
+<div class="head"><span class="num">156</span><span class="kind">Մաս 4 — Ամպերի սարը</span></div>
+<p class="what">One episode, about four minutes spoken.</p>
+<p class="where">One episode per session: the toy offers the lowest episode the child has not heard yet, and only one new episode at a time.</p>
+<p class="hy">Առավոտյան Ծիվիկը սկսեց բարձրանալ սարը։ Սկզբում հեշտ էր՝ լանջերին ծաղիկներ էին ու տաք արև։ Բայց որքան բարձր, այնքան ցուրտ էր դառնում։ Քամին սուլում էր՝ վու-վու, վու-վու։ Ամպերը այնքան մոտ էին, որ Ծիվիկը կարող էր թևիկով դիպչել նրանց։</p>
+<p class="hy">Մի մեծ քարի տակ նա կանգ առավ հանգստանալու։ Թևիկները հոգնել էին, իսկ գագաթը դեռ հեռու էր։</p>
+<p class="hy">— Կռա-կռա,— լսվեց հանկարծ։ Քարի վրա նստած էր մի ծեր ագռավ՝ մոխրագույն փետուրներով ու իմաստուն աչքերով։</p>
+<p class="hy">— Այս ցուրտ սարին ի՞նչ ես անում, փոքրիկ ծիծեռնակ։</p>
+<p class="hy">— Ես ծովն եմ փնտրում,— ասաց Ծիվիկը։</p>
+<p class="hy">— Ուզում եմ անցնել սարի վրայով, բայց քամին ցուրտ է, իսկ ես հոգնել եմ։ Ծեր ագռավը երկար նայեց նրան։</p>
+<p class="hy">— Ես այս սարի բոլոր քարերը գիտեմ,— ասաց նա։</p>
+<p class="hy">— Գագաթով մի՛ գնա, այնտեղ քամին կատաղի է։ Ժայռերի արանքում մի նեղ կածան կա։ Այնտեղ քամին հանգիստ է, իսկ արևը՝ տաք։ Ծիվիկը ուրախացավ։ Հետո հիշեց, որ թևիկի տակ մի ազնվամորի ունի՝ ճանապարհի համար պահած։</p>
+<p class="hy">— Վերցրո՛ւ,— ասաց նա ագռավին։</p>
+<p class="hy">— Դու ինձ ճանապարհ ցույց տվեցիր, ես էլ քեզ քաղցր բան կհյուրասիրեմ։ Ագռավը զարմացավ։ Շատ վաղուց ոչ ոք նրան նվեր չէր տվել։ Նա կերավ ազնվամորին ու փայլող աչքերով ասաց․ — Արի՛, միասին գնանք։ Ես քեզ կուղեկցեմ մինչև կածանի վերջը։ Նրանք միասին թռան նեղ կածանով՝ ժայռերի արանքով, տաք արևի տակ։</p>
+<p class="hy">Ծեր ագռավը պատմում էր սարի պատմությունները, և ճանապարհը աննկատ անցավ։ Եվ ահա նրանք կանգնեցին սարի ուսին։</p>
+<p class="hy">— Նայի՛ր,— ասաց ագռավը՝ թևով ցույց տալով հեռուն։ Ծիվիկը նայեց ու շունչը պահեց։ Հեռվում, բլուրների ետևում, արևի տակ փայլում էր մի արծաթե ժապավեն՝ լայն ու հանգիստ։</p>
+<p class="hy">— Ծո՞վն է,— կամաց հարցրեց Ծիվիկը։</p>
+<p class="hy">— Չգիտեմ,— ասաց ծեր ագռավը։</p>
+<p class="hy">— Ես այսքան հեռու երբեք չեմ թռել։ Բայց դու կթռչես, փոքրի՛կ։ Քո թևիկները փոքր են, բայց սիրտդ մեծ է։ Ծիվիկը շնորհակալություն ասաց իր նոր ընկերոջը։ Այդ գիշեր նա քնեց սարի տաք քարերի արանքում՝ ամպերի փափուկ վերմակի տակ։ Իսկ սրտում մի հարց էր թպրտում՝ արծաթե ժապավենը իսկապե՞ս ծովն է։</p>
+<p class="hy">Վաղը նա կիմանա։</p>
+<p class="foot">Shown in blocks here so it reads on a phone. In the file it is one continuous text — not a word was changed.</p>
+</article>
+<article class="item" id="i157">
+<div class="head"><span class="num">157</span><span class="kind">Մաս 5 — Արծաթե ժապավենը</span></div>
+<p class="what">One episode, about four minutes spoken.</p>
+<p class="where">One episode per session: the toy offers the lowest episode the child has not heard yet, and only one new episode at a time.</p>
+<p class="hy">Առավոտյան Ծիվիկը թռավ սարից ներքև՝ ուղիղ դեպի արծաթե ժապավենը։ Թռչում էր ու երազում՝ ահա հիմա կտեսնի ալիքները, կլսի ծովի երգը։ Բայց երբ մոտեցավ, տեսավ՝ ջուրը հանգիստ է, ալիքներ չկան, իսկ ափերը երևում են բոլոր կողմերից։ Դա ծովը չէր։</p>
+<p class="hy">Դա մի մեծ, գեղեցիկ լիճ էր։ Ծիվիկը նստեց եղեգնիկի վրա, ու նրա սրտիկը տխրեց։ Այսքան ճանապարհ, այսքան օր… իսկ ծովը դեռ չկա։</p>
+<p class="hy">— Ինչո՞ւ ես տխուր, փոքրիկ թռչնակ,— լսվեց մի ձայն։ Ջրի վրա ճախրում էր մի սպիտակ ճայ։</p>
+<p class="hy">— Ես կարծում էի, թե սա ծովն է,— ասաց Ծիվիկը։</p>
+<p class="hy">— Բայց սա լիճ է։ Ճայը ծիծաղեց՝ պարզ ու բարի։</p>
+<p class="hy">— Ես Ալիկն եմ,— ասաց նա։</p>
+<p class="hy">— Ես ծովում եմ ծնվել։ Իսկ գիտե՞ս, թե ինչու եմ այստեղ։ Ծովից թռչում եմ լիճ, լճից՝ ծով։ Ծովը այստեղից մեկ օրվա ճանապարհ է։ Դու արդեն շատ մոտ ես։</p>
+<p class="hy">— Իսկապե՞ս,— Ծիվիկի աչքերը փայլեցին։</p>
+<p class="hy">— Իսկապես,— ասաց Ալիկը։</p>
+<p class="hy">— Փակի՛ր աչքերդ ու շնչի՛ր։ Ծիվիկը փակեց աչքերը ու խորը շնչեց։ Քամին բերում էր մի նոր, անծանոթ հոտ՝ թարմ ու մի քիչ աղի։</p>
+<p class="hy">— Սա ծովի հոտն է,— ասաց Ալիկը։</p>
+<p class="hy">— Քամին այն բերում է ալիքների վրայից։ Այնտեղ, որտեղից փչում է աղի քամին, այնտեղ էլ ծովն է։ Գնա՛ քամու հոտի ետևից, ու չես մոլորվի։ Ծիվիկը բացեց աչքերը։ Տխրությունը չքացել էր։ Նա նայեց լճին ու տեսավ, թե ինչ գեղեցիկ է այն՝ արծաթե ջուր, կանաչ եղեգներ, սպիտակ շուշաններ։</p>
+<p class="hy">— Գիտե՞ս, Ալի՛կ,— ասաց նա,— ես այսօր ծովը չգտա։ Բայց գտա մի գեղեցիկ լիճ, մի նոր ընկեր ու ծովի հոտը։ Երկար ճանապարհին կանգառը վերջ չէ։ Կանգառը պարզապես հանգիստ է՝ նոր թռիչքից առաջ։ Այդ երեկո Ալիկը Ծիվիկին հյուրասիրեց լճափի ամենահամեղ մոշով, ու նրանք երկար զրուցեցին։</p>
+<p class="hy">Ալիկը պատմում էր ծովի մասին՝ ալիքների, նավերի, ափի ոսկե ավազի։ Ծիվիկը լսում էր ու ժպտում։ Վաղը լուսադեմին նա կթռչի աղի քամու ետևից։ Եվ այս անգամ՝ մինչև ծովը։</p>
+<p class="foot">Shown in blocks here so it reads on a phone. In the file it is one continuous text — not a word was changed.</p>
+</article>
+<article class="item" id="i158">
+<div class="head"><span class="num">158</span><span class="kind">Մաս 6 — Ծովը</span></div>
+<p class="what">One episode, about four minutes spoken.</p>
+<p class="where">One episode per session: the toy offers the lowest episode the child has not heard yet, and only one new episode at a time.</p>
+<p class="hy">Դեռ արևը նոր էր բարձրանում, երբ Ծիվիկը թռավ լճի վրայով՝ աղի քամու ետևից։ Նա թռչում էր ամբողջ օրը՝ բլուրների, ձորերի, ծաղկած դաշտերի վրայով։ Քամին գնալով ավելի աղի էր դառնում, ավելի թարմ։ Եվ հանկարծ Ծիվիկը լսեց… երգը։ Շը-շը, շը-շը։</p>
+<p class="hy">Նույն երգը, որ տատիկը երգում էր հին տան կտուրի տակ։ Սրտիկը սկսեց արագ-արագ բաբախել։ Նա բարձրացավ վերջին բլուրի վրայով և… կանգ առավ օդի մեջ։ Նրա առաջ, մինչև երկնքի ծայրը, փռված էր ծովը։ Կապույտ էր, այնքա՜ն կապույտ, որ երկինքը նրա կողքին գունատ էր թվում։</p>
+<p class="hy">Ալիքները գալիս էին ափին ու երգում՝ շը-շը, շը-շը։ Իսկ ջրի վրա արևը փայլում էր հազար ոսկե կայծիկով՝ ճիշտ այնպես, ինչպես տատիկն էր պատմել։</p>
+<p class="hy">— Ծո՜վը,— շշնջաց Ծիվիկը։</p>
+<p class="hy">— Ես հասա՜։ Նա իջավ ցած ու թռավ ալիքների վրայով։ Ջրի կաթիլները թռչում էին վեր ու գույնզգույն փայլում արևի տակ։ Ծիվիկը ծիծաղում էր ու պտտվում օդի մեջ։ Հետո նստեց ափի մի տաք քարի վրա ու երկար նայեց ծովին։ Եվ հանկարծ հասկացավ մի բան։</p>
+<p class="hy">Նա այստեղ հասավ ոչ միայն իր թևիկներով։ Տատիկը նրան երազանք տվեց։ Արագիլը սովորեցրեց վստահել քամուն։ Պուտիկը ցույց տվեց ամպերի սարը։ Ծեր ագռավը գտավ տաք կածանը։ Ալիկը նվիրեց աղի քամու գաղտնիքը։ Փոքրիկ թևերը մեծ ճանապարհ անցան, որովհետև ճանապարհին բարի սրտեր կային։</p>
+<p class="hy">Ծիվիկը վեր կացավ ու բարձր, ուրախ ծիվ-ծիվ արեց՝ շնորհակալություն բոլորին։ Ծովը պատասխանեց իր երգով՝ շը-շը, շը-շը։ Նրանք երկար երգեցին միասին՝ փոքրիկ ծիծեռնակը և մեծ ծովը։ Իսկ երբ արևը սկսեց իջնել ալիքների մեջ, Ծիվիկը մտածեց տան մասին։</p>
+<p class="hy">Հին կտուրը, տատիկը, թոռնիկները… Նրանք դեռ չգիտեն, թե ինչ գեղեցիկ է ծովը։</p>
+<p class="hy">— Ես կվերադառնամ ու ամեն ինչ կպատմեմ,— որոշեց Ծիվիկը։</p>
+<p class="hy">— Ամենամեծ ուրախությունը տեսած հրաշքը սիրելի սրտերի հետ կիսելն է։ Նա նայեց ետ՝ անցած երկար ճանապարհին, ու ժպտաց։ Տուն տանող ճամփան լի է ընկերներով։ Իսկ փոքրիկ թևերի համար աշխարհում դեռ շա՜տ մեծ ճանապարհներ կան։</p>
+<p class="foot">Shown in blocks here so it reads on a phone. In the file it is one continuous text — not a word was changed.</p>
+</article>
+</div></details>
+<details id="b-closed">
+<summary><span class="t">Already done — nothing to read here</span><span class="m">4 batches you have already answered on</span><span class="tap">Tap to open</span></summary>
+<div class="body">
+<p class="batchintro">These are here only so you know they were not forgotten. None of them needs a word from you.</p>
+<ul class="closed">
+<li><span class="n">The 10 alternate story endings</span><br><span class="w">You reviewed these on 7 August - you rewrote 7 of them yourself, kept anban-huri as drafted, and picked option A for sutasan. Nothing left to read. What is left is the audio render and the listen test.</span><br><span class="w"><code>backend/content/variant-endings/</code></span></li>
+<li><span class="n">The 90 offline-game clips (mind-reader, buzzer, sound game, Simon, story pauses)</span><br><span class="w">You made your own edit pass on these on 7 August - 34 lines in your wording - and they are already rendered and on the toy for bench testing. The remaining gate is the expressive re-render before launch, not the words. One question inside them is still open, and it is written down under “Problems found” in docs/review/content-review-index.md.</span><br><span class="w"><code>backend/content/offline-games/</code></span></li>
+<li><span class="n">The 43 welcome greetings and menu lines</span><br><span class="w">These are your own words - your set of greetings, cut down to 39 plus the menu lines. They are rendered and shipped. Only the listen test is open.</span><br><span class="w"><code>backend/content/voice-clips/</code></span></li>
+<li><span class="n">The 10 story texts themselves</span><br><span class="w">All approved and on the toy. No story text is on this page.</span><br><span class="w"><code>backend/src/.../Stories/Content/</code></span></li>
+</ul></div></details>
+<footer>Packaged from the repo as it stands, 9 August 2026. The words are copied exactly as they are written in the files — nothing was edited, shortened or tidied to make this page. Plain-text version of the same summary: <code>docs/review/content-review-index.md</code>.</footer>
+</div>
