@@ -1,0 +1,389 @@
+<title>Areg — where the build stands</title>
+<style>
+  :root {
+    --ground: #E9E4DB;
+    --panel: #F3EFE8;
+    --ink: #1A1D26;
+    --ink-soft: #5B5F6B;
+    --rule: #CFC7BA;
+    --lapis: #2E56A0;
+    --moss: #3A6E55;
+    --ochre: #96701C;
+    --pom: #96263A;
+    --chip-ink: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #12141C;
+      --panel: #191C26;
+      --ink: #E7E3DA;
+      --ink-soft: #9096A6;
+      --rule: #2C3040;
+      --lapis: #86A8EC;
+      --moss: #6FB794;
+      --ochre: #D2A648;
+      --pom: #E4778A;
+      --chip-ink: #12141C;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #12141C;
+    --panel: #191C26;
+    --ink: #E7E3DA;
+    --ink-soft: #9096A6;
+    --rule: #2C3040;
+    --lapis: #86A8EC;
+    --moss: #6FB794;
+    --ochre: #D2A648;
+    --pom: #E4778A;
+    --chip-ink: #12141C;
+  }
+  :root[data-theme="light"] {
+    --ground: #E9E4DB;
+    --panel: #F3EFE8;
+    --ink: #1A1D26;
+    --ink-soft: #5B5F6B;
+    --rule: #CFC7BA;
+    --lapis: #2E56A0;
+    --moss: #3A6E55;
+    --ochre: #96701C;
+    --pom: #96263A;
+    --chip-ink: #FFFFFF;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: ui-sans-serif, "Segoe UI", system-ui, "Noto Sans Armenian", sans-serif;
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.25rem 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.75rem;
+  }
+
+  .eyebrow {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 8vw, 2.9rem);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    font-weight: 800;
+    margin: 0.5rem 0 0;
+    text-wrap: balance;
+  }
+
+  .lede {
+    margin: 0.75rem 0 0;
+    color: var(--ink-soft);
+    font-size: 1.02rem;
+  }
+
+  h2 {
+    font-size: 1.28rem;
+    letter-spacing: -0.02em;
+    font-weight: 750;
+    margin: 0 0 0.9rem;
+    text-wrap: balance;
+  }
+
+  section { display: block; }
+
+  .next {
+    background: var(--panel);
+    border-top: 3px solid var(--lapis);
+    padding: 1.4rem 1.25rem 1.5rem;
+  }
+  .next h2 { margin-bottom: 0.4rem; }
+  .next p { margin: 0.4rem 0 0; }
+  .next .do {
+    font-size: 1.22rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.35;
+  }
+  .next .mins {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.76rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--lapis);
+  }
+
+  ol.rows, ul.rows { list-style: none; margin: 0; padding: 0; }
+
+  .row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.6rem 0.85rem;
+    align-items: baseline;
+    padding: 0.9rem 0;
+    border-top: 1px solid var(--rule);
+  }
+  .row:last-child { border-bottom: 1px solid var(--rule); }
+
+  .chip {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.63rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 700;
+    padding: 0.22rem 0.5rem;
+    color: var(--chip-ink);
+    white-space: nowrap;
+    align-self: start;
+    margin-top: 0.15rem;
+  }
+  .c-live { background: var(--moss); }
+  .c-untested { background: var(--ochre); }
+  .c-you { background: var(--pom); }
+  .c-todo { background: var(--ink-soft); }
+
+  .row .what { margin: 0; }
+  .row .why {
+    margin: 0.3rem 0 0;
+    color: var(--ink-soft);
+    font-size: 0.93rem;
+  }
+  .row strong { font-weight: 700; }
+
+  .path { counter-reset: step; }
+  .path .row { grid-template-columns: auto 1fr; }
+  .step-n {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--lapis);
+    align-self: start;
+    margin-top: 0.1rem;
+  }
+
+  .note {
+    border-left: 3px solid var(--rule);
+    padding: 0.15rem 0 0.15rem 1rem;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+  }
+  .note strong { color: var(--ink); }
+
+  footer {
+    color: var(--ink-soft);
+    font-size: 0.87rem;
+    border-top: 1px solid var(--rule);
+    padding-top: 1.25rem;
+  }
+  a { color: var(--lapis); }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Areg · build status · 9 August 2026</p>
+    <h1>The toy works. Three things stand between it and children.</h1>
+    <p class="lede">You are not behind. Most of this is built. This page exists so you never have to hold it all in your head at once.</p>
+  </header>
+
+  <section class="next">
+    <h2>Do this next</h2>
+    <p class="mins">Five minutes · tonight</p>
+    <p class="do">Turn the toy on. It should be silent. Press BOOT, say something, and see if it answers.</p>
+    <p class="why" style="color:var(--ink-soft);margin-top:0.7rem;font-size:0.95rem;">That confirms the fix installed tonight actually worked. Then stop — nothing else needs you today.</p>
+  </section>
+
+  <section>
+    <h2>Waiting on you</h2>
+    <p class="note" style="margin-bottom:1.1rem;">Only three things in the whole project need <strong>you</strong>. Everything else is mine.</p>
+    <ul class="rows">
+      <li class="row">
+        <span class="chip c-you">Decide</span>
+        <div>
+          <p class="what"><strong>Whose voice tells the stories.</strong></p>
+          <p class="why">Every story is currently narrated by your own voice clone, which you said is temporary. Nothing can be re-recorded until this is decided — so this one blocks the launch more than any code. I am preparing samples so you can just listen and point.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-you">Read</span>
+        <div>
+          <p class="what"><strong>The new Armenian texts.</strong></p>
+          <p class="why">Alternate story endings and the six-part Tsivik serial are written and waiting for your yes. I am putting them into one page you can read on your phone and answer with numbers.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-you">Buy</span>
+        <div>
+          <p class="what"><strong>Two push buttons.</strong></p>
+          <p class="why">About 500 dram at the Yerevan radio shop. Without them the three games inside the toy cannot be tested at all.</p>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Working today</h2>
+    <ul class="rows">
+      <li class="row">
+        <span class="chip c-live">Live</span>
+        <div>
+          <p class="what"><strong>The toy talks.</strong> Armenian conversation through the cloud, with safety checks on every message.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-live">Live</span>
+        <div>
+          <p class="what"><strong>Eight stories with audio</strong>, played from the card even with no internet.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-live">Live</span>
+        <div>
+          <p class="what"><strong>Questions during a story.</strong> The child can interrupt and ask, and the answer stays inside that story.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-live">Live</span>
+        <div>
+          <p class="what"><strong>Parent dashboard on the web.</strong> See conversations, set bedtime, pause the toy, turn modes off.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-live">Live</span>
+        <div>
+          <p class="what"><strong>The toy updates itself over Wi-Fi.</strong> Proven six times, including tonight — and it restores the old version by itself if an update fails.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-live">Live</span>
+        <div>
+          <p class="what"><strong>All the sound files reach the toy by themselves</strong> — 8 stories, 43 greetings, 92 game clips, downloaded over Wi-Fi with no cable.</p>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Built, but never tried on the real toy</h2>
+    <p class="note" style="margin-bottom:1.1rem;">The code exists and compiles. Nobody has pressed the buttons yet. Until someone does, none of it counts.</p>
+    <ul class="rows">
+      <li class="row">
+        <span class="chip c-untested">Untested</span>
+        <div>
+          <p class="what"><strong>Three games</strong> — mind-reader, two-player buzzer, tone memory.</p>
+          <p class="why">Needs the two buttons.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-untested">Untested</span>
+        <div>
+          <p class="what"><strong>The greeting and spoken menu.</strong></p>
+          <p class="why">Switched off tonight after it took over the toy's behaviour. It stays off until we test it together and you decide whether you like it.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-untested">Untested</span>
+        <div>
+          <p class="what"><strong>Pauses inside stories</strong>, where Areg stops and invites the child to shout something.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-untested">Untested</span>
+        <div>
+          <p class="what"><strong>Different endings on a second listen</strong>, and the Tsivik serial playing in order.</p>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Not built yet</h2>
+    <ul class="rows">
+      <li class="row">
+        <span class="chip c-todo">Open</span>
+        <div>
+          <p class="what"><strong>The circuit board.</strong> The wiring plan is finished and machine-checked; the physical board drawing is in progress.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-todo">Open</span>
+        <div>
+          <p class="what"><strong>A body for the toy.</strong> No case, no shape, no colour decided.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-todo">Open</span>
+        <div>
+          <p class="what"><strong>iPhone app.</strong> Apple refused the developer account in August, so the phone surface is the web page for now. Android is unaffected.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-todo">Open</span>
+        <div>
+          <p class="what"><strong>Safety certification and paying customers.</strong> Both needed before selling; neither needed to let a few friendly families try it.</p>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>The shortest path to five real families</h2>
+    <ol class="rows path">
+      <li class="row">
+        <span class="step-n">1</span>
+        <div>
+          <p class="what"><strong>Pick the voice</strong> and re-record the eight stories with it.</p>
+          <p class="why">This is the one that changes how the toy feels. Everything else is plumbing.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="step-n">2</span>
+        <div>
+          <p class="what"><strong>Wire the two buttons and test everything on your own toy</strong> for a week — games, pauses, greeting.</p>
+          <p class="why">Your own children are the honest test. Anything they ignore, we cut.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="step-n">3</span>
+        <div>
+          <p class="what"><strong>Build four more toys by hand</strong> on the same boards you already use, in simple cases.</p>
+          <p class="why">Do not wait for the factory board for this. Five hand-made toys are enough to learn everything a first version can teach.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="step-n">4</span>
+        <div>
+          <p class="what"><strong>Give them to five families you know</strong>, free, for a month.</p>
+          <p class="why">Before this step, have someone check what you legally owe families in Armenia and the EU even when giving a device away — I can prepare the questions, but a lawyer answers them.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="step-n">5</span>
+        <div>
+          <p class="what"><strong>Then</strong> decide about the factory board, the case, certification and selling.</p>
+          <p class="why">Those cost thousands. Spend them after five families tell you the toy is worth it, not before.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <footer>
+    <p>Written for Hayk, 9 August 2026, after the toy was returned to its simple behaviour (firmware 1.1.7). Every claim here is something I checked in the repository or watched happen tonight — where something is untested, it says untested.</p>
+  </footer>
+
+</div>
