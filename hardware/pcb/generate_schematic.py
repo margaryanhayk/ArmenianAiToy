@@ -253,6 +253,22 @@ NC = object()          # sentinel: explicit no-connect
 
 GRID = 1.27            # mm — KiCad's schematic connectivity grid
 
+# JLCPCB sourcing (hardware/pcb/jlcpcb-readiness.md, 2026-08-09): these
+# resistor values have NO fee-free 0402 part in JLC's Basic library, and the
+# 0402 parts that do exist force a minimum-buy worth more than the loading
+# fee they would avoid. In 0603 every one of them is a Basic part. Layout has
+# not started, so this costs nothing today and a respin later.
+VALUES_PREFERRING_0603 = {'0R', '33R', '560R', '200R', '91k', '511k'}
+R0402 = 'Resistor_SMD:R_0402_1005Metric'
+R0603 = 'Resistor_SMD:R_0603_1608Metric'
+
+
+def prefer_0603(value, footprint):
+    if footprint == R0402 and value in VALUES_PREFERRING_0603:
+        return R0603
+    return footprint
+
+
 # The design below was laid out on a compact coordinate grid; at 1:1 the
 # symbols collide. Connectivity here is by GLOBAL LABELS and power symbols
 # placed on pin endpoints — there is no wire geometry — so scaling every
@@ -279,6 +295,7 @@ class Design:
         # instance ORIGIN must also be a 1.27 multiple or every pin endpoint
         # lands off-grid (KiCad ERC: endpoint_off_grid, 201 of them).
         x, y = snap(x), snap(y)
+        footprint = prefer_0603(value, footprint)
         if lib_id not in self.symdefs:
             d = get_symdef(lib_id)
             self.symdefs[lib_id] = d
@@ -384,8 +401,8 @@ d.nets('U4', {
 # PHASE-2 GATE: confirm value against the TPS63802 datasheet inductor-selection
 # table before fab — TI's typical application is 1.5 uH; 2.2 uH is the audited
 # BOM choice and must be shown acceptable at our load, or the BOM changes.
-d.place('L1', 'Device:L', 295, 30, '2.2uH VLS6045EX-2R2N',
-        'Inductor_SMD:L_TDK_VLS6045EX_VLS6045AF')
+d.place('L1', 'Device:L', 295, 30, '2.2uH 6x6mm shielded',
+        'Inductor_SMD:L_TDK_VLS6045EX_VLS6045AF', 'C2849533')
 d.nets('L1', {'1': 'SW1', '2': 'SW2'})
 d.place('C1', 'Device:C', 265, 70, '10uF', 'Capacitor_SMD:C_0603_1608Metric', 'C19702')
 d.nets('C1', {'1': 'VSYS', '2': 'GND'})
@@ -402,8 +419,11 @@ d.nets('C4', {'1': '+3V3', '2': 'GND'})
 
 # mic supply filter branch: +3V3 -> FB1 -> 3V3_MIC_F -> 10R -> MIC_VDD
 d.add_text('MIC SUPPLY FILTER', 355, 22)
-d.place('FB1', 'Device:FerriteBead', 365, 40, 'BLM18PG601SN1D',
-        'Inductor_SMD:L_0603_1608Metric', 'C1017')
+# C1017 (the earlier PN) is an 0805 part on an 0603 land — wrong footprint,
+# and wrong current rating for the speaker legs. Split by role instead:
+# signal-supply filtering here, high-current beads on the class-D output.
+d.place('FB1', 'Device:FerriteBead', 365, 40, '600R@100MHz 0603 (200mA)',
+        'Inductor_SMD:L_0603_1608Metric', 'C1002')
 d.nets('FB1', {'1': '+3V3', '2': '3V3_MIC_F'})
 d.place('R7', 'Device:R', 365, 60, '10R', 'Resistor_SMD:R_0402_1005Metric')
 d.nets('R7', {'1': '3V3_MIC_F', '2': 'MIC_VDD'})
@@ -591,11 +611,13 @@ d.place('C21', 'Device:C_Polarized', 445, 240, '330uF 6.3V polymer',
         'Capacitor_Tantalum_SMD:CP_EIA-7343-31_Kemet-D', 'C79113')
 d.nets('C21', {'1': '+3V3', '2': 'GND'})
 # speaker legs: ferrite + 1nF C0G each (EMC insurance; parts DNP-able, M9 decides)
-d.place('FB2', 'Device:FerriteBead', 495, 220, 'BLM18PG601SN1D',
-        'Inductor_SMD:L_0603_1608Metric', 'C1017')
+# FB2/FB3 sit in the class-D speaker path (~0.4 A peak at 3.3 V into 8 R), so
+# they need a 2 A bead, not the 200 mA signal-filter type.
+d.place('FB2', 'Device:FerriteBead', 495, 220, '120R@100MHz 0603 (2A)',
+        'Inductor_SMD:L_0603_1608Metric', 'C14709')
 d.nets('FB2', {'1': 'AMP_OUTP', '2': 'SPK_P'})
-d.place('FB3', 'Device:FerriteBead', 505, 220, 'BLM18PG601SN1D',
-        'Inductor_SMD:L_0603_1608Metric', 'C1017')
+d.place('FB3', 'Device:FerriteBead', 505, 220, '120R@100MHz 0603 (2A)',
+        'Inductor_SMD:L_0603_1608Metric', 'C14709')
 d.nets('FB3', {'1': 'AMP_OUTN', '2': 'SPK_N'})
 d.place('C22', 'Device:C', 495, 245, '1nF C0G', 'Capacitor_SMD:C_0402_1005Metric',
         dnp=True)
