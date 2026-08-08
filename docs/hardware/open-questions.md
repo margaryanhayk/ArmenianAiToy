@@ -12,10 +12,17 @@ item names who closes it and what a PASS looks like.
    pays ~€150-300/yr in cells; Li-ion = +$8.65 BOM + €6-10k
    one-time + weeks, zero recurring. Split recommendation on file:
    AA run 1, Li-ion run 2 — but it is a business call.
-2. **Speaker sensitivity ↔ rail count** — order 2-3 candidate 50 mm
-   8 Ω drivers WITH published T/S data and measure sensitivity. ≥88
-   dB/W/m measured → single 3V3 rail; ≤86 → the 5 V amp rail
-   returns. This gates the schematic.
+2. **Speaker sensitivity ↔ rail count** — AMENDED by the 2026-08-08
+   component audit (`audit-components.md` §5): ≥88 dB/W/m at 50 mm
+   is an empty set on the market (survey on file: real 50 mm drivers
+   cluster 77-85 dB/W/m), and the crest-headroom math shows 3V3-only
+   survives at **≥85 dB measured in-enclosure**. Revised gate:
+   widen the driver to 50-70 mm, Fs ≤300 Hz free-air; ≥85 dB/W/m
+   MEASURED in the enclosure → single 3V3 rail; ≤84 → 5 V rail
+   returns. Candidates to order for M10: Same Sky GF0668 (primary),
+   Dayton CE50MP-8 (50 mm only, sensitivity unpublished — measure),
+   Peerless PLS-50N25AL01-08 (fidelity control; 81 dB ⇒ 5 V).
+   This still gates the schematic.
 3. **EU or not for run 1** — €500-1,500 written pre-assessment from
    a notified body (TÜV/SGS/BV/Intertek) that does BOTH toys and
    RED, asked in writing: (a) does the AI Act's Annex-I toy hook
@@ -50,12 +57,20 @@ item names who closes it and what a PASS looks like.
 
 ## Sourcing / lifecycle
 
-- **INMP441 EOL** (TDK PCN Jan 2026 covers family members;
-  ICS-43434 shows obsolete/LTB mid-2026). CONFIRM WITH TDK before
-  fixing any footprint. Alternates: Knowles SPH0645LM4H-B (I2S,
-  near-drop-in) or a PDM mic (cheaper, better stocked, S3 has PDM
-  RX — but a different footprint AND a different firmware capture
-  path).
+- **Microphone (RESOLVED as research, 2026-08-08 audit — see
+  `audit-components.md` §3).** Verified: INMP441 discontinued;
+  TDK PCN-000772 (2026-01-15) EOLs ICS-43434 AND T3902 — **LTB
+  2026-06-15 has PASSED**, LTS 2027-01-15 (distributor shelf stock
+  only); the previously-named fallback **Knowles SPH0645LM4H-B is
+  itself obsolete** (Knowles→Syntiant line pruning); CUI
+  CMM-4030D-261-I2S discontinued. The whole Western I2S-mic
+  category is exiting. Plan: run 1 = INMP441/ICS-43434 remaining
+  stock (buy at BOM-freeze); production rev A = **Infineon
+  IM69D130, PDM** (active, SNR 69 dBA, AOP 130 dB SPL — both
+  better) via ESP32-S3 I2S0 PDM-RX — a firmware capture-path slice
+  with its own bench session, decided BEFORE footprint freeze.
+  Last-resort I2S drop-in: MSM261S4030H0 (in production, but
+  57 dBA SNR = −4 dB vs INMP441).
 - Espressif longevity/PCN pages for the exact WROOM-1 SKU before
   tooling; module allocation lead time 2-6 weeks, occasionally worse.
 - EN 71-1:2026 edition exists — confirm clause 4.20 unchanged vs the

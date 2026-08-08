@@ -9,15 +9,15 @@ differ. Battery-option deltas at the end.
 |---|---|---|---|---:|---:|
 | U1 | ESP32-S3-WROOM-1-**N16R8** (PCB antenna) | module | 1 | $4.30 | $3.60 |
 | U2 | MAX98357AETE+T (class-D I2S amp) | TQFN-16 | 1 | $2.20 | $1.45 |
-| U3 | INMP441ACEZ ⚠ EOL risk — see open-questions | LGA | 1 | $2.40 | $1.80 |
+| U3 | INMP441ACEZ ⚠ EOL — run-1 stock only; production = IM69D130 PDM (fallback SPH0645 is ALSO obsolete — audit-components.md §3) | LGA | 1 | $2.40 | $1.80 |
 | U4 | TPS63802DLAR buck-boost 3V3/2A | — | 1 | $1.60 | $1.35 |
 | U5 | USBLC6-2SC6 (USB ESD) | SOT-23-6 | 1 | $0.15 | $0.09 |
 | U6 | TPS22918DBVR (soft-start switch) | SOT-23-6 | 1 | $0.35 | $0.22 |
-| U7 | SN74LVC1T45DBVR (LED level shifter; DNP on 3V3-only build) | SOT-23-6 | 1 | $0.18 | $0.11 |
+| U7 | SN74LVC1T45DBVR ⚠ audit 2026-08-08: DELETE on battery builds — WS2812B VDD min 3.5 V, no valid rail exists (audit-components.md §8); baseline = 3 discrete LEDs | SOT-23-6 | 1 | $0.18 | $0.11 |
 | U8 | ESDALC6V1-5M6 (SD ESD; DNP if slot internal) | SOT-23-6 | 1 | $0.16 | $0.10 |
 | Q1 | DMG2301L reverse-block P-FET | SOT-23 | 1 | $0.09 | $0.05 |
 | Q2 | DMG3415U LED-rail gate (battery builds) | SOT-23 | 1 | $0.08 | $0.05 |
-| D1 | WS2812B-2020 (or 3× discrete LED on 3V3-only) | 2020 | 1 | $0.12 | $0.06 |
+| D1 | 3× discrete 0603 LED @2-3 mA (WS2812B-2020 only as DNP on USB-powered dev builds — VDD min 3.5 V) | 0603 | 3 | $0.06 | $0.03 |
 | L1 | 2.2 µH 2 A shielded | 0630 | 1 | $0.15 | $0.08 |
 | C1 | 330 µF 6.3 V low-ESR polymer (amp bulk) | D-case | 1 | $0.42 | $0.26 |
 | C2-C6 | 22/10 µF X5R | 0603 | 5 | $0.20 | $0.10 |
@@ -40,7 +40,7 @@ differ. Battery-option deltas at the end.
 | Option | Adds | Δ @1000 | One-time |
 |---|---|---|---|
 | A: 3×AA | holder + contacts + screwed door | +$0.40 | — |
-| B: Li-ion | 803860 2000 mAh pouch w/ PCM + reports $4.20, BQ24074 $1.60, MAX17048 fuel gauge $1.40, NTC $0.15, USB-C protection (TPD4S014+PTC) $0.70, pack bay/hatch $0.60 | **+$8.65** | UN 38.3 + IEC 62133-2 + EN IEC 62115 ≈ €6-10k, 4-6 weeks |
+| B: Li-ion | 803860 2000 mAh pouch w/ PCM + reports $4.20, BQ24074 $1.60, MAX17048 fuel gauge $1.40, NTC $0.15, USB-C protection (TPD4S014 + PTC **1206L075** — the 1206L050's 0.5 A hold derates to ~0.35 A hot and nuisance-trips the 500 mA charge; audit-components.md §2) $0.70, pack bay/hatch $0.60 | **+$8.65** | UN 38.3 + IEC 62133-2 + EN IEC 62115 ≈ €6-10k, 4-6 weeks |
 
 ## Whole-product context (manufacturing lens)
 

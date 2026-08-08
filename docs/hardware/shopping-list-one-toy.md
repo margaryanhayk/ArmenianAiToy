@@ -8,28 +8,28 @@ prototype run because you WILL burn parts.
 
 | Qty | Buy exactly | Purpose |
 |---|---|---|
-| 1 | **ESP32-S3-WROOM-1-N16R8** module (PCB antenna) | the brain (U1) |
+| 1 | **ESP32-S3-WROOM-1-N8R8** module (PCB antenna) — N16R8 not earned: 67% of the 8 MB is idle today, PSRAM identical; audit-mcu.md §2 | the brain (U1) |
 | 1 | **MAX98357AETE+T** | audio amplifier (U2) |
-| 1 | **INMP441** MEMS microphone (verify stock — if EOL: **Knowles SPH0645LM4H-B**) | microphone (U3) |
+| 1 | **INMP441** MEMS microphone (bench/run-1 stock only — the old fallback SPH0645LM4H-B is ALSO obsolete; production path = **Infineon IM69D130** PDM, see audit-components.md §3) | microphone (U3) |
 | 1 | **TPS63802DLAR** | 3.3 V buck-boost regulator (U4) |
 | 1 | **TPS22918DBVR** | soft-start switch (U6) |
 | 1 | **USBLC6-2SC6** | USB ESD protection (U5a) |
 | 1 | **TPD4S014DSQR** | USB-C VBUS/CC protection (U5b) |
-| 1 | **SN74LVC1T45DBVR** | LED level shifter (U8; skip on 3V3-only LED) |
+| 1 | **SN74LVC1T45DBVR** | LED level shifter — SKIP on battery builds (discrete-LED baseline, audit-components.md §8) |
 | 1 | **DMG2301L** P-FET | reverse-battery block (Q1) |
-| 1 | **WS2812B-2020** | status LED (D1) |
+| 3 | discrete 0603 LEDs + resistors (WS2812B-2020 only on USB-powered dev builds — its VDD min is 3.5 V, no valid rail on battery; audit-components.md §8) | status LEDs (D1) |
 | 1 | **SMAJ5.0A** TVS diode | USB surge clamp (D60) |
-| 1 | **Littelfuse 1206L050/15YR** PTC | USB fuse (F1) |
-| 1 | 2.2 µH 2 A shielded inductor, 0630 (e.g. **TDK VLS6045EX-2R2M**) | for U4 (L1) |
+| 1 | **Littelfuse 1206L075** PTC (not 1206L050 — 0.5 A hold derates to ~0.35 A hot vs the 500 mA charge draw; audit-components.md §2) | USB fuse (F1) |
+| 1 | 2.2 µH shielded inductor, 0630 — **TDK VLS6045EX-2R2N** (the "-2R2M" PN in earlier drafts does not exist; buy-links.md) | for U4 (L1) |
 
 ## Electro-mechanics
 
 | Qty | Buy exactly | Purpose |
 |---|---|---|
-| 1 | Speaker **50 mm, 8 Ω, ≥1 W, sensitivity ≥88 dB/W/m** with published Fs ≤400 Hz (reference: **Dayton Audio CE50MP-8**... verify sensitivity!) | LS1 |
-| 1 | **Bourns PTV09A-4020F-B103** (10 kΩ linear, DETENTED) + a plastic knob | volume (RV1) |
-| 3 | 6 mm tactile switches, ~160 gf (e.g. **Omron B3F-1000**) | main / green / red buttons |
-| 1 | **Molex 5031821852** microSD socket (push-PULL) | J2 |
+| 1 | Speaker **50-70 mm, 8 Ω, ≥1 W, ≥85 dB/W/m MEASURED in enclosure, Fs ≤300 Hz** — order for M10: **Same Sky GF0668** (primary), **Dayton CE50MP-8** (50 mm option; sensitivity unpublished — measure), **Peerless PLS-50N25AL01-08** (fidelity control; 81 dB ⇒ needs 5 V rail). ≥88 @ 50 mm proved an empty set — audit-components.md §5 | LS1 |
+| 1 | **Bourns PTV09A-4220F-B103** (10 kΩ linear, DETENTED — the -4020F- variant is the smooth/no-detent one; buy-links.md) + a plastic knob | volume (RV1) |
+| 3 | 6 mm tactile switches, ~160 gf (**Omron B3F-1002** — the B3F-1000 is the ~100 gf variant, too light for a pocketed toy) | main / green / red buttons |
+| 1 | microSD socket: **Hirose DM3AT-SF-PEJM5** (push-push, active, big stock) — the previously-specified Molex 5031821852 is discontinued (residual stock only); buy-links.md | J2 |
 | 1 | microSD card **8 GB industrial/pSLC** (e.g. SanDisk Industrial / ATP) | content storage |
 | 1 | USB-C receptacle, 16-pin SMD (e.g. **GCT USB4105-GF-A**) | J1 |
 | 1 | **3×AA battery holder** with leads + screws | BT1 |
@@ -62,7 +62,7 @@ prototype run because you WILL burn parts.
 ## NOT needed (myths killed during review)
 
 - ~~AMS1117 regulator~~ — the buck-boost replaces every LDO
-- ~~5 V rail / boost converter~~ — gone if the speaker is ≥88 dB/W/m
+- ~~5 V rail / boost converter~~ — gone if the speaker measures ≥85 dB/W/m in the enclosure (the old ≥88 paper spec proved unbuyable at 50 mm; audit-components.md §5–6)
 - ~~SD level-shifter module~~ — SD runs natively on 3.3 V
 - ~~coin cell~~ — none anywhere, by design (US toy-safety rule)
 
