@@ -1,0 +1,8 @@
+# KiCad working files
+*-backups/
+*.kicad_prl
+fp-info-cache
+
+# Regenerated on every run — the generator is the source of truth
+out/
+erc*.rpt

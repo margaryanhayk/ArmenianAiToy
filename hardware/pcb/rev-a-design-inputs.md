@@ -62,3 +62,8 @@ there forecloses a future RTC crystal; accepted for rev A, recorded.
 ## Status log
 
 - 2026-08-08: project started; KiCad 10 installing; this contract written.
+- 2026-08-08: **Phase 1 (schematic capture) COMPLETE** — ERC 0 errors,
+  netlist verified (89 nets), render inspected. See `phase1-status.md`.
+  Two contract items resolved during capture: SD socket footprint uses the
+  Hirose DM3AT stock footprint; inductor is the contract's VLS6045EX-2R2N
+  with a phase-2 datasheet gate on the 2.2 µH value.
