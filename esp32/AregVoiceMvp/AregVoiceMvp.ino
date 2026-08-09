@@ -1257,7 +1257,18 @@ static void handle_story_session() {
     // Clips-on-the-card and story-long-enough are checked inside
     // story_pause_session_begin. new_story = false on a resume, so the
     // at-most-twice ceiling counts per STORY, not per press.
-    const bool pauses_ok = use_sd
+    // AREG_STORY_PAUSES_ENABLED — DEFAULT OFF (owner report 2026-08-10:
+    // "the story is cut"). Mid-story pauses were wired on 2026-08-07 and
+    // have NEVER been bench-run; like the welcome flow, they went live the
+    // moment their clips reached the card, changing playback nobody had
+    // tested. The parent toggle and the manifest still work — this is an
+    // extra firmware-side gate that keeps an untested behaviour off until
+    // it is deliberately tested. Set to 1 to bench it.
+#ifndef AREG_STORY_PAUSES_ENABLED
+#define AREG_STORY_PAUSES_ENABLED 0
+#endif
+    const bool pauses_ok = AREG_STORY_PAUSES_ENABLED
+                           && use_sd
                            && !voice_in_bedtime_window()
                            && story_pauses_enabled();
     story_pause_session_begin(s_story_offset == 0, pauses_ok, sd_narration_path);

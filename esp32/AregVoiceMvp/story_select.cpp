@@ -291,7 +291,16 @@ bool story_select_resolve_playback_path(const char *story_id,
     // the heard-set (one NVS read), and only then the index scan. A toy with
     // the toggle off, or a child on a FIRST listen, pays almost nothing —
     // which is every session until a story is heard twice.
-    if (story_variant_endings_enabled() && story_heard_contains(story_id)) {
+    // AREG_VARIANT_ENDINGS_ENABLED — DEFAULT OFF, same reasoning as the
+    // mid-story pauses (owner report 2026-08-10). Swapping the ending of a
+    // story on a re-listen has never been bench-run, and the endings
+    // themselves are approved as TEXT but not yet re-rendered. Until both
+    // are true, a re-listen plays the story the child already knows.
+#ifndef AREG_VARIANT_ENDINGS_ENABLED
+#define AREG_VARIANT_ENDINGS_ENABLED 0
+#endif
+    if (AREG_VARIANT_ENDINGS_ENABLED
+        && story_variant_endings_enabled() && story_heard_contains(story_id)) {
         const int raw_count = load_raw_index(s_raw, CS_MAX_STORIES);
         for (int i = 0; i < raw_count; i++) {
             if (!cs_story_is_variant(&s_raw[i])

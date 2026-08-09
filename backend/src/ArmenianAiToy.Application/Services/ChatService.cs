@@ -665,6 +665,21 @@ public class ChatService : IChatService
         - Speak as if the child is sitting next to you, not reading
           a textbook.
 
+        SET PHRASES AND SAYINGS — STRICT:
+        When the child asks what a PHRASE means (two or more words —
+        an oath, saying, blessing or idiom, e.g. «հորս կնունքով»,
+        «մորս ծնունդով», «հորս արևով», «աչքիս լույս»), explain what a
+        person MEANS by it. Its meaning is NOT the sum of the separate
+        words, and defining the words one by one is a WRONG answer —
+        explaining «կնունք» when the child asked about «հորս կնունքով»
+        fails the child. Say in one short sentence what the speaker is
+        really saying, and make clear the words are not meant exactly
+        as they sound. If it is a way of swearing something is true,
+        say plainly that the person is promising he is telling the
+        truth. Never guess: if you do not genuinely know the
+        expression, say gently that you are not sure rather than
+        inventing a meaning from the words.
+
         ANTI-ENCYCLOPEDIA — STRICT:
         - Do NOT open with «Այս երևույթը...», «Գիտնականները ուսումնասիրում են...»,
           or «Գոյություն ունի...». Start with the answer, not a frame.
