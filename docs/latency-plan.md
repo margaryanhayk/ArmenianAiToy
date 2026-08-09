@@ -1,0 +1,239 @@
+# Spoken-answer latency: where the ~16 s goes, and what to do about it
+
+Written 2026-08-10, after the owner measured a ~16 s wait between a child
+finishing their question and hearing Areg answer, with `POST /api/chat`
+(text in, text out, from a PC) measured at 3.4–4.6 s with 0.1 s connect.
+
+Every number below is labelled **measured** or **inferred**. The measured
+ones come from this repo's own instrumentation and bench runs, not from
+estimates.
+
+---
+
+## Part 0 — which code path is actually being timed
+
+This matters, because two different voice endpoints exist and they are not
+equally live.
+
+A press while a story is playing is a **barge-in question** and goes to
+`POST /api/chat/story-qa` (`AregVoiceMvp.ino:1531` → `voice_client.cpp:854-884`).
+A press at idle does **not** ask a question at all — it starts or resumes a
+story (`AregVoiceMvp.ino:2355`).
+
+`POST /api/chat/audio` is reached only from the boot welcome flow, when the
+spoken menu resolves to game / riddle / curiosity (`AregVoiceMvp.ino:1065-1070`).
+The classic "record → POST `/api/chat/audio` → play" turn,
+`handle_record_upload_playback()` (`AregVoiceMvp.ino:255-420`), is **defined
+and never called** in the current sketch — including its own
+`[latency] release->play_begin_ms` print.
+
+**So "the child asks a question and waits" is the `story-qa` path.** The rest
+of this document is anchored there; the `/api/chat/audio` figures are noted
+where they differ.
+
+---
+
+## Part 1 — the breakdown
+
+### 1.1 Backend stages — MEASURED
+
+`StoryQaController.Ask` has had per-stage `Stopwatch` instrumentation since
+commit `a73b443`: one structured log line per turn
+(`"Story-QA timing ms: stt=… inMod=… gpt=… outMod=… tts=… total=…"`) plus
+`X-Qa-*-Ms` response headers in Development. Two bench runs of 8 real
+Armenian turns each are recorded in the commit messages:
+
+| Stage | Before (`a73b443`) | After (`a5dfcf5`) | What it is |
+|---|---:|---:|---|
+| STT (Whisper) | **1900 ms** | 886 ms | `whisper-1` → `gpt-4o-mini-transcribe` |
+| Input moderation | **580 ms** | ~580 ms | unchanged, and must stay serial |
+| GPT answer | **1400 ms** | 903 ms | bounded `LibraryStoryQuestionService` |
+| Output moderation | **490 ms** | ~300 ms, hidden under TTS | now overlapped with speculative TTS |
+| TTS | **4250 ms** | 1322 ms | `tts-1` → `gpt-4o-mini-tts`, and shorter answers |
+| **Backend total** | **8650 ms** | **3676 ms** | |
+| PC client total | 10700 ms | 3945 ms | measured from a PC, not the toy |
+
+Two things follow directly:
+
+- **TTS is the single largest backend stage**, and it is driven by how many
+  characters are handed to it.
+- The 8650 → 3676 ms win was **entirely configuration** (two model names)
+  plus one safe overlap. No new mechanism was invented.
+
+### 1.2 The configuration finding — MEASURED, and the largest single item
+
+The models that produced the 3676 ms number are set in exactly one place in
+this repo:
+
+```
+backend/run-local.ps1:32   $env:StoryQa__TranscriptionModel = "gpt-4o-mini-transcribe"
+backend/run-local.ps1:33   $env:OpenAI__TtsModel            = "gpt-4o-mini-tts"
+```
+
+That is the **local bench launcher**. Neither key appears in
+`appsettings.json`, in `appsettings.Development.json`, in `railway.json`, or
+in the `Dockerfile`. The shipped defaults are `whisper-1`
+(`DependencyInjection.cs:116`) and `tts-1` (`:117`).
+
+**Unless those two variables are set by hand in the Railway dashboard, the
+deployed backend is running the 8650 ms configuration, not the 3676 ms one.**
+This cannot be verified from the repo — the Railway dashboard is the source
+of truth — but it is the first thing to check, and on its own it accounts for
+roughly **5 s** of the 16.
+
+### 1.3 Device-side stages — INFERRED (with measured constants)
+
+There is no device instrumentation splitting record / upload / server /
+download / decode. The only live timing print is
+`[latency] qa_release->play_begin_ms` (`AregVoiceMvp.ino:1599-1601`), and its
+anchor is taken at `:1529` — **after** the 600 ms earcon — so it already
+understates the child-perceived gap.
+
+| Stage | Estimate | Basis |
+|---|---:|---|
+| Blocking "thinking" earcon before the POST | **600 ms** | measured constant `AREG_EARCON_DURATION_MS` (`config.h:145`), blocking synth at `.ino:1491`, POST only fires at `.ino:1531` |
+| TLS handshake | **~300–800 ms** | inferred. `~HTTPClient()` calls `_client->stop()` unconditionally (`HTTPClient.cpp:88-91`), so the shared `WiFiClientSecure` (`net_transport.cpp:51-55`) is torn down after every call and each request re-handshakes |
+| WAV upload | **~1–3 s** | 16 kHz/16-bit/mono PCM = **32 000 B/s** (`config.h:101-102`); a 3 s question is 96 044 B, the 15 s cap is 480 044 B. Store-and-forward: the whole buffer is `memcpy`'d into PSRAM and POSTed with a `Content-Length` (`.ino:1465-1472`, `voice_client.cpp:884`). No compression anywhere |
+| Backend | **3.7 s or 8.7 s** | measured, §1.1 — depending on §1.2 |
+| Response download | **~0.5–1.5 s** | inferred. Body = answer + 1.2 s silence + bridge (+ recap), typically ~30–60 KB |
+| Wait for the earcon pulse boundary | **0–600 ms** | the completion poll only happens between pulses (`.ino:1547-1563`) |
+| Decoder start | **~100 ms** + `DIAG_MARK` overhead | `audio_play_mp3_buffer` from a resident buffer (`audio_io.cpp:292-317`); `DIAG_MARK` is not compile-gated and each mark does `Serial.flush(); delay(5);` (`diag.cpp:69-77`) — ~75 ms/turn |
+
+Adding the slow-config case: 0.6 + 0.5 + 2 + 8.7 + 1 + 0.6 + 0.2 ≈ **13.6 s**,
+and a longer question or a weaker Wi-Fi link closes the gap to the observed
+16 s. The breakdown is consistent with what the owner measured.
+
+### 1.4 The structural fact that constrains every fix
+
+**The toy cannot start playing until the whole response has arrived, and it
+rejects any response without a `Content-Length`.**
+
+```
+voice_client.cpp:543   const int body_len = http.getSize();
+voice_client.cpp:544   if (body_len <= 0) {
+voice_client.cpp:545       Serial.printf("[voice] http: unexpected body length %d\n", body_len);
+voice_client.cpp:546       return false;
+```
+
+`getSize()` is `-1` for a chunked response, so a chunked answer **fails the
+turn outright** and the child hears the canned failure clip. This is not a
+theory: backend chunked streaming was shipped (`fdc4b66`) and then reverted
+after hardware bring-up (`96d6084`) for exactly this reason.
+
+The streaming player that would fix it, `audio_play_qa_stream()`
+(`audio_io.cpp:754-805`), **is written and never called** — the sketch plays
+the buffered POST body instead (`.ino:1646-1648`), with the intended fix
+recorded as a comment at `.ino:1640-1645`.
+
+So: *any* backend change that shortens time-to-first-audio by streaming is
+blocked until a firmware slice lands. Backend-only work can only reduce
+**total** wall clock.
+
+### 1.5 What must stay serial
+
+Input moderation → GPT is a safety ordering, not a latency choice: an unsafe
+transcript is never sent to the answer model. It stays serial.
+
+Output moderation is **already overlapped** correctly (`a5dfcf5`, and
+`StoryQaController.cs:404-436`): the answer TTS is started speculatively while
+the classifier runs, and if moderation blocks, the speculative audio is
+**discarded** and the canned fallback is spoken. Unmoderated audio is never
+returned. Nothing further should be taken out of that path.
+
+---
+
+## Part 2 — levers, ranked by seconds saved ÷ risk
+
+| # | Lever | Est. saving | Risk | Owner? |
+|---|---|---:|---|---|
+| 1 | **Verify/set the two fast-model env vars on Railway** (`OpenAI__TtsModel=gpt-4o-mini-tts`, `StoryQa__TranscriptionModel=gpt-4o-mini-transcribe`) | **~5.0 s** (measured 8650→3676 ms) | Low mechanically; child-facing, so it needs the Armenian listen test. Both were already reviewed and approved once (`a5dfcf5`) | **Owner/operator** — config only, no code |
+| 2 | **Stream TTS to the device, play on first bytes** | ~2–4 s | High — needs firmware. Backend chunking alone **breaks the turn** (§1.4). Requires calling the already-written `audio_play_qa_stream()` and removing the `getSize()` gate | Firmware slice |
+| 3 | **Kill the ~1.2 s of blocking earcon padding** (fire the POST before/while the earcon plays; poll completion inside the pulse) | ~0.6–1.2 s | Low-medium, firmware-only | Firmware slice |
+| 4 | **Reuse the TLS connection** (`~HTTPClient()` closes the shared client) | ~0.3–0.8 s/turn | Medium, firmware-only | Firmware slice |
+| 5 | **Parallel sentence-chunked TTS** — render a long reply's sentences concurrently and concatenate | ~1–3 s on long replies; **no effect below 260 chars** | Low. Backend-only, no firmware dependency, text unchanged | **Implemented here, flag off** |
+| 6 | **Compress or downsample the upload** (16 kHz PCM → 8 kHz, or any codec) | ~0.5–1.5 s | Medium — firmware + STT accuracy on child Armenian; the bias prompt already props up short answers | Firmware slice |
+| 7 | **Trim what the device must download before it plays** (`StoryQa:AnswerBridgePauseMs`, recap gating) | ~0.2–0.5 s | Low, but degrades a reviewed UX; recap is already effectively off at 130 chars | Config |
+| 8 | **Host near OpenAI** | ~0.1–0.2 s × 4–5 sequential calls | — | **Owner decision**, not code |
+| 9 | Compile-gate `DIAG_MARK` (~75 ms of `delay()` per turn) | ~0.075 s | Very low, firmware-only | Firmware slice |
+
+**Explicitly rejected: taking output moderation off the critical path.** It is
+already overlapped as far as it safely can be, and the fail-closed contract
+(unsafe → canned fallback, speculative audio discarded) is child-safety
+critical. It must remain, and it must remain gating what is *returned*.
+
+Note that levers 2, 3, 4, 6 and 9 are all firmware, and together they are
+worth more than everything available on the backend. **The next real latency
+work is a firmware slice**, and the single most valuable item in it is calling
+the streaming player that is already written.
+
+---
+
+## Part 3 — what was implemented
+
+**Lever 5: parallel sentence-chunked TTS, behind `Audio:ParallelTts:Enabled`,
+defaulting to `false` (today's exact behaviour).**
+
+It was chosen because it is the only item on the list that attacks the largest
+backend stage (§1.1) without touching firmware, moderation, models, prompts,
+or any child-facing text.
+
+### How it works
+
+`SpeechChunker` (`Application/Audio/SpeechChunker.cs`) splits a reply into
+whole-sentence chunks; `ParallelChunkedSynthesisService`
+(`Application/Audio/ParallelChunkedSynthesisService.cs`) renders them
+concurrently through the real provider and concatenates the audio in order.
+It is registered in `AddInfrastructure` as a **decorator** over whichever TTS
+provider is configured, so every caller benefits with no controller change.
+
+Design decisions worth keeping:
+
+- **Armenian punctuation.** «՞» and «՜» are placed inside the stressed vowel
+  of a word, *not* at the end of a sentence, so they are **not** boundaries.
+  The Armenian full stop «։» is, as are ASCII `.` `!` `?` and `…`.
+- **Never cuts inside a sentence.** A single long sentence stays whole even if
+  it exceeds the target size; a reply with no sentence boundary is a single
+  call.
+- **Short replies take the current path exactly.** Below `MinTextChars` (260)
+  it is one call with the original string — so most in-story Q&A answers,
+  which are 1–2 sentences by prompt rule, are unaffected.
+- **Failure posture is no worse than today.** Splitting multiplies the chance
+  that one request blips, so any chunk failure falls back to a single
+  full-text render; the caller's sanitized-failure handling only sees an
+  exception if that fallback fails too.
+- **A streaming-capable provider is never wrapped.** `AudioChatController`
+  feature-detects `IStreamingAudioSynthesisService` (ElevenLabs) to start the
+  device at first byte; wrapping would hide that capability and make the toy
+  slower.
+- **One ID3 tag, not one per chunk.** Trailing chunks have their ID3v2 header
+  stripped. The concatenated file still carries the first chunk's duration
+  header — the same property the shipped answer+bridge+recap composition
+  already has, harmless on the toy's decoder, worth knowing for the parent
+  dashboard's browser replay.
+
+### Honest limits
+
+- Saves **nothing** on a short reply, which is most in-story Q&A turns today.
+  Its value is on the long story-mode replies (`/api/chat/audio`,
+  3–5 sentences plus the spoken choice bridge) and any future long spoken
+  answer.
+- Chunk seams are a **listening** question, exactly as they were for the
+  `eleven_v3` narration renders. The flag must not be turned on for children
+  before someone listens to a chunked reply end to end.
+- It does not change time-to-first-*byte*; the device still buffers the whole
+  body (§1.4).
+
+### Tests
+
+13 new tests in
+`backend/tests/ArmenianAiToy.Application.Tests/ParallelChunkedSynthesisTests.cs`:
+the flag is off with no config; overrides parse and `MaxChunks` clamps;
+garbage values fall back to defaults; short text and a single long sentence
+and an «Ի՞նչ» question each make exactly one call with the original string;
+long text splits, **renders concurrently** (asserted via observed max
+concurrency and wall clock), and concatenates back to the original sentences
+in order; the chunk cap holds; a failing chunk falls back to one full-text
+render; cancellation propagates without a fallback render; ID3 stripping and
+non-MP3 pass-through.
+
+Full suite: **2522 passed, 0 failed** (2509 before).

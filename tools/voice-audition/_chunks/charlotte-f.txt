@@ -1,0 +1,7 @@
+file 'C:/Users/hayk.margaryan/Documents/Projects/ArmenianAiToy/tools/voice-audition/_chunks/charlotte-f-00.mp3'
+file 'C:/Users/hayk.margaryan/Documents/Projects/ArmenianAiToy/tools/voice-audition/_chunks/charlotte-f-01.mp3'
+file 'C:/Users/hayk.margaryan/Documents/Projects/ArmenianAiToy/tools/voice-audition/_chunks/charlotte-f-02.mp3'
+file 'C:/Users/hayk.margaryan/Documents/Projects/ArmenianAiToy/tools/voice-audition/_chunks/charlotte-f-03.mp3'
+file 'C:/Users/hayk.margaryan/Documents/Projects/ArmenianAiToy/tools/voice-audition/_chunks/charlotte-f-04.mp3'
+file 'C:/Users/hayk.margaryan/Documents/Projects/ArmenianAiToy/tools/voice-audition/_chunks/charlotte-f-05.mp3'
+file 'C:/Users/hayk.margaryan/Documents/Projects/ArmenianAiToy/tools/voice-audition/_chunks/charlotte-f-06.mp3'

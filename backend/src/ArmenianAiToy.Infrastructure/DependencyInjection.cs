@@ -135,14 +135,17 @@ public static class DependencyInjection
         // the Armenian listen test must not require a code change. Unset →
         // "nova", exactly what shipped before the key existed.
         var ttsVoice = config["OpenAI:TtsVoice"];
+        // Built here, registered once below, so the optional parallel-chunk
+        // latency decorator can wrap whichever provider was selected.
+        Func<IServiceProvider, IAudioSynthesisService>? ttsFactory = null;
         switch (ttsProvider)
         {
             case AiProviderConfig.OpenAI:
-                services.AddSingleton<IAudioSynthesisService>(sp =>
+                ttsFactory = sp =>
                     new OpenAITtsSynthesisService(
                         ttsClient,
                         sp.GetRequiredService<ILogger<OpenAITtsSynthesisService>>(),
-                        ttsVoice));
+                        ttsVoice);
                 break;
 
             case AiProviderConfig.ElevenLabs:
@@ -162,13 +165,48 @@ public static class DependencyInjection
                     ?? throw new InvalidOperationException(
                         "AI:TtsProvider is 'elevenlabs' but ElevenLabs:VoiceId / ELEVENLABS_VOICE_ID is not set.");
                 var elModelId = FirstNonEmpty(config["ElevenLabs:ModelId"]) ?? "eleven_v3";
-                services.AddSingleton<IAudioSynthesisService>(sp =>
+                ttsFactory = sp =>
                     new ElevenLabsTtsSynthesisService(
                         openAiHttpClient, // reuse the warm pooled client — different host, same pool
                         elApiKey, elVoiceId, elModelId,
-                        sp.GetRequiredService<ILogger<ElevenLabsTtsSynthesisService>>()));
+                        sp.GetRequiredService<ILogger<ElevenLabsTtsSynthesisService>>());
                 break;
             }
+        }
+        if (ttsFactory is not null)
+        {
+            // Latency: optional parallel sentence-chunked synthesis. The toy
+            // waits for the WHOLE reply to be rendered before it hears a
+            // sound (the firmware needs a Content-Length, so a chunked HTTP
+            // body is not an option here), and provider TTS time scales with
+            // text length — so a long story turn pays for its sentences one
+            // after another. Rendering them concurrently collapses that to
+            // roughly the longest sentence group.
+            //
+            // Ships OFF: the default resolves to today's single call, and the
+            // seam changes only HOW the already-moderated text is voiced.
+            // Flipping it is an operator decision after an Armenian listen
+            // test (chunk seams are a listening question, per the story
+            // narration pipeline's v3 lesson).
+            //
+            // A streaming-capable provider is deliberately NOT wrapped:
+            // AudioChatController feature-detects IStreamingAudioSynthesisService
+            // to start the device playing at first byte, which beats chunking
+            // outright — wrapping would hide that capability behind the
+            // decorator and make the toy slower.
+            var parallelTts = ParallelTtsOptions.Resolve(config);
+            var innerTtsFactory = ttsFactory;
+            services.AddSingleton<IAudioSynthesisService>(sp =>
+            {
+                var inner = innerTtsFactory(sp);
+                if (!parallelTts.Enabled || inner is IStreamingAudioSynthesisService)
+                {
+                    return inner;
+                }
+                return new ParallelChunkedSynthesisService(
+                    inner, parallelTts,
+                    sp.GetRequiredService<ILogger<ParallelChunkedSynthesisService>>());
+            });
         }
         services.AddSingleton<IAudioBlobStore, LocalDiskAudioBlobStore>();
         // Slice F — custom-story-request photo storage (owner queue).

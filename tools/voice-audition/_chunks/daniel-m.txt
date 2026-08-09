@@ -1,0 +1,7 @@
+file 'C:/Users/hayk.margaryan/Documents/Projects/ArmenianAiToy/tools/voice-audition/_chunks/daniel-m-00.mp3'
+file 'C:/Users/hayk.margaryan/Documents/Projects/ArmenianAiToy/tools/voice-audition/_chunks/daniel-m-01.mp3'
+file 'C:/Users/hayk.margaryan/Documents/Projects/ArmenianAiToy/tools/voice-audition/_chunks/daniel-m-02.mp3'
+file 'C:/Users/hayk.margaryan/Documents/Projects/ArmenianAiToy/tools/voice-audition/_chunks/daniel-m-03.mp3'
+file 'C:/Users/hayk.margaryan/Documents/Projects/ArmenianAiToy/tools/voice-audition/_chunks/daniel-m-04.mp3'
+file 'C:/Users/hayk.margaryan/Documents/Projects/ArmenianAiToy/tools/voice-audition/_chunks/daniel-m-05.mp3'
+file 'C:/Users/hayk.margaryan/Documents/Projects/ArmenianAiToy/tools/voice-audition/_chunks/daniel-m-06.mp3'
