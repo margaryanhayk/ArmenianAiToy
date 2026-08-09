@@ -2107,22 +2107,20 @@ void setup() {
     // chance (holding the button at boot must never be mistaken for an
     // answer to a menu question).
     //
-    // DEFAULT OFF (owner report 2026-08-09). The flow was code-complete on
-    // 2026-08-04 but has never been bench-verified on hardware; it went
-    // live by accident the moment the 43 voice clips were configured
-    // (2026-08-07), because until then voice_clip_next_greeting() found
-    // nothing and the whole flow returned silently. The observed result:
-    // the toy greets, asks a question, listens ~8 s, retries, and then
-    // starts a whole story from INSIDE setup() — never returning to
-    // loop() — so the button does nothing but barge in for minutes. That
-    // is not a behaviour anyone signed off; it is an untested feature that
-    // switched itself on. Off until it is deliberately bench-tested, then
-    // turned on as a decision rather than a side effect.
+    // DEFAULT ON (owner, 2026-08-10: "I turn on the toy, it greets me,
+    // it asks me what to do" — that IS the product). It was switched off
+    // on 2026-08-09 on a misreading of "give me an initial point"; the
+    // owner wanted this flow to WORK, not to disappear.
     //
-    // Set AREG_WELCOME_FLOW_ENABLED to 1 in config.h (or -D on the build)
-    // to exercise it on the bench.
+    // What actually made it feel broken on 08-09 was NOT the greeting: it
+    // was the one-time content sync downloading 135 new clips before the
+    // toy settled, so minutes passed before it spoke and the button did
+    // nothing in the meantime. Those files are on the card now, so the
+    // greeting starts promptly.
+    //
+    // Set AREG_WELCOME_FLOW_ENABLED to 0 to silence the opening again.
 #ifndef AREG_WELCOME_FLOW_ENABLED
-#define AREG_WELCOME_FLOW_ENABLED 0
+#define AREG_WELCOME_FLOW_ENABLED 1
 #endif
 #if AREG_WELCOME_FLOW_ENABLED
     // One best-effort heartbeat first: it is a ~200 ms POST that already
