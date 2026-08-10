@@ -98,7 +98,7 @@ The renderer writes `<id>--narration--s1.0.mp3`; `Ship-StoryAudio.ps1` wants
 
 ```powershell
 Get-ChildItem $render -Filter '*--narration--s*.mp3' | ForEach-Object {
-    Rename-Item $_.FullName ($_.Name -replace '--narration--s[\d.]+', '')
+    Rename-Item $_.FullName ($_.Name -replace '--narration--s[\d.]+\.mp3$', '.mp3')
 }
 ```
 
