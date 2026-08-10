@@ -1448,6 +1448,10 @@ static void handle_story_session() {
         // Barge-in: capture the question while the button stays held.
         transition_to(ST_RECORDING);
         const size_t captured = record_question();
+        // Latency anchor. Taken HERE — the instant the child stops speaking —
+        // not after the earcon, which is where it used to sit and which made
+        // the printed figure ~600 ms kinder than what the child experienced.
+        const uint32_t qa_release_ms = millis();
         const uint32_t ms_held = (captured * 1000) / AREG_SAMPLE_RATE_HZ;
 
         if (ms_held < AREG_MIN_RECORD_MS) {
@@ -1472,25 +1476,6 @@ static void handle_story_session() {
         memcpy(payload + 44, s_capture_buf, pcm_bytes);
 
         transition_to(ST_UPLOADING);
-
-        // -------------------------------------------------------
-        // S1 — Instant "thinking" earcon (UNVERIFIED — not compiled/flashed)
-        //
-        // Play the earcon the moment recording ends and upload begins.
-        // The child gets IMMEDIATE acoustic acknowledgement instead of
-        // the ~7–8 s silent gap that was here before. The earcon is a
-        // ~600 ms synthesized tone; it returns before the upload call below.
-        //
-        // audio_speaker_begin() is called first because the earcon
-        // function creates AudioOutputI2S internally (same as
-        // audio_play_mp3_buffer). After audio_play_thinking_earcon()
-        // returns the speaker is left in a valid state for the thinking
-        // bed + answer playback below.
-        // -------------------------------------------------------
-        audio_speaker_begin();
-        audio_play_thinking_earcon();  // S1: immediate acoustic ack
-        Serial.println("[qa] earcon done; starting async upload + thinking bed");
-        Serial.flush();
 
         // -------------------------------------------------------
         // S3 — Fire async upload, play thinking-bed while network blocks
@@ -1524,12 +1509,22 @@ static void handle_story_session() {
         //   voice_async_upload_done() returns true immediately on the next
         //   check and we skip the thinking-bed and go straight to playback —
         //   same behavior as the old code (minus the earcon, which already played).
+        //
+        // ORDER (latency, 2026-08-10): the upload starts FIRST, and the earcon
+        // is simply the first bed pulse. It used to be the other way round —
+        // a blocking ~600 ms tone played to completion and only then was the
+        // POST fired — so every question paid 600 ms of network idle before a
+        // single byte left the toy. The child's experience is unchanged (the
+        // tone still begins within a few ms of them letting go); the request
+        // is now 600 ms further ahead.
         // -------------------------------------------------------
         {
-            const uint32_t qa_release_ms = millis();  // latency anchor
-
             voice_start_question_upload_async(payload, payload_bytes,
                                               s_story_offset);
+
+            // audio_speaker_begin() before the first pulse: the earcon builds
+            // its own AudioOutputI2S, same as audio_play_mp3_buffer.
+            audio_speaker_begin();
 
             // Play thinking-bed pulses while the upload is in flight.
             // Each pulse is a short synthesized tone; we poll done after
@@ -1558,7 +1553,12 @@ static void handle_story_session() {
                 // on every pulse. For now, reuse the earcon (same freq/duration)
                 // so we can verify the FreeRTOS + I2S coexistence first.
                 esp_task_wdt_reset();  // #047 — feed across the ~0.6s-per-pulse bed
-                audio_play_thinking_earcon();
+                // ABORTABLE (latency, 2026-08-10): the pulse now checks the
+                // upload's done flag every ~16 ms and fades out early instead
+                // of finishing its 600 ms. Before this, an answer that arrived
+                // 20 ms into a pulse still waited out the other 580 ms —
+                // 0-600 ms of dead time on every question, ~300 ms on average.
+                audio_play_thinking_earcon_abortable(voice_async_upload_done);
                 bed_count++;
             }
             Serial.printf("[qa] thinking-bed done after %d pulses; upload_done=%s\n",
@@ -1601,52 +1601,44 @@ static void handle_story_session() {
                               (unsigned)qa_latency_ms);
                 Serial.flush();
 
-                // S3 — Play the answer: try streamed first, fall back to buffered.
+                // Play the answer.
                 //
-                // The backend (another agent) is making the Q&A response a
-                // chunked/streamed audio/mpeg. We try audio_play_qa_stream()
-                // on the same Q&A URL with the same query params. If the backend
-                // doesn't support streaming yet (or the connection fails), we
-                // fall back to audio_play_mp3_buffer() with the already-buffered
-                // bytes from the async task.
+                // NOTE the thing NOT done here: audio_play_qa_stream(url) opens
+                // its OWN GET, and /api/chat/story-qa is POST-only — and if a
+                // GET were ever added there it would re-run STT+GPT+TTS and
+                // double-bill one child's question. The answer only ever exists
+                // as the body of the POST the toy already made, so the streaming
+                // form below decodes THAT body instead of fetching a second one.
                 //
-                // HARDWARE ASSUMPTION: the Q&A URL (AREG_STORY_QA_URL +
-                // ?storyId=...&offset=...) accepts both POST (WAV upload,
-                // used by the async task) and GET (fetch the pre-composed
-                // streamed answer). This GET path is the "backend streams the
-                // validated answer" described in the task brief. If the backend
-                // does NOT yet support a GET endpoint here, the stream will
-                // return non-200 and we fall through to the buffered path —
-                // which is what the original code did, so there is no regression.
-                //
-                // NOTE: in the current architecture the Q&A POST returns the
-                // answer MP3 as the response body, so the async task already
-                // buffered it in turn.response_bytes. The streaming path below
-                // opens a NEW connection to the same URL as a GET. For this to
-                // work the backend must implement a GET endpoint that returns
-                // the latest pre-rendered answer for this (storyId, offset) pair.
-                // If the backend instead streams the answer as part of the POST
-                // response (not yet implemented), a future firmware revision can
-                // modify the async task to read incrementally from the HTTP
-                // response stream instead of calling read_response_into().
-                //
-                // For now this is a best-effort streaming attempt with a reliable
-                // buffered fallback.
-                // Play the answer the async task already buffered from the
-                // POST response body. DO NOT open a separate GET to the Q&A
-                // URL to "stream": that route is POST-only, so a GET 404s —
-                // and if a GET were ever added it would RE-RUN the whole
-                // STT+GPT+TTS pipeline and DOUBLE-BILL for one question.
-                // The real latency win (TODO, needs on-device verification) is
-                // to decode incrementally from THIS POST response stream
-                // instead of read_response_into() buffering it first — i.e.
-                // change the async task to hand the live HTTP stream to the
-                // MP3 decoder. Until that lands, buffered playback is correct
-                // and matches the backend's byte-identical streamed body.
-                audio_speaker_begin();
-                audio_play_mp3_buffer(turn.response_bytes, turn.response_length);
-                Serial.println("[qa] answer played (buffered POST response)");
-                Serial.flush();
+                // Default (flag off): the async task buffered the whole body in
+                // PSRAM and we decode from memory. Correct, and the only shape
+                // that has ever run on hardware.
+#ifdef AREG_QA_STREAM_PLAYBACK
+                if (turn.streaming) {
+                    // Flag on: the task stopped at the headers. Decode the live
+                    // socket, so sound starts on the first frames instead of
+                    // after the last byte lands. No buffered copy exists on
+                    // this path — a failure means the child heard nothing, so
+                    // it falls through to the canned failure clip.
+                    audio_speaker_begin();
+                    const bool streamed = audio_play_qa_stream_response(
+                        voice_qa_stream_body(), voice_qa_stream_content_length());
+                    voice_qa_stream_finish();   // ALWAYS — closes the response
+                    if (streamed) {
+                        Serial.println("[qa] answer played (streamed POST response)");
+                    } else {
+                        Serial.println("[qa] streamed answer failed; playing failure clip");
+                        play_canned_failure_clip();
+                    }
+                    Serial.flush();
+                } else
+#endif
+                {
+                    audio_speaker_begin();
+                    audio_play_mp3_buffer(turn.response_bytes, turn.response_length);
+                    Serial.println("[qa] answer played (buffered POST response)");
+                    Serial.flush();
+                }
                 voice_release_last_response();
             } else {
                 if (payload != nullptr) {

@@ -7,6 +7,8 @@
 // -------------------------------------------------------------
 #include "diag.h"
 
+#include "config.h"   // AREG_DIAG_MARK_SERIAL may be defined by the bench config
+
 #include <esp_attr.h>
 #include <string.h>
 
@@ -66,6 +68,14 @@ void diag_mark(uint32_t step_id, const char *label, uint32_t line_no) {
     } else {
         g_diag_last_label[0] = '\0';
     }
+#ifdef AREG_DIAG_MARK_SERIAL
+    // LIVE-TRACE MODE (bench opt-in). The printf is cheap; the flush +
+    // delay(5) are not — see the latency note in diag.h. A single in-story
+    // Q&A turn crosses ~26 marks (mic begin/capture/teardown + playback +
+    // the voice_client HTTP marks), so this costs ~130 ms of pure delay per
+    // question. It buys one thing the RTC breadcrumb cannot: a live view of
+    // where the firmware is RIGHT NOW while it is running. Turn it on when
+    // you are watching a hang happen; leave it off otherwise.
     Serial.printf("[mark] step=%u label=%s line=%u\n",
                   (unsigned)step_id,
                   (label != nullptr ? label : ""),
@@ -75,4 +85,5 @@ void diag_mark(uint32_t step_id, const char *label, uint32_t line_no) {
     // the host still needs a few ms to receive over the link
     // before any possible crash on the very next instruction.
     delay(5);
+#endif
 }

@@ -337,6 +337,39 @@
 #endif
 
 // -------------------------------------------------------------
+// In-story Q&A latency switches (2026-08-10)
+// See esp32/AregVoiceMvp/latency-firmware-notes.md
+// -------------------------------------------------------------
+
+// AREG_QA_STREAM_PLAYBACK — start playing the spoken answer on the FIRST
+// bytes of the POST response instead of after the whole body has landed in
+// PSRAM. Worth ~0.5-1.5 s per question, and more if the backend ever
+// produces the answer progressively.
+//
+// OFF BY DEFAULT, and it must stay off until it has been bench-tested on
+// real hardware: it swaps a proven buffered decode for a live-socket one,
+// and it has NO buffered copy to fall back on — a bad stream is a question
+// the child gets no answer to.
+//
+// IT ALSO NEEDS THE BACKEND. The endpoint today composes the whole MP3 and
+// sends it with a Content-Length; with the flag on that still works (the
+// device just decodes as the body arrives instead of after), but the real
+// win needs /api/chat/story-qa to WRITE AND FLUSH audio as it is produced,
+// which makes the response Transfer-Encoding: chunked. The firmware side of
+// that is done — the de-chunker is in audio_io.cpp — but the buffered path
+// still rejects a body with no Content-Length, so the two ends must be
+// flipped together. Details in latency-firmware-notes.md § "What the
+// backend must do".
+// #define AREG_QA_STREAM_PLAYBACK 1
+
+// AREG_DIAG_MARK_SERIAL — print + flush + delay(5) on every DIAG_MARK.
+// OFF by default since 2026-08-10: it cost ~130 ms per Q&A turn (~26 marks)
+// for a live trace nobody was watching. The crash breadcrumb itself is
+// unaffected — it lives in RTC memory and still prints on the next boot.
+// Turn this on when you are watching a hang happen in real time.
+// #define AREG_DIAG_MARK_SERIAL 1
+
+// -------------------------------------------------------------
 // Phase B.2 — BLE Wi-Fi provisioning (OPT-IN; bench default = OFF)
 // -------------------------------------------------------------
 // Uncomment AREG_USE_BLE_PROVISIONING to build the provisioning variant.

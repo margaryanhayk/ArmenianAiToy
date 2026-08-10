@@ -651,6 +651,83 @@ VoiceTurnResult voice_upload_turn(const uint8_t *payload, size_t length) {
     return result;
 }
 
+// -------------------------------------------------------------
+// In-story Q&A transport — ONE reused TLS connection
+// -------------------------------------------------------------
+//
+// WHY THIS IS A SHARED, LAZY, FUNCTION-STATIC OBJECT (latency, 2026-08-10).
+// Both Q&A upload paths used to declare `HTTPClient http;` on the stack.
+// ~HTTPClient() calls disconnect(), which calls _client->stop() on the
+// SHARED WiFiClientSecure in net_transport.cpp — so every question tore the
+// TLS session down and the next one paid a full handshake (~0.3-0.8 s on
+// this link). A function-static client with setReuse(true) keeps the socket
+// open between questions, which is exactly the fix content_sync.cpp landed
+// in the field on 2026-08-07 after its per-call clients died at ~14 files.
+//
+// Heap-allocated on first use, exactly like tls_client() in net_transport.cpp,
+// rather than a static object: a plain `static HTTPClient http;` costs ~230 B
+// of .bss on every toy whether or not a child ever asks a question, and .bss
+// is the scarce pool on this board. Never deleted — it is meant to live for
+// the process, which is what keeps the connection alive.
+//
+// SCOPE OF THE WIN, honestly: any OTHER module's local HTTPClient (heartbeat,
+// OTA poll, content sync) still stops the shared client when it is destroyed,
+// so the reuse holds BETWEEN QUESTIONS INSIDE ONE STORY — which is the case
+// that matters, since nothing else touches the network while a story plays —
+// and the first question after any other backend call still handshakes.
+static HTTPClient &qa_http() {
+    static HTTPClient *http = nullptr;
+    if (http == nullptr) {
+        http = new HTTPClient();
+        http->setReuse(true);
+    }
+    return *http;
+}
+
+// Opens + POSTs the question, with ONE retry that is deliberately NARROWER
+// than content_sync's.
+//
+// content_sync retries every negative status because a GET is idempotent.
+// This POST is NOT: it spends an STT + moderation + GPT + TTS pipeline, and a
+// blind retry could pay for one child's question twice and speak two answers.
+// So the retry is limited to the three failures that PROVE the request never
+// reached the server — connection refused, send-header failed, send-payload
+// failed. Those are precisely what a reused-but-idle-closed socket produces,
+// which is the failure this reuse introduces; anything later (connection lost
+// mid-headers, read timeout) may already have been processed and is reported
+// to the caller unchanged.
+static int qa_post_with_retry(HTTPClient &http, const char *url,
+                              const uint8_t *payload, size_t length) {
+    int status = HTTPC_ERROR_NOT_CONNECTED;
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        if (!areg_http_begin(http, url)) {
+            Serial.println("[qa] http.begin failed");
+            Serial.flush();
+            return HTTPC_ERROR_NOT_CONNECTED;
+        }
+        http.setReuse(true);
+        http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
+        http.setTimeout(AREG_HTTP_READ_MS);
+        http.addHeader("Content-Type", "audio/wav");
+        add_device_auth_headers(http);
+
+        status = http.POST((uint8_t *)payload, length);
+        if (status == 200) return status;
+
+        const bool never_sent = (status == HTTPC_ERROR_CONNECTION_REFUSED ||
+                                 status == HTTPC_ERROR_SEND_HEADER_FAILED ||
+                                 status == HTTPC_ERROR_SEND_PAYLOAD_FAILED);
+        http.end();
+        if (!never_sent || attempt == 1) return status;
+
+        Serial.printf("[qa] request not delivered (%d) — resetting TLS, retrying once\n",
+                      status);
+        Serial.flush();
+        areg_net_reset();   // drop the wedged keep-alive; next begin() handshakes
+    }
+    return status;
+}
+
 VoiceTurnResult voice_upload_question(const uint8_t *payload, size_t length,
                                       uint32_t offset) {
     VoiceTurnResult result;
@@ -670,26 +747,15 @@ VoiceTurnResult voice_upload_question(const uint8_t *payload, size_t length,
     snprintf(url, sizeof(url), "%s?storyId=%s&offset=%u",
              AREG_STORY_QA_URL, voice_active_story_id(), (unsigned)offset);
 
-    HTTPClient http;
-    http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
-    http.setTimeout(AREG_HTTP_READ_MS);
-    if (!areg_http_begin(http, url)) {
-        Serial.println("[qa] http.begin failed");
-        Serial.flush();
-        return result;
-    }
-    http.addHeader("Content-Type", "audio/wav");
-    add_device_auth_headers(http);
-
+    HTTPClient &http = qa_http();
     Serial.printf("[qa] POST question (%u bytes) offset=%u\n",
                   (unsigned)length, (unsigned)offset);
     Serial.flush();
-    const int status = http.POST((uint8_t *)payload, length);
+    const int status = qa_post_with_retry(http, url, payload, length);
     result.http_status = status;
     if (status != 200) {
         Serial.printf("[qa] http POST non-200: %d\n", status);
-        http.end();
-        return result;
+        return result;  // qa_post_with_retry already ended the request
     }
 
     const bool read_ok = read_response_into(http, result);
@@ -855,18 +921,11 @@ static void upload_question_task(void * /*pvParams*/) {
     snprintf(url, sizeof(url), "%s?storyId=%s&offset=%u",
              AREG_STORY_QA_URL, voice_active_story_id(), (unsigned)s_async_offset);
 
-    HTTPClient http;
-    http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
-    http.setTimeout(AREG_HTTP_READ_MS);
-    if (!areg_http_begin(http, url)) {
-        Serial.println("[qa-async] http.begin failed");
-        Serial.flush();
-        async_publish_result(result);
-        vTaskDelete(nullptr);
-        return;
-    }
-    http.addHeader("Content-Type", "audio/wav");
-    add_device_auth_headers(http);
+    // Shared, reused TLS connection — see qa_http() above. The client is a
+    // function-static, so it deliberately OUTLIVES this task: on the streaming
+    // path below the loop core keeps reading its response body after the task
+    // has already exited.
+    HTTPClient &http = qa_http();
 
     Serial.printf("[qa-async] POST (%u bytes) offset=%u\n",
                   (unsigned)s_async_length, (unsigned)s_async_offset);
@@ -881,16 +940,33 @@ static void upload_question_task(void * /*pvParams*/) {
     // This is safe because the task runs AFTER the caller has already finished
     // playing the previous answer (the story playback was cut before record_question).
     voice_release_last_response();
-    const int status = http.POST((uint8_t *)s_async_payload, s_async_length);
+    const int status = qa_post_with_retry(http, url, s_async_payload, s_async_length);
     result.http_status = status;
     if (status != 200) {
         Serial.printf("[qa-async] POST non-200: %d\n", status);
-        http.end();
-        async_publish_result(result);
+        async_publish_result(result);   // qa_post_with_retry already ended it
         vTaskDelete(nullptr);
         return;
     }
 
+#ifdef AREG_QA_STREAM_PLAYBACK
+    // STREAMING PATH (flag ON). Stop at the headers and hand the still-open
+    // body to the loop core, which decodes it as it arrives. Nothing is
+    // buffered, so `response_bytes` stays null and the caller MUST take the
+    // `streaming` branch. `http` is the function-static above, so it stays
+    // valid after this task exits; the loop core closes it via
+    // voice_qa_stream_finish().
+    result.ok        = true;
+    result.streaming = true;
+    result.response_length =
+        (http.getSize() > 0) ? (size_t)http.getSize() : 0;
+    Serial.printf("[qa-async] headers in, streaming body (content_length=%d)\n",
+                  http.getSize());
+    Serial.flush();
+    async_publish_result(result);
+    vTaskDelete(nullptr);
+    return;
+#else
     const bool read_ok = read_response_into(http, result);
     http.end();
     if (!read_ok) {
@@ -902,7 +978,33 @@ static void upload_question_task(void * /*pvParams*/) {
     }
     async_publish_result(result);
     vTaskDelete(nullptr);
+#endif
 }
+
+#ifdef AREG_QA_STREAM_PLAYBACK
+Stream *voice_qa_stream_body() {
+    return qa_http().getStreamPtr();
+}
+
+int voice_qa_stream_content_length() {
+    return qa_http().getSize();
+}
+
+void voice_qa_stream_finish() {
+    // DELIBERATELY drops the connection instead of keeping it alive.
+    //
+    // On the buffered path the body is read to the exact byte, so the socket
+    // is clean and reusable. On this path it is not: the MP3 decoder stops at
+    // the audio's end, which need not be the body's end (ID3v1 trailer, a
+    // final partial frame), and a chunked body additionally leaves the CRLF
+    // after the terminating 0-size chunk unread. Reusing a socket that still
+    // has bytes in it makes the NEXT request read them as its own response —
+    // a silent, one-turn-delayed corruption, in a child's room. One extra TLS
+    // handshake on the next question is a much cheaper price than that.
+    qa_http().end();
+    areg_net_reset();
+}
+#endif
 
 void voice_start_question_upload_async(const uint8_t *payload,
                                        size_t length,

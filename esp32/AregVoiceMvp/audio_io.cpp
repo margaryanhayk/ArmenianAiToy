@@ -641,10 +641,19 @@ bool audio_play_story_file(const char *path,
 // The envelope ramps the amplitude up for the first 50 ms and down for the
 // last 50 ms (linear fade) to avoid a click at start/end.
 #ifndef AREG_DISABLE_MP3_PLAYBACK
+//
+// `abort` (optional, added 2026-08-10 for the Q&A latency slice) is polled
+// every kAbortPollSamples samples. When it returns true the tone stops EARLY
+// with a short linear fade-out instead of running out its full duration.
+// Rationale: the thinking-bed loop could only notice the answer had arrived
+// BETWEEN pulses, so a reply that landed 20 ms into a 600 ms pulse still waited
+// out the remaining 580 ms of tone before playing. The fade is what keeps an
+// early stop from clicking; a hard cut mid-sine is audible on the MAX98357A.
 static void synth_write_tone(AudioOutputI2S &out,
                              uint16_t freq_hz,
                              uint32_t duration_ms,
-                             int16_t  amplitude) {
+                             int16_t  amplitude,
+                             audio_abort_fn abort = nullptr) {
     // HARDWARE ASSUMPTION: AREG_SAMPLE_RATE_HZ is 16000. If it is changed,
     // this function adapts automatically via the constant.
     const uint32_t total_samples =
@@ -655,7 +664,21 @@ static void synth_write_tone(AudioOutputI2S &out,
     uint32_t phase     = 0;
     uint32_t phase_inc = ((uint32_t)freq_hz << 16) / AREG_SAMPLE_RATE_HZ;
 
+    // Early-stop state. `abort_at` is the sample index the abort fired on;
+    // from there the envelope ramps to zero over kAbortFadeSamples and the
+    // loop ends. 0xFFFFFFFF = "not aborting".
+    static constexpr uint32_t kAbortPollSamples = 256;                       // ~16 ms @16 kHz
+    const uint32_t kAbortFadeSamples = (uint32_t)AREG_SAMPLE_RATE_HZ * 8 / 1000;  // 8 ms
+    uint32_t abort_at = 0xFFFFFFFFu;
+
     for (uint32_t i = 0; i < total_samples; ++i) {
+        if (abort != nullptr && abort_at == 0xFFFFFFFFu &&
+            (i % kAbortPollSamples) == 0 && abort()) {
+            abort_at = i;
+        }
+        if (abort_at != 0xFFFFFFFFu && i >= abort_at + kAbortFadeSamples) {
+            return;  // faded out cleanly above
+        }
         // Map the 32-bit phase accumulator (0..0xFFFFFFFF) onto 0..2π and
         // compute sinf(). The Xtensa LX7 has hardware FPU — this is fast.
         // HARDWARE ASSUMPTION: ESP32-S3 Xtensa LX7 FPU handles sinf in ~10 cycles.
@@ -668,6 +691,13 @@ static void synth_write_tone(AudioOutputI2S &out,
         } else if (i > total_samples - fade_samples) {
             uint32_t tail = total_samples - i;
             raw = (int16_t)((int32_t)raw * (int32_t)tail / (int32_t)fade_samples);
+        }
+        // Abort fade-out overrides the normal envelope (it is always steeper).
+        if (abort_at != 0xFFFFFFFFu) {
+            const uint32_t done = i - abort_at;
+            raw = (int16_t)((int32_t)raw *
+                            (int32_t)(kAbortFadeSamples - done) /
+                            (int32_t)kAbortFadeSamples);
         }
 
         // ConsumeSample expects AudioOutput::AudioType (int16_t[2] packed
@@ -696,9 +726,14 @@ static void synth_write_tone(AudioOutputI2S &out,
 
 // ---- S1: audio_play_thinking_earcon() -----------------------
 bool audio_play_thinking_earcon() {
+    return audio_play_thinking_earcon_abortable(nullptr);
+}
+
+bool audio_play_thinking_earcon_abortable(audio_abort_fn abort) {
     Serial.println("[audio] earcon_begin");
     Serial.flush();
 #ifdef AREG_DISABLE_MP3_PLAYBACK
+    (void)abort;
     // Playback disabled for bench I2S isolation — treat as success
     // (the important thing is we didn't add silence; earcon is optional).
     Serial.println("[audio] earcon: playback disabled, skipping");
@@ -731,7 +766,8 @@ bool audio_play_thinking_earcon() {
     synth_write_tone(out,
                      AREG_EARCON_FREQ_HZ,
                      AREG_EARCON_DURATION_MS,
-                     AREG_EARCON_AMPLITUDE);
+                     AREG_EARCON_AMPLITUDE,
+                     abort);
 
     out.stop();
     Serial.println("[audio] earcon_end");
@@ -803,6 +839,206 @@ bool audio_play_qa_stream(const char *url) {
     return true;
 #endif
 }
+
+
+// ---- AREG_QA_STREAM_PLAYBACK: decode the live POST response --------
+//
+// See audio_io.h for the contract, and latency-firmware-notes.md for why
+// the URL form above cannot serve the Q&A answer. Everything in this block
+// compiles to ZERO bytes without the flag.
+#ifdef AREG_QA_STREAM_PLAYBACK
+#ifdef AREG_DISABLE_MP3_PLAYBACK
+
+bool audio_play_qa_stream_response(Stream *, int) {
+    Serial.println("[audio] qa_stream: playback disabled, skipping");
+    Serial.flush();
+    return false;
+}
+
+#else
+
+// An AudioFileSource over an already-open HTTP response body.
+//
+// Two shapes of body, one class:
+//   identity — `_remaining` counts down from Content-Length.
+//   chunked  — `_remaining` is refilled from each hex chunk-size line and a
+//              zero-size chunk ends the body. HTTPClient does NOT de-chunk
+//              for us on getStreamPtr(); it only does that inside
+//              writeToStream(). Feeding raw chunk headers to the MP3 decoder
+//              would be garbage-in, so the de-framing lives here.
+//
+// The first bytes of the body are sniffed for an MP3 signature before any
+// byte can reach the decoder (#048 parity with the buffered path) and then
+// replayed from `_head`, because a socket cannot be rewound.
+//
+// Not seekable, and getSize() is honestly unknown; AudioGeneratorMP3
+// requires neither.
+class AudioFileSourceHttpBody : public AudioFileSource {
+public:
+    AudioFileSourceHttpBody(Stream *body, int content_length)
+        : _body(body),
+          _chunked(content_length <= 0),
+          _remaining(content_length > 0 ? (uint32_t)content_length : 0) {}
+
+    // Reads and validates the leading bytes. Must be called once, before
+    // the generator. Returns false when the body is short or not MP3.
+    bool prime() {
+        uint8_t head[3];
+        if (pull(head, sizeof(head)) != sizeof(head)) {
+            Serial.println("[audio] qa_stream: body too short");
+            Serial.flush();
+            return false;
+        }
+        const bool is_mp3 = (head[0] == 'I' && head[1] == 'D' && head[2] == '3') ||
+                            (head[0] == 0xFF && (head[1] & 0xE0) == 0xE0);
+        if (!is_mp3) {
+            Serial.printf("[audio] qa_stream: body is not MP3 (%02X %02X %02X); rejecting\n",
+                          head[0], head[1], head[2]);
+            Serial.flush();
+            return false;
+        }
+        memcpy(_head, head, sizeof(head));
+        _head_len = sizeof(head);
+        _head_pos = 0;
+        return true;
+    }
+
+    bool isOpen() override { return _body != nullptr; }
+    bool close() override { _body = nullptr; return true; }
+    uint32_t getSize() override { return 0; }   // unknown — streaming
+    uint32_t getPos() override { return _pos; }
+    bool seek(int32_t, int) override { return false; }
+
+    uint32_t read(void *data, uint32_t len) override {
+        uint8_t *dst = (uint8_t *)data;
+        uint32_t done = 0;
+        // Replay the sniffed bytes first.
+        while (done < len && _head_pos < _head_len) {
+            dst[done++] = _head[_head_pos++];
+            _pos++;
+        }
+        if (done < len) {
+            done += pull(dst + done, len - done);
+        }
+        return done;
+    }
+
+private:
+    // Body bytes, transfer-encoding aware. Returns a short count at EOF.
+    uint32_t pull(uint8_t *dst, uint32_t len) {
+        uint32_t done = 0;
+        while (done < len && !_eof) {
+            if (_remaining == 0) {
+                if (!_chunked)       { _eof = true; break; }  // identity complete
+                if (!next_chunk())   { _eof = true; break; }  // 0-size chunk / error
+            }
+            uint32_t want = len - done;
+            if (want > _remaining) want = _remaining;
+            const int got = wait_read(dst + done, want);
+            if (got <= 0) { _eof = true; break; }
+            done       += (uint32_t)got;
+            _pos       += (uint32_t)got;
+            _remaining -= (uint32_t)got;
+        }
+        return done;
+    }
+
+    // Blocking read with a stall bound + watchdog feeding. The decoder calls
+    // this from inside mp3.loop(), which is exactly where the toy legitimately
+    // waits on the network — an unbounded wait here is a watchdog reboot.
+    int wait_read(uint8_t *dst, uint32_t want) {
+        const uint32_t deadline = millis() + (uint32_t)AREG_HTTP_READ_MS;
+        while (_body->available() == 0) {
+            esp_task_wdt_reset();
+            if ((int32_t)(millis() - deadline) >= 0) {
+                Serial.println("[audio] qa_stream: body stalled");
+                Serial.flush();
+                return -1;
+            }
+            delay(2);
+        }
+        int avail = _body->available();
+        if ((uint32_t)avail > want) avail = (int)want;
+        return (int)_body->readBytes(dst, (size_t)avail);
+    }
+
+    // Reads "<hex>[;ext]\r\n" and arms _remaining. A zero-size chunk is the
+    // end of the body and returns false (trailers are ignored — the socket
+    // is about to be closed or drained by HTTPClient::end()).
+    bool next_chunk() {
+        if (_saw_chunk) {                       // CRLF terminating the previous chunk
+            uint8_t crlf[2];
+            if (wait_read(crlf, 2) != 2) return false;
+        }
+        char line[24];
+        size_t n = 0;
+        for (;;) {
+            uint8_t c;
+            if (wait_read(&c, 1) != 1) return false;
+            if (c == '\n') break;
+            if (c != '\r' && n < sizeof(line) - 1) line[n++] = (char)c;
+        }
+        line[n] = '\0';
+        const long size = strtol(line, nullptr, 16);
+        if (size <= 0) return false;
+        _remaining = (uint32_t)size;
+        _saw_chunk = true;
+        return true;
+    }
+
+    Stream  *_body;
+    bool     _chunked;
+    uint32_t _remaining;
+    uint32_t _pos       = 0;
+    bool     _eof       = false;
+    bool     _saw_chunk = false;
+    uint8_t  _head[3]   = {0, 0, 0};
+    uint8_t  _head_len  = 0;
+    uint8_t  _head_pos  = 0;
+};
+
+bool audio_play_qa_stream_response(Stream *body, int content_length) {
+    if (body == nullptr) return false;
+    Serial.printf("[audio] qa_stream_begin (live POST body, len=%d, %s)\n",
+                  content_length, content_length > 0 ? "identity" : "chunked");
+    Serial.flush();
+
+    AudioFileSourceHttpBody source(body, content_length);
+    if (!source.prime()) {
+        return false;
+    }
+
+    AudioOutputI2S out;
+    out.SetPinout(AREG_PIN_AMP_BCK, AREG_PIN_AMP_LRC, AREG_PIN_AMP_DATA);
+    out.SetGain(0.6f);
+
+    AudioGeneratorMP3 mp3;
+    if (!mp3.begin(&source, &out)) {
+        Serial.println("[audio] qa_stream: mp3.begin failed");
+        Serial.flush();
+        return false;
+    }
+
+    uint32_t last_yield = millis();
+    while (mp3.isRunning()) {
+        esp_task_wdt_reset();
+        if (!mp3.loop()) {
+            mp3.stop();
+            break;
+        }
+        if (millis() - last_yield > 50) {
+            delay(1);
+            last_yield = millis();
+        }
+    }
+    out.stop();
+    Serial.println("[audio] qa_stream_end ok=true");
+    Serial.flush();
+    return true;
+}
+
+#endif  // AREG_DISABLE_MP3_PLAYBACK
+#endif  // AREG_QA_STREAM_PLAYBACK
 
 // -------------------------------------------------------------
 // WAV header

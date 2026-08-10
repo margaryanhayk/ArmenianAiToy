@@ -11,6 +11,11 @@
 
 #include <Arduino.h>
 
+// Build flags this header switches on (AREG_QA_STREAM_PLAYBACK) live in
+// config.h, so it must be visible here regardless of include order at the
+// call site. config.h is #pragma once and macro-only, so this is free.
+#include "config.h"
+
 // Initialize the INMP441 I2S mic. Call once at boot.
 // Returns true on success.
 bool audio_mic_begin();
@@ -154,6 +159,19 @@ bool audio_play_story_file(const char *path,
 // silent earcon is still better than a crash).
 bool audio_play_thinking_earcon();
 
+// Same tone, but interruptible. `abort` is polled roughly every 16 ms of
+// audio; when it returns true the tone fades out over ~8 ms and returns
+// early instead of running the full AREG_EARCON_DURATION_MS.
+//
+// WHY (Q&A latency, 2026-08-10): the thinking-bed loop between the upload
+// and the answer could only check "has the answer arrived?" BETWEEN pulses,
+// so an answer that landed just after a pulse started still waited out the
+// rest of that 600 ms pulse — 0-600 ms of pure dead time added to every
+// question, averaging ~300 ms. Passing voice_async_upload_done here removes
+// it. Passing nullptr is exactly audio_play_thinking_earcon().
+typedef bool (*audio_abort_fn)();
+bool audio_play_thinking_earcon_abortable(audio_abort_fn abort);
+
 // S3 — Stream a Q&A answer incrementally from a URL.
 //
 // Opens `url` as an HTTP stream and decodes the MP3 response chunk-by-
@@ -177,6 +195,44 @@ bool audio_play_thinking_earcon();
 // before this. The URL must be reachable (caller is responsible for
 // checking Wi-Fi connectivity).
 bool audio_play_qa_stream(const char *url);
+
+// ---------------------------------------------------------------
+// AREG_QA_STREAM_PLAYBACK — play the Q&A answer AS IT ARRIVES
+// (compile-gated, OFF by default; see latency-firmware-notes.md)
+// ---------------------------------------------------------------
+//
+// audio_play_qa_stream() above is the URL form, and it is UNUSABLE for the
+// in-story Q&A answer: AudioFileSourceHTTPStream issues its own GET, while
+// /api/chat/story-qa is POST-only — and if a GET were ever added there it
+// would re-run STT+moderation+GPT+TTS and double-bill one question. The
+// answer only ever exists as the body of the POST the toy already made.
+//
+// So this is the form that can actually be used: it decodes from an
+// ALREADY-OPEN HTTP response stream (the one voice_client's Q&A POST is
+// sitting on) and starts making sound on the first frames instead of after
+// the whole body has landed in PSRAM.
+//
+// `content_length` is HTTPClient::getSize():
+//   > 0  — Content-Length known; exactly that many raw MP3 bytes are read.
+//   <= 0 — no Content-Length, i.e. Transfer-Encoding: chunked. The chunk
+//          framing is de-framed HERE, because HTTPClient only de-chunks
+//          inside writeToStream(); getStreamPtr() hands back the RAW socket
+//          with the hex size lines still in it, and feeding those to the MP3
+//          decoder is garbage-in. This is the half that makes a chunked
+//          backend response work instead of failing the turn.
+//
+// Keeps the #048 contract: the first bytes are sniffed for an MP3 signature
+// (ID3 tag or MPEG frame sync) before ANY byte reaches the decoder, exactly
+// as the buffered path does.
+//
+// Returns true when the answer played to its end. False means nothing (or
+// only part of the answer) was heard — the caller has no buffered copy to
+// fall back to on this path and should play the canned failure clip.
+//
+// The caller owns the stream and must close the HTTP response afterwards.
+#ifdef AREG_QA_STREAM_PLAYBACK
+bool audio_play_qa_stream_response(Stream *body, int content_length);
+#endif
 
 // Write a canonical 44-byte PCM WAV header into `hdr_out`
 // describing `pcm_sample_count` mono 16-bit samples at

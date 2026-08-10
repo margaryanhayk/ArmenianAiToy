@@ -12,6 +12,10 @@
 
 #include <Arduino.h>
 
+// Build flags this header switches on (AREG_QA_STREAM_PLAYBACK) live in
+// config.h, so it must be visible here regardless of include order.
+#include "config.h"
+
 class HTTPClient;  // fwd-decl — keeps HTTPClient.h out of this header
 
 // OTA foundation — the shared device-auth header seam for OTHER modules'
@@ -121,6 +125,14 @@ struct VoiceTurnResult {
     // should auto-fetch the next segment via voice_continue_turn()
     // with no button press. false ends hands-free autoplay.
     bool continue_more = false;
+    // AREG_QA_STREAM_PLAYBACK only. true means "HTTP 200, headers are in,
+    // the body has NOT been buffered — decode it live off the socket".
+    // response_bytes is null in this case; response_length carries the
+    // Content-Length when the server sent one, or 0 for a chunked body.
+    // The caller must play it with audio_play_qa_stream_response() and then
+    // call voice_qa_stream_finish(). Always false without the flag, so every
+    // existing `if (turn.ok)` caller keeps its buffered contract.
+    bool streaming = false;
 };
 
 // POST `payload` (WAV header + PCM) to AREG_BACKEND_URL with
@@ -239,3 +251,29 @@ bool voice_async_upload_done();
 // The returned VoiceTurnResult has the same semantics as voice_upload_question().
 // MUST only be called after voice_async_upload_done() == true.
 VoiceTurnResult voice_get_async_result();
+
+// ---------------------------------------------------------------
+// AREG_QA_STREAM_PLAYBACK — live answer body (compile-gated, OFF by default)
+// ---------------------------------------------------------------
+//
+// With the flag on, the upload task stops at the response HEADERS and leaves
+// the body open on a function-static HTTPClient, so the loop core can start
+// decoding on the first frames instead of waiting for the whole answer to
+// land in PSRAM. These three calls are the seam.
+//
+// Contract, in order, and only when voice_get_async_result().streaming:
+//   1. audio_play_qa_stream_response(voice_qa_stream_body(),
+//                                    voice_qa_stream_content_length())
+//   2. voice_qa_stream_finish()   — ALWAYS, including on a playback failure.
+//                                   It CLOSES the connection rather than
+//                                   pooling it (the decoder does not
+//                                   necessarily drain the body — see the
+//                                   implementation comment), so streaming
+//                                   trades the TLS keep-alive for safety.
+// There is no buffered copy on this path, so a failure means the child heard
+// nothing and the caller should play the canned failure clip.
+#ifdef AREG_QA_STREAM_PLAYBACK
+Stream *voice_qa_stream_body();
+int     voice_qa_stream_content_length();
+void    voice_qa_stream_finish();
+#endif

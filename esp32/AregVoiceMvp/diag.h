@@ -33,11 +33,24 @@
 //   [boot] previous_step=<id> label=<label> line=<line>
 void diag_print_previous_boot_context();
 
-// Record a breadcrumb. Writes (step_id, label, line_no) into
-// RTC slow memory, prints `[mark] step=… label=… line=…` on
-// Serial, flushes the TX buffer, and waits a few ms so the
-// native USB CDC has time to actually transmit the bytes
-// before any potential crash on the next instruction.
+// Record a breadcrumb. ALWAYS writes (step_id, label, line_no) into
+// RTC slow memory — that is the crash-forensics half, it survives the
+// reset, and it is essentially free (three word stores + a strncpy).
+//
+// The Serial half — printing `[mark] …`, flushing the TX buffer, and
+// waiting a few ms so native USB CDC actually transmits before a
+// possible crash on the next instruction — is compiled in ONLY when
+// AREG_DIAG_MARK_SERIAL is defined (bench opt-in; off by default).
+//
+// WHY IT IS OFF BY DEFAULT (latency, 2026-08-10). Each mark cost a
+// Serial.flush() plus a hard delay(5). An in-story Q&A turn crosses
+// ~26 marks — mic begin (9), capture (4), teardown (6), MP3 playback
+// (7) — so it added ~130 ms of pure delay to every question a child
+// asks, on a path the whole product is trying to shorten. The next-boot
+// breadcrumb (diag_print_previous_boot_context) is unaffected: it reads
+// RTC memory, not the serial log, so crash localisation still works
+// with this off. Define AREG_DIAG_MARK_SERIAL in config.h when you need
+// the live trace of a hang in progress.
 //
 // `label` is truncated to fit a fixed 48-byte buffer in RTC.
 // nullptr is treated as the empty string.
