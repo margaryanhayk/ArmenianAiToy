@@ -7,7 +7,12 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '../../backend/src/ArmenianAiToy.Api/wwwroot');
 const iso = (d) => new Date(d).toISOString();
-const now = Date.now();
+// Fixed by default so two runs produce byte-identical screenshots and a
+// before/after diff means something. Override with AREG_MOCK_NOW=now for a
+// run where you want plausible "just happened" times.
+const now = process.env.AREG_MOCK_NOW === 'now'
+  ? Date.now()
+  : Date.parse(process.env.AREG_MOCK_NOW || '2026-08-10T18:00:00Z');
 const ago = (min) => iso(now - min * 60000);
 
 const DEV1 = '11111111-1111-1111-1111-111111111111';
