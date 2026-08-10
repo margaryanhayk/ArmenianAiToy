@@ -11,7 +11,7 @@
     inert in a desktop browser and costs one extra request (the manifest).
   -->
   <link rel="manifest" href="/manifest.webmanifest">
-  <meta name="theme-color" content="#fff6e3">
+  <meta name="theme-color" content="#F6E7C4">
   <link rel="icon" href="/icons/areg-192.png" sizes="192x192" type="image/png">
   <!-- iOS ignores the manifest's icons; it reads apple-touch-icon only. -->
   <link rel="apple-touch-icon" href="/icons/areg-180.png">
@@ -32,88 +32,92 @@
        ────────────────────────────────────────────────────────────────── */
     :root {
       /* text, darkest to faintest */
-      --ink: #2b1f47;
-      --ink-2: #3f3060;
-      --ink-3: #4b3b6e;
-      --ink-4: #5b4c7d;
-      --ink-muted: #6b5b8a;
-      --ink-hint: #7a6b95;
-      --ink-faint: #b8a8d6;
-      --chev: #b7a8d4;
-      --chev-strong: #9d86c9;
+      --ink: #241E12;
+      --ink-2: #302713;
+      --ink-3: #3E3420;
+      --ink-4: #584A2F;
+      --ink-muted: #6A5B3E;
+      --ink-hint: #726241;
+      /* --ink-faint is the DISABLED button label and --chev the '>' on a
+         navigation tile. Both were below the AA floor in the old lavender
+         too (1.77 and 2.07); these values clear 4.5 against the surfaces
+         they actually sit on. Do not lighten them back. */
+      --ink-faint: #6E5E3C;
+      --chev: #7E6E4C;
+      --chev-strong: #2A4A8F;
       /* brand accents */
-      --brand-deep: #4b2e83;
-      --brand: #5b3e8a;
-      --brand-strong: #7c5cbf;
-      --brand-strong-hover: #6b4aad;
-      --brand-soft: #b99ae8;
+      --brand-deep: #1C2F5C;
+      --brand: #25417D;
+      --brand-strong: #2A4A8F;
+      --brand-strong-hover: #1C2F5C;
+      --brand-soft: #7C9BD4;
       /* lines */
-      --line-strong: #cbb8ec;
-      --line-hover: #d3c2f0;
-      --line-secondary-hover: #d0c2e8;
-      --line-tab-hover: #d8c8f0;
-      --line-card: #ded1f4;
-      --line-input: #e0d6f0;
-      --line: #e4d9f7;
-      --line-soft: #ece4f8;
-      --line-soft-2: #ece6f8;
+      --line-strong: #C9B893;
+      --line-hover: #C9B893;
+      --line-secondary-hover: #D8C9A8;
+      --line-tab-hover: #D8C9A8;
+      --line-card: #E2D6BC;
+      --line-input: #D8C9A8;
+      --line: #E2D6BC;
+      --line-soft: #EADFC8;
+      --line-soft-2: #EADFC8;
       /* surfaces, white to most tinted */
-      --surface: #ffffff;
-      --surface-2: #fdfbff;
-      --surface-3: #faf7ff;
-      --surface-4: #faf8ff;
-      --surface-5: #f6f4fb;
-      --surface-tint: #f5f0ff;
-      --surface-card: #f4f0fb;
-      --surface-6: #f3edfc;
-      --surface-hover: #f2ebff;
-      --surface-row-hover: #f0e8fc;
-      --surface-main-hover: #efe7ff;
+      --surface: #FFFDF8;
+      --surface-2: #FDFAF2;
+      --surface-3: #FBF6EC;
+      --surface-4: #FBF6EC;
+      --surface-5: #F7F1E3;
+      --surface-tint: #F4EDDF;
+      --surface-card: #FBF6EC;
+      --surface-6: #F4EDDF;
+      --surface-hover: #EFE6D2;
+      --surface-row-hover: #F2E9D3;
+      --surface-main-hover: #EFE6D2;
       /* the warm header band */
-      --warm: #fff6e3;
-      --warm-2: #ffeccb;
-      --warm-3: #fff6ec;
-      --warm-line: #f3e2bd;
-      --warm-line-2: #f0dfc8;
-      --warm-line-3: #f0e2cf;
-      --warm-ink: #8a7554;
+      --warm: #F6E7C4;
+      --warm-2: #EFD9A6;
+      --warm-3: #F9EED6;
+      --warm-line: #DCC48A;
+      --warm-line-2: #E4D0A0;
+      --warm-line-3: #E4D0A0;
+      --warm-ink: #7A6230;
       /* good news */
-      --ok-bg: #e6f6ec;
-      --ok-line: #b9e4c9;
-      --ok-ink: #1e7a45;
-      --ok-ink-strong: #1a6b3c;
-      --ok-ink-soft: #3a5a3a;
-      --ok-bg-soft: #f0f7f0;
-      --ok-line-soft: #b6d6b6;
+      --ok-bg: #E4EFE1;
+      --ok-line: #A9C4A2;
+      --ok-ink: #2C5233;
+      --ok-ink-strong: #24462B;
+      --ok-ink-soft: #3E5C42;
+      --ok-bg-soft: #EBF2E7;
+      --ok-line-soft: #A9C4A2;
       /* needs a look */
-      --warn-bg: #fef3c7;
-      --warn-line: #e7c66a;
-      --warn-ink: #92400e;
-      --warn-bg-2: #fff3e0;
-      --warn-ink-2: #e65100;
-      --warn-bg-3: #fff8ee;
-      --warn-bg-4: #fff8f0;
+      --warn-bg: #FAF0D6;
+      --warn-line: #D8AE55;
+      --warn-ink: #7A5410;
+      --warn-bg-2: #FAF0D6;
+      --warn-ink-2: #8A4A14;
+      --warn-bg-3: #FCF5E4;
+      --warn-bg-4: #FCF5E4;
       /* destructive / blocked */
-      --danger-bg: #fee2e2;
-      --danger-line: #e8a7a7;
-      --danger-ink: #991b1b;
-      --danger-ink-2: #b3261e;
-      --danger-ink-3: #c62828;
-      --danger-line-2: #d9a19e;
-      --danger-ink-4: #b3403a;
-      --danger-bg-2: #fdf0ef;
-      --danger-bg-3: #fff5f6;
-      --danger-line-3: #e8cfcf;
-      --danger-ink-5: #8a2f2f;
-      --danger-ink-6: #c66;
-      --danger-ink-7: #8a3b3b;
-      --danger-bg-4: #fce4ec;
+      --danger-bg: #F8E3E3;
+      --danger-line: #D9A7A0;
+      --danger-ink: #7E2547;
+      --danger-ink-2: #A32D22;
+      --danger-ink-3: #A32D22;
+      --danger-line-2: #D9A7A0;
+      --danger-ink-4: #A32D22;
+      --danger-bg-2: #FBEDEC;
+      --danger-bg-3: #FCF1F0;
+      --danger-line-3: #E8CFC9;
+      --danger-ink-5: #7E2547;
+      --danger-ink-6: #A32D22;
+      --danger-ink-7: #8A3B2E;
+      --danger-bg-4: #F8E3E8;
       /* plain neutrals */
-      --muted-bg: #f2f2f2;
-      --muted-line: #dddddd;
-      --muted-ink: #666666;
-      --hairline: #eee;
-      --neutral-ink: #555;
+      --muted-bg: #F0EBE0;
+      --muted-line: #D5CCB8;
+      --muted-ink: #6A5B3E;
+      --hairline: #E7DFCE;
+      --neutral-ink: #584A2F;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -732,8 +736,9 @@
 
     .status { font-size: 13px; padding: 8px 0; min-height: 20px; }
     .status.err { color: var(--danger-ink-2); }
-    /* #9a8ab5 on white is ~3:1 — under the AA floor for body text, and this
-       is the colour every "Loading…" and empty state used. */
+    /* Every "Loading…" and empty state uses this. It was once a colour that
+       sat at ~3:1 on white — under the AA floor for body text — so it is
+       --ink-muted, which is checked against every surface it lands on. */
     .status.muted { color: var(--ink-muted); }
     .status.ok { color: var(--ok-ink-strong); font-weight: 600; }
 
@@ -6092,8 +6097,8 @@
       if (next) {
         var badge = document.createElement('span');
         badge.className = 'chip chip-info';
-        // White, not chip-info's #f5f0ff — that fill is invisible against
-        // this card's #f4f0fb.
+        // White, not chip-info's --surface-tint — that fill is invisible
+        // against this card's --surface-card.
         badge.style.cssText = 'background:var(--surface);font-weight:600;vertical-align:middle;';
         badge.textContent = tf('series_next', {
           n: partNumber(next, group.items.indexOf(next))
