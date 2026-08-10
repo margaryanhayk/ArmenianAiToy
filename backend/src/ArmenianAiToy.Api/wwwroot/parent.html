@@ -1192,7 +1192,7 @@
               style="margin-top:8px;" data-i18n="logout">Log out</button>
 
       <div class="danger-zone">
-        <div class="section-cap" style="margin:0 2px 8px;" data-i18n="careful_zone">Careful zone</div>
+        <div class="section-cap" style="margin:0 2px 8px;" data-i18n="careful_zone">Cannot be undone</div>
         <button id="toggleDeleteAccountBtn" class="btn-ghost-danger" type="button"
                 aria-expanded="false" aria-controls="deleteAccountForm"
                 data-i18n="delete_account">Delete account</button>
@@ -1272,7 +1272,6 @@
       <section id="todayPanel" class="today-panel" hidden aria-live="polite">
         <h3 data-i18n="today">☀️ Today</h3>
         <div id="todayCounts" class="today-counts"></div>
-        <div id="todayNewest"></div>
         <div id="todayFlagged"></div>
         <div id="todayFootnote" class="today-footnote"></div>
       </section>
@@ -1438,6 +1437,10 @@
       password: { en: 'Password', ru: 'Пароль', hy: 'Գաղտնաբառ' },
       login_btn: { en: 'Log in', ru: 'Войти', hy: 'Մուտք' },
       forgot: { en: 'Forgot password?', ru: 'Забыли пароль?', hy: 'Մոռացե՞լ եք գաղտնաբառը' },
+      // How every timestamp on the page is worded — see fmtTime.
+      when_today: { en: 'Today, {time}', ru: 'Сегодня, {time}', hy: 'Այսօր, {time}' },
+      when_yesterday: { en: 'Yesterday, {time}', ru: 'Вчера, {time}', hy: 'Երեկ, {time}' },
+      when_on: { en: '{date}, {time}', ru: '{date}, {time}', hy: '{date}, {time}' },
       no_verif: { en: "Didn't get a verification email?", ru: 'Не пришло письмо-подтверждение?', hy: 'Չստացա՞ք հաստատման նամակը' },
       reset_title: { en: 'Reset your password', ru: 'Сброс пароля', hy: 'Վերականգնել գաղտնաբառը' },
       send_reset: { en: 'Send reset link', ru: 'Отправить ссылку', hy: 'Ուղարկել հղումը' },
@@ -1585,7 +1588,7 @@
       delete_conversation: { en: 'Delete conversation', ru: 'Удалить разговор', hy: 'Ջնջել զրույցը' },
       your_activity: { en: 'Your activity', ru: 'Ваша активность', hy: 'Ձեր գործողությունները' },
       toy_settings: { en: 'Toy settings', ru: 'Настройки игрушки', hy: 'Խաղալիքի կարգավորումներ' },
-      careful_zone: { en: 'Careful zone', ru: 'Необратимые действия', hy: 'Անդառնալի գործողություններ' },
+      careful_zone: { en: 'Cannot be undone', ru: 'Необратимые действия', hy: 'Անդառնալի գործողություններ' },
       bedtime_label: { en: '🌙 Bedtime:', ru: '🌙 Сон:', hy: '🌙 Քնի ժամ՝' },
       modes_label: { en: '🎮 Modes:', ru: '🎮 Режимы:', hy: '🎮 Ռեժիմներ՝' },
       name_label: { en: '✏️ Name:', ru: '✏️ Имя:', hy: '✏️ Անուն՝' },
@@ -1613,7 +1616,6 @@
       bedtime_off_ok: { en: 'Bedtime turned off.', ru: 'Часы сна выключены.', hy: 'Քնի ժամն անջատվեց։' },
       bedtime_overnight: { en: '(this window runs overnight)', ru: '(это ночной интервал)', hy: '(այս միջակայքն անցնում է կեսգիշերով)' },
       saved_ok: { en: '✓ Saved', ru: '✓ Сохранено', hy: '✓ Պահպանվեց' },
-      newest: { en: 'Newest:', ru: 'Последние:', hy: 'Վերջինները՝' },
       flagged_today: { en: 'Flagged today:', ru: 'Отмечено сегодня:', hy: 'Այսօր նշվածները՝' },
       no_flagged_today: { en: 'No conversations flagged today.', ru: 'Сегодня нет отмеченных разговоров.', hy: 'Այսօր նշված զրույցներ չկան։' },
       mode_story: { en: '📖 Story', ru: '📖 Сказка', hy: '📖 Հեքիաթ' },
@@ -1776,6 +1778,10 @@
       speaker_toy: { en: 'Areg', ru: 'Арег', hy: 'Արեգ' },
       safe_reply_note: { en: 'safe reply sent instead', ru: 'вместо этого отправлен безопасный ответ', hy: 'փոխարենն ուղարկվել է անվտանգ պատասխան' },
       msg_count: { en: 'Messages: {n}', ru: 'Сообщений: {n}', hy: 'Հաղորդագրություններ՝ {n}' },
+      // How long a visit lasted — see fmtSpan for why these are short forms.
+      span_under_min: { en: 'under 1 min', ru: 'меньше 1 мин', hy: '1 րոպեից քիչ' },
+      span_min: { en: '{n} min', ru: '{n} мин', hy: '{n} րոպե' },
+      span_hr: { en: '{n} h', ru: '{n} ч', hy: '{n} ժամ' },
       badge_blocked: { en: '⚠ Held back', ru: '⚠ Задержано', hy: '⚠ Հետ է պահվել' },
       badge_flagged: { en: '⚠ Noted', ru: '⚠ Отмечено', hy: '⚠ Նշվել է' },
       badge_needs_look: { en: '⚠ Needs a look: {n}', ru: '⚠ Требует внимания: {n}', hy: '⚠ Ուշադրության կարիք՝ {n}' },
@@ -2056,12 +2062,75 @@
       while (el.firstChild) el.removeChild(el.firstChild);
     }
 
+    // Times a person reads, not a machine's. The old version handed
+    // toLocaleString() straight through, which on this page meant a parent
+    // being told their child started a story at "10/08/2026, 15:58:10" —
+    // seconds included. No parent has ever needed the seconds.
+    //
+    // Today and yesterday get named, because those are the two days a parent
+    // is actually asking about; anything older gets a short date. The clock
+    // itself still comes from toLocaleTimeString so 24h/12h and the Armenian
+    // and Russian numerals stay whatever the phone says they are.
+    //
+    // This is the ONLY place any timestamp in the dashboard is formatted —
+    // all 14 call sites go through it — so a change here is a change
+    // everywhere, and there is nowhere for a stray raw date to hide.
     function fmtTime(iso) {
       if (!iso) return '';
-      try { return new Date(iso).toLocaleString(activeLocale()); }
-      catch (e) {
-        try { return new Date(iso).toLocaleString(); } catch (e2) { return iso; }
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      try {
+        // hy-AM's locale data asks for a 12-hour clock, so an Armenian
+        // parent was reading «Այսօր, 04:25 PM» — Armenia runs on a 24-hour
+        // clock and the "PM" is English besides. en-GB and ru-RU already
+        // resolve to 24h, so only Armenian needs saying out loud.
+        var clockOpts = { hour: '2-digit', minute: '2-digit' };
+        if (getLang() === 'hy') clockOpts.hour12 = false;
+        var clock = d.toLocaleTimeString(activeLocale(), clockOpts);
+        // Compare START OF DAY to start of day. Subtracting the raw
+        // timestamp instead is off by one for the whole of yesterday: a
+        // 22:00 conversation is under 24h from this morning's midnight and
+        // floors to 0, so it reports as "Today". Round, not floor, so a
+        // 23- or 25-hour DST day still lands on a whole number.
+        var startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        var startOfThatDay = new Date(d);
+        startOfThatDay.setHours(0, 0, 0, 0);
+        var days = Math.round((startOfToday - startOfThatDay) / 86400000);
+        if (days < 0) days = 0;               // clock skew, or a future stamp
+        if (days === 0) return tf('when_today', { time: clock });
+        if (days === 1) return tf('when_yesterday', { time: clock });
+        var sameYear = d.getFullYear() === new Date().getFullYear();
+        var date = d.toLocaleDateString(activeLocale(), sameYear
+          ? { day: 'numeric', month: 'short' }
+          : { day: 'numeric', month: 'short', year: 'numeric' });
+        return tf('when_on', { date: date, time: clock });
+      } catch (e) {
+        try { return d.toLocaleString(); } catch (e2) { return iso; }
       }
+    }
+
+    // How long a conversation lasted. "Messages: 22" is an implementation
+    // detail — it counts rows in a table. A parent wants to know their child
+    // was with the toy for twelve minutes.
+    //
+    // Abbreviated on purpose ("12 min", not "12 minutes"): Russian declines
+    // after a numeral — 1 минута / 2 минуты / 5 минут — and a plural-rule
+    // engine for one label on one row is more ways to be wrong than it is
+    // worth. "мин" and "ч" do not decline, «րոպե» and «ժամ» never did, and
+    // the short form sits better beside a timestamp on a phone anyway.
+    //
+    // Returns null when the span cannot be known — an open conversation has
+    // no endedAt — and the caller falls back to the message count rather
+    // than inventing a number.
+    function fmtSpan(startIso, endIso) {
+      if (!startIso || !endIso) return null;
+      var ms = new Date(endIso) - new Date(startIso);
+      if (!(ms > 0)) return null;
+      var mins = Math.round(ms / 60000);
+      if (mins < 1) return t('span_under_min');
+      if (mins < 60) return tf('span_min', { n: mins });
+      return tf('span_hr', { n: Math.round(mins / 60) });
     }
 
     function shortId(guid) {
@@ -4408,8 +4477,9 @@
       }
 
       var countSpan = document.createElement('span');
-      var count = (typeof row.messageCount === 'number') ? row.messageCount : 0;
-      countSpan.textContent = tf('msg_count', { n: count });
+      var span = fmtSpan(row.startedAt, row.endedAt);
+      countSpan.textContent = span
+        || tf('msg_count', { n: (typeof row.messageCount === 'number') ? row.messageCount : 0 });
 
       top.appendChild(leftWrap);
       top.appendChild(countSpan);
@@ -4481,11 +4551,9 @@
       if (!panel || !deviceId) return;
       panel.hidden = false;
       var counts   = document.getElementById('todayCounts');
-      var newest   = document.getElementById('todayNewest');
       var flagged  = document.getElementById('todayFlagged');
       var footnote = document.getElementById('todayFootnote');
       clearChildren(counts);
-      clearChildren(newest);
       clearChildren(flagged);
       if (footnote) footnote.textContent = '';
 
@@ -4509,11 +4577,9 @@
 
     function renderTodayPanel(dto) {
       var counts   = document.getElementById('todayCounts');
-      var newest   = document.getElementById('todayNewest');
       var flagged  = document.getElementById('todayFlagged');
       var footnote = document.getElementById('todayFootnote');
       clearChildren(counts);
-      clearChildren(newest);
       clearChildren(flagged);
 
       var conversationsToday = (typeof dto.conversationsCount === 'number')
@@ -4524,7 +4590,6 @@
         ? dto.flaggedMessagesCount : 0;
       var audioToday = (typeof dto.assistantMessagesWithAudio === 'number')
         ? dto.assistantMessagesWithAudio : 0;
-      var newestRows = Array.isArray(dto.newest) ? dto.newest : [];
       var flaggedRows = Array.isArray(dto.flagged) ? dto.flagged : [];
 
       if (conversationsToday === 0) {
@@ -4570,15 +4635,6 @@
         tiles.appendChild(statTile('🔊', audioToday, 'stat_replayable'));
       }
       counts.appendChild(tiles);
-
-      // Newest — server pre-orders by startedAt desc and caps at 3.
-      var newestLabel = document.createElement('div');
-      newestLabel.className = 'today-section-label';
-      newestLabel.textContent = t('newest');
-      newest.appendChild(newestLabel);
-      newestRows.forEach(function (r) {
-        newest.appendChild(buildTodayLink(r, false));
-      });
 
       // Flagged — server pre-orders by latest-flagged-today timestamp
       // desc, caps at 3, and excludes today-clean conversations.
@@ -4797,7 +4853,8 @@
         }
         var metaParts = [tf('started_at', { time: fmtTime(c.startedAt) })];
         if (c.endedAt) metaParts.push(tf('ended_at', { time: fmtTime(c.endedAt) }));
-        metaParts.push(tf('msg_count', { n: c.messageCount || 0 }));
+        var span = fmtSpan(c.startedAt, c.endedAt);
+        metaParts.push(span || tf('msg_count', { n: c.messageCount || 0 }));
         if (flaggedCount > 0) {
           metaParts.push(tf('needs_look_count', { n: flaggedCount }));
         } else if (c.hasFlaggedContent) {
