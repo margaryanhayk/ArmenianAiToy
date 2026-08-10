@@ -20,11 +20,106 @@
   <meta name="apple-mobile-web-app-title" content="Areg">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <style>
+    /* ── Palette ──────────────────────────────────────────────────────────
+       Every colour in this file lives here. Before this block there were 78
+       hex values across 233 places — a style block, 50 inline style
+       attributes and JS style.cssText strings — so changing the look meant a
+       find-and-replace nobody could review.
+
+       Names say what a colour is FOR, not what it looks like, so the values
+       can change without the names lying. Numbered variants (-2, -3) are
+       shades of the same role, lightest last.
+       ────────────────────────────────────────────────────────────────── */
+    :root {
+      /* text, darkest to faintest */
+      --ink: #2b1f47;
+      --ink-2: #3f3060;
+      --ink-3: #4b3b6e;
+      --ink-4: #5b4c7d;
+      --ink-muted: #6b5b8a;
+      --ink-hint: #7a6b95;
+      --ink-faint: #b8a8d6;
+      --chev: #b7a8d4;
+      --chev-strong: #9d86c9;
+      /* brand accents */
+      --brand-deep: #4b2e83;
+      --brand: #5b3e8a;
+      --brand-strong: #7c5cbf;
+      --brand-strong-hover: #6b4aad;
+      --brand-soft: #b99ae8;
+      /* lines */
+      --line-strong: #cbb8ec;
+      --line-hover: #d3c2f0;
+      --line-secondary-hover: #d0c2e8;
+      --line-tab-hover: #d8c8f0;
+      --line-card: #ded1f4;
+      --line-input: #e0d6f0;
+      --line: #e4d9f7;
+      --line-soft: #ece4f8;
+      --line-soft-2: #ece6f8;
+      /* surfaces, white to most tinted */
+      --surface: #ffffff;
+      --surface-2: #fdfbff;
+      --surface-3: #faf7ff;
+      --surface-4: #faf8ff;
+      --surface-5: #f6f4fb;
+      --surface-tint: #f5f0ff;
+      --surface-card: #f4f0fb;
+      --surface-6: #f3edfc;
+      --surface-hover: #f2ebff;
+      --surface-row-hover: #f0e8fc;
+      --surface-main-hover: #efe7ff;
+      /* the warm header band */
+      --warm: #fff6e3;
+      --warm-2: #ffeccb;
+      --warm-3: #fff6ec;
+      --warm-line: #f3e2bd;
+      --warm-line-2: #f0dfc8;
+      --warm-line-3: #f0e2cf;
+      --warm-ink: #8a7554;
+      /* good news */
+      --ok-bg: #e6f6ec;
+      --ok-line: #b9e4c9;
+      --ok-ink: #1e7a45;
+      --ok-ink-strong: #1a6b3c;
+      --ok-ink-soft: #3a5a3a;
+      --ok-bg-soft: #f0f7f0;
+      --ok-line-soft: #b6d6b6;
+      /* needs a look */
+      --warn-bg: #fef3c7;
+      --warn-line: #e7c66a;
+      --warn-ink: #92400e;
+      --warn-bg-2: #fff3e0;
+      --warn-ink-2: #e65100;
+      --warn-bg-3: #fff8ee;
+      --warn-bg-4: #fff8f0;
+      /* destructive / blocked */
+      --danger-bg: #fee2e2;
+      --danger-line: #e8a7a7;
+      --danger-ink: #991b1b;
+      --danger-ink-2: #b3261e;
+      --danger-ink-3: #c62828;
+      --danger-line-2: #d9a19e;
+      --danger-ink-4: #b3403a;
+      --danger-bg-2: #fdf0ef;
+      --danger-bg-3: #fff5f6;
+      --danger-line-3: #e8cfcf;
+      --danger-ink-5: #8a2f2f;
+      --danger-ink-6: #c66;
+      --danger-ink-7: #8a3b3b;
+      --danger-bg-4: #fce4ec;
+      /* plain neutrals */
+      --muted-bg: #f2f2f2;
+      --muted-line: #dddddd;
+      --muted-ink: #666666;
+      --hairline: #eee;
+      --neutral-ink: #555;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f6f4fb;
-      color: #2b1f47;
+      background: var(--surface-5);
+      color: var(--ink);
       min-height: 100vh;
       padding: 16px;
       /* Installed on a home screen there is no browser toolbar below the
@@ -46,8 +141,8 @@
          sideways instead of squashing the title. */
       flex-wrap: wrap;
       gap: 10px;
-      background: linear-gradient(135deg, #fff6e3, #ffeccb);
-      border: 1px solid #f3e2bd;
+      background: linear-gradient(135deg, var(--warm), var(--warm-2));
+      border: 1px solid var(--warm-line);
       border-radius: 18px;
       padding: 14px 16px;
       margin: 4px 0 16px;
@@ -59,15 +154,15 @@
       height: 46px;
       flex: none;
       border-radius: 50%;
-      background: #ffffff;
+      background: var(--surface);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 26px;
-      box-shadow: inset 0 0 0 2px #f3e2bd;
+      box-shadow: inset 0 0 0 2px var(--warm-line);
     }
-    .header h1 { font-size: 22px; color: #4b2e83; letter-spacing: 0.2px; }
-    .header .sub { font-size: 12px; color: #8a7554; }
+    .header h1 { font-size: 22px; color: var(--brand-deep); letter-spacing: 0.2px; }
+    .header .sub { font-size: 12px; color: var(--warm-ink); }
     .header .right { display: flex; gap: 8px; align-items: center; }
 
     .card {
@@ -77,20 +172,20 @@
       box-shadow: 0 4px 18px rgba(91,62,138,0.07);
       margin-bottom: 14px;
     }
-    .card h2 { font-size: 16px; color: #5b3e8a; margin-bottom: 12px; }
+    .card h2 { font-size: 16px; color: var(--brand); margin-bottom: 12px; }
 
-    label { display: block; font-size: 12px; color: #6b5b8a; margin-bottom: 4px; }
+    label { display: block; font-size: 12px; color: var(--ink-muted); margin-bottom: 4px; }
     input {
       width: 100%;
       padding: 12px 14px;
-      border: 2px solid #e0d6f0;
+      border: 2px solid var(--line-input);
       border-radius: 12px;
       font-size: 15px;
       margin-bottom: 12px;
     }
     input:focus, select:focus {
       outline: none;
-      border-color: #7c5cbf;
+      border-color: var(--brand-strong);
     }
     /* The generic input rule above is meant for text fields; without
        these overrides it inflates checkboxes and time pickers into
@@ -103,7 +198,7 @@
       border: none;
       border-radius: 0;
       flex: none;
-      accent-color: #7c5cbf;
+      accent-color: var(--brand-strong);
     }
     input[type="time"] {
       width: auto;
@@ -135,70 +230,70 @@
       min-height: 44px;
       padding: 10px 12px;
       font-size: 15px;
-      background: #ffffff;
-      border: 2px solid #e0d6f0;
+      background: var(--surface);
+      border: 2px solid var(--line-input);
       border-radius: 12px;
-      color: #4b3b6e;
+      color: var(--ink-3);
       cursor: pointer;
     }
     .seg button[aria-checked="true"] {
-      background: #5b3e8a;
-      border-color: #5b3e8a;
-      color: #ffffff;
+      background: var(--brand);
+      border-color: var(--brand);
+      color: var(--surface);
       font-weight: 600;
     }
-    .chip-ok     { background: #e6f6ec; border-color: #b9e4c9; color: #1e7a45; }
-    .chip-muted  { background: #f2f2f2; border-color: #dddddd; color: #666666; }
-    .chip-warn   { background: #fef3c7; border-color: #e7c66a; color: #92400e; }
-    .chip-danger { background: #fee2e2; border-color: #e8a7a7; color: #991b1b; }
-    .chip-info   { background: #f5f0ff; border-color: #e4d9f7; color: #5b3e8a; }
+    .chip-ok     { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok-ink); }
+    .chip-muted  { background: var(--muted-bg); border-color: var(--muted-line); color: var(--muted-ink); }
+    .chip-warn   { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn-ink); }
+    .chip-danger { background: var(--danger-bg); border-color: var(--danger-line); color: var(--danger-ink); }
+    .chip-info   { background: var(--surface-tint); border-color: var(--line); color: var(--brand); }
 
     .ctl-row {
       margin: 6px 0 10px;
       padding: 12px 14px;
-      background: #faf8ff;
-      border: 1px solid #e4d9f7;
+      background: var(--surface-4);
+      border: 1px solid var(--line);
       border-radius: 12px;
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
       align-items: center;
       font-size: 13px;
-      color: #2b1f47;
+      color: var(--ink);
     }
-    .ctl-label { color: #6b5b8a; font-weight: 600; }
-    .ctl-hint  { color: #6b5b8a; font-size: 11px; flex-basis: 100%; }
+    .ctl-label { color: var(--ink-muted); font-weight: 600; }
+    .ctl-hint  { color: var(--ink-muted); font-size: 11px; flex-basis: 100%; }
 
     .btn-ghost {
       padding: 6px 12px;
       font-size: 12px;
-      background: #ffffff;
-      border: 1px solid #cbb8ec;
-      color: #5b3e8a;
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      color: var(--brand);
       border-radius: 8px;
       cursor: pointer;
     }
-    .btn-ghost:hover { background: #f5f0ff; }
+    .btn-ghost:hover { background: var(--surface-tint); }
     .btn-ghost-ok {
       padding: 6px 12px;
       font-size: 13px;
-      background: #ffffff;
-      border: 1px solid #b9e4c9;
-      color: #1e7a45;
+      background: var(--surface);
+      border: 1px solid var(--ok-line);
+      color: var(--ok-ink);
       border-radius: 8px;
       cursor: pointer;
     }
-    .btn-ghost-ok:hover { background: #e6f6ec; }
+    .btn-ghost-ok:hover { background: var(--ok-bg); }
     .btn-ghost-danger {
       padding: 6px 12px;
       font-size: 13px;
-      background: #ffffff;
-      border: 1px solid #d9a19e;
-      color: #b3403a;
+      background: var(--surface);
+      border: 1px solid var(--danger-line-2);
+      color: var(--danger-ink-4);
       border-radius: 8px;
       cursor: pointer;
     }
-    .btn-ghost-danger:hover { background: #fdf0ef; }
+    .btn-ghost-danger:hover { background: var(--danger-bg-2); }
 
     /* 44px is the thumb floor on a phone, and the whole toy-settings panel
        (pause, toggles, saves, revoke, unlink, remove) is built from these
@@ -211,7 +306,7 @@
        was the one control still under it. */
     .tabs button { min-height: 44px; }
     /* Shared hint text next to a blocked or inert control. */
-    .ctl-hint { font-size: 11px; color: #7a6b95; margin-left: 8px; }
+    .ctl-hint { font-size: 11px; color: var(--ink-hint); margin-left: 8px; }
 
     /* Grouped-settings vocabulary (Family-Link/Yoto-style): quiet
        uppercase captions between control groups, and a visually
@@ -221,7 +316,7 @@
       font-weight: 600;
       letter-spacing: 1px;
       text-transform: uppercase;
-      color: #6b5b8a;
+      color: var(--ink-muted);
       margin: 16px 2px 6px;
     }
 
@@ -234,41 +329,41 @@
       gap: 12px;
       width: 100%;
       text-align: left;
-      background: #faf7ff;
-      border: 1px solid #e4d9f7;
+      background: var(--surface-3);
+      border: 1px solid var(--line);
       border-radius: 14px;
       padding: 13px 14px;
       margin-bottom: 8px;
       cursor: pointer;
       transition: background 0.15s, border-color 0.15s;
     }
-    .tile:hover { background: #f2ebff; border-color: #d3c2f0; }
+    .tile:hover { background: var(--surface-hover); border-color: var(--line-hover); }
     /* The one thing a parent opens the toy page to do. The other three are
        real, but they are not why anyone comes here — so they read as the
        list under it rather than three equal siblings. */
     .tile-main {
-      background: linear-gradient(135deg, #f5f0ff, #fdfbff);
-      border-color: #cbb8ec;
+      background: linear-gradient(135deg, var(--surface-tint), var(--surface-2));
+      border-color: var(--line-strong);
       border-width: 2px;
       padding: 18px 16px;
       margin-bottom: 14px;
     }
-    .tile-main:hover { background: #efe7ff; border-color: #b99ae8; }
+    .tile-main:hover { background: var(--surface-main-hover); border-color: var(--brand-soft); }
     /* Two classes deep on purpose. The base `.tile .t` / `.tile .ico` rules
        below have the same specificity and come later, so a plain
        `.tile-main .t` here loses to them and the "main" card silently
        renders at the ordinary size — which is exactly what happened. */
     .tile.tile-main .ico { width: 46px; height: 46px; font-size: 26px; border-radius: 13px; }
-    .tile.tile-main .t { font-size: 19px; font-weight: 700; color: #4b2e83; }
-    .tile.tile-main .s { font-size: 13px; color: #6b5b8a; margin-top: 4px; }
-    .tile.tile-main .chev { font-size: 22px; color: #9d86c9; }
+    .tile.tile-main .t { font-size: 19px; font-weight: 700; color: var(--brand-deep); }
+    .tile.tile-main .s { font-size: 13px; color: var(--ink-muted); margin-top: 4px; }
+    .tile.tile-main .chev { font-size: 22px; color: var(--chev-strong); }
     .tile .ico {
       width: 38px;
       height: 38px;
       flex: none;
       border-radius: 11px;
-      background: #ffffff;
-      border: 1px solid #ece4f8;
+      background: var(--surface);
+      border: 1px solid var(--line-soft);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -282,19 +377,19 @@
       display: block;
       font-size: 15px;
       font-weight: 600;
-      color: #2b1f47;
+      color: var(--ink);
       line-height: 1.3;
     }
     .tile .s {
       display: block;
       font-size: 12px;
-      color: #6b5b8a;
+      color: var(--ink-muted);
       margin-top: 3px;
       line-height: 1.35;
     }
-    .tile .chev { color: #b7a8d4; font-size: 18px; flex: none; }
+    .tile .chev { color: var(--chev); font-size: 18px; flex: none; }
     .danger-zone {
-      border-top: 1px dashed #e8cfcf;
+      border-top: 1px dashed var(--danger-line-3);
       margin-top: 14px;
       padding-top: 10px;
     }
@@ -302,21 +397,21 @@
     /* Today panel stat tiles */
     .stat-tiles { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
     .stat-tile {
-      background: #ffffff;
-      border: 1px solid #e4d9f7;
+      background: var(--surface);
+      border: 1px solid var(--line);
       border-radius: 12px;
       padding: 8px 10px;
       min-width: 80px;
       flex: 1;
       text-align: center;
     }
-    .stat-value { font-size: 16px; font-weight: 700; color: #4b2e83; }
-    .stat-label { font-size: 11px; color: #5b4c7d; }
-    .stat-tile.stat-warn { background: #fff8ee; border-color: #e7c66a; }
-    .stat-tile.stat-warn .stat-value { color: #92400e; }
+    .stat-value { font-size: 16px; font-weight: 700; color: var(--brand-deep); }
+    .stat-label { font-size: 11px; color: var(--ink-4); }
+    .stat-tile.stat-warn { background: var(--warn-bg-3); border-color: var(--warn-line); }
+    .stat-tile.stat-warn .stat-value { color: var(--warn-ink); }
     button {
       padding: 11px 16px;
-      background: #7c5cbf;
+      background: var(--brand-strong);
       color: white;
       border: none;
       border-radius: 12px;
@@ -324,44 +419,44 @@
       font-size: 14px;
       font-weight: 600;
     }
-    button:hover { background: #6b4aad; }
-    button.secondary { background: #e0d6f0; color: #5b3e8a; }
-    button.secondary:hover { background: #d0c2e8; }
+    button:hover { background: var(--brand-strong-hover); }
+    button.secondary { background: var(--line-input); color: var(--brand); }
+    button.secondary:hover { background: var(--line-secondary-hover); }
     button.link {
       background: none;
-      color: #7c5cbf;
+      color: var(--brand-strong);
       padding: 0;
       font-size: 13px;
       font-weight: 500;
       text-decoration: underline;
     }
-    button.link:hover { background: none; color: #5b3e8a; }
+    button.link:hover { background: none; color: var(--brand); }
     button:disabled,
     button.secondary:disabled {
-      background: #ece4f8;
-      color: #b8a8d6;
+      background: var(--line-soft);
+      color: var(--ink-faint);
       cursor: not-allowed;
     }
     button:focus-visible,
     .row:focus-visible {
-      outline: 2px solid #7c5cbf;
+      outline: 2px solid var(--brand-strong);
       outline-offset: 2px;
     }
 
     .device-context {
       font-size: 12px;
-      color: #6b5b8a;
+      color: var(--ink-muted);
       margin-top: 6px;
       margin-bottom: 10px;
       word-break: break-all;
     }
-    .device-context strong { color: #5b3e8a; }
+    .device-context strong { color: var(--brand); }
 
     .legend-box {
       font-size: 12px;
-      color: #5b3e8a;
-      background: #f5f0ff;
-      border: 1px solid #e4d9f7;
+      color: var(--brand);
+      background: var(--surface-tint);
+      border: 1px solid var(--line);
       border-radius: 6px;
       padding: 8px 10px;
       margin: 0 0 10px;
@@ -377,9 +472,9 @@
        privacy surface. */
     .today-panel {
       font-size: 13px;
-      color: #5b3e8a;
-      background: linear-gradient(135deg, #f5f0ff, #fdfbff);
-      border: 1px solid #e4d9f7;
+      color: var(--brand);
+      background: linear-gradient(135deg, var(--surface-tint), var(--surface-2));
+      border: 1px solid var(--line);
       border-radius: 12px;
       padding: 12px 14px;
       margin: 0 0 10px;
@@ -387,7 +482,7 @@
     .today-panel h3 {
       font-size: 13px;
       font-weight: 600;
-      color: #5b3e8a;
+      color: var(--brand);
       margin: 0 0 6px;
     }
     .today-counts { font-size: 13px; margin-bottom: 6px; }
@@ -400,7 +495,7 @@
     .today-link {
       display: block;
       background: white;
-      border: 1px solid #e4d9f7;
+      border: 1px solid var(--line);
       border-radius: 4px;
       padding: 5px 8px;
       margin-bottom: 4px;
@@ -408,23 +503,23 @@
       text-align: left;
       width: 100%;
       font-size: 12px;
-      color: #5b3e8a;
+      color: var(--brand);
       font-family: inherit;
     }
-    .today-link:hover { background: #ece4f8; }
+    .today-link:hover { background: var(--line-soft); }
     .today-empty {
       font-style: italic;
-      color: #6b5b8a;
+      color: var(--ink-muted);
       font-size: 12px;
     }
     .today-footnote {
       font-size: 11px;
-      color: #6b5b8a;
+      color: var(--ink-muted);
       margin-top: 6px;
     }
     .today-error {
       font-size: 12px;
-      color: #c62828;
+      color: var(--danger-ink-3);
     }
 
     /* "Talk about it tonight" — an OFFER, sitting above the Today panel:
@@ -434,9 +529,9 @@
        card is hidden entirely when the toy has reported no story plays. */
     .tonight-card {
       font-size: 13px;
-      color: #3f3060;
-      background: linear-gradient(135deg, #fff6ec, #fdfbff);
-      border: 1px solid #f0dfc8;
+      color: var(--ink-2);
+      background: linear-gradient(135deg, var(--warm-3), var(--surface-2));
+      border: 1px solid var(--warm-line-2);
       border-radius: 12px;
       padding: 12px 14px;
       margin: 0 0 10px;
@@ -446,14 +541,14 @@
       font-size: 13px;
       font-weight: 600;
       /* The page's existing warm brown (.chip-warn), not a new colour. */
-      color: #92400e;
+      color: var(--warn-ink);
       margin: 0 0 6px;
     }
-    .tonight-story { font-weight: 600; color: #2b1f47; }
+    .tonight-story { font-weight: 600; color: var(--ink); }
     .tonight-question { margin: 4px 0 0; }
     .tonight-answer {
-      background: #fff;
-      border: 1px solid #f0e2cf;
+      background: var(--surface);
+      border: 1px solid var(--warm-line-3);
       border-radius: 8px;
       padding: 6px 8px;
       margin: 6px 0 0;
@@ -463,7 +558,7 @@
       overflow-wrap: break-word;
       word-break: break-word;
     }
-    .tonight-label { font-size: 12px; color: #6b5b8a; }
+    .tonight-label { font-size: 12px; color: var(--ink-muted); }
     .tonight-answer .said {
       /* A four-year-old can talk for twenty seconds, and the whole
          transcript would push the Today panel and the conversation list
@@ -475,7 +570,7 @@
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    .tonight-takeaway { font-size: 12px; color: #3a5a3a; margin-top: 6px; }
+    .tonight-takeaway { font-size: 12px; color: var(--ok-ink-soft); margin-top: 6px; }
 
     /* Weekly digest. Lilac like the Today panel — it is the same KIND of
        thing (a read-only summary of a period), so it should not compete
@@ -484,9 +579,9 @@
        comparison with last week, because none of those are rendered. */
     .week-card {
       font-size: 13px;
-      color: #5b3e8a;
-      background: linear-gradient(135deg, #f5f0ff, #fdfbff);
-      border: 1px solid #e4d9f7;
+      color: var(--brand);
+      background: linear-gradient(135deg, var(--surface-tint), var(--surface-2));
+      border: 1px solid var(--line);
       border-radius: 12px;
       padding: 12px 14px;
       margin: 0 0 10px;
@@ -495,45 +590,45 @@
     .week-card h3 {
       font-size: 13px;
       font-weight: 600;
-      color: #5b3e8a;
+      color: var(--brand);
       margin: 0 0 6px;
     }
-    .week-count { font-weight: 600; color: #2b1f47; }
+    .week-count { font-weight: 600; color: var(--ink); }
     .week-titles { font-size: 12px; margin-top: 2px; }
     .week-said {
-      background: #fff;
-      border: 1px solid #e4d9f7;
+      background: var(--surface);
+      border: 1px solid var(--line);
       border-radius: 8px;
       padding: 6px 8px;
       margin: 8px 0 0;
       overflow-wrap: break-word;
       word-break: break-word;
     }
-    .week-label { font-size: 12px; color: #6b5b8a; }
+    .week-label { font-size: 12px; color: var(--ink-muted); }
     .week-ask { margin-top: 8px; }
-    .week-quiet { font-style: italic; color: #6b5b8a; }
-    .week-footnote { font-size: 11px; color: #6b5b8a; margin-top: 6px; }
+    .week-quiet { font-style: italic; color: var(--ink-muted); }
+    .week-footnote { font-size: 11px; color: var(--ink-muted); margin-top: 6px; }
 
     /* Reflection journal — one row per saved answer, newest first. */
     .journal-row {
       padding: 10px 0;
-      border-bottom: 1px solid #ece4f8;
+      border-bottom: 1px solid var(--line-soft);
       font-size: 13px;
       line-height: 1.5;
     }
     .journal-row:last-child { border-bottom: none; }
-    .journal-meta { font-size: 12px; color: #6b5b8a; }
-    .journal-question { color: #5b3e8a; margin-top: 2px; }
+    .journal-meta { font-size: 12px; color: var(--ink-muted); }
+    .journal-question { color: var(--brand); margin-top: 2px; }
     .journal-answer {
       margin-top: 2px;
       overflow-wrap: break-word;
       word-break: break-word;
     }
-    .journal-takeaway { font-size: 12px; color: #3a5a3a; margin-top: 2px; }
+    .journal-takeaway { font-size: 12px; color: var(--ok-ink-soft); margin-top: 2px; }
 
     .pager-info {
       font-size: 12px;
-      color: #6b5b8a;
+      color: var(--ink-muted);
       text-align: center;
       margin-top: 6px;
     }
@@ -545,14 +640,14 @@
     .link-device-empty {
       margin-top: 10px;
       padding: 14px;
-      border: 1px dashed #d0c2e8;
+      border: 1px dashed var(--line-secondary-hover);
       border-radius: 10px;
-      background: #faf7ff;
+      background: var(--surface-3);
     }
     .link-device-empty .link-device-help {
       margin: 0 0 10px;
       font-size: 13px;
-      color: #5b3e8a;
+      color: var(--brand);
       line-height: 1.4;
     }
 
@@ -569,14 +664,14 @@
     .tabs button {
       padding: 6px 12px;
       font-size: 13px;
-      background: #ece4f8;
-      color: #5b3e8a;
+      background: var(--line-soft);
+      color: var(--brand);
       border-radius: 999px;
       white-space: nowrap;
     }
-    .tabs button:hover { background: #d8c8f0; }
-    .tabs button.active { background: #7c5cbf; color: white; }
-    .tabs button.active:hover { background: #6b4aad; }
+    .tabs button:hover { background: var(--line-tab-hover); }
+    .tabs button.active { background: var(--brand-strong); color: white; }
+    .tabs button.active:hover { background: var(--brand-strong-hover); }
 
     /* Mode filter under the tab strip. The five per-mode pills used to sit
        in the tab strip itself; as filters of one list they belong in a
@@ -588,7 +683,7 @@
       flex-wrap: wrap;
       margin: 0 0 10px;
     }
-    .filter-label { font-size: 12px; color: #6b5b8a; margin: 0; }
+    .filter-label { font-size: 12px; color: var(--ink-muted); margin: 0; }
     .filter-select {
       flex: 1 1 160px;
       min-width: 0;
@@ -596,16 +691,16 @@
       min-height: 44px;
       padding: 8px 10px;
       font-size: 14px;
-      color: #2b1f47;
-      background: #fff;
-      border: 1px solid #e0d6f0;
+      color: var(--ink);
+      background: var(--surface);
+      border: 1px solid var(--line-input);
       border-radius: 10px;
     }
     .inline-note {
       font-size: 12px;
-      color: #5b3e8a;
-      background: #f5f0ff;
-      border: 1px solid #e4d9f7;
+      color: var(--brand);
+      background: var(--surface-tint);
+      border: 1px solid var(--line);
       border-radius: 10px;
       padding: 8px 10px;
       margin: 0 0 10px;
@@ -628,37 +723,37 @@
       background: none;
       border: none;
       border-radius: 10px;
-      color: #5b3e8a;
+      color: var(--brand);
       font-size: 18px;
       line-height: 1;
       cursor: pointer;
     }
-    .pw-eye:hover { background: #f2ebff; }
+    .pw-eye:hover { background: var(--surface-hover); }
 
     .status { font-size: 13px; padding: 8px 0; min-height: 20px; }
-    .status.err { color: #b3261e; }
+    .status.err { color: var(--danger-ink-2); }
     /* #9a8ab5 on white is ~3:1 — under the AA floor for body text, and this
        is the colour every "Loading…" and empty state used. */
-    .status.muted { color: #6b5b8a; }
-    .status.ok { color: #1a6b3c; font-weight: 600; }
+    .status.muted { color: var(--ink-muted); }
+    .status.ok { color: var(--ok-ink-strong); font-weight: 600; }
 
     .row {
       display: block;
       width: 100%;
       text-align: left;
-      background: #faf7ff;
-      border: 1px solid #e4d9f7;
+      background: var(--surface-3);
+      border: 1px solid var(--line);
       border-radius: 14px;
       padding: 14px 16px;
       margin-bottom: 10px;
       cursor: pointer;
       font-size: 14px;
-      color: #2b1f47;
+      color: var(--ink);
     }
-    .row:hover { background: #f0e8fc; }
+    .row:hover { background: var(--surface-row-hover); }
 
-    .row .top span:first-child { font-weight: 600; font-size: 15px; color: #2b1f47; }
-    .row .top span:last-child:not(:first-child) { color: #7c5cbf; font-size: 13px; }
+    .row .top span:first-child { font-weight: 600; font-size: 15px; color: var(--ink); }
+    .row .top span:last-child:not(:first-child) { color: var(--brand-strong); font-size: 13px; }
     .row .top {
       display: flex;
       justify-content: space-between;
@@ -667,18 +762,18 @@
       gap: 2px 10px;
       margin-bottom: 6px;
       font-size: 12px;
-      color: #6b5b8a;
+      color: var(--ink-muted);
     }
     .row .snippet {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      color: #4b3b6e;
+      color: var(--ink-3);
       margin-top: 2px;
     }
-    .row .snippet.assistant { color: #7c5cbf; }
+    .row .snippet.assistant { color: var(--brand-strong); }
     .row .content-block {
-      color: #2b1f47;
+      color: var(--ink);
       margin-top: 4px;
       white-space: pre-wrap;
       word-wrap: break-word;
@@ -689,7 +784,7 @@
     }
     .row .from-line {
       font-size: 11px;
-      color: #6b5b8a;
+      color: var(--ink-muted);
       margin-top: 6px;
     }
 
@@ -698,67 +793,67 @@
       font-size: 11px;
       padding: 2px 8px;
       border-radius: 999px;
-      background: #fce4ec;
-      color: #c62828;
+      background: var(--danger-bg-4);
+      color: var(--danger-ink-3);
       margin-left: 6px;
       vertical-align: middle;
     }
-    .badge.warn { background: #fff3e0; color: #e65100; }
-    .badge.muted { background: #ece4f8; color: #6b5b8a; }
+    .badge.warn { background: var(--warn-bg-2); color: var(--warn-ink-2); }
+    .badge.muted { background: var(--line-soft); color: var(--ink-muted); }
     .role-tag {
       display: inline-block;
       font-size: 11px;
-      color: #6b5b8a;
+      color: var(--ink-muted);
       margin-left: 6px;
       vertical-align: middle;
     }
 
     .msg {
-      border: 1px solid #e0d6f0;
+      border: 1px solid var(--line-input);
       padding: 10px 14px;
       margin-bottom: 10px;
-      background: #faf7ff;
+      background: var(--surface-3);
       border-radius: 14px;
       max-width: 88%;
     }
     /* Chat-bubble layout: child speaks from the left (warm cream),
        Areg answers from the right (soft lavender). */
     .msg.from-child {
-      background: #fff6e3;
-      border-color: #f3e2bd;
+      background: var(--warm);
+      border-color: var(--warm-line);
       margin-right: auto;
       border-bottom-left-radius: 4px;
     }
     .msg.from-toy {
-      background: #f3edfc;
-      border-color: #e4d9f7;
+      background: var(--surface-6);
+      border-color: var(--line);
       margin-left: auto;
       border-bottom-right-radius: 4px;
     }
-    .msg.flagged { border-left: 3px solid #c62828; background: #fff5f6; }
-    .msg.flagged.warn { border-left: 3px solid #e65100; background: #fff8f0; }
+    .msg.flagged { border-left: 3px solid var(--danger-ink-3); background: var(--danger-bg-3); }
+    .msg.flagged.warn { border-left: 3px solid var(--warn-ink-2); background: var(--warn-bg-4); }
     /* Transient highlight when the parent jumps to a specific message
        from the Flagged tab. JS adds the class on arrival and removes
        it after ~1.8s. The box-shadow transition fades the outline out
        gently so the parent can still spot the message if they look
        a moment late. */
     .msg.msg-target-highlight {
-      box-shadow: 0 0 0 3px #b99ae8;
+      box-shadow: 0 0 0 3px var(--brand-soft);
       transition: box-shadow 1.5s ease-out;
     }
     .msg .meta {
       font-size: 11px;
-      color: #6b5b8a;
+      color: var(--ink-muted);
       margin-bottom: 4px;
     }
     .msg .role {
       font-weight: 600;
-      color: #5b3e8a;
+      color: var(--brand);
       margin-right: 8px;
     }
     .msg .body {
       font-size: 14px;
-      color: #2b1f47;
+      color: var(--ink);
       white-space: pre-wrap;
       word-wrap: break-word;
     }
@@ -786,7 +881,7 @@
       </div>
       <div class="right">
         <select id="langSelect" data-i18n-aria="cap_language" aria-label="Language"
-                style="padding:8px;border:1px solid #e0d6f0;border-radius:8px;background:#fff;color:#5b3e8a;font-size:13px;cursor:pointer;max-width:120px;min-height:40px;">
+                style="padding:8px;border:1px solid var(--line-input);border-radius:8px;background:var(--surface);color:var(--brand);font-size:13px;cursor:pointer;max-width:120px;min-height:40px;">
           <option value="en">English</option>
           <option value="ru">Русский</option>
           <option value="hy">Հայերեն</option>
@@ -822,9 +917,9 @@
         token — the backend enforces the same rule server-side.
       -->
       <div id="googleSignInBlock" hidden
-           style="margin-top:16px;padding-top:12px;border-top:1px solid #eee;">
+           style="margin-top:16px;padding-top:12px;border-top:1px solid var(--hairline);">
         <div id="googleSignInButton" style="margin-bottom:6px;"></div>
-        <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#4b3b6e;cursor:pointer;line-height:1.4;">
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--ink-3);cursor:pointer;line-height:1.4;">
           <input id="googleAcceptTerms" type="checkbox" style="margin-top:3px;">
           <span data-i18n="google_terms">I accept the terms (needed the first time you sign in with Google).</span>
         </label>
@@ -836,10 +931,10 @@
         acceptance must be reachable without signing in first — and the
         privacy URL is required later for an App Store listing.
       -->
-      <p style="margin-top:16px;font-size:12px;color:#6b5b8a;">
-        <a href="/privacy.html" target="_blank" rel="noopener" style="color:#5b3e8a;" data-i18n="privacy_link">Privacy Policy</a>
+      <p style="margin-top:16px;font-size:12px;color:var(--ink-muted);">
+        <a href="/privacy.html" target="_blank" rel="noopener" style="color:var(--brand);" data-i18n="privacy_link">Privacy Policy</a>
         ·
-        <a href="/terms.html" target="_blank" rel="noopener" style="color:#5b3e8a;" data-i18n="terms_link">Terms of Service</a>
+        <a href="/terms.html" target="_blank" rel="noopener" style="color:var(--brand);" data-i18n="terms_link">Terms of Service</a>
       </p>
       <!--
         Home-screen tip. Unhidden by initInstallHint() ONLY on a phone that
@@ -850,7 +945,7 @@
         retranslates it through the normal applyStaticI18n pass.
       -->
       <p id="installHint" hidden
-         style="margin-top:10px;font-size:12px;color:#6b5b8a;line-height:1.5;"></p>
+         style="margin-top:10px;font-size:12px;color:var(--ink-muted);line-height:1.5;"></p>
     </section>
 
     <!--
@@ -869,14 +964,14 @@
       <input id="signupPasswordInput" type="password" autocomplete="new-password">
       <label for="signupConfirmInput" data-i18n="confirm_new_password">Confirm new password</label>
       <input id="signupConfirmInput" type="password" autocomplete="new-password">
-      <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#4b3b6e;cursor:pointer;line-height:1.4;margin:4px 0 14px;">
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--ink-3);cursor:pointer;line-height:1.4;margin:4px 0 14px;">
         <input id="signupAcceptTerms" type="checkbox" style="margin-top:3px;">
         <span data-i18n="accept_terms">I accept the Terms of Service and the Privacy Policy.</span>
       </label>
       <p style="margin:-8px 0 14px;font-size:12px;">
-        <a href="/terms.html" target="_blank" rel="noopener" style="color:#5b3e8a;" data-i18n="terms_link">Terms of Service</a>
+        <a href="/terms.html" target="_blank" rel="noopener" style="color:var(--brand);" data-i18n="terms_link">Terms of Service</a>
         ·
-        <a href="/privacy.html" target="_blank" rel="noopener" style="color:#5b3e8a;" data-i18n="privacy_link">Privacy Policy</a>
+        <a href="/privacy.html" target="_blank" rel="noopener" style="color:var(--brand);" data-i18n="privacy_link">Privacy Policy</a>
       </p>
       <button id="signupBtn" data-i18n="signup_btn">Create account</button>
       <button id="signupBackBtn" class="link" type="button"
@@ -930,7 +1025,7 @@
     -->
     <section id="verifyEmailCompleteView" class="card" hidden>
       <h2 data-i18n="verify_title">Verify your email</h2>
-      <p style="margin:0 0 12px;color:#6b5b8a;font-size:13px;">
+      <p style="margin:0 0 12px;color:var(--ink-muted);font-size:13px;">
         <span data-i18n="confirm_verify">Click below to confirm your email address.</span>
       </p>
       <button id="verifyEmailCompleteBtn" data-i18n="verify_btn">Verify email</button>
@@ -974,15 +1069,15 @@
              kept hidden so its click handler stays a single code path. -->
         <button id="toggleStoryRequestBtn" class="link" type="button" hidden data-i18n="request_story">✍️ Request a story</button>
         <div id="storyRequestForm" hidden
-             style="margin-top:8px;padding:10px 12px;background:#f5f0ff;
-                    border:1px solid #e4d9f7;border-radius:6px;max-width:460px;">
-          <p style="margin:0 0 8px;font-size:13px;color:#5b3e8a;" data-i18n="request_story_help">
+             style="margin-top:8px;padding:10px 12px;background:var(--surface-tint);
+                    border:1px solid var(--line);border-radius:6px;max-width:460px;">
+          <p style="margin:0 0 8px;font-size:13px;color:var(--brand);" data-i18n="request_story_help">
             Describe the story you'd like for your child — or attach a photo
             of a book page. We review every request by hand and record it in
             the storyteller's voice.</p>
           <label for="storyRequestText" data-i18n="request_story_text">Your story idea</label>
           <textarea id="storyRequestText" rows="4" maxlength="2000"
-                    style="width:100%;padding:10px 12px;border:2px solid #e0d6f0;
+                    style="width:100%;padding:10px 12px;border:2px solid var(--line-input);
                            border-radius:12px;font-size:14px;margin-bottom:10px;
                            font-family:inherit;"></textarea>
           <label for="storyRequestPhoto" data-i18n="request_story_photo">Book page photo (optional)</label>
@@ -1002,16 +1097,16 @@
       <div style="margin:0 0 12px;">
         <button id="toggleClaimBtn" class="link" type="button" data-i18n="add_toy">＋ Add a toy</button>
         <div id="claimDeviceForm" hidden
-             style="margin-top:8px;padding:10px 12px;background:#f0f7f0;
-                    border:1px solid #b6d6b6;border-radius:6px;max-width:420px;">
-          <p style="margin:0 0 8px;font-size:13px;color:#3a5a3a;" data-i18n="claim_help">
+             style="margin-top:8px;padding:10px 12px;background:var(--ok-bg-soft);
+                    border:1px solid var(--ok-line-soft);border-radius:6px;max-width:420px;">
+          <p style="margin:0 0 8px;font-size:13px;color:var(--ok-ink-soft);" data-i18n="claim_help">
             Enter the pairing code from your toy's box or setup card (the app can
             scan its QR instead). This links the toy to your account.</p>
-          <label for="claimDeviceIdInput" style="display:block;font-size:12px;color:#4b3b6e;" data-i18n="device_id">Device ID</label>
+          <label for="claimDeviceIdInput" style="display:block;font-size:12px;color:var(--ink-3);" data-i18n="device_id">Device ID</label>
           <input id="claimDeviceIdInput" type="text" autocomplete="off" inputmode="text"
                  placeholder="00000000-0000-0000-0000-000000000000"
                  style="width:100%;padding:10px;margin:2px 0 8px;box-sizing:border-box;">
-          <label for="claimCodeInput" style="display:block;font-size:12px;color:#4b3b6e;" data-i18n="pairing_code">Pairing code</label>
+          <label for="claimCodeInput" style="display:block;font-size:12px;color:var(--ink-3);" data-i18n="pairing_code">Pairing code</label>
           <input id="claimCodeInput" type="text" autocomplete="off"
                  placeholder="code from the toy" data-i18n-ph="ph_pairing"
                  style="width:100%;padding:10px;margin:2px 0 8px;box-sizing:border-box;">
@@ -1025,7 +1120,7 @@
             new parent saw, which taught them to handle a credential they
             should never hold.
           -->
-          <div style="margin-top:12px;border-top:1px dashed #b6d6b6;padding-top:8px;">
+          <div style="margin-top:12px;border-top:1px dashed var(--ok-line-soft);padding-top:8px;">
             <button id="toggleSetupCardBtn" class="link" type="button"
                     aria-expanded="false" aria-controls="linkDeviceEmptyState"
                     data-i18n="setup_card_toggle">Use a setup card instead</button>
@@ -1064,7 +1159,7 @@
 
       <div class="section-cap" data-i18n="cap_language">Language</div>
       <select id="accountLangSelect" data-i18n-aria="cap_language"
-              style="width:100%;max-width:280px;padding:10px;border:2px solid #e0d6f0;border-radius:12px;background:#fff;color:#2b1f47;font-size:15px;min-height:44px;">
+              style="width:100%;max-width:280px;padding:10px;border:2px solid var(--line-input);border-radius:12px;background:var(--surface);color:var(--ink);font-size:15px;min-height:44px;">
         <option value="en">English</option>
         <option value="ru">Русский</option>
         <option value="hy">Հայերեն</option>
@@ -1097,7 +1192,7 @@
                 aria-expanded="false" aria-controls="deleteAccountForm"
                 data-i18n="delete_account">Delete account</button>
         <div id="deleteAccountForm" hidden>
-          <div style="background:#fee2e2;border:1px solid #e8a7a7;padding:12px;border-radius:12px;margin:10px 0;font-size:13px;color:#8a2f2f;line-height:1.5;"
+          <div style="background:var(--danger-bg);border:1px solid var(--danger-line);padding:12px;border-radius:12px;margin:10px 0;font-size:13px;color:var(--danger-ink-5);line-height:1.5;"
                data-i18n="delete_account_warning">This cannot be undone.</div>
           <label for="deleteAccountPasswordInput" data-i18n="current_password">Current password</label>
           <input id="deleteAccountPasswordInput" type="password" autocomplete="current-password">
@@ -1295,7 +1390,7 @@
     <section id="detailView" class="card" hidden>
       <h2>
         <button class="link" id="backFromDetailBtn" data-i18n="nav_back">← Back</button>
-        <button id="deleteConversationBtn" type="button" style="color:#c66;margin-left:12px;background:none;border:none;cursor:pointer;font-size:13px" hidden data-i18n="delete_conversation">Delete conversation</button>
+        <button id="deleteConversationBtn" type="button" style="color:var(--danger-ink-6);margin-left:12px;background:none;border:none;cursor:pointer;font-size:13px" hidden data-i18n="delete_conversation">Delete conversation</button>
       </h2>
       <div id="detailMeta" class="status muted" aria-live="polite"></div>
       <div id="detailMessages"></div>
@@ -1307,7 +1402,7 @@
          does not leak that parent's actions into this feed. -->
     <section id="auditView" class="card" hidden>
       <h2><button class="link" id="backFromAudit" data-i18n-aria="nav_account" data-i18n="nav_account">← Account</button> <span data-i18n="your_activity">Your activity</span></h2>
-      <p style="color:#4b3b6e;font-size:13px;margin:4px 0 12px;line-height:1.5;"
+      <p style="color:var(--ink-3);font-size:13px;margin:4px 0 12px;line-height:1.5;"
          data-i18n="activity_intro">Changes you have made to this account.</p>
       <div id="auditList"></div>
       <div id="auditStatus" class="status muted" aria-live="polite"></div>
@@ -2682,11 +2777,11 @@
       var box = document.getElementById('accountIdentity');
       clearChildren(box);
       var who = document.createElement('div');
-      who.style.cssText = 'font-size:13px;color:#6b5b8a;';
+      who.style.cssText = 'font-size:13px;color:var(--ink-muted);';
       who.textContent = t('signed_in_as');
       box.appendChild(who);
       var mail = document.createElement('div');
-      mail.style.cssText = 'font-size:16px;font-weight:600;color:#2b1f47;word-break:break-word;';
+      mail.style.cssText = 'font-size:16px;font-weight:600;color:var(--ink);word-break:break-word;';
       mail.textContent = (me && me.email) || '…';
       box.appendChild(mail);
       if (!me) return;
@@ -3005,12 +3100,12 @@
       var header = document.getElementById('toyHeader');
       clearChildren(header);
       var nameEl = document.createElement('div');
-      nameEl.style.cssText = 'font-size:18px;font-weight:700;color:#2b1f47;';
+      nameEl.style.cssText = 'font-size:18px;font-weight:700;color:var(--ink);';
       nameEl.textContent = '🧸 ' + toyLabel(d);
       header.appendChild(nameEl);
 
       var childEl = document.createElement('div');
-      childEl.style.cssText = 'font-size:13px;color:#6b5b8a;margin-top:2px;';
+      childEl.style.cssText = 'font-size:13px;color:var(--ink-muted);margin-top:2px;';
       if (d.children && d.children.length > 0) {
         childEl.textContent = t('child_label') + ' ' + d.children.map(function (c) {
           return c.name + (c.age != null ? ' (' + tf('age_short', { n: c.age }) + ')' : '');
@@ -3045,7 +3140,7 @@
       // this to support, who decide what it means.
       if (d.faultCode) {
         var helpEl = document.createElement('p');
-        helpEl.style.cssText = 'margin:8px 0 0;font-size:13px;line-height:1.45;color:#8a3b3b;';
+        helpEl.style.cssText = 'margin:8px 0 0;font-size:13px;line-height:1.45;color:var(--danger-ink-7);';
         helpEl.appendChild(document.createTextNode(t('fault_help') + ' '));
         var codeEl = document.createElement('strong');
         codeEl.textContent = d.faultCode;
@@ -3368,7 +3463,7 @@
           bedtimeRow.appendChild(bedStart);
           var dash = document.createElement('span');
           dash.textContent = '–';
-          dash.style.color = '#555';
+          dash.style.color = 'var(--neutral-ink)';
           bedtimeRow.appendChild(dash);
           var bedEnd = document.createElement('input');
           bedEnd.type = 'time';
@@ -3642,8 +3737,8 @@
         wrap.appendChild(lbl);
         var sel = document.createElement('select');
         sel.style.cssText =
-          'padding:4px 6px;font-size:12px;color:#2b1f47;background:#fff;' +
-          'border:1px solid #e0d6f0;border-radius:8px;';
+          'padding:4px 6px;font-size:12px;color:var(--ink);background:var(--surface);' +
+          'border:1px solid var(--line-input);border-radius:8px;';
         sel.setAttribute('data-role', 'child-override-' + m.key);
         var inheritLabel = m.device ? t('inherit_on') : t('inherit_off');
         [
@@ -3777,12 +3872,12 @@
 
       var form = document.createElement('div');
       form.hidden = true;
-      form.style.cssText = 'margin:2px 0 10px;padding:10px 12px;background:#faf8ff;' +
-        'border:1px solid #ece6f8;border-radius:12px;';
+      form.style.cssText = 'margin:2px 0 10px;padding:10px 12px;background:var(--surface-4);' +
+        'border:1px solid var(--line-soft-2);border-radius:12px;';
 
       var why = document.createElement('p');
       why.textContent = t('child_why');
-      why.style.cssText = 'font-size:12px;color:#6b5b8a;line-height:1.5;margin-bottom:10px;';
+      why.style.cssText = 'font-size:12px;color:var(--ink-muted);line-height:1.5;margin-bottom:10px;';
       form.appendChild(why);
 
       // Every field gets a visible label. A placeholder disappears the moment
@@ -4800,17 +4895,17 @@
       btn.className = 'btn-ghost';
 
       var status = document.createElement('span');
-      status.style.cssText = 'font-size:12px;color:#6b5b8a;';
+      status.style.cssText = 'font-size:12px;color:var(--ink-muted);';
 
       btn.onclick = function () {
         btn.disabled = true;
         status.textContent = t('busy_loading');
-        status.style.color = '#6b5b8a';
+        status.style.color = 'var(--ink-muted)';
 
         var token = getToken();
         if (!token) {
           status.textContent = t('session_expired');
-          status.style.color = '#b3261e';
+          status.style.color = 'var(--danger-ink-2)';
           btn.disabled = false;
           return;
         }
@@ -4823,13 +4918,13 @@
           }
           if (res.status === 404) {
             status.textContent = t('audio_unavailable');
-            status.style.color = '#b3261e';
+            status.style.color = 'var(--danger-ink-2)';
             btn.disabled = false;
             return null;
           }
           if (!res.ok) {
             status.textContent = t('err_generic');
-            status.style.color = '#b3261e';
+            status.style.color = 'var(--danger-ink-2)';
             btn.disabled = false;
             return null;
           }
@@ -4857,7 +4952,7 @@
           wrap.appendChild(audio);
         }).catch(function () {
           status.textContent = t('err_network');
-          status.style.color = '#b3261e';
+          status.style.color = 'var(--danger-ink-2)';
           btn.disabled = false;
         });
       };
@@ -4919,7 +5014,7 @@
     function renderAuditRow(e) {
       var row = document.createElement('div');
       row.style.cssText =
-        'padding:8px 10px;margin:4px 0;border-bottom:1px solid #eee;';
+        'padding:8px 10px;margin:4px 0;border-bottom:1px solid var(--hairline);';
       row.title = e.id;
 
       var top = document.createElement('div');
@@ -4931,7 +5026,7 @@
       top.appendChild(labelSpan);
       var timeSpan = document.createElement('span');
       timeSpan.textContent = fmtTime(e.timestamp);
-      timeSpan.style.cssText = 'color:#6b5b8a;font-size:12px;white-space:nowrap;';
+      timeSpan.style.cssText = 'color:var(--ink-muted);font-size:12px;white-space:nowrap;';
       top.appendChild(timeSpan);
       row.appendChild(top);
 
@@ -4947,7 +5042,7 @@
       if (summary) {
         var sumDiv = document.createElement('div');
         sumDiv.className = 'snippet';
-        sumDiv.style.color = '#5b4c7d';
+        sumDiv.style.color = 'var(--ink-4)';
         sumDiv.textContent = summary;
         row.appendChild(sumDiv);
       }
@@ -5180,9 +5275,9 @@
         }
         rows.forEach(function (r) {
           var row = document.createElement('div');
-          row.style.cssText = 'padding:6px 0;border-top:1px solid #e4d9f7;font-size:13px;';
+          row.style.cssText = 'padding:6px 0;border-top:1px solid var(--line);font-size:13px;';
           var meta = document.createElement('div');
-          meta.style.cssText = 'color:#6b5b8a;font-size:12px;';
+          meta.style.cssText = 'color:var(--ink-muted);font-size:12px;';
           meta.textContent = fmtTime(r.createdAtUtc) + ' · '
             + requestStatusLabel(r.status)
             + (r.hasPhoto ? ' · 📷' : '');
@@ -5322,7 +5417,7 @@
           name.textContent = '📖 ' + storyTitle(tt.storyId);
           line.appendChild(name);
           var counts = document.createElement('span');
-          counts.style.cssText = 'color:#5b4c7d;margin-left:8px;font-size:13px;';
+          counts.style.cssText = 'color:var(--ink-4);margin-left:8px;font-size:13px;';
           counts.textContent = tf('listened_count', { n: tt.count, f: tt.finishedCount });
           line.appendChild(counts);
           totalsEl.appendChild(line);
@@ -5395,9 +5490,9 @@
         }
         answers.forEach(function (a) {
           var row = document.createElement('div');
-          row.style.cssText = 'padding:6px 0;border-bottom:1px solid #ece4f8;font-size:13px;';
+          row.style.cssText = 'padding:6px 0;border-bottom:1px solid var(--line-soft);font-size:13px;';
           var meta = document.createElement('div');
-          meta.style.cssText = 'color:#6b5b8a;font-size:12px;';
+          meta.style.cssText = 'color:var(--ink-muted);font-size:12px;';
           meta.textContent = storyTitle(a.storyId) + ' · ' + fmtTime(a.createdAtUtc)
             + (a.safetyFlag && a.safetyFlag !== 'Clean' ? ' · ' + t('badge_flagged') : '');
           var text = document.createElement('div');
@@ -5960,7 +6055,7 @@
 
     function buildSeriesCard(group) {
       var card = document.createElement('div');
-      card.style.cssText = 'padding:14px;background:#f4f0fb;border:1px solid #ded1f4;border-radius:14px;margin:0 0 10px;';
+      card.style.cssText = 'padding:14px;background:var(--surface-card);border:1px solid var(--line-card);border-radius:14px;margin:0 0 10px;';
 
       // Headline = the series' real name, sitting in the same slot and the
       // same typography a standalone card gives a story title. Without an
@@ -5975,7 +6070,7 @@
       // Demoted descriptor. Only shown when the headline is a real name —
       // otherwise it would repeat the line directly above it.
       var meta = document.createElement('div');
-      meta.style.cssText = 'color:#6b5b8a;font-size:12px;margin:2px 0 6px;';
+      meta.style.cssText = 'color:var(--ink-muted);font-size:12px;margin:2px 0 6px;';
       meta.textContent = name
         ? t('series_fallback_title') + ' · ' + t('series_episodes')
         : t('series_episodes');
@@ -5999,7 +6094,7 @@
         badge.className = 'chip chip-info';
         // White, not chip-info's #f5f0ff — that fill is invisible against
         // this card's #f4f0fb.
-        badge.style.cssText = 'background:#ffffff;font-weight:600;vertical-align:middle;';
+        badge.style.cssText = 'background:var(--surface);font-weight:600;vertical-align:middle;';
         badge.textContent = tf('series_next', {
           n: partNumber(next, group.items.indexOf(next))
         });
@@ -6026,7 +6121,7 @@
       var partsSummary = document.createElement('summary');
       // padding, not min-height: keeps the native disclosure marker while
       // clearing the 44px thumb floor.
-      partsSummary.style.cssText = 'cursor:pointer;color:#5b3e8a;font-size:13px;padding:13px 0;';
+      partsSummary.style.cssText = 'cursor:pointer;color:var(--brand);font-size:13px;padding:13px 0;';
       partsSummary.textContent = tf('series_show_parts', { n: group.items.length });
       parts.appendChild(partsSummary);
       group.items.forEach(function (s, i) {
@@ -6045,8 +6140,8 @@
     function buildLibraryCard(s, partLabel) {
       var card = document.createElement('div');
       card.style.cssText = partLabel
-        ? 'padding:10px 12px;background:#fff;border:1px solid #e4d9f7;border-radius:12px;margin:6px 0 0;'
-        : 'padding:14px;background:#faf7ff;border:1px solid #e4d9f7;border-radius:14px;margin:0 0 10px;';
+        ? 'padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;margin:6px 0 0;'
+        : 'padding:14px;background:var(--surface-3);border:1px solid var(--line);border-radius:14px;margin:0 0 10px;';
 
       var title = document.createElement('div');
       title.style.cssText = partLabel
@@ -6067,7 +6162,7 @@
       if (s.bedtimeSafe === true) metaBits.push(t('bedtime_safe'));
       if (metaBits.length > 0) {
         var meta = document.createElement('div');
-        meta.style.cssText = 'color:#6b5b8a;font-size:12px;margin:2px 0 6px;';
+        meta.style.cssText = 'color:var(--ink-muted);font-size:12px;margin:2px 0 6px;';
         meta.textContent = metaBits.join(' · ');
         card.appendChild(meta);
       }
@@ -6080,13 +6175,13 @@
       }
       if (s.lesson) {
         var lesson = document.createElement('div');
-        lesson.style.cssText = 'font-size:13px;margin:4px 0;color:#3a5a3a;';
+        lesson.style.cssText = 'font-size:13px;margin:4px 0;color:var(--ok-ink-soft);';
         lesson.textContent = t('lesson_label') + t('label_sep') + s.lesson;
         card.appendChild(lesson);
       }
 
       var counts = document.createElement('div');
-      counts.style.cssText = 'font-size:12px;color:#5b4c7d;margin:6px 0 4px;';
+      counts.style.cssText = 'font-size:12px;color:var(--ink-4);margin:6px 0 4px;';
       counts.textContent = tf('listened_count', {
         n: s.listenCount || 0, f: s.finishedCount || 0
       });
@@ -6100,7 +6195,7 @@
         var discuss = document.createElement('details');
         discuss.style.cssText = 'margin:6px 0 4px;font-size:13px;';
         var summaryEl = document.createElement('summary');
-        summaryEl.style.cssText = 'cursor:pointer;color:#5b3e8a;';
+        summaryEl.style.cssText = 'cursor:pointer;color:var(--brand);';
         summaryEl.textContent = '💬 ' + t('discuss_with_child');
         discuss.appendChild(summaryEl);
         var cons = Array.isArray(s.reflectionConclusions) ? s.reflectionConclusions : [];
@@ -6111,7 +6206,7 @@
           discuss.appendChild(qEl);
           if (cons[i]) {
             var cEl = document.createElement('div');
-            cEl.style.cssText = 'margin:2px 0 0 20px;color:#3a5a3a;font-size:12px;';
+            cEl.style.cssText = 'margin:2px 0 0 20px;color:var(--ok-ink-soft);font-size:12px;';
             cEl.textContent = '→ ' + cons[i];
             discuss.appendChild(cEl);
           }
@@ -6148,13 +6243,13 @@
       btn.textContent = t('listen_btn');
       btn.className = 'btn-ghost';
       var status = document.createElement('span');
-      status.style.cssText = 'font-size:12px;color:#6b5b8a;';
+      status.style.cssText = 'font-size:12px;color:var(--ink-muted);';
       btn.onclick = function () {
         btn.disabled = true;
         status.textContent = t('busy_loading');
         // Reset the colour too, or every later "Loading…" on this card
         // stays in the red left behind by one earlier failure.
-        status.style.color = '#6b5b8a';
+        status.style.color = 'var(--ink-muted)';
         var token = getToken();
         if (!token) { status.textContent = t('session_expired'); btn.disabled = false; return; }
         fetch(url, { headers: { 'Authorization': 'Bearer ' + token } })
@@ -6165,7 +6260,7 @@
             if (res.status === 401) { sessionExpired(); return null; }
             if (!res.ok) {
               status.textContent = t('audio_unavailable');
-              status.style.color = '#b3261e';
+              status.style.color = 'var(--danger-ink-2)';
               btn.disabled = false;
               return null;
             }
@@ -6219,7 +6314,7 @@
         setStatus('musicStatus', '', '');
         tracks.forEach(function (m) {
           var card = document.createElement('div');
-          card.style.cssText = 'padding:14px;background:#faf7ff;border:1px solid #e4d9f7;border-radius:14px;margin:0 0 10px;';
+          card.style.cssText = 'padding:14px;background:var(--surface-3);border:1px solid var(--line);border-radius:14px;margin:0 0 10px;';
           var title = document.createElement('div');
           title.style.cssText = 'font-size:15px;font-weight:600;';
           title.textContent = '🎵 ' + (m.title || m.trackId);
