@@ -35,7 +35,8 @@
 //                       BEFORE YOU BATCH: the narrator voice is still interim,
 //                       so a full render is thrown away when it changes.
 //   --speed <x>         voice_settings.speed, ElevenLabs range 0.7–1.2 (default 1.0)
-//   --model <id>        default eleven_multilingual_v2
+//   --model <id>        default eleven_v3 (the only model on this account
+//                       that speaks Armenian — see the note by the variable)
 //   --output <dir>      default %TEMP%/areg-elevenlabs-render
 //   --render            actually call the API (with --confirm-paid-api)
 //   --confirm-paid-api  second key of the two-man rule

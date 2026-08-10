@@ -89,8 +89,11 @@ def scan(path: Path) -> dict:
     # false-positives on ordinary audio data - ulik.mp3 contains those three
     # bytes at offset 427715, and a loose check read it as a second tag and
     # reported a defect that is not there.
+    # -9, not -10: a header needs 10 bytes, so the last position that can hold
+    # one is len-10 and range() is exclusive. A tag sitting at the very end of
+    # the file - nothing after it - would otherwise go uncounted.
     id3_tags = sum(
-        1 for at in range(len(data) - 10) if _is_id3v2_header(data, at)
+        1 for at in range(len(data) - 9) if _is_id3v2_header(data, at)
     )
 
     start = _id3v2_end(data, 0)
