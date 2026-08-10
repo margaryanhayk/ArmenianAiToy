@@ -179,6 +179,22 @@ Not optional, and not replaceable by any of the above.
 
 Then commit. Railway deploys, and every toy re-downloads on the `Version` bumps.
 
+## Step 9 — make it impossible to regress
+
+Once step 5 prints PASS on all ten, wire it into CI so nobody has to remember.
+It is not there today, deliberately: it exits non-zero right now because of the
+three truncated stories, and a check that is red for a known reason gets
+ignored — which is the whole story of this defect. Add it the day it is green:
+
+```yaml
+      - name: Story audio is complete
+        working-directory: .
+        run: python3 tools/story-audio/check_story_audio.py
+```
+
+in `.github/workflows/ci.yml`, alongside the existing build-and-test steps. It
+needs no ffmpeg, no dotnet and no network, so it costs the run a second.
+
 ---
 
 ## What this pass deliberately leaves out
