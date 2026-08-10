@@ -65,6 +65,37 @@ was not done:
   that are complete. The re-render did not fix the problem it was for, and
   nothing compared the result against the text afterwards.
 
+## The second consequence: in-story questions are answered about the wrong scene
+
+Truncation does not only cut the story short — it also misleads the part of the
+backend that decides *where in the story the child is*.
+
+When a child interrupts to ask a question, the toy sends the byte offset it
+paused at. `StoryQaController.OffsetToSegment` prefers an exact per-segment byte
+map (`{story}.segments.json`) and falls back to
+`offset × segmentCount ÷ fileSize` when there is none. **There is none: zero
+`.segments.json` files exist in this repo**, because the library was rendered
+outside it. So every shipped story uses the proportional guess.
+
+That guess is fine when the audio matches the text. On the truncated stories it
+is badly wrong, because `fileSize` covers only a fraction of the segments:
+
+- `khosogh-dzuk`'s file holds ~26% of the text. A child who interrupts near the
+  end of the *file* has heard roughly segment 2 of 9 — the proportional guess
+  scores him at segment 8.
+- The prompt is then grounded in a scene he has not heard, and the re-anchor
+  recap line describes events that have not happened yet.
+
+The whole-story summary in the prompt still answers most questions correctly, so
+this degrades quality rather than breaking it — but it is a real, invisible
+second cost of the truncation and it disappears with the same fix.
+
+**The durable fix is in the recording, not the code:** ask the narrator for one
+WAV per story segment. Concatenating them produces the exact byte map as a
+by-product, which retires the proportional fallback for good. Recorded in
+`docs/voice-narrator-brief.md` §3, because it has to be asked for *before* the
+studio session, not after.
+
 ## Two related observations
 
 - **`ulik.mp3` does NOT have a second ID3 tag.** An early pass reported one; it

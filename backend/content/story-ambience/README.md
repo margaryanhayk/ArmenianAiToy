@@ -61,11 +61,33 @@ shipped stories were rendered outside this repo and have no `.segments.json`
 byte map, so there are no timings to key to — and a segment index and a quoted
 line both survive the re-render, when every timestamp would not.
 
+## The tool that reads this file
+
+`tools/story-audio/mix_ambience.py` takes the per-segment WAVs, this cue sheet
+and a folder of sounds, and produces one mixed story plus the
+`<storyId>.segments.json` map. **Dry run by default** — it prints every cue's
+resolved time and the exact ffmpeg command and writes nothing. It does not
+level: -16.4 LUFS stays with `Ship-StoryAudio.ps1`, after the mix.
+
+```
+python3 tools/story-audio/mix_ambience.py --self-test
+python3 tools/story-audio/mix_ambience.py --story ulik \
+    --segments-dir <wavs> --sounds-dir <sounds> --out mixed
+```
+
+It warns when two cues land within 2 seconds of each other. That check exists
+because the first run of this sheet found one: a cue at the **end** of segment 1
+and another at the **start** of segment 2 are the *same instant*, which is not
+obvious when reading the JSON. The `forest-evening` cue in «Ուլիկը» was moved to
+the start of its segment because of it.
+
 ## What a mix session needs
 
 1. The sounds themselves (see `sounds` in the JSON — none are chosen yet).
 2. This cue sheet, owner-approved.
-3. The narration, rendered full length in the chosen voice.
+3. The narration, **one WAV per segment**, full length, in the chosen voice —
+   see `docs/voice-narrator-brief.md` §3 for why that shape and not one file
+   per story.
 4. Mix, **then** normalise the finished file to **-16.4 LUFS** — the level every
    story in the library sits at. Never level the narration and the ambience
    separately.
