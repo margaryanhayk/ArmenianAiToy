@@ -75,7 +75,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2509 tests)
+dotnet test                                     # Run all tests (2522 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2230,6 +2230,70 @@ without someone listening end to end.
 narration the owner approved; a new story that ignores it makes half the
 library loud and half quiet, which is itself a quality complaint.
 
+**STAGE 2 WAS NEVER RUN ON THE SHIPPED LIBRARY — three stories are still
+truncated today (found 2026-08-10).** Do not read the pipeline above as a
+description of what happened to the files in `story-audio/`; it is a
+description of what *should* happen to them and did not. Measured:
+`khosogh-dzuk` plays **1:21 of a 5:17 story (26%)**, `anban-huri` **1:27 of
+3:39 (40%)**, `pochat-aghves` **1:25 of 3:35 (40%)** — each ends mid-tale. The
+proof that the shipper never touched them is the encoding: `-Fix` emits
+192 kbps and every shipped file is 128 kbps. Note also that **all five stories
+at `Version: 6` — i.e. every story re-rendered in response to the 2026-08-04
+truncation — are short**, while the three at `Version: 2` that were never
+re-rendered are the three that are complete. The chunking mitigation was real;
+nothing compared its output against the text afterwards.
+
+Deliberately NOT re-rendered: the narrator is an open owner decision and this
+tool's own header says a render is thrown away when the voice changes, so the
+fix belongs in that one pass — together with the ambience cues in
+`backend/content/story-ambience/`. Full measurement and method:
+`tools/quality-evidence/story-audio-truncation-20260810.md`.
+
+**The gate now runs anywhere:** `python3 tools/story-audio/check_story_audio.py`
+repeats Stage 2's two structural checks (length vs `chars/15`, ID3 tag count)
+with **no ffmpeg and no dotnet**, exiting non-zero on failure. It exists because
+the PowerShell shipper needs a toolchain, and a check that needs a toolchain is
+the check that gets skipped on the day it matters. It never writes —
+`Ship-StoryAudio.ps1` remains the only thing that repairs, levels, installs and
+bumps `Version`, and the human listen test is still the last gate.
+
+## Story ambience (owner request 2026-08-10)
+
+Ambient sound during storytelling — forest, river, rain — as
+`backend/content/story-ambience/{README.md,ambience-cues.json}`. Text only;
+**nothing at runtime reads it**, same convention as every other folder there.
+29 cues across the 8 stories that have audio, each anchored to a segment index
+plus an exact quoted line (verified against the story text) rather than a
+timestamp, because the shipped stories have no `.segments.json` byte map and
+are about to be re-rendered anyway.
+
+Two owner decisions shape it, and both are load-bearing:
+
+- **Mixed into the story file at render time, not on the toy.** On-device
+  mixing is *feasible* — a PCM shim over the existing decoder, fed from PSRAM,
+  costs no second decoder and leaves `file.getPos()` (and therefore resume,
+  barge-in and the sticky pause) untouched. It is not *cheap*: every playback
+  function builds its `AudioOutputI2S` as a stack local and tears the I2S
+  peripheral down on return, the port is shared with the mic, and every other
+  sound the toy makes runs through that same function as a nested call during a
+  story. Plus a fifth ContentSync namespace and index schema v8. Baking costs
+  zero firmware change and buys per-moment ducking a loop cannot.
+- **Sparse, never a continuous bed.** Establish a place in 3–5 seconds, then
+  get out of the voice's way; the narration is always the loudest element. A bed
+  under four minutes of Armenian on a mono speaker costs intelligibility, and
+  the listeners who lose that first are the four-year-olds.
+
+Three omissions are deliberate and should not be "fixed" by a later pass: no
+gunshot in «Սուտլիկ որսկանը», no wolf howl in «Ուլիկը» or «Երեք խոզուկները»
+(the menace is already in the narration, and the toy's posture is calm), and no
+frogs in «Անբան Հուռին» because the narrator voices them himself. In «Ուլիկը»
+the wolf's knock and the mother's knock are the **same** sound at the same
+level on purpose — the door is identical and only the voice differs, which is
+the thing the child is meant to notice.
+
+Sound licences are all `TBD`: nothing has been chosen or bought, so no file can
+quietly reach a toy without someone answering the question.
+
 ## Spoken welcome flow (owner request 2026-08-04) — backend half
 
 The toy was SILENT at power-on and a button press always started/resumed a
@@ -3572,8 +3636,16 @@ owner review + a sample-first listen test gates any render):**
 ## Owner batch (2026-08-07) — games over Wi-Fi, welcome voice shipped, story pauses play, OTA field-proven, hardware dossier
 
 A second same-day owner batch, landing directly on top of the
-content-depth batch above. Test count grew to the current **2509** (see
-§ Build & Test).
+content-depth batch above. Test count at the time was **2509**; it is **2522**
+at HEAD (see § Build & Test).
+
+**This file is synced only to 2026-08-07 and the repo has moved past it.**
+Everything below documents that batch and stops there; **26 commits** have
+landed since (`git log bfc4068..HEAD`), including firmware releases up to
+**1.2.0**, the in-story Q&A latency work, the production fix where the slow AI
+models had silently been in use, the welcome flow going off and back on, the
+rev-A PCB layout and the story-audio findings above. Read `git log` before
+trusting a date in this file.
 
 **Games ContentSync namespace — the fourth namespace.** The 92 offline-game
 clips (see the correction above) now reach the toy the same way stories,
