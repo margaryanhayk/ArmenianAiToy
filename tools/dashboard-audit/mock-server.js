@@ -175,7 +175,51 @@ http.createServer((req, res) => {
       return send({ id: CONV[0], deviceId: DEV1, startedAt: ago(95), endedAt: ago(78),
         messageCount: messages.length, hasFlaggedContent: false, messages });
     if (/audio$/.test(u.pathname)) { res.writeHead(404); return res.end('{}'); }
-    return send({ ok: true });               // every mutation succeeds
+
+    // Mutations PERSIST in memory. A mock that accepts every write and then
+    // serves the old value back cannot test a UI where the controls save
+    // themselves - the page reloads after each save and silently undoes what
+    // you just did, so a guard never gets to fire.
+    if (req.method === 'PUT' || req.method === 'POST') {
+      let body = '';
+      req.on('data', (c) => { body += c; });
+      return req.on('end', () => {
+        let payload = {};
+        try { payload = JSON.parse(body || '{}'); } catch (e) { /* not json */ }
+        const m = u.pathname.match(/\/devices\/([0-9a-f-]+)\/([a-z-]+)$/i);
+        const dev = m && devices.find((d) => d.deviceId === m[1]);
+        if (dev) {
+          const what = m[2];
+          if (what === 'mode-flags') {
+            ['story', 'game', 'riddle', 'curiosity'].forEach((k) => {
+              if (typeof payload[k] === 'boolean') dev[k + 'Enabled'] = payload[k];
+            });
+          } else if (what === 'bedtime-window') {
+            dev.bedtimeStart = payload.start || null;
+            dev.bedtimeEnd = payload.end || null;
+          } else if (what === 'name') {
+            if (payload.name) dev.deviceName = payload.name;
+          } else if (what === 'pause') { dev.isPaused = true; }
+          else if (what === 'resume') { dev.isPaused = false; }
+          else if (what === 'revoke') { dev.isRevoked = !!payload.revoked; }
+          else if (typeof payload.enabled === 'boolean') {
+            const flag = { 'story-intro': 'storyIntroEnabled', 'story-pauses': 'storyPausesEnabled',
+                           'variant-endings': 'variantEndingsEnabled',
+                           'bedtime-music': 'bedtimeMusicEnabled' }[what];
+            if (flag) dev[flag] = payload.enabled;
+          }
+        }
+        const kid = u.pathname.match(/\/children\/([0-9a-f-]+)\/mode-flags$/i);
+        if (kid) {
+          const c = devices.flatMap((d) => d.children).find((x) => x.childId === kid[1]);
+          if (c) ['story', 'game', 'riddle', 'curiosity'].forEach((k) => {
+            if (k in payload) c[k + 'Enabled'] = payload[k];
+          });
+        }
+        send({ ok: true });
+      });
+    }
+    return send({ ok: true });
   }
 
   let p = u.pathname === '/' ? '/index.html' : u.pathname;

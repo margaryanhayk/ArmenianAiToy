@@ -1593,8 +1593,6 @@
       modes_label: { en: '🎮 Modes:', ru: '🎮 Режимы:', hy: '🎮 Ռեժիմներ՝' },
       name_label: { en: '✏️ Name:', ru: '✏️ Имя:', hy: '✏️ Անուն՝' },
       save: { en: 'Save', ru: 'Сохранить', hy: 'Պահպանել' },
-      save_name: { en: 'Save name', ru: 'Сохранить имя', hy: 'Պահպանել անունը' },
-      save_modes: { en: 'Save modes', ru: 'Сохранить режимы', hy: 'Պահպանել ռեժիմները' },
       revoke: { en: 'Revoke access', ru: 'Отозвать доступ', hy: 'Կասեցնել մուտքը' },
       restore: { en: 'Restore access', ru: 'Восстановить доступ', hy: 'Վերականգնել մուտքը' },
       unlink: { en: 'Unlink', ru: 'Отвязать', hy: 'Հեռացնել հաշվից' },
@@ -2022,7 +2020,21 @@
     function setToken(t) { sessionStorage.setItem(TOKEN_KEY, t); }
     function clearToken() { sessionStorage.removeItem(TOKEN_KEY); }
 
+    // Where the parent was standing before a same-view redraw. Restoring it
+    // has to wait for the rebuild: clearing the list momentarily shortens the
+    // page, the browser clamps scrollY to the new maximum, and the position
+    // is lost before the new content arrives.
+    var pendingScrollY = null;
+    function restoreScroll() {
+      if (pendingScrollY === null) return;
+      var y = pendingScrollY;
+      pendingScrollY = null;
+      try { window.scrollTo(0, y); } catch (e) { /* cosmetic */ }
+    }
+
     function show(viewId) {
+      var sameView = !document.getElementById(viewId)
+        || !document.getElementById(viewId).hidden;
       // Leaving a view must silence any preview it was playing — otherwise
       // a story keeps narrating from a page the parent has left — and hand
       // back the audio memory, which used to be held until a page reload.
@@ -2046,10 +2058,21 @@
         verifyEmailRequestView: 1, verifyEmailCompleteView: 1
       };
       document.getElementById('accountBtn').hidden = !!preAuthViews[viewId];
-      // Every view change starts at the top — otherwise tapping a toy from
+      // Every view CHANGE starts at the top — otherwise tapping a toy from
       // half-way down a long list opens its page already scrolled past the
       // toy's name.
-      try { window.scrollTo(0, 0); } catch (e) { /* cosmetic */ }
+      //
+      // But a re-show of the view you are already on is not a change, it is
+      // a redraw: saving a setting reloads the toy page in place. Scrolling
+      // then throws the parent 1,900px back to the top every time they tick
+      // a box — tolerable behind a Save button pressed once, unbearable now
+      // that every control saves itself.
+      if (sameView) {
+        pendingScrollY = window.scrollY || 0;
+      } else {
+        pendingScrollY = null;
+        try { window.scrollTo(0, 0); } catch (e) { /* cosmetic */ }
+      }
     }
 
     function setStatus(elId, text, kind) {
@@ -3239,6 +3262,7 @@
       } else {
         deviceStatus('', '');
       }
+      restoreScroll();
     }
 
     // Refresh whichever device surface is open after a settings change.
@@ -3544,14 +3568,18 @@
           bedEnd.setAttribute('data-role', 'bedtime-end');
           if (d.bedtimeEnd) bedEnd.value = d.bedtimeEnd.substring(0, 5);
           bedtimeRow.appendChild(bedEnd);
-          var saveBedtimeBtn = document.createElement('button');
-          saveBedtimeBtn.type = 'button';
-          saveBedtimeBtn.textContent = t('save');
-          saveBedtimeBtn.className = 'btn-ghost';
-          saveBedtimeBtn.addEventListener('click', function () {
-            saveBedtimeWindow(d.deviceId, bedStart.value, bedEnd.value);
-          });
-          bedtimeRow.appendChild(saveBedtimeBtn);
+          // Saves itself, like every other control on this page — but only
+          // once the pair makes sense. The server normalises a half-window to
+          // "disabled", so writing after the FIRST field changed would switch
+          // bedtime OFF the moment a parent picked a start time. So: write
+          // when both are set, or when both are cleared; otherwise wait
+          // quietly for the second field.
+          function bedtimeChanged() {
+            var s = bedStart.value, e = bedEnd.value;
+            if ((s && e) || (!s && !e)) saveBedtimeWindow(d.deviceId, s, e);
+          }
+          bedStart.addEventListener('change', bedtimeChanged);
+          bedEnd.addEventListener('change', bedtimeChanged);
           var bedtimeHint = document.createElement('span');
           bedtimeHint.textContent = t('bedtime_hint');
           bedtimeHint.className = 'ctl-hint';
@@ -3593,29 +3621,28 @@
             lbl.appendChild(txt);
             modesRow.appendChild(lbl);
           });
-          var saveModesBtn = document.createElement('button');
-          saveModesBtn.type = 'button';
-          saveModesBtn.textContent = t('save_modes');
-          saveModesBtn.className = 'btn-ghost';
-          saveModesBtn.addEventListener('click', function () {
-            var anyOn = modeInputs.story.checked || modeInputs.game.checked
-              || modeInputs.riddle.checked || modeInputs.curiosity.checked;
-            // Guard: never let a parent disable ALL play modes — the toy
-            // would refuse every request (only bedtime/calm would work),
-            // which is almost always an accident. (Calm has no toggle and
-            // stays on regardless, but that's not a play mode.)
-            if (!anyOn) {
-              deviceStatus(t('modes_need_one'), 'err');
-              return;
-            }
-            saveDeviceModeFlags(
-              d.deviceId,
-              modeInputs.story.checked,
-              modeInputs.game.checked,
-              modeInputs.riddle.checked,
-              modeInputs.curiosity.checked);
+          // Each box saves itself. The guard that used to sit behind the
+          // Save button now UNDOES the tick that would have emptied the set:
+          // a parent must never be able to disable every play mode, because
+          // the toy would then refuse everything except bedtime. (Calm has no
+          // toggle and stays on regardless, but it is not a play mode.)
+          modeDefs.forEach(function (m) {
+            modeInputs[m.key].addEventListener('change', function () {
+              var anyOn = modeInputs.story.checked || modeInputs.game.checked
+                || modeInputs.riddle.checked || modeInputs.curiosity.checked;
+              if (!anyOn) {
+                modeInputs[m.key].checked = true;
+                deviceStatus(t('modes_need_one'), 'err');
+                return;
+              }
+              saveDeviceModeFlags(
+                d.deviceId,
+                modeInputs.story.checked,
+                modeInputs.game.checked,
+                modeInputs.riddle.checked,
+                modeInputs.curiosity.checked);
+            });
           });
-          modesRow.appendChild(saveModesBtn);
           var modesHint = document.createElement('span');
           modesHint.textContent = t('modes_hint');
           modesHint.className = 'ctl-hint';
@@ -3633,6 +3660,10 @@
           renameRow.appendChild(renameLabel);
           var nameInput = document.createElement('input');
           nameInput.type = 'text';
+          // Every other control on this page carries a data-role; this one
+          // did not, so it was only reachable as "the last text input" — and
+          // the hidden add-child form owns the first one.
+          nameInput.setAttribute('data-role', 'device-name');
           nameInput.maxLength = 60;
           nameInput.value = d.deviceName || '';
           nameInput.placeholder = t('name_placeholder');
@@ -3640,14 +3671,17 @@
             'flex:1;width:auto;min-width:160px;margin:0;' +
             'padding:8px 10px;font-size:14px;border-radius:8px;';
           renameRow.appendChild(nameInput);
-          var saveNameBtn = document.createElement('button');
-          saveNameBtn.type = 'button';
-          saveNameBtn.textContent = t('save_name');
-          saveNameBtn.className = 'btn-ghost';
-          saveNameBtn.addEventListener('click', function () {
-            renameDevice(d.deviceId, nameInput.value);
+          // 'change' fires on blur or Enter, and only when the value really
+          // differs — so tapping into the field and out again writes nothing.
+          // An emptied name is put back rather than sent: the endpoint
+          // rejects 0 characters, and a parent should not have to read an
+          // error to learn that a toy needs a name.
+          nameInput.addEventListener('change', function () {
+            var next = (nameInput.value || '').trim();
+            if (!next) { nameInput.value = d.deviceName || ''; return; }
+            if (next === (d.deviceName || '')) return;
+            renameDevice(d.deviceId, next);
           });
-          renameRow.appendChild(saveNameBtn);
           listEl.appendChild(renameRow);
 
           // #074 revoke / restore — the credential kill-switch for a lost or
@@ -3831,20 +3865,20 @@
         row.appendChild(wrap);
       });
 
-      var saveBtn = document.createElement('button');
-      saveBtn.type = 'button';
-      saveBtn.textContent = t('save');
-      saveBtn.className = 'btn-ghost';
-      saveBtn.addEventListener('click', function () {
-        saveChildModeOverrides(
-          child.childId,
-          triToOverride(selects.story.value),
-          triToOverride(selects.game.value),
-          triToOverride(selects.riddle.value),
-          triToOverride(selects.curiosity.value)
-        );
+      // Each select saves itself. No all-off guard here on purpose: a child
+      // override forcing a mode off is a deliberate per-child decision, and
+      // the DEVICE still has to keep one mode on, which is guarded above.
+      ['story', 'game', 'riddle', 'curiosity'].forEach(function (k) {
+        selects[k].addEventListener('change', function () {
+          saveChildModeOverrides(
+            child.childId,
+            triToOverride(selects.story.value),
+            triToOverride(selects.game.value),
+            triToOverride(selects.riddle.value),
+            triToOverride(selects.curiosity.value)
+          );
+        });
       });
-      row.appendChild(saveBtn);
 
       var hint = document.createElement('span');
       hint.textContent = t('child_override_hint');
