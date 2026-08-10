@@ -65,6 +65,9 @@
 
   .wrap {
     max-width: 40rem;
+    /* One file path on this page is 36 characters. On a 390px phone that is
+       close enough to the edge to be worth saying explicitly. */
+    overflow-wrap: anywhere;
     margin: 0 auto;
     padding: 2.5rem 1.25rem 5rem;
     display: flex;
@@ -204,9 +207,9 @@
 
   <section class="next">
     <h2>Do this next</h2>
-    <p class="mins">One conversation · this week</p>
-    <p class="do">Ask the storyteller one question: would you allow an AI voice to be made from your voice?</p>
-    <p class="why" style="color:var(--ink-soft);margin-top:0.7rem;font-size:0.95rem;">Ask it before money is discussed. Some performers refuse at any price, and it is better to know in the first conversation. Everything else in the project is waiting behind his answer. Ask what he would charge to record the ten stories too, in case he says no to the AI part.</p>
+    <p class="mins">An afternoon at your computer · this week</p>
+    <p class="do">Record all ten stories again in the voice you picked, and fix the three broken ones at the same time.</p>
+    <p class="why" style="color:var(--ink-soft);margin-top:0.7rem;font-size:0.95rem;">You changed the order, and you were right: you cannot sell a famous storyteller an idea. You hand him a toy that already works and ask whether he wants it to be his voice. So the toy gets a good voice now — the one you chose — and he comes later. Good news: the same test that found the three half-length stories shows the new voice does <strong>not</strong> cut them short. Changing the voice is also the repair. Every command, in order: <strong>docs/story-audio-rerender-runbook.md</strong>.</p>
   </section>
 
   <section>
@@ -214,10 +217,10 @@
     <p class="note" style="margin-bottom:1.1rem;">Only three things in the whole project need <strong>you</strong>. Everything else is mine.</p>
     <ul class="rows">
       <li class="row">
-        <span class="chip c-you">Ask</span>
+        <span class="chip c-you">Run</span>
         <div>
-          <p class="what"><strong>The storyteller — will he allow an AI voice?</strong></p>
-          <p class="why">You decided: a real, famous Armenian storyteller, paid, with an AI copy of his voice so you can add stories later yourself. That can be done — just not on ElevenLabs, which forbids copying another person even with their permission. An Armenian company in Yerevan, VS.AM, sells exactly this. But none of it starts until he says yes.</p>
+          <p class="what"><strong>The re-recording. One afternoon, your machine, your key.</strong></p>
+          <p class="why">Ten stories in the new voice, including the two that have never been recorded at all. Nothing here needs me and nothing waits for anyone else. The runbook checks the result before it installs anything, so a story that comes back short is caught by the computer this time instead of by a child.</p>
         </div>
       </li>
       <li class="row">
@@ -235,7 +238,7 @@
         </div>
       </li>
     </ul>
-    <p class="note" style="margin-top:1.1rem;">One thing to remember much later, when you book the studio: ask for <strong>one sound file per part of a story</strong>, not one file for the whole story. It costs the studio nothing, it lets the toy know exactly where the child is in the tale, and it cannot be added after the recording is finished.</p>
+    <p class="note" style="margin-top:1.1rem;"><strong>The storyteller comes after this</strong>, not before — with a working toy in your hand, the conversation is a demonstration instead of a pitch. Everything you will need for it is written down and waiting: the first question to ask him, the letter in Armenian, what to put in the contract. Two things to remember then: ask him for <strong>one sound file per part of a story</strong> (it costs the studio nothing and cannot be added afterwards), and know that ElevenLabs cannot make a copy of someone else's voice even with their permission — an Armenian company in Yerevan, VS.AM, sells exactly that.</p>
   </section>
 
   <section>
@@ -257,7 +260,7 @@
         <span class="chip c-broken">Broken</span>
         <div>
           <p class="what"><strong>Three of the eight stories stop halfway.</strong> «Խոսող ձուկը» plays 1 minute 21 seconds of a story that needs 5 minutes 17 — the child never hears the ending.</p>
-          <p class="why">Found on 10 August. Nobody had ever compared the recordings against the text. Nothing is re-recorded yet on purpose: it gets fixed in the same session that gives the toy its new voice, so the work is done once instead of twice.</p>
+          <p class="why">Found on 10 August. Nobody had ever compared the recordings against the text. This is the first thing on the page above, and the fix is the same afternoon as the new voice — the new voice does not cut the stories short, so one job does both.</p>
         </div>
       </li>
       <li class="row">
@@ -358,8 +361,8 @@
       <li class="row">
         <span class="step-n">1</span>
         <div>
-          <p class="what"><strong>Settle the storyteller</strong>, then record all ten stories once — new voice, the three broken ones made whole, and the forest and river sounds mixed in.</p>
-          <p class="why">This is the one that changes how the toy feels. Three problems solved in a single session instead of three. Two of the ten stories have never been recorded at all and are twenty seconds each — while he is in the room they cost a minute.</p>
+          <p class="what"><strong>Record all ten stories</strong> in the voice you picked — the three broken ones made whole in the same pass.</p>
+          <p class="why">This is the one that changes how the toy feels, and it is the cheapest step on this page. Two of the ten have never been recorded at all — they are twenty seconds each. The forest and river sounds are not in this pass: no sound has been bought yet, and they do not change whether the toy works. They ride the next recording.</p>
         </div>
       </li>
       <li class="row">
@@ -394,7 +397,7 @@
   </section>
 
   <footer>
-    <p>Written for Hayk, updated 10 August 2026 after a full review of the repository. Every claim here was checked against the code and the actual sound files today, not remembered — which is how the three half-length stories were found. Where something is untested, it says untested.</p>
+    <p>Written for Hayk, updated 10 August 2026 — twice: once after a full review of the repository, and again when you reversed the order and put the working toy before the storyteller. Every claim here was checked against the code and the actual sound files today, not remembered — which is how the three half-length stories were found. Where something is untested, it says untested.</p>
   </footer>
 
 </div>
