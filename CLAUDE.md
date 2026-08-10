@@ -2294,6 +2294,27 @@ the thing the child is meant to notice.
 Sound licences are all `TBD`: nothing has been chosen or bought, so no file can
 quietly reach a toy without someone answering the question.
 
+**The mixer exists: `tools/story-audio/mix_ambience.py`.** Per-segment WAVs +
+the cue sheet + a sounds folder → one mixed story plus a `.segments.json` map,
+then `Ship-StoryAudio.ps1` levels and ships it. Dry-run by default (prints the
+resolved cue times and the exact ffmpeg command, writes nothing); `--self-test`
+verifies the timing maths with no audio and no ffmpeg. It deliberately does NOT
+level — measuring loudness on anything but the finished mix defeats the -16.4
+LUFS contract. Two rules it enforces that were learned by running it: `amix`
+carries `normalize=0`, because the default rescales every input by 1/N and would
+quietly pull the narration down as cues are added; and it warns when two cues
+land within 2 s, because a cue at the END of segment N and one at the START of
+N+1 are the same instant — that collision was real in «Ուլիկը» and is fixed.
+
+**Why the narrator must deliver one WAV per SEGMENT** (recorded in
+`docs/voice-narrator-brief.md` §3, and it cannot be added after the session):
+this repo has **zero** `.segments.json` files, so `OffsetToSegment` guesses a
+child's position from `offset / fileSize`. On the truncated stories that guess
+is badly wrong — `khosogh-dzuk`'s file holds 26% of the text, so a child near
+the end of the file is scored near the end of the story and gets an answer about
+a scene he has not heard. Per-segment files retire the guess, make ambience
+placement exact, and make a fluffed line a one-segment re-record.
+
 ## Spoken welcome flow (owner request 2026-08-04) — backend half
 
 The toy was SILENT at power-on and a button press always started/resumed a

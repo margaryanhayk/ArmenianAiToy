@@ -92,10 +92,39 @@ one and sloppy for the other has to be repeated.
 | | |
 |---|---|
 | Format | WAV, **48 kHz, 24-bit, mono** (44.1/16 acceptable floor). Never MP3 at source. |
+| Files | **One file per story SEGMENT, not one per story.** See below — this is the single most valuable thing to get right in the session. |
 | Room | Quiet, no echo. A proper booth if at all possible. |
 | Processing | **None.** No noise reduction, no EQ, no compression, no de-esser. Cloning wants raw. Levelling to -16.4 LUFS happens later in our own pipeline. |
 | Consistency | Same mic, same distance, same day. A clone trained on varying distance sounds unstable. |
 | Takes | Slate each one. Keep every raw file forever — that corpus is an asset. |
+
+**Ask for one file per segment — this cannot be added afterwards**
+
+The stories are already written as 4–9 numbered segments, so this costs the
+studio nothing (they slate takes anyway) and it buys four things at once:
+
+1. **An exact segment map, which this project has never had.** There are zero
+   `.segments.json` files in the repo today. The backend wants one
+   (`StoryQaController.OffsetToSegment`) and, not finding it, guesses with
+   `offset × segmentCount ÷ fileSize`.
+2. **Correct scene context when a child interrupts to ask a question.** That
+   guess is only as good as the file matching the text — and on the three
+   truncated stories it does not, so today a child near the end of the *file* is
+   scored as near the end of the *story* and gets an answer about a scene he has
+   not heard.
+3. **Exact ambience placement.** The 29 cues in
+   `backend/content/story-ambience/ambience-cues.json` are anchored to a segment
+   index plus a quoted line precisely *because* no timings exist. Per-segment
+   files turn those anchors into exact times with no guesswork.
+4. **Cheap corrections.** A fluffed line means re-recording one segment, not a
+   whole story.
+
+WAV per segment also removes the glued-header defect by construction: everything
+is concatenated once and encoded to MP3 exactly once, so there is never a second
+length header for a player to believe. That defect once made a four-minute story
+stop at 34 seconds.
+
+Name them `<storyId>-01.wav`, `<storyId>-02.wav`, … in reading order.
 
 **Content to record, in this order**
 

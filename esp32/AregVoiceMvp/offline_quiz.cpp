@@ -68,6 +68,20 @@ char wait_for_answer() {
 // Find question NN as /quiz/qNN-{y,n}.mp3 (plain quiz) or
 // /quiz/vkNN-{y,n}.mp3 (the Vardan-vs-Katrin 3-voice rounds).
 // Returns true and fills path + expected ('Y'/'N') + is_vk.
+//
+// KNOWN DEFECT (found 2026-08-10, deliberately NOT fixed here). The q and vk
+// probes below share ONE index space and q is tried first. The rendered set is
+// q01-q50 (every slot filled) and vk01-vk10, so for every n in 1..10 the q
+// probe matches and returns before vk is ever reached: *is_vk can never become
+// true and play_vk_feedback() is dead code. All 31 Vardan-vs-Katrin clips are
+// unreachable, card or no card.
+//
+// The fix is to give vk its own index range or its own scan loop — but that
+// belongs in the slice that actually revives this game and bench-tests it. Two
+// things that slice also needs: this whole file is behind
+// AREG_OFFLINE_QUIZ_BENCH, which is defined NOWHERE in the repo, and the quiz
+// is not on a button — it auto-fires 30 s after boot from the IDLE loop.
+// Context: rendered-content/README.md, and note the VK texts are still DRAFTS.
 bool find_question(int n, char *path, size_t path_len, char *expected,
                    bool *is_vk) {
     snprintf(path, path_len, "/quiz/q%02d-y.mp3", n);
