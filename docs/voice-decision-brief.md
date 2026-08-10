@@ -38,6 +38,34 @@ are in CLAUDE.md today:
    again inside five months.
    ([Voices capability docs](https://elevenlabs.io/docs/overview/capabilities/voices.md))
 
+   > **Independently verified 2026-08-10**, after the owner asked whether it was real.
+   > Until then this repo asserted it on the strength of one docs page read while writing
+   > this brief; a verification was offered on 2026-08-10 and not carried out, and it was
+   > repeated in conversation meanwhile as though settled. It is settled now.
+   >
+   > Two facts this brief did not carry, both from ElevenLabs' own help centre
+   > ([What are Default voices?](https://help.elevenlabs.io/hc/en-us/articles/26942950589969-What-are-Default-voices)):
+   > the Default set is being **replaced with new voices that do not expire**, and
+   > Default voices are **only available to accounts created before March 2026** — a new
+   > account never sees them at all.
+   >
+   > **The distinction that matters, and that was blurred when this was explained aloud:
+   > the expiry applies to Default voices only. It does NOT apply to a clone.**
+   >
+   > | | Expires 31 Dec 2026? |
+   > |---|---|
+   > | The six audition voices (Rachel, Bella, Charlotte, Antoni, Adam, Daniel) | **Yes** — all Default |
+   > | `areg-storyteller` — the 8 stories and 43 welcome clips | **No.** It is the owner's own PVC |
+   > | `vardan-v2` / `katrin-v3` — the 92 game and 31 VK clips | **Unconfirmed.** Almost certainly created voices rather than Default picks, but that is an inference from their version suffixes, not a check. Confirm in the account, where Default voices are labelled as such. |
+   >
+   > So the current library is **not** at risk from this date, and neither is the decision
+   > actually taken — a licensed clone of a hired storyteller is not a Default voice. This
+   > mattered only under the abandoned plan of adopting Charlotte or Daniel.
+   >
+   > Read second-hand: `elevenlabs.io` is blocked by this environment's egress proxy, so
+   > the wording above comes from their help-centre text via search rather than from the
+   > page itself. Their words, not a rumour — but not read at source.
+
 And one more, which explains a lot of the disappointment to date:
 
 > *"Professional Voice Clones (PVCs) are currently not fully optimized for Eleven v3,
