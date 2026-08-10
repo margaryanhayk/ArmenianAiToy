@@ -1,0 +1,172 @@
+{
+  "_status": "DRAFTS, 2026-08-10. Pending the owner's review, then a sound library with cleared licences, then the mix. Nothing at runtime reads this file. No sound has been chosen or bought; every licence field reads TBD on purpose.",
+  "_rules": {
+    "narrationIsLoudest": "The voice is never competed with. If a cue makes a sentence harder to understand, the cue is wrong.",
+    "sparse": "A scene establishes in 3-5 seconds and fades out. It does not run under the whole story.",
+    "levelIsRelative": "level is dB relative to the narration and is always negative.",
+    "anchor": "segment is the index into the story's segments[] array; cueLine is the exact line it lands on. Not timestamps - the shipped stories have no byte map and will be re-rendered.",
+    "loudness": "Mix first, then normalise the finished file to -16.4 LUFS. Never level narration and ambience separately.",
+    "afterMixing": "Ship with tools/story-audio/Ship-StoryAudio.ps1 -Fix -Apply so sha256, size and Version are re-stamped. Then the human listen test."
+  },
+  "sounds": [
+    { "id": "forest-day", "description": "Deep summer forest, mid-distance birds, no single bird in front.", "licence": "TBD" },
+    { "id": "forest-evening", "description": "The same forest later - lower, thinner, a little wind. Calm, never eerie.", "licence": "TBD" },
+    { "id": "river-shallow", "description": "A shallow river over stones, close but soft.", "licence": "TBD" },
+    { "id": "spring-trickle", "description": "A village spring running into a jug. Small and clear, not a waterfall.", "licence": "TBD" },
+    { "id": "water-splash", "description": "One gentle splash - something small returning to the water.", "licence": "TBD" },
+    { "id": "village-morning", "description": "Distant village at the start of a day. Very low, almost subliminal.", "licence": "TBD" },
+    { "id": "village-yard", "description": "A yard with animals a good way off - a goat, a hen, nothing in front.", "licence": "TBD" },
+    { "id": "open-country-wind", "description": "Open ground, light wind, a sense of walking somewhere.", "licence": "TBD" },
+    { "id": "wind-leaves", "description": "Wind through dry leaves - autumn.", "licence": "TBD" },
+    { "id": "wind-gust", "description": "One short gust. Used where a character blows, never as menace.", "licence": "TBD" },
+    { "id": "rain-light", "description": "First rain on leaves and roof.", "licence": "TBD" },
+    { "id": "rain-storm", "description": "Heavy rain against a window from indoors.", "licence": "TBD" },
+    { "id": "thunder-distant", "description": "Thunder far away and rounded. Never a sharp crack.", "licence": "TBD" },
+    { "id": "birds-dawn", "description": "First birds of the morning. Hopeful, used to end a story.", "licence": "TBD" },
+    { "id": "birds-spring", "description": "Spring birds, brighter and busier than dawn.", "licence": "TBD" },
+    { "id": "fire-cooking", "description": "A small fire and a pot. Homely.", "licence": "TBD" },
+    { "id": "door-knock", "description": "Three knocks on a wooden door. Firm, not alarming.", "licence": "TBD" },
+    { "id": "hall-murmur", "description": "A few people in a large room, no words distinguishable.", "licence": "TBD" }
+  ],
+  "stories": [
+    {
+      "storyId": "anban-huri",
+      "title": "Անբան Հուռին",
+      "cues": [
+        { "segment": 0, "at": "start", "kind": "scene", "sound": "village-morning", "seconds": 4, "level": -24, "holdUnder": false,
+          "cueLine": "Լինում է, չի լինում՝ մի կին։",
+          "note": "Places the tale in a village and then gets out. Kept very low so the opening line lands first." },
+        { "segment": 3, "at": "start", "kind": "scene", "sound": "river-shallow", "seconds": 5, "level": -20, "holdUnder": true,
+          "cueLine": "Մի օր էլ գետի ափովն անց կենալիս լսում է, որ գորտերը կոկռում են։",
+          "note": "The river is where the whole story turns. Water only - the narrator voices the frogs himself, and a real frog would talk over the joke." },
+        { "segment": 4, "at": "start", "kind": "scene", "sound": "river-shallow", "seconds": 3, "level": -22, "holdUnder": false,
+          "cueLine": "Գնում է, մի քանի օրից ետ է գալի։",
+          "note": "She is back at the same river. Shorter than the first time - the place is already established, this is only a reminder." },
+        { "segment": 6, "at": "start", "kind": "scene", "sound": "hall-murmur", "seconds": 3, "level": -26, "holdUnder": false,
+          "cueLine": "Քեֆի լավ ժամանակը մի բզեզ է ներս մտնում ու բռռացնելով պտտվում սենյակում։",
+          "note": "A feast in a room. No beetle sound - the narrator's «բռռացնելով» is funnier than anything we could add." }
+      ]
+    },
+    {
+      "storyId": "khosogh-dzuk",
+      "title": "Խոսող ձուկը",
+      "cues": [
+        { "segment": 0, "at": "start", "kind": "scene", "sound": "river-shallow", "seconds": 5, "level": -20, "holdUnder": true,
+          "cueLine": "Լինում է, չի լինում՝ մի աղքատ մարդ։",
+          "note": "The river is this story's home. Establish it once, properly, then keep a thread of it under the fishing." },
+        { "segment": 2, "at": "start", "kind": "oneshot", "sound": "water-splash", "seconds": 1, "level": -18, "holdUnder": false,
+          "cueLine": "Էս շալակատարի մեղքը գալիս է, առնում է, ետ գցում գետը։",
+          "note": "The kindness that the whole story pays back, in one sound. It must land exactly on «գցում գետը» and nowhere else." },
+        { "segment": 3, "at": "start", "kind": "scene", "sound": "open-country-wind", "seconds": 3, "level": -26, "holdUnder": false,
+          "cueLine": "- Հիմի ես ո՞ւր գնամ, ի՞նչ անեմ, ո՞նց ապրեմ․․․- տարակուսած մտածելով, դառն ու դատարկ վերադառնում է աղքատը դեպի տուն։",
+          "note": "He has left the river and is walking home with nothing. The change of place does the work; keep it faint." },
+        { "segment": 6, "at": "start", "kind": "oneshot", "sound": "door-knock", "seconds": 2, "level": -16, "holdUnder": false,
+          "cueLine": "Մին էլ կեսգիշերին դուռը դղրդում է։",
+          "note": "The tensest moment in the library. Firm knocks, not loud ones - the fear is already in the story and does not need help." },
+        { "segment": 8, "at": "start", "kind": "scene", "sound": "birds-dawn", "seconds": 4, "level": -22, "holdUnder": false,
+          "cueLine": "Հետն էլ բացվում է բարի լուսը, և երիտասարդ հյուրը վեր է կենում, մնաք բարով է ասում, որ գնա իր ճանապարհը։",
+          "note": "Morning after the night. This is the cue that tells a child the danger is over, before the words do." }
+      ]
+    },
+    {
+      "storyId": "pochat-aghves",
+      "title": "Պոչատ աղվեսը",
+      "cues": [
+        { "segment": 0, "at": "start", "kind": "scene", "sound": "village-yard", "seconds": 4, "level": -24, "holdUnder": false,
+          "cueLine": "Լինում է, չի լինում՝ մի պառավ․ էս պառավն իր էծը կթում է, կաթը վեր դնում, գնում է ցախ ու փետ բերի, որ կրակ անի, կաթն եփի։",
+          "note": "One yard, established once." },
+        { "segment": 2, "at": "start", "kind": "scene", "sound": "spring-trickle", "seconds": 4, "level": -22, "holdUnder": false,
+          "cueLine": "Աղվեսը գնում է աղբյուրի մոտ։",
+          "note": "The spring is the only genuinely different place in a chain of errands, so it is the only one worth marking." },
+        { "segment": 4, "at": "start", "kind": "scene", "sound": "open-country-wind", "seconds": 3, "level": -26, "holdUnder": false,
+          "cueLine": "Աղվեսը գնում է կալվորի մոտ։",
+          "note": "Out at the threshing floor. Deliberately only three cues in this story - it is a chain tale that repeats by design, and a sound on every link would become wallpaper." }
+      ]
+    },
+    {
+      "storyId": "sutlik-orskan",
+      "title": "Սուտլիկ որսկանը",
+      "cues": [
+        { "segment": 0, "at": "start", "kind": "scene", "sound": "open-country-wind", "seconds": 3, "level": -26, "holdUnder": false,
+          "cueLine": "Հորս կնունքով, մորս ծնունդով, վեր կացանք մի օր հինգ ու վեց հոգով, թրով—թվանքով որսի գնացինք։",
+          "note": "Setting out. Light - the comedy is in the telling and must not be dressed up." },
+        { "segment": 1, "at": "start", "kind": "scene", "sound": "open-country-wind", "seconds": 3, "level": -26, "holdUnder": false,
+          "cueLine": "Գնացի՜նք, գնացի՜նք, շատ թե քիչ, մին էլ տեսնենք երեք լիճ․ երկուսը՝ ցամաք, մնի մեջ էլ իսկի ջուր չկա։",
+          "note": "NO water here, on purpose. The joke is that the lakes have no water in them; a lapping shore would flatly contradict the line being spoken." },
+        { "segment": 4, "at": "start", "kind": "scene", "sound": "fire-cooking", "seconds": 3, "level": -24, "holdUnder": false,
+          "cueLine": "Ջուրը լցրինք էս անտակ պղինձը, մեջը ածինք բադն ու բրինձը, անկրակ եփեցինք։",
+          "note": "A pot that cooks with no fire, over a bottomless pan. The sound plays it straight while the words are absurd, which is the joke." }
+      ]
+    },
+    {
+      "storyId": "ulik",
+      "title": "Ուլիկը",
+      "cues": [
+        { "segment": 0, "at": "start", "kind": "scene", "sound": "forest-day", "seconds": 5, "level": -20, "holdUnder": true,
+          "cueLine": "Խոր անտառում մի այծ է լինում։",
+          "note": "«Խոր անտառում» - the deep forest, named in the first four words. This is the clearest forest cue in the whole library." },
+        { "segment": 1, "at": "end", "kind": "scene", "sound": "forest-evening", "seconds": 4, "level": -22, "holdUnder": true,
+          "cueLine": "Էս բոլորը թաքուն տեսնում է գայլը։",
+          "note": "The moment the wolf enters the story. The same forest, later in the day - the day cue from segment 0 hands over to this one. Calm, never eerie: the light changes, the mood does not." },
+        { "segment": 2, "at": "start", "kind": "oneshot", "sound": "door-knock", "seconds": 2, "level": -18, "holdUnder": false,
+          "cueLine": "Մի իրիկուն այծից առաջ գալիս է, դուռը զարկում ու իր հաստ ձայնով կանչում․",
+          "note": "The wolf at the door. No howl anywhere in this story - the menace is the voice, and that is the point the child is meant to notice." },
+        { "segment": 4, "at": "start", "kind": "oneshot", "sound": "door-knock", "seconds": 2, "level": -18, "holdUnder": false,
+          "cueLine": "Գալիս է մայրը, դուռը ծեծում․",
+          "note": "The SAME knock, at the same level, as the wolf's. That is deliberate: the door sounds identical and only the voice differs, which is exactly what the kid had to work out." }
+      ]
+    },
+    {
+      "storyId": "three-piglets",
+      "title": "Երեք խոզուկները",
+      "cues": [
+        { "segment": 0, "at": "start", "kind": "scene", "sound": "forest-day", "seconds": 4, "level": -22, "holdUnder": false,
+          "cueLine": "Ամբողջ ամառ նրանք ուրախ խաղում էին անտառի եզրին։",
+          "note": "Summer at the forest edge." },
+        { "segment": 1, "at": "start", "kind": "scene", "sound": "wind-leaves", "seconds": 3, "level": -24, "holdUnder": false,
+          "cueLine": "Աշնանը տերևները սկսեցին թափվել։",
+          "note": "Autumn. This story is built on the turn of the seasons, so the seasons are what get marked." },
+        { "segment": 2, "at": "start", "kind": "scene", "sound": "rain-light", "seconds": 4, "level": -22, "holdUnder": false,
+          "cueLine": "Երբ եկան առաջին անձրևները, եղբայրներն էլ գործի անցան։",
+          "note": "The first rains - the moment the brothers finally start working." },
+        { "segment": 3, "at": "start", "kind": "oneshot", "sound": "wind-gust", "seconds": 2, "level": -20, "holdUnder": false,
+          "cueLine": "Գայլը մոտեցավ ծղոտե տնակին ու փչեց ամբողջ ուժով։",
+          "note": "One gust on the first blow only, not on all three. A wind sound, never a growl - the wolf must stay a character in a story, not a thing in the room." },
+        { "segment": 5, "at": "start", "kind": "scene", "sound": "birds-spring", "seconds": 3, "level": -24, "holdUnder": false,
+          "cueLine": "Իսկ գարնանը Նիֆ-Նիֆն ու Նաֆ-Նաֆն էլ իրենց համար քարե տներ շինեցին։",
+          "note": "Spring, and everyone safe. Closes the seasonal arc the other cues opened." }
+      ]
+    },
+    {
+      "storyId": "sutasan",
+      "title": "Սուտասանը",
+      "cues": [
+        { "segment": 0, "at": "start", "kind": "scene", "sound": "hall-murmur", "seconds": 3, "level": -26, "holdUnder": false,
+          "cueLine": "Լինում է, չի լինում՝ մի թագավոր։",
+          "note": "A king's hall with people waiting in it. Almost entirely a dialogue story, so two cues is the whole budget." },
+        { "segment": 2, "at": "start", "kind": "oneshot", "sound": "thunder-distant", "seconds": 3, "level": -22, "holdUnder": false,
+          "cueLine": "Երեկ շատ անձրև եկավ, կայծակները տրաքեցին, երկինքը պատռվեց, գնացել էի կարկատելու։",
+          "note": "Thunder inside a lie - the tailor claims he went up to patch the torn sky. Far away and rounded, never a crack: it is a joke, not a storm." }
+      ]
+    },
+    {
+      "storyId": "princess-and-pea",
+      "title": "Արքայադուստրը և սիսեռահատիկը",
+      "cues": [
+        { "segment": 1, "at": "start", "kind": "scene", "sound": "rain-storm", "seconds": 5, "level": -20, "holdUnder": true,
+          "cueLine": "Մի երեկո եղանակը շատ վատացավ։",
+          "note": "The storm is the reason the girl arrives soaked, so it earns the longest establish in this story and a thread underneath." },
+        { "segment": 1, "at": "end", "kind": "oneshot", "sound": "door-knock", "seconds": 2, "level": -16, "holdUnder": false,
+          "cueLine": "Հանկարծ պալատի դուռը թակեցին։",
+          "note": "On «թակեցին», with the rain still under it. The rain fades out once she is indoors." },
+        { "segment": 3, "at": "start", "kind": "scene", "sound": "birds-dawn", "seconds": 3, "level": -26, "holdUnder": false,
+          "cueLine": "Առավոտյան թագուհին հարցրեց, թե ինչպես էր քնել։",
+          "note": "Morning after a sleepless night. Quiet - the story ends on a joke, not on weather." }
+      ]
+    }
+  ],
+  "_notCovered": {
+    "hedgehog-apple": "No narration audio shipped. Draft cues in the pass that first renders it.",
+    "little-cloud": "No narration audio shipped. Draft cues in the pass that first renders it."
+  }
+}
