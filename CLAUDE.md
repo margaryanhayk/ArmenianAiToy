@@ -2559,6 +2559,38 @@ for a voice nobody has heard would be speculative. The interface
 (`Application/Audio/IAudioSynthesisService.cs`) is already provider-neutral, so
 it is one class plus one DI line when the decision lands.
 
+**NARRATOR DECIDED IN PRINCIPLE (owner, 2026-08-10): a real, famous, living
+Armenian storyteller, paid, with a LICENSED AI CLONE of his voice — for the
+stories AND for Areg's live answers.** So the two-voices seam above is meant to
+CLOSE, not to be lived with. Practical consequences, and the reason this is not
+simply "pick a voice":
+
+- **ElevenLabs cannot serve this.** It forbids cloning another person even with
+  their consent (*"Even with their consent, you cannot clone someone else's
+  voice"*), enforced by a live voice-captcha no fee can bypass, and its cloning
+  carries no Armenian at all. The documented workaround — the person builds the
+  clone on THEIR account and shares it by link — puts the model, and the power
+  to revoke it, inside a contractor's account. Note the contrast with
+  `vardan-v2` / `katrin-v3`: those are **invented characters**, so there was
+  never anyone to ask.
+- **The vendor must hold three things at once** — third-party cloning with
+  documented consent, Armenian in the *cloned* voice, and low enough latency for
+  a live reply. No vendor is confirmed to hold all three. First doors:
+  **VS.AM (Yerevan)**, then **Camb.ai**.
+- **Latency is a veto, not a detail.** Today TTS is ~1.3 s inside a ~9–10 s
+  reply. A better voice that answers slower is a worse toy — if no vendor is
+  fast enough, the clone takes the (pre-rendered) stories and today's voice
+  keeps the live answers.
+- **Nothing is recorded before the AI clause is signed** — audio captured
+  without it cannot legally be cloned.
+
+Full package — the first question to ask him, the Armenian outreach draft
+(pending linguistic review), the studio spec, the contract clauses, the ten
+vendor questions, and the paid test that gates the whole decision:
+`docs/voice-narrator-brief.md`. The earlier options analysis stays in
+`docs/voice-decision-brief.md`; its Gemini/Azure re-audition is now a fallback,
+not the decision.
+
 ## Story Q&A text harness (`POST /api/story-qa-text`)
 
 Unauthenticated TEXT-only harness for checking in-story Q&A answer
