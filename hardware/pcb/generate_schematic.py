@@ -170,6 +170,16 @@ def get_pins(symdef):
 # TPS63802DLA — created from TI datasheet SLVSEU9D (rev D, Jan 2021),
 # Table 7-1: 1 EN, 2 MODE, 3 AGND, 4 FB, 5 PG, 6 VOUT, 7 L2, 8 GND, 9 L1,
 # 10 VIN. Package: 10-pin VSON-HR (DLA), 2.5 x 3.0 mm.
+#
+# PHASE-2 CORRECTION (2026-08-10): pin 11 = the exposed thermal PAD was
+# MISSING from this symbol, so the KiCad footprint's 1.65 x 2.40 mm EP land
+# carried no net and would have been left floating on the fabricated board.
+# That pad is the main GND return AND the only heat path for a 2 A
+# buck-boost; floating it is a thermal and a ground-return fault, not a
+# cosmetic one. Found by the layout generator (the pad had no net to route),
+# not by ERC — ERC cannot miss a pin that was never declared. Added as
+# `passive` (not power_in) so it does not trip the same pin-type warning the
+# MAX98357A's EP already carries.
 TPS63802_SYM = '''
 (symbol "TPS63802DLA" (exclude_from_sim no) (in_bom yes) (on_board yes)
   (property "Reference" "U" (at -7.62 11.43 0) (effects (font (size 1.27 1.27))))
@@ -202,6 +212,8 @@ TPS63802_SYM = '''
       (name "AGND" (effects (font (size 1.27 1.27)))) (number "3" (effects (font (size 1.27 1.27)))))
     (pin power_in line (at 11.43 -7.62 180) (length 2.54)
       (name "GND" (effects (font (size 1.27 1.27)))) (number "8" (effects (font (size 1.27 1.27)))))
+    (pin passive line (at 0 -12.7 90) (length 2.54)
+      (name "PAD" (effects (font (size 1.27 1.27)))) (number "11" (effects (font (size 1.27 1.27)))))
   )
 )
 '''
@@ -396,6 +408,7 @@ d.nets('U4', {
     '9': 'SW1', '7': 'SW2',
     '6': '+3V3', '4': 'FB63802', '5': NC,   # PG open-drain unused
     '3': 'GND', '8': 'GND',
+    '11': 'GND',      # exposed thermal PAD — datasheet-mandatory GND tie
 })
 # Contract part (rev-a-design-inputs.md): TDK VLS6045EX-2R2N, 2.2 uH / 5.1 A.
 # PHASE-2 GATE: confirm value against the TPS63802 datasheet inductor-selection
@@ -744,7 +757,12 @@ def emit():
         for num in pins:
             pintxt.append(f'\t\t(pin "{num}" (uuid "{new_uuid()}"))')
         dnp = 'yes' if inst['dnp'] else 'no'
-        in_bom = 'no' if inst['ref'].startswith('#') else 'yes'
+        # Test pads are bare copper artwork: no part number, no placement
+        # cost, no BOM line (jlcpcb-readiness.md § Through-hole). Marking
+        # them in-BOM here made the footprint/symbol BOM attributes disagree,
+        # which is what schematic-parity was reporting.
+        in_bom = ('no' if inst['ref'].startswith('#')
+                  or inst['ref'].startswith('TP') else 'yes')
         inst_txt.append(
             f'\t(symbol (lib_id "{lib_id}") (at {x0:g} {y0:g} 0) (unit 1)\n'
             f'\t\t(exclude_from_sim no) (in_bom {in_bom}) (on_board yes) '
