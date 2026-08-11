@@ -12,6 +12,7 @@ import { errText, FlaggedMessage, getFlagged, UnauthorizedError } from '../api';
 import { getLanguage, t, tf } from '../i18n';
 import { useLang } from '../useLang';
 import { theme } from '../theme';
+import DiaryFilter, { DiaryView } from './DiaryFilter';
 
 const LOCALE: Record<string, string> = { en: 'en-GB', ru: 'ru-RU', hy: 'hy-AM' };
 
@@ -19,6 +20,7 @@ type Props = {
   deviceId: string;
   deviceName: string;
   onBack: () => void;
+  onDiary: (v: DiaryView) => void;
   onOpenConversation: (conversationId: string) => void;
   onLogout: () => void;
 };
@@ -37,6 +39,7 @@ export default function FlaggedScreen({
   deviceId,
   deviceName,
   onBack,
+  onDiary,
   onOpenConversation,
   onLogout,
 }: Props) {
@@ -76,6 +79,7 @@ export default function FlaggedScreen({
         <Text style={styles.back}>{t('back_activity')}</Text>
       </Pressable>
       <Text style={styles.title}>{tf('flagged_of', { name: deviceName || t('toy_word') })}</Text>
+      <DiaryFilter current="flagged" onChange={onDiary} />
 
       {loading ? (
         <ActivityIndicator size="large" color={theme.brand} style={{ marginTop: 40 }} />

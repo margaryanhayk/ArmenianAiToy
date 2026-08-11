@@ -83,6 +83,18 @@ function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
     );
   }
 
+  // The diary's three views are one destination with three shapes, so the
+  // routing for them lives in one place rather than being spelled out three
+  // times with three chances to differ.
+  const goDiary = (deviceId: string, deviceName: string) => (v: 'conversations' | 'plays' | 'flagged') =>
+    setScreen(
+      v === 'plays'
+        ? { name: 'plays', deviceId, deviceName }
+        : v === 'flagged'
+          ? { name: 'flagged', deviceId, deviceName }
+          : { name: 'conversations', deviceId, deviceName },
+    );
+
   if (screen.name === 'capabilities') {
     return <CapabilitiesScreen onBack={() => setScreen({ name: 'devices' })} />;
   }
@@ -93,6 +105,7 @@ function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
         deviceId={screen.deviceId}
         deviceName={screen.deviceName}
         onBack={() => setScreen({ name: 'devices' })}
+        onDiary={goDiary(screen.deviceId, screen.deviceName)}
         onLogout={onLogout}
       />
     );
@@ -165,9 +178,7 @@ function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
             deviceName: screen.deviceName,
           })
         }
-        onOpenFlagged={() =>
-          setScreen({ name: 'flagged', deviceId: screen.deviceId, deviceName: screen.deviceName })
-        }
+        onDiary={goDiary(screen.deviceId, screen.deviceName)}
         onLogout={onLogout}
       />
     );
@@ -189,6 +200,7 @@ function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
             deviceName: screen.deviceName,
           })
         }
+        onDiary={goDiary(screen.deviceId, screen.deviceName)}
         onLogout={onLogout}
       />
     );
