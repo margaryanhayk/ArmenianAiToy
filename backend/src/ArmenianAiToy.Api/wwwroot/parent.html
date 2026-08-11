@@ -6320,6 +6320,41 @@
         ? 'padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;margin:6px 0 0;'
         : 'padding:14px;background:var(--surface-3);border:1px solid var(--line);border-radius:14px;margin:0 0 10px;';
 
+      // The cover, if one has been drawn. Found by CONVENTION —
+      // /covers/<storyId>.webp — so adding artwork is dropping a file in a
+      // folder: no endpoint, no DTO field, no config, no Version bump. The
+      // toy has no screen and never downloads these; only the parent sees
+      // them.
+      //
+      // A missing cover removes itself and the card reads exactly as it did
+      // before, which is what lets the set arrive one story at a time
+      // without a half-illustrated library looking broken.
+      if (!partLabel && s.storyId) {
+        // .webp first because it is a third the size, then the formats an
+        // image tool actually hands you. Trying them in the browser costs
+        // one 404 per miss and saves a conversion step per story.
+        var exts = ['webp', 'png', 'jpg'];
+        var attempt = 0;
+        var cover = document.createElement('img');
+        cover.alt = '';                  // decorative: the title is right below
+        cover.loading = 'lazy';
+        cover.decoding = 'async';
+        // 4:5 reserved up front so the page does not jump as covers land.
+        cover.style.cssText =
+          'display:block;width:100%;aspect-ratio:4/5;object-fit:cover;' +
+          'border-radius:10px;margin:0 0 10px;background:var(--surface-tint);';
+        cover.addEventListener('error', function () {
+          attempt += 1;
+          if (attempt < exts.length) {
+            cover.src = '/covers/' + encodeURIComponent(s.storyId) + '.' + exts[attempt];
+            return;
+          }
+          if (cover.parentNode) cover.parentNode.removeChild(cover);
+        });
+        cover.src = '/covers/' + encodeURIComponent(s.storyId) + '.' + exts[0];
+        card.appendChild(cover);
+      }
+
       var title = document.createElement('div');
       title.style.cssText = partLabel
         ? 'font-size:14px;font-weight:600;'
