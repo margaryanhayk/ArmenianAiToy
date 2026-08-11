@@ -13,6 +13,16 @@ namespace ArmenianAiToy.Application.Stories;
 /// that is malformed in ANY way must fail loudly at load/test time,
 /// never serve silently.
 /// </summary>
+/// <summary>One language's parent-facing text for a story. Every field is
+/// optional so a translation can cover only what has been written; an empty
+/// string is a shape violation, exactly as it is for the Armenian.</summary>
+internal sealed class StoryTextsDto
+{
+    public string? Title { get; init; }
+    public string? Goal { get; init; }
+    public string? Lesson { get; init; }
+}
+
 internal sealed class StoryFileDto
 {
     public required int SchemaVersion { get; init; }
@@ -37,6 +47,19 @@ internal sealed class StoryFileDto
     /// metadata, it is toy-spoken content: owner listen test gates any
     /// render of it.</summary>
     public string? Lesson { get; init; }
+
+    /// <summary>Optional PARENT-FACING translations of title / goal /
+    /// lesson, keyed by language code ("en", "ru"). The dashboard shows the
+    /// parent's own language and falls back to the Armenian above when a
+    /// language is missing, so a newly added story is never blank.
+    /// <para>
+    /// These are read by the parent app ONLY. Nothing here is ever spoken,
+    /// rendered to audio, or sent to the toy: the child hears Armenian, and
+    /// a translated string reaching the device would be a defect. Keep the
+    /// Armenian fields authoritative — these translate them, they do not
+    /// replace them.
+    /// </para></summary>
+    public Dictionary<string, StoryTextsDto>? Translations { get; init; }
 
     public required int MinAge { get; init; }
     public required int MaxAge { get; init; }
@@ -162,6 +185,34 @@ internal static class StoryFileParser
         {
             throw Fail(sourceName, "lesson is present but blank (omit the field instead)");
         }
+        if (dto.Translations is not null)
+        {
+            foreach (var (lang, texts) in dto.Translations)
+            {
+                if (string.IsNullOrWhiteSpace(lang))
+                {
+                    throw Fail(sourceName, "translations has a blank language key");
+                }
+                if (texts is null)
+                {
+                    throw Fail(sourceName, $"translations['{lang}'] is null (omit the key instead)");
+                }
+                // Present-but-blank is an authoring mistake here for the same
+                // reason it is for the Armenian: it silently ships an empty
+                // card field rather than falling back to the Armenian.
+                foreach (var (field, value) in new[]
+                         {
+                             ("title", texts.Title), ("goal", texts.Goal), ("lesson", texts.Lesson)
+                         })
+                {
+                    if (value is not null && string.IsNullOrWhiteSpace(value))
+                    {
+                        throw Fail(sourceName,
+                            $"translations['{lang}'].{field} is present but blank (omit the field instead)");
+                    }
+                }
+            }
+        }
         if (dto.MinAge <= 0 || dto.MaxAge < dto.MinAge)
         {
             throw Fail(sourceName, $"invalid age range {dto.MinAge}-{dto.MaxAge}");
@@ -238,6 +289,9 @@ internal static class StoryFileParser
             Author = dto.Author,
             Goal = dto.Goal,
             Lesson = dto.Lesson,
+            Translations = dto.Translations?.ToDictionary(
+                kv => kv.Key,
+                kv => new CuratedStoryTexts(kv.Value.Title, kv.Value.Goal, kv.Value.Lesson)),
             ReflectionConclusions = dto.ReflectionConclusions,
         };
     }

@@ -5,6 +5,18 @@
   "author": "Հովհաննես Թումանյան",
   "goal": "Պատմել աշխատասիրության արժեքի մասին։",
   "lesson": "Այս հեքիաթը հիշեցնում է, որ աշխատասիրությունը մարդուն դարձնում է օգտակար ու սիրելի, իսկ ծուլությունը ոչ մի բանի չի հասցնում։",
+  "translations": {
+    "en": {
+      "title": "Lazy Huri",
+      "goal": "A story about the value of hard work.",
+      "lesson": "Hard work makes a person useful and loved; idleness leads nowhere."
+    },
+    "ru": {
+      "title": "Ленивая Ури",
+      "goal": "История о ценности трудолюбия.",
+      "lesson": "Трудолюбие делает человека нужным и любимым, а лень не ведёт никуда."
+    }
+  },
   "minAge": 4,
   "maxAge": 7,
   "tone": "classic",

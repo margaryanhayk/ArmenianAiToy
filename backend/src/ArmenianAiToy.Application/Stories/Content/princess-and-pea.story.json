@@ -5,6 +5,18 @@
   "author": "Հանս Քրիստիան Անդերսեն",
   "goal": "Պատմել նրբանկատության և ճշմարտության մասին։",
   "lesson": "Իսկականը թաքցնել չես կարող․ ճշմարտությունը միշտ երևում է։",
+  "translations": {
+    "en": {
+      "title": "The Princess and the Pea",
+      "goal": "A story about sensitivity and truth.",
+      "lesson": "What is real cannot be hidden — the truth always shows."
+    },
+    "ru": {
+      "title": "Принцесса на горошине",
+      "goal": "История о чуткости и правде.",
+      "lesson": "Настоящее не спрячешь: правда всегда видна."
+    }
+  },
   "minAge": 4,
   "maxAge": 7,
   "tone": "warm",

@@ -4,6 +4,18 @@
   "title": "Երեք խոզուկները",
   "goal": "Պատմել ջանասիրության և հեռատեսության մասին։",
   "lesson": "Համբերությամբ ու ջանասիրությամբ արվածը ամուր է լինում և պաշտպանում է փորձանքից։",
+  "translations": {
+    "en": {
+      "title": "The Three Little Pigs",
+      "goal": "A story about diligence and thinking ahead.",
+      "lesson": "What is made with patience and care stands firm and keeps you safe."
+    },
+    "ru": {
+      "title": "Три поросёнка",
+      "goal": "История о старании и предусмотрительности.",
+      "lesson": "Сделанное терпеливо и старательно стоит крепко и защищает от беды."
+    }
+  },
   "minAge": 4,
   "maxAge": 7,
   "tone": "warm",

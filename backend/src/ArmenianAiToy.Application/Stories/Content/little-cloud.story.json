@@ -4,10 +4,26 @@
   "title": "Փոքրիկ ամպիկը",
   "goal": "Պատմել բարության և օգնելու ուրախության մասին։",
   "lesson": "Երբ օգնում ենք ուրիշներին, մեր սիրտն էլ է ուրախանում։",
+  "translations": {
+    "en": {
+      "title": "The Little Cloud",
+      "goal": "A story about kindness and the joy of helping.",
+      "lesson": "When we help others, our own heart is glad too."
+    },
+    "ru": {
+      "title": "Облачко",
+      "goal": "История о доброте и радости помогать.",
+      "lesson": "Когда мы помогаем другим, радуется и наше сердце."
+    }
+  },
   "minAge": 4,
   "maxAge": 7,
   "tone": "warm",
-  "tags": ["kindness", "helping", "friendship"],
+  "tags": [
+    "kindness",
+    "helping",
+    "friendship"
+  ],
   "category": "general",
   "bedtimeSafe": true,
   "segments": [

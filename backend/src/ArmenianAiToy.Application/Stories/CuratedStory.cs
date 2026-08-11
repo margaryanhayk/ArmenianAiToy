@@ -26,6 +26,10 @@ namespace ArmenianAiToy.Application.Stories;
 /// <param name="BedtimeSafe">True when every segment is free of
 /// startles/spikes and the story may surface near the bedtime
 /// window.</param>
+/// <summary>One language's parent-facing text for a story. Parent app only —
+/// never spoken, never rendered to audio, never sent to the toy.</summary>
+public sealed record CuratedStoryTexts(string? Title, string? Goal, string? Lesson);
+
 public sealed record CuratedStory(
     string Id,
     string Title,
@@ -59,4 +63,9 @@ public sealed record CuratedStory(
     /// library card. Null = no conclusions authored (the dialogue then
     /// closes with the reaction alone).</summary>
     public IReadOnlyList<string>? ReflectionConclusions { get; init; }
+
+    /// <summary>Parent-facing translations of title / goal / lesson, keyed by
+    /// language code. Null when none are authored — the parent app then shows
+    /// the Armenian. Never spoken: the child hears Armenian, always.</summary>
+    public IReadOnlyDictionary<string, CuratedStoryTexts>? Translations { get; init; }
 }

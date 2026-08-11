@@ -4,10 +4,26 @@
   "title": "Ոզնիկն ու խնձորը",
   "goal": "Պատմել ընկերության և միասին անելու ուժի մասին։",
   "lesson": "Ընկերոջ հետ ամեն դժվար գործ հեշտանում է, իսկ կիսված ուրախությունը կրկնապատկվում է։",
+  "translations": {
+    "en": {
+      "title": "The Hedgehog and the Apple",
+      "goal": "A story about friendship and the strength of doing things together.",
+      "lesson": "With a friend every hard task gets easier, and a shared joy is doubled."
+    },
+    "ru": {
+      "title": "Ёжик и яблоко",
+      "goal": "История о дружбе и о силе общего дела.",
+      "lesson": "С другом любое трудное дело легче, а разделённая радость вдвое больше."
+    }
+  },
   "minAge": 4,
   "maxAge": 7,
   "tone": "warm",
-  "tags": ["friendship", "sharing", "helping"],
+  "tags": [
+    "friendship",
+    "sharing",
+    "helping"
+  ],
   "category": "general",
   "bedtimeSafe": true,
   "segments": [

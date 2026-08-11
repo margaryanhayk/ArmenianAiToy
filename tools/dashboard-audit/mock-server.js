@@ -74,6 +74,11 @@ const messages = [
 
 const stories = [
   { storyId: 'ulik', title: 'Ուլիկը', author: 'Հովհաննես Թումանյան', goal: 'Զգուշություն օտարների հանդեպ',
+    translations: {
+      en: { title: 'The Little Goat', goal: 'A story about being careful and listening to grown-ups.',
+            lesson: 'Listening to your mother keeps a little one safe.' },
+      ru: { title: 'Козлёнок', goal: 'История об осторожности и о том, как важно слушать взрослых.',
+            lesson: 'Когда слушаешь маму, остаёшься в безопасности.' } },
     lesson: 'Մայրիկի խոսքը լսելը պաշտպանում է։', bedtimeSafe: true, minAge: 4, maxAge: 7, segmentCount: 6,
     reflectionQuestions: ['Ինչո՞ւ ուլիկը դուռը չբացեց։', 'Դու ի՞նչ կանեիր։', 'Ո՞վ էր ուլիկին օգնում։'],
     reflectionConclusions: ['Որովհետև ձայնը մայրիկինը չէր։', 'Լավ է հարցնել մեծերին։', 'Մայրիկը։'],
