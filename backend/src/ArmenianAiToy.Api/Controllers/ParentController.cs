@@ -401,6 +401,71 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Issue a short-lived invite so a SECOND parent can join this toy by typing
+    /// a code, rather than needing the toy's 36-character id plus the claim code
+    /// printed on its box. The code is returned ONCE and cannot be re-read.
+    ///
+    /// <para>
+    /// Silent 404 for a toy the caller does not own — same convention as every
+    /// other per-device endpoint here. Also 404 when the toy is revoked or
+    /// already has its two parents: the caller learns that no invite was
+    /// issued, not which of those was the reason.
+    /// </para>
+    ///
+    /// <para>
+    /// Rate-limited on the per-IP auth bucket. This mints a credential, which
+    /// puts it in the same class as claim and login rather than with the
+    /// read-only parent endpoints.
+    /// </para>
+    /// </summary>
+    [HttpPost("devices/{deviceId}/invite")]
+    [Authorize]
+    [EnableRateLimiting(AuthRateLimiter.PolicyName)]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(429)]
+    public async Task<IActionResult> CreateDeviceInvite(Guid deviceId)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var issued = await _parentService.CreateDeviceInviteAsync(parentId, deviceId);
+        if (issued == null)
+            return NotFound(new { error = "Device not found." });
+
+        return Ok(new { code = issued.Code, expiresAt = issued.ExpiresAt });
+    }
+
+    /// <summary>
+    /// Redeem an invite code and join the toy it belongs to. Takes only the
+    /// code — no device id — because that is what makes an invite worth having.
+    ///
+    /// <para>
+    /// ONE uniform 400 for every failure (unknown / expired / already used /
+    /// wrong code / revoked toy / toy already has two parents), exactly as
+    /// <see cref="ClaimDevice"/> does, so this cannot be used to discover which
+    /// codes or toys exist. Rate-limited on the auth bucket: a short typed code
+    /// is a brute-force surface.
+    /// </para>
+    /// </summary>
+    [HttpPost("devices/redeem-invite")]
+    [Authorize]
+    [EnableRateLimiting(AuthRateLimiter.PolicyName)]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(429)]
+    public async Task<IActionResult> RedeemDeviceInvite([FromBody] DeviceInviteRedeemRequest request)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var joined = await _parentService.RedeemDeviceInviteAsync(parentId, request.Code);
+
+        if (!joined)
+            return BadRequest(new { error = "That invite code didn't work. Ask for a new one." });
+
+        return Ok(new { joined = true });
+    }
+
+    /// <summary>
     /// Unlink a device from the authenticated parent account. Idempotent —
     /// the response is identical whether a link existed or not, so a caller
     /// cannot probe whether a given (parent, device) pair is real. Removes

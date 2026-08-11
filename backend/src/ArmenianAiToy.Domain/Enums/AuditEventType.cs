@@ -46,6 +46,19 @@ public enum AuditEventType
     /// the claimer; TargetDeviceId = the toy. No claim code in metadata.</summary>
     ParentDeviceClaimed,
 
+    /// <summary>A parent issued a short-lived invite so a SECOND parent could
+    /// link the same toy without its printed claim code. ActorParentId = the
+    /// issuer; TargetDeviceId = the toy. The code, its selector and any email
+    /// are deliberately absent from metadata — an audit row must not be a
+    /// second copy of the credential it describes.</summary>
+    ParentDeviceInviteCreated,
+
+    /// <summary>A parent redeemed an invite and took the second seat on a toy.
+    /// ActorParentId = the joiner; TargetDeviceId = the toy. Complements — does
+    /// not replace — ParentDeviceClaimed, which stays the record of the
+    /// printed-code path.</summary>
+    ParentDeviceInviteRedeemed,
+
     /// <summary>A parent renamed one of their linked devices (multi-toy
     /// labeling). ActorParentId = the parent; TargetDeviceId = the toy. The new
     /// name is NOT recorded (parent-chosen free text may contain a child's

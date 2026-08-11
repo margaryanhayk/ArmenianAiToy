@@ -23,6 +23,17 @@ public interface IParentService
     Task<ParentLoginResponse?> LoginAsync(string email, string password);
     Task<bool> LinkDeviceAsync(Guid parentId, Guid deviceId, string apiKey);
     Task<bool> ClaimDeviceAsync(Guid parentId, Guid deviceId, string claimCode);
+
+    /// <summary>Issue a short-lived invite letting a SECOND parent join this toy
+    /// without its printed claim code. Null when the caller does not own the toy,
+    /// the toy is revoked, or it already has its two parents. The returned code
+    /// is the only time it exists in readable form.</summary>
+    Task<DeviceInviteIssued?> CreateDeviceInviteAsync(Guid parentId, Guid deviceId);
+
+    /// <summary>Redeem an invite code and take a seat on the toy it belongs to.
+    /// False for every failure so the endpoint can answer uniformly. The
+    /// two-parent limit is re-checked here, not merely at issue time.</summary>
+    Task<bool> RedeemDeviceInviteAsync(Guid parentId, string code);
     Task<bool> UnlinkDeviceAsync(Guid parentId, Guid deviceId);
     Task<List<Guid>> GetLinkedDeviceIdsAsync(Guid parentId);
     Task<List<LinkedDeviceDto>> GetLinkedDeviceDetailsAsync(Guid parentId);

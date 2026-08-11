@@ -193,6 +193,35 @@ http.createServer((req, res) => {
       return req.on('end', () => {
         let payload = {};
         try { payload = JSON.parse(body || '{}'); } catch (e) { /* not json */ }
+        // Invites answer with a real-shaped code so the UI can be driven.
+        // The server is the authority on the two-parent limit, so this mock
+        // deliberately does NOT reimplement it - the limit is pinned by the
+        // C# tests, and a second copy of the rule here would only ever drift.
+        const inv = u.pathname.match(/\/devices\/([0-9a-f-]+)\/invite$/i);
+        if (inv) {
+          if (!devices.find((d) => d.deviceId === inv[1])) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ error: 'Device not found.' }));
+          }
+          if (req.method !== 'POST') {
+            // The catch-all below answers {ok:true} to anything, which once
+            // let a GET-instead-of-POST bug render an empty code under a
+            // success message. Refuse it here so the harness sees it.
+            res.writeHead(405, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ error: 'POST only.' }));
+          }
+          return send({ code: 'ABCDEFGHJKMN',
+                        expiresAt: new Date(now + 24 * 3600 * 1000).toISOString() });
+        }
+        if (req.method === 'POST' && u.pathname === '/api/parents/devices/redeem-invite') {
+          const code = String(payload.code || '').replace(/[^A-Za-z0-9]/g, '');
+          if (code.length !== 12) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ error: "That invite code didn't work." }));
+          }
+          return send({ joined: true });
+        }
+
         // Creating a child really adds one, so the toy page's "no child
         // profile" state can be tested BOTH ways - the form appears, and it
         // goes away once a profile exists. Accepting the POST and serving

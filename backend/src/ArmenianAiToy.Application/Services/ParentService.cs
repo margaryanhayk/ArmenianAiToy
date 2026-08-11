@@ -495,6 +495,222 @@ public class ParentService : IParentService
         return true;
     }
 
+    /// <summary>
+    /// Characters an invite code is drawn from. Deliberately excludes
+    /// I, L, O, U, 0 and 1: the code is read off a screen and often said aloud
+    /// down a phone, and O/0 and I/1/L are exactly where that goes wrong.
+    /// </summary>
+    private const string InviteAlphabet = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
+
+    /// <summary>Public half of the code — enough to make lookup unique, no more.</summary>
+    private const int InviteSelectorLength = 4;
+
+    /// <summary>Secret half. Eight characters of this alphabet is ~39 bits, which
+    /// is why it is stored as PBKDF2 and not as a bare hash.</summary>
+    private const int InviteSecretLength = 8;
+
+    /// <summary>Default lifetime of an invite. Short on purpose: it exists to be
+    /// used in the next few minutes while two people are talking to each other.</summary>
+    private const int DefaultInviteTtlHours = 24;
+
+    /// <summary>
+    /// Issue a short-lived invite so a SECOND parent can join this toy by typing
+    /// a code, instead of needing the toy's 36-character id plus the claim code
+    /// printed on its box.
+    ///
+    /// <para>
+    /// Returns the code exactly ONCE — only its selector and a PBKDF2 hash of
+    /// the secret half are stored. Returns null when the caller does not own the
+    /// toy, the toy is revoked, or the toy already has
+    /// <see cref="MaxParentsPerDevice"/> parents. Issuing a code that could not
+    /// be redeemed would be its own small lie.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Device.ClaimCodeHash is not touched.</b> The claim code backs the QR
+    /// printed on the toy and must keep working for the toy's whole life;
+    /// re-minting it to produce something shareable is the one thing this
+    /// feature must never do.
+    /// </para>
+    /// </summary>
+    public async Task<DeviceInviteIssued?> CreateDeviceInviteAsync(Guid parentId, Guid deviceId)
+    {
+        var owns = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!owns)
+            return null;
+
+        var device = await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == deviceId);
+        if (device == null || device.IsRevoked)
+            return null;
+
+        // Refused when the toy is already full. The seat is re-counted again at
+        // redemption — this check is about not handing someone a code that
+        // cannot work, not about enforcement.
+        var seatsTaken = await _db.Set<ParentDevice>()
+            .CountAsync(pd => pd.DeviceId == deviceId);
+        if (seatsTaken >= MaxParentsPerDevice)
+            return null;
+
+        string selector;
+        // The selector column is unique, so a collision is a real (if
+        // vanishingly rare) possibility rather than something to assume away.
+        var attempts = 0;
+        do
+        {
+            selector = RandomInviteString(InviteSelectorLength);
+            attempts++;
+        }
+        while (attempts < 5 &&
+               await _db.Set<DeviceInvite>().AnyAsync(i => i.Selector == selector));
+
+        var secret = RandomInviteString(InviteSecretLength);
+        var ttlHours = ReadInviteTtlHours();
+        var now = DateTime.UtcNow;
+
+        _db.Set<DeviceInvite>().Add(new DeviceInvite
+        {
+            Id = Guid.NewGuid(),
+            DeviceId = deviceId,
+            CreatedByParentId = parentId,
+            Selector = selector,
+            SecretHash = DeviceApiKeyHasher.Hash(secret),
+            CreatedAt = now,
+            ExpiresAt = now.AddHours(ttlHours)
+        });
+        TrackAndAddAudit(AuditEvent.ParentDeviceInviteCreated(parentId, deviceId));
+        await _db.SaveChangesAsync();
+
+        // Logged without the code. An invite in a log file is an invite.
+        _logger.LogInformation(
+            "Parent {ParentId} issued an invite for device {DeviceId}", parentId, deviceId);
+
+        return new DeviceInviteIssued(selector + secret, now.AddHours(ttlHours));
+    }
+
+    /// <summary>
+    /// Redeem an invite code and take a seat on the toy it belongs to.
+    /// Returns false for every failure — unknown / expired / already used /
+    /// wrong secret / revoked toy / toy already full — so the endpoint above it
+    /// can answer with ONE message and never become a way to probe which codes
+    /// or toys exist.
+    ///
+    /// <para>
+    /// <b>The seat limit is enforced HERE, not at issue time.</b> An invite
+    /// created while a seat was free can be presented after that seat has gone —
+    /// to the other parent using the printed code, or to a second outstanding
+    /// invite. The count is therefore re-taken immediately before the link is
+    /// added, using the same rule <see cref="ClaimDeviceAsync"/> uses.
+    /// </para>
+    /// </summary>
+    public async Task<bool> RedeemDeviceInviteAsync(Guid parentId, string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            return false;
+
+        // Accept what a person actually types: spaces, dashes, lower case.
+        var normalized = new string(code.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();
+        if (normalized.Length != InviteSelectorLength + InviteSecretLength)
+            return false;
+
+        var selector = normalized[..InviteSelectorLength];
+        var secret = normalized[InviteSelectorLength..];
+
+        var invite = await _db.Set<DeviceInvite>()
+            .FirstOrDefaultAsync(i => i.Selector == selector);
+        if (invite == null)
+            return false;
+
+        // Constant-time verify, same discipline as the device key and the claim
+        // code — the selector already told an attacker the row exists, so the
+        // secret compare is the part that must not leak timing.
+        if (!DeviceApiKeyHasher.Verify(secret, invite.SecretHash))
+            return false;
+
+        if (invite.ConsumedAt != null)
+            return false;
+        if (invite.ExpiresAt <= DateTime.UtcNow)
+            return false;
+
+        var device = await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == invite.DeviceId);
+        if (device == null || device.IsRevoked)
+            return false;
+
+        var alreadyLinked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == invite.DeviceId);
+
+        var existingHolders = new List<string>();
+        if (!alreadyLinked)
+        {
+            var seatsTaken = await _db.Set<ParentDevice>()
+                .CountAsync(pd => pd.DeviceId == invite.DeviceId);
+            if (seatsTaken >= MaxParentsPerDevice)
+                // Refused, and the invite is deliberately left UNCONSUMED: the
+                // seat may free up if someone unlinks, and burning the code
+                // here would punish the joiner for a race they did not cause.
+                return false;
+
+            existingHolders = await _db.Set<ParentDevice>()
+                .Where(pd => pd.DeviceId == invite.DeviceId)
+                .Join(_db.Set<Parent>(), pd => pd.ParentId, p => p.Id, (pd, p) => p)
+                .Where(p => p.AnonymizedAt == null && p.Email != null && p.Email != "")
+                .Select(p => p.Email!)
+                .ToListAsync();
+
+            _db.Set<ParentDevice>().Add(new ParentDevice
+            {
+                ParentId = parentId,
+                DeviceId = invite.DeviceId,
+                LinkedAt = DateTime.UtcNow
+            });
+        }
+
+        invite.ConsumedAt = DateTime.UtcNow;
+        invite.ConsumedByParentId = parentId;
+        device.ClaimedAt = DateTime.UtcNow;
+        TrackAndAddAudit(AuditEvent.ParentDeviceInviteRedeemed(parentId, invite.DeviceId));
+        await _db.SaveChangesAsync();
+        _logger.LogInformation(
+            "Parent {ParentId} redeemed an invite for device {DeviceId}", parentId, invite.DeviceId);
+
+        // Same contract as the printed-code path: whoever already held the toy
+        // is told somebody joined, never who. After the commit, best-effort.
+        var toyName = string.IsNullOrWhiteSpace(device.Name) ? "Areg" : device.Name;
+        foreach (var email in existingHolders)
+        {
+            try
+            {
+                await _notifier.SendToyJoinedByAnotherParentAsync(email, toyName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Could not notify an existing parent that device {DeviceId} was joined",
+                    invite.DeviceId);
+            }
+        }
+        return true;
+    }
+
+    private int ReadInviteTtlHours()
+    {
+        var raw = _config["Auth:DeviceInviteTtlHours"];
+        if (int.TryParse(raw, out var parsed) && parsed > 0)
+            return parsed;
+        return DefaultInviteTtlHours;
+    }
+
+    private static string RandomInviteString(int length)
+    {
+        // RandomNumberGenerator.GetString would do this in one call on .NET 8+,
+        // but spelling it out keeps the alphabet and the rejection-free indexing
+        // visible — GetInt32 is unbiased, unlike the % trick it replaces.
+        var chars = new char[length];
+        for (var i = 0; i < length; i++)
+            chars[i] = InviteAlphabet[RandomNumberGenerator.GetInt32(InviteAlphabet.Length)];
+        return new string(chars);
+    }
+
     public async Task<bool> UnlinkDeviceAsync(Guid parentId, Guid deviceId)
     {
         var link = await _db.Set<ParentDevice>()
