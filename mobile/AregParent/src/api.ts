@@ -256,6 +256,17 @@ export type LibraryStory = {
   listenCount: number;
   finishedCount: number;
   previewUrl: string | null;
+  /**
+   * Parent-facing text in the parent's language, keyed by language code.
+   * The story itself stays Armenian — it is what a child hears — but the
+   * DESCRIPTION is written for the parent, and an English-speaking one was
+   * being shown «Զգուշություն օտարների հանդեպ» under an English label.
+   *
+   * Absent, or absent for one field, is normal: falls back to the Armenian
+   * per FIELD rather than per story, so a half-written translation costs one
+   * line instead of the whole card.
+   */
+  translations?: Record<string, { title?: string | null; goal?: string | null; lesson?: string | null }> | null;
 };
 
 export type MusicTrack = { trackId: string; title: string; previewUrl: string | null };

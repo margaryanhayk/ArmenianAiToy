@@ -82,11 +82,20 @@ const stories = [
     lesson: 'Մայրիկի խոսքը լսելը պաշտպանում է։', bedtimeSafe: true, minAge: 4, maxAge: 7, segmentCount: 6,
     reflectionQuestions: ['Ինչո՞ւ ուլիկը դուռը չբացեց։', 'Դու ի՞նչ կանեիր։', 'Ո՞վ էր ուլիկին օգնում։'],
     reflectionConclusions: ['Որովհետև ձայնը մայրիկինը չէր։', 'Լավ է հարցնել մեծերին։', 'Մայրիկը։'],
-    listenCount: 12, finishedCount: 9, previewUrl: '/api/parents/stories/ulik/audio' },
+    listenCount: 12, finishedCount: 9, previewUrl: '/api/parents/stories/ulik/audio',
+    translations: {
+      en: { title: 'The Little Goat', goal: 'Being careful with strangers',
+            lesson: 'Listening to your mother' },
+      ru: { title: 'Козлёнок', goal: 'Осторожность с чужими',
+            lesson: 'Слушать маму' } } },
   { storyId: 'khosogh-dzuk', title: 'Խոսող ձուկը', author: 'Հովհաննես Թումանյան', goal: 'Բարություն',
     lesson: 'Բարությունը վերադառնում է։', bedtimeSafe: true, minAge: 5, maxAge: 7, segmentCount: 9,
     reflectionQuestions: ['Ինչո՞ւ տղան ձկանը բաց թողեց։'], reflectionConclusions: ['Որովհետև խղճաց։'],
-    listenCount: 7, finishedCount: 2, previewUrl: '/api/parents/stories/khosogh-dzuk/audio' },
+    listenCount: 7, finishedCount: 2, previewUrl: '/api/parents/stories/khosogh-dzuk/audio',
+    // Title only, on purpose: the fallback is PER FIELD, so this card must
+    // show an English title with its goal and lesson still in Armenian
+    // rather than dropping back to Armenian wholesale.
+    translations: { en: { title: 'The Talking Fish' } } },
   { storyId: 'three-piglets', title: 'Երեք խոզուկները', author: null, goal: 'Աշխատասիրություն',
     lesson: 'Հոգնած ձեռքը ամուր տուն է կառուցում։', bedtimeSafe: true, minAge: 4, maxAge: 6,
     segmentCount: 5, reflectionQuestions: ['Ո՞ր տունը ամենաամուրն էր։'], reflectionConclusions: ['Աղյուսից։'],
@@ -291,6 +300,7 @@ http.createServer((req, res) => {
   if (!file.startsWith(ROOT) || !fs.existsSync(file)) { res.writeHead(404); return res.end('not found'); }
   const ext = path.extname(file);
   const type = { '.html': 'text/html; charset=utf-8', '.png': 'image/png', '.json': 'application/json',
+                 '.webp': 'image/webp', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml',
                  '.webmanifest': 'application/manifest+json' }[ext] || 'application/octet-stream';
   res.writeHead(200, { 'Content-Type': type });
   res.end(fs.readFileSync(file));

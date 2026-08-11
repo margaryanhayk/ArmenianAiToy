@@ -226,7 +226,7 @@ export default function App() {
   if (booting) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2c4a7a" />
+        <ActivityIndicator size="large" color={theme.brand} />
         <StatusBar style="auto" />
       </View>
     );

@@ -56,7 +56,7 @@ export default function MusicScreen({ onBack, onLogout }: Props) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2c4a7a" />
+        <ActivityIndicator size="large" color={theme.brand} />
       </View>
     );
   }

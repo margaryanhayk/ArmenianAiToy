@@ -139,7 +139,7 @@ export default function DevicesScreen({
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2c4a7a" />
+        <ActivityIndicator size="large" color={theme.brand} />
       </View>
     );
   }
@@ -184,7 +184,7 @@ export default function DevicesScreen({
             disabled={claimBusy}
           >
             {claimBusy ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={theme.onBrand} />
             ) : (
               <Text style={styles.primaryBtnText}>{t('pair_toy')}</Text>
             )}

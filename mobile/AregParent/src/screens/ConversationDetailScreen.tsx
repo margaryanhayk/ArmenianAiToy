@@ -61,7 +61,7 @@ export default function ConversationDetailScreen({ conversationId, onBack, onLog
       <Text style={styles.title}>{t('conversation_title')}</Text>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#2c4a7a" style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={theme.brand} style={{ marginTop: 40 }} />
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
       ) : (
