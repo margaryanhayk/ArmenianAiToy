@@ -372,6 +372,7 @@
       align-items: center;
       justify-content: center;
       font-size: 20px;
+      color: var(--brand);
     }
     .tile .body { min-width: 0; flex: 1; }
     /* Both are <span>, so without this the title and the line under it run
@@ -3029,13 +3030,45 @@
     // Shared card affordance: icon, title, one line of explanation, chevron.
     // Used by the toy page and the account page so the same idea does not
     // get two different looks.
+    // Six tile marks, drawn rather than typed. Emoji were the only
+    // iconography on this page: every phone draws its own, none takes a
+    // colour, and at 20px ✍️ and 💭 are smudges. These are stroked in
+    // currentColor so they inherit the tile's own ink.
+    var TILE_ICONS = {
+      conversations: 'M4 5h16v11H9l-5 4z',                      // speech
+      journal: 'M5 4h14v16H5zM8 8h8M8 12h8M8 16h5',             // a page with lines
+      library: 'M4 5h6v15H4zM12 5h3v15h-3zM17 6l3 14',          // books on a shelf
+      music: 'M9 18V6l10-2v12M9 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19 16a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z',
+      request: 'M4 20l1-4L16 5l3 3L8 19zM14 7l3 3',             // a nib
+      settings: 'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2'
+    };
+
+    function tileIcon(name) {
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('width', '21');
+      svg.setAttribute('height', '21');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '1.7');
+      svg.setAttribute('stroke-linecap', 'round');
+      svg.setAttribute('stroke-linejoin', 'round');
+      svg.setAttribute('aria-hidden', 'true');
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', TILE_ICONS[name] || TILE_ICONS.conversations);
+      svg.appendChild(path);
+      return svg;
+    }
+
     function buildTile(icon, titleKey, subKey, onClick, isMain) {
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'tile' + (isMain ? ' tile-main' : '');
       var ico = document.createElement('span');
       ico.className = 'ico';
-      ico.textContent = icon;
+      // A name draws; anything else is still printed, so no caller breaks.
+      if (TILE_ICONS[icon]) ico.appendChild(tileIcon(icon));
+      else ico.textContent = icon;
       var body = document.createElement('span');
       body.className = 'body';
       var tt = document.createElement('span');
@@ -3193,7 +3226,7 @@
       // request form (moved into the toy page, owner decision 2026-08-04).
       var links = document.getElementById('toyContentLinks');
       clearChildren(links);
-      links.appendChild(buildTile('💬', 'tile_conversations', 'tile_conversations_sub', function () {
+      links.appendChild(buildTile('conversations', 'tile_conversations', 'tile_conversations_sub', function () {
         openDevice(d.deviceId);
       }, true));
       // Next to Conversations on purpose: these two are the record of the
@@ -3201,16 +3234,16 @@
       // toy can play. Reached from here rather than the tab strip, which
       // was deliberately cut back to three pills for phone width — and a
       // distinct 💭 so it does not scan as a second Conversations tile.
-      links.appendChild(buildTile('💭', 'tile_journal', 'tile_journal_sub', function () {
+      links.appendChild(buildTile('journal', 'tile_journal', 'tile_journal_sub', function () {
         state.currentDeviceId = d.deviceId;
         state.journalOffset = 0;   // a fresh visit starts at the newest
         loadReflectionJournal();
       }));
-      links.appendChild(buildTile('📚', 'tile_library', 'tile_library_sub', function () {
+      links.appendChild(buildTile('library', 'tile_library', 'tile_library_sub', function () {
         loadStoryLibrary(d.deviceId);
       }));
-      links.appendChild(buildTile('🎵', 'tile_music', 'tile_music_sub', loadMusicLibrary));
-      links.appendChild(buildTile('✍️', 'tile_request', 'tile_request_sub', function () {
+      links.appendChild(buildTile('music', 'tile_music', 'tile_music_sub', loadMusicLibrary));
+      links.appendChild(buildTile('request', 'tile_request', 'tile_request_sub', function () {
         var f = document.getElementById('storyRequestForm');
         if (!f) return;   // defensive: block detached (see cache below)
         f.hidden = !f.hidden;
@@ -3229,7 +3262,7 @@
       }
       // Settings last: the content above is what a parent came to see, and
       // bedtime is the once-a-month visit.
-      links.appendChild(buildTile('⚙️', 'tile_settings', 'tile_settings_sub', function () {
+      links.appendChild(buildTile('settings', 'tile_settings', 'tile_settings_sub', function () {
         openToySettings(d.deviceId);
       }));
 
