@@ -169,6 +169,31 @@ public class AuditEvent
         TargetDeviceId = deviceId
     };
 
+    /// <summary>A parent issued an invite for a second parent to join this toy.
+    /// No metadata: the code and its selector are the credential, and an audit
+    /// row that carried them would hand a database reader the invite itself.
+    /// Who redeemed it is recorded separately, if anyone does.</summary>
+    public static AuditEvent ParentDeviceInviteCreated(Guid parentId, Guid deviceId) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDeviceInviteCreated,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId
+    };
+
+    /// <summary>A parent redeemed an invite and took a seat on this toy.
+    /// ActorParentId is the JOINER, so the row appears in the joiner's own
+    /// activity feed; the issuing parent already has their Created row.</summary>
+    public static AuditEvent ParentDeviceInviteRedeemed(Guid parentId, Guid deviceId) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDeviceInviteRedeemed,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId
+    };
+
     /// <summary>A parent renamed a linked device. No metadata — the chosen name
     /// is parent free-text that could carry a child's name (PII); we record
     /// only that a rename occurred. Current name lives on the Device row.</summary>

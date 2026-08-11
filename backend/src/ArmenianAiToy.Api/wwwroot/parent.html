@@ -1188,6 +1188,22 @@
         <div id="claimDeviceForm" hidden
              style="margin-top:8px;padding:10px 12px;background:var(--ok-bg-soft);
                     border:1px solid var(--ok-line-soft);border-radius:6px;max-width:420px;">
+          <!-- The invite path FIRST: someone joining a toy their partner
+               already set up needs one short code and nothing else, and that
+               is now the commoner case of the two. The box path stays below
+               for the parent unpacking a new toy. -->
+          <div style="margin:0 0 12px;padding-bottom:12px;border-bottom:1px dashed var(--ok-line-soft);">
+            <label for="redeemInviteInput" style="display:block;font-size:12px;color:var(--ink-3);"
+                   data-i18n="invite_have">Got an invite code?</label>
+            <input id="redeemInviteInput" type="text" autocomplete="off"
+                   spellcheck="false" maxlength="20"
+                   placeholder="ABCD-EFGH-JKLM" data-i18n-ph="invite_ph"
+                   style="width:100%;padding:10px;margin:2px 0 8px;box-sizing:border-box;
+                          font-family:ui-monospace,Menlo,Consolas,monospace;
+                          text-transform:uppercase;">
+            <button id="redeemInviteBtn" type="button" data-i18n="invite_join">Join this toy</button>
+            <div id="redeemInviteStatus" class="status muted" aria-live="polite"></div>
+          </div>
           <p style="margin:0 0 8px;font-size:13px;color:var(--ok-ink-soft);" data-i18n="claim_help">
             Enter the pairing code from your toy's box or setup card (the app can
             scan its QR instead). This links the toy to your account.</p>
@@ -1730,6 +1746,16 @@
       share_id_label: { en: "This toy's number", ru: 'Номер этой игрушки', hy: 'Այս խաղալիքի համարը' },
       share_copy: { en: 'Copy', ru: 'Копировать', hy: 'Պատճենել' },
       share_copied: { en: 'Copied ✓', ru: 'Скопировано ✓', hy: 'Պատճենվեց ✓' },
+      invite_intro: { en: 'Easier: make a code they can type. It works once and lasts a day. The code printed on your toy keeps working as before.', ru: 'Проще: создайте код, который он введёт. Он сработает один раз и действует сутки. Код на коробке продолжит работать как раньше.', hy: 'Ավելի հեշտ՝ ստեղծեք կոդ, որ նա մուտքագրի։ Այն աշխատում է մեկ անգամ և գործում է մեկ օր։ Խաղալիքի վրա տպված կոդը շարունակում է աշխատել ինչպես առաջ։' },
+      invite_make: { en: 'Make an invite code', ru: 'Создать код-приглашение', hy: 'Ստեղծել հրավերի կոդ' },
+      invite_again: { en: 'Make another one', ru: 'Создать ещё один', hy: 'Ստեղծել մեկ ուրիշը' },
+      invite_once: { en: 'Write it down or send it now — it is shown only this once. Making a new one is free.', ru: 'Запишите или отправьте прямо сейчас — он показывается только один раз. Создать новый можно в любой момент.', hy: 'Գրեք կամ ուղարկեք հիմա — ցուցադրվում է միայն այս մեկ անգամ։ Նորը ստեղծելը միշտ հնարավոր է։' },
+      invite_failed: { en: 'Could not make a code. This toy may already have two people on it — that is the limit.', ru: 'Не удалось создать код. Возможно, у этой игрушки уже два человека — это максимум.', hy: 'Չհաջողվեց կոդ ստեղծել։ Հնարավոր է՝ այս խաղալիքն արդեն երկու հոգի ունի — դա սահմանն է։' },
+      invite_have: { en: 'Got an invite code?', ru: 'Есть код-приглашение?', hy: 'Հրավերի կոդ ունե՞ք' },
+      invite_ph: { en: 'ABCD-EFGH-JKLM', ru: 'ABCD-EFGH-JKLM', hy: 'ABCD-EFGH-JKLM' },
+      invite_join: { en: 'Join this toy', ru: 'Присоединиться', hy: 'Միանալ խաղալիքին' },
+      invite_joined: { en: 'Done — the toy is on your account now.', ru: 'Готово — игрушка теперь в вашем аккаунте.', hy: 'Պատրաստ է — խաղալիքն այժմ ձեր հաշվում է։' },
+      invite_bad: { en: "That invite code didn't work. Ask for a new one.", ru: 'Код-приглашение не подошёл. Попросите новый.', hy: 'Հրավերի կոդը չաշխատեց։ Խնդրեք նորը։' },
       share_code_note: { en: 'The pairing code is the one printed on the toy’s box. It is not kept here, so it cannot be shown — if the box is lost, ask us for a new one.', ru: 'Код привязки напечатан на коробке игрушки. Здесь он не хранится, поэтому показать его нельзя — если коробка потерялась, попросите у нас новый.', hy: 'Կապակցման կոդը տպված է խաղալիքի տուփի վրա։ Այն այստեղ չի պահվում, ուստի ցույց տալ հնարավոր չէ — եթե տուփը կորել է, խնդրեք մեզնից նորը։' },
       // The three diary destinations that are not play modes. Worded as
       // things that happened, matching the play modes beside them, rather
@@ -4594,6 +4620,96 @@
       codeNote.style.cssText = 'font-size:12px;color:var(--ink-muted);line-height:1.55;margin:10px 0 0;';
       body.appendChild(codeNote);
 
+      // The easy way: a code the other parent can type, with no toy number and
+      // no box. Sits under the manual route rather than replacing it - the box
+      // still works, and works when this toy has no internet.
+      var inviteWrap = document.createElement('div');
+      inviteWrap.style.cssText = 'margin-top:12px;padding-top:12px;' +
+        'border-top:1px solid var(--line-soft);';
+
+      var inviteIntro = document.createElement('p');
+      inviteIntro.textContent = t('invite_intro');
+      inviteIntro.style.cssText = 'font-size:12.5px;color:var(--ink-muted);line-height:1.55;margin:0 0 8px;';
+      inviteWrap.appendChild(inviteIntro);
+
+      var inviteBtn = document.createElement('button');
+      inviteBtn.type = 'button';
+      inviteBtn.className = 'btn-ghost';
+      inviteBtn.textContent = t('invite_make');
+      inviteBtn.style.fontSize = '13px';
+      inviteWrap.appendChild(inviteBtn);
+
+      var inviteOut = document.createElement('div');
+      inviteOut.hidden = true;
+      inviteOut.style.marginTop = '10px';
+      inviteWrap.appendChild(inviteOut);
+
+      inviteBtn.addEventListener('click', function () {
+        inviteBtn.disabled = true;
+        inviteBtn.textContent = t('busy_saving');
+        // Raw fetch, NOT authedFetch: that helper takes only a url and always
+        // issues a GET, so an options object handed to it is silently dropped.
+        // This went out as a GET the first time and the mock's catch-all
+        // answered {ok:true}, which rendered an EMPTY code box under a success
+        // message - the real endpoint would simply have refused.
+        var token = getToken();
+        if (!token) { sessionExpired(); return; }
+        fetch('/api/parents/devices/' + encodeURIComponent(d.deviceId) + '/invite', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Accept': 'application/json'
+          }
+        })
+          .then(function (res) {
+            if (res.status === 401) { sessionExpired(); return Promise.reject(); }
+            if (!res.ok) return Promise.reject();
+            return res.json();
+          })
+          .then(function (r) {
+            // A body without a code is a failure however the status read.
+            if (!r || !r.code) return Promise.reject();
+            inviteBtn.disabled = false;
+            inviteBtn.textContent = t('invite_again');
+            clearChildren(inviteOut);
+            inviteOut.hidden = false;
+
+            var code = document.createElement('div');
+            // Grouped in fours. A code is read aloud down a phone at least as
+            // often as it is copied, and unbroken 12 characters is where that
+            // goes wrong.
+            var raw = String((r && r.code) || '');
+            code.textContent = raw.replace(/(.{4})(.{4})(.{4})/, '$1-$2-$3');
+            code.style.cssText = 'font-family:ui-monospace,Menlo,Consolas,monospace;' +
+              'font-size:20px;font-weight:700;letter-spacing:2px;user-select:all;' +
+              'background:var(--surface);border:1px solid var(--line-soft);' +
+              'border-radius:8px;padding:10px 12px;text-align:center;';
+            inviteOut.appendChild(code);
+
+            var once = document.createElement('p');
+            // Said plainly because it is true: only the selector and a hash of
+            // the rest are stored, so nothing can show this code again.
+            once.textContent = t('invite_once');
+            once.style.cssText = 'font-size:12px;color:var(--ink-muted);line-height:1.55;margin:8px 0 0;';
+            inviteOut.appendChild(once);
+          })
+          .catch(function () {
+            inviteBtn.disabled = false;
+            inviteBtn.textContent = t('invite_make');
+            clearChildren(inviteOut);
+            inviteOut.hidden = false;
+            var err = document.createElement('p');
+            // The endpoint answers 404 for "not yours", "revoked" and "already
+            // has two parents" alike, so the only honest message covers all
+            // three rather than guessing which one happened.
+            err.textContent = t('invite_failed');
+            err.style.cssText = 'font-size:12.5px;color:var(--danger-ink-7);line-height:1.55;margin:0;';
+            inviteOut.appendChild(err);
+          });
+      });
+
+      body.appendChild(inviteWrap);
+
       openBtn.addEventListener('click', function () { body.hidden = !body.hidden; });
       wrap.appendChild(body);
       return wrap;
@@ -4969,6 +5085,55 @@
       }).catch(function () {
         claimBtn.disabled = false;
         setStatus('claimDeviceStatus', t('err_network'), 'err');
+      });
+    }
+
+    // Redeem an invite code. Same shape as claimDevice above, minus the device
+    // id — an invite carries its own selector, which is the entire point.
+    function redeemInvite() {
+      var token = getToken();
+      if (!token) { sessionExpired(); return; }
+      var input = document.getElementById('redeemInviteInput');
+      var btn = document.getElementById('redeemInviteBtn');
+      var raw = (input.value || '').trim();
+      if (!raw) { setStatus('redeemInviteStatus', t('invite_bad'), 'err'); return; }
+
+      // Single-use, so a double tap would spend the code and then report that
+      // it did not work — the same trap claimDevice already learned.
+      btn.disabled = true;
+      setStatus('redeemInviteStatus', t('busy_pairing'), 'muted');
+      fetch('/api/parents/devices/redeem-invite', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ code: raw })
+      }).then(function (res) {
+        btn.disabled = false;
+        if (res.status === 401) { sessionExpired(); return null; }
+        if (res.status === 429) {
+          setStatus('redeemInviteStatus', t('err_too_many'), 'err');
+          return null;
+        }
+        if (!res.ok) {
+          // The server answers one 400 for every reason on purpose, so the UI
+          // must not invent a more specific story than it was told.
+          setStatus('redeemInviteStatus', t('invite_bad'), 'err');
+          return null;
+        }
+        return res.json();
+      }).then(function (data) {
+        if (data && data.joined) {
+          input.value = '';
+          setStatus('redeemInviteStatus', t('invite_joined'), 'ok');
+          document.getElementById('claimDeviceForm').hidden = true;
+          loadDevices();
+        }
+      }).catch(function () {
+        btn.disabled = false;
+        setStatus('redeemInviteStatus', t('err_network'), 'err');
       });
     }
 
@@ -5960,6 +6125,7 @@
     document.getElementById('flaggedNewerBtn').addEventListener('click', pageNewerFlagged);
     document.getElementById('linkDeviceBtn').addEventListener('click', submitLinkDevice);
     document.getElementById('claimDeviceBtn').addEventListener('click', claimDevice);
+    document.getElementById('redeemInviteBtn').addEventListener('click', redeemInvite);
     document.getElementById('toggleClaimBtn').addEventListener('click', function () {
       var f = document.getElementById('claimDeviceForm');
       f.hidden = !f.hidden;

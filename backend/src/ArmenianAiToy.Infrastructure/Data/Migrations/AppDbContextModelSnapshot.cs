@@ -288,6 +288,48 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                     b.ToTable("DeviceCommands");
                 });
 
+            modelBuilder.Entity("ArmenianAiToy.Domain.Entities.DeviceInvite", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ConsumedByParentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CreatedByParentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SecretHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Selector")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId");
+
+                    b.HasIndex("Selector")
+                        .IsUnique();
+
+                    b.ToTable("DeviceInvites");
+                });
+
             modelBuilder.Entity("ArmenianAiToy.Domain.Entities.Message", b =>
                 {
                     b.Property<Guid>("Id")
@@ -603,6 +645,17 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                 });
 
             modelBuilder.Entity("ArmenianAiToy.Domain.Entities.DeviceCommand", b =>
+                {
+                    b.HasOne("ArmenianAiToy.Domain.Entities.Device", "Device")
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Device");
+                });
+
+            modelBuilder.Entity("ArmenianAiToy.Domain.Entities.DeviceInvite", b =>
                 {
                     b.HasOne("ArmenianAiToy.Domain.Entities.Device", "Device")
                         .WithMany()

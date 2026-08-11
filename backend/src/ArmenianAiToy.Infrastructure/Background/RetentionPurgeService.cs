@@ -268,6 +268,7 @@ public sealed class RetentionPurgeService : BackgroundService
         await PurgeExpiredConversationsAsync(db, blobStore, maxAgeDays, stoppingToken);
         await PurgeStalePasswordResetTokensAsync(db, stoppingToken);
         await PurgeStaleEmailVerificationTokensAsync(db, stoppingToken);
+        await PurgeStaleDeviceInvitesAsync(db, stoppingToken);
         // Anonymize before warn is deliberate. If warn ran first it
         // would stamp DormancyWarnedAt to "now" for every refire-due
         // parent, and the 7-day grace-floor condition on anonymize
@@ -1058,6 +1059,37 @@ public sealed class RetentionPurgeService : BackgroundService
             _logger.LogInformation(
                 "RetentionPurgeService tick: deleted {DevicesDeleted} dormant device(s) (warn={WarnAfterDays}d, delete={DeleteAfterDays}d).",
                 devicesDeleted, warnAfterDays, deleteAfterDays);
+        }
+    }
+
+    /// <summary>
+    /// Deletes stale <c>DeviceInvite</c> rows — the short-lived codes that let a
+    /// second parent join a toy. Same rule and same shape as the two token
+    /// passes above: consumed invites go unconditionally, expired ones once
+    /// they are past the grace window.
+    ///
+    /// <para>
+    /// No audit row: the <c>ParentDeviceInviteCreated</c> and
+    /// <c>ParentDeviceInviteRedeemed</c> rows already record what happened, and
+    /// they are the durable account. This is the credential being swept up
+    /// afterwards, not the event.
+    /// </para>
+    /// </summary>
+    private async Task PurgeStaleDeviceInvitesAsync(
+        AppDbContext db, CancellationToken stoppingToken)
+    {
+        var graceHours = ReadPasswordResetGracePeriodHours();
+        var expiryCutoff = DateTime.UtcNow - TimeSpan.FromHours(graceHours);
+
+        var deleted = await db.Set<DeviceInvite>()
+            .Where(i => i.ConsumedAt != null || i.ExpiresAt < expiryCutoff)
+            .ExecuteDeleteAsync(stoppingToken);
+
+        if (deleted > 0)
+        {
+            _logger.LogInformation(
+                "RetentionPurgeService tick: cleaned up {Deleted} stale device invite(s) (graceHours={GraceHours}).",
+                deleted, graceHours);
         }
     }
 

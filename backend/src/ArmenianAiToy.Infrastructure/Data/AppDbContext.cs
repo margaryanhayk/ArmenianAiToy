@@ -21,6 +21,7 @@ public class AppDbContext : DbContext
     public DbSet<StoryPlay> StoryPlays => Set<StoryPlay>();
     public DbSet<StoryReflectionAnswer> StoryReflectionAnswers => Set<StoryReflectionAnswer>();
     public DbSet<StoryRequest> StoryRequests => Set<StoryRequest>();
+    public DbSet<DeviceInvite> DeviceInvites => Set<DeviceInvite>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -139,6 +140,23 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(t => t.TokenHash).IsUnique();
             e.HasIndex(t => t.ParentId);
+        });
+
+        // DeviceInvite — short-lived, single-use invitation letting a SECOND
+        // parent join a toy without its printed claim code. FK cascade to
+        // Device: an invite must not outlive the toy it opens. Unique index on
+        // Selector because redemption looks the row up by selector alone — the
+        // joiner is not asked for a device id, which is the whole point.
+        // CreatedByParentId is deliberately NOT a FK (see the entity xmldoc).
+        modelBuilder.Entity<DeviceInvite>(e =>
+        {
+            e.HasKey(i => i.Id);
+            e.HasOne(i => i.Device)
+                .WithMany()
+                .HasForeignKey(i => i.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(i => i.Selector).IsUnique();
+            e.HasIndex(i => i.DeviceId);
         });
 
         // DeviceCommand — the OTA-foundation / device command queue. FK cascade
