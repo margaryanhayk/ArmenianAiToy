@@ -107,6 +107,25 @@ public class ContentSyncAudioRootTests
         {
             var id = story.GetProperty("StoryId").GetString()!;
             var file = Path.Combine(audioDir, story.GetProperty("AudioPath").GetString()!);
+
+            // A story whose narration has not been rendered yet is configured
+            // as a PLACEHOLDER so Ship-StoryAudio.ps1 can find and fill its
+            // row on the day it is. SizeBytes 0 is what makes that safe: the
+            // manifest validator drops the entry, so it is never advertised
+            // and no toy attempts a download of a file that isn't there.
+            //
+            // Skip those here — but only if they are placeholders in FULL. A
+            // half-filled row (real hash, no size) is exactly the rot this
+            // test exists to catch, so it must still fail.
+            if (story.GetProperty("SizeBytes").GetInt64() == 0)
+            {
+                Assert.Equal(new string('0', 64), story.GetProperty("Sha256").GetString());
+                Assert.False(File.Exists(file),
+                    $"{id}: has audio on disk but is still configured as a placeholder — "
+                    + "run Ship-StoryAudio.ps1 -Apply to fill in its size, hash and Version");
+                continue;
+            }
+
             Assert.True(File.Exists(file), $"{id}: configured audio file is missing ({file})");
 
             var bytes = File.ReadAllBytes(file);

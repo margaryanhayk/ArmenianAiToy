@@ -75,7 +75,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2542 tests)
+dotnet test                                     # Run all tests (2549 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2343,6 +2343,41 @@ the end of the file is scored near the end of the story and gets an answer about
 a scene he has not heard. Per-segment files retire the guess, make ambience
 placement exact, and make a fluffed line a one-segment re-record.
 
+**Where a segment map lives, and why it is never one map (2026-08-11).** Two
+MP3s of every story exist and their byte offsets are NOT interchangeable: the
+ElevenLabs narration the toy plays from SD (`story-audio/`, map written by
+`tools/story-audio/segments_to_bytes.py`) and an OpenAI-TTS render of the same
+story that the backend streams over Wi-Fi (`StoryAudio:CacheRoot`, map written
+automatically by `StoryAudioController`). `StoryQaController.OffsetToSegment`
+reads the cache map first and the ContentSync one second, so each is only ever
+paired with its own audio — a map of one read as a map of the other would be
+worse than no map at all. Cache-first needs no `src` query param and no
+firmware release, because `StoryAudioController` re-renders whenever the audio
+or either sidecar is missing, so a streaming session always has its own map by
+the time it serves a byte and never reaches the second step. When no map
+exists — the state of the whole library until the re-render lands — the
+proportional estimate is now measured against whichever MP3 is present;
+previously an absent cache file returned segment **0**, which on the SD path
+(the one children actually use) meant every in-story question was answered
+about the opening scene. `ArmenianAiToy.Api.csproj` copies
+`story-audio\**\*.segments.json` into the publish output via `Content Update`
+(the SDK's default items already claim every `.json`, they are simply never
+copied) — the third widening of that glob family, after games and voice.
+
+**Two stories ship as placeholder manifest rows.** `hedgehog-apple` and
+`little-cloud` have approved text and no narration, and are configured with
+`SizeBytes: 0` and an all-zero hash. Zero size is load-bearing: the manifest
+validator drops the entry, so nothing is advertised and no toy attempts a
+download of a file that is not there, while `Ship-StoryAudio.ps1`'s patch regex
+still finds the row and fills in the real size, hash and `Version` on the day
+they are rendered. Without the rows, `-Apply` copies the MP3 in and only THEN
+`Write-Error`s on the missing entry — without halting — leaving new bytes on
+disk described by an old manifest, which every toy downloads and rejects.
+Pinned in both directions by
+`ContentManifestServiceTests.ShippedConfig_AdvertisesExactlyTheStoriesThatHaveAudio`
+and `ContentSyncAudioRootTests.ShippedConfiguration_PointsAtFilesThatActuallyExist`,
+so a half-filled row (real hash, no size) still fails.
+
 ## Spoken welcome flow (owner request 2026-08-04) — backend half
 
 The toy was SILENT at power-on and a button press always started/resumed a
@@ -3742,7 +3777,7 @@ owner review + a sample-first listen test gates any render):**
 ## Owner batch (2026-08-07) — games over Wi-Fi, welcome voice shipped, story pauses play, OTA field-proven, hardware dossier
 
 A second same-day owner batch, landing directly on top of the
-content-depth batch above. Test count at the time was **2509**; it is **2542**
+content-depth batch above. Test count at the time was **2509**; it is **2549**
 at HEAD (see § Build & Test).
 
 **This file is synced only to 2026-08-07 and the repo has moved past it.**

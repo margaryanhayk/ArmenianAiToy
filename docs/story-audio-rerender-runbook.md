@@ -190,18 +190,20 @@ thing that makes a toy in the field re-download.
 
 It refuses to install anything that still fails a check.
 
-> **Do this before `-Apply`, not after:** `hedgehog-apple` and `little-cloud`
-> have no `ContentSync:Stories` entry — they have never had audio. Add both by
-> hand first, copying the shape of an existing entry **in the same field
-> order** (`StoryId`, `Version`, `Title`, `AudioUrl`, `AudioPath`, `SizeBytes`,
-> `Sha256`) — the script finds entries with a regex that depends on it. Set
-> `Version: 1`, `AudioPath: "<id>.mp3"`, and any placeholder 64-hex `Sha256`
-> and integer `SizeBytes`; `-Apply` overwrites both with the real values.
+> **Nothing to add by hand.** `hedgehog-apple` and `little-cloud` have never
+> had audio, and used to need a hand-written `ContentSync:Stories` entry before
+> `-Apply` — forget it and the script copied the MP3 in and *then* failed on the
+> missing entry, leaving new bytes on disk described by an old manifest, which
+> every toy downloads and rejects. Both now ship as placeholder rows with
+> `SizeBytes: 0` and an all-zero hash: the manifest validator drops a zero-size
+> story, so nothing is advertised and no toy is disturbed, while the script's
+> regex still finds the row and fills in the real size, hash and `Version`.
 >
-> If you forget, the script copies the MP3 in and *then* fails on the missing
-> entry, leaving new bytes on disk described by an old manifest — which every
-> toy will download and reject. Recoverable by adding the entries and re-running,
-> but easier to avoid.
+> Two tests hold that shape —
+> `ContentManifestServiceTests.ShippedConfig_AdvertisesExactlyTheStoriesThatHaveAudio`
+> and `ContentSyncAudioRootTests.ShippedConfiguration_PointsAtFilesThatActuallyExist`
+> — so a half-filled row (real hash, no size) still fails the build rather than
+> reaching a toy.
 
 Re-run step 5 against `backend/src/ArmenianAiToy.Api/story-audio` afterwards —
 the levelling re-encodes the files, so what ships is not what step 5 checked.
@@ -227,6 +229,25 @@ Get-ChildItem $render -Filter '*.segments.json' | ForEach-Object {
 
 This is what stops an in-story question being answered about a scene the child
 has not reached. It needs nothing installed.
+
+> **The map belongs beside the MP3 in `story-audio/`, not in the cache folder.**
+> Two MP3s of every story exist and their byte offsets are not interchangeable:
+> the ElevenLabs narration the toy plays from SD (`story-audio/`, this map) and
+> an OpenAI-TTS render of the same story that the backend streams over Wi-Fi
+> (`StoryAudio:CacheRoot`, its own map, written automatically by
+> `StoryAudioController`). `OffsetToSegment` reads the cache map first and this
+> one second, so each is only ever paired with its own audio. Moving this file
+> into the cache folder would make a map of one file be read as a map of the
+> other — worse than having no map at all.
+>
+> `ArmenianAiToy.Api.csproj` copies `story-audio\**\*.segments.json` into the
+> publish output, so the map reaches the container. It was not always so: the
+> same glob had to be widened twice before, both times because the manifest
+> advertised files the image did not contain.
+>
+> One known gap, harmless today: if **variant endings** are ever switched back
+> on, a child may be hearing the alternate file while this map describes the
+> base story. They are off on every device today.
 
 ## Step 8 — the 43 welcome clips, same voice
 

@@ -262,4 +262,91 @@ public class ContentManifestServiceTests
         Assert.Equal(1, item.Version);
         Assert.True(item.Enabled);
     }
+
+    // ---- the shipped configuration ----
+
+    // Two stories have approved text but no narration yet (hedgehog-apple,
+    // little-cloud). They are configured with SizeBytes 0 and a placeholder
+    // hash so that Ship-StoryAudio.ps1's patch regex can find and fill them
+    // on the day they are rendered — its "-Apply" copies the MP3 in and only
+    // THEN Write-Errors on a missing entry, without halting, which would
+    // leave new bytes on disk described by an old manifest.
+    //
+    // Zero size is what keeps that safe today: the per-item validity check
+    // above drops the entry, so nothing is advertised and no toy attempts a
+    // doomed download. This test is the tripwire — it fails the day someone
+    // gives a placeholder a plausible hash and size, or deletes the rows and
+    // restores the hand-add trap.
+    [Fact]
+    public void ShippedConfig_AdvertisesExactlyTheStoriesThatHaveAudio()
+    {
+        var settings = FindRepoFile(Path.Combine(
+            "backend", "src", "ArmenianAiToy.Api", "appsettings.json"));
+        var audioDir = FindRepoDirectory(Path.Combine(
+            "backend", "src", "ArmenianAiToy.Api", "story-audio"));
+        if (settings is null || audioDir is null)
+        {
+            return;   // repo tree not deployed alongside the test binary
+        }
+
+        var configured = ReadShippedStories(settings);
+        Assert.True(configured.Count > 0, "no ContentSync:Stories found");
+
+        var advertised = new ContentManifestService(
+                new ContentSyncOptions { Enabled = true, Stories = configured })
+            .Build().Stories
+            .Select(s => s.StoryId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var onDisk = Directory.EnumerateFiles(audioDir, "*.mp3")
+            .Select(Path.GetFileNameWithoutExtension)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase!);
+
+        Assert.Equal(onDisk.OrderBy(x => x), advertised.OrderBy(x => x));
+
+        // A configured story with no bytes yet must be an explicit placeholder,
+        // never a half-filled row that only LOOKS advertisable.
+        foreach (var story in configured.Where(s => !onDisk.Contains(s.StoryId)))
+        {
+            Assert.Equal(0, story.SizeBytes);
+        }
+    }
+
+    private static List<ContentSyncStoryOptions> ReadShippedStories(string settingsPath)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(settingsPath));
+        var stories = doc.RootElement.GetProperty("ContentSync").GetProperty("Stories");
+        return stories.EnumerateArray().Select(s => new ContentSyncStoryOptions
+        {
+            StoryId = s.GetProperty("StoryId").GetString() ?? "",
+            Version = s.GetProperty("Version").GetInt32(),
+            Title = s.GetProperty("Title").GetString() ?? "",
+            AudioUrl = s.GetProperty("AudioUrl").GetString() ?? "",
+            AudioPath = s.GetProperty("AudioPath").GetString() ?? "",
+            Sha256 = s.GetProperty("Sha256").GetString() ?? "",
+            SizeBytes = s.GetProperty("SizeBytes").GetInt64(),
+        }).ToList();
+    }
+
+    private static string? FindRepoFile(string relative)
+        => FindUpwards(relative, File.Exists);
+
+    private static string? FindRepoDirectory(string relative)
+        => FindUpwards(relative, Directory.Exists);
+
+    private static string? FindUpwards(string relative, Func<string, bool> exists)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            var candidate = Path.Combine(dir.FullName, relative);
+            if (exists(candidate))
+            {
+                return candidate;
+            }
+            dir = dir.Parent;
+        }
+        return null;
+    }
 }
