@@ -1635,6 +1635,8 @@
       bedtime_music_label: { en: 'Music at bedtime hours', ru: 'Музыка в часы сна', hy: 'Երաժշտություն քնի ժամերին' },
       bedtime_music_needs_window: { en: 'set a bedtime window first', ru: 'сначала задайте часы сна', hy: 'նախ սահմանեք քնի ժամերը' },
       bedtime_music_needs_tracks: { en: 'no music available yet', ru: 'музыки пока нет', hy: 'երաժշտություն դեռ չկա' },
+      feature_not_on_toy: { en: 'Not on your toy yet — coming in an update', ru: 'Пока не работает на игрушке — будет в обновлении', hy: 'Դեռ չի աշխատում խաղալիքի վրա — կլինի թարմացման հետ' },
+      flag_not_yet: { en: 'Not yet', ru: 'Пока нет', hy: 'Դեռ ոչ' },
       flag_on: { en: 'On ✓ — tap to turn off', ru: 'Вкл ✓ — нажмите, чтобы выключить', hy: 'Միացված ✓ — սեղմեք անջատելու համար' },
       flag_off: { en: 'Off — tap to turn on', ru: 'Выкл — нажмите, чтобы включить', hy: 'Անջատված — սեղմեք միացնելու համար' },
       nav_toy: { en: '← Toy', ru: '← Игрушка', hy: '← Խաղալիք' },
@@ -3730,7 +3732,20 @@
             // meaningless: no bedtime window set, or — for music — no tracks
             // published yet. Turning it OFF is always allowed.
             var blockHint = null;
-            if (opts.requiresBedtime && !current && !(d.bedtimeStart && d.bedtimeEnd)) {
+            // Some behaviours are gated OFF inside the toy's own firmware,
+            // and the server cannot see a compile-time flag. Until the toy
+            // reports what it actually runs, the dashboard must not show a
+            // switch reading "On ✓" for something that never happens - which
+            // is exactly what it did for mid-story pauses after the owner
+            // had them turned off, and for variant endings which have never
+            // been bench-run at all.
+            //
+            // The state stays honest in both directions: the parent's saved
+            // preference is untouched, the switch simply says the toy is not
+            // doing it yet.
+            if (opts.notOnToyYet) {
+              blockHint = t('feature_not_on_toy');
+            } else if (opts.requiresBedtime && !current && !(d.bedtimeStart && d.bedtimeEnd)) {
               blockHint = t('bedtime_music_needs_window');
             } else if (opts.requiresMusic && !current && state.musicAvailable === false) {
               // Only a definitive "no tracks published" greys this out.
@@ -3739,7 +3754,13 @@
               // simply have not managed to ask yet.
               blockHint = t('bedtime_music_needs_tracks');
             }
-            btn.textContent = current ? t('flag_on') : t('flag_off');
+            // "On ✓ — tap to turn off" beside "not on your toy yet" is two
+            // claims at once, and the louder one is still the wrong one. A
+            // behaviour the toy does not run reads as off, whatever the
+            // saved preference happens to be.
+            btn.textContent = opts.notOnToyYet
+              ? t('flag_not_yet')
+              : (current ? t('flag_on') : t('flag_off'));
             // The button's visible text ("On ✓ — tap to turn off") is now the
             // accessible name of FOUR adjacent switches, so a screen-reader
             // or voice-control user would hear the same name four times with
@@ -3821,14 +3842,19 @@
           // manifest fallback and the column default.
           listEl.appendChild(flagToggle('story_pauses_label',
             d.storyPausesEnabled !== false, 'story-pauses',
-            { noteKey: 'story_pauses_note' }));
+            // AREG_STORY_PAUSES_ENABLED is 0 in the firmware (owner report
+            // 2026-08-10: "the story is cut"). Flip this the day that goes
+            // to 1 and has been bench-run.
+            { noteKey: 'story_pauses_note', notOnToyYet: true }));
           // Variant endings is the one switch here whose effect is invisible
           // by design: with the toggle on, a story that has no second ending
           // simply ends the way it always did. Without a standing note the
           // only conclusion available to a parent is "it ignored my setting".
           listEl.appendChild(flagToggle('variant_endings_label',
             d.variantEndingsEnabled !== false, 'variant-endings',
-            { noteKey: 'variant_endings_note' }));
+            // AREG_VARIANT_ENDINGS_ENABLED defaults to 0 and has never been
+            // bench-run. Same rule: flip when the toy really does it.
+            { noteKey: 'variant_endings_note', notOnToyYet: true }));
           // NOTE: the bedtime-music toggle is appended AFTER the bedtime
           // window row below — its hint tells the parent to set that window,
           // so the thing it points at must not be above it.
