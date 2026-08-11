@@ -306,9 +306,6 @@
       min-height: 44px;
       padding: 10px 14px;
     }
-    /* 44px is the thumb floor everywhere else on the page; the tab strip
-       was the one control still under it. */
-    .tabs button { min-height: 44px; }
     /* Shared hint text next to a blocked or inert control. */
     .ctl-hint { font-size: 11px; color: var(--ink-hint); margin-left: 8px; }
 
@@ -705,31 +702,10 @@
       line-height: 1.4;
     }
 
-    .tabs {
-      /* Eight tabs since the mode-tabs slice — WRAP instead of blowing the
-         page out sideways on phones (that overflow squashed the whole
-         layout on iOS). Block-level flex row that sits under the back
-         button and wraps to as many lines as the width needs. */
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin: 10px 0 2px;
-    }
-    .tabs button {
-      padding: 6px 12px;
-      font-size: 13px;
-      background: var(--line-soft);
-      color: var(--brand);
-      border-radius: 999px;
-      white-space: nowrap;
-    }
-    .tabs button:hover { background: var(--line-tab-hover); }
-    .tabs button.active { background: var(--brand-strong); color: white; }
-    .tabs button.active:hover { background: var(--brand-strong-hover); }
-
-    /* Mode filter under the tab strip. The five per-mode pills used to sit
-       in the tab strip itself; as filters of one list they belong in a
-       control that stays one line wide in every language. */
+    /* The diary control. Was a tab strip plus a separate mode filter; the
+       strip's pills were only ever filters of the same list, so all of it
+       collapsed into one select that stays one line wide in every
+       language. */
     .filter-row {
       display: flex;
       align-items: center;
@@ -1373,23 +1349,8 @@
       <h2>
         <button class="link" id="backToDevices" data-i18n-aria="nav_toy" data-i18n="nav_toy">← Toy</button>
       </h2>
-      <div class="tabs" role="tablist" data-i18n-aria="aria_toy_views" aria-label="Toy views">
-        <button data-tab="summaries" role="tab" aria-selected="false" aria-controls="summariesList" data-i18n="tab_conversations">Conversations</button>
-        <button data-tab="flagged" role="tab" aria-selected="false" aria-controls="flaggedList" data-i18n="tab_flagged">Flagged</button>
-        <button data-tab="plays" role="tab" aria-selected="false" aria-controls="playsList" data-i18n="tab_plays">Story plays</button>
-      </div>
+      <div class="filter-row" id="summariesDiaryFilter"></div>
       <div id="summariesDeviceContext" class="device-context"></div>
-      <div class="filter-row">
-        <label for="modeFilterSelect" class="filter-label" data-i18n="filter_show">Show</label>
-        <select id="modeFilterSelect" class="filter-select">
-          <option value="" data-i18n-opt="filter_all">All play</option>
-          <option value="story" data-i18n-opt="tab_stories">Stories</option>
-          <option value="game" data-i18n-opt="tab_games">Games</option>
-          <option value="riddle" data-i18n-opt="tab_riddles">Riddles</option>
-          <option value="curiosity" data-i18n-opt="tab_questions">Questions</option>
-          <option value="calm" data-i18n-opt="tab_bedtime">Calm</option>
-        </select>
-      </div>
       <p id="storiesNote" class="inline-note" hidden data-i18n="stories_note"></p>
       <!-- E1.1 Today summary panel — frontend-only digest above the
            paginated conversation list. Hidden until loadTodayPanel
@@ -1414,11 +1375,7 @@
       <h2>
         <button class="link" id="flaggedBackToDevices" data-i18n-aria="nav_toy" data-i18n="nav_toy">← Toy</button>
       </h2>
-      <div class="tabs" role="tablist" data-i18n-aria="aria_toy_views" aria-label="Toy views">
-        <button data-tab="summaries" role="tab" aria-selected="false" aria-controls="summariesList" data-i18n="tab_conversations">Conversations</button>
-        <button data-tab="flagged" role="tab" aria-selected="false" aria-controls="flaggedList" data-i18n="tab_flagged">Flagged</button>
-        <button data-tab="plays" role="tab" aria-selected="false" aria-controls="playsList" data-i18n="tab_plays">Story plays</button>
-      </div>
+      <div class="filter-row" id="flaggedDiaryFilter"></div>
       <div id="flaggedDeviceContext" class="device-context"></div>
       <details class="legend-box">
         <summary style="cursor:pointer;font-weight:600;" data-i18n="legend_title">What the marks mean</summary>
@@ -1443,11 +1400,7 @@
       <h2>
         <button class="link" id="playsBackToDevices" data-i18n-aria="nav_toy" data-i18n="nav_toy">← Toy</button>
       </h2>
-      <div class="tabs" role="tablist" data-i18n-aria="aria_toy_views" aria-label="Toy views">
-        <button data-tab="summaries" role="tab" aria-selected="false" aria-controls="summariesList" data-i18n="tab_conversations">Conversations</button>
-        <button data-tab="flagged" role="tab" aria-selected="false" aria-controls="flaggedList" data-i18n="tab_flagged">Flagged</button>
-        <button data-tab="plays" role="tab" aria-selected="false" aria-controls="playsList" data-i18n="tab_plays">Story plays</button>
-      </div>
+      <div class="filter-row" id="playsDiaryFilter"></div>
       <div id="playsDeviceContext" class="device-context"></div>
       <div id="playsTotals" style="margin:8px 0 12px;"></div>
       <div id="playsList"></div>
@@ -1488,6 +1441,7 @@
         <button class="link" id="journalBackToToy" data-i18n-aria="nav_toy" data-i18n="nav_toy">← Toy</button>
         <span data-i18n="journal_title">💭 What they said</span>
       </h2>
+      <div class="filter-row" id="journalDiaryFilter"></div>
       <div id="journalDeviceContext" class="device-context"></div>
       <!-- Said ONCE, here — not repeated on every row. Speech-to-text can
            mangle a four-year-old's word, and a parent reading their
@@ -1583,14 +1537,11 @@
       update_password: { en: 'Update password', ru: 'Обновить пароль', hy: 'Թարմացնել գաղտնաբառը' },
       delete_account: { en: 'Delete account', ru: 'Удалить аккаунт', hy: 'Ջնջել հաշիվը' },
       delete_account_confirm: { en: 'Permanently delete account', ru: 'Удалить аккаунт навсегда', hy: 'Ընդմիշտ ջնջել հաշիվը' },
-      tab_conversations: { en: 'Conversations', ru: 'Разговоры', hy: 'Զրույցներ' },
-      tab_flagged: { en: 'Flagged', ru: 'Отмеченные', hy: 'Նշվածներ' },
       tab_stories: { en: 'Stories', ru: 'Сказки', hy: 'Հեքիաթներ' },
       tab_games: { en: 'Games', ru: 'Игры', hy: 'Խաղեր' },
       tab_riddles: { en: 'Riddles', ru: 'Загадки', hy: 'Հանելուկներ' },
       tab_questions: { en: 'Questions', ru: 'Вопросы', hy: 'Հարցեր' },
       tab_bedtime: { en: 'Calm', ru: 'Спокойные', hy: 'Հանգիստ' },
-      tab_plays: { en: 'Story plays', ru: 'Прослушивания', hy: 'Լսած հեքիաթներ' },
       // The tab bar.
       tab_today: { en: 'Today', ru: 'Сегодня', hy: 'Այսօր' },
       tab_library: { en: 'Library', ru: 'Сказки', hy: 'Գրադարան' },
@@ -1772,6 +1723,12 @@
       set_how: { en: 'How it tells stories', ru: 'Как рассказывает сказки', hy: 'Ինչպես է հեքիաթ պատմում' },
       set_how_n: { en: 'Small touches during a story.', ru: 'Мелочи во время сказки.', hy: 'Փոքր բաներ հեքիաթի ընթացքում։' },
       set_toy: { en: 'This toy', ru: 'Эта игрушка', hy: 'Այս խաղալիքը' },
+      // The three diary destinations that are not play modes. Worded as
+      // things that happened, matching the play modes beside them, rather
+      // than as the names of screens.
+      filter_flagged: { en: 'Only what was held back', ru: 'Только задержанное', hy: 'Միայն այն, ինչ կասեցվել է' },
+      filter_plays: { en: 'Stories heard', ru: 'Прослушанные сказки', hy: 'Լսած հեքիաթները' },
+      filter_journal: { en: 'What my child said', ru: 'Что сказал мой ребёнок', hy: 'Իմ երեխայի ասածը' },
       bedtime_label: { en: '🌙 Bedtime:', ru: '🌙 Сон:', hy: '🌙 Քնի ժամ՝' },
       modes_label: { en: '🎮 Modes:', ru: '🎮 Режимы:', hy: '🎮 Ռեժիմներ՝' },
       name_label: { en: '✏️ Name:', ru: '✏️ Имя:', hy: '✏️ Անուն՝' },
@@ -1917,7 +1874,6 @@
       hide_password: { en: 'Hide password', ru: 'Скрыть пароль', hy: 'Թաքցնել գաղտնաբառը' },
       filter_show: { en: 'Show', ru: 'Показать', hy: 'Ցուցադրել' },
       filter_all: { en: 'All play', ru: 'Все занятия', hy: 'Ամեն ինչ' },
-      aria_toy_views: { en: 'Toy views', ru: 'Разделы игрушки', hy: 'Խաղալիքի բաժիններ' },
 
       // ---------- toys ----------
       toy_fallback: { en: 'Toy {id}', ru: 'Игрушка {id}', hy: 'Խաղալիք {id}' },
@@ -2503,13 +2459,64 @@
       return map[mode] ? t(map[mode]) : mode;
     }
 
-    function setActiveTab(name) {
-      var tabs = document.querySelectorAll('.tabs button');
-      for (var i = 0; i < tabs.length; i++) {
-        var isActive = tabs[i].getAttribute('data-tab') === name;
-        tabs[i].classList.toggle('active', isActive);
-        tabs[i].setAttribute('aria-selected', isActive ? 'true' : 'false');
-      }
+    // The diary is ONE question - "what happened?" - and it used to have
+    // four answers in four places: a three-tab strip (Conversations /
+    // Flagged / Story plays) plus a separate mode filter, and "What they
+    // said" hidden behind a tile on the toy page where nothing announced
+    // it. A parent had to already know a screen existed to reach it.
+    //
+    // One control now, on all four screens, listing everything it can
+    // show. The lists themselves stay separate because they ARE separate:
+    // four endpoints, four shapes, four pagers. Interleaving four
+    // independently-paged sources into one scroll would either lie about
+    // ordering or drop rows, and neither is worth the appearance of a
+    // single stream. What a parent needed was one place to ask, not one
+    // array to scroll.
+    var DIARY_VIEWS = {
+      flagged:  { load: function () { loadFlagged(); },           label: 'filter_flagged' },
+      plays:    { load: function () { loadStoryPlays(); },        label: 'filter_plays' },
+      journal:  { load: function () { state.journalOffset = 0;
+                                      loadReflectionJournal(); }, label: 'filter_journal' }
+    };
+
+    function renderDiaryFilter(elId, current) {
+      var el = document.getElementById(elId);
+      if (!el) return;
+      clearChildren(el);
+      var selId = elId + 'Select';
+      var label = document.createElement('label');
+      label.className = 'filter-label';
+      label.setAttribute('for', selId);
+      label.textContent = t('filter_show');
+      el.appendChild(label);
+
+      var sel = document.createElement('select');
+      sel.className = 'filter-select';
+      sel.id = selId;
+      [['', 'filter_all'], ['story', 'tab_stories'], ['game', 'tab_games'],
+       ['riddle', 'tab_riddles'], ['curiosity', 'tab_questions'],
+       ['calm', 'tab_bedtime'], ['journal', 'filter_journal'],
+       ['plays', 'filter_plays'], ['flagged', 'filter_flagged']
+      ].forEach(function (pair) {
+        var o = document.createElement('option');
+        o.value = pair[0];
+        o.textContent = t(pair[1]);
+        sel.appendChild(o);
+      });
+      sel.value = current || '';
+      sel.addEventListener('change', function () {
+        var v = sel.value;
+        // Every switch restarts at page one. Landing mid-way through a
+        // list you have not seen the beginning of is disorienting, and
+        // paging deep into one view then picking another used to leave
+        // the offsets behind.
+        state.offset = 0;
+        state.flaggedOffset = 0;
+        if (DIARY_VIEWS[v]) { DIARY_VIEWS[v].load(); return; }
+        state.modeFilter = v || null;
+        loadSummaries();
+      });
+      el.appendChild(sel);
     }
 
     function renderDeviceContext(elId) {
@@ -4950,12 +4957,9 @@
     function loadSummaries() {
       show('summariesView');
       setViewHash('summaries', state.currentDeviceId);
-      setActiveTab('summaries');
-      // The mode filter is a control, not a tab — keep it showing whatever
-      // is actually being filtered, including after a language switch or a
-      // restore from the URL.
-      var modeSel = document.getElementById('modeFilterSelect');
-      if (modeSel) modeSel.value = state.modeFilter || '';
+      // Keep the control showing whatever is actually being shown,
+      // including after a language switch or a restore from the URL.
+      renderDiaryFilter('summariesDiaryFilter', state.modeFilter || '');
       // Stories the child hears from the toy's SD card never become
       // conversations, so a family that listens daily would otherwise find
       // this filter empty and conclude the dashboard was lying to them.
@@ -5278,7 +5282,7 @@
     function loadFlagged() {
       show('flaggedView');
       setViewHash('flagged', state.currentDeviceId);
-      setActiveTab('flagged');
+      renderDiaryFilter('flaggedDiaryFilter', 'flagged');
       state.backFromDetail = loadFlagged;
       renderDeviceContext('flaggedDeviceContext');
       setStatus('flaggedStatus', t('busy_loading'), 'muted');
@@ -6020,7 +6024,7 @@
     function loadStoryPlays() {
       show('playsView');
       setViewHash('plays', state.currentDeviceId);
-      setActiveTab('plays');
+      renderDiaryFilter('playsDiaryFilter', 'plays');
       renderDeviceContext('playsDeviceContext');
       setStatus('playsStatus', t('busy_loading'), 'muted');
       var totalsEl = document.getElementById('playsTotals');
@@ -6513,6 +6517,7 @@
     function loadReflectionJournal() {
       show('journalView');
       setViewHash('journal', state.currentDeviceId);
+      renderDiaryFilter('journalDiaryFilter', 'journal');
       renderDeviceContext('journalDeviceContext');
       setStatus('journalStatus', t('busy_loading'), 'muted');
       var listEl = document.getElementById('journalList');
@@ -7226,40 +7231,8 @@
       });
     }
 
-    // Tab buttons (identical strips in the summaries, flagged, and plays
-    // views). Mode tabs are the conversations list with a server-side
-    // &mode= filter; switching tabs always restarts at page one.
-    var tabButtons = document.querySelectorAll('.tabs button');
-    for (var i = 0; i < tabButtons.length; i++) {
-      (function (btn) {
-        btn.addEventListener('click', function () {
-          // `tab`, not `t` — that name shadowed the translate function.
-          var tab = btn.getAttribute('data-tab');
-          // Both offsets reset. Only the conversations one used to, so
-          // paging to Flagged page 3, leaving and coming back dropped the
-          // parent onto page 3 again — or onto an empty page reading
-          // "nothing more to show" on a tab they had just opened.
-          state.offset = 0;
-          state.flaggedOffset = 0;
-          if (tab === 'flagged') {
-            loadFlagged();
-          } else if (tab === 'plays') {
-            loadStoryPlays();
-          } else {
-            loadSummaries();
-          }
-        });
-      })(tabButtons[i]);
-    }
-
-    // Mode filter: same list, narrowed server-side. Changing it always
-    // restarts at page one, otherwise the parent lands mid-way through a
-    // list they have not seen the beginning of.
-    document.getElementById('modeFilterSelect').addEventListener('change', function () {
-      state.modeFilter = this.value || null;
-      state.offset = 0;
-      loadSummaries();
-    });
+    // The tab strip and the separate mode filter are gone - one control,
+    // built per view by renderDiaryFilter, wires itself on render.
 
     // ---------- google sign-in ----------
     //
