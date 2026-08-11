@@ -1597,6 +1597,8 @@
       tile_request_sub: { en: 'Ask us to make one for your child', ru: 'Попросите нас сделать её для вашего ребёнка', hy: 'Կարող ենք հեքիաթ ստեղծել ձեր երեխայի համար' },
       music_title: { en: '🎵 Music', ru: '🎵 Музыка', hy: '🎵 Երաժշտություն' },
       no_music_yet: { en: 'No music tracks are published yet.', ru: 'Музыкальных треков пока нет.', hy: 'Երաժշտական ձայնագրություններ դեռ չկան։' },
+      music_empty_title: { en: 'Quiet music for bedtime', ru: 'Тихая музыка перед сном', hy: 'Հանգիստ երաժշտություն քնելուց առաջ' },
+      music_empty_body: { en: 'No songs have been added yet. When they are, they will show here and you can switch them on in Toy settings.', ru: 'Песни ещё не добавлены. Когда появятся, они будут здесь, а включить их можно в настройках игрушки.', hy: 'Երգեր դեռ ավելացված չեն։ Երբ ավելանան, կհայտնվեն այստեղ, իսկ միացնել կարող եք խաղալիքի կարգավորումներում։' },
       today: { en: '☀️ Today', ru: '☀️ Сегодня', hy: '☀️ Այսօր' },
       newer: { en: '← Newer', ru: '← Новее', hy: '← Ավելի նոր' },
       older: { en: 'Older →', ru: 'Ранее →', hy: 'Ավելի հին →' },
@@ -6520,7 +6522,27 @@
         // Keep the toy-settings toggle honest with what this view shows.
         state.musicAvailable = tracks.length > 0;
         if (tracks.length === 0) {
-          setStatus('musicStatus', t('no_music_yet'), 'muted');
+          // An empty screen with one grey negative on it reads as a fault. A
+          // parent who opens Music should learn what it is, that nothing is
+          // broken, and where the switch will be — in that order.
+          setStatus('musicStatus', '', '');
+          var empty = document.createElement('div');
+          empty.style.cssText =
+            'padding:20px 16px;background:var(--surface-3);border:1px solid var(--line);' +
+            'border-radius:14px;text-align:center;';
+          var mark = document.createElement('div');
+          mark.style.cssText = 'font-size:30px;line-height:1;margin-bottom:8px;';
+          mark.textContent = '🌙';
+          empty.appendChild(mark);
+          var lead = document.createElement('div');
+          lead.style.cssText = 'font-size:15px;font-weight:600;margin-bottom:6px;';
+          lead.textContent = t('music_empty_title');
+          empty.appendChild(lead);
+          var why = document.createElement('div');
+          why.style.cssText = 'font-size:13px;color:var(--ink-muted);line-height:1.5;';
+          why.textContent = t('music_empty_body');
+          empty.appendChild(why);
+          listEl.appendChild(empty);
           return;
         }
         setStatus('musicStatus', '', '');
