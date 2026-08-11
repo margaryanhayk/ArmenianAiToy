@@ -6273,10 +6273,15 @@
       // same typography a standalone card gives a story title. Without an
       // authored name the descriptor is promoted here instead, so the slot
       // is never empty and never shows a slug.
+      // The series has one mark of its own — /covers/<seriesId> — rather
+      // than borrowing episode one's, so the group reads as a group.
+      var seriesCover = buildCover(group.items[0] && group.items[0].seriesId);
+      if (seriesCover) card.appendChild(seriesCover);
+
       var name = seriesDisplayTitle(group);
       var title = document.createElement('div');
       title.style.cssText = 'font-size:16px;font-weight:600;';
-      title.textContent = '📚 ' + (name || t('series_fallback_title'));
+      title.textContent = (seriesCover ? '' : '📚 ') + (name || t('series_fallback_title'));
       card.appendChild(title);
 
       // Demoted descriptor. Only shown when the headline is a real name —
@@ -6349,6 +6354,38 @@
     // metadata, goal, lesson, counts, the discuss block, the preview — is
     // identical either way, so a serial episode is never a second-class
     // library entry.
+    // A story's cover, found by CONVENTION at /covers/<id>.<ext>. Returns
+    // null when there is no id to look one up by; a file that is not there
+    // removes the element instead, so a card without artwork reads exactly
+    // as it did before covers existed and the set can arrive one at a time.
+    //
+    // .webp first because it is a third the size, then the formats an image
+    // tool actually hands you — one 404 per miss buys the owner no
+    // conversion step.
+    function buildCover(coverId) {
+      if (!coverId) return null;
+      var exts = ['webp', 'png', 'jpg'];
+      var attempt = 0;
+      var img = document.createElement('img');
+      img.alt = '';                    // decorative: the title is right below
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      // 4:5 reserved up front so the page does not jump as covers land.
+      img.style.cssText =
+        'display:block;width:100%;aspect-ratio:4/5;object-fit:cover;' +
+        'border-radius:10px;margin:0 0 10px;background:var(--surface-tint);';
+      img.addEventListener('error', function () {
+        attempt += 1;
+        if (attempt < exts.length) {
+          img.src = '/covers/' + encodeURIComponent(coverId) + '.' + exts[attempt];
+          return;
+        }
+        if (img.parentNode) img.parentNode.removeChild(img);
+      });
+      img.src = '/covers/' + encodeURIComponent(coverId) + '.' + exts[0];
+      return img;
+    }
+
     function buildLibraryCard(s, partLabel) {
       var card = document.createElement('div');
       card.style.cssText = partLabel
@@ -6364,31 +6401,8 @@
       // A missing cover removes itself and the card reads exactly as it did
       // before, which is what lets the set arrive one story at a time
       // without a half-illustrated library looking broken.
-      if (!partLabel && s.storyId) {
-        // .webp first because it is a third the size, then the formats an
-        // image tool actually hands you. Trying them in the browser costs
-        // one 404 per miss and saves a conversion step per story.
-        var exts = ['webp', 'png', 'jpg'];
-        var attempt = 0;
-        var cover = document.createElement('img');
-        cover.alt = '';                  // decorative: the title is right below
-        cover.loading = 'lazy';
-        cover.decoding = 'async';
-        // 4:5 reserved up front so the page does not jump as covers land.
-        cover.style.cssText =
-          'display:block;width:100%;aspect-ratio:4/5;object-fit:cover;' +
-          'border-radius:10px;margin:0 0 10px;background:var(--surface-tint);';
-        cover.addEventListener('error', function () {
-          attempt += 1;
-          if (attempt < exts.length) {
-            cover.src = '/covers/' + encodeURIComponent(s.storyId) + '.' + exts[attempt];
-            return;
-          }
-          if (cover.parentNode) cover.parentNode.removeChild(cover);
-        });
-        cover.src = '/covers/' + encodeURIComponent(s.storyId) + '.' + exts[0];
-        card.appendChild(cover);
-      }
+      var storyCover = partLabel ? null : buildCover(s.storyId);
+      if (storyCover) card.appendChild(storyCover);
 
       var title = document.createElement('div');
       title.style.cssText = partLabel
@@ -6396,7 +6410,7 @@
         : 'font-size:16px;font-weight:600;';
       title.textContent = partLabel
         ? partLabel + t('label_sep') + s.title
-        : '📖 ' + s.title;
+        : (storyCover ? '' : '📖 ') + s.title;
       card.appendChild(title);
 
       var metaBits = [];
