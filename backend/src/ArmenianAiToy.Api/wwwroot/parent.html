@@ -379,6 +379,31 @@
        none of them is the one we drew. */
     summary::-webkit-details-marker { display: none; }
     summary::marker { content: ''; }
+    /* Fixed, not sticky: the views are long and a sticky bar would scroll
+       away exactly when a parent is deepest in one and most likely to want
+       out. The body gets bottom padding to match, plus the iPhone's home
+       indicator inset. */
+    .tabbar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+      display: flex; background: var(--surface-2);
+      border-top: 1px solid var(--line);
+      padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+      box-shadow: 0 -2px 12px rgba(20, 23, 43, .06);
+    }
+    .tabbar button {
+      flex: 1; background: none; border: none; padding: 4px 2px;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      color: var(--ink-muted); font-size: 11px; font-weight: 600;
+      cursor: pointer; min-height: 46px; border-radius: 10px;
+    }
+    .tabbar button:hover { background: var(--surface-hover); }
+    .tabbar button svg {
+      width: 22px; height: 22px; fill: none; stroke: currentColor;
+      stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .tabbar button[aria-current="page"] { color: var(--brand-strong); }
+    body.has-tabbar .app { padding-bottom: 72px; }
+
     .tile .body { min-width: 0; flex: 1; }
     /* Both are <span>, so without this the title and the line under it run
        together as one sentence: "ConversationsWhat your child talked about".
@@ -900,9 +925,40 @@
         <!-- Account replaces the old header Log out: signing out is a rare,
              deliberate act and belongs with the other account controls,
              while "Account" is the door a parent actually looks for. -->
-        <button id="accountBtn" class="secondary" hidden data-i18n="account">Account</button>
+        <!-- The Account button lived here. It is a row at the foot of the
+             Settings tab now; see renderSettingsView. Kept in the DOM and
+             permanently hidden so the existing click wiring and the
+             pre-auth hide logic in show() keep working untouched. -->
+        <button id="accountBtn" class="secondary" hidden data-i18n="account"
+                style="display:none;">Account</button>
       </div>
     </div>
+
+    <!-- The tab bar. Four destinations, always on screen once signed in.
+         Before this, every feature was reached by drilling down and backing
+         out through "← Toy" links, so a parent who had not opened the app
+         for a week had no way to learn that "What they said" or "Your
+         activity" existed at all — nothing mentioned them unless you were
+         already standing on the one screen that linked to them.
+         Hidden on the six pre-auth views; see setTab. -->
+    <nav id="tabBar" class="tabbar" hidden aria-label="Main">
+      <button type="button" data-tab-to="today" data-i18n-aria="tab_today">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 8h-3v10h-4v-6h-4v6H6V11H3z"/></svg>
+        <span data-i18n="tab_today">Today</span>
+      </button>
+      <button type="button" data-tab-to="library" data-i18n-aria="tab_library">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h6v15H4zM12 5h3v15h-3zM17 6l3 14"/></svg>
+        <span data-i18n="tab_library">Library</span>
+      </button>
+      <button type="button" data-tab-to="diary" data-i18n-aria="tab_diary">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16l-7-4-7 4z"/></svg>
+        <span data-i18n="tab_diary">Diary</span>
+      </button>
+      <button type="button" data-tab-to="settings" data-i18n-aria="tab_settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/></svg>
+        <span data-i18n="tab_settings">Settings</span>
+      </button>
+    </nav>
 
     <!-- Login view -->
     <section id="loginView" class="card" hidden>
@@ -1233,8 +1289,11 @@
            Week first (what has been happening), then tonight (what to do
            with it), then the tiles. Both stay hidden until there is
            something real to show. -->
-      <section id="weekCard" class="week-card" hidden aria-live="polite"></section>
+      <!-- Tonight FIRST since it carries the artwork: the landing screen's
+           opening image should be the story the child heard, not a summary
+           of the week. The week digest follows it. -->
       <section id="tonightCard" class="tonight-card" hidden aria-live="polite"></section>
+      <section id="weekCard" class="week-card" hidden aria-live="polite"></section>
       <!-- Content links for THIS toy (library / music / request a story).
            Populated by renderToyView; the request-form block is physically
            moved in here so its form and status live with it. -->
@@ -1486,6 +1545,13 @@
       tab_questions: { en: 'Questions', ru: 'Вопросы', hy: 'Հարցեր' },
       tab_bedtime: { en: 'Calm', ru: 'Спокойные', hy: 'Հանգիստ' },
       tab_plays: { en: 'Story plays', ru: 'Прослушивания', hy: 'Լսած հեքիաթներ' },
+      // The tab bar.
+      tab_today: { en: 'Today', ru: 'Сегодня', hy: 'Այսօր' },
+      tab_library: { en: 'Library', ru: 'Сказки', hy: 'Գրադարան' },
+      tab_diary: { en: 'Diary', ru: 'Дневник', hy: 'Օրագիր' },
+      tab_settings: { en: 'Settings', ru: 'Настройки', hy: 'Կարգավորումներ' },
+      tile_account: { en: 'Your account', ru: 'Ваш аккаунт', hy: 'Ձեր հաշիվը' },
+      tile_account_sub: { en: 'Password, your data, activity, sign out', ru: 'Пароль, ваши данные, действия, выход', hy: 'Գաղտնաբառ, ձեր տվյալները, գործողություններ, ելք' },
       story_library: { en: '📚 Story library', ru: '📚 Библиотека сказок', hy: '📚 Հեքիաթների գրադարան' },
       child_answers: { en: "Child's answers to the story question", ru: 'Ответы ребёнка на вопрос сказки', hy: 'Երեխայի պատասխանները հեքիաթի հարցին' },
       approx_time: { en: 'approximate time', ru: 'примерное время', hy: 'մոտավոր ժամանակ' },
@@ -2056,6 +2122,62 @@
       try { window.scrollTo(0, y); } catch (e) { /* cosmetic */ }
     }
 
+    // Which tab each view belongs under. Views not listed (detail, audit,
+    // account) light no tab but still show the bar — a parent three levels
+    // deep must always be one tap from somewhere they recognise.
+    var TAB_OF_VIEW = {
+      toyView: 'today', devicesView: 'today',
+      libraryView: 'library', musicView: 'library',
+      summariesView: 'diary', flaggedView: 'diary', playsView: 'diary',
+      journalView: 'diary', detailView: 'diary',
+      settingsView: 'settings', accountView: 'settings', auditView: 'settings'
+    };
+    var PRE_AUTH_VIEWS = {
+      loginView: 1, signupView: 1, resetRequestView: 1, resetPasswordView: 1,
+      verifyEmailRequestView: 1, verifyEmailCompleteView: 1
+    };
+
+    function syncTabBar(viewId) {
+      var bar = document.getElementById('tabBar');
+      if (!bar) return;
+      var signedIn = !PRE_AUTH_VIEWS[viewId] && !!getToken();
+      bar.hidden = !signedIn;
+      document.body.classList.toggle('has-tabbar', signedIn);
+      var active = TAB_OF_VIEW[viewId] || '';
+      var btns = bar.querySelectorAll('button');
+      for (var i = 0; i < btns.length; i++) {
+        if (btns[i].getAttribute('data-tab-to') === active) {
+          btns[i].setAttribute('aria-current', 'page');
+        } else {
+          btns[i].removeAttribute('aria-current');
+        }
+      }
+    }
+
+    // Each tab lands on the toy the parent last had open. With no toy chosen
+    // yet the content tabs cannot mean anything, so they fall back to the
+    // toy list rather than opening an empty screen.
+    function openTab(name) {
+      var id = state.currentToyId || state.currentDeviceId;
+      if (name === 'today') {
+        if (id) { openToy(id); } else { state.currentToyId = null; loadDevices(); }
+        return;
+      }
+      if (!id) {
+        // Several toys and none chosen yet: the list is the honest answer
+        // to "whose library?" rather than guessing at one of them. With a
+        // single toy this state never occurs, because loadDevices opens it.
+        state.currentToyId = null;
+        loadDevices();
+        return;
+      }
+      state.currentToyId = id;
+      state.currentDeviceId = id;
+      if (name === 'library') { loadStoryLibrary(id); return; }
+      if (name === 'diary') { state.offset = 0; loadSummaries(); return; }
+      if (name === 'settings') { openToySettings(id); return; }
+    }
+
     function show(viewId) {
       var sameView = !document.getElementById(viewId)
         || !document.getElementById(viewId).hidden;
@@ -2092,6 +2214,7 @@
       // then throws the parent 1,900px back to the top every time they tick
       // a box — tolerable behind a Save button pressed once, unbearable now
       // that every control saves itself.
+      syncTabBar(viewId);
       if (sameView) {
         pendingScrollY = window.scrollY || 0;
       } else {
@@ -3168,6 +3291,20 @@
         }
         deviceStatus('', '');
         window.__toyFlash = null;
+
+        // One toy: open it. A list containing exactly one card is not a
+        // choice, it is a tap between the parent and the thing they came
+        // for - and they paid it on every single visit. With two or more
+        // the list is a real question and stays.
+        //
+        // Guarded on `openingToy` so this only fires on a genuine landing:
+        // loadDevices also runs after every save, and re-opening the toy
+        // from there would fight whatever screen the parent is on.
+        if (devices.length === 1 && !openingToy) {
+          openToy(devices[0].deviceId);
+          return;
+        }
+
         devices.forEach(function (d) {
           listEl.appendChild(buildToyCard(d));
         });
@@ -3197,6 +3334,19 @@
 
     // Open one toy's own page. Sets currentToyId then reuses loadDevices to
     // fetch fresh data and render the toy view.
+    (function wireTabBar() {
+      var bar = document.getElementById('tabBar');
+      if (!bar) return;
+      var btns = bar.querySelectorAll('button');
+      for (var i = 0; i < btns.length; i++) {
+        (function (b) {
+          b.addEventListener('click', function () {
+            openTab(b.getAttribute('data-tab-to'));
+          });
+        })(btns[i]);
+      }
+    })();
+
     document.getElementById('settingsBackBtn').addEventListener('click', function () {
       openToy(state.currentToyId);
     });
@@ -3231,9 +3381,7 @@
       // request form (moved into the toy page, owner decision 2026-08-04).
       var links = document.getElementById('toyContentLinks');
       clearChildren(links);
-      links.appendChild(buildTile('conversations', 'tile_conversations', 'tile_conversations_sub', function () {
-        openDevice(d.deviceId);
-      }, true));
+
       // Next to Conversations on purpose: these two are the record of the
       // CHILD, while library / music / request below are the content the
       // toy can play. Reached from here rather than the tab strip, which
@@ -3244,9 +3392,7 @@
         state.journalOffset = 0;   // a fresh visit starts at the newest
         loadReflectionJournal();
       }));
-      links.appendChild(buildTile('library', 'tile_library', 'tile_library_sub', function () {
-        loadStoryLibrary(d.deviceId);
-      }));
+
       links.appendChild(buildTile('music', 'tile_music', 'tile_music_sub', loadMusicLibrary));
       links.appendChild(buildTile('request', 'tile_request', 'tile_request_sub', function () {
         var f = document.getElementById('storyRequestForm');
@@ -3265,11 +3411,21 @@
         reqBlock.hidden = false;
         links.appendChild(reqBlock);   // relocate the form under this toy
       }
-      // Settings last: the content above is what a parent came to see, and
-      // bedtime is the once-a-month visit.
-      links.appendChild(buildTile('settings', 'tile_settings', 'tile_settings_sub', function () {
-        openToySettings(d.deviceId);
-      }));
+      // Conversations, Story library and Toy settings used to be tiles here.
+      // The tab bar reaches all three from every screen now, and a tile that
+      // repeats a tab is furniture: it lengthens the one screen a parent
+      // reads most in order to say something already on display.
+      //
+      // The three kept below are the ones with no other door yet - the
+      // journal, music and the request form all live behind a tab that
+      // lands somewhere else.
+
+      // "← Toys" is a real answer with several toys and pure noise with
+      // one, where it points at a list the parent is never sent to.
+      var backBtn = document.getElementById('toyBackBtn');
+      if (backBtn) {
+        backBtn.hidden = (state.lastDevicesResponse || []).length < 2;
+      }
 
       var header = document.getElementById('toyHeader');
       clearChildren(header);
@@ -3371,6 +3527,17 @@
       var settings = document.getElementById('toySettings');
       clearChildren(settings);
       renderToySettings(d, settings);
+
+      // Your account, at the foot of Settings. It used to sit behind a
+      // header button reading "Account" - a word most parents read as
+      // billing - which is where the activity log and the data download
+      // were also hiding. "Change something about this" is one idea and
+      // belongs in one place.
+      var accountTile = buildTile('settings', 'tile_account', 'tile_account_sub', function () {
+        openAccount();
+      });
+      accountTile.style.marginTop = '14px';
+      settings.appendChild(accountTile);
 
       if (window.__toyFlash && window.__toyFlash.msg) {
         var fmsg = window.__toyFlash.msg, fkind = window.__toyFlash.kind || 'ok';
@@ -5375,6 +5542,9 @@
     document.getElementById('logoutBtn').addEventListener('click', doLogout);
     document.getElementById('accountBtn').addEventListener('click', openAccount);
     document.getElementById('accountBackBtn').addEventListener('click', function () {
+      // Account is reached from the foot of Settings now, so back means
+      // Settings - not the toy list it used to drop the parent on.
+      if (state.currentToyId) { openToySettings(state.currentToyId); return; }
       state.currentToyId = null;
       loadDevices();
     });
@@ -5970,14 +6140,52 @@
       var question = questions[qIndex] || questions[0] || null;
       var takeaway = conclusions[qIndex] || (story && story.lesson) || null;
 
-      var h = document.createElement('h3');
-      h.textContent = '🌙 ' + t('tonight_title');
-      card.appendChild(h);
-
-      var titleEl = document.createElement('div');
-      titleEl.className = 'tonight-story';
-      titleEl.textContent = '📖 ' + storyTitle(model.play.storyId);
-      card.appendChild(titleEl);
+      // The landing screen opens with the artwork of the story the child
+      // actually heard, full width. Before this, the first thing a parent
+      // saw after signing in was a heading - and the eleven covers, the
+      // best thing in the product, were three taps and a scroll away.
+      //
+      // No cover means no cover: a toy that has told no story yet falls
+      // back to the heading, rather than a grey box or a stock picture
+      // standing in for a night that did not happen.
+      var poster = buildCover(model.play.storyId);
+      if (poster) {
+        var frame = document.createElement('div');
+        frame.style.cssText = 'position:relative;margin:0 0 10px;';
+        poster.style.margin = '0';
+        frame.appendChild(poster);
+        var scrim = document.createElement('div');
+        scrim.style.cssText =
+          'position:absolute;left:0;right:0;bottom:0;height:52%;border-radius:0 0 10px 10px;' +
+          'background:linear-gradient(to top, rgba(20,23,43,.9), rgba(20,23,43,.55) 45%, rgba(20,23,43,0));' +
+          'pointer-events:none;';
+        frame.appendChild(scrim);
+        var onArt = document.createElement('div');
+        onArt.style.cssText =
+          'position:absolute;left:14px;right:14px;bottom:12px;color:#FBF6EC;pointer-events:none;';
+        var eyebrow = document.createElement('div');
+        eyebrow.style.cssText =
+          'font-size:11px;letter-spacing:.14em;text-transform:uppercase;' +
+          'color:#E4D0A0;margin-bottom:4px;';
+        eyebrow.textContent = t('tonight_title');
+        var nameEl = document.createElement('div');
+        nameEl.style.cssText =
+          'font-size:22px;font-weight:700;line-height:1.15;text-wrap:balance;' +
+          'text-shadow:0 1px 3px rgba(0,0,0,.6);';
+        nameEl.textContent = storyTitle(model.play.storyId);
+        onArt.appendChild(eyebrow);
+        onArt.appendChild(nameEl);
+        frame.appendChild(onArt);
+        card.appendChild(frame);
+      } else {
+        var h = document.createElement('h3');
+        h.textContent = '🌙 ' + t('tonight_title');
+        card.appendChild(h);
+        var titleEl = document.createElement('div');
+        titleEl.className = 'tonight-story';
+        titleEl.textContent = storyTitle(model.play.storyId);
+        card.appendChild(titleEl);
+      }
 
       if (question) {
         var qEl = document.createElement('div');

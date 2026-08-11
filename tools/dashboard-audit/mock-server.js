@@ -108,8 +108,10 @@ const routes = {
   'GET /api/parents/google-config': () => ({ clientId: null }),
   'GET /api/parents/me': () => ({ email: 'anna@example.am', emailVerifiedAt: ago(60 * 24 * 30) }),
   'GET /api/parents/devices': () => ({ deviceIds: [DEV1, DEV2] }),
+  // AREG_MOCK_DEVICES=1 exercises the single-toy landing, which is the
+  // common case and the one with a shortcut.
   'GET /api/parents/devices/details': () => ({
-    devices,
+    devices: process.env.AREG_MOCK_DEVICES === '1' ? devices.slice(0, 1) : devices,
     summary: { totalDevices: 2, dormantDevices: 0, lastLoginAt: ago(3), emailVerifiedAt: ago(60 * 24 * 30) } }),
   'GET /api/conversations/summary': (q) => ({
     conversations: q.mode ? summaries.filter(s => (s.modes || []).includes(q.mode)) : summaries }),
