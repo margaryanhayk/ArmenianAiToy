@@ -6,6 +6,27 @@ Armenian AI Toy ("Areg") — a physical children's toy (ages 4-7) with an Armeni
 
 Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 
+## Communication rules
+
+**When the owner asks what he needs to do, answer with the actions and
+nothing else.** A numbered list, shortest form that is still true. No
+background, no reasoning, no alternatives considered, no recap of what I
+just built. If a line is not something for HIM to do, it does not belong in
+that answer. He has asked for this more than once; a rule that only survives
+one message is not a rule, which is why it is written here.
+
+- **Detail on request, never by default.** "Why?" is a question he can ask.
+  Pre-empting it is what turns a three-line answer into a page.
+- **Bad news is an action, not detail.** Short never means cheerful. A
+  blocker, a cost, a thing that is broken, a decision only he can make —
+  those stay in, stated plainly. Brevity must never become the reason
+  something true went unsaid.
+- **Length is not effort.** Ambition and thoroughness go into the work, the
+  tests and the commit message. The chat reply is not where they are proved.
+- Applies to every surface he reads as a person: chat, and any status page
+  written for him.
+
+
 ## Product Constraints
 
 - **Armenian-first.** All child-facing output is in Armenian.
@@ -2915,8 +2936,11 @@ sessions + TOTP MFA above.)
 - **No architecture redesign.** Work within existing structure.
 - **Minimal changes only.** Small diffs. Preserve existing behavior.
 - **No new engines or abstractions.** No state machines. No speculative features.
-- **Always explain what changed and why.**
-- **Always show full updated file contents** after changes.
+- **Always explain what changed and why** — in the commit message, the PR
+  body and code comments. NOT in a chat reply to a question about what to do
+  next; see § Communication rules, which wins there.
+- **Always show full updated file contents** after changes — when reviewing
+  code, on request. Never as the default shape of a reply.
 - **Prefer tests** for logic changes and edge cases.
 - **Do not expand scope** beyond what was asked.
 - **Do not add folklore, audio, or hardware work.**
