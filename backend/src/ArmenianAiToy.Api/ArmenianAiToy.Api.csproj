@@ -68,6 +68,20 @@
     -->
     <Content Include="story-audio\**\*.mp3" CopyToOutputDirectory="PreserveNewest" />
     <!--
+      The per-segment byte maps written beside each narration by
+      tools/story-audio/segments_to_bytes.py. StoryQaController reads one to
+      decide WHICH SCENE an in-story question is answered about; without it
+      the offset is only proportional to file size. Third widening of this
+      glob family, and the same failure mode as the other two: the file is
+      on the bench, absent from the image, and nothing says so.
+
+      Update, not Include: the SDK's default content items already CLAIM
+      every .json under the project (an Include here is a duplicate-item
+      build error), they are simply never copied to the output. Update adds
+      the copy to the item that already exists.
+    -->
+    <Content Update="story-audio\**\*.segments.json" CopyToOutputDirectory="PreserveNewest" />
+    <!--
       Game clips live in per-game SUBFOLDERS (story-audio/games/<key>/<clip>.mp3)
       because four games each define a clip called "intro". The top-level glob
       above does not recurse, so without this line the manifest advertises 92

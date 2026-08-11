@@ -1200,18 +1200,42 @@ public class StoryQaController : ControllerBase
     }
 
     /// <summary>
-    /// Maps a byte offset in the pre-rendered story MP3 to the segment the
-    /// child is in, so the Q&amp;A prompt's "current segment" and the
-    /// re-anchor recap line match where they barged in. Prefers the exact
-    /// per-segment byte map written by the render
-    /// (<c>{story}.segments.json</c>): the largest segment whose start byte
-    /// is ≤ the offset. Falls back to the old proportional-to-file-size
-    /// estimate only when that sidecar is absent (a cache rendered before
-    /// the segment map existed). Falls back to segment 0 on any failure —
+    /// Maps a byte offset in the story MP3 to the segment the child is in,
+    /// so the Q&amp;A prompt's "current segment" and the re-anchor recap line
+    /// match where they barged in. Prefers the exact per-segment byte map
+    /// written by the render (<c>{story}.segments.json</c>): the largest
+    /// segment whose start byte is ≤ the offset.
+    ///
+    /// <para>
+    /// TWO MP3s of the same story exist and their byte offsets are NOT
+    /// interchangeable: the OpenAI-TTS render under
+    /// <c>StoryAudio:CacheRoot</c> that this backend streams, and the
+    /// ElevenLabs narration under <c>ContentSync:AudioRoot</c> that the toy
+    /// downloads to its SD card and plays offline. A map of one read as a
+    /// map of the other would be worse than no map at all, so each is only
+    /// ever paired with its own sidecar.
+    /// </para>
+    ///
+    /// <para>
+    /// Cache first, because <c>StoryAudioController</c> re-renders whenever
+    /// the audio or either sidecar is missing — a streaming session always
+    /// has a correct cache map by the time it serves a byte, so it never
+    /// reaches the ContentSync map. The SD child, whose offsets belong to
+    /// the shipped file, reaches it every time. That ordering is what lets
+    /// this work with no firmware change and no <c>src</c> query param.
+    /// </para>
+    ///
+    /// <para>
+    /// Falls back to a proportional-to-file-size estimate when no sidecar is
+    /// present, measured against whichever MP3 exists — previously this
+    /// returned 0 whenever the cache file was absent, which on the SD path
+    /// (the one children actually use) meant EVERY question was grounded in
+    /// segment 0. Falls back to segment 0 only when nothing at all resolves;
     /// the whole-story summary in the prompt answers correctly regardless,
-    /// so position is only a context refinement.
+    /// so position is a context refinement.
+    /// </para>
     /// </summary>
-    private int OffsetToSegment(string storyId, long offset, int segmentCount)
+    internal int OffsetToSegment(string storyId, long offset, int segmentCount)
     {
         if (offset <= 0 || segmentCount <= 1)
         {
@@ -1219,41 +1243,86 @@ public class StoryQaController : ControllerBase
         }
         try
         {
-            var root = _config["StoryAudio:CacheRoot"];
-            if (string.IsNullOrWhiteSpace(root))
-            {
-                root = Path.Combine(_env.ContentRootPath, "story-audio-cache");
-            }
-            var safe = string.Concat(storyId.Where(c => char.IsLetterOrDigit(c) || c == '-'));
-            var path = Path.Combine(root, $"{safe}.mp3");
+            // Cache render first, shipped narration second — see the ordering
+            // rationale above. A null entry simply means that source is not
+            // configured for this story.
+            var candidates = new[] { CacheAudioPath(storyId), ShippedAudioPath(storyId) };
 
             // Preferred: exact segment-start byte map. Q&A is infrequent
             // (one per barge-in), so reading the small sidecar per call is
             // cheap and avoids any stale-cache risk on re-render.
-            var segmentsPath = Path.ChangeExtension(path, ".segments.json");
-            var segmentMap = LoadSegmentMap(segmentsPath);
-            if (segmentMap.Length > 1)
+            foreach (var audio in candidates)
             {
-                return SegmentForOffset(segmentMap, offset, segmentCount);
+                if (string.IsNullOrEmpty(audio))
+                {
+                    continue;
+                }
+                var segmentMap = LoadSegmentMap(Path.ChangeExtension(audio, ".segments.json"));
+                if (segmentMap.Length > 1)
+                {
+                    return SegmentForOffset(segmentMap, offset, segmentCount);
+                }
             }
 
-            // Fallback: proportional to file size (pre-segment-map caches).
-            if (!System.IO.File.Exists(path))
+            // Fallback: proportional to the size of the file the offset most
+            // likely came from (a render that predates the segment map).
+            foreach (var audio in candidates)
             {
-                return 0;
+                if (string.IsNullOrEmpty(audio) || !System.IO.File.Exists(audio))
+                {
+                    continue;
+                }
+                var size = new FileInfo(audio).Length;
+                if (size <= 0)
+                {
+                    continue;
+                }
+                var proportional = (int)(offset * segmentCount / size);
+                return Math.Clamp(proportional, 0, segmentCount - 1);
             }
-            var size = new FileInfo(path).Length;
-            if (size <= 0)
-            {
-                return 0;
-            }
-            var proportional = (int)(offset * segmentCount / size);
-            return Math.Clamp(proportional, 0, segmentCount - 1);
+
+            return 0;
         }
         catch
         {
             return 0;
         }
+    }
+
+    /// <summary>The OpenAI-TTS render this backend streams and caches.
+    /// Always a path; the file may not exist yet.</summary>
+    private string CacheAudioPath(string storyId)
+    {
+        var root = _config["StoryAudio:CacheRoot"];
+        if (string.IsNullOrWhiteSpace(root))
+        {
+            root = Path.Combine(_env.ContentRootPath, "story-audio-cache");
+        }
+        var safe = string.Concat(storyId.Where(c => char.IsLetterOrDigit(c) || c == '-'));
+        return Path.Combine(root, $"{safe}.mp3");
+    }
+
+    /// <summary>The narration the toy downloads to SD, or null when this
+    /// story configures none.
+    ///
+    /// <para>
+    /// The path comes from <c>ResolveStories()</c> — the single place the
+    /// manifest service and the content-file endpoint both read — rather
+    /// than being re-derived from the content root, because
+    /// <c>ResolveAudioPath</c> roots a relative <c>AudioPath</c> at
+    /// <c>AppContext.BaseDirectory</c>. Re-deriving it by hand is precisely
+    /// how the backend and the manifest come to disagree about where a file
+    /// lives. Deliberately NOT gated on <c>ContentSync:Enabled</c>: the
+    /// switch governs what is offered to devices, while a toy that synced
+    /// before it was turned off still plays that file and still deserves an
+    /// answer about the right scene.
+    /// </para></summary>
+    private string? ShippedAudioPath(string storyId)
+    {
+        var path = ContentSyncOptions.Resolve(_config).ResolveStories()
+            .FirstOrDefault(s => string.Equals(s.StoryId, storyId, StringComparison.OrdinalIgnoreCase))
+            ?.AudioPath;
+        return string.IsNullOrWhiteSpace(path) ? null : path;
     }
 
     /// <summary>Given the segment-start byte map (ascending; entry i is the
