@@ -107,6 +107,10 @@ studio nothing (they slate takes anyway) and it buys four things at once:
    `.segments.json` files in the repo today. The backend wants one
    (`StoryQaController.OffsetToSegment`) and, not finding it, guesses with
    `offset × segmentCount ÷ fileSize`.
+   Note the map takes **two** steps, not one: `mix_ambience.py` emits it in
+   seconds, and `segments_to_bytes.py` converts that to the byte offsets the
+   backend actually deserializes, after the MP3 exists. Skip the second and the
+   backend ignores the file without complaining and carries on guessing.
 2. **Correct scene context when a child interrupts to ask a question.** That
    guess is only as good as the file matching the text — and on the three
    truncated stories it does not, so today a child near the end of the *file* is
