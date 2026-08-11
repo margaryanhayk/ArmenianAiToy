@@ -18,6 +18,7 @@ import {
 } from '../api';
 import { Key, getLanguage, t, tf } from '../i18n';
 import { useLang } from '../useLang';
+import { theme } from '../theme';
 
 const LOCALE: Record<string, string> = { en: 'en-GB', ru: 'ru-RU', hy: 'hy-AM' };
 
@@ -162,40 +163,40 @@ function Stat({ labelKey, value, warn }: { labelKey: Key; value: number; warn?: 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: '#fff' },
+  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: theme.surface },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  back: { color: '#2c4a7a', fontSize: 15, marginBottom: 4 },
-  flaggedLink: { color: '#a02622', fontSize: 15, fontWeight: '600' },
-  title: { fontSize: 24, fontWeight: '700', color: '#2c4a7a', marginBottom: 12 },
+  back: { color: theme.brand, fontSize: 15, marginBottom: 4 },
+  flaggedLink: { color: theme.danger, fontSize: 15, fontWeight: '600' },
+  title: { fontSize: 24, fontWeight: '700', color: theme.brand, marginBottom: 12 },
   todayCard: {
-    backgroundColor: '#f0f4fb',
-    borderColor: '#cdddf2',
+    backgroundColor: theme.surfaceTint,
+    borderColor: theme.line,
     borderWidth: 1,
     borderRadius: 10,
     padding: 14,
     marginBottom: 16,
   },
-  todayTitle: { fontSize: 14, fontWeight: '600', color: '#2c4a7a', marginBottom: 10 },
+  todayTitle: { fontSize: 14, fontWeight: '600', color: theme.brand, marginBottom: 10 },
   todayRow: { flexDirection: 'row', justifyContent: 'space-around' },
   stat: { alignItems: 'center' },
-  statValue: { fontSize: 26, fontWeight: '700', color: '#2c4a7a' },
-  statWarn: { color: '#a02622' },
-  statLabel: { fontSize: 12, color: '#666', marginTop: 2 },
-  sectionLabel: { fontSize: 13, color: '#888', marginBottom: 6, textTransform: 'uppercase' },
-  empty: { textAlign: 'center', color: '#888', marginTop: 24 },
-  error: { color: '#a02622', marginBottom: 8 },
+  statValue: { fontSize: 26, fontWeight: '700', color: theme.brand },
+  statWarn: { color: theme.danger },
+  statLabel: { fontSize: 12, color: theme.inkMuted, marginTop: 2 },
+  sectionLabel: { fontSize: 13, color: theme.inkHint, marginBottom: 6, textTransform: 'uppercase' },
+  empty: { textAlign: 'center', color: theme.inkHint, marginTop: 24 },
+  error: { color: theme.danger, marginBottom: 8 },
   row: {
     borderWidth: 1,
-    borderColor: '#e2e2e2',
+    borderColor: theme.line,
     borderRadius: 10,
     padding: 12,
     marginBottom: 8,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.surfaceSunken,
   },
   rowTop: { flexDirection: 'row', alignItems: 'center' },
-  rowTime: { color: '#555', fontSize: 13, flex: 1 },
-  rowCount: { color: '#888', fontSize: 12 },
-  flag: { color: '#a02622', fontSize: 12, marginLeft: 8 },
-  snippet: { color: '#222', marginTop: 6 },
-  snippetAreg: { color: '#2c4a7a', marginTop: 4 },
+  rowTime: { color: theme.inkMuted, fontSize: 13, flex: 1 },
+  rowCount: { color: theme.inkHint, fontSize: 12 },
+  flag: { color: theme.danger, fontSize: 12, marginLeft: 8 },
+  snippet: { color: theme.ink, marginTop: 6 },
+  snippetAreg: { color: theme.brand, marginTop: 4 },
 });

@@ -14,6 +14,7 @@ import { errText, login, register } from '../api';
 import { LANG_NAMES, LANGS, getLanguage, setLanguage, t } from '../i18n';
 import { useLang } from '../useLang';
 import PasswordInput from '../PasswordInput';
+import { theme } from '../theme';
 
 type Props = {
   onLoggedIn: (token: string) => void;
@@ -137,41 +138,41 @@ export default function LoginScreen({ onLoggedIn }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, justifyContent: 'center', backgroundColor: '#fff' },
+  container: { flex: 1, padding: 24, justifyContent: 'center', backgroundColor: theme.surface },
   logo: { width: 88, height: 88, alignSelf: 'center', marginBottom: 4 },
-  brand: { fontSize: 40, fontWeight: '700', textAlign: 'center', color: '#2c4a7a' },
-  subtitle: { fontSize: 16, textAlign: 'center', marginBottom: 24, color: '#555' },
+  brand: { fontSize: 40, fontWeight: '700', textAlign: 'center', color: theme.brand },
+  subtitle: { fontSize: 16, textAlign: 'center', marginBottom: 24, color: theme.inkMuted },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: theme.lineInput,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     marginBottom: 12,
   },
   button: {
-    backgroundColor: '#2c4a7a',
+    backgroundColor: theme.brand,
     borderRadius: 8,
     padding: 14,
     alignItems: 'center',
     marginTop: 4,
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  link: { color: '#2c4a7a', textAlign: 'center', marginTop: 16 },
-  status: { color: '#2f6b2f', textAlign: 'center', marginTop: 16 },
-  error: { color: '#a02622', textAlign: 'center', marginTop: 16 },
+  buttonText: { color: theme.surface, fontSize: 16, fontWeight: '600' },
+  link: { color: theme.brand, textAlign: 'center', marginTop: 16 },
+  status: { color: theme.ok, textAlign: 'center', marginTop: 16 },
+  error: { color: theme.danger, textAlign: 'center', marginTop: 16 },
   langRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 28 },
   langPill: {
     borderWidth: 1,
-    borderColor: '#d5d5d5',
+    borderColor: theme.line,
     borderRadius: 999,
     paddingVertical: 8,
     paddingHorizontal: 14,
     minHeight: 44,
     justifyContent: 'center',
   },
-  langPillOn: { borderColor: '#2c4a7a', backgroundColor: '#eef3fb' },
-  langText: { color: '#666', fontSize: 13 },
-  langTextOn: { color: '#2c4a7a', fontWeight: '700' },
+  langPillOn: { borderColor: theme.brand, backgroundColor: theme.brandTint },
+  langText: { color: theme.inkMuted, fontSize: 13 },
+  langTextOn: { color: theme.brand, fontWeight: '700' },
 });

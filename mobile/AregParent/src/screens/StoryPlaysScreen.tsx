@@ -20,6 +20,7 @@ import {
 } from '../api';
 import { getLanguage, t, tf } from '../i18n';
 import { useLang } from '../useLang';
+import { theme } from '../theme';
 
 type Props = {
   deviceId: string;
@@ -166,27 +167,27 @@ export default function StoryPlaysScreen({ deviceId, deviceName, onBack, onLogou
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: '#fff' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
-  back: { color: '#2c4a7a', fontSize: 15, marginBottom: 4 },
-  title: { fontSize: 22, fontWeight: '700', color: '#2c4a7a' },
-  sub: { color: '#666', marginBottom: 12 },
-  section: { fontSize: 16, fontWeight: '700', color: '#2c4a7a', marginBottom: 8 },
+  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: theme.surface },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface },
+  back: { color: theme.brand, fontSize: 15, marginBottom: 4 },
+  title: { fontSize: 22, fontWeight: '700', color: theme.brand },
+  sub: { color: theme.inkMuted, marginBottom: 12 },
+  section: { fontSize: 16, fontWeight: '700', color: theme.brand, marginBottom: 8 },
   totalRow: {
-    borderWidth: 1, borderColor: '#cdddf2', backgroundColor: '#f0f4fb',
+    borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surfaceTint,
     borderRadius: 10, padding: 12, marginBottom: 8,
   },
-  totalName: { fontSize: 15, fontWeight: '700', color: '#222' },
-  totalCount: { color: '#555', marginTop: 2, fontSize: 13 },
+  totalName: { fontSize: 15, fontWeight: '700', color: theme.ink },
+  totalCount: { color: theme.inkMuted, marginTop: 2, fontSize: 13 },
   row: {
-    borderWidth: 1, borderColor: '#e2e2e2', borderRadius: 10,
-    padding: 12, marginBottom: 8, backgroundColor: '#fafafa',
+    borderWidth: 1, borderColor: theme.line, borderRadius: 10,
+    padding: 12, marginBottom: 8, backgroundColor: theme.surfaceSunken,
   },
-  rowName: { fontSize: 15, color: '#222' },
-  rowMeta: { color: '#666', fontSize: 12, marginTop: 3 },
-  answer: { borderBottomWidth: 1, borderBottomColor: '#eee', paddingVertical: 8 },
-  answerText: { color: '#222', marginTop: 3 },
-  empty: { textAlign: 'center', color: '#666', marginTop: 24 },
-  note: { color: '#666', fontSize: 12, marginTop: 8 },
-  error: { color: '#a02622', marginBottom: 8 },
+  rowName: { fontSize: 15, color: theme.ink },
+  rowMeta: { color: theme.inkMuted, fontSize: 12, marginTop: 3 },
+  answer: { borderBottomWidth: 1, borderBottomColor: theme.lineSoft, paddingVertical: 8 },
+  answerText: { color: theme.ink, marginTop: 3 },
+  empty: { textAlign: 'center', color: theme.inkMuted, marginTop: 24 },
+  note: { color: theme.inkMuted, fontSize: 12, marginTop: 8 },
+  error: { color: theme.danger, marginBottom: 8 },
 });

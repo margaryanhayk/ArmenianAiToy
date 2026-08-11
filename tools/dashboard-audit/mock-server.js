@@ -168,6 +168,15 @@ http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   const q = Object.fromEntries(u.searchParams);
   const key = req.method + ' ' + u.pathname;
+  // CORS, so the phone app (mobile/AregParent) can be driven against this
+  // mock too. It is built with Expo and served from a different port, so
+  // without these headers every call fails before it is even attempted, and
+  // the fourteen screens behind the login stay unverifiable.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+
   const send = (o, code = 200) => {
     res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(o));

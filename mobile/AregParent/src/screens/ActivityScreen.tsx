@@ -11,6 +11,7 @@ import {
 import { AuditEntry, errText, getActivity, LinkedDevice, UnauthorizedError } from '../api';
 import { getLanguage, Key, t } from '../i18n';
 import { useLang } from '../useLang';
+import { theme } from '../theme';
 
 type Props = {
   devices: LinkedDevice[];
@@ -146,15 +147,15 @@ export default function ActivityScreen({ devices, onBack, onLogout }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: '#fff' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
-  back: { color: '#2c4a7a', fontSize: 15, marginBottom: 4 },
-  title: { fontSize: 22, fontWeight: '700', color: '#2c4a7a', marginBottom: 12 },
-  row: { borderBottomWidth: 1, borderBottomColor: '#eee', paddingVertical: 10 },
+  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: theme.surface },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface },
+  back: { color: theme.brand, fontSize: 15, marginBottom: 4 },
+  title: { fontSize: 22, fontWeight: '700', color: theme.brand, marginBottom: 12 },
+  row: { borderBottomWidth: 1, borderBottomColor: theme.lineSoft, paddingVertical: 10 },
   rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  label: { color: '#222', fontWeight: '600', flex: 1 },
-  time: { color: '#666', fontSize: 12 },
-  target: { color: '#666', fontSize: 13, marginTop: 3 },
-  empty: { textAlign: 'center', color: '#666', marginTop: 24 },
-  error: { color: '#a02622', marginBottom: 8 },
+  label: { color: theme.ink, fontWeight: '600', flex: 1 },
+  time: { color: theme.inkMuted, fontSize: 12 },
+  target: { color: theme.inkMuted, fontSize: 13, marginTop: 3 },
+  empty: { textAlign: 'center', color: theme.inkMuted, marginTop: 24 },
+  error: { color: theme.danger, marginBottom: 8 },
 });

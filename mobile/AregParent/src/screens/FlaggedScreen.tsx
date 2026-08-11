@@ -11,6 +11,7 @@ import {
 import { errText, FlaggedMessage, getFlagged, UnauthorizedError } from '../api';
 import { getLanguage, t, tf } from '../i18n';
 import { useLang } from '../useLang';
+import { theme } from '../theme';
 
 const LOCALE: Record<string, string> = { en: 'en-GB', ru: 'ru-RU', hy: 'hy-AM' };
 
@@ -114,26 +115,26 @@ export default function FlaggedScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: '#fff' },
-  back: { color: '#2c4a7a', fontSize: 15, marginBottom: 4 },
-  title: { fontSize: 22, fontWeight: '700', color: '#2c4a7a', marginBottom: 12 },
-  error: { color: '#a02622', marginBottom: 8 },
+  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: theme.surface },
+  back: { color: theme.brand, fontSize: 15, marginBottom: 4 },
+  title: { fontSize: 22, fontWeight: '700', color: theme.brand, marginBottom: 12 },
+  error: { color: theme.danger, marginBottom: 8 },
   clear: { alignItems: 'center', marginTop: 48, paddingHorizontal: 24 },
-  clearIcon: { fontSize: 44, color: '#5aa45a' },
-  clearText: { fontSize: 18, fontWeight: '700', color: '#2f6b2f', marginTop: 8 },
-  clearHint: { textAlign: 'center', color: '#888', marginTop: 8 },
+  clearIcon: { fontSize: 44, color: theme.okLine },
+  clearText: { fontSize: 18, fontWeight: '700', color: theme.ok, marginTop: 8 },
+  clearHint: { textAlign: 'center', color: theme.inkHint, marginTop: 8 },
   row: {
     borderWidth: 1,
-    borderColor: '#f0c9c7',
-    backgroundColor: '#fdf6f5',
+    borderColor: theme.dangerLine,
+    backgroundColor: theme.dangerBg,
     borderRadius: 10,
     padding: 12,
     marginBottom: 8,
   },
   rowTop: { flexDirection: 'row', alignItems: 'center' },
-  flag: { color: '#a02622', fontWeight: '700', fontSize: 13 },
-  role: { color: '#777', fontSize: 12, marginLeft: 8, flex: 1 },
-  time: { color: '#999', fontSize: 12 },
-  content: { color: '#222', marginTop: 6 },
-  openHint: { color: '#2c4a7a', fontSize: 12, marginTop: 8 },
+  flag: { color: theme.danger, fontWeight: '700', fontSize: 13 },
+  role: { color: theme.inkHint, fontSize: 12, marginLeft: 8, flex: 1 },
+  time: { color: theme.inkHint, fontSize: 12 },
+  content: { color: theme.ink, marginTop: 6 },
+  openHint: { color: theme.brand, fontSize: 12, marginTop: 8 },
 });

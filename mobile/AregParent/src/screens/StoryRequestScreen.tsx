@@ -19,6 +19,7 @@ import {
 } from '../api';
 import { getLanguage, Key, t } from '../i18n';
 import { useLang } from '../useLang';
+import { theme } from '../theme';
 
 type Props = { onBack: () => void; onLogout: () => void };
 
@@ -168,26 +169,26 @@ export default function StoryRequestScreen({ onBack, onLogout }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: '#fff' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
-  back: { color: '#2c4a7a', fontSize: 15, marginBottom: 4 },
-  title: { fontSize: 22, fontWeight: '700', color: '#2c4a7a' },
-  help: { color: '#555', marginTop: 6, marginBottom: 12, lineHeight: 20 },
+  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: theme.surface },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface },
+  back: { color: theme.brand, fontSize: 15, marginBottom: 4 },
+  title: { fontSize: 22, fontWeight: '700', color: theme.brand },
+  help: { color: theme.inkMuted, marginTop: 6, marginBottom: 12, lineHeight: 20 },
   input: {
-    borderWidth: 1, borderColor: '#ccc', borderRadius: 8,
+    borderWidth: 1, borderColor: theme.lineInput, borderRadius: 8,
     padding: 12, minHeight: 110, fontSize: 15, marginBottom: 10,
   },
-  primaryBtn: { backgroundColor: '#2c4a7a', borderRadius: 8, padding: 14, alignItems: 'center' },
-  primaryBtnText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  primaryBtn: { backgroundColor: theme.brand, borderRadius: 8, padding: 14, alignItems: 'center' },
+  primaryBtnText: { color: theme.surface, fontWeight: '600', fontSize: 16 },
   disabled: { opacity: 0.6 },
-  section: { fontSize: 16, fontWeight: '700', color: '#2c4a7a', marginTop: 24, marginBottom: 8 },
+  section: { fontSize: 16, fontWeight: '700', color: theme.brand, marginTop: 24, marginBottom: 8 },
   card: {
-    borderWidth: 1, borderColor: '#e2e2e2', borderRadius: 10,
-    padding: 12, marginBottom: 8, backgroundColor: '#fafafa',
+    borderWidth: 1, borderColor: theme.line, borderRadius: 10,
+    padding: 12, marginBottom: 8, backgroundColor: theme.surfaceSunken,
   },
-  meta: { color: '#666', fontSize: 12 },
-  body: { color: '#222', marginTop: 4 },
-  empty: { color: '#666' },
-  status: { color: '#2f6b2f', marginTop: 10 },
-  error: { color: '#a02622', marginTop: 10 },
+  meta: { color: theme.inkMuted, fontSize: 12 },
+  body: { color: theme.ink, marginTop: 4 },
+  empty: { color: theme.inkMuted },
+  status: { color: theme.ok, marginTop: 10 },
+  error: { color: theme.danger, marginTop: 10 },
 });

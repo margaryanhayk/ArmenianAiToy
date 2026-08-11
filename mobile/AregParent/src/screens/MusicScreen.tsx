@@ -11,6 +11,7 @@ import {
 import { errText, getMusic, MusicTrack, UnauthorizedError } from '../api';
 import { t } from '../i18n';
 import { useLang } from '../useLang';
+import { theme } from '../theme';
 
 type Props = { onBack: () => void; onLogout: () => void };
 
@@ -87,15 +88,15 @@ export default function MusicScreen({ onBack, onLogout }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: '#fff' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
-  back: { color: '#2c4a7a', fontSize: 15, marginBottom: 4 },
-  title: { fontSize: 22, fontWeight: '700', color: '#2c4a7a', marginBottom: 12 },
+  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: theme.surface },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface },
+  back: { color: theme.brand, fontSize: 15, marginBottom: 4 },
+  title: { fontSize: 22, fontWeight: '700', color: theme.brand, marginBottom: 12 },
   card: {
-    borderWidth: 1, borderColor: '#e2e2e2', borderRadius: 10,
-    padding: 14, marginBottom: 8, backgroundColor: '#fafafa',
+    borderWidth: 1, borderColor: theme.line, borderRadius: 10,
+    padding: 14, marginBottom: 8, backgroundColor: theme.surfaceSunken,
   },
-  name: { fontSize: 15, fontWeight: '600', color: '#222' },
-  empty: { textAlign: 'center', color: '#666', marginTop: 24 },
-  error: { color: '#a02622', marginBottom: 8 },
+  name: { fontSize: 15, fontWeight: '600', color: theme.ink },
+  empty: { textAlign: 'center', color: theme.inkMuted, marginTop: 24 },
+  error: { color: theme.danger, marginBottom: 8 },
 });

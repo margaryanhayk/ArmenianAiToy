@@ -11,6 +11,7 @@ import {
 import { errText, getStoryLibrary, LibraryStory, UnauthorizedError } from '../api';
 import { t, tf } from '../i18n';
 import { useLang } from '../useLang';
+import { theme } from '../theme';
 
 type Props = {
   deviceId: string;
@@ -137,23 +138,23 @@ export default function StoryLibraryScreen({ deviceId, deviceName, onBack, onLog
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: '#fff' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
-  back: { color: '#2c4a7a', fontSize: 15, marginBottom: 4 },
-  title: { fontSize: 22, fontWeight: '700', color: '#2c4a7a' },
-  sub: { color: '#666', marginBottom: 12 },
+  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: theme.surface },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface },
+  back: { color: theme.brand, fontSize: 15, marginBottom: 4 },
+  title: { fontSize: 22, fontWeight: '700', color: theme.brand },
+  sub: { color: theme.inkMuted, marginBottom: 12 },
   card: {
-    borderWidth: 1, borderColor: '#e2e2e2', borderRadius: 10,
-    padding: 14, marginBottom: 10, backgroundColor: '#fafafa',
+    borderWidth: 1, borderColor: theme.line, borderRadius: 10,
+    padding: 14, marginBottom: 10, backgroundColor: theme.surfaceSunken,
   },
-  name: { fontSize: 16, fontWeight: '700', color: '#222' },
-  meta: { color: '#666', fontSize: 12, marginTop: 2 },
-  body: { color: '#333', fontSize: 14, marginTop: 6 },
-  lesson: { color: '#3a5a3a', fontSize: 14, marginTop: 4 },
-  counts: { color: '#666', fontSize: 12, marginTop: 6 },
-  discuss: { color: '#2c4a7a', fontWeight: '600', marginTop: 10, paddingVertical: 6 },
-  question: { color: '#222', marginLeft: 6 },
-  takeaway: { color: '#3a5a3a', fontSize: 13, marginLeft: 16, marginTop: 2 },
-  empty: { textAlign: 'center', color: '#666', marginTop: 24 },
-  error: { color: '#a02622', marginBottom: 8 },
+  name: { fontSize: 16, fontWeight: '700', color: theme.ink },
+  meta: { color: theme.inkMuted, fontSize: 12, marginTop: 2 },
+  body: { color: theme.ink, fontSize: 14, marginTop: 6 },
+  lesson: { color: theme.ok, fontSize: 14, marginTop: 4 },
+  counts: { color: theme.inkMuted, fontSize: 12, marginTop: 6 },
+  discuss: { color: theme.brand, fontWeight: '600', marginTop: 10, paddingVertical: 6 },
+  question: { color: theme.ink, marginLeft: 6 },
+  takeaway: { color: theme.ok, fontSize: 13, marginLeft: 16, marginTop: 2 },
+  empty: { textAlign: 'center', color: theme.inkMuted, marginTop: 24 },
+  error: { color: theme.danger, marginBottom: 8 },
 });

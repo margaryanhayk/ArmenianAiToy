@@ -19,6 +19,7 @@ import {
 } from '../api';
 import { t, tf } from '../i18n';
 import { useLang } from '../useLang';
+import { theme } from '../theme';
 
 type Props = {
   device: LinkedDevice;
@@ -198,48 +199,48 @@ export default function DeviceSettingsScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: '#fff' },
-  back: { color: '#2c4a7a', fontSize: 15, marginBottom: 4 },
-  title: { fontSize: 22, fontWeight: '700', color: '#2c4a7a', marginBottom: 16 },
+  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: theme.surface },
+  back: { color: theme.brand, fontSize: 15, marginBottom: 4 },
+  title: { fontSize: 22, fontWeight: '700', color: theme.brand, marginBottom: 16 },
   card: {
     borderWidth: 1,
-    borderColor: '#e2e2e2',
+    borderColor: theme.line,
     borderRadius: 10,
     padding: 14,
     marginBottom: 14,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.surfaceSunken,
   },
-  cardTitle: { fontSize: 16, fontWeight: '600', color: '#2c4a7a', marginBottom: 8 },
+  cardTitle: { fontSize: 16, fontWeight: '600', color: theme.brand, marginBottom: 8 },
   wifiBtn: {
-    backgroundColor: '#eef3fb',
-    borderColor: '#cdddf2',
+    backgroundColor: theme.surfaceTint,
+    borderColor: theme.line,
     borderWidth: 1,
     borderRadius: 10,
     padding: 14,
     alignItems: 'center',
     marginBottom: 14,
   },
-  wifiBtnText: { color: '#2c4a7a', fontWeight: '700', fontSize: 15 },
+  wifiBtnText: { color: theme.brand, fontWeight: '700', fontSize: 15 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
-  rowTitle: { fontSize: 16, color: '#222' },
-  rowHint: { fontSize: 12, color: '#888', marginTop: 4 },
-  modeLabel: { fontSize: 15, color: '#222' },
+  rowTitle: { fontSize: 16, color: theme.ink },
+  rowHint: { fontSize: 12, color: theme.inkHint, marginTop: 4 },
+  modeLabel: { fontSize: 15, color: theme.ink },
   timeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
   timeInput: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: theme.lineInput,
     borderRadius: 8,
     padding: 8,
     width: 90,
     textAlign: 'center',
     fontSize: 16,
   },
-  dash: { marginHorizontal: 12, color: '#555' },
+  dash: { marginHorizontal: 12, color: theme.inkMuted },
   btnRow: { flexDirection: 'row', marginTop: 12 },
-  primaryBtn: { backgroundColor: '#2c4a7a', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 20, marginRight: 10 },
-  primaryBtnText: { color: '#fff', fontWeight: '600' },
-  secondaryBtn: { borderWidth: 1, borderColor: '#999', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16 },
-  secondaryBtnText: { color: '#555', fontWeight: '600' },
-  status: { color: '#2f6b2f', marginTop: 8 },
-  error: { color: '#a02622', marginTop: 8 },
+  primaryBtn: { backgroundColor: theme.brand, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 20, marginRight: 10 },
+  primaryBtnText: { color: theme.surface, fontWeight: '600' },
+  secondaryBtn: { borderWidth: 1, borderColor: theme.inkHint, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16 },
+  secondaryBtnText: { color: theme.inkMuted, fontWeight: '600' },
+  status: { color: theme.ok, marginTop: 8 },
+  error: { color: theme.danger, marginTop: 8 },
 });

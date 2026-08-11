@@ -17,6 +17,7 @@ import StoryLibraryScreen from './src/screens/StoryLibraryScreen';
 import MusicScreen from './src/screens/MusicScreen';
 import StoryRequestScreen from './src/screens/StoryRequestScreen';
 import ActivityScreen from './src/screens/ActivityScreen';
+import { theme } from './src/theme';
 
 type Screen =
   | { name: 'devices' }
@@ -244,5 +245,5 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface },
 });
