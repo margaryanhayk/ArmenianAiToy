@@ -173,6 +173,35 @@ const D = {
     hy: 'Ձեր հաշիվը պատրաստ է։ Խնդրում ենք մուտք գործել։',
   },
 
+  // ---------- child profile and invites ----------
+  // Lifted from the web dashboard by script, same as the capability
+  // strings: one wording, one linguistic review, no drift.
+  add_child: { en: '＋ Add child', ru: '＋ Добавить ребёнка', hy: '＋ Ավելացնել երեխա' },
+  child_name_ph: { en: "Child's name", ru: 'Имя ребёнка', hy: 'Երեխայի անունը' },
+  gender_label: { en: 'Boy or girl', ru: 'Мальчик или девочка', hy: 'Տղա, թե աղջիկ' },
+  gender_boy: { en: 'Boy', ru: 'Мальчик', hy: 'Տղա' },
+  gender_girl: { en: 'Girl', ru: 'Девочка', hy: 'Աղջիկ' },
+  birth_year: { en: 'Birth year (optional)', ru: 'Год рождения (необязательно)', hy: 'Ծննդյան տարի (ըստ ցանկության)' },
+  no_child: { en: 'No child profile yet', ru: 'Профиль ребёнка ещё не создан', hy: 'Երեխայի պրոֆիլ դեռ չկա' },
+  child_name_required: { en: 'Please enter a name.', ru: 'Введите имя.', hy: 'Խնդրում ենք մուտքագրել անունը։' },
+  invite_intro: { en: 'Easier: make a code they can type. It works once and lasts a day. The code printed on your toy keeps working as before.', ru: 'Проще: создайте код, который он введёт. Он сработает один раз и действует сутки. Код на коробке продолжит работать как раньше.', hy: 'Ավելի հեշտ՝ ստեղծեք կոդ, որ նա մուտքագրի։ Այն աշխատում է մեկ անգամ և գործում է մեկ օր։ Խաղալիքի վրա տպված կոդը շարունակում է աշխատել ինչպես առաջ։' },
+  invite_make: { en: 'Make an invite code', ru: 'Создать код-приглашение', hy: 'Ստեղծել հրավերի կոդ' },
+  invite_again: { en: 'Make another one', ru: 'Создать ещё один', hy: 'Ստեղծել մեկ ուրիշը' },
+  invite_once: { en: 'Write it down or send it now — it is shown only this once. Making a new one is free.', ru: 'Запишите или отправьте прямо сейчас — он показывается только один раз. Создать новый можно в любой момент.', hy: 'Գրեք կամ ուղարկեք հիմա — ցուցադրվում է միայն այս մեկ անգամ։ Նորը ստեղծելը միշտ հնարավոր է։' },
+  invite_failed: { en: 'Could not make a code. This toy may already have two people on it — that is the limit.', ru: 'Не удалось создать код. Возможно, у этой игрушки уже два человека — это максимум.', hy: 'Չհաջողվեց կոդ ստեղծել։ Հնարավոր է՝ այս խաղալիքն արդեն երկու հոգի ունի — դա սահմանն է։' },
+  invite_have: { en: 'Got an invite code?', ru: 'Есть код-приглашение?', hy: 'Հրավերի կոդ ունե՞ք' },
+  invite_ph: { en: 'ABCD-EFGH-JKLM', ru: 'ABCD-EFGH-JKLM', hy: 'ABCD-EFGH-JKLM' },
+  invite_join: { en: 'Join this toy', ru: 'Присоединиться', hy: 'Միանալ խաղալիքին' },
+  invite_joined: { en: 'Done — the toy is on your account now.', ru: 'Готово — игрушка теперь в вашем аккаунте.', hy: 'Պատրաստ է — խաղալիքն այժմ ձեր հաշվում է։' },
+  invite_bad: { en: "That invite code didn't work. Ask for a new one.", ru: 'Код-приглашение не подошёл. Попросите новый.', hy: 'Հրավերի կոդը չաշխատեց։ Խնդրեք նորը։' },
+  share_title: { en: 'Let someone else see this toy', ru: 'Дать доступ другому человеку', hy: 'Թույլ տալ, որ ուրիշն էլ տեսնի այս խաղալիքը' },
+  share_how: { en: 'Two people can watch one toy. The other person makes their own account, taps “＋ Add a toy”, and enters the two things below. They will be able to change the settings too — you will get an email when they join.', ru: 'За одной игрушкой могут следить два человека. Другой человек создаёт свой аккаунт, нажимает «＋ Добавить игрушку» и вводит то, что ниже. Он тоже сможет менять настройки — вы получите письмо, когда он присоединится.', hy: 'Մեկ խաղալիքին կարող են հետևել երկու հոգի։ Մյուսը ստեղծում է իր հաշիվը, սեղմում «＋ Ավելացնել խաղալիք» և մուտքագրում ներքևինը։ Նա նույնպես կկարողանա փոխել կարգավորումները — դուք նամակ կստանաք, երբ նա միանա։' },
+  child_why: { en: 'Areg uses this to call your child by name and to pitch stories at the right age. Armenian also needs to know whether it is speaking to a boy or a girl.', ru: 'Areg обращается к ребёнку по имени и подбирает истории по возрасту. Армянскому языку также нужно знать, мальчик это или девочка.', hy: 'Areg-ը այս տվյալներով դիմում է երեխային անունով և ընտրում տարիքին համապատասխան հեքիաթներ։ Հայերենին պետք է նաև իմանալ՝ տղա է, թե աղջիկ։' },
+  // Failure messages for the two new calls. The server answers ONE thing
+  // for every reason on both, so these must not invent a specific cause.
+  e_invite_failed: { en: 'Could not make a code. This toy may already have two people on it — that is the limit.', ru: 'Не удалось создать код. Возможно, у этой игрушки уже два человека — это максимум.', hy: 'Չհաջողվեց կոդ ստեղծել։ Հնարավոր է՝ այս խաղալիքն արդեն երկու հոգի ունի — դա սահմանն է։' },
+  e_invite_bad: { en: "That invite code didn't work. Ask for a new one.", ru: 'Код-приглашение не подошёл. Попросите новый.', hy: 'Հրավերի կոդը չաշխատեց։ Խնդրեք նորը։' },
+
   // ---------- what Areg can do ----------
   // Lifted verbatim from the web dashboard (wwwroot/parent.html) rather than
   // retyped: the same parent may read both, and two hand-copied sets of the

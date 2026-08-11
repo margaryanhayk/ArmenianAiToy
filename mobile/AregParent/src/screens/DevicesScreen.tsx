@@ -11,7 +11,10 @@ import {
   View,
 } from 'react-native';
 import {
+  addChild,
   claimDevice,
+  createInvite,
+  redeemInvite,
   errText,
   getDevices,
   LinkedDevice,
@@ -56,6 +59,30 @@ export default function DevicesScreen({
   const [claimCode, setClaimCode] = useState('');
   const [claimBusy, setClaimBusy] = useState(false);
   const [claimMsg, setClaimMsg] = useState<string | null>(null);
+
+  // Joining a toy someone else already set up.
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState<string | null>(null);
+
+  async function handleRedeem() {
+    const code = inviteCode.trim();
+    if (!code) { setInviteMsg(t('invite_bad')); return; }
+    setInviteBusy(true);
+    setInviteMsg(null);
+    try {
+      await redeemInvite(code);
+      setInviteCode('');
+      setInviteMsg(t('invite_joined'));
+      setShowClaim(false);
+      await load();
+    } catch (e) {
+      if (e instanceof UnauthorizedError) { onLogout(); return; }
+      setInviteMsg(errText(e));
+    } finally {
+      setInviteBusy(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setError(null);
@@ -172,6 +199,35 @@ export default function DevicesScreen({
 
       {showClaim ? (
         <View style={styles.claimBox}>
+          {/* The invite path FIRST: someone joining a toy their partner
+              already set up needs one short code and nothing else, and that
+              is now the commoner of the two. The box path stays below, for
+              the parent unpacking a new toy. */}
+          <Text style={styles.claimHelp}>{t('invite_have')}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={t('invite_ph')}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            value={inviteCode}
+            onChangeText={setInviteCode}
+            editable={!inviteBusy}
+            maxLength={20}
+          />
+          <Pressable
+            style={[styles.primaryBtn, inviteBusy && styles.disabled]}
+            onPress={handleRedeem}
+            disabled={inviteBusy}
+          >
+            {inviteBusy ? (
+              <ActivityIndicator color={theme.onBrand} />
+            ) : (
+              <Text style={styles.primaryBtnText}>{t('invite_join')}</Text>
+            )}
+          </Pressable>
+          {inviteMsg ? <Text style={styles.claimHelp}>{inviteMsg}</Text> : null}
+
+          <View style={styles.claimDivider} />
           <Text style={styles.claimHelp}>{t('claim_help')}</Text>
           <TextInput
             style={styles.input}
@@ -234,6 +290,151 @@ export default function DevicesScreen({
   );
 }
 
+/**
+ * The add-a-child form, shown on a toy that has no child profile yet.
+ *
+ * Open, not collapsed: it only appears when there is no profile at all, so
+ * the form IS the point and hiding it behind a tap adds a step for nothing.
+ */
+function AddChildBlock({
+  deviceId,
+  onAdded,
+}: {
+  deviceId: string;
+  onAdded: () => Promise<void> | void;
+}) {
+  const [name, setName] = useState('');
+  const [gender, setGender] = useState<0 | 1>(0);
+  const [year, setYear] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function save() {
+    const trimmed = name.trim();
+    if (!trimmed) { setMsg(t('child_name_required')); return; }
+    setBusy(true);
+    setMsg(null);
+    try {
+      const y = parseInt(year, 10);
+      await addChild(deviceId, trimmed, gender, isNaN(y) ? null : y);
+      await onAdded();
+    } catch (e) {
+      setMsg(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <View style={styles.childBox}>
+      <Text style={styles.childTitle}>{t('add_child')}</Text>
+      <Text style={styles.childWhy}>{t('child_why')}</Text>
+      <TextInput
+        style={styles.input}
+        placeholder={t('child_name_ph')}
+        value={name}
+        onChangeText={setName}
+        maxLength={60}
+      />
+      <Text style={styles.childLabel}>{t('gender_label')}</Text>
+      {/* Two buttons rather than a dropdown: both options stay visible, each
+          is a full-size tap target, and it matches the rest of the form
+          instead of a grey system widget. */}
+      <View style={styles.segRow}>
+        {([[0, 'gender_boy'], [1, 'gender_girl']] as [0 | 1, 'gender_boy' | 'gender_girl'][]).map(
+          ([v, k]) => (
+            <Pressable
+              key={v}
+              style={[styles.seg, gender === v && styles.segOn]}
+              onPress={() => setGender(v)}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: gender === v }}
+            >
+              <Text style={[styles.segText, gender === v && styles.segTextOn]}>{t(k)}</Text>
+            </Pressable>
+          ),
+        )}
+      </View>
+      <TextInput
+        style={styles.input}
+        placeholder={t('birth_year')}
+        value={year}
+        onChangeText={setYear}
+        keyboardType="number-pad"
+        maxLength={4}
+      />
+      <Pressable style={[styles.primaryBtn, busy && styles.disabled]} onPress={save} disabled={busy}>
+        {busy ? (
+          <ActivityIndicator color={theme.onBrand} />
+        ) : (
+          <Text style={styles.primaryBtnText}>{t('save')}</Text>
+        )}
+      </Pressable>
+      {msg ? <Text style={styles.error}>{msg}</Text> : null}
+    </View>
+  );
+}
+
+/**
+ * "Let someone else see this toy" — issues a short code the other parent
+ * types, instead of them needing this toy's 36-character id plus the code
+ * printed on its box.
+ *
+ * It does NOT touch the printed claim code. Re-minting that would be the easy
+ * way to make something shareable and would kill the QR on the toy for good.
+ */
+function InviteBlock({ deviceId }: { deviceId: string }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [code, setCode] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function make() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await createInvite(deviceId);
+      // Grouped in fours: a code is read aloud down a phone at least as often
+      // as it is copied, and unbroken twelve characters is where that fails.
+      setCode(r.code.replace(/(.{4})(.{4})(.{4})/, '$1-$2-$3'));
+    } catch (e) {
+      setMsg(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <Pressable onPress={() => setOpen(true)}>
+        <Text style={styles.inviteLink}>{t('share_title')}</Text>
+      </Pressable>
+    );
+  }
+
+  return (
+    <View style={styles.inviteBox}>
+      <Text style={styles.childWhy}>{t('invite_intro')}</Text>
+      {code ? (
+        <>
+          <Text style={styles.inviteCode} selectable>
+            {code}
+          </Text>
+          <Text style={styles.childWhy}>{t('invite_once')}</Text>
+        </>
+      ) : null}
+      <Pressable style={[styles.secondaryBtn, busy && styles.disabled]} onPress={make} disabled={busy}>
+        {busy ? (
+          <ActivityIndicator color={theme.brand} />
+        ) : (
+          <Text style={styles.secondaryBtnText}>{code ? t('invite_again') : t('invite_make')}</Text>
+        )}
+      </Pressable>
+      {msg ? <Text style={styles.error}>{msg}</Text> : null}
+    </View>
+  );
+}
+
 function DeviceCard({
   device,
   onRevoke,
@@ -289,7 +490,17 @@ function DeviceCard({
         {device.isPaused ? <Text style={styles.pausedTag}>{t('paused')}</Text> : null}
       </View>
 
-      {childLine ? <Text style={styles.children}>{childLine}</Text> : null}
+      {childLine ? (
+        <Text style={styles.children}>{childLine}</Text>
+      ) : (
+        /* No child profile means the toy has no name, no age and no GENDER
+           for the prompt - and Armenian grammar needs the gender, so it is
+           literally talking to a stranger. The phone had no way to fix this
+           at all; the web page at least had a form buried in Settings. */
+        <AddChildBlock deviceId={device.deviceId} onAdded={onRenamed} />
+      )}
+
+      <InviteBlock deviceId={device.deviceId} />
 
       {/* The one thing a parent opens a toy to do. The rest are real, but
           they are not why anyone comes here. */}
@@ -370,6 +581,7 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   claimHelp: { color: theme.ok, marginBottom: 8 },
+  claimDivider: { height: 1, backgroundColor: theme.okLine, marginVertical: 12 },
   input: { borderWidth: 1, borderColor: theme.lineInput, borderRadius: 8, padding: 10, marginBottom: 8 },
   primaryBtn: { backgroundColor: theme.brand, borderRadius: 8, padding: 12, alignItems: 'center' },
   primaryBtnText: { color: theme.surface, fontWeight: '600' },
@@ -408,6 +620,63 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   children: { color: theme.inkMuted, marginTop: 6 },
+  childBox: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.line,
+    backgroundColor: theme.surfaceTint,
+  },
+  childTitle: { fontSize: 15, fontWeight: '700', color: theme.ink, marginBottom: 4 },
+  childWhy: { fontSize: 12.5, lineHeight: 19, color: theme.inkMuted, marginBottom: 10 },
+  childLabel: { fontSize: 12, color: theme.inkMuted, marginBottom: 4 },
+  segRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  seg: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.lineInput,
+    alignItems: 'center',
+    backgroundColor: theme.surface,
+  },
+  segOn: { borderColor: theme.brand, backgroundColor: theme.brandTint },
+  segText: { color: theme.inkMuted, fontWeight: '600' },
+  segTextOn: { color: theme.brand },
+  inviteLink: { color: theme.brand, fontSize: 14, fontWeight: '600', marginTop: 10 },
+  // This screen had no quiet button style of its own — only the filled
+  // primary one, which would have made "make a code" shout as loudly as
+  // pairing a toy.
+  secondaryBtn: {
+    borderWidth: 1,
+    borderColor: theme.brand,
+    borderRadius: 8,
+    padding: 11,
+    alignItems: 'center',
+  },
+  secondaryBtnText: { color: theme.brand, fontWeight: '600' },
+  inviteBox: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.line,
+    backgroundColor: theme.surfaceTint,
+  },
+  inviteCode: {
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: 2,
+    textAlign: 'center',
+    color: theme.ink,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.line,
+    borderRadius: 8,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
   actionRow: { flexDirection: 'row', marginTop: 10, gap: 8 },
   mainBtn: {
     flexDirection: 'row', alignItems: 'center',
