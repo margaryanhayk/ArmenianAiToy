@@ -1723,6 +1723,14 @@
       set_how: { en: 'How it tells stories', ru: 'Как рассказывает сказки', hy: 'Ինչպես է հեքիաթ պատմում' },
       set_how_n: { en: 'Small touches during a story.', ru: 'Мелочи во время сказки.', hy: 'Փոքր բաներ հեքիաթի ընթացքում։' },
       set_toy: { en: 'This toy', ru: 'Эта игрушка', hy: 'Այս խաղալիքը' },
+      // Adding the second parent. Says what to do, and is honest that the
+      // pairing code lives on the box and cannot be shown here.
+      share_title: { en: 'Let someone else see this toy', ru: 'Дать доступ другому человеку', hy: 'Թույլ տալ, որ ուրիշն էլ տեսնի այս խաղալիքը' },
+      share_how: { en: 'Two people can watch one toy. The other person makes their own account, taps “＋ Add a toy”, and enters the two things below. They will be able to change the settings too — you will get an email when they join.', ru: 'За одной игрушкой могут следить два человека. Другой человек создаёт свой аккаунт, нажимает «＋ Добавить игрушку» и вводит то, что ниже. Он тоже сможет менять настройки — вы получите письмо, когда он присоединится.', hy: 'Մեկ խաղալիքին կարող են հետևել երկու հոգի։ Մյուսը ստեղծում է իր հաշիվը, սեղմում «＋ Ավելացնել խաղալիք» և մուտքագրում ներքևինը։ Նա նույնպես կկարողանա փոխել կարգավորումները — դուք նամակ կստանաք, երբ նա միանա։' },
+      share_id_label: { en: "This toy's number", ru: 'Номер этой игрушки', hy: 'Այս խաղալիքի համարը' },
+      share_copy: { en: 'Copy', ru: 'Копировать', hy: 'Պատճենել' },
+      share_copied: { en: 'Copied ✓', ru: 'Скопировано ✓', hy: 'Պատճենվեց ✓' },
+      share_code_note: { en: 'The pairing code is the one printed on the toy’s box. It is not kept here, so it cannot be shown — if the box is lost, ask us for a new one.', ru: 'Код привязки напечатан на коробке игрушки. Здесь он не хранится, поэтому показать его нельзя — если коробка потерялась, попросите у нас новый.', hy: 'Կապակցման կոդը տպված է խաղալիքի տուփի վրա։ Այն այստեղ չի պահվում, ուստի ցույց տալ հնարավոր չէ — եթե տուփը կորել է, խնդրեք մեզնից նորը։' },
       // The three diary destinations that are not play modes. Worded as
       // things that happened, matching the play modes beside them, rather
       // than as the names of screens.
@@ -4204,6 +4212,19 @@
           });
           gToy.appendChild(renameRow);
 
+          // Adding the other parent already works - two accounts per toy,
+          // and the claim code is deliberately never consumed so the QR
+          // printed on the toy keeps working for its whole life. What did
+          // not work was FINDING the device id: the page shows a shortened
+          // one, so the only way to read the real thing was the address
+          // bar. That is not something to ask a parent to do.
+          //
+          // The pairing code itself is stored only as a hash and is not
+          // shown here - it cannot be, and minting a fresh one would kill
+          // the code printed on the box. So this hands over the half we
+          // hold and says plainly where the other half comes from.
+          gToy.appendChild(renderShareRow(d));
+
           // #074 revoke / restore — the credential kill-switch for a lost or
           // compromised toy. Reversible. Distinct from unlink (which removes
           // the link + can cascade data) and pause (soft, still authenticates).
@@ -4499,6 +4520,85 @@
     //               the point and hiding it behind a tap adds a step for
     //               nothing. In Settings the opposite is true: the usual case
     //               is a profile that already exists.
+    // "Let someone else see this toy" - the device id, copyable, plus what
+    // to do with it. Read-only: no endpoint is called, nothing is minted,
+    // and the toy is not touched.
+    function renderShareRow(d) {
+      var wrap = document.createElement('div');
+
+      var openBtn = document.createElement('button');
+      openBtn.type = 'button';
+      openBtn.className = 'btn-ghost';
+      openBtn.textContent = t('share_title');
+      openBtn.style.cssText = 'margin:8px 0 4px;font-size:13px;';
+      wrap.appendChild(openBtn);
+
+      var body = document.createElement('div');
+      body.hidden = true;
+      body.style.cssText = 'margin:2px 0 6px;padding:10px 12px;background:var(--surface-4);' +
+        'border:1px solid var(--line-soft-2);border-radius:12px;';
+
+      var how = document.createElement('p');
+      how.textContent = t('share_how');
+      how.style.cssText = 'font-size:12.5px;color:var(--ink-muted);line-height:1.55;margin:0 0 10px;';
+      body.appendChild(how);
+
+      var idLabel = document.createElement('div');
+      idLabel.textContent = t('share_id_label');
+      idLabel.style.cssText = 'font-size:12px;font-weight:600;margin-bottom:4px;';
+      body.appendChild(idLabel);
+
+      // The id is selectable text rather than an input: it is not editable,
+      // and a phone keyboard popping up over a value you only want to copy
+      // is its own small annoyance.
+      var idBox = document.createElement('div');
+      idBox.textContent = d.deviceId;
+      idBox.style.cssText = 'font-family:ui-monospace,Menlo,Consolas,monospace;' +
+        'font-size:12px;line-height:1.5;word-break:break-all;user-select:all;' +
+        'background:var(--surface);border:1px solid var(--line-soft);' +
+        'border-radius:8px;padding:8px 10px;';
+      body.appendChild(idBox);
+
+      var copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'btn-ghost';
+      copyBtn.textContent = t('share_copy');
+      copyBtn.style.cssText = 'margin-top:8px;font-size:13px;';
+      copyBtn.addEventListener('click', function () {
+        var done = function () {
+          copyBtn.textContent = t('share_copied');
+          setTimeout(function () { copyBtn.textContent = t('share_copy'); }, 2000);
+        };
+        // Clipboard access needs a secure context and can be refused; when
+        // it is, select the id so the parent can copy it by hand rather
+        // than being left with a button that silently does nothing.
+        var select = function () {
+          try {
+            var r = document.createRange();
+            r.selectNodeContents(idBox);
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(r);
+          } catch (e) { /* nothing better to offer */ }
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(d.deviceId).then(done, select);
+        } else {
+          select();
+        }
+      });
+      body.appendChild(copyBtn);
+
+      var codeNote = document.createElement('p');
+      codeNote.textContent = t('share_code_note');
+      codeNote.style.cssText = 'font-size:12px;color:var(--ink-muted);line-height:1.55;margin:10px 0 0;';
+      body.appendChild(codeNote);
+
+      openBtn.addEventListener('click', function () { body.hidden = !body.hidden; });
+      wrap.appendChild(body);
+      return wrap;
+    }
+
     function renderAddChildRow(d, opts) {
       opts = opts || {};
       var scope = opts.scope || 'settings';
