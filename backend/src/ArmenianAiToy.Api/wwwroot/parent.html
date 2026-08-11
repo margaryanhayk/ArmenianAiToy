@@ -1233,8 +1233,22 @@
            Populated by renderToyView; the request-form block is physically
            moved in here so its form and status live with it. -->
       <div id="toyContentLinks" style="margin:0 0 12px;"></div>
-      <div id="toySettings"></div>
       <div id="toyStatus" class="status muted" aria-live="polite"></div>
+    </section>
+
+    <!-- Toy settings. Split out of the toy page 2026-08-10: that page was
+         2,748px on a phone - three and a half screens - because it answered
+         two unrelated questions at once. "What did my child hear today?" and
+         "change the bedtime" are different visits, and a parent doing either
+         had to scroll past the other. Content stays on the toy page; every
+         control lives here. -->
+    <section id="settingsView" class="card" hidden>
+      <h2>
+        <button class="link" id="settingsBackBtn" type="button" data-i18n="nav_toy">← Toy</button>
+      </h2>
+      <div id="settingsHeader" class="device-context"></div>
+      <div id="toySettings"></div>
+      <div id="settingsStatus" class="status muted" aria-live="polite"></div>
     </section>
 
     <!-- Summaries view.
@@ -1576,6 +1590,8 @@
       // subtitle is the one line that can teach what this place is.
       tile_journal_sub: { en: 'After each story, Areg asks a question', ru: 'После каждой сказки Арег задаёт вопрос', hy: 'Ամեն հեքիաթից հետո Արեգը հարց է տալիս' },
       tile_music: { en: 'Music', ru: 'Музыка', hy: 'Երաժշտություն' },
+      tile_settings: { en: 'Toy settings', ru: 'Настройки игрушки', hy: 'Խաղալիքի կարգավորումներ' },
+      tile_settings_sub: { en: 'Bedtime, modes, children, name', ru: 'Сон, режимы, дети, имя', hy: 'Քուն, ռեժիմներ, երեխաներ, անուն' },
       tile_music_sub: { en: 'Calm tunes for bedtime', ru: 'Спокойная музыка для сна', hy: 'Հանգիստ մեղեդիներ քնելու համար' },
       tile_request: { en: 'Request a story', ru: 'Заказать сказку', hy: 'Պատվիրել հեքիաթ' },
       tile_request_sub: { en: 'Ask us to make one for your child', ru: 'Попросите нас сделать её для вашего ребёнка', hy: 'Կարող ենք հեքիաթ ստեղծել ձեր երեխայի համար' },
@@ -2043,7 +2059,8 @@
       releaseObjectUrls();
       var ids = ['loginView', 'signupView', 'resetRequestView', 'resetPasswordView',
                  'verifyEmailRequestView', 'verifyEmailCompleteView',
-                 'devicesView', 'toyView', 'accountView', 'summariesView', 'flaggedView',
+                 'devicesView', 'toyView', 'settingsView', 'accountView',
+                 'summariesView', 'flaggedView',
                  'playsView', 'libraryView', 'journalView', 'musicView',
                  'detailView', 'auditView'];
       for (var i = 0; i < ids.length; i++) {
@@ -3075,7 +3092,9 @@
         // repainting blindly would drag a parent who has since opened the
         // library or a conversation back to the toy page.
         var tv = document.getElementById('toyView');
-        if (state.currentToyId && tv && !tv.hidden) renderToyView();
+        var sv = document.getElementById('settingsView');
+        if (state.currentToyId && sv && !sv.hidden) renderSettingsView();
+        else if (state.currentToyId && tv && !tv.hidden) renderToyView();
       });
       deviceStatus(t('busy_loading'), 'muted');
       var listEl = document.getElementById('devicesList');
@@ -3089,7 +3108,11 @@
         // after unlink — then fall back to the list).
         if (state.currentToyId) {
           var stillThere = devices.some(function (d) { return d.deviceId === state.currentToyId; });
-          if (stillThere) { renderToyView(); return; }
+          if (stillThere) {
+            var sview = document.getElementById('settingsView');
+            if (sview && !sview.hidden) renderSettingsView(); else renderToyView();
+            return;
+          }
           state.currentToyId = null;
           show('devicesView'); setViewHash('devices');
         }
@@ -3121,14 +3144,23 @@
 
     // Status helper that writes to whichever surface is visible: the toy
     // page's status line when a toy is open, else the devices-list line.
+    // Every save on this page reports through here, and the saves now live
+    // on their own screen — so the message has to follow them.
     function deviceStatus(msg, kind) {
+      var settings = document.getElementById('settingsView');
       var toy = document.getElementById('toyView');
-      var id = (toy && !toy.hidden) ? 'toyStatus' : 'devicesStatus';
+      var id = 'devicesStatus';
+      if (settings && !settings.hidden) id = 'settingsStatus';
+      else if (toy && !toy.hidden) id = 'toyStatus';
       setStatus(id, msg, kind);
     }
 
     // Open one toy's own page. Sets currentToyId then reuses loadDevices to
     // fetch fresh data and render the toy view.
+    document.getElementById('settingsBackBtn').addEventListener('click', function () {
+      openToy(state.currentToyId);
+    });
+
     function openToy(deviceId) {
       state.currentToyId = deviceId;
       show('toyView');
@@ -3193,6 +3225,11 @@
         reqBlock.hidden = false;
         links.appendChild(reqBlock);   // relocate the form under this toy
       }
+      // Settings last: the content above is what a parent came to see, and
+      // bedtime is the once-a-month visit.
+      links.appendChild(buildTile('⚙️', 'tile_settings', 'tile_settings_sub', function () {
+        openToySettings(d.deviceId);
+      }));
 
       var header = document.getElementById('toyHeader');
       clearChildren(header);
@@ -3245,10 +3282,7 @@
         header.appendChild(helpEl);
       }
 
-      // (Conversations is now the first content tile above.)
-      var settings = document.getElementById('toySettings');
-      clearChildren(settings);
-      renderToySettings(d, settings);
+      // Settings render on their own screen now — see renderSettingsView.
       // Surface a one-shot confirmation from the last action (e.g. bedtime
       // turned off / overnight note), else clear the status line.
       if (window.__toyFlash && window.__toyFlash.msg) {
@@ -3256,8 +3290,55 @@
         window.__toyFlash = null;
         deviceStatus(fmsg, fkind);
         setTimeout(function () {
-          var el = document.getElementById('toyStatus');
-          if (el && el.textContent === fmsg) setStatus('toyStatus', '', '');
+          ['toyStatus', 'settingsStatus'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el && el.textContent === fmsg) setStatus(id, '', '');
+          });
+        }, 3500);
+      } else {
+        deviceStatus('', '');
+      }
+      restoreScroll();
+    }
+
+    // The toy's settings, on their own screen. currentToyId is already set
+    // (you can only arrive from that toy's page or from the URL hash), so
+    // loadDevices fetches and the renderer below paints whichever of the two
+    // screens is showing.
+    function openToySettings(deviceId) {
+      state.currentToyId = deviceId;
+      show('settingsView');
+      setViewHash('settings', deviceId);
+      loadDevices();
+    }
+
+    function renderSettingsView() {
+      var d = null;
+      var devices = state.lastDevicesResponse || [];
+      for (var i = 0; i < devices.length; i++) {
+        if (devices[i].deviceId === state.currentToyId) { d = devices[i]; break; }
+      }
+      if (!d) { state.currentToyId = null; loadDevices(); return; }
+      show('settingsView');
+      setViewHash('settings', state.currentToyId);
+
+      // Which toy these settings belong to. A parent with two toys must
+      // never be one wrong tap from putting the wrong child to bed.
+      var header = document.getElementById('settingsHeader');
+      clearChildren(header);
+      header.appendChild(document.createTextNode('🧸 ' + toyLabel(d)));
+
+      var settings = document.getElementById('toySettings');
+      clearChildren(settings);
+      renderToySettings(d, settings);
+
+      if (window.__toyFlash && window.__toyFlash.msg) {
+        var fmsg = window.__toyFlash.msg, fkind = window.__toyFlash.kind || 'ok';
+        window.__toyFlash = null;
+        deviceStatus(fmsg, fkind);
+        setTimeout(function () {
+          var el = document.getElementById('settingsStatus');
+          if (el && el.textContent === fmsg) setStatus('settingsStatus', '', '');
         }, 3500);
       } else {
         deviceStatus('', '');
@@ -6756,6 +6837,8 @@
 
         if (v === 'toy' && d) {
           primeDevicesThen(function () { openToy(d); });
+        } else if (v === 'settings' && d) {
+          primeDevicesThen(function () { openToySettings(d); });
         } else if (v === 'summaries' && d) {
           state.currentDeviceId = d; state.offset = 0; state.flaggedOffset = 0;
           state.currentToyId = d;
