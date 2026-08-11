@@ -193,6 +193,25 @@ http.createServer((req, res) => {
       return req.on('end', () => {
         let payload = {};
         try { payload = JSON.parse(body || '{}'); } catch (e) { /* not json */ }
+        // Creating a child really adds one, so the toy page's "no child
+        // profile" state can be tested BOTH ways - the form appears, and it
+        // goes away once a profile exists. Accepting the POST and serving
+        // the childless device back would let a broken form look fine.
+        if (req.method === 'POST' && u.pathname === '/api/children') {
+          const target = devices.find((d) => d.deviceId === payload.deviceId);
+          if (target && payload.name) {
+            target.children.push({
+              childId: 'c0000000-0000-4000-8000-' + String(Date.now()).slice(-12),
+              name: payload.name,
+              age: payload.birthYear
+                ? new Date(now).getUTCFullYear() - payload.birthYear
+                : null,
+              storyEnabled: null, gameEnabled: null,
+              riddleEnabled: null, curiosityEnabled: null
+            });
+          }
+          return send({ ok: true });
+        }
         const m = u.pathname.match(/\/devices\/([0-9a-f-]+)\/([a-z-]+)$/i);
         const dev = m && devices.find((d) => d.deviceId === m[1]);
         if (dev) {
