@@ -31,6 +31,7 @@ type Props = {
   onOpenPlays: (device: LinkedDevice) => void;
   onOpenLibrary: (device: LinkedDevice) => void;
   onOpenAccount: () => void;
+  onOpenCapabilities: () => void;
 };
 
 export default function DevicesScreen({
@@ -41,6 +42,7 @@ export default function DevicesScreen({
   onOpenPlays,
   onOpenLibrary,
   onOpenAccount,
+  onOpenCapabilities,
 }: Props) {
   useLang();
   const [devices, setDevices] = useState<LinkedDevice[]>([]);
@@ -155,6 +157,17 @@ export default function DevicesScreen({
 
       <Pressable style={styles.addBtn} onPress={() => setShowClaim((v) => !v)}>
         <Text style={styles.addBtnText}>{showClaim ? t('close_form') : t('add_toy')}</Text>
+      </Pressable>
+
+      {/* What the toy actually does. On the list rather than inside a toy: it
+          describes the product, not one device, and a parent with no toy
+          paired yet still has a reason to read it. */}
+      <Pressable style={styles.capsRow} onPress={onOpenCapabilities}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.capsTitle}>{t('caps_link')}</Text>
+          <Text style={styles.capsSub}>{t('caps_link_sub')}</Text>
+        </View>
+        <Text style={styles.capsChev}>›</Text>
       </Pressable>
 
       {showClaim ? (
@@ -335,6 +348,19 @@ const styles = StyleSheet.create({
   link: { color: theme.brand, fontSize: 15 },
   addBtn: { marginTop: 12, marginBottom: 4 },
   addBtnText: { color: theme.brand, fontSize: 16, fontWeight: '600' },
+  capsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.surfaceTint,
+    borderColor: theme.line,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 13,
+    marginBottom: 12,
+  },
+  capsTitle: { color: theme.brand, fontSize: 15, fontWeight: '700' },
+  capsSub: { color: theme.inkMuted, fontSize: 12.5, marginTop: 2 },
+  capsChev: { color: theme.inkHint, fontSize: 20, marginLeft: 8 },
   claimBox: {
     backgroundColor: theme.okBg,
     borderColor: theme.okLine,

@@ -173,6 +173,47 @@ const D = {
     hy: 'Ձեր հաշիվը պատրաստ է։ Խնդրում ենք մուտք գործել։',
   },
 
+  // ---------- what Areg can do ----------
+  // Lifted verbatim from the web dashboard (wwwroot/parent.html) rather than
+  // retyped: the same parent may read both, and two hand-copied sets of the
+  // same sentence drift the first time one is edited. The Armenian there has
+  // been through the linguistic review.
+  caps_title: { en: 'What Areg can do', ru: 'Что умеет Арег', hy: 'Ի՞նչ գիտի Արեգը' },
+  caps_intro: { en: 'Everything your toy does, in plain words. You can switch most of these on or off in Settings.', ru: 'Всё, что умеет ваша игрушка, простыми словами. Почти всё можно включить или выключить в настройках.', hy: 'Այն ամենը, ինչ գիտի ձեր խաղալիքը՝ պարզ բառերով։ Մեծ մասը կարող եք միացնել կամ անջատել կարգավորումներում։' },
+  caps_soon_title: { en: 'Coming soon', ru: 'Скоро', hy: 'Շուտով' },
+  caps_soon_note: { en: 'Built and being tested. Your toy does not do these yet.', ru: 'Сделано и проходит проверку. Пока игрушка этого не делает.', hy: 'Պատրաստ է և ստուգվում է։ Խաղալիքը դեռ չի անում սա։' },
+  caps_footer: { en: 'Everything above happens in Armenian. Areg never chats freely — it plays, tells, asks and calms, and nothing else.', ru: 'Всё вышеперечисленное — на армянском. Арег никогда не болтает свободно: он играет, рассказывает, спрашивает и успокаивает — и ничего больше.', hy: 'Վերևի ամեն ինչ հայերեն է։ Արեգը երբեք ազատ չի զրուցում — նա խաղում է, պատմում, հարցնում և հանգստացնում, ուրիշ ոչինչ։' },
+  caps_link: { en: 'What Areg can do', ru: 'Что умеет Арег', hy: 'Ի՞նչ գիտի Արեգը' },
+  caps_link_sub: { en: 'Every feature, explained', ru: 'Все возможности, понятно', hy: 'Բոլոր հնարավորությունները՝ պարզ' },
+  cap_stories_t: { en: 'Tells stories', ru: 'Рассказывает сказки', hy: 'Հեքիաթ է պատմում' },
+  cap_stories_e: { en: 'Eight Armenian tales on the card. No internet needed — it works in the car, in the village, anywhere.', ru: 'Восемь армянских сказок на карте. Интернет не нужен — работает в машине, в деревне, где угодно.', hy: 'Ութ հայկական հեքիաթ՝ քարտի վրա։ Ինտերնետ պետք չէ — աշխատում է մեքենայում, գյուղում, ամենուր։' },
+  cap_askmid_t: { en: 'Your child can interrupt and ask', ru: 'Ребёнок может перебить и спросить', hy: 'Երեխան կարող է ընդհատել ու հարցնել' },
+  cap_askmid_e: { en: 'Mid-story your child asks «And did the wolf come?» — Areg answers from that story, then carries on where it stopped.', ru: 'Посреди сказки ребёнок спрашивает «А волк пришёл?» — Арег отвечает по этой сказке и продолжает с того же места.', hy: 'Հեքիաթի կեսին երեխան հարցնում է՝ «Իսկ գայլը եկա՞վ» — Արեգը պատասխանում է հենց այդ հեքիաթից և շարունակում նույն տեղից։' },
+  cap_askafter_t: { en: 'Asks a question at the end — and you can read the answer', ru: 'Задаёт вопрос в конце — и вы читаете ответ', hy: 'Վերջում հարց է տալիս — իսկ դուք կարդում եք պատասխանը' },
+  cap_askafter_e: { en: "After the story: «Why didn't the kid open the door?» Whatever your child says is saved for you under What they said.", ru: 'После сказки: «Почему козлёнок не открыл дверь?» Ответ ребёнка сохраняется для вас в разделе «Что он сказал».', hy: 'Հեքիաթից հետո՝ «Ինչո՞ւ ուլիկը դուռը չբացեց»։ Երեխայի ասածը պահվում է ձեզ համար՝ «Ինչ ասաց» բաժնում։' },
+  cap_games_t: { en: 'Plays games', ru: 'Играет в игры', hy: 'Խաղ է խաղում' },
+  cap_games_e: { en: 'Counting, animal sounds, silly yes-or-no, making words small — and a guessing game where Areg tries to guess what your child is thinking of.', ru: 'Счёт, звуки животных, смешные «да-нет», уменьшительные слова — и угадайка, где Арег угадывает, что задумал ребёнок.', hy: 'Հաշվել, կենդանիների ձայներ, ծիծաղելի «այո-ոչ», փոքրացնող բառեր — և գուշակելու խաղ, որտեղ Արեգը փորձում է գուշակել, թե ինչ է մտածում երեխան։' },
+  cap_riddles_t: { en: 'Asks riddles', ru: 'Загадывает загадки', hy: 'Հանելուկ է տալիս' },
+  cap_riddles_e: { en: 'Simple riddles for this age, with a warm hint if your child gets stuck. Never a test.', ru: 'Простые загадки для этого возраста, с мягкой подсказкой, если ребёнок затрудняется. Никогда не экзамен.', hy: 'Այս տարիքին հարմար պարզ հանելուկներ, տաք հուշումով, եթե երեխան դժվարանա։ Երբեք քննություն չէ։' },
+  cap_why_t: { en: "Answers 'why' questions", ru: 'Отвечает на «почему»', hy: 'Պատասխանում է «ինչու» հարցերին' },
+  cap_why_e: { en: '«Why is the sky blue?» — one real answer a child can hold, then straight back to playing.', ru: '«Почему небо голубое?» — один настоящий ответ, понятный ребёнку, и сразу обратно к игре.', hy: '«Ինչո՞ւ է երկինքը կապույտ» — մեկ իսկական պատասխան, որ երեխան կհասկանա, և անմիջապես նորից խաղ։' },
+  cap_calm_t: { en: 'Calms down at bedtime', ru: 'Успокаивает перед сном', hy: 'Հանգստացնում է քնելուց առաջ' },
+  cap_calm_e: { en: 'Soft and slow, no questions, no cliffhanger. Always on — a sleepy word always reaches it, whatever else you have switched off.', ru: 'Мягко и медленно, без вопросов и интриги. Всегда включено — сонное слово доходит всегда, что бы вы ни отключили.', hy: 'Փափուկ ու դանդաղ, առանց հարցերի։ Միշտ միացված է — քնի մասին խոսքը միշտ հասնում է, ինչ էլ որ անջատած լինեք։' },
+  cap_greets_t: { en: 'Says hello when it wakes up', ru: 'Здоровается при включении', hy: 'Բարևում է, երբ արթնանում է' },
+  cap_greets_e: { en: 'Presses on: «Ողջու՛յն։ Ուրախ եմ, որ եկար։» Then it offers a story by name — one your child has not heard yet.', ru: 'Включается: «Ողջու՛յն։ Ուրախ եմ, որ եկար։» Потом предлагает сказку по названию — ту, которую ребёнок ещё не слышал.', hy: 'Միանում է՝ «Ողջու՛յն։ Ուրախ եմ, որ եկար։» Հետո առաջարկում է հեքիաթ՝ անունով, մի բան, որ երեխան դեռ չի լսել։' },
+  cap_intro_t: { en: "Says the story's name and author first", ru: 'Сначала называет сказку и автора', hy: 'Սկզբում ասում է հեքիաթի անունն ու հեղինակին' },
+  cap_intro_e: { en: '«Հեքիաթ՝ «Ուլիկը»։ Հեղինակ՝ Հովհաննես Թումանյան։» So your child learns whose story it is.', ru: '«Հեքիաթ՝ «Ուլիկը»։ Հեղինակ՝ Հովհաննես Թումանյան։» Чтобы ребёнок знал, чья это сказка.', hy: '«Հեքիաթ՝ «Ուլիկը»։ Հեղինակ՝ Հովհաննես Թումանյան։» Որ երեխան իմանա՝ ում հեքիաթն է։' },
+  cap_quiet_t: { en: 'Stays quiet during the hours you choose', ru: 'Молчит в выбранные вами часы', hy: 'Լռում է ձեր ընտրած ժամերին' },
+  cap_quiet_e: { en: 'Set 20:30–07:00 and the toy will not chat in the night, even if it is picked up.', ru: 'Поставьте 20:30–07:00 — и ночью игрушка не будет разговаривать, даже если её возьмут.', hy: 'Դրեք 20։30–07։00, և գիշերը խաղալիքը չի խոսի, նույնիսկ եթե վերցնեն։' },
+  cap_pauses_t: { en: 'Stops mid-story so your child can shout something', ru: 'Останавливается посреди сказки, чтобы ребёнок крикнул', hy: 'Կանգ է առնում հեքիաթի կեսին, որ երեխան բարձր ասի' },
+  cap_pauses_e: { en: 'Areg pauses, asks what happens next, waits — then carries on the same story from the same place.', ru: 'Арег делает паузу, спрашивает, что будет дальше, ждёт — и продолжает ту же сказку с того же места.', hy: 'Արեգը դադար է տալիս, հարցնում է՝ ի՞նչ կլինի հետո, սպասում է — հետո շարունակում է նույն հեքիաթը նույն տեղից։' },
+  cap_endings_t: { en: 'A different ending when a story is heard again', ru: 'Другой финал при повторном прослушивании', hy: 'Ուրիշ վերջ, երբ հեքիաթը կրկին են լսում' },
+  cap_endings_e: { en: 'Only some stories have a second ending — the rest end the way they always did.', ru: 'Второй финал есть не у всех сказок — остальные заканчиваются как обычно.', hy: 'Երկրորդ վերջ ունեն միայն որոշ հեքիաթներ — մնացածը ավարտվում են ինչպես միշտ։' },
+  cap_buttons_t: { en: 'Three games with the buttons', ru: 'Три игры с кнопками', hy: 'Երեք խաղ կոճակներով' },
+  cap_buttons_e: { en: 'Areg guesses the animal your child is thinking of; two children race to press first; and a tone game to copy.', ru: 'Арег угадывает животное, которое загадал ребёнок; двое детей соревнуются, кто нажмёт первым; и игра на повтор мелодии.', hy: 'Արեգը գուշակում է երեխայի մտապահած կենդանին, երկու երեխա մրցում են՝ ով շուտ կսեղմի, և մեղեդի կրկնելու խաղ։' },
+  cap_music_t: { en: 'Quiet music at bedtime', ru: 'Тихая музыка перед сном', hy: 'Հանգիստ երաժշտություն քնելուց առաջ' },
+  cap_music_e: { en: 'Instead of a story, a calm tune during your quiet hours.', ru: 'Вместо сказки — спокойная мелодия в ваши тихие часы.', hy: 'Հեքիաթի փոխարեն՝ հանգիստ մեղեդի ձեր լուռ ժամերին։' },
+
   // ---------- toys ----------
   your_toys: { en: 'Your toys', ru: 'Ваши игрушки', hy: 'Ձեր խաղալիքները' },
   account: { en: 'Account', ru: 'Аккаунт', hy: 'Հաշիվ' },

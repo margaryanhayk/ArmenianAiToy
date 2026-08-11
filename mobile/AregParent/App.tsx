@@ -5,6 +5,7 @@ import { clearToken, getToken, saveToken } from './src/auth';
 import { loadLanguage } from './src/i18n';
 import { LinkedDevice } from './src/api';
 import LoginScreen from './src/screens/LoginScreen';
+import CapabilitiesScreen from './src/screens/CapabilitiesScreen';
 import DevicesScreen from './src/screens/DevicesScreen';
 import ConversationsScreen from './src/screens/ConversationsScreen';
 import ConversationDetailScreen from './src/screens/ConversationDetailScreen';
@@ -35,7 +36,9 @@ type Screen =
   | { name: 'music' }
   | { name: 'request' }
   | { name: 'activity' }
-  | { name: 'account' };
+  | { name: 'account' }
+  // Not per-toy: it describes the product, not one device.
+  | { name: 'capabilities' };
 
 function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
   const [screen, setScreen] = useState<Screen>({ name: 'devices' });
@@ -63,6 +66,7 @@ function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
           setScreen({ name: 'library', deviceId: d.deviceId, deviceName: d.deviceName })
         }
         onOpenAccount={() => setScreen({ name: 'account' })}
+        onOpenCapabilities={() => setScreen({ name: 'capabilities' })}
       />
     );
   }
@@ -77,6 +81,10 @@ function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
         onOpenActivity={() => setScreen({ name: 'activity' })}
       />
     );
+  }
+
+  if (screen.name === 'capabilities') {
+    return <CapabilitiesScreen onBack={() => setScreen({ name: 'devices' })} />;
   }
 
   if (screen.name === 'plays') {
