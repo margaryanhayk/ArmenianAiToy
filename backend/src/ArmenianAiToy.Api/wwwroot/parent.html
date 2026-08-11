@@ -3586,6 +3586,18 @@
         header.appendChild(helpEl);
       }
 
+      // A toy with no child profile used to say so here and offer nothing -
+      // the form to fix it was two taps away, inside Settings, collapsed
+      // behind a small button in the middle of a long list. That is not a
+      // cosmetic gap: without a profile ChildService.BuildChildContext has no
+      // name, no age and no GENDER to put in the prompt, and Armenian
+      // grammar needs the gender. A freshly paired toy talks to a stranger,
+      // and the one screen that says so had no way out. Same form Settings
+      // uses, opened, right under the line that reports the problem.
+      if (!(d.children && d.children.length > 0)) {
+        header.appendChild(renderAddChildRow(d, { scope: 'toy', open: true }));
+      }
+
       // Settings render on their own screen now — see renderSettingsView.
       // Surface a one-shot confirmation from the last action (e.g. bedtime
       // turned off / overnight note), else clear the status line.
@@ -3799,7 +3811,7 @@
           // saw "No child profile yet" had no way to fix it, and the toy kept
           // talking to a stranger. Collapsed behind a link so the common case
           // (profile already set up) stays quiet.
-          listEl.appendChild(renderAddChildRow(d));
+          listEl.appendChild(renderAddChildRow(d, { scope: 'settings' }));
 
           // Pause/Resume control, sibling to the row (not nested in the
           // clickable button). Label flips based on current state. Same
@@ -4397,18 +4409,40 @@
     // wrong guess is heard in every sentence the toy speaks. Birth year is
     // optional and is a YEAR only — #066 deliberately never stores a full
     // date of birth for a child.
-    function renderAddChildRow(d) {
+    // opts.scope  - 'settings' (default) or 'toy'. Folded into every field
+    //               id, because this row is now rendered in TWO sections that
+    //               both exist in the document at once (one hidden). Without
+    //               it, both copies would carry the same ids and every
+    //               <label for=...> would bind to whichever came first.
+    // opts.open   - render the form already open, with a plain heading
+    //               instead of the toggle button. The toy page only renders
+    //               this row when there is no child at all, so the form IS
+    //               the point and hiding it behind a tap adds a step for
+    //               nothing. In Settings the opposite is true: the usual case
+    //               is a profile that already exists.
+    function renderAddChildRow(d, opts) {
+      opts = opts || {};
+      var scope = opts.scope || 'settings';
+      var startOpen = !!opts.open;
       var wrap = document.createElement('div');
 
-      var openBtn = document.createElement('button');
-      openBtn.type = 'button';
-      openBtn.className = 'btn-ghost';
-      openBtn.textContent = t('add_child');
-      openBtn.style.cssText = 'margin:4px 0 6px;font-size:13px;';
-      wrap.appendChild(openBtn);
+      if (startOpen) {
+        var heading = document.createElement('div');
+        heading.textContent = t('add_child');
+        heading.style.cssText =
+          'font-size:14px;font-weight:700;color:var(--ink);margin:10px 0 4px;';
+        wrap.appendChild(heading);
+      } else {
+        var openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'btn-ghost';
+        openBtn.textContent = t('add_child');
+        openBtn.style.cssText = 'margin:4px 0 6px;font-size:13px;';
+        wrap.appendChild(openBtn);
+      }
 
       var form = document.createElement('div');
-      form.hidden = true;
+      form.hidden = !startOpen;
       form.style.cssText = 'margin:2px 0 10px;padding:10px 12px;background:var(--surface-4);' +
         'border:1px solid var(--line-soft-2);border-radius:12px;';
 
@@ -4421,7 +4455,7 @@
       // something is typed, so a filled form was three unlabelled boxes —
       // "2016" with nothing saying it is a birth year.
       function addLabel(key, control) {
-        var id = 'ac-' + key + '-' + d.deviceId;
+        var id = 'ac-' + scope + '-' + key + '-' + d.deviceId;
         var l = document.createElement('label');
         l.textContent = t(key);
         l.setAttribute('for', id);
@@ -4482,10 +4516,12 @@
       saveBtn.style.marginTop = '8px';
       form.appendChild(saveBtn);
 
-      openBtn.addEventListener('click', function () {
-        form.hidden = !form.hidden;
-        if (!form.hidden) nameInput.focus();
-      });
+      if (openBtn) {
+        openBtn.addEventListener('click', function () {
+          form.hidden = !form.hidden;
+          if (!form.hidden) nameInput.focus();
+        });
+      }
 
       saveBtn.addEventListener('click', function () {
         var name = (nameInput.value || '').trim();
