@@ -2279,8 +2279,24 @@ without someone listening end to end.
 narration the owner approved; a new story that ignores it makes half the
 library loud and half quiet, which is itself a quality complaint.
 
-**STAGE 2 WAS NEVER RUN ON THE SHIPPED LIBRARY — three stories are still
-truncated today (found 2026-08-10).** Do not read the pipeline above as a
+**RESOLVED 2026-08-11 — the library was re-rendered and is now complete.** All
+ten stories (the eight that existed plus `hedgehog-apple` and `little-cloud`,
+which had never been narrated) were rendered `--per-segment` in the SAME voice,
+`areg-storyteller` — the owner decided against changing narrator, and the
+truncation was never a voice problem. `check_story_audio.py` now PASSES 10 of
+10; «Խոսող ձուկը» went 1:21 → 5:03, `anban-huri` 1:27 → 3:38, `pochat-aghves`
+1:25 → 3:39. Stage 2 ran for the first time: every file is now 192 kbps with a
+single ID3 tag at -16.6..-17.0 LUFS, and every `Version` was bumped so field
+toys re-download. Ten `.segments.json` byte maps exist for the first time, so
+`OffsetToSegment` no longer guesses. **The human listen test has NOT happened**
+— 56 stitched requests, and no tool can hear a seam. Evidence:
+`tools/quality-evidence/story-audio-rerender-20260811.md`.
+
+The paragraph below describes the state BEFORE that run, and is kept because
+the failure it records is the reason the gate exists:
+
+**STAGE 2 WAS NEVER RUN ON THE SHIPPED LIBRARY — three stories were still
+truncated (found 2026-08-10).** Do not read the pipeline above as a
 description of what happened to the files in `story-audio/`; it is a
 description of what *should* happen to them and did not. Measured:
 `khosogh-dzuk` plays **1:21 of a 5:17 story (26%)**, `anban-huri` **1:27 of
@@ -2385,9 +2401,11 @@ about the opening scene. `ArmenianAiToy.Api.csproj` copies
 (the SDK's default items already claim every `.json`, they are simply never
 copied) — the third widening of that glob family, after games and voice.
 
-**Two stories ship as placeholder manifest rows.** `hedgehog-apple` and
-`little-cloud` have approved text and no narration, and are configured with
-`SizeBytes: 0` and an all-zero hash. Zero size is load-bearing: the manifest
+**Two stories shipped as placeholder manifest rows** until 2026-08-11, when the
+re-render gave `hedgehog-apple` and `little-cloud` their first narration and
+`-Apply` filled both rows in. The mechanism is documented because it is how any
+future story enters the library: a story with approved text and no audio is
+configured with `SizeBytes: 0` and an all-zero hash. Zero size is load-bearing: the manifest
 validator drops the entry, so nothing is advertised and no toy attempts a
 download of a file that is not there, while `Ship-StoryAudio.ps1`'s patch regex
 still finds the row and fills in the real size, hash and `Version` on the day
