@@ -1,14 +1,13 @@
-# Re-rendering the library in a new voice — the exact commands, in order
+# Re-rendering the library in your own voice — the exact commands, in order
 
-**Written 2026-08-10.** For the owner's Windows machine, which has `dotnet`,
-`ffmpeg` and `python3`. Everything here is run by the owner: **the ElevenLabs
-API key never leaves his hands.**
+**Written 2026-08-10, rewritten 2026-08-11 for the owner's own clone.** For the
+owner's Windows machine, which has `dotnet`, `ffmpeg` and `python3`. Everything
+here is run by the owner: **the ElevenLabs API key never leaves his hands.**
 
-The voice for this pass is **Charlotte**, an ElevenLabs premade voice, chosen
-2026-08-10. She is interim by design — the plan is to hand a *working* toy to a
-famous Armenian storyteller and ask whether he wants it to be his voice
-(`docs/voice-narrator-brief.md`). This render is expected to be thrown away, and
-the owner has said that is fine.
+The voice for this pass is **the owner's own ElevenLabs clone** — the same
+`areg-storyteller` that narrates the library today. Owner decision, 2026-08-11.
+The famous-storyteller conversation still happens (`docs/voice-narrator-brief.md`),
+but it happens with a *working* toy in hand, not as a prerequisite.
 
 ---
 
@@ -16,69 +15,88 @@ the owner has said that is fine.
 
 Three of the eight shipped stories play a quarter to a third of their text and
 stop mid-tale (`tools/quality-evidence/story-audio-truncation-20260810.md`).
-Measured on the same story, same tool, same `eleven_v3` model:
 
-| Voice | `khosogh-dzuk` (needs 5:17) | Share |
-|---|---|---|
-| the owner's clone — **what ships today** | 1:21 | **26%** |
-| Charlotte | 6:03 | 114% |
-| Daniel | 7:04 | 134% |
+**The cause was measured on 2026-08-11 and it is not the voice — it is the
+REQUEST SIZE.** Your clone stops at roughly **1,300 characters of output**,
+however long the input is:
 
-The truncation is a property of the **clone**, not of the pipeline — consistent
-with ElevenLabs' own note that Professional Voice Clones are not fully optimised
-for Eleven v3. **So changing the voice is also the truncation fix**, and the two
-stories that have never been recorded at all (`hedgehog-apple`, `little-cloud`)
-come along in the same pass, taking the library from 8 to 10.
+| story | characters | what shipped | share |
+|---|---|---|---|
+| princess-and-pea | 967 | complete | 97% |
+| sutasan | 1,080 | complete | 96% |
+| three-piglets | 1,222 | complete | 102% |
+| ulik | 1,616 | ~1,163 chars of audio | 72% |
+| sutlik-orskan | 1,875 | ~1,500 chars of audio | 80% |
+| pochat-aghves | 3,220 | ~1,288 chars of audio | 40% |
+| anban-huri | 3,290 | ~1,316 chars of audio | 40% |
+| khosogh-dzuk | 4,753 | ~1,236 chars of audio | 26% |
 
-Size of the job: **~18,700 characters** of narration across 10 stories, plus
-**~1,400** across the 43 welcome clips. One sitting.
+Every story **under** the ceiling rendered perfectly. Every story **over** it
+came back at the ceiling and stopped there. The line is that sharp.
+
+A Default voice (Charlotte) rendered the 4,753-character story to 114% with the
+same tool on the same day, which is consistent with ElevenLabs' note that
+Professional Voice Clones are not fully optimised for Eleven v3 — so a clone
+needs smaller requests, and until now the tool was sending one request per
+story (`--max-chunk 4000`).
+
+**The fix is `--per-segment`.** Your longest single story segment is **835
+characters**, so a segment-sized request cannot reach the ceiling. Truncation
+stops being unlikely and becomes arithmetically impossible.
+
+Three things come free with it:
+
+- **Seams fall on paragraph breaks**, where a narrator pauses anyway. (v3
+  refuses `previous_text`/`next_text`, so every seam is blind either way —
+  better to put them where a pause belongs.)
+- **A fluffed line costs one request**, not a whole story.
+- **`<storyId>.segments.json`** — the segment map this repo has never had. The
+  backend wants it so an in-story question is answered about the scene the
+  child is actually in; today it guesses from `offset / fileSize`, and on the
+  truncated stories that guess is badly wrong. `mix_ambience.py` wants it too.
+
+Two stories have never been recorded at all (`hedgehog-apple`, `little-cloud`),
+so this pass takes the library from 8 to 10.
+
+Size of the job: **~18,700 characters** of narration across 10 stories in **56
+requests**, plus **~1,400** across the 43 welcome clips. One sitting.
 
 ---
 
 ## Verified end to end on 2026-08-11 (except the paid call)
 
-Everything in this runbook except the render itself has now been **run**, not
-just written — a container with `ffmpeg`, `pwsh` and `dotnet` was set up for it
-(see `docs/container-toolchain.md`). What that turned up:
+Everything here except the render itself has been **run**, not just written — a
+container with `ffmpeg`, `pwsh` and `dotnet` was set up for it (see
+`docs/container-toolchain.md`). What that turned up:
 
 - **`Ship-StoryAudio.ps1` executes and its diagnosis is exact.** Against the
   eight shipped stories it reports the same three as cut short, at the same
   percentages, as the dependency-free checker:
   `khosogh-dzuk 26%`, `anban-huri 40%`, `pochat-aghves 40%`.
-- **Loudness is NOT the problem.** Measured, every shipped file is between
-  -16.1 and -16.9 LUFS against a -16.4 target, and every one carries exactly
-  one ID3 tag. **Length is the only fault.** So `-Fix` has nothing to repair
-  here; what these three need is a re-render, which is what this pass is.
-- **The dry run is accurate**: 10 files, 11 requests, 18,782 characters.
+- **Loudness is NOT the problem.** Every shipped file measures between -16.1
+  and -16.9 LUFS against a -16.4 target, with exactly one ID3 tag. **Length is
+  the only fault.**
+- **The `--per-segment` dry run is accurate**: 10 files, 56 requests, 18,692
+  characters, every chunk at or under 835.
+- **The segment map is exact, and proving it found a real bug.** Each API
+  response opens with a 26 ms Xing header frame that the stitcher drops but the
+  duration walker counted, so summing the raw responses overshot by 26 ms per
+  segment and drifted down the story. `--self-test` caught it (4 pieces,
+  0.104 s = 4 x 26 ms); the map now measures each piece *as it appears in the
+  finished file*, and the same test reports a 0.000 s delta.
 
-The one number to watch when you render:
+You can re-run that check yourself, with no API key and nothing sent:
 
-> `khosogh-dzuk` is the only story that splits (4,767 chars → 2 chunks). Every
-> other story goes as a **single request of up to 3,306 characters**.
-
-That is deliberate — seams are audible, so the tool chunks as little as the
-5,000-character limit allows — and it is safe **because the tool aborts on the
-first chunk that comes back short**, naming the percentage and telling you to
-lower `--max-chunk`. A wrong setting costs one request, not twenty-six. If that
-abort fires, re-run with `--max-chunk 1500` and it will still be far cheaper
-than the alternative.
-
----
+```powershell
+dotnet run --project tools/ElevenLabsRender -- --self-test --output <a folder of mp3s>
+```
 
 ## Before you start
 
-**Get Charlotte's voice ID.** It is recorded nowhere in this repo — the audition
-rendered her but never wrote the IDs down. Open the ElevenLabs Voices page, open
-Charlotte, copy the voice ID.
-
-Two things worth knowing while you are there:
-
-- ElevenLabs categorise Charlotte as Swedish. **Your ear on real Armenian output
-  beats their marketplace tag** — but listen once for a Swedish colour on a name
-  like «Հուռին», because someone has already raised it.
-- Charlotte is a **Default** voice, and ElevenLabs' Default voices stop working
-  **31 December 2026** (`docs/voice-decision-brief.md` §0). That is fine for an
-  interim pass. It is not fine as a permanent answer.
+**Get your clone's voice ID.** ElevenLabs Voices page → `areg-storyteller` →
+copy the voice ID. It is the same voice that narrates the library today, so
+there is nothing new to audition — but note that the whole point of this pass is
+that the *requests* change, not the voice.
 
 ---
 
@@ -89,48 +107,63 @@ file, never committed.
 
 ```powershell
 $env:ELEVENLABS_API_KEY  = "<your key>"
-$env:ELEVENLABS_VOICE_ID = "<Charlotte's voice id>"
-$render = "$env:TEMP\areg-charlotte"
+$env:ELEVENLABS_VOICE_ID = "<areg-storyteller's voice id>"
+$render = "$env:TEMP\areg-rerender"
 ```
 
 ## Step 2 — the dry run. Free. Read it before paying.
 
 ```powershell
-dotnet run --project tools/ElevenLabsRender -- --all --output $render
+dotnet run --project tools/ElevenLabsRender -- --all --per-segment --output $render
 ```
 
-It prints every text, its character count, and the expected duration, and sends
+It prints every file, its character count and its expected duration, and sends
 **nothing** to the API. `--render --confirm-paid-api` are the two keys that
 unlock spending; neither is here.
 
-Check the plan says **10 files** and roughly 18,700 characters.
+Check the plan says **10 file(s) in 56 request(s)** and roughly 18,700
+characters. If the request count is 11 instead of 56, `--per-segment` did not
+take — that is the one-request-per-story shape that truncated the library.
 
 ## Step 3 — render the ten stories
 
 ```powershell
-dotnet run --project tools/ElevenLabsRender -- --all --output $render `
+dotnet run --project tools/ElevenLabsRender -- --all --per-segment --output $render `
     --render --confirm-paid-api
 ```
 
 Leave `--model` and `--speed` alone. `eleven_v3` is the only model on the
 account that speaks Armenian, and at the default speed the request deliberately
-carries no `voice_settings` at all, so Charlotte's own saved settings apply —
+carries no `voice_settings` at all, so the clone's own saved settings apply —
 sending one "just to set speed 1.0" replaces them.
 
-Watch for `*** TOO SHORT` in the output. The tool refuses a render under 70% of
-the length its text needs and names the file. If one appears, re-render that
-story alone with `--only <id>--narration--s1.0` before going on.
+Two things to watch in the output:
 
-## Step 4 — rename to what the shipper expects
+- **`*** chunk N came back ...%`** — the tool stops at the FIRST short chunk
+  rather than paying for the rest. It should not fire at segment sizes, but if
+  it does, that segment alone is over the ceiling: re-run that story with
+  `--max-chunk 600` and it will split the segment on a sentence boundary.
+- **`segment map: N segment(s) -> ...`** — one line per story, confirming the
+  `.segments.json` was written.
 
-The renderer writes `<id>--narration--s1.0.mp3`; `Ship-StoryAudio.ps1` wants
-`<id>.mp3`. Nothing else bridges the two.
+What you get in `$render`:
 
-```powershell
-Get-ChildItem $render -Filter '*--narration--s*.mp3' | ForEach-Object {
-    Rename-Item $_.FullName ($_.Name -replace '--narration--s[\d.]+\.mp3$', '.mp3')
-}
 ```
+khosogh-dzuk.mp3            <- ship-ready name, already what the shipper wants
+khosogh-dzuk.segments.json  <- seconds map
+segments/khosogh-dzuk--seg01.mp3 ... --seg09.mp3
+manifest-snippet.json
+```
+
+**Keep the `segments/` folder.** Those pieces are what `mix_ambience.py` needs
+when the ambience sounds are finally licensed — throwing them away means paying
+to render the whole library a second time.
+
+## Step 4 — no rename needed
+
+`--per-segment` already writes `<storyId>.mp3`, which is exactly what
+`Ship-StoryAudio.ps1 -In <dir>` looks for. The rename step that used to sit
+here, undocumented, between two tools is gone.
 
 ## Step 5 — the gate that was skipped last time
 
@@ -173,7 +206,29 @@ It refuses to install anything that still fails a check.
 Re-run step 5 against `backend/src/ArmenianAiToy.Api/story-audio` afterwards —
 the levelling re-encodes the files, so what ships is not what step 5 checked.
 
-## Step 7 — the 43 welcome clips, same voice
+## Step 7 — turn the segment map into the bytes the backend reads
+
+The map from step 3 is in **seconds**. `StoryQaController.LoadSegmentMap`
+deserialises a bare array of **byte offsets**, and when it cannot it silently
+falls back to guessing the child's position from `offset / fileSize` — so a
+seconds map installed as-is looks like it works and changes nothing.
+
+Byte offsets can only be known after step 6, because `-Fix` re-encodes the file.
+
+```powershell
+Get-ChildItem $render -Filter '*.segments.json' | ForEach-Object {
+    $id = $_.Name -replace '\.segments\.json$',''
+    python3 tools/story-audio/segments_to_bytes.py `
+        --seconds $_.FullName `
+        --mp3 "backend/src/ArmenianAiToy.Api/story-audio/$id.mp3" `
+        --out  "backend/src/ArmenianAiToy.Api/story-audio/$id.segments.json"
+}
+```
+
+This is what stops an in-story question being answered about a scene the child
+has not reached. It needs nothing installed.
+
+## Step 8 — the 43 welcome clips, same voice
 
 Skip this and the toy greets the child in one voice and tells the story in
 another.
@@ -198,7 +253,7 @@ most on the stories; if a greeting sounds noticeably quieter than the narration,
 run the same two-pass `loudnorm` from the header of
 `tools/ElevenLabsRender/Program.cs` over the clip folder before installing.
 
-## Step 8 — listen
+## Step 9 — listen
 
 Not optional, and not replaceable by any of the above.
 
@@ -209,7 +264,7 @@ Not optional, and not replaceable by any of the above.
 
 Then commit. Railway deploys, and every toy re-downloads on the `Version` bumps.
 
-## Step 9 — make it impossible to regress
+## Step 10 — make it impossible to regress
 
 Once step 5 prints PASS on all ten, wire it into CI so nobody has to remember.
 It is not there today, deliberately: it exits non-zero right now because of the
@@ -233,8 +288,10 @@ needs no ffmpeg, no dotnet and no network, so it costs the run a second.
   read `licence: "TBD"` — nothing has been chosen or bought. Forest sounds do
   not change whether the toy works for the storyteller demo. They ride the next
   render, through `tools/story-audio/mix_ambience.py`.
-- **One WAV per segment.** Worth asking for from a studio, not from an API —
-  see `docs/voice-narrator-brief.md` §3 for why it matters.
+- **A studio session.** `--per-segment` now gets per-segment audio out of the
+  API, so the segment map no longer waits on a human narrator. The instruction
+  in `docs/voice-narrator-brief.md` §3 stands for the day a real one records —
+  it cannot be added after the session.
 - **`AREG_STORY_PAUSE_BYTES_PER_SEC`.** The firmware assumes 192 kbps; today's
   files are 128. After step 6 they *will* be 192, so the constant becomes
   correct by itself — but check it against the shipped bitrate before story
