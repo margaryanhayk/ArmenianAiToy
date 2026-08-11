@@ -173,6 +173,15 @@ const D = {
     hy: 'Ձեր հաշիվը պատրաստ է։ Խնդրում ենք մուտք գործել։',
   },
 
+  // ---------- settings groups ----------
+  // The same questions the web dashboard groups its settings under, so
+  // a parent who uses both is taught one mental model rather than two.
+  set_when: { en: 'When can it play?', ru: 'Когда можно играть?', hy: 'Ե՞րբ կարող է խաղալ' },
+  set_when_n: { en: 'Quiet hours, and a way to stop it right now.', ru: 'Тихие часы и способ остановить игрушку прямо сейчас.', hy: 'Լուռ ժամերը և միանգամից կանգնեցնելու ձևը։' },
+  set_what: { en: 'What can it play?', ru: 'Во что можно играть?', hy: 'Ի՞նչ կարող է խաղալ' },
+  set_what_n: { en: 'Switch off anything you would rather it did not do. Bedtime calm always stays on.', ru: 'Выключите то, чего не хотите. Спокойный режим перед сном остаётся всегда.', hy: 'Անջատեք այն, ինչ չեք ուզում։ Քնելու հանգիստ ռեժիմը միշտ միացված է մնում։' },
+  set_toy: { en: 'This toy', ru: 'Эта игрушка', hy: 'Այս խաղալիքը' },
+
   // ---------- child profile and invites ----------
   // Lifted from the web dashboard by script, same as the capability
   // strings: one wording, one linguistic review, no drift.

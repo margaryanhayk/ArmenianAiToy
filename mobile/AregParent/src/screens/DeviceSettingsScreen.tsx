@@ -126,11 +126,11 @@ export default function DeviceSettingsScreen({
       </Pressable>
       <Text style={styles.title}>{tf('settings_of', { name: device.deviceName || t('toy_word') })}</Text>
 
-      {/* Wi-Fi setup over Bluetooth */}
-      <Pressable style={styles.wifiBtn} onPress={onOpenProvisioning}>
-        <Text style={styles.wifiBtnText}>{t('wifi_btn')}</Text>
-      </Pressable>
-
+      {/* Grouped under the questions a parent arrives with, the same five the
+          web dashboard uses. Pause and bedtime sit TOGETHER now - they answer
+          one question and were separated by the mode switches. */}
+      <Text style={styles.groupTitle}>{t('set_when')}</Text>
+      <Text style={styles.groupNote}>{t('set_when_n')}</Text>
       {/* Pause */}
       <View style={styles.card}>
         <View style={styles.rowBetween}>
@@ -140,25 +140,6 @@ export default function DeviceSettingsScreen({
           </View>
           <Switch value={paused} onValueChange={togglePause} />
         </View>
-      </View>
-
-      {/* Modes */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>{t('modes_title')}</Text>
-        {(
-          [
-            ['story', 'mode_story'],
-            ['game', 'mode_game'],
-            ['riddle', 'mode_riddle'],
-            ['curiosity', 'mode_curiosity'],
-          ] as [keyof ModeFlags, 'mode_story' | 'mode_game' | 'mode_riddle' | 'mode_curiosity'][]
-        ).map(([key, labelKey]) => (
-          <View key={key} style={styles.rowBetween}>
-            <Text style={styles.modeLabel}>{t(labelKey)}</Text>
-            <Switch value={modes[key]} onValueChange={(v) => toggleMode(key, v)} />
-          </View>
-        ))}
-        <Text style={styles.rowHint}>{t('modes_hint')}</Text>
       </View>
 
       {/* Bedtime */}
@@ -192,6 +173,34 @@ export default function DeviceSettingsScreen({
         </View>
       </View>
 
+
+      <Text style={styles.groupTitle}>{t('set_what')}</Text>
+      <Text style={styles.groupNote}>{t('set_what_n')}</Text>
+      {/* Modes */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>{t('modes_title')}</Text>
+        {(
+          [
+            ['story', 'mode_story'],
+            ['game', 'mode_game'],
+            ['riddle', 'mode_riddle'],
+            ['curiosity', 'mode_curiosity'],
+          ] as [keyof ModeFlags, 'mode_story' | 'mode_game' | 'mode_riddle' | 'mode_curiosity'][]
+        ).map(([key, labelKey]) => (
+          <View key={key} style={styles.rowBetween}>
+            <Text style={styles.modeLabel}>{t(labelKey)}</Text>
+            <Switch value={modes[key]} onValueChange={(v) => toggleMode(key, v)} />
+          </View>
+        ))}
+        <Text style={styles.rowHint}>{t('modes_hint')}</Text>
+      </View>
+
+
+      <Text style={styles.groupTitle}>{t('set_toy')}</Text>
+      <Pressable style={styles.wifiBtn} onPress={onOpenProvisioning}>
+        <Text style={styles.wifiBtnText}>{t('wifi_btn')}</Text>
+      </Pressable>
+
       {status ? <Text style={styles.status}>{status}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </ScrollView>
@@ -211,6 +220,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surfaceSunken,
   },
   cardTitle: { fontSize: 16, fontWeight: '600', color: theme.brand, marginBottom: 8 },
+  // A plain question in sentence case. An uppercase letter-spaced label
+  // reads as a warning, which is the wrong tone for "when can it play?".
+  groupTitle: { fontSize: 15, fontWeight: '700', color: theme.ink, marginTop: 18, marginBottom: 2 },
+  groupNote: { fontSize: 12.5, lineHeight: 19, color: theme.inkMuted, marginBottom: 10 },
   wifiBtn: {
     backgroundColor: theme.surfaceTint,
     borderColor: theme.line,
