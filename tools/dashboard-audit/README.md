@@ -21,6 +21,14 @@ node tools/dashboard-audit/mock-server.js &     # http://127.0.0.1:5099
 node tools/dashboard-audit/walk.js              # writes shots/ and walk.log
 ```
 
+**Writes persist for the life of the server process.** That is deliberate —
+the controls save themselves and the page reloads after each save, so a mock
+that forgot every write could not test them at all. The cost is that a check
+which CREATES something (adding a child, renaming a toy) has already changed
+the fixture by the time it finishes: run it twice against the same server and
+the second run starts from a state the first run made. **Restart the server
+between runs of anything that writes.**
+
 `walk.js` needs Playwright and a Chromium. If they are not where node looks by
 default, point at them:
 

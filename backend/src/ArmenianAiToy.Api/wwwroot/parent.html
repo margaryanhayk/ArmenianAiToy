@@ -324,6 +324,25 @@
       margin: 16px 2px 6px;
     }
 
+    /* Settings group heading. A plain question in sentence case, not the
+       uppercase letter-spaced .section-cap - a question shouted in capitals
+       reads like a warning. The whole settings screen uses this one idiom,
+       including the careful zone, so a parent scanning it sees a single
+       kind of divider rather than two competing ones. */
+    .set-group-t {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--ink);
+      margin: 22px 2px 2px;
+    }
+    .set-group:first-child .set-group-t { margin-top: 6px; }
+    .set-group-n {
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: var(--ink-muted);
+      margin: 0 2px 8px;
+    }
+
     /* Content tiles inside a toy (story library / music / request a story).
        Replaces the underlined text-links-with-arrows, which read as web
        links rather than parts of the app. */
@@ -1741,6 +1760,18 @@
       your_activity: { en: 'Your activity', ru: 'Ваша активность', hy: 'Ձեր գործողությունները' },
       toy_settings: { en: 'Toy settings', ru: 'Настройки игрушки', hy: 'Խաղալիքի կարգավորումներ' },
       careful_zone: { en: 'Cannot be undone', ru: 'Необратимые действия', hy: 'Անդառնալի գործողություններ' },
+      // Settings groups. Questions a parent arrives with, not names of
+      // subsystems - "When can it play?" is what someone opens this screen
+      // thinking, "Device flags" is not.
+      set_who: { en: 'Who is it for?', ru: 'Для кого это?', hy: 'Ո՞ւմ համար է' },
+      set_who_n: { en: 'Areg needs the name, the age and boy-or-girl to speak correct Armenian.', ru: 'Арегу нужны имя, возраст и мальчик или девочка, чтобы говорить по-армянски правильно.', hy: 'Արեգին պետք են անունը, տարիքը և տղա՞ է, թե՞ աղջիկ, որ ճիշտ հայերեն խոսի։' },
+      set_when: { en: 'When can it play?', ru: 'Когда можно играть?', hy: 'Ե՞րբ կարող է խաղալ' },
+      set_when_n: { en: 'Quiet hours, and a way to stop it right now.', ru: 'Тихие часы и способ остановить игрушку прямо сейчас.', hy: 'Լուռ ժամերը և միանգամից կանգնեցնելու ձևը։' },
+      set_what: { en: 'What can it play?', ru: 'Во что можно играть?', hy: 'Ի՞նչ կարող է խաղալ' },
+      set_what_n: { en: 'Switch off anything you would rather it did not do. Bedtime calm always stays on.', ru: 'Выключите то, чего не хотите. Спокойный режим перед сном остаётся всегда.', hy: 'Անջատեք այն, ինչ չեք ուզում։ Քնելու հանգիստ ռեժիմը միշտ միացված է մնում։' },
+      set_how: { en: 'How it tells stories', ru: 'Как рассказывает сказки', hy: 'Ինչպես է հեքիաթ պատմում' },
+      set_how_n: { en: 'Small touches during a story.', ru: 'Мелочи во время сказки.', hy: 'Փոքր բաներ հեքիաթի ընթացքում։' },
+      set_toy: { en: 'This toy', ru: 'Эта игрушка', hy: 'Այս խաղալիքը' },
       bedtime_label: { en: '🌙 Bedtime:', ru: '🌙 Сон:', hy: '🌙 Քնի ժամ՝' },
       modes_label: { en: '🎮 Modes:', ru: '🎮 Режимы:', hy: '🎮 Ռեժիմներ՝' },
       name_label: { en: '✏️ Name:', ru: '✏️ Имя:', hy: '✏️ Անուն՝' },
@@ -3661,12 +3692,23 @@
         openCapabilitiesFrom('settings');
       });
       capsTile.style.marginTop = '14px';
-      settings.appendChild(capsTile);
 
       var accountTile = buildTile('settings', 'tile_account', 'tile_account_sub', function () {
         openAccount();
       });
-      settings.appendChild(accountTile);
+
+      // Ahead of the careful zone, not after it. Unlinking a toy is the last
+      // thing on this screen or it is not a careful zone - two ordinary tiles
+      // sitting under "Cannot be undone" made it read as one more section
+      // rather than the end of the road.
+      var danger = settings.querySelector('.danger-zone');
+      if (danger) {
+        settings.insertBefore(capsTile, danger);
+        settings.insertBefore(accountTile, danger);
+      } else {
+        settings.appendChild(capsTile);
+        settings.appendChild(accountTile);
+      }
 
       if (window.__toyFlash && window.__toyFlash.msg) {
         var fmsg = window.__toyFlash.msg, fkind = window.__toyFlash.kind || 'ok';
@@ -3777,6 +3819,41 @@
     // name, careful zone) into a container — used by the toy detail page.
     function renderToySettings(d, listEl) {
 
+          // Settings was one flat run of ~27 controls under a single
+          // "TOY SETTINGS" label - pause sat next to the spoken intro, and
+          // the bedtime window was four controls away from the bedtime
+          // music that only plays inside it. Grouping them under the
+          // questions a parent actually arrives with is the whole change.
+          //
+          // Each group is a container created UP FRONT and appended to
+          // listEl in reading order; every control below keeps its own
+          // code exactly where it was and only changes which container it
+          // lands in. That is what makes this a re-ordering with no
+          // behaviour change - no control moved past the code that builds
+          // it, and no listener was re-wired.
+          function settingsGroup(titleKey, noteKey) {
+            var wrap = document.createElement('div');
+            wrap.className = 'set-group';
+            var title = document.createElement('div');
+            title.className = 'set-group-t';
+            title.textContent = t(titleKey);
+            wrap.appendChild(title);
+            if (noteKey) {
+              var note = document.createElement('div');
+              note.className = 'set-group-n';
+              note.textContent = t(noteKey);
+              wrap.appendChild(note);
+            }
+            listEl.appendChild(wrap);
+            return wrap;
+          }
+
+          var gWho = settingsGroup('set_who', 'set_who_n');
+          var gWhen = settingsGroup('set_when', 'set_when_n');
+          var gWhat = settingsGroup('set_what', 'set_what_n');
+          var gHow = settingsGroup('set_how', 'set_how_n');
+          var gToy = settingsGroup('set_toy', null);
+
           // Per-child remove row. Sibling to the clickable device button so
           // we can attach per-child action buttons without nesting buttons.
           // Deleting a child also deletes their conversations (service-side
@@ -3797,12 +3874,12 @@
                 deleteChild(c.childId, c.name);
               });
               childRow.appendChild(removeChildBtn);
-              listEl.appendChild(childRow);
+              gWho.appendChild(childRow);
               // Per-child mode override row — tri-state per mode (Inherit
               // from device / On / Off). Calm has no control by design.
               // Effective-state hint shows what the device currently allows
               // for "Inherit" to reduce silent-disable surprises.
-              listEl.appendChild(renderChildOverridesRow(d, c));
+              gWho.appendChild(renderChildOverridesRow(d, c));
             });
           }
 
@@ -3811,16 +3888,11 @@
           // saw "No child profile yet" had no way to fix it, and the toy kept
           // talking to a stranger. Collapsed behind a link so the common case
           // (profile already set up) stays quiet.
-          listEl.appendChild(renderAddChildRow(d, { scope: 'settings' }));
+          gWho.appendChild(renderAddChildRow(d, { scope: 'settings' }));
 
           // Pause/Resume control, sibling to the row (not nested in the
           // clickable button). Label flips based on current state. Same
           // inline-style pattern used by the unlink button below.
-          var settingsCap = document.createElement('div');
-          settingsCap.className = 'section-cap';
-          settingsCap.textContent = t('toy_settings');
-          listEl.appendChild(settingsCap);
-
           var pauseBtn = document.createElement('button');
           pauseBtn.type = 'button';
           pauseBtn.textContent = d.isPaused ? t('pause_off') : t('pause_on');
@@ -3830,7 +3902,7 @@
           pauseBtn.addEventListener('click', function () {
             toggleDevicePause(d.deviceId, d.deviceName, d.isPaused);
           });
-          listEl.appendChild(pauseBtn);
+          gWhen.appendChild(pauseBtn);
 
           // B3 + Slice E — two simple flag toggles (spoken story intro,
           // bedtime music). PUT the opposite value, then reload the page
@@ -3959,7 +4031,7 @@
             }
             return row;
           }
-          listEl.appendChild(flagToggle('story_intro_label',
+          gHow.appendChild(flagToggle('story_intro_label',
             d.storyIntroEnabled !== false, 'story-intro'));
           // The two story-shaping toggles sit with the intro, not with the
           // bedtime block: all three answer "what does a story sound like on
@@ -3967,7 +4039,7 @@
           // Both default ON, so `!== false` (not `=== true`) — a device row
           // from a backend that predates them must read as on, matching the
           // manifest fallback and the column default.
-          listEl.appendChild(flagToggle('story_pauses_label',
+          gHow.appendChild(flagToggle('story_pauses_label',
             d.storyPausesEnabled !== false, 'story-pauses',
             // AREG_STORY_PAUSES_ENABLED is 0 in the firmware (owner report
             // 2026-08-10: "the story is cut"). Flip this the day that goes
@@ -3977,7 +4049,7 @@
           // by design: with the toggle on, a story that has no second ending
           // simply ends the way it always did. Without a standing note the
           // only conclusion available to a parent is "it ignored my setting".
-          listEl.appendChild(flagToggle('variant_endings_label',
+          gHow.appendChild(flagToggle('variant_endings_label',
             d.variantEndingsEnabled !== false, 'variant-endings',
             // AREG_VARIANT_ENDINGS_ENABLED defaults to 0 and has never been
             // bench-run. Same rule: flip when the toy really does it.
@@ -4025,10 +4097,10 @@
           bedtimeHint.textContent = t('bedtime_hint');
           bedtimeHint.className = 'ctl-hint';
           bedtimeRow.appendChild(bedtimeHint);
-          listEl.appendChild(bedtimeRow);
+          gWhen.appendChild(bedtimeRow);
 
           // Bedtime music sits directly under the window it depends on.
-          listEl.appendChild(flagToggle('bedtime_music_label',
+          gWhen.appendChild(flagToggle('bedtime_music_label',
             d.bedtimeMusicEnabled === true, 'bedtime-music',
             { requiresBedtime: true, requiresMusic: true }));
 
@@ -4088,7 +4160,7 @@
           modesHint.textContent = t('modes_hint');
           modesHint.className = 'ctl-hint';
           modesRow.appendChild(modesHint);
-          listEl.appendChild(modesRow);
+          gWhat.appendChild(modesRow);
 
           // Rename row — label the toy so multiple toys are distinguishable
           // ("Anna's toy", "Living room"). Sibling row (input not nested in a
@@ -4123,7 +4195,7 @@
             if (next === (d.deviceName || '')) return;
             renameDevice(d.deviceId, next);
           });
-          listEl.appendChild(renameRow);
+          gToy.appendChild(renameRow);
 
           // #074 revoke / restore — the credential kill-switch for a lost or
           // compromised toy. Reversible. Distinct from unlink (which removes
@@ -4140,7 +4212,7 @@
           var dangerWrap = document.createElement('div');
           dangerWrap.className = 'danger-zone';
           var dangerCap = document.createElement('div');
-          dangerCap.className = 'section-cap';
+          dangerCap.className = 'set-group-t';
           dangerCap.textContent = t('careful_zone');
           dangerCap.style.margin = '0 2px 8px';
           dangerWrap.appendChild(dangerCap);
@@ -7412,6 +7484,12 @@
       var views = {
         toyView: loadDevices,
         devicesView: loadDevices,
+        // Was missing since Settings was split onto its own screen: a
+        // language switch there left EVERY control - the switches, the
+        // child rows, Remove, Boy/Girl - in the old language until the
+        // parent navigated away and came back. loadDevices re-renders
+        // settings when settingsView is the visible one.
+        settingsView: loadDevices,
         accountView: openAccount,
         summariesView: loadSummaries,
         flaggedView: loadFlagged,
