@@ -35,6 +35,36 @@ Size of the job: **~18,700 characters** of narration across 10 stories, plus
 
 ---
 
+## Verified end to end on 2026-08-11 (except the paid call)
+
+Everything in this runbook except the render itself has now been **run**, not
+just written — a container with `ffmpeg`, `pwsh` and `dotnet` was set up for it
+(see `docs/container-toolchain.md`). What that turned up:
+
+- **`Ship-StoryAudio.ps1` executes and its diagnosis is exact.** Against the
+  eight shipped stories it reports the same three as cut short, at the same
+  percentages, as the dependency-free checker:
+  `khosogh-dzuk 26%`, `anban-huri 40%`, `pochat-aghves 40%`.
+- **Loudness is NOT the problem.** Measured, every shipped file is between
+  -16.1 and -16.9 LUFS against a -16.4 target, and every one carries exactly
+  one ID3 tag. **Length is the only fault.** So `-Fix` has nothing to repair
+  here; what these three need is a re-render, which is what this pass is.
+- **The dry run is accurate**: 10 files, 11 requests, 18,782 characters.
+
+The one number to watch when you render:
+
+> `khosogh-dzuk` is the only story that splits (4,767 chars → 2 chunks). Every
+> other story goes as a **single request of up to 3,306 characters**.
+
+That is deliberate — seams are audible, so the tool chunks as little as the
+5,000-character limit allows — and it is safe **because the tool aborts on the
+first chunk that comes back short**, naming the percentage and telling you to
+lower `--max-chunk`. A wrong setting costs one request, not twenty-six. If that
+abort fires, re-run with `--max-chunk 1500` and it will still be far cheaper
+than the alternative.
+
+---
+
 ## Before you start
 
 **Get Charlotte's voice ID.** It is recorded nowhere in this repo — the audition
