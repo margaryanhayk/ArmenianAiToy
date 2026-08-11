@@ -960,6 +960,28 @@
       </button>
     </nav>
 
+    <!-- What Areg can do. Owner request 2026-08-11: "App must show every
+         feature that we have" - said by the OWNER, who knows every feature
+         and was still confused using the app.
+         Two audiences, deliberately: a parent who already owns a toy and may
+         never have been told what it does, and someone deciding whether to
+         buy one. So it is reachable SIGNED OUT, and it explains rather than
+         only listing - every capability carries a real example of what the
+         child actually hears.
+         Read-only. The switches stay in Settings; this screen says so. -->
+    <section id="capabilitiesView" class="card" hidden>
+      <h2>
+        <button class="link" id="capsBackBtn" type="button" data-i18n="nav_back">← Back</button>
+        <span data-i18n="caps_title">What Areg can do</span>
+      </h2>
+      <p class="note" data-i18n="caps_intro"></p>
+      <div id="capsLive"></div>
+      <h3 class="section-cap" style="margin-top:18px" data-i18n="caps_soon_title">Coming soon</h3>
+      <p class="note" data-i18n="caps_soon_note"></p>
+      <div id="capsSoon"></div>
+      <p class="note" id="capsFooter" style="margin-top:16px" data-i18n="caps_footer"></p>
+    </section>
+
     <!-- Login view -->
     <section id="loginView" class="card" hidden>
       <h2 data-i18n="login_title">👋 Welcome back</h2>
@@ -974,6 +996,11 @@
         <button id="showSignupBtn" class="link" type="button" data-i18n="signup_link">New here? Create an account</button>
         <button id="forgotPasswordBtn" class="link" type="button" data-i18n="forgot">Forgot password?</button>
         <button id="verifyEmailRequestBtn" class="link" type="button" data-i18n="no_verif">Didn't get a verification email?</button>
+        <!-- Reachable before signing in on purpose. Apple declined the
+             Developer Program enrollment, so there is no App Store page
+             describing this product; the login screen is the only surface
+             someone without an account can read. -->
+        <button id="showCapsBtn" class="link" type="button" data-i18n="caps_link">What Areg can do</button>
       </div>
       <div id="loginStatus" class="status" aria-live="polite"></div>
       <!--
@@ -1550,6 +1577,42 @@
       tab_library: { en: 'Library', ru: 'Сказки', hy: 'Գրադարան' },
       tab_diary: { en: 'Diary', ru: 'Дневник', hy: 'Օրագիր' },
       tab_settings: { en: 'Settings', ru: 'Настройки', hy: 'Կարգավորումներ' },
+      // "What Areg can do" — see capabilitiesView.
+      caps_title: { en: 'What Areg can do', ru: 'Что умеет Арег', hy: 'Ի՞նչ գիտի Արեգը' },
+      caps_intro: { en: 'Everything your toy does, in plain words. You can switch most of these on or off in Settings.', ru: 'Всё, что умеет ваша игрушка, простыми словами. Почти всё можно включить или выключить в настройках.', hy: 'Այն ամենը, ինչ գիտի ձեր խաղալիքը՝ պարզ բառերով։ Մեծ մասը կարող եք միացնել կամ անջատել կարգավորումներում։' },
+      caps_soon_title: { en: 'Coming soon', ru: 'Скоро', hy: 'Շուտով' },
+      caps_soon_note: { en: 'Built and being tested. Your toy does not do these yet.', ru: 'Сделано и проходит проверку. Пока игрушка этого не делает.', hy: 'Պատրաստ է և ստուգվում է։ Խաղալիքը դեռ չի անում սա։' },
+      caps_footer: { en: 'Everything above happens in Armenian. Areg never chats freely — it plays, tells, asks and calms, and nothing else.', ru: 'Всё вышеперечисленное — на армянском. Арег никогда не болтает свободно: он играет, рассказывает, спрашивает и успокаивает — и ничего больше.', hy: 'Վերևի ամեն ինչ հայերեն է։ Արեգը երբեք ազատ չի զրուցում — նա խաղում է, պատմում, հարցնում և հանգստացնում, ուրիշ ոչինչ։' },
+      caps_link: { en: 'What Areg can do', ru: 'Что умеет Арег', hy: 'Ի՞նչ գիտի Արեգը' },
+      caps_link_sub: { en: 'Every feature, explained', ru: 'Все возможности, понятно', hy: 'Բոլոր հնարավորությունները՝ պարզ' },
+      cap_stories_t: { en: 'Tells stories', ru: 'Рассказывает сказки', hy: 'Հեքիաթ է պատմում' },
+      cap_stories_e: { en: 'Eight Armenian tales on the card. No internet needed — it works in the car, in the village, anywhere.', ru: 'Восемь армянских сказок на карте. Интернет не нужен — работает в машине, в деревне, где угодно.', hy: 'Ութ հայկական հեքիաթ՝ քարտի վրա։ Ինտերնետ պետք չէ — աշխատում է մեքենայում, գյուղում, ամենուր։' },
+      cap_askmid_t: { en: 'Your child can interrupt and ask', ru: 'Ребёнок может перебить и спросить', hy: 'Երեխան կարող է ընդհատել ու հարցնել' },
+      cap_askmid_e: { en: 'Mid-story your child asks «And did the wolf come?» — Areg answers from that story, then carries on where it stopped.', ru: 'Посреди сказки ребёнок спрашивает «А волк пришёл?» — Арег отвечает по этой сказке и продолжает с того же места.', hy: 'Հեքիաթի կեսին երեխան հարցնում է՝ «Իսկ գայլը եկա՞վ» — Արեգը պատասխանում է հենց այդ հեքիաթից և շարունակում նույն տեղից։' },
+      cap_askafter_t: { en: 'Asks a question at the end — and you can read the answer', ru: 'Задаёт вопрос в конце — и вы читаете ответ', hy: 'Վերջում հարց է տալիս — իսկ դուք կարդում եք պատասխանը' },
+      cap_askafter_e: { en: "After the story: «Why didn't the kid open the door?» Whatever your child says is saved for you under What they said.", ru: 'После сказки: «Почему козлёнок не открыл дверь?» Ответ ребёнка сохраняется для вас в разделе «Что он сказал».', hy: 'Հեքիաթից հետո՝ «Ինչո՞ւ ուլիկը դուռը չբացեց»։ Երեխայի ասածը պահվում է ձեզ համար՝ «Ինչ ասաց» բաժնում։' },
+      cap_games_t: { en: 'Plays games', ru: 'Играет в игры', hy: 'Խաղ է խաղում' },
+      cap_games_e: { en: 'Counting, animal sounds, silly yes-or-no, making words small — and a guessing game where Areg tries to guess what your child is thinking of.', ru: 'Счёт, звуки животных, смешные «да-нет», уменьшительные слова — и угадайка, где Арег угадывает, что задумал ребёнок.', hy: 'Հաշվել, կենդանիների ձայներ, ծիծաղելի «այո-ոչ», փոքրացնող բառեր — և գուշակելու խաղ, որտեղ Արեգը փորձում է գուշակել, թե ինչ է մտածում երեխան։' },
+      cap_riddles_t: { en: 'Asks riddles', ru: 'Загадывает загадки', hy: 'Հանելուկ է տալիս' },
+      cap_riddles_e: { en: 'Simple riddles for this age, with a warm hint if your child gets stuck. Never a test.', ru: 'Простые загадки для этого возраста, с мягкой подсказкой, если ребёнок затрудняется. Никогда не экзамен.', hy: 'Այս տարիքին հարմար պարզ հանելուկներ, տաք հուշումով, եթե երեխան դժվարանա։ Երբեք քննություն չէ։' },
+      cap_why_t: { en: "Answers 'why' questions", ru: 'Отвечает на «почему»', hy: 'Պատասխանում է «ինչու» հարցերին' },
+      cap_why_e: { en: '«Why is the sky blue?» — one real answer a child can hold, then straight back to playing.', ru: '«Почему небо голубое?» — один настоящий ответ, понятный ребёнку, и сразу обратно к игре.', hy: '«Ինչո՞ւ է երկինքը կապույտ» — մեկ իսկական պատասխան, որ երեխան կհասկանա, և անմիջապես նորից խաղ։' },
+      cap_calm_t: { en: 'Calms down at bedtime', ru: 'Успокаивает перед сном', hy: 'Հանգստացնում է քնելուց առաջ' },
+      cap_calm_e: { en: 'Soft and slow, no questions, no cliffhanger. Always on — a sleepy word always reaches it, whatever else you have switched off.', ru: 'Мягко и медленно, без вопросов и интриги. Всегда включено — сонное слово доходит всегда, что бы вы ни отключили.', hy: 'Փափուկ ու դանդաղ, առանց հարցերի։ Միշտ միացված է — քնի մասին խոսքը միշտ հասնում է, ինչ էլ որ անջատած լինեք։' },
+      cap_greets_t: { en: 'Says hello when it wakes up', ru: 'Здоровается при включении', hy: 'Բարևում է, երբ արթնանում է' },
+      cap_greets_e: { en: 'Presses on: «Ողջու՛յն։ Ուրախ եմ, որ եկար։» Then it offers a story by name — one your child has not heard yet.', ru: 'Включается: «Ողջու՛յն։ Ուրախ եմ, որ եկար։» Потом предлагает сказку по названию — ту, которую ребёнок ещё не слышал.', hy: 'Միանում է՝ «Ողջու՛յն։ Ուրախ եմ, որ եկար։» Հետո առաջարկում է հեքիաթ՝ անունով, մի բան, որ երեխան դեռ չի լսել։' },
+      cap_intro_t: { en: "Says the story's name and author first", ru: 'Сначала называет сказку и автора', hy: 'Սկզբում ասում է հեքիաթի անունն ու հեղինակին' },
+      cap_intro_e: { en: '«Հեքիաթ՝ «Ուլիկը»։ Հեղինակ՝ Հովհաննես Թումանյան։» So your child learns whose story it is.', ru: '«Հեքիաթ՝ «Ուլիկը»։ Հեղինակ՝ Հովհաննես Թումանյան։» Чтобы ребёнок знал, чья это сказка.', hy: '«Հեքիաթ՝ «Ուլիկը»։ Հեղինակ՝ Հովհաննես Թումանյան։» Որ երեխան իմանա՝ ում հեքիաթն է։' },
+      cap_quiet_t: { en: 'Stays quiet during the hours you choose', ru: 'Молчит в выбранные вами часы', hy: 'Լռում է ձեր ընտրած ժամերին' },
+      cap_quiet_e: { en: 'Set 20:30–07:00 and the toy will not chat in the night, even if it is picked up.', ru: 'Поставьте 20:30–07:00 — и ночью игрушка не будет разговаривать, даже если её возьмут.', hy: 'Դրեք 20։30–07։00, և գիշերը խաղալիքը չի խոսի, նույնիսկ եթե վերցնեն։' },
+      cap_pauses_t: { en: 'Stops mid-story so your child can shout something', ru: 'Останавливается посреди сказки, чтобы ребёнок крикнул', hy: 'Կանգ է առնում հեքիաթի կեսին, որ երեխան բարձր ասի' },
+      cap_pauses_e: { en: 'Areg pauses, asks what happens next, waits — then carries on the same story from the same place.', ru: 'Арег делает паузу, спрашивает, что будет дальше, ждёт — и продолжает ту же сказку с того же места.', hy: 'Արեգը դադար է տալիս, հարցնում է՝ ի՞նչ կլինի հետո, սպասում է — հետո շարունակում է նույն հեքիաթը նույն տեղից։' },
+      cap_endings_t: { en: 'A different ending when a story is heard again', ru: 'Другой финал при повторном прослушивании', hy: 'Ուրիշ վերջ, երբ հեքիաթը կրկին են լսում' },
+      cap_endings_e: { en: 'Only some stories have a second ending — the rest end the way they always did.', ru: 'Второй финал есть не у всех сказок — остальные заканчиваются как обычно.', hy: 'Երկրորդ վերջ ունեն միայն որոշ հեքիաթներ — մնացածը ավարտվում են ինչպես միշտ։' },
+      cap_buttons_t: { en: 'Three games with the buttons', ru: 'Три игры с кнопками', hy: 'Երեք խաղ կոճակներով' },
+      cap_buttons_e: { en: 'Areg guesses the animal your child is thinking of; two children race to press first; and a tone game to copy.', ru: 'Арег угадывает животное, которое загадал ребёнок; двое детей соревнуются, кто нажмёт первым; и игра на повтор мелодии.', hy: 'Արեգը գուշակում է երեխայի մտապահած կենդանին, երկու երեխա մրցում են՝ ով շուտ կսեղմի, և մեղեդի կրկնելու խաղ։' },
+      cap_music_t: { en: 'Quiet music at bedtime', ru: 'Тихая музыка перед сном', hy: 'Հանգիստ երաժշտություն քնելուց առաջ' },
+      cap_music_e: { en: 'Instead of a story, a calm tune during your quiet hours.', ru: 'Вместо сказки — спокойная мелодия в ваши тихие часы.', hy: 'Հեքիաթի փոխարեն՝ հանգիստ մեղեդի ձեր լուռ ժամերին։' },
       tile_account: { en: 'Your account', ru: 'Ваш аккаунт', hy: 'Ձեր հաշիվը' },
       tile_account_sub: { en: 'Password, your data, activity, sign out', ru: 'Пароль, ваши данные, действия, выход', hy: 'Գաղտնաբառ, ձեր տվյալները, գործողություններ, ելք' },
       story_library: { en: '📚 Story library', ru: '📚 Библиотека сказок', hy: '📚 Հեքիաթների գրադարան' },
@@ -2045,6 +2108,12 @@
       // the routine re-renders of that page don't refetch and flicker them.
       toyCardsDeviceId: null,
       journalOffset: 0,
+      // Which screen the "What Areg can do" explainer was opened from, so
+      // its Back button returns there. It is reachable from three places
+      // (Settings, the toy page, and the login screen while signed out),
+      // and a Back that always guessed one of them would strand the other
+      // two.
+      capsReturn: null,
       // Cached #storyRequestBlock node — it gets detached from the DOM each
       // time the toy page re-renders (see renderToyView).
       storyRequestBlock: null,
@@ -2132,7 +2201,8 @@
       libraryView: 'library', musicView: 'library',
       summariesView: 'diary', flaggedView: 'diary', playsView: 'diary',
       journalView: 'diary', detailView: 'diary',
-      settingsView: 'settings', accountView: 'settings', auditView: 'settings'
+      settingsView: 'settings', accountView: 'settings', auditView: 'settings',
+      capabilitiesView: 'settings'
     };
     var PRE_AUTH_VIEWS = {
       loginView: 1, signupView: 1, resetRequestView: 1, resetPasswordView: 1,
@@ -2192,7 +2262,7 @@
       var ids = ['loginView', 'signupView', 'resetRequestView', 'resetPasswordView',
                  'verifyEmailRequestView', 'verifyEmailCompleteView',
                  'devicesView', 'toyView', 'settingsView', 'accountView',
-                 'summariesView', 'flaggedView',
+                 'capabilitiesView', 'summariesView', 'flaggedView',
                  'playsView', 'libraryView', 'journalView', 'musicView',
                  'detailView', 'auditView'];
       for (var i = 0; i < ids.length; i++) {
@@ -2206,7 +2276,12 @@
         resetRequestView: 1, resetPasswordView: 1,
         verifyEmailRequestView: 1, verifyEmailCompleteView: 1
       };
-      document.getElementById('accountBtn').hidden = !!preAuthViews[viewId];
+      // ...and it is equally meaningless without a session. The explainer
+      // is reachable signed out, and it is not in the list above, so the
+      // token has to be checked too or a visitor with no account is offered
+      // an Account button that cannot work.
+      document.getElementById('accountBtn').hidden =
+        !!preAuthViews[viewId] || !getToken();
       // Every view CHANGE starts at the top — otherwise tapping a toy from
       // half-way down a long list opens its page already scrolled past the
       // toy's name.
@@ -3170,7 +3245,8 @@
       library: 'M4 5h6v15H4zM12 5h3v15h-3zM17 6l3 14',          // books on a shelf
       music: 'M9 18V6l10-2v12M9 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19 16a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z',
       request: 'M4 20l1-4L16 5l3 3L8 19zM14 7l3 3',             // a nib
-      settings: 'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2'
+      settings: 'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2',
+      help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.6 9.4a2.5 2.5 0 1 1 3.3 2.4c-.7.3-1 .8-1 1.5v.4M12 16.6v.5'
     };
 
     function tileIcon(name) {
@@ -3353,6 +3429,29 @@
       openToy(state.currentToyId);
     });
 
+    // Back out of "What Areg can do" to wherever it was opened from. A
+    // signed-out visitor reached it from the login screen and has no toy to
+    // go back to, so the token is checked before state.capsReturn.
+    document.getElementById('capsBackBtn').addEventListener('click', function () {
+      if (!getToken()) { show('loginView'); return; }
+      if (state.capsReturn === 'settings' && state.currentToyId) {
+        openToySettings(state.currentToyId);
+        return;
+      }
+      if (state.currentToyId) { openToy(state.currentToyId); return; }
+      loadDevices();
+    });
+
+    // The explainer is the one signed-in screen a signed-OUT visitor can
+    // also reach, which is the point of it - someone deciding whether this
+    // toy is worth buying has no other page to read. Everything that only
+    // makes sense with an account is therefore set by the caller, not
+    // assumed: openCapabilities takes where to come back to.
+    function openCapabilitiesFrom(from) {
+      state.capsReturn = from;
+      openCapabilities();
+    }
+
     function openToy(deviceId) {
       state.currentToyId = deviceId;
       show('toyView');
@@ -3402,6 +3501,13 @@
         f.hidden = !f.hidden;
         if (!f.hidden) loadMyStoryRequests();
       }));
+      // No tab reaches this one either, and it is the answer to the question
+      // that started this redesign - "what does it actually do?" - so it
+      // belongs on the screen a parent opens, not only inside Settings.
+      links.appendChild(buildTile('help', 'caps_link', 'caps_link_sub', function () {
+        openCapabilitiesFrom('toy');
+      }));
+
       // clearChildren(links) above DETACHES this block on every re-render,
       // after which getElementById can no longer find it — cache the node
       // so the request form survives a second visit to the toy page.
@@ -3535,10 +3641,19 @@
       // billing - which is where the activity log and the data download
       // were also hiding. "Change something about this" is one idea and
       // belongs in one place.
+      // What all these switches actually DO. The owner - who knows every
+      // feature in the product - said he was confused using the app; a
+      // screen of controls never explains what the toy does with them, and
+      // a row called "Story pauses" teaches a parent nothing.
+      var capsTile = buildTile('help', 'caps_link', 'caps_link_sub', function () {
+        openCapabilitiesFrom('settings');
+      });
+      capsTile.style.marginTop = '14px';
+      settings.appendChild(capsTile);
+
       var accountTile = buildTile('settings', 'tile_account', 'tile_account_sub', function () {
         openAccount();
       });
-      accountTile.style.marginTop = '14px';
       settings.appendChild(accountTile);
 
       if (window.__toyFlash && window.__toyFlash.msg) {
@@ -5604,6 +5719,10 @@
     // Email-verification flow: login-view affordance, verify-request
     // form, verify-complete form activated by ?verifyToken=... on boot.
     document.getElementById('verifyEmailRequestBtn').addEventListener('click', showVerifyEmailRequest);
+
+    document.getElementById('showCapsBtn').addEventListener('click', function () {
+      openCapabilitiesFrom('login');
+    });
     document.getElementById('verifyEmailRequestSubmitBtn').addEventListener('click', submitVerifyEmailRequest);
     document.getElementById('verifyEmailInput').addEventListener('keydown', function (e) {
       if (e.key === 'Enter') submitVerifyEmailRequest();
@@ -6616,6 +6735,68 @@
       var tr = s.translations && s.translations[getLang()];
       var v = tr && tr[field];
       return (v && String(v).trim()) ? v : (s[field] || '');
+    }
+
+    var CAPABILITIES = [
+      { k: 'stories', icon: 'library', live: true },
+      { k: 'askmid', icon: 'conversations', live: true },
+      { k: 'askafter', icon: 'journal', live: true },
+      { k: 'games', icon: 'help', live: true },
+      { k: 'riddles', icon: 'help', live: true },
+      { k: 'why', icon: 'help', live: true },
+      { k: 'calm', icon: 'help', live: true },
+      { k: 'greets', icon: 'music', live: true },
+      { k: 'intro', icon: 'library', live: true },
+      { k: 'quiet', icon: 'settings', live: true },
+      { k: 'pauses', icon: 'conversations', live: false },
+      { k: 'endings', icon: 'library', live: false },
+      { k: 'buttons', icon: 'settings', live: false },
+      { k: 'music', icon: 'music', live: false },
+    ];
+
+    // One capability row: what it is, and a real example of what the child
+    // actually hears. The example is the point - a parent who has never
+    // stood next to the toy learns nothing from "Asks riddles."
+    function buildCapability(cap) {
+      var row = document.createElement('div');
+      row.style.cssText =
+        'display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line-soft);';
+      var ico = document.createElement('span');
+      ico.className = 'ico';
+      ico.style.cssText = 'flex:none;width:34px;height:34px;border-radius:10px;' +
+        'background:var(--surface);border:1px solid var(--line-soft);display:flex;' +
+        'align-items:center;justify-content:center;color:var(--brand);';
+      ico.appendChild(tileIcon(cap.icon));
+      row.appendChild(ico);
+      var body = document.createElement('div');
+      body.style.minWidth = '0';
+      var name = document.createElement('div');
+      name.style.cssText = 'font-size:14px;font-weight:700;line-height:1.3;';
+      name.textContent = t('cap_' + cap.k + '_t');
+      body.appendChild(name);
+      var eg = document.createElement('div');
+      eg.style.cssText =
+        'font-size:13px;line-height:1.5;color:var(--ink-muted);margin-top:3px;';
+      eg.textContent = t('cap_' + cap.k + '_e');
+      body.appendChild(eg);
+      row.appendChild(body);
+      // A "coming soon" row was dimmed whole, which put its example text at
+      // 3.45:1 - under AA - in both themes. The heading and note above the
+      // list already say these are not on the toy yet, so the dimming was
+      // saying it twice and charging legibility for the second time. Only
+      // the icon, which carries no words, is dimmed now.
+      if (!cap.live) { ico.style.opacity = '0.55'; }
+      return row;
+    }
+
+    function openCapabilities() {
+      show('capabilitiesView');
+      var live = document.getElementById('capsLive');
+      var soon = document.getElementById('capsSoon');
+      clearChildren(live); clearChildren(soon);
+      CAPABILITIES.forEach(function (c) {
+        (c.live ? live : soon).appendChild(buildCapability(c));
+      });
     }
 
     function buildCover(coverId) {
