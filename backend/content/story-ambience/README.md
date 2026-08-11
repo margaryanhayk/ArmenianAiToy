@@ -65,7 +65,8 @@ line both survive the re-render, when every timestamp would not.
 
 `tools/story-audio/mix_ambience.py` takes the per-segment WAVs, this cue sheet
 and a folder of sounds, and produces one mixed story plus the
-`<storyId>.segments.json` map. **Dry run by default** — it prints every cue's
+`<storyId>.segments.json` map (in seconds — `segments_to_bytes.py` turns that
+into the byte offsets the backend reads, once the MP3 exists). **Dry run by default** — it prints every cue's
 resolved time and the exact ffmpeg command and writes nothing. It does not
 level: -16.4 LUFS stays with `Ship-StoryAudio.ps1`, after the mix.
 

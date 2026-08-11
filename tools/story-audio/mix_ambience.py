@@ -23,8 +23,13 @@ Segment boundaries are what the ambience cues are anchored to, and this project
 has never had them: there are zero `.segments.json` files in the repo, so
 `StoryQaController.OffsetToSegment` falls back to guessing a child's position
 from `offset / fileSize`. Recording one file per segment gives exact boundaries
-for free, so this tool emits `<storyId>.segments.json` as a by-product and the
-guess can be retired. See `docs/voice-narrator-brief.md` §3.
+for free, so this tool emits `<storyId>.segments.json` as a by-product.
+
+That map is in SECONDS, and the backend reads BYTES — it deserializes a bare
+`long[]` of offsets into the finished MP3, which cannot be known until after the
+encode. Run `segments_to_bytes.py` against the shipped file to convert it, or
+the backend silently ignores the map and keeps guessing. See
+`docs/voice-narrator-brief.md` §3.
 
 A single whole-story file is still accepted (`--single`), but then cue times
 must be estimated from character counts and the segment map is not written —
