@@ -126,6 +126,68 @@ export async function claimDevice(deviceId: string, claimCode: string): Promise<
   }
 }
 
+/**
+ * POST /api/children. Creates the child profile the toy speaks to.
+ *
+ * Not cosmetic: without one, ChildService.BuildChildContext has no name, no
+ * age and no GENDER for the prompt - and Armenian grammar needs the gender.
+ * A freshly paired toy talks to a stranger until this is filled in, and the
+ * phone had no way to do it at all.
+ *
+ * `gender` is the enum ORDINAL (Boy=0, Girl=1); the API has no string-enum
+ * converter, so posting "Boy" is a 400.
+ */
+export async function addChild(
+  deviceId: string,
+  name: string,
+  gender: 0 | 1,
+  birthYear: number | null,
+): Promise<void> {
+  const res = await fetch(url('/api/children'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+    body: JSON.stringify({ deviceId, name, gender, birthYear }),
+  });
+  if (res.status === 401) throw new UnauthorizedError();
+  if (!res.ok) throw new ApiError('e_generic');
+}
+
+/**
+ * POST /api/parents/devices/{id}/invite — a short code a SECOND parent can
+ * type, instead of needing this toy's 36-character id plus the code printed
+ * on its box.
+ *
+ * The code comes back ONCE and cannot be re-read: only its selector and a
+ * hash of the rest are stored. A 404 covers "not yours", "revoked" and
+ * "already has its two parents" alike, so the message must not guess which.
+ */
+export async function createInvite(deviceId: string): Promise<{ code: string; expiresAt: string }> {
+  const res = await fetch(url(`/api/parents/devices/${encodeURIComponent(deviceId)}/invite`), {
+    method: 'POST',
+    headers: { Accept: 'application/json', ...(await authHeader()) },
+  });
+  if (res.status === 401) throw new UnauthorizedError();
+  if (res.status === 429) throw new ApiError('e_too_many');
+  if (!res.ok) throw new ApiError('e_invite_failed');
+  return res.json();
+}
+
+/**
+ * POST /api/parents/devices/redeem-invite. Takes ONLY the code - no device
+ * id, which is the whole point of an invite. One uniform failure from the
+ * server, so one message here.
+ */
+export async function redeemInvite(code: string): Promise<void> {
+  const res = await fetch(url('/api/parents/devices/redeem-invite'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+    body: JSON.stringify({ code }),
+  });
+  if (res.status === 401) throw new UnauthorizedError();
+  if (res.status === 429) throw new ApiError('e_too_many');
+  if (!res.ok) throw new ApiError('e_invite_bad');
+}
+
 /** PUT /api/parents/devices/{id}/name. 1..60 chars. */
 export async function renameDevice(deviceId: string, name: string): Promise<void> {
   const res = await fetch(url(`/api/parents/devices/${encodeURIComponent(deviceId)}/name`), {
