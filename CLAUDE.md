@@ -75,7 +75,7 @@ Areg is a **play leader and storyteller**, not an AI friend or chatbot.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2522 tests)
+dotnet test                                     # Run all tests (2542 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 
 # API key (one-time setup)
@@ -2917,6 +2917,31 @@ Three invariants replace single-use, all pinned by
   because there is no parent who could see or stop it. Derived, not stored —
   claiming wakes it on the next request with nothing to switch back on.
 
+**Invites — a second parent without the box (2026-08-11).** Adding the second
+parent needed the toy's 36-char id AND the printed claim code. `DeviceInvite`
+(FK cascade to Device; migration `AddDeviceInvites`, hand-written + snapshot
+edited) backs a short code the first parent issues and the second types:
+`POST /api/parents/devices/{id}/invite` (parent-JWT, ownership-checked, auth
+rate bucket, silent 404 — which also covers "revoked" and "already full") →
+`{ code, expiresAt }`, returned ONCE; `POST /api/parents/devices/redeem-invite`
+`{ code }` → one uniform 400 for every failure, exactly like `ClaimDevice`.
+Audited `ParentDeviceInviteCreated` / `ParentDeviceInviteRedeemed` (no code, no
+selector, no email). Swept by a third `RetentionPurgeService` pass beside the
+two token passes. Three invariants, all pinned:
+- **`Device.ClaimCodeHash` is never written.** Re-minting the claim code is the
+  easy way to make something shareable and would kill the QR printed on the toy
+  — the trap that once made unlink a one-way door.
+- **`MaxParentsPerDevice = 2` is re-counted at REDEMPTION**, inside the same
+  transaction, not merely at issue time: a code issued while a seat was free can
+  be presented after that seat has gone (to the printed-code path, or to a
+  second outstanding invite). A refused redemption leaves the invite
+  **unconsumed** — the seat may free up, and the joiner did not cause the race.
+- **Selector + PBKDF2 secret, not the SHA-256 used for reset tokens.** That hash
+  is unsalted and safe there only because the token is 32 CSPRNG bytes; a code a
+  parent can TYPE is a few dozen bits. The 4-char selector is public and indexed
+  so redemption needs no device id — the point of the feature. Alphabet excludes
+  `I L O U 0 1` (the code gets read aloud).
+
 **Unlink keeps the toy, erases the family.** The last-parent branch of
 `ParentService.UnlinkDeviceAsync` removes `Conversation` (Messages cascade),
 `Child`, `StoryPlay`, `StoryReflectionAnswer` and `DeviceCommand` explicitly,
@@ -3556,7 +3581,7 @@ TLS (Stage A runs over the HTTP LAN bench; `ota_http_begin()` in
 A run of owner-picked items shipped as separate same-day slices, each
 following the same-commit dashboard rule (backend + firmware + `parent.html`
 land together — see § Product Constraints). Test count grew across the
-batch to the current **2484** (see § Build & Test); some of the batch's
+batch to **2484** at the time (see § Build & Test for the current count); some of the batch's
 commits are content-only (Armenian text edits) and add no tests.
 
 **Serial support (Tsivik plays in order).** The owner picked a serial as
@@ -3689,7 +3714,7 @@ owner review + a sample-first listen test gates any render):**
 ## Owner batch (2026-08-07) — games over Wi-Fi, welcome voice shipped, story pauses play, OTA field-proven, hardware dossier
 
 A second same-day owner batch, landing directly on top of the
-content-depth batch above. Test count at the time was **2509**; it is **2522**
+content-depth batch above. Test count at the time was **2509**; it is **2542**
 at HEAD (see § Build & Test).
 
 **This file is synced only to 2026-08-07 and the repo has moved past it.**
