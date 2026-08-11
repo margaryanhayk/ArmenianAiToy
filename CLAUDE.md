@@ -2200,6 +2200,34 @@ are five MP3s" from a TTS service, a studio, or a person with a microphone.
   transport fault — is why the 2026-08-03 narration is 1:20–1:40 long. Long
   stories need ~800-character chunks. The tool aborts on the FIRST short chunk
   so a bad `--max-chunk` costs one request, not twenty-six.
+  **This paragraph was right and the tool stopped honouring it.** The default
+  was later raised to `--max-chunk 4000` on the reasoning that the truncation
+  had "really been a wrong-model problem" — so most stories went as ONE request
+  again, and the library re-broke. Measured across all eight shipped stories
+  (2026-08-11): every story under ~1,300 characters rendered complete (967 /
+  1,080 / 1,222 → 97% / 96% / 102%) and every story over it came back holding
+  ~1,300 characters' worth of audio and stopped (1,616 / 1,875 / 3,220 / 3,290 /
+  4,753 → 72% / 80% / 40% / 40% / 26%). The ceiling is **on this account's
+  clone**: a Default voice rendered the 4,753-char story to 114% on the same
+  day with the same tool, consistent with ElevenLabs' note that Professional
+  Voice Clones are not fully optimised for v3. So the model matters AND the
+  request size matters, and no single default expresses both — which is why
+  narration now renders with **`--per-segment`** (one request per story
+  segment; longest segment in the library is 835 chars, so the ceiling is
+  unreachable by construction). Full runbook:
+  `docs/story-audio-rerender-runbook.md`.
+- **`--per-segment` also produces `<storyId>.segments.json`**, the segment map
+  this repo has never had — the one `StoryQaController` wants so an in-story
+  question is answered about the scene the child is actually in, and the one
+  `mix_ambience.py` wants for cue placement. It is written in **seconds**;
+  `tools/story-audio/segments_to_bytes.py` converts it to the byte offsets the
+  backend deserialises, and must run AFTER `Ship-StoryAudio.ps1` because the
+  offsets depend on that re-encode. The per-segment MP3s are kept under
+  `segments/` so the ambience mix does not require paying for a second render.
+  Verified by `--self-test`, which caught a real off-by-26ms-per-segment drift:
+  each API response opens with a Xing header frame that the stitcher drops but
+  the duration walker counted, so the map now measures each piece *as it
+  appears in the finished file*.
 - **v3 rejects `previous_text`/`next_text`** (HTTP 400 `unsupported_model`), so
   chunks are rendered blind and seams are a listening question. At the default
   speed the request carries **no `voice_settings` at all**, so the voice's own

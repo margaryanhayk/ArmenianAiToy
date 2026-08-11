@@ -34,6 +34,13 @@
 //                       without .mp3 (greet-01, anban-huri--offer, ...). SAMPLE
 //                       BEFORE YOU BATCH: the narrator voice is still interim,
 //                       so a full render is thrown away when it changes.
+//   --per-segment       narration only: one request per STORY SEGMENT, output
+//                       named <storyId>.mp3 (ship-ready — no rename before
+//                       Ship-StoryAudio.ps1), plus <storyId>.segments.json and
+//                       the individual pieces under segments/. USE THIS FOR
+//                       THE CLONE: it is what makes truncation impossible.
+//   --self-test         check the segment-map arithmetic against a directory
+//                       of MP3s (--output <dir>). No API key, sends nothing.
 //   --speed <x>         voice_settings.speed, ElevenLabs range 0.7–1.2 (default 1.0)
 //   --model <id>        default eleven_v3 (the only model on this account
 //                       that speaks Armenian — see the note by the variable)
@@ -95,8 +102,40 @@ var output = Path.Combine(Path.GetTempPath(), "areg-elevenlabs-render");
 // eleven_v3 accepts 5,000 characters per request, and every seam is a place
 // the delivery can jump — so chunk as LITTLE as the limit allows rather than
 // as much as possible. At 4,000 most stories render in a single request.
-// (The old 700 came from a truncation that was really a wrong-model problem.)
+//
+// CORRECTED 2026-08-11. The line that used to sit here — "the old 700 came
+// from a truncation that was really a wrong-model problem" — was wrong, and
+// raising the default on the strength of it is what put five truncated stories
+// on children's toys. The model matters (only v3 speaks Armenian) AND the
+// request size matters: this account's clone stops at ~1,300 characters of
+// output whatever it is sent. 4,000 is safe for a Default voice and unsafe for
+// a clone, which is not something a single default can express — so prefer
+// --per-segment for narration and treat this number as the fallback it is.
 var maxChunkChars = 4000;
+// One request per STORY SEGMENT, instead of packing segments up to
+// maxChunkChars. Measured 2026-08-11 against the owner's own clone: it stops
+// at roughly 1,300 characters of OUTPUT however long the input is. Every
+// shipped story under that ceiling (967-1,222 chars) rendered complete; every
+// one above it (1,616-4,753) came back at exactly ~1,300 characters' worth of
+// audio and shipped truncated. ElevenLabs say Professional Voice Clones are
+// not fully optimised for eleven_v3, which is why a Default voice rendered the
+// same 4,753-character story to 114% on the same day and the same tool.
+//
+// The longest single segment in the library is 835 characters, so segment-
+// sized requests cannot reach the ceiling — truncation becomes arithmetically
+// impossible rather than merely unlikely. Three things fall out for free:
+// seams land on paragraph breaks (where a narrator pauses anyway, and v3
+// refuses previous_text/next_text so every seam is blind), a fluffed line
+// costs one request instead of a story, and the per-segment durations give the
+// `<id>.segments.json` map this repo has never had — the one the backend wants
+// for in-story questions and mix_ambience.py wants for cue placement.
+var perSegment = false;
+// --self-test <dir>: stitch the MP3s in a directory the way a real render
+// does and check the segment map against them. It exists because the segment
+// map's whole value is that a start time is EXACT, and "the frames are copied
+// untouched so the durations add up" is an assertion until something adds
+// them up. Needs no API key and sends nothing.
+var selfTest = false;
 // A render shorter than this fraction of the expected duration is treated as
 // truncated and refused. Generous on purpose — it is there to catch a story
 // that stops in the middle, not to argue about a brisk delivery.
@@ -116,6 +155,8 @@ for (var i = 0; i < args.Length; i++)
         case "--speed": speed = double.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture); break;
         case "--model": model = args[++i]; break;
         case "--max-chunk": maxChunkChars = int.Parse(args[++i]); break;
+        case "--per-segment": perSegment = true; break;
+        case "--self-test": selfTest = true; break;
         case "--output": output = args[++i]; break;
         default:
             Console.Error.WriteLine($"Unknown option: {args[i]}");
@@ -127,6 +168,11 @@ if (speed is < 0.7 or > 1.2)
 {
     Console.Error.WriteLine("--speed must be within ElevenLabs' supported 0.7–1.2 range.");
     return 2;
+}
+
+if (selfTest)
+{
+    return SegmentMapSelfTest.Run(output);
 }
 
 var library = new EmbeddedCuratedStoryLibrary(
@@ -184,6 +230,10 @@ if (voiceClips || clips)
 // near a length the API might refuse or curtail, and the length check below
 // means a short result can never be written out again.
 var jobs = new List<(string FileName, string Label, List<string> Chunks)>();
+// Output file -> story id, for the narration jobs whose chunks ARE the story's
+// segments one for one. Only those can produce an honest segment map, so this
+// is what decides whether one is written rather than a flag read later.
+var segmentMapFor = new Dictionary<string, string>(StringComparer.Ordinal);
 
 // Welcome flow — the device-global lines. One file per clip id, named
 // <voiceId>.mp3 so Ship-StoryAudio.ps1 picks them up by id like everything
@@ -213,6 +263,21 @@ foreach (var story in stories)
         // story file carries. Speed is in the filename so a two-speed
         // comparison render can't mix files up.
         var segments = story.Segments.Select(s => s.Text).ToList();
+        if (perSegment)
+        {
+            // Ship-ready name. Ship-StoryAudio.ps1 -In <dir> matches
+            // `<storyId>.mp3`, so the rename step that sat undocumented
+            // between the two tools disappears — and a rename is exactly the
+            // kind of manual step that gets skipped on the day it matters.
+            // Speed still appears when it is not 1.0, so a comparison render
+            // can never overwrite a ship candidate.
+            var shipName = Math.Abs(speed - 1.0) < 0.001
+                ? $"{story.Id}.mp3"
+                : $"{story.Id}--s{speed:0.0#}.mp3";
+            jobs.Add((shipName, $"{story.Id} narration (per segment)", segments));
+            segmentMapFor[shipName] = story.Id;
+            continue;
+        }
         jobs.Add((
             $"{story.Id}--narration--s{speed:0.0#}.mp3",
             $"{story.Id} narration",
@@ -329,6 +394,7 @@ foreach (var job in jobs)
         $"Rendering {job.Label} ({jobChars:N0} chars, {job.Chunks.Count} chunk(s))...");
 
     var pieces = new List<byte[]>();
+    var pieceDurations = new List<double>();
     for (var c = 0; c < job.Chunks.Count; c++)
     {
         // At the default speed the request carries no voice_settings at all,
@@ -366,6 +432,7 @@ foreach (var job in jobs)
         var piece = await response.Content.ReadAsByteArrayAsync();
         pieces.Add(piece);
         var pieceSeconds = Mp3Duration.Seconds(piece);
+        pieceDurations.Add(pieceSeconds);
         var pieceExpected = ExpectedSeconds(job.Chunks[c].Length);
         Console.WriteLine(
             $"    chunk {c + 1}/{job.Chunks.Count} {job.Chunks[c].Length,5:N0} chars -> {piece.LongLength,9:N0} B  {FormatDuration(pieceSeconds)}");
@@ -403,6 +470,54 @@ foreach (var job in jobs)
     var path = Path.Combine(output, job.FileName);
     await File.WriteAllBytesAsync(path, bytes);
     var sha = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
+    // The segment map, for the narration jobs whose chunks are the segments.
+    // Frames are copied untouched by Mp3Stitch, so a segment starts exactly
+    // where the pieces before it end — the starts are a running sum, not an
+    // estimate. Seconds, not bytes: byte offsets depend on the re-encode
+    // Ship-StoryAudio.ps1 does afterwards, which is why segments_to_bytes.py
+    // runs last against the finished file. Shape matches mix_ambience.py's
+    // output so both producers of this file agree.
+    if (segmentMapFor.TryGetValue(job.FileName, out var mapStoryId))
+    {
+        // Measure each piece AS IT APPEARS IN THE JOINED FILE, not as the API
+        // returned it. Every response opens with a Xing/"Info" header frame
+        // that Mp3Stitch drops, and that frame is 26ms of nothing which
+        // Mp3Duration nonetheless counts. Summing the raw response durations
+        // therefore overshoots by ~26ms PER SEGMENT and the error accumulates
+        // down the story — the self-test caught exactly this (4 pieces,
+        // 0.104s = 4 x 26ms). Re-joining a single piece runs it through the
+        // same stripping the final file got, so the numbers cannot disagree.
+        var stripped = pieces.Select(p => Mp3Duration.Seconds(Mp3Stitch.Join([p]))).ToList();
+        var starts = new List<double>(stripped.Count);
+        var running = 0.0;
+        foreach (var d in stripped)
+        {
+            starts.Add(Math.Round(running, 3));
+            running += d;
+        }
+        var mapPath = Path.Combine(output, $"{mapStoryId}.segments.json");
+        await File.WriteAllTextAsync(mapPath, JsonSerializer.Serialize(new
+        {
+            storyId = mapStoryId,
+            unit = "seconds",
+            starts,
+            durations = stripped.Select(d => Math.Round(d, 3)).ToList(),
+        }, new JsonSerializerOptions { WriteIndented = true }));
+
+        // Keep the individual segment renders. The ambience mix wants
+        // per-segment audio and the sounds are not licensed yet, so throwing
+        // the pieces away here would mean paying to render the whole library
+        // a second time when they are.
+        var segDir = Path.Combine(output, "segments");
+        Directory.CreateDirectory(segDir);
+        for (var s = 0; s < pieces.Count; s++)
+        {
+            await File.WriteAllBytesAsync(
+                Path.Combine(segDir, $"{mapStoryId}--seg{s + 1:00}.mp3"), pieces[s]);
+        }
+        Console.WriteLine($"  segment map: {pieces.Count} segment(s) -> {mapPath}");
+    }
     manifest.Add(new
     {
         file = job.FileName,
@@ -677,4 +792,134 @@ internal static class Mp3Duration
         2 => (V2L3[bIdx] * 1000, Rates[1][sIdx], 576),
         _ => (V2L3[bIdx] * 1000, Rates[2][sIdx], 576),
     };
+}
+
+/// <summary>
+/// Checks the segment map against real MP3 bytes, with no API key and nothing
+/// sent anywhere. Point it at a directory of MP3 pieces (--output &lt;dir&gt;);
+/// it stitches them exactly as a render does and verifies the two claims the
+/// map rests on:
+///
+///   1. Joining pieces preserves total playing time — Mp3Stitch drops each
+///      piece's ID3 tag and Xing header frame but copies every audio frame, so
+///      nothing is lost or double-counted at a seam.
+///   2. A segment's start is the running sum of the pieces before it, which is
+///      only true if (1) holds.
+///
+/// If (1) ever stops holding, every start time after the first seam is wrong
+/// and the backend answers questions about the wrong scene — silently, because
+/// a plausible-looking number is indistinguishable from a correct one.
+/// </summary>
+internal static class SegmentMapSelfTest
+{
+    public static int Run(string dir)
+    {
+        if (!Directory.Exists(dir))
+        {
+            Console.Error.WriteLine($"--self-test needs a directory of MP3 pieces: {dir} does not exist.");
+            Console.Error.WriteLine("Make some with ffmpeg, e.g.");
+            Console.Error.WriteLine("  ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t 5 -b:a 128k p1.mp3");
+            return 2;
+        }
+        var files = Directory.GetFiles(dir, "*.mp3").OrderBy(f => f, StringComparer.Ordinal).ToList();
+        if (files.Count < 2)
+        {
+            Console.Error.WriteLine($"--self-test needs at least 2 MP3s in {dir}; found {files.Count}.");
+            return 2;
+        }
+
+        var pieces = files.Select(File.ReadAllBytes).ToList();
+        // Raw = what the API handed back, header frame and all. Stripped =
+        // what survives into the joined file. They differ by one 26ms frame
+        // per piece, and using the raw number is the mistake this test exists
+        // to catch: it looks right, and it silently walks every segment start
+        // later down the story.
+        var raw = pieces.Select(Mp3Duration.Seconds).ToList();
+        var durations = pieces.Select(p => Mp3Duration.Seconds(Mp3Stitch.Join([p]))).ToList();
+        var joined = Mp3Stitch.Join(pieces);
+        var joinedSeconds = Mp3Duration.Seconds(joined);
+        var summed = durations.Sum();
+
+        var failures = 0;
+        Console.WriteLine($"pieces in {dir}:");
+        for (var i = 0; i < files.Count; i++)
+        {
+            Console.WriteLine(
+                $"  {Path.GetFileName(files[i]),-28} raw {raw[i],7:F3}s  in-file {durations[i],7:F3}s  {pieces[i].LongLength,9:N0} B");
+        }
+        Console.WriteLine(
+            $"  (raw total {raw.Sum(),8:F3}s — using this instead of in-file would drift {raw.Sum() - summed:F3}s)");
+
+        // One frame is 26ms at 44.1kHz; allow a hair over one frame so a
+        // rounding difference is not called a failure, but a dropped or
+        // duplicated frame is.
+        const double Tolerance = 0.030;
+        var delta = Math.Abs(joinedSeconds - summed);
+        Console.WriteLine();
+        Console.WriteLine($"  sum of pieces {summed,8:F3}s");
+        Console.WriteLine($"  joined file   {joinedSeconds,8:F3}s   delta {delta:F3}s");
+        if (delta > Tolerance)
+        {
+            Console.Error.WriteLine(
+                $"  FAIL: joining changed the playing time by {delta:F3}s (> {Tolerance:F3}s). "
+                + "Segment starts after the first seam would be wrong.");
+            failures++;
+        }
+
+        // The starts the render writes, checked against a walk of the joined
+        // stream rather than against the same addition that produced them.
+        var starts = new List<double>();
+        var running = 0.0;
+        foreach (var d in durations) { starts.Add(Math.Round(running, 3)); running += d; }
+        if (starts[0] != 0.0)
+        {
+            Console.Error.WriteLine($"  FAIL: first segment starts at {starts[0]}s, not 0.");
+            failures++;
+        }
+        for (var i = 1; i < starts.Count; i++)
+        {
+            if (starts[i] <= starts[i - 1])
+            {
+                Console.Error.WriteLine($"  FAIL: segment {i + 1} starts at or before segment {i}.");
+                failures++;
+            }
+        }
+        if (starts[^1] >= joinedSeconds)
+        {
+            Console.Error.WriteLine(
+                $"  FAIL: last segment starts at {starts[^1]:F3}s, at or past the end of a {joinedSeconds:F3}s file.");
+            failures++;
+        }
+        Console.WriteLine($"  starts: {string.Join(", ", starts.Select(s => $"{s:F3}"))}");
+
+        // A stitched file must carry exactly one header region — the defect
+        // that once made a four-minute story stop at 0:34 was every piece keeping
+        // its own. check_story_audio.py counts ID3 tags on the shipped file;
+        // this catches it one stage earlier, before anything is paid for.
+        var id3 = CountId3(joined);
+        Console.WriteLine($"  ID3 tags in joined stream: {id3}");
+        if (id3 > 0)
+        {
+            Console.Error.WriteLine("  FAIL: the joined stream still carries an ID3 tag from a piece.");
+            failures++;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(failures == 0 ? "SELF-TEST PASS" : $"SELF-TEST FAIL ({failures})");
+        return failures == 0 ? 0 : 1;
+    }
+
+    private static int CountId3(byte[] d)
+    {
+        var n = 0;
+        for (var i = 0; i + 10 <= d.Length; i++)
+        {
+            if (d[i] != 0x49 || d[i + 1] != 0x44 || d[i + 2] != 0x33) continue;
+            if (d[i + 3] == 0xFF || d[i + 4] == 0xFF) continue;
+            var syncsafe = true;
+            for (var k = 0; k < 4; k++) if (d[i + 6 + k] >= 0x80) syncsafe = false;
+            if (syncsafe) n++;
+        }
+        return n;
+    }
 }
