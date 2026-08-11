@@ -173,6 +173,13 @@ const D = {
     hy: 'Ձեր հաշիվը պատրաստ է։ Խնդրում ենք մուտք գործել։',
   },
 
+  // ---------- the diary ----------
+  // Named as things that happened, not as screens. Short enough for three
+  // pills across a 390px phone in all three languages.
+  diary_talk: { en: 'Talked', ru: 'Разговоры', hy: 'Խոսել է' },
+  diary_heard: { en: 'Heard', ru: 'Слушал', hy: 'Լսել է' },
+  diary_held: { en: 'Held back', ru: 'Задержано', hy: 'Կասեցված' },
+
   // ---------- settings groups ----------
   // The same questions the web dashboard groups its settings under, so
   // a parent who uses both is taught one mental model rather than two.
@@ -415,7 +422,6 @@ const D = {
   },
 
   // ---------- conversations ----------
-  flagged_link: { en: '⚑ Flagged', ru: '⚑ Отмеченные', hy: '⚑ Նշվածներ' },
   today: { en: 'Today', ru: 'Сегодня', hy: 'Այսօր' },
   stat_talks: { en: 'Talks', ru: 'Разговоры', hy: 'Զրույցներ' },
   stat_messages: { en: 'Messages', ru: 'Сообщения', hy: 'Հաղորդագրություններ' },

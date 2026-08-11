@@ -19,6 +19,7 @@ import {
 import { Key, getLanguage, t, tf } from '../i18n';
 import { useLang } from '../useLang';
 import { theme } from '../theme';
+import DiaryFilter, { DiaryView } from './DiaryFilter';
 
 const LOCALE: Record<string, string> = { en: 'en-GB', ru: 'ru-RU', hy: 'hy-AM' };
 
@@ -27,7 +28,7 @@ type Props = {
   deviceName: string;
   onBack: () => void;
   onOpenConversation: (conversationId: string) => void;
-  onOpenFlagged: () => void;
+  onDiary: (v: DiaryView) => void;
   onLogout: () => void;
 };
 
@@ -47,7 +48,7 @@ export default function ConversationsScreen({
   deviceName,
   onBack,
   onOpenConversation,
-  onOpenFlagged,
+  onDiary,
   onLogout,
 }: Props) {
   useLang();
@@ -89,11 +90,11 @@ export default function ConversationsScreen({
         <Pressable onPress={onBack}>
           <Text style={styles.back}>{t('back_toys')}</Text>
         </Pressable>
-        <Pressable onPress={onOpenFlagged}>
-          <Text style={styles.flaggedLink}>{t('flagged_link')}</Text>
-        </Pressable>
       </View>
       <Text style={styles.title}>{deviceName || t('toy_word')}</Text>
+      {/* Flagged used to be a small link tucked in this header - findable only
+          if you already knew to look for it. It is one of three equals now. */}
+      <DiaryFilter current="conversations" onChange={onDiary} />
 
       {loading ? (
         <ActivityIndicator size="large" color={theme.brand} style={{ marginTop: 40 }} />
@@ -166,7 +167,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: theme.surface },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   back: { color: theme.brand, fontSize: 15, marginBottom: 4 },
-  flaggedLink: { color: theme.danger, fontSize: 15, fontWeight: '600' },
   title: { fontSize: 24, fontWeight: '700', color: theme.brand, marginBottom: 12 },
   todayCard: {
     backgroundColor: theme.surfaceTint,

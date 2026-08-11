@@ -348,7 +348,11 @@ function AddChildBlock({
               style={[styles.seg, gender === v && styles.segOn]}
               onPress={() => setGender(v)}
               accessibilityRole="radio"
+              // Same pairing as the diary pills: accessibilityState for the
+              // native builds, aria-checked for the web one, which does not
+              // derive it.
               accessibilityState={{ checked: gender === v }}
+              aria-checked={gender === v}
             >
               <Text style={[styles.segText, gender === v && styles.segTextOn]}>{t(k)}</Text>
             </Pressable>

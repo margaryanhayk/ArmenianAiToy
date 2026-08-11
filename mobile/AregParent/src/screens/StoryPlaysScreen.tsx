@@ -21,11 +21,13 @@ import {
 import { getLanguage, t, tf } from '../i18n';
 import { useLang } from '../useLang';
 import { theme } from '../theme';
+import DiaryFilter, { DiaryView } from './DiaryFilter';
 
 type Props = {
   deviceId: string;
   deviceName: string;
   onBack: () => void;
+  onDiary: (v: DiaryView) => void;
   onLogout: () => void;
 };
 
@@ -46,7 +48,7 @@ function fmtTime(iso: string): string {
  * This is the honest record of what the child actually heard — and the answers
  * they gave afterwards, in their own words.
  */
-export default function StoryPlaysScreen({ deviceId, deviceName, onBack, onLogout }: Props) {
+export default function StoryPlaysScreen({ deviceId, deviceName, onBack, onDiary, onLogout }: Props) {
   useLang();
   const [plays, setPlays] = useState<StoryPlay[]>([]);
   const [totals, setTotals] = useState<StoryPlayTotal[]>([]);
@@ -114,6 +116,7 @@ export default function StoryPlaysScreen({ deviceId, deviceName, onBack, onLogou
         <Text style={styles.back}>{t('back_toys')}</Text>
       </Pressable>
       <Text style={styles.title}>{t('plays_title')}</Text>
+      <DiaryFilter current="plays" onChange={onDiary} />
       <Text style={styles.sub}>{deviceName || t('toy_word')}</Text>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
