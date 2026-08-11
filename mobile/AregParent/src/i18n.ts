@@ -411,10 +411,12 @@ const D = {
     ru: 'Пока ничего. Игрушка отправит это, когда будет в сети.',
     hy: 'Դեռ ոչինչ չկա։ Խաղալիքը կուղարկի տվյալները, երբ առցանց լինի։',
   },
+  // No colon, no field name — "Listened:" was a column heading from a
+  // database leaking onto a phone, the same habit the web dashboard dropped.
   listened_count: {
-    en: 'Listened: {n} · to the end: {f}',
-    ru: 'Прослушано: {n} · до конца: {f}',
-    hy: 'Լսել է {n} անգամ · մինչև վերջ՝ {f} անգամ',
+    en: '{n} listens · {f} finished',
+    ru: '{n} прослушиваний · {f} до конца',
+    hy: '{n} անգամ լսել է · {f} անգամ մինչև վերջ',
   },
   play_finished: { en: '✓ to the end', ru: '✓ до конца', hy: '✓ մինչև վերջ' },
   play_partial: { en: 'stopped early', ru: 'не до конца', hy: 'կիսատ է մնացել' },

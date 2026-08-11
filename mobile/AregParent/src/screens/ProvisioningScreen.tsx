@@ -134,14 +134,14 @@ export default function ProvisioningScreen({ device, onBack }: Props) {
         </View>
       ) : phase === 'searching' || phase === 'connecting' ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#2c4a7a" />
+          <ActivityIndicator size="large" color={theme.brand} />
           <Text style={styles.body}>
             {phase === 'searching' ? t('wifi_looking') : t('wifi_connecting')}
           </Text>
         </View>
       ) : phase === 'provisioning' ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#2c4a7a" />
+          <ActivityIndicator size="large" color={theme.brand} />
           <Text style={styles.body}>{t('wifi_sending')}</Text>
         </View>
       ) : phase === 'done' ? (

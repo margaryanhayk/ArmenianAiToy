@@ -93,7 +93,7 @@ export default function LoginScreen({ onLoggedIn }: Props) {
         disabled={busy}
       >
         {busy ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={theme.onBrand} />
         ) : (
           <Text style={styles.buttonText}>
             {mode === 'login' ? t('sign_in') : t('create_account')}

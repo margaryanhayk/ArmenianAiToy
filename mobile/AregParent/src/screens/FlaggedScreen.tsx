@@ -78,7 +78,7 @@ export default function FlaggedScreen({
       <Text style={styles.title}>{tf('flagged_of', { name: deviceName || t('toy_word') })}</Text>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#2c4a7a" style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={theme.brand} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
           data={items}

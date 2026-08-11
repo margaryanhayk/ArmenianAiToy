@@ -99,7 +99,7 @@ export default function StoryPlaysScreen({ deviceId, deviceName, onBack, onLogou
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2c4a7a" />
+        <ActivityIndicator size="large" color={theme.brand} />
       </View>
     );
   }

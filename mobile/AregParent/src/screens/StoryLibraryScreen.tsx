@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,7 +10,8 @@ import {
   View,
 } from 'react-native';
 import { errText, getStoryLibrary, LibraryStory, UnauthorizedError } from '../api';
-import { t, tf } from '../i18n';
+import { API_BASE_URL } from '../config';
+import { getLanguage, t, tf } from '../i18n';
 import { useLang } from '../useLang';
 import { theme } from '../theme';
 
@@ -28,6 +30,39 @@ type Props = {
  * The listen counts are scoped to ONE toy here, which is why the toy's name
  * is printed above them: a count without its scope is not information.
  */
+/**
+ * The parent-facing text in the parent's language, falling back to the
+ * Armenian PER FIELD. Per field, not per story: a story with an English title
+ * and no English lesson should show the English title, not drop back wholesale.
+ */
+function storyText(s: LibraryStory, field: 'title' | 'goal' | 'lesson'): string {
+  const tr = s.translations?.[getLanguage()];
+  const v = tr?.[field];
+  if (v && String(v).trim()) return String(v);
+  return (s[field] as string | null) ?? '';
+}
+
+/**
+ * The story's cover. Convention-based, exactly as on the web: the file is
+ * `/covers/<storyId>.webp` on the backend, so nothing has to be added to the
+ * DTO and a story without artwork simply has no file.
+ *
+ * A missing cover must leave NO trace — not a grey box, not a broken-image
+ * icon. Ten stories have art and the eleventh should look deliberate.
+ */
+function StoryCover({ storyId }: { storyId: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <Image
+      source={{ uri: `${API_BASE_URL}/covers/${encodeURIComponent(storyId)}.webp` }}
+      style={styles.cover}
+      onError={() => setFailed(true)}
+      accessibilityIgnoresInvertColors
+    />
+  );
+}
+
 export default function StoryLibraryScreen({ deviceId, deviceName, onBack, onLogout }: Props) {
   useLang();
   const [stories, setStories] = useState<LibraryStory[]>([]);
@@ -63,7 +98,7 @@ export default function StoryLibraryScreen({ deviceId, deviceName, onBack, onLog
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2c4a7a" />
+        <ActivityIndicator size="large" color={theme.brand} />
       </View>
     );
   }
@@ -89,22 +124,25 @@ export default function StoryLibraryScreen({ deviceId, deviceName, onBack, onLog
       ) : (
         stories.map((s) => {
           const meta: string[] = [];
-          if (s.author) meta.push(`${t('author_label')}${t('label_sep')}${s.author}`);
+          if (s.author) meta.push(s.author);
           if (s.minAge != null && s.maxAge != null) meta.push(`${s.minAge}–${s.maxAge}`);
           if (s.bedtimeSafe) meta.push(t('bedtime_safe'));
           const isOpen = !!open[s.storyId];
           const questions = s.reflectionQuestions ?? [];
           const takeaways = s.reflectionConclusions ?? [];
+          const title = storyText(s, 'title') || s.title;
+          const goal = storyText(s, 'goal');
+          const lesson = storyText(s, 'lesson');
           return (
             <View key={s.storyId} style={styles.card}>
-              <Text style={styles.name}>📖 {s.title}</Text>
+              <StoryCover storyId={s.storyId} />
+              <Text style={styles.name}>{title}</Text>
               {meta.length > 0 ? <Text style={styles.meta}>{meta.join(' · ')}</Text> : null}
-              {s.goal ? (
-                <Text style={styles.body}>{t('goal_label')}{t('label_sep')}{s.goal}</Text>
-              ) : null}
-              {s.lesson ? (
-                <Text style={styles.lesson}>{t('lesson_label')}{t('label_sep')}{s.lesson}</Text>
-              ) : null}
+              {/* The goal is the card's own sentence now. "About:" in front of
+                  it was a column heading from a database, and no real app
+                  shows a parent the name of a field. */}
+              {goal ? <Text style={styles.body}>{goal}</Text> : null}
+              {lesson ? <Text style={styles.lesson}>{lesson}</Text> : null}
               <Text style={styles.counts}>
                 {tf('listened_count', { n: s.listenCount ?? 0, f: s.finishedCount ?? 0 })}
               </Text>
@@ -138,6 +176,16 @@ export default function StoryLibraryScreen({ deviceId, deviceName, onBack, onLog
 }
 
 const styles = StyleSheet.create({
+  // 4:5, the same proportion the covers were drawn at, reserved up front so
+  // the list does not jump as images land.
+  cover: {
+    width: '100%',
+    aspectRatio: 4 / 5,
+    borderRadius: 10,
+    marginBottom: 10,
+    backgroundColor: theme.surfaceTint,
+    resizeMode: 'cover',
+  },
   container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: theme.surface },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface },
   back: { color: theme.brand, fontSize: 15, marginBottom: 4 },
