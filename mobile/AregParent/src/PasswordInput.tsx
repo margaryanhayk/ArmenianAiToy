@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { t } from './i18n';
+import { theme } from './theme';
 
 type Props = {
   placeholder: string;
@@ -56,7 +57,7 @@ const styles = StyleSheet.create({
   wrap: { position: 'relative', marginBottom: 12 },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: theme.lineInput,
     borderRadius: 8,
     padding: 12,
     paddingRight: 52,

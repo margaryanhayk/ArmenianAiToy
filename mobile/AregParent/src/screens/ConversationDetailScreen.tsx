@@ -9,6 +9,7 @@ import {
 } from '../api';
 import { getLanguage, t } from '../i18n';
 import { useLang } from '../useLang';
+import { theme } from '../theme';
 
 const LOCALE: Record<string, string> = { en: 'en-GB', ru: 'ru-RU', hy: 'hy-AM' };
 
@@ -100,20 +101,20 @@ function Bubble({ message }: { message: ConversationMessage }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: '#fff' },
-  back: { color: '#2c4a7a', fontSize: 15, marginBottom: 4 },
-  title: { fontSize: 22, fontWeight: '700', color: '#2c4a7a', marginBottom: 12 },
-  error: { color: '#a02622', marginTop: 16 },
-  empty: { textAlign: 'center', color: '#888', marginTop: 24 },
+  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: theme.surface },
+  back: { color: theme.brand, fontSize: 15, marginBottom: 4 },
+  title: { fontSize: 22, fontWeight: '700', color: theme.brand, marginBottom: 12 },
+  error: { color: theme.danger, marginTop: 16 },
+  empty: { textAlign: 'center', color: theme.inkHint, marginTop: 24 },
   bubbleWrap: { marginBottom: 14, maxWidth: '85%' },
   wrapLeft: { alignSelf: 'flex-start' },
   wrapRight: { alignSelf: 'flex-end' },
-  who: { fontSize: 12, color: '#888', marginBottom: 2 },
+  who: { fontSize: 12, color: theme.inkHint, marginBottom: 2 },
   bubble: { borderRadius: 12, padding: 12 },
-  child: { backgroundColor: '#e7f0ff' },
-  areg: { backgroundColor: '#f1f1f1' },
-  flaggedBubble: { borderWidth: 1, borderColor: '#d9534f' },
-  childText: { color: '#143', fontSize: 15 },
-  aregText: { color: '#222', fontSize: 15 },
-  time: { fontSize: 11, color: '#aaa', marginTop: 3 },
+  child: { backgroundColor: theme.surfaceTint },
+  areg: { backgroundColor: theme.surfaceSunken },
+  flaggedBubble: { borderWidth: 1, borderColor: theme.danger },
+  childText: { color: theme.brand, fontSize: 15 },
+  aregText: { color: theme.ink, fontSize: 15 },
+  time: { fontSize: 11, color: theme.inkHint, marginTop: 3 },
 });

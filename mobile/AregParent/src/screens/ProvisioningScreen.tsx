@@ -14,6 +14,7 @@ import type { ESPDevice, ESPWifiList } from '@orbital-systems/react-native-esp-i
 import { LinkedDevice } from '../api';
 import { t, tf } from '../i18n';
 import { useLang } from '../useLang';
+import { theme } from '../theme';
 
 // Must match the firmware (ble_provisioning.cpp): the toy advertises
 // "Areg-Setup" (prefix "Areg"), proof-of-possession "areg-pair", security 1.
@@ -194,31 +195,31 @@ export default function ProvisioningScreen({ device, onBack }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: '#fff' },
-  back: { color: '#2c4a7a', fontSize: 15, marginBottom: 4 },
-  title: { fontSize: 22, fontWeight: '700', color: '#2c4a7a', marginBottom: 16 },
-  card: { borderWidth: 1, borderColor: '#e2e2e2', borderRadius: 10, padding: 16, backgroundColor: '#fafafa' },
+  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: theme.surface },
+  back: { color: theme.brand, fontSize: 15, marginBottom: 4 },
+  title: { fontSize: 22, fontWeight: '700', color: theme.brand, marginBottom: 16 },
+  card: { borderWidth: 1, borderColor: theme.line, borderRadius: 10, padding: 16, backgroundColor: theme.surfaceSunken },
   center: { alignItems: 'center', marginTop: 40 },
-  body: { color: '#444', fontSize: 15, marginBottom: 10 },
-  code: { fontSize: 18, fontWeight: '700', color: '#a06a00' },
-  primaryBtn: { backgroundColor: '#2c4a7a', borderRadius: 8, padding: 13, alignItems: 'center', marginTop: 6 },
-  primaryBtnText: { color: '#fff', fontWeight: '600' },
+  body: { color: theme.inkMuted, fontSize: 15, marginBottom: 10 },
+  code: { fontSize: 18, fontWeight: '700', color: theme.warn },
+  primaryBtn: { backgroundColor: theme.brand, borderRadius: 8, padding: 13, alignItems: 'center', marginTop: 6 },
+  primaryBtnText: { color: theme.surface, fontWeight: '600' },
   disabled: { opacity: 0.5 },
   netRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 12,
     borderWidth: 1,
-    borderColor: '#e2e2e2',
+    borderColor: theme.line,
     borderRadius: 8,
     marginBottom: 6,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.surfaceSunken,
   },
-  netSelected: { borderColor: '#2c4a7a', backgroundColor: '#eef3fb' },
-  netName: { fontSize: 15, color: '#222' },
-  netCheck: { color: '#2c4a7a', fontWeight: '700' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, marginTop: 10 },
-  doneIcon: { fontSize: 44, color: '#5aa45a', textAlign: 'center' },
-  doneText: { fontSize: 18, fontWeight: '700', color: '#2f6b2f', textAlign: 'center', marginVertical: 8 },
-  error: { color: '#a02622', marginTop: 12 },
+  netSelected: { borderColor: theme.brand, backgroundColor: theme.brandTint },
+  netName: { fontSize: 15, color: theme.ink },
+  netCheck: { color: theme.brand, fontWeight: '700' },
+  input: { borderWidth: 1, borderColor: theme.lineInput, borderRadius: 8, padding: 10, marginTop: 10 },
+  doneIcon: { fontSize: 44, color: theme.okLine, textAlign: 'center' },
+  doneText: { fontSize: 18, fontWeight: '700', color: theme.ok, textAlign: 'center', marginVertical: 8 },
+  error: { color: theme.danger, marginTop: 12 },
 });

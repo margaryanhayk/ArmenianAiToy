@@ -21,6 +21,7 @@ import {
 } from '../api';
 import { getLanguage, t, tf } from '../i18n';
 import { useLang } from '../useLang';
+import { theme } from '../theme';
 
 type Props = {
   onLogout: () => void;
@@ -317,7 +318,7 @@ function DeviceCard({
       </View>
 
       <Pressable style={styles.revokeBtn} onPress={() => onRevoke(device)}>
-        <Text style={[styles.revokeText, { color: device.isRevoked ? '#2f6b2f' : '#a02622' }]}>
+        <Text style={[styles.revokeText, { color: device.isRevoked ? theme.ok : theme.danger }]}>
           {device.isRevoked ? t('restore_access') : t('revoke_access')}
         </Text>
       </Pressable>
@@ -326,46 +327,46 @@ function DeviceCard({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: '#fff' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: theme.surface },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface },
   flexGrow: { flexGrow: 1, justifyContent: 'center' },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: '700', color: '#2c4a7a' },
-  link: { color: '#2c4a7a', fontSize: 15 },
+  title: { fontSize: 24, fontWeight: '700', color: theme.brand },
+  link: { color: theme.brand, fontSize: 15 },
   addBtn: { marginTop: 12, marginBottom: 4 },
-  addBtnText: { color: '#2c4a7a', fontSize: 16, fontWeight: '600' },
+  addBtnText: { color: theme.brand, fontSize: 16, fontWeight: '600' },
   claimBox: {
-    backgroundColor: '#f0f7f0',
-    borderColor: '#b6d6b6',
+    backgroundColor: theme.okBg,
+    borderColor: theme.okLine,
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
     marginVertical: 8,
   },
-  claimHelp: { color: '#3a5a3a', marginBottom: 8 },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, marginBottom: 8 },
-  primaryBtn: { backgroundColor: '#2c4a7a', borderRadius: 8, padding: 12, alignItems: 'center' },
-  primaryBtnText: { color: '#fff', fontWeight: '600' },
+  claimHelp: { color: theme.ok, marginBottom: 8 },
+  input: { borderWidth: 1, borderColor: theme.lineInput, borderRadius: 8, padding: 10, marginBottom: 8 },
+  primaryBtn: { backgroundColor: theme.brand, borderRadius: 8, padding: 12, alignItems: 'center' },
+  primaryBtnText: { color: theme.surface, fontWeight: '600' },
   disabled: { opacity: 0.6 },
-  empty: { textAlign: 'center', color: '#888', fontSize: 16 },
+  empty: { textAlign: 'center', color: theme.inkHint, fontSize: 16 },
   card: {
     borderWidth: 1,
-    borderColor: '#e2e2e2',
+    borderColor: theme.line,
     borderRadius: 10,
     padding: 14,
     marginVertical: 6,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.surfaceSunken,
   },
-  cardName: { fontSize: 16, fontWeight: '700', color: '#222', marginBottom: 6 },
+  cardName: { fontSize: 16, fontWeight: '700', color: theme.ink, marginBottom: 6 },
   cardTop: { flexDirection: 'row', alignItems: 'center' },
   dot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
-  dotOn: { backgroundColor: '#5aa45a' },
-  dotOff: { backgroundColor: '#bbb' },
-  dotLabel: { color: '#555', fontSize: 13 },
+  dotOn: { backgroundColor: theme.okLine },
+  dotOff: { backgroundColor: theme.lineInput },
+  dotLabel: { color: theme.inkMuted, fontSize: 13 },
   revokedTag: {
     marginLeft: 8,
-    color: '#a02622',
-    backgroundColor: '#fdecea',
+    color: theme.danger,
+    backgroundColor: theme.dangerBg,
     borderRadius: 4,
     paddingHorizontal: 6,
     fontSize: 12,
@@ -373,56 +374,56 @@ const styles = StyleSheet.create({
   },
   pausedTag: {
     marginLeft: 8,
-    color: '#856404',
-    backgroundColor: '#fff3cd',
+    color: theme.warn,
+    backgroundColor: theme.warnBg,
     borderRadius: 4,
     paddingHorizontal: 6,
     fontSize: 12,
     overflow: 'hidden',
   },
-  children: { color: '#444', marginTop: 6 },
+  children: { color: theme.inkMuted, marginTop: 6 },
   actionRow: { flexDirection: 'row', marginTop: 10, gap: 8 },
   mainBtn: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#eef3fb', borderColor: '#a9c4e8', borderWidth: 2,
+    backgroundColor: theme.surfaceTint, borderColor: theme.line, borderWidth: 2,
     borderRadius: 10, paddingVertical: 14, paddingHorizontal: 14, marginTop: 12,
   },
-  mainBtnTitle: { color: '#2c4a7a', fontWeight: '700', fontSize: 17 },
-  mainBtnSub: { color: '#5a6b85', fontSize: 12, marginTop: 2 },
-  mainBtnChev: { color: '#7f9bc4', fontSize: 22 },
+  mainBtnTitle: { color: theme.brand, fontWeight: '700', fontSize: 17 },
+  mainBtnSub: { color: theme.inkMuted, fontSize: 12, marginTop: 2 },
+  mainBtnChev: { color: theme.brandStrong, fontSize: 22 },
   activityBtn: {
     flex: 1,
-    backgroundColor: '#eef3fb',
+    backgroundColor: theme.surfaceTint,
     borderRadius: 8,
     paddingVertical: 10,
     alignItems: 'center',
   },
   settingsBtn: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.surfaceSunken,
     borderRadius: 8,
     paddingVertical: 10,
     alignItems: 'center',
   },
-  activityText: { color: '#2c4a7a', fontWeight: '600' },
+  activityText: { color: theme.brand, fontWeight: '600' },
   nameRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
   nameInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: theme.lineInput,
     borderRadius: 8,
     padding: 8,
     marginRight: 8,
   },
   saveBtn: {
     borderWidth: 1,
-    borderColor: '#6a8ec9',
+    borderColor: theme.brandStrong,
     borderRadius: 6,
     paddingVertical: 8,
     paddingHorizontal: 14,
   },
-  saveBtnText: { color: '#2c4a7a', fontWeight: '600' },
+  saveBtnText: { color: theme.brand, fontWeight: '600' },
   revokeBtn: { marginTop: 10, alignSelf: 'flex-start' },
   revokeText: { fontWeight: '600' },
-  error: { color: '#a02622', marginVertical: 8 },
+  error: { color: theme.danger, marginVertical: 8 },
 });
