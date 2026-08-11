@@ -5,6 +5,18 @@
   "author": "Հովհաննես Թումանյան",
   "goal": "Պատմել բարության և երախտագիտության մասին։",
   "lesson": "Բարի գործը երբեք չի կորչում․ լավություն արա, և լավությունը քեզ կվերադառնա։",
+  "translations": {
+    "en": {
+      "title": "The Talking Fish",
+      "goal": "A story about kindness and gratitude.",
+      "lesson": "A kind deed is never lost — do good, and good comes back to you."
+    },
+    "ru": {
+      "title": "Говорящая рыба",
+      "goal": "История о доброте и благодарности.",
+      "lesson": "Доброе дело не пропадает: сделай добро, и оно вернётся к тебе."
+    }
+  },
   "minAge": 5,
   "maxAge": 7,
   "tone": "warm",

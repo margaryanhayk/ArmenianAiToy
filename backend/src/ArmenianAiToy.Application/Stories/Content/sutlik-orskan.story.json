@@ -5,6 +5,18 @@
   "author": "Հովհաննես Թումանյան",
   "goal": "Զվարճացնել և զարգացնել երևակայությունը։",
   "lesson": "Երբեմն հեքիաթը պարզապես ուրախ խաղ է․ հորինելն ու ծիծաղելը նույնպես արվեստ են։",
+  "translations": {
+    "en": {
+      "title": "The Boasting Hunter",
+      "goal": "A tall tale, to amuse and stretch the imagination.",
+      "lesson": "Sometimes a story is simply a happy game — making things up and laughing is an art too."
+    },
+    "ru": {
+      "title": "Охотник-хвастун",
+      "goal": "Небылица — чтобы повеселить и разбудить воображение.",
+      "lesson": "Иногда сказка — просто весёлая игра: выдумывать и смеяться тоже искусство."
+    }
+  },
   "minAge": 5,
   "maxAge": 7,
   "tone": "warm",

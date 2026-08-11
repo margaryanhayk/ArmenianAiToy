@@ -5,6 +5,18 @@
   "author": "Հովհաննես Թումանյան",
   "goal": "Պատմել խելքի և հնարամտության մասին։",
   "lesson": "Խելքն ու հնարամտությունը երբեմն ավելի զորավոր են, քան ուժը։",
+  "translations": {
+    "en": {
+      "title": "The Liar",
+      "goal": "A story about cleverness and quick wit.",
+      "lesson": "Wit and cleverness are sometimes stronger than force."
+    },
+    "ru": {
+      "title": "Лгун",
+      "goal": "История об уме и находчивости.",
+      "lesson": "Ум и находчивость порой сильнее силы."
+    }
+  },
   "minAge": 4,
   "maxAge": 7,
   "tone": "warm",

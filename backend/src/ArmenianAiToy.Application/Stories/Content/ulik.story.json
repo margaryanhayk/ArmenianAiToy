@@ -4,6 +4,18 @@
   "title": "Ուլիկը",
   "goal": "Պատմել զգուշության և մեծերին լսելու մասին։",
   "lesson": "Մայրիկին լսելը փոքրիկին պահում է անվտանգ։",
+  "translations": {
+    "en": {
+      "title": "The Little Goat",
+      "goal": "A story about being careful and listening to grown-ups.",
+      "lesson": "Listening to your mother keeps a little one safe."
+    },
+    "ru": {
+      "title": "Козлёнок",
+      "goal": "История об осторожности и о том, как важно слушать взрослых.",
+      "lesson": "Когда слушаешь маму, остаёшься в безопасности."
+    }
+  },
   "minAge": 4,
   "maxAge": 7,
   "tone": "warm",

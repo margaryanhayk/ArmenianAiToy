@@ -374,6 +374,11 @@
       font-size: 20px;
       color: var(--brand);
     }
+    /* Safari draws its own ▶ on <summary> and ignores list-style:none.
+       Without this the disclosure carries two markers on an iPhone and
+       none of them is the one we drew. */
+    summary::-webkit-details-marker { display: none; }
+    summary::marker { content: ''; }
     .tile .body { min-width: 0; flex: 1; }
     /* Both are <span>, so without this the title and the line under it run
        together as one sentence: "ConversationsWhat your child talked about".
@@ -1486,9 +1491,6 @@
       approx_time: { en: 'approximate time', ru: 'примерное время', hy: 'մոտավոր ժամանակ' },
       play_finished: { en: '✓ finished', ru: '✓ до конца', hy: '✓ մինչև վերջ' },
       play_partial: { en: 'stopped early', ru: 'не до конца', hy: 'ընդհատվել է' },
-      author_label: { en: 'Author', ru: 'Автор', hy: 'Հեղինակ' },
-      goal_label: { en: 'About', ru: 'О сказке', hy: 'Հեքիաթի մասին' },
-      lesson_label: { en: 'What it teaches', ru: 'Чему учит', hy: 'Ինչ է սովորեցնում հեքիաթը' },
       bedtime_safe: { en: '🌙 bedtime-safe', ru: '🌙 подходит для сна', hy: '🌙 հարմար է քնելուց առաջ' },
       no_plays_yet: { en: 'No story plays reported yet. The toy uploads them when it is online.', ru: 'Прослушиваний пока нет. Игрушка отправит их, когда будет онлайн.', hy: 'Դեռ լսած հեքիաթներ չկան։ Խաղալիքը կուղարկի տվյալները, երբ առցանց լինի։' },
       discuss_with_child: { en: 'Discuss with your child', ru: 'Обсудите с ребёнком', hy: 'Զրուցեք հեքիաթի մասին ձեր երեխայի հետ' },
@@ -1828,7 +1830,10 @@
       today_tail: { en: '{n} today', ru: 'сегодня: {n}', hy: 'այսօր՝ {n}' },
 
       // ---------- story plays & library ----------
-      listened_count: { en: 'Listened: {n} · to the end: {f}', ru: 'Прослушано: {n} · до конца: {f}', hy: 'Լսել է {n} անգամ · մինչև վերջ՝ {f} անգամ' },
+      // No colons, no field names — see buildLibraryCard.
+      age_range: { en: 'ages {a}–{b}', ru: '{a}–{b} лет', hy: '{a}–{b} տարեկան' },
+      listens_plain: { en: 'heard {n}×', ru: 'слушали {n} раз', hy: 'լսել է {n} անգամ' },
+      listens_finished: { en: '{n} listens · {f} finished', ru: '{n} прослушиваний · {f} до конца', hy: '{n} անգամ · {f} անգամ մինչև վերջ' },
       listened_on_toy: { en: 'Toy', ru: 'Игрушка', hy: 'Խաղալիքը' },
       listened_all_toys: { en: 'Across all your toys', ru: 'По всем вашим игрушкам', hy: 'Ձեր բոլոր խաղալիքներով' },
       plays_more: { en: 'Showing the {n} most recent.', ru: 'Показаны только последние записи ({n}).', hy: 'Ցուցադրված են վերջին {n} լսումը։' },
@@ -5630,7 +5635,9 @@
           line.appendChild(name);
           var counts = document.createElement('span');
           counts.style.cssText = 'color:var(--ink-4);margin-left:8px;font-size:13px;';
-          counts.textContent = tf('listened_count', { n: tt.count, f: tt.finishedCount });
+          counts.textContent = tf('listens_finished', {
+            n: tt.count, f: tt.finishedCount
+          });
           line.appendChild(counts);
           totalsEl.appendChild(line);
         });
@@ -6011,9 +6018,10 @@
       if (takeaway) {
         var tk = document.createElement('div');
         tk.className = 'tonight-takeaway';
-        // lesson_label, not a second name for the same idea: the story
-        // library card already labels this exact text "What it teaches".
-        tk.textContent = t('lesson_label') + t('label_sep') + takeaway;
+        // No label. The card has already said who asked and who answered;
+        // a third line in the story's own voice needs no field name, and
+        // "What it teaches:" was a column heading printed on a phone.
+        tk.textContent = takeaway;
         card.appendChild(tk);
       }
       card.hidden = false;
@@ -6362,6 +6370,20 @@
     // .webp first because it is a third the size, then the formats an image
     // tool actually hands you — one 404 per miss buys the owner no
     // conversion step.
+    // Story text in the parent's language. title / goal / lesson are
+    // authored in Armenian - the child's language - and translated for the
+    // parent only; the toy is never given these strings.
+    //
+    // Falls back PER FIELD, not per story, so a half-written translation
+    // costs one line rather than the whole card, and a story added tomorrow
+    // with no translations at all still reads.
+    function storyText(s, field) {
+      if (!s) return '';
+      var tr = s.translations && s.translations[getLang()];
+      var v = tr && tr[field];
+      return (v && String(v).trim()) ? v : (s[field] || '');
+    }
+
     function buildCover(coverId) {
       if (!coverId) return null;
       var exts = ['webp', 'png', 'jpg'];
@@ -6401,52 +6423,86 @@
       // A missing cover removes itself and the card reads exactly as it did
       // before, which is what lets the set arrive one story at a time
       // without a half-illustrated library looking broken.
+      // The title sits ON the cover, under a scrim, the way a book jacket
+      // works - so the picture and the name are one object rather than an
+      // image with a caption. Without a cover it falls back to a plain
+      // heading and nothing else changes.
+      var titleText = partLabel
+        ? partLabel + t('label_sep') + storyText(s, 'title')
+        : storyText(s, 'title');
       var storyCover = partLabel ? null : buildCover(s.storyId);
-      if (storyCover) card.appendChild(storyCover);
+      if (storyCover) {
+        var poster = document.createElement('div');
+        poster.style.cssText = 'position:relative;margin:0 0 8px;';
+        storyCover.style.margin = '0';
+        poster.appendChild(storyCover);
+        var scrim = document.createElement('div');
+        // Tall and soft: these covers are busy at the bottom edge, and a
+        // hard band would cut the artwork in half.
+        scrim.style.cssText =
+          'position:absolute;left:0;right:0;bottom:0;height:46%;border-radius:0 0 10px 10px;' +
+          'background:linear-gradient(to top, rgba(20,23,43,.88), rgba(20,23,43,.55) 45%, rgba(20,23,43,0));' +
+          'pointer-events:none;';
+        poster.appendChild(scrim);
+        var onArt = document.createElement('div');
+        onArt.style.cssText =
+          'position:absolute;left:12px;right:12px;bottom:10px;color:#FBF6EC;' +
+          'font-size:19px;font-weight:700;line-height:1.2;text-wrap:balance;' +
+          'text-shadow:0 1px 3px rgba(0,0,0,.55);pointer-events:none;';
+        onArt.textContent = titleText;
+        poster.appendChild(onArt);
+        card.appendChild(poster);
+        // Play belongs on the artwork, not under it as a bordered form
+        // control. buildPreviewAffordance still owns all the fetch and
+        // error handling; only where its button sits has changed.
+        card.__coverPoster = poster;
+      } else {
+        var title = document.createElement('div');
+        title.style.cssText = partLabel
+          ? 'font-size:14px;font-weight:600;'
+          : 'font-size:16px;font-weight:600;';
+        title.textContent = titleText;
+        card.appendChild(title);
+      }
 
-      var title = document.createElement('div');
-      title.style.cssText = partLabel
-        ? 'font-size:14px;font-weight:600;'
-        : 'font-size:16px;font-weight:600;';
-      title.textContent = partLabel
-        ? partLabel + t('label_sep') + s.title
-        : (storyCover ? '' : '📖 ') + s.title;
-      card.appendChild(title);
-
+      // One quiet line, no field names. A parent does not need to be told
+      // which of these words is the "author" - the shape of the line says
+      // it. The Armenian title rides here so a child who asks for
+      // «Ուլիկը» can still be found by a parent reading English.
       var metaBits = [];
-      // The separator here was the Armenian comma U+055D in every
-      // language, so an English card read "Author՝ Hovhannes Tumanyan".
-      if (s.author) metaBits.push(t('author_label') + t('label_sep') + s.author);
+      if (!partLabel && s.title && s.title !== titleText) metaBits.push(s.title);
+      if (s.author) metaBits.push(s.author);
       if (typeof s.minAge === 'number' && typeof s.maxAge === 'number') {
-        metaBits.push(s.minAge + '–' + s.maxAge);
+        metaBits.push(tf('age_range', { a: s.minAge, b: s.maxAge }));
       }
       if (s.bedtimeSafe === true) metaBits.push(t('bedtime_safe'));
+      if (s.listenCount > 0) {
+        metaBits.push(tf('listens_plain', { n: s.listenCount }));
+      }
       if (metaBits.length > 0) {
         var meta = document.createElement('div');
-        meta.style.cssText = 'color:var(--ink-muted);font-size:12px;margin:2px 0 6px;';
+        meta.style.cssText = 'color:var(--ink-muted);font-size:12px;margin:0 0 6px;line-height:1.5;';
         meta.textContent = metaBits.join(' · ');
         card.appendChild(meta);
       }
 
-      if (s.goal) {
+      // The goal is the card's own sentence now. It used to carry the label
+      // "About:" - a column heading from a database, printed on a phone.
+      var goalText = storyText(s, 'goal');
+      if (goalText) {
         var goal = document.createElement('div');
-        goal.style.cssText = 'font-size:13px;margin:4px 0;';
-        goal.textContent = t('goal_label') + t('label_sep') + s.goal;
+        goal.style.cssText = 'font-size:14px;margin:0 0 4px;line-height:1.45;';
+        goal.textContent = goalText;
         card.appendChild(goal);
       }
-      if (s.lesson) {
+      var lessonText = storyText(s, 'lesson');
+      if (lessonText) {
         var lesson = document.createElement('div');
-        lesson.style.cssText = 'font-size:13px;margin:4px 0;color:var(--ok-ink-soft);';
-        lesson.textContent = t('lesson_label') + t('label_sep') + s.lesson;
+        lesson.style.cssText =
+          'font-size:13px;margin:0 0 6px;line-height:1.45;color:var(--ok-ink-soft);';
+        lesson.textContent = lessonText;
         card.appendChild(lesson);
       }
-
-      var counts = document.createElement('div');
-      counts.style.cssText = 'font-size:12px;color:var(--ink-4);margin:6px 0 4px;';
-      counts.textContent = tf('listened_count', {
-        n: s.listenCount || 0, f: s.finishedCount || 0
-      });
-      card.appendChild(counts);
 
       // Reflection dialogue — the same question/takeaway guide the toy
       // speaks after the story, so a parent can continue the conversation
@@ -6456,8 +6512,23 @@
         var discuss = document.createElement('details');
         discuss.style.cssText = 'margin:6px 0 4px;font-size:13px;';
         var summaryEl = document.createElement('summary');
-        summaryEl.style.cssText = 'cursor:pointer;color:var(--brand);';
-        summaryEl.textContent = '💬 ' + t('discuss_with_child');
+        // list-style:none kills the browser's own ▶ marker, which is the
+        // one piece of UI on this page nobody designed. A '+/−' that flips
+        // with the open state says the same thing in the page's own hand.
+        summaryEl.style.cssText =
+          'cursor:pointer;color:var(--brand);list-style:none;font-weight:600;' +
+          'padding:6px 0;display:flex;align-items:center;gap:8px;';
+        var marker = document.createElement('span');
+        marker.style.cssText =
+          'display:inline-flex;width:18px;height:18px;border-radius:50%;flex:none;' +
+          'align-items:center;justify-content:center;font-size:13px;line-height:1;' +
+          'background:var(--surface-tint);color:var(--brand);';
+        marker.textContent = '+';
+        discuss.addEventListener('toggle', function () {
+          marker.textContent = discuss.open ? '−' : '+';
+        });
+        summaryEl.appendChild(marker);
+        summaryEl.appendChild(document.createTextNode(t('discuss_with_child')));
         discuss.appendChild(summaryEl);
         var cons = Array.isArray(s.reflectionConclusions) ? s.reflectionConclusions : [];
         qs.forEach(function (question, i) {
@@ -6476,7 +6547,7 @@
       }
 
       if (s.previewUrl) {
-        card.appendChild(buildPreviewAffordance(s.previewUrl));
+        card.appendChild(buildPreviewAffordance(s.previewUrl, card.__coverPoster));
       }
       return card;
     }
@@ -6496,13 +6567,27 @@
 
     // Same JWT-fetched Blob pattern as the C2.1 message-audio Listen
     // button — the bytes never appear in the URL bar / history.
-    function buildPreviewAffordance(url) {
+    // `poster` is optional: when a card has cover art the round play button
+    // is placed over it and only the status line stays below, which is what
+    // makes the card read as a sleeve rather than a form.
+    function buildPreviewAffordance(url, poster) {
       var wrap = document.createElement('div');
       wrap.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.textContent = t('listen_btn');
-      btn.className = 'btn-ghost';
+      if (poster) {
+        btn.setAttribute('aria-label', t('listen_btn'));
+        btn.style.cssText =
+          'position:absolute;right:10px;bottom:10px;width:44px;height:44px;border-radius:50%;' +
+          'border:none;padding:0;background:var(--surface);color:var(--brand);' +
+          'box-shadow:0 2px 8px rgba(20,23,43,.45);display:flex;align-items:center;' +
+          'justify-content:center;font-size:17px;line-height:1;cursor:pointer;';
+        btn.textContent = '▶';
+        poster.appendChild(btn);
+      } else {
+        btn.textContent = t('listen_btn');
+        btn.className = 'btn-ghost';
+      }
       var status = document.createElement('span');
       status.style.cssText = 'font-size:12px;color:var(--ink-muted);';
       btn.onclick = function () {
@@ -6540,6 +6625,10 @@
             // starts (covers autoplay AND a later manual re-play).
             audio.addEventListener('play', function () { stopOtherPreviews(audio); });
             stopOtherPreviews(audio);
+            // The button lives on the artwork now, so clearing wrap alone
+            // would leave a dead ▶ sitting over the cover next to a
+            // playing <audio>.
+            if (btn.parentNode) btn.parentNode.removeChild(btn);
             wrap.innerHTML = '';
             wrap.appendChild(audio);
           }).catch(function () {
@@ -6547,7 +6636,9 @@
             btn.disabled = false;
           });
       };
-      wrap.appendChild(btn);
+      // appendChild MOVES a node, so doing this unconditionally pulled the
+      // button straight back off the poster it had just been placed on.
+      if (!poster) wrap.appendChild(btn);
       wrap.appendChild(status);
       return wrap;
     }

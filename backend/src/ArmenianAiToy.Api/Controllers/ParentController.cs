@@ -1045,7 +1045,8 @@ public class ParentController : ControllerBase
                     story?.ReflectionConclusions?.ToList(),
                     item.SeriesId,
                     item.SeriesIndex,
-                    item.SeriesTitle);
+                    item.SeriesTitle,
+                    ToTexts(story));
             }).ToList();
         }
         else
@@ -1059,10 +1060,28 @@ public class ParentController : ControllerBase
                     story.Segments.Count, story.ReflectionQuestions.ToList(),
                     t?.Count ?? 0, t?.FinishedCount ?? 0,
                     PreviewUrl: null,
-                    story.ReflectionConclusions?.ToList());
+                    story.ReflectionConclusions?.ToList(),
+                    Translations: ToTexts(story));
             }).ToList();
         }
         return Ok(new StoryLibraryResponse(items));
+    }
+
+    /// <summary>
+    /// Parent-facing translations for one story, or null when none are
+    /// authored. Straight passthrough — the DASHBOARD picks the language,
+    /// because it switches language without refetching this endpoint.
+    /// </summary>
+    private static Dictionary<string, StoryTextsDto>? ToTexts(CuratedStory? story)
+    {
+        var translations = story?.Translations;
+        if (translations is null || translations.Count == 0)
+        {
+            return null;
+        }
+        return translations.ToDictionary(
+            kv => kv.Key,
+            kv => new StoryTextsDto(kv.Value.Title, kv.Value.Goal, kv.Value.Lesson));
     }
 
     /// <summary>

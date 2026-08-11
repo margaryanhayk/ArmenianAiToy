@@ -5,6 +5,18 @@
   "author": "Հովհաննես Թումանյան",
   "goal": "Պատմել արարքների հետևանքների մասին։",
   "lesson": "Առանց թույլտվության ուրիշինը վերցնելը փորձանք է բերում․ ամեն արարք ունի իր հետևանքը։",
+  "translations": {
+    "en": {
+      "title": "The Tailless Fox",
+      "goal": "A story about the consequences of what we do.",
+      "lesson": "Taking what is not yours brings trouble — every action has its consequence."
+    },
+    "ru": {
+      "title": "Лиса без хвоста",
+      "goal": "История о том, что у каждого поступка есть последствия.",
+      "lesson": "Брать чужое без спроса — к беде: у каждого поступка есть последствия."
+    }
+  },
   "minAge": 4,
   "maxAge": 7,
   "tone": "warm",

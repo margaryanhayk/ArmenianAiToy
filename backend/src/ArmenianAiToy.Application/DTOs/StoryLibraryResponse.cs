@@ -48,4 +48,18 @@ public sealed record StoryLibraryItemDto(
     /// card's headline. Null when unconfigured — the dashboard then falls
     /// back to a generic descriptor, because a slug or a name guessed from
     /// the episode titles would be worse than not naming it.</summary>
-    string? SeriesTitle = null);
+    string? SeriesTitle = null,
+    /// <summary>Parent-facing translations of title / goal / lesson, keyed by
+    /// language code ("en", "ru"). The dashboard switches language without
+    /// refetching, so every language ships on the wire and the client picks;
+    /// a missing language falls back to the Armenian fields above.
+    /// <para>
+    /// Parent app only. Nothing in here is ever spoken or sent to the toy —
+    /// the child hears Armenian.
+    /// </para></summary>
+    Dictionary<string, StoryTextsDto>? Translations = null);
+
+/// <summary>One language's parent-facing text for a story. Any field may be
+/// null; the dashboard falls back to the Armenian for that field alone, so a
+/// half-written translation degrades one line rather than the card.</summary>
+public sealed record StoryTextsDto(string? Title, string? Goal, string? Lesson);
