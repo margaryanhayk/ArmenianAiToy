@@ -108,17 +108,26 @@ function Get-Lufs([string]$path) {
 # A healthy MP3 carries at most one ID3 tag, at offset 0. More than one means
 # pieces were glued together with their wrappers left in.
 function Get-Id3Count([string]$path) {
+    # Every field is checked, because the letters "ID3" occur in audio data by
+    # chance and a loose test turns a good story into a refusal. This happened:
+    # a clean three-piglets render carried the bytes 49 44 33 at offset
+    # 1,996,978 declaring a 29 MB tag inside a 2 MB file, and the shipper
+    # refused to install it while check_story_audio.py — which validates the
+    # version byte — passed it. Two gates that disagree are worse than one, so
+    # this now applies the SAME rules as _is_id3v2_header in that script.
     $b = [IO.File]::ReadAllBytes($path)
     $n = 0
     for ($i = 0; $i -lt $b.Length - 9; $i++) {
-        if ($b[$i] -eq 0x49 -and $b[$i + 1] -eq 0x44 -and $b[$i + 2] -eq 0x33 -and
-            $b[$i + 3] -ne 0xFF -and $b[$i + 4] -ne 0xFF -and
-            (($b[$i + 6] -bor $b[$i + 7] -bor $b[$i + 8] -bor $b[$i + 9]) -band 0x80) -eq 0) {
-            $n++
-            $size = (($b[$i + 6] -band 0x7f) -shl 21) -bor (($b[$i + 7] -band 0x7f) -shl 14) -bor
-                    (($b[$i + 8] -band 0x7f) -shl 7) -bor ($b[$i + 9] -band 0x7f)
-            $i += 9 + $size
-        }
+        if ($b[$i] -ne 0x49 -or $b[$i + 1] -ne 0x44 -or $b[$i + 2] -ne 0x33) { continue }
+        if ($b[$i + 3] -ne 2 -and $b[$i + 3] -ne 3 -and $b[$i + 3] -ne 4) { continue }  # major version
+        if ($b[$i + 4] -eq 0xFF) { continue }                                           # reserved revision
+        # The four size bytes are syncsafe: the high bit of each is always clear.
+        if ((($b[$i + 6] -bor $b[$i + 7] -bor $b[$i + 8] -bor $b[$i + 9]) -band 0x80) -ne 0) { continue }
+        $size = (($b[$i + 6] -band 0x7f) -shl 21) -bor (($b[$i + 7] -band 0x7f) -shl 14) -bor
+                (($b[$i + 8] -band 0x7f) -shl 7) -bor ($b[$i + 9] -band 0x7f)
+        if ($i + 10 + $size -gt $b.Length) { continue }   # a tag cannot run past the file
+        $n++
+        $i += 9 + $size
     }
     return $n
 }

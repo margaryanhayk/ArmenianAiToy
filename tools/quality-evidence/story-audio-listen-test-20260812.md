@@ -2,6 +2,16 @@
 
 **Verdict: APPROVED by the owner, 2026-08-12.**
 
+> **SUPERSEDED the same day.** Every file this approval names has been
+> replaced by the character-voice re-render recorded in
+> `story-audio-character-voices-20260812.md`. The approval below is pinned to
+> the sha256 in the table, and not one of those hashes is on disk any more, so
+> **it does not carry over** — the library is unlistened again. Kept because
+> the approval genuinely happened and because the reason it was thrown away is
+> worth remembering: the owner noticed that the wolf and the mother in
+> «Ուլիկը» say the same words in the same voice, which is exactly the
+> difference the scene asks a child to hear.
+
 This file records the owner's acceptance. Per the standing convention in
 `anban-huri-listen-test-TEMPLATE.md`, the listening is a human act and an
 agent must not fill in the verdict — so what is written here is that the
