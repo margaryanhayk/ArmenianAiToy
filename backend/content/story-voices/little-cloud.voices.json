@@ -1,0 +1,56 @@
+{
+ "storyId": "little-cloud",
+ "title": "Փոքրիկ ամպիկը",
+ "_status": "DRAFT — attribution pending the owner's review. This file changes no story text.",
+ "_rule": "Only DIRECT speech gets a character. Reported speech («Նա ասաց, որ…») stays narrator, because it is the narrator speaking about them, not them speaking.",
+ "_why": "One line of direct speech: the flower thanking the cloud. Everything else is narration.",
+ "speakers": {
+  "narrator": {
+   "role": "The storyteller",
+   "direction": null,
+   "pitch": 1.0
+  },
+  "flower": {
+   "role": "Ծաղիկը",
+   "direction": "a small flower, delighted and grateful, light and high",
+   "pitch": 1.08
+  }
+ },
+ "segments": [
+  {
+   "index": 0,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Երկնքում ապրում էր մի փոքրիկ ամպիկ։ Նա շատ էր սիրում թռչել քամու հետ։ Մի օր ամպիկը տեսավ մի փոքրիկ ծաղիկ։ Ծաղիկը ծարավ էր։"
+    }
+   ]
+  },
+  {
+   "index": 1,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Ամպիկը մոտեցավ ծաղկին։ Նա մի քիչ անձրև մաղեց։ Ծաղիկն ուրախացավ ու բացեց իր թերթիկները։"
+    }
+   ]
+  },
+  {
+   "index": 2,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Ծաղիկն ասաց՝ "
+    },
+    {
+     "speaker": "flower",
+     "text": "շնորհակալ եմ, ամպի՛կ ջան։ "
+    },
+    {
+     "speaker": "narrator",
+     "text": "Ամպիկը ժպտաց ու թռավ երկինք։ Նրանք դարձան լավ ընկերներ։"
+    }
+   ]
+  }
+ ]
+}

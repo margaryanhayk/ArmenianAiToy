@@ -1,0 +1,125 @@
+{
+ "storyId": "sutlik-orskan",
+ "title": "Սուտլիկ որսկանը",
+ "_status": "DRAFT — attribution pending the owner's review. This file changes no story text.",
+ "_rule": "Only DIRECT speech gets a character. Reported speech («Նա ասաց, որ…») stays narrator, because it is the narrator speaking about them, not them speaking.",
+ "_why": "Told in first person by the boaster, so 'narrator' is a character here. His companions answer as one flat chorus.",
+ "speakers": {
+  "narrator": {
+   "role": "The storyteller",
+   "direction": null,
+   "pitch": 1.0
+  },
+  "boaster": {
+   "role": "Սուտլիկ որսկանը — the tall-tale teller himself",
+   "direction": "a village braggart telling an impossible hunting story with total conviction, delighted with himself, never winking",
+   "pitch": 1.0,
+   "note": "This story has no neutral narrator: the teller IS the liar, first person throughout. He must never signal that he knows it is nonsense — the child does the laughing."
+  },
+  "companion": {
+   "role": "Հադի, Հյուդի, Չատի, Մատի — the companions",
+   "direction": "flat, unbothered, answering the same way every time — the joke is the repetition",
+   "pitch": 0.97,
+   "note": "One voice for all four on purpose. They are a chorus, not four characters, and distinguishing them would slow the run of gags."
+  }
+ },
+ "segments": [
+  {
+   "index": 0,
+   "spans": [
+    {
+     "speaker": "boaster",
+     "text": "Հորս կնունքով, մորս ծնունդով, վեր կացանք մի օր հինգ ու վեց հոգով, թրով—թվանքով որսի գնացինք։ Հադին էր, Հյուդին էր, Չատին էր, Մատին էր, հերս էր, ես էի․ գնացինք որսի․․․ Սարեր, ձորեր դուզ գնացինք, որտեղ որս կար՝ սուսուփուս գնացինք, որտեղ ահ էր՝ կուզեկուզ գնացինք․․․"
+    }
+   ]
+  },
+  {
+   "index": 1,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Գնացի՜նք, գնացի՜նք, շատ թե քիչ, մին էլ տեսնենք երեք լիճ․ երկուսը՝ ցամաք, մնի մեջ էլ իսկի ջուր չկա։ Մին էլ, ըհը՛, մտիկ տանք, որ էս անջուր լճում լողում են, ճչում երեք հատ սիպտակ բադ, երկուսը սատկած են, մինն էլ կենդանի չի։ "
+    },
+    {
+     "speaker": "boaster",
+     "text": "— Հադի՛, տո՛ւր հա, տո՛ւր։ "
+    },
+    {
+     "speaker": "companion",
+     "text": "Թե՝ թվանք չունեմ։ "
+    },
+    {
+     "speaker": "boaster",
+     "text": "— Հյուդի՛, տո՛ւր հա, տո՛ւր։ "
+    },
+    {
+     "speaker": "companion",
+     "text": "— Ես էլ չունեմ։ "
+    },
+    {
+     "speaker": "boaster",
+     "text": "— Չատի․․․ Մատի․․․ "
+    },
+    {
+     "speaker": "companion",
+     "text": "— Մենք էլ չունենք։"
+    }
+   ]
+  },
+  {
+   "index": 2,
+   "spans": [
+    {
+     "speaker": "boaster",
+     "text": "— Բա ի՞նչ անենք․․․ Հորս ձեռին կարճ ու երկար, հաստ ու բարակ մի փետ կար․ երեսն առավ, նշան դրեց, մին էլ տրա՜ք, որ կրակեց․․․ Նա կրակեց, ես զարկեցի․ որ զարկեցի՝ փռվեց էսպես, ամեն թևը հինգ գազ ու կես․․․ "
+    },
+    {
+     "speaker": "boaster",
+     "text": "— Հադի, դանա՜կ․․․ "
+    },
+    {
+     "speaker": "companion",
+     "text": "Թե՝ դանակ չունեմ։ "
+    },
+    {
+     "speaker": "boaster",
+     "text": "— Հյուդի, դու․․․ "
+    },
+    {
+     "speaker": "companion",
+     "text": "— Ես էլ չունեմ․․․ "
+    },
+    {
+     "speaker": "boaster",
+     "text": "- Չատի՞, Մատի՞․․․ "
+    },
+    {
+     "speaker": "companion",
+     "text": "- Մենք էլ չունենք։ "
+    },
+    {
+     "speaker": "boaster",
+     "text": "- Բա ի՞նչ անենք․․․ Հերս էլ ունի, բերան չունի։ Էս անբերան դանակը քաշեցինք։ Հադին մորթեց, չկարաց․ Հյուդին մորթեց, չկարաց, Չատին չկարաց, Մատին չկարաց, հերս էլ չկարաց, ես քաշեցի մորթեցի։ Մորթեցի, վեր գցեցի, բադ մի ասիլ, մի գոմեշ ասա։"
+    }
+   ]
+  },
+  {
+   "index": 3,
+   "spans": [
+    {
+     "speaker": "boaster",
+     "text": "Հադին շալակեց, չկարաց, Հյուդին շալակեց, չկարաց, Չատին չկարաց, Մատին չկարաց, հերս էլ չկարաց, ես շալակեցի։ Շալակեցի, գնացինք։ Գնացինք, գնացինք, հասանք մի տեղ, մին էլ տեսնենք երեք գեղ, երկուսի տեղն իսկի չի երևում, մնումն էլ իսկի շենլիկ չկա։ Էս անշեն գեղում դես ման եկանք, դեն ման եկանք, մի տուն գտանք, մեջը՝ երեք պառավ, երկուսը՝ մեռած, մնի բերնումն էլ շունչ չկա։"
+    }
+   ]
+  },
+  {
+   "index": 4,
+   "spans": [
+    {
+     "speaker": "boaster",
+     "text": "- Տղերք,- ասինք,- եկեք բադով փլավ անենք։ Էս անշունչ պառավը գնաց դես ման եկավ, դեն ման եկավ, կես բրինձ գտավ, երեք պղինձ, երկուսը՝ ծակ, մինն էլ իսկի տակ չունի։ Ջուրը լցրինք էս անտակ պղինձը, մեջը ածինք բադն ու բրինձը, անկրակ եփեցինք։ Եփեց, եփեց, միսն ու բրինձը գնացին, մնաց ջուրը։ Որսից եկած սոված մարդի՜կ, վրա եկանք, կերա՜նք, կերա՜նք․ ոչ աչքերս բան տեսավ, ոչ բերաններս բան մտավ։"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,208 @@
+{
+ "storyId": "anban-huri",
+ "title": "Անբան Հուռին",
+ "_status": "DRAFT — attribution pending the owner's review. This file changes no story text.",
+ "_rule": "Only DIRECT speech gets a character. Reported speech («Նա ասաց, որ…») stays narrator, because it is the narrator speaking about them, not them speaking.",
+ "_why": "The frogs are the joke and the mother-in-law is the plot. Her beetle speech must be sincere, or the ending stops working.",
+ "speakers": {
+  "narrator": {
+   "role": "The storyteller",
+   "direction": null,
+   "pitch": 1.0
+  },
+  "huri": {
+   "role": "Անբան Հուռին",
+   "direction": "lazy, unbothered, pleased with herself; the verse chewed out slowly like she is chewing mastic",
+   "pitch": 1.04,
+   "note": "Never sly. She genuinely believes the frogs are spinning her cotton — the whole comedy rests on her sincerity."
+  },
+  "frogs": {
+   "role": "Փեփելն ու Կեկելը — the frogs",
+   "direction": "croaking, two-note, flat and repetitive — a frog, not a character with feelings",
+   "pitch": 0.9,
+   "note": "The narrator voices these himself and they are the story's best joke. The ambience cue sheet forbids a REAL frog sound over them for exactly this reason."
+  },
+  "husband": {
+   "role": "Վաճառական մարդը",
+   "direction": "a young merchant, warm and hasty, easily delighted and easily frightened",
+   "pitch": 0.96
+  },
+  "mother_in_law": {
+   "role": "Զոքանչը",
+   "direction": "a sly old woman, honeyed and utterly straight-faced while inventing the beetle",
+   "pitch": 1.0,
+   "note": "Her lie must be delivered with complete sincerity — she is saving her daughter, not being funny."
+  }
+ },
+ "segments": [
+  {
+   "index": 0,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Լինում է, չի լինում՝ մի կին։ Էս կնիկը մի աղջիկ է ունենում, անունը՝ Հուռի։ Մի ծույլ, անշնորհք աղջիկ։ Օրը մինչև իրիկուն պարապ-սարապ նստած։\n"
+    },
+    {
+     "speaker": "huri",
+     "text": "Բանն ինչ կանեմ՝ կեղտոտ է,\n\nԲամբակը կորիզոտ է։\n\nՄաստակ պիտի, որ ծամեմ,\n\nԿըտերը տիտիկ անեմ,\n\nԱնցնողին մըտիկ անեմ․\n\nՈւտեմ, խմեմ,\n\nՄըթնի, քընեմ։"
+    }
+   ]
+  },
+  {
+   "index": 1,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Հարևանները անունը դնում են Անբան Հուռի։ Ինչ մերն է՝ աղջկանը գովելով ման է գալի․ լիդրը գզող, լիդրը մանող, հա՛մ խճճող, հա՛մ խճուճը հանող, ձևող-կարող, հունցող-թխող, եփող-թափող, մի խոսքով՝ հուրի-հրեղեն, մատները՝ ոսկի։"
+    }
+   ]
+  },
+  {
+   "index": 2,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Էս գովասանքը գնում, մի երիտասարդ վաճառականի ականջն է ընկնում։ Էս երիտասարդ վաճառականն ասում է՝ իմ ուզածն էլ հենց սա է, որ կա։ Գլխապատառ գալիս է Անբան Հուռուն ուզում է, հետը պսակվում, տանում իրենց տունը։ Մի քանի ժամանակից հետո մի տասը-քսան բեռը բամբակ է առնում, տալիս կնկանը, թե՝ ես գնում եմ հեռու տեղեր առուտուրի, դու էլ այս բամբակը գզի, մանի, գամ, տանեմ ծախեմ, հարստանանք։"
+    }
+   ]
+  },
+  {
+   "index": 3,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Անբան Հուռին է, իրեն համար մաստակ ծամելով ման է գալի։ Մի օր էլ գետի ափովն անց կենալիս լսում է, որ գորտերը կոկռում են։\n\n"
+    },
+    {
+     "speaker": "frogs",
+     "text": "- Փե՛փել․․․ Կե՛կել․․․ Փե՛փել․․․ Կե՛կել․․․\n\n"
+    },
+    {
+     "speaker": "huri",
+     "text": "- Վո՛ւյ, աղջի Փեփել, Կեկել,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "— ձեն է տալի Անբան Հուռին,"
+    },
+    {
+     "speaker": "huri",
+     "text": "- որ բամբակը բերեմ ձեզ տամ, կգզե՞ք․․․\n\n"
+    },
+    {
+     "speaker": "frogs",
+     "text": "- Բե՛ր, բե՛ր, բե՛ր․․․\n\n"
+    },
+    {
+     "speaker": "narrator",
+     "text": "Անբան Հուռին ուրախանում է։ Գնում է, բամբակը կրում, բերում, ածում գետը։\n\n"
+    },
+    {
+     "speaker": "huri",
+     "text": "- Դե գզեց ե՛ք, մանեցե′ք։ Մի քանի օրից հետո կգամ, մանածը կտանեմ, որ ծախենք։"
+    }
+   ]
+  },
+  {
+   "index": 4,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Գնում է, մի քանի օրից ետ է գալի։ Գորտերը էլի կռկոում են,\n\n"
+    },
+    {
+     "speaker": "frogs",
+     "text": "- Փե՛փել-Կեկել․․․ Փե՛փել-Կեկել․․․\n\n"
+    },
+    {
+     "speaker": "huri",
+     "text": "- Աղչի Փեփել, Կեկել, դե մանածը բերեք։\n\n"
+    },
+    {
+     "speaker": "narrator",
+     "text": "Գորտերը շարունակում են կռկռալ, իսկ մանածը չեն բերում։\n\nՀուռին մին էլ որ նայում է, աչքովն ընկնում գետի ափերին ու քարերին փաթաթված կանաչ մուռը։\n\n"
+    },
+    {
+     "speaker": "huri",
+     "text": "- Վո՛ւյ,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- ասում է,- "
+    },
+    {
+     "speaker": "huri",
+     "text": "քոռանամ ես, տե՛ս, համ գզել ու մանել են, համ խալիչա են գործել իրենց համար։\n\n"
+    },
+    {
+     "speaker": "narrator",
+     "text": "Ձեռը ճակատին է դնում, ձեն տալի․\n\n"
+    },
+    {
+     "speaker": "huri",
+     "text": "- Դե որ խալիչա եք գործել, մեր բամբակի փողը բերեք։\n\n"
+    },
+    {
+     "speaker": "narrator",
+     "text": "Ձեն է տալի ու ոտը փոխում է, մտնում ջուրը։ Հանկարծ ոտը առնում է մի կոշտ բանի։ Հանում է, տեսնում՝ մի կտոր ոսկի։ Փեփելին ու Կեկելին շնորհակալություն է անում, ոսկու կտորը փեշը դնում, գալիս տուն։ Մարդն էլ առուտուրի տեղիցն է գալիս։ Գալիս է տեսնում՝ իրենց թարեքին մի մեծ ոսկու կտոր։"
+    }
+   ]
+  },
+  {
+   "index": 5,
+   "spans": [
+    {
+     "speaker": "husband",
+     "text": "- Ա՛յ կին, այս ի՞նչ ոսկի է։\n\n"
+    },
+    {
+     "speaker": "narrator",
+     "text": "Թե՝ բա չես ասիլ, բամբակը Փեփելի ու Կեկելի վրա ծախեցի, բամբակի փողն է։\nՄարդը ո՜նց է ուրախանում, այնպես էլ դուք ուրախանաք։ Զոքանչին հրավիրում է, ընծաներ է տալի, գովում է, շնորհակալություն է անում, որ այնպես խելոք, շնորհքով, աշխատասեր աղջիկ է մեծացրել։ Քեֆ է սարքում, նստում են քեֆի։"
+    }
+   ]
+  },
+  {
+   "index": 6,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Զոքանչը խորամանկ կին է լինում։ Իմանում է, թե բանը ինչպես է պատահել, վախենում է՝ փեսեն էլի աղջկանը գործ հանձնի, ու գաղտնիքը բացվի։ Քեֆի լավ ժամանակը մի բզեզ է ներս մտնում ու բռռացնելով պտտվում սենյակում։ Էս զոքանչը վեր է կենում, գլուխ է տալի բզեզին։ Ասում է․\n\n"
+    },
+    {
+     "speaker": "mother_in_law",
+     "text": "- Բարով եկար, մորքուր ջան, ո՜նց ես, ո՛րտեղ ես, այսքան ժամանակ չես երևում․․․ Ախր քեզ ո՞վ էր ասում՝ այդքան բան անես, որ այդ օրն ընկնես․․․"
+    }
+   ]
+  },
+  {
+   "index": 7,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Փեսեն մնում է զարմացած։ Ասում է․\n\n"
+    },
+    {
+     "speaker": "husband",
+     "text": "- Ա՛յ մեր, խելագարվեցի՞ր, քեզ ի՞նչ պատահեց, այդ բզեզին այդ ի՞նչ ես ասում, մորքո՞ւրս որն է․․․\n\n"
+    },
+    {
+     "speaker": "narrator",
+     "text": "Զոքանչը թե․\n\n"
+    },
+    {
+     "speaker": "mother_in_law",
+     "text": "- Ա՛յ որդի, քեզանից ինչ թաքցնեմ, դու էլ իմ որդին ես։ Չես ասիլ՝ այս բզեզն իմ մորքուրն է։ Խեղճը շատ աշխատասեր կին էր։ Ամբողջ օրն աշխատում էր, շատ աշխատելուց կուչ եկավ, պստիկացավ, այնքան պստիկացավ, որ դառավ բզեզ։ Մեր ցեղն այսպես է։ Շատ աշխատասեր ենք։ Բայց աշխատելուց պստիկանում, բզեզ ենք դառնում։"
+    }
+   ]
+  },
+  {
+   "index": 8,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Էս որ փեսեն լսում է, վախից քիչ է մնում պռոշը ճաքի․ այն է լինում որ այն, արգելում է Հուռուն ձեռն էլ բանի չտա, որ մորքուրի նման բզեզ չդառնա։"
+    }
+   ]
+  }
+ ]
+}
