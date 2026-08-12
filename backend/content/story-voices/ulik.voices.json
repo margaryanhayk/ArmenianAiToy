@@ -6,25 +6,45 @@
  "speakers": {
   "narrator": {
    "role": "The storyteller",
-   "direction": null,
-   "pitch": 1.0
+   "pitch": 1.0,
+   "directionForHumanNarrator": null,
+   "voiceSettings": {
+    "stability": 0.55,
+    "similarity_boost": 0.8,
+    "style": 0.2
+   }
   },
   "mother": {
    "role": "Այծը, Ուլիկի մայրը",
-   "direction": "warm gentle mother goat, sweet and light, calling to her child",
    "pitch": 1.0,
-   "note": "Her call is the one the kid trusts, and the wolf's copy is measured against it. It must be unmistakably kind."
+   "note": "Her call is the one the kid trusts, and the wolf's copy is measured against it. It must be unmistakably kind.",
+   "directionForHumanNarrator": "warm gentle mother goat, sweet and light, calling to her child",
+   "voiceSettings": {
+    "stability": 0.6,
+    "similarity_boost": 0.85,
+    "style": 0.3
+   }
   },
   "wolf": {
    "role": "Գայլը",
-   "direction": "deep thick growling wolf, badly pretending to be sweet",
    "pitch": 0.88,
-   "note": "Says the mother's words EXACTLY — only the voice differs, and that IS the scene. Not frightening: the kid is unimpressed, not terrified, and sends him away."
+   "note": "Says the mother's words EXACTLY — only the voice differs, and that IS the scene. Not frightening: the kid is unimpressed, not terrified, and sends him away.",
+   "directionForHumanNarrator": "deep thick growling wolf, badly pretending to be sweet",
+   "voiceSettings": {
+    "stability": 0.3,
+    "similarity_boost": 0.8,
+    "style": 0.55
+   }
   },
   "ulik": {
    "role": "Ուլիկը",
-   "direction": "small young goat, bright, a little wary, then excited telling his mother",
-   "pitch": 1.06
+   "pitch": 1.06,
+   "directionForHumanNarrator": "small young goat, bright, a little wary, then excited telling his mother",
+   "voiceSettings": {
+    "stability": 0.4,
+    "similarity_boost": 0.8,
+    "style": 0.45
+   }
   }
  },
  "segments": [
@@ -118,5 +138,6 @@
     }
    ]
   }
- ]
+ ],
+ "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing)."
 }

@@ -7,48 +7,93 @@
  "speakers": {
   "narrator": {
    "role": "The storyteller",
-   "direction": null,
-   "pitch": 1.0
+   "pitch": 1.0,
+   "directionForHumanNarrator": null,
+   "voiceSettings": {
+    "stability": 0.55,
+    "similarity_boost": 0.8,
+    "style": 0.2
+   }
   },
   "fox": {
    "role": "Պոչատ աղվեսը",
-   "direction": "anxious and pleading, saying the same long request over and over, a little more desperate each time",
-   "pitch": 1.05
+   "pitch": 1.05,
+   "directionForHumanNarrator": "anxious and pleading, saying the same long request over and over, a little more desperate each time",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   },
   "old_woman": {
    "role": "Պառավը",
-   "direction": "an old village woman, brisk, unimpressed",
-   "pitch": 0.98
+   "pitch": 0.98,
+   "directionForHumanNarrator": "an old village woman, brisk, unimpressed",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   },
   "cow": {
    "role": "Կովը",
-   "direction": "slow, placid, low",
-   "pitch": 0.9
+   "pitch": 0.9,
+   "directionForHumanNarrator": "slow, placid, low",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   },
   "field": {
    "role": "Արտը",
-   "direction": "the field itself — wide, unhurried, almost a whisper",
-   "pitch": 0.95
+   "pitch": 0.95,
+   "directionForHumanNarrator": "the field itself — wide, unhurried, almost a whisper",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   },
   "spring": {
    "role": "Աղբյուրը",
-   "direction": "the spring — light, bubbling, quick",
-   "pitch": 1.1
+   "pitch": 1.1,
+   "directionForHumanNarrator": "the spring — light, bubbling, quick",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   },
   "girl": {
    "role": "Աղջիկը",
-   "direction": "a young village girl, matter-of-fact",
-   "pitch": 1.08
+   "pitch": 1.08,
+   "directionForHumanNarrator": "a young village girl, matter-of-fact",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   },
   "pedlar": {
    "role": "Չարչին",
-   "direction": "a pedlar, sing-song, used to bargaining",
-   "pitch": 1.0
+   "pitch": 1.0,
+   "directionForHumanNarrator": "a pedlar, sing-song, used to bargaining",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   },
   "hen": {
    "role": "Հավը",
-   "direction": "clipped, fussy, a hen's short syllables",
-   "pitch": 1.12
+   "pitch": 1.12,
+   "directionForHumanNarrator": "clipped, fussy, a hen's short syllables",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   }
  },
  "segments": [
@@ -202,5 +247,6 @@
     }
    ]
   }
- ]
+ ],
+ "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing)."
 }

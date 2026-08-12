@@ -7,13 +7,23 @@
  "speakers": {
   "narrator": {
    "role": "The storyteller",
-   "direction": null,
-   "pitch": 1.0
+   "pitch": 1.0,
+   "directionForHumanNarrator": null,
+   "voiceSettings": {
+    "stability": 0.55,
+    "similarity_boost": 0.8,
+    "style": 0.2
+   }
   },
   "flower": {
    "role": "Ծաղիկը",
-   "direction": "a small flower, delighted and grateful, light and high",
-   "pitch": 1.08
+   "pitch": 1.08,
+   "directionForHumanNarrator": "a small flower, delighted and grateful, light and high",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   }
  },
  "segments": [
@@ -52,5 +62,6 @@
     }
    ]
   }
- ]
+ ],
+ "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing)."
 }

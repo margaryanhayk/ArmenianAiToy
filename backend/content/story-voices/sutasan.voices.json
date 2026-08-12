@@ -7,30 +7,55 @@
  "speakers": {
   "narrator": {
    "role": "The storyteller",
-   "direction": null,
-   "pitch": 1.0
+   "pitch": 1.0,
+   "directionForHumanNarrator": null,
+   "voiceSettings": {
+    "stability": 0.55,
+    "similarity_boost": 0.8,
+    "style": 0.2
+   }
   },
   "king": {
    "role": "Թագավորը",
-   "direction": "a king, confident and amused, enjoying the game until he is caught",
    "pitch": 0.95,
-   "note": "He out-lies the first two happily. His last two lines are the joke: he must sound cornered, changing his story."
+   "note": "He out-lies the first two happily. His last two lines are the joke: he must sound cornered, changing his story.",
+   "directionForHumanNarrator": "a king, confident and amused, enjoying the game until he is caught",
+   "voiceSettings": {
+    "stability": 0.45,
+    "similarity_boost": 0.8,
+    "style": 0.4
+   }
   },
   "shepherd": {
    "role": "Հովիվը",
-   "direction": "a shepherd, plain and bold, telling a whopper with a straight face",
-   "pitch": 1.0
+   "pitch": 1.0,
+   "directionForHumanNarrator": "a shepherd, plain and bold, telling a whopper with a straight face",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   },
   "tailor": {
    "role": "Դերձակը",
-   "direction": "a tailor, apologetic and quick, as if the excuse were ordinary",
-   "pitch": 1.02
+   "pitch": 1.02,
+   "directionForHumanNarrator": "a tailor, apologetic and quick, as if the excuse were ordinary",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   },
   "peasant": {
    "role": "Աղքատ գյուղացին",
-   "direction": "a poor villager, calm, patient, completely serious — the quietest voice wins",
    "pitch": 0.98,
-   "note": "He must NOT sound clever or mocking. The trap only works because he sounds like he means it."
+   "note": "He must NOT sound clever or mocking. The trap only works because he sounds like he means it.",
+   "directionForHumanNarrator": "a poor villager, calm, patient, completely serious — the quietest voice wins",
+   "voiceSettings": {
+    "stability": 0.65,
+    "similarity_boost": 0.85,
+    "style": 0.2
+   }
   }
  },
  "segments": [
@@ -154,5 +179,6 @@
     }
    ]
   }
- ]
+ ],
+ "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing)."
 }

@@ -7,36 +7,66 @@
  "speakers": {
   "narrator": {
    "role": "The storyteller",
-   "direction": null,
-   "pitch": 1.0
+   "pitch": 1.0,
+   "directionForHumanNarrator": null,
+   "voiceSettings": {
+    "stability": 0.55,
+    "similarity_boost": 0.8,
+    "style": 0.2
+   }
   },
   "poor_man": {
    "role": "Աղքատ մարդը",
-   "direction": "a poor, gentle, wondering man — the kindness is in his voice before it is in his actions",
-   "pitch": 1.0
+   "pitch": 1.0,
+   "directionForHumanNarrator": "a poor, gentle, wondering man — the kindness is in his voice before it is in his actions",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   },
   "fish": {
    "role": "Խոսող ձուկը",
-   "direction": "very quiet, breathless, struggling — the text says «ցա՜ծ, շա՜տ ցած ձենով, ցամաքած բերանը բացուխուփ անելով»",
    "pitch": 1.05,
-   "note": "The text prescribes this delivery explicitly. It must be hard to hear without being inaudible — that is what makes the man lean in."
+   "note": "The text prescribes this delivery explicitly. It must be hard to hear without being inaudible — that is what makes the man lean in.",
+   "directionForHumanNarrator": "very quiet, breathless, struggling — the text says «ցա՜ծ, շա՜տ ցած ձենով, ցամաքած բերանը բացուխուփ անելով»",
+   "voiceSettings": {
+    "stability": 0.45,
+    "similarity_boost": 0.85,
+    "style": 0.4
+   }
   },
   "fisherman": {
    "role": "Ձկնորսը",
-   "direction": "harsh, contemptuous, shouting at his servant",
-   "pitch": 0.93
+   "pitch": 0.93,
+   "directionForHumanNarrator": "harsh, contemptuous, shouting at his servant",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   },
   "monster": {
    "role": "Հրեշը",
-   "direction": "huge and calm, sure of itself, never shouting — its confidence is the threat",
    "pitch": 0.85,
-   "note": "Not a roaring monster. It loses a riddle contest, so it must sound like something that expects to win, then quietly gives up."
+   "note": "Not a roaring monster. It loses a riddle contest, so it must sound like something that expects to win, then quietly gives up.",
+   "directionForHumanNarrator": "huge and calm, sure of itself, never shouting — its confidence is the threat",
+   "voiceSettings": {
+    "stability": 0.35,
+    "similarity_boost": 0.8,
+    "style": 0.45
+   }
   },
   "guest": {
    "role": "Անծանոթ երիտասարդը — the fish",
-   "direction": "a calm young traveller, warm and completely unafraid",
    "pitch": 1.0,
-   "note": "He IS the fish, revealed in the last line. Do NOT make him sound like the fish — the reveal must land as a surprise. If anything is shared, it is the calm, not the voice."
+   "note": "He IS the fish, revealed in the last line. Do NOT make him sound like the fish — the reveal must land as a surprise. If anything is shared, it is the calm, not the voice.",
+   "directionForHumanNarrator": "a calm young traveller, warm and completely unafraid",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   }
  },
  "segments": [
@@ -369,5 +399,6 @@
     }
    ]
   }
- ]
+ ],
+ "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing)."
 }
