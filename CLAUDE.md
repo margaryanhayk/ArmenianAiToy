@@ -98,10 +98,24 @@ one message is not a rule, which is why it is written here.
 dotnet build                                    # Build all projects
 dotnet test                                     # Run all tests (2549 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
-
-# API key (one-time setup)
-dotnet user-secrets set "OpenAI:ApiKey" "sk-..." --project src/ArmenianAiToy.Api
 ```
+
+**Two secrets are REQUIRED before the API will start.** Neither has a
+default and the process exits on either — `dotnet build` and `dotnet test`
+work fine without them, so the gap only appears at first run:
+
+```bash
+dotnet user-secrets set "OpenAI:ApiKey" "sk-..." --project src/ArmenianAiToy.Api
+dotnet user-secrets set "Jwt:Key" "<32+ characters>" --project src/ArmenianAiToy.Api
+```
+
+A dummy `OpenAI:ApiKey` is enough to boot and to use every non-AI surface
+(dashboard, admin console, device endpoints, health); only calls that reach
+OpenAI fail. `Jwt:Key` must be at least 32 characters and must not be the
+legacy insecure literal — see § JWT key rotation.
+
+Verified end to end from a fresh clone on 2026-08-12:
+`tools/quality-evidence/clean-clone-boot-20260812.md`.
 
 Database (SQLite) auto-applies EF Core migrations on first run via
 `db.Database.Migrate()`. See **Database migrations** below.
