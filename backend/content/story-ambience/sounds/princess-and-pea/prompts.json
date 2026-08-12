@@ -1,0 +1,20 @@
+{
+  "birds-dawn": {
+    "prompt": "The first birds of the morning, a few of them, spread out and unhurried. Hopeful and light. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "door-knock": {
+    "prompt": "Three firm knocks on a solid wooden door, then silence. Close and clear, firm but not violent. No music, no melody, no speech, no singing. A single event with silence after it.",
+    "durationSeconds": 4.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "rain-storm": {
+    "prompt": "Heavy rain driving against a window, heard from inside a house. Steady and enclosing. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  }
+}

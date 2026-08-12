@@ -1,0 +1,14 @@
+{
+  "hall-murmur": {
+    "prompt": "A few people talking quietly in a large stone room, heard from the far side. No word is distinguishable, no laughter stands out. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "thunder-distant": {
+    "prompt": "Thunder a long way off, rounded and rolling, arriving late and fading slowly. Never a sharp near crack. No music, no melody, no speech, no singing. A single event with silence after it.",
+    "durationSeconds": 4.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  }
+}

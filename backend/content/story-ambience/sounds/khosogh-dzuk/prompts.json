@@ -1,0 +1,32 @@
+{
+  "birds-dawn": {
+    "prompt": "The first birds of the morning, a few of them, spread out and unhurried. Hopeful and light. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "door-knock": {
+    "prompt": "Three firm knocks on a solid wooden door, then silence. Close and clear, firm but not violent. No music, no melody, no speech, no singing. A single event with silence after it.",
+    "durationSeconds": 4.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "open-country-wind": {
+    "prompt": "Open country under a light wind, dry grass moving, a sense of walking somewhere with nothing around. No trees close by. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "river-shallow": {
+    "prompt": "A shallow river running over stones, heard from the bank a few steps away. Steady and soft, no waterfall, no rapids, no surf. No frogs, no birds in front. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "water-splash": {
+    "prompt": "One gentle splash as something small slips back into calm water, then the water closing over it. A single event, nothing before or after. No music, no melody, no speech, no singing. A single event with silence after it.",
+    "durationSeconds": 4.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  }
+}

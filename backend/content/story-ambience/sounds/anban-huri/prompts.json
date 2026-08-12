@@ -1,0 +1,20 @@
+{
+  "hall-murmur": {
+    "prompt": "A few people talking quietly in a large stone room, heard from the far side. No word is distinguishable, no laughter stands out. No insects, no beetle. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "river-shallow": {
+    "prompt": "A shallow river running over stones, heard from the bank a few steps away. Steady and soft, no waterfall, no rapids, no surf. No frogs, no animals. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 2
+  },
+  "village-morning": {
+    "prompt": "A country village heard from a distance at the start of the day. Very faint and far off, no single sound identifiable, just the sense of a place waking. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  }
+}

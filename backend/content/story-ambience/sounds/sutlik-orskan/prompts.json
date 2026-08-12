@@ -1,0 +1,14 @@
+{
+  "fire-cooking": {
+    "prompt": "A small cooking fire with a pot over it. Wood ticking and settling, a low simmer. Homely and domestic, not a bonfire. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "open-country-wind": {
+    "prompt": "Open country under a light wind, dry grass moving, a sense of walking somewhere with nothing around. No trees close by. No water, no lake, no waves. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 2
+  }
+}

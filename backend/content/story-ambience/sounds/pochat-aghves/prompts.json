@@ -1,0 +1,20 @@
+{
+  "open-country-wind": {
+    "prompt": "Open country under a light wind, dry grass moving, a sense of walking somewhere with nothing around. No trees close by. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "spring-trickle": {
+    "prompt": "A small village spring running into a clay jug. A thin clear stream of water into a vessel, close and modest, not a fountain and not a waterfall. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "village-yard": {
+    "prompt": "A farmyard heard from across it. A goat and a hen a good way off, some movement, nothing close enough to be in front. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  }
+}
