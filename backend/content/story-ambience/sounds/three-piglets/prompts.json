@@ -1,0 +1,32 @@
+{
+  "birds-spring": {
+    "prompt": "Spring birdsong, brighter and busier than dawn, several birds at a middle distance. Cheerful, no single bird dominant. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "forest-day": {
+    "prompt": "A deep summer forest in the middle of the day. Leaves moving, several small birds at a distance, none of them close or in front. Warm, open, unhurried. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "rain-light": {
+    "prompt": "The first light rain of the season falling on leaves and a roof. Soft, even, hopeful, no wind and no thunder. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "wind-gust": {
+    "prompt": "One short gust of wind rising and falling away, as if something blew hard once. Air only. No growl, no animal, no voice. No music, no melody, no speech, no singing. A single event with silence after it.",
+    "durationSeconds": 4.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "wind-leaves": {
+    "prompt": "Autumn wind moving through dry fallen leaves and bare branches. Rustling and dry, cool but not cold. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  }
+}

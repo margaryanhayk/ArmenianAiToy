@@ -630,11 +630,33 @@ def mmss(s: float) -> str:
     return f"{int(s // 60)}:{s % 60:05.2f}"
 
 
+def partition_held(cues: list[dict]) -> tuple[list[dict], list[str]]:
+    """Split off cues that are deliberately not ready to be mixed.
+
+    A cue with `held` is one whose POSITION is not yet known — four one-shots
+    in the library have notes demanding they land on an exact phrase, and the
+    only honest way to find that is forced alignment, which the API key cannot
+    yet call. Skipping them is not the same as forgetting them: they stay in
+    the cue sheet, they are printed on every run, and the story is re-mixed to
+    add them once the position can be measured.
+
+    The alternative — mixing them at the segment start — is precisely the
+    placement the owner rejected twice.
+    """
+    keep, held = [], []
+    for c in cues:
+        if c.get("held"):
+            held.append(f"{c['sound']}@seg{c['segment']} HELD: {c['held']}")
+        else:
+            keep.append(c)
+    return keep, held
+
+
 def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Path,
         render: bool, narration: Path | None = None,
         map_path: Path | None = None, force: bool = False,
         install_marker: Path | None = None) -> int:
-    cues = load_cues(story_id)
+    cues, held = partition_held(load_cues(story_id))
     refuse_if_already_mixed(narration, force)
     audio_dir = narration.parent if narration is not None else Path(".")
     if narration is not None:
@@ -728,9 +750,11 @@ def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Pat
         print(f"{mmss(c['start']):>10} {c['duration']:>6.2f}s "
               f"{c['level']:>6.1f}dB  {c['label']}")
 
+    for h in held:
+        print(f"  {h}")
     for n in line_notes:
         print(f"  {n}")
-    if line_notes:
+    if line_notes or held:
         print()
 
     for w in collisions(chains):
@@ -788,6 +812,7 @@ def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Pat
          "sounds": sorted({c["sound"] for c in chains}),
          "cues": len([c for c in chains if c["kind"] != "bed"]),
          "mixedFrom": narration.name if narration else str(segments_dir),
+         "heldCues": held,
          "note": "Do not mix this file again — see refuse_if_already_mixed in "
                  "tools/story-audio/mix_ambience.py. The narration-only master "
                  "is in git history."},

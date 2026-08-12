@@ -1,0 +1,15 @@
+{
+  "storyId": "three-piglets",
+  "sounds": [
+    "birds-spring",
+    "forest-day",
+    "rain-light",
+    "wind-leaves"
+  ],
+  "cues": 4,
+  "mixedFrom": "three-piglets.mp3",
+  "heldCues": [
+    "wind-gust@seg3 HELD: position needs forced alignment - the ElevenLabs key is missing the forced_alignment permission. Estimating it put a knock in the wrong place twice on 2026-08-12, in opposite directions; the owner heard both. Add with tools/story-audio/align_story.py once the key allows it, then re-mix this story from its narration master."
+  ],
+  "note": "Do not mix this file again \u2014 see refuse_if_already_mixed in tools/story-audio/mix_ambience.py. The narration-only master is in git history."
+}

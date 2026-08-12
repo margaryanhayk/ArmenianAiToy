@@ -1,0 +1,12 @@
+{
+  "storyId": "pochat-aghves",
+  "sounds": [
+    "open-country-wind",
+    "spring-trickle",
+    "village-yard"
+  ],
+  "cues": 3,
+  "mixedFrom": "pochat-aghves.mp3",
+  "heldCues": [],
+  "note": "Do not mix this file again \u2014 see refuse_if_already_mixed in tools/story-audio/mix_ambience.py. The narration-only master is in git history."
+}
