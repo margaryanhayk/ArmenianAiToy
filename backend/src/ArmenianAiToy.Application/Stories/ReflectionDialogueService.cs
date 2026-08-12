@@ -10,7 +10,13 @@ namespace ArmenianAiToy.Application.Stories;
 public sealed record ReflectionReaction(
     string? Text,
     StoryAnswerRejection FirstRejection,
-    StoryAnswerRejection? RetryRejection);
+    StoryAnswerRejection? RetryRejection,
+    /// <summary>Characters of prompt actually sent to the model, summed
+    /// across the first call and the repair retry. Before this existed the
+    /// reflection reaction was a billed model call the cost meter did not
+    /// record AT ALL — the reflection path counted speech-to-text only.
+    /// Defaults to 0 so existing constructions keep compiling.</summary>
+    long PromptCharsSent = 0);
 
 /// <summary>
 /// The after-story reflection dialogue's ONE model surface (owner request
@@ -54,21 +60,26 @@ public sealed class ReflectionDialogueService
 
         var question = story.ReflectionQuestions[questionIndex];
 
-        var first = await CompleteOrNullAsync(BuildSystemPrompt(story, question, repair: false), childAnswer);
+        var firstPrompt = BuildSystemPrompt(story, question, repair: false);
+        // Counted before the call: one that throws was still sent and billed.
+        long promptChars = firstPrompt.Length + childAnswer.Length;
+        var first = await CompleteOrNullAsync(firstPrompt, childAnswer);
         var firstRejection = StoryAnswerFilter.Check(first, story, StoryQuestionGuides.TryGet(story.Id));
         if (firstRejection == StoryAnswerRejection.None)
         {
-            return new ReflectionReaction(first!.Trim(), firstRejection, RetryRejection: null);
+            return new ReflectionReaction(first!.Trim(), firstRejection, RetryRejection: null, promptChars);
         }
 
-        var retry = await CompleteOrNullAsync(BuildSystemPrompt(story, question, repair: true), childAnswer);
+        var repairPrompt = BuildSystemPrompt(story, question, repair: true);
+        promptChars += repairPrompt.Length + childAnswer.Length;
+        var retry = await CompleteOrNullAsync(repairPrompt, childAnswer);
         var retryRejection = StoryAnswerFilter.Check(retry, story, StoryQuestionGuides.TryGet(story.Id));
         if (retryRejection == StoryAnswerRejection.None)
         {
-            return new ReflectionReaction(retry!.Trim(), firstRejection, retryRejection);
+            return new ReflectionReaction(retry!.Trim(), firstRejection, retryRejection, promptChars);
         }
 
-        return new ReflectionReaction(null, firstRejection, retryRejection);
+        return new ReflectionReaction(null, firstRejection, retryRejection, promptChars);
     }
 
     /// <summary>System prompt in English (project rule: GPT follows English

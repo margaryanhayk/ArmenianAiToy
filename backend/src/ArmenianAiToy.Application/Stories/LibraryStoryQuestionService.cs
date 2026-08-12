@@ -18,7 +18,15 @@ public sealed record StoryQuestionAnswer(
     string Text,
     bool UsedFallback,
     StoryAnswerRejection FirstRejection,
-    StoryAnswerRejection? RetryRejection);
+    StoryAnswerRejection? RetryRejection,
+    /// <summary>Total characters of prompt actually handed to the model for
+    /// this turn, summed across the first call and the repair retry. Exists
+    /// so the caller can price the turn against what was really sent —
+    /// grounding is two thirds of the cost of answering a child, and a
+    /// repair retry is a second billed call. Defaults to 0 so the many
+    /// existing constructions in tests keep compiling; a 0 simply prices
+    /// the turn the old, under-counting way.</summary>
+    long PromptCharsSent = 0);
 
 /// <summary>
 /// Service boundary for the bounded in-story Q&amp;A surface (MODES.md
@@ -76,25 +84,37 @@ public sealed class LibraryStoryQuestionService
 
         var prompt = LibraryStoryQuestionPromptBuilder.Build(
             story, guide, segmentIndex, childQuestion);
+        // Counted before the call, not after: a call that throws was still
+        // sent and still billed, and the fallback path must not look free.
+        long promptChars = PromptChars(prompt);
         var first = await CompleteOrNullAsync(prompt);
         var firstRejection = StoryAnswerFilter.Check(first, story, guide);
         if (firstRejection == StoryAnswerRejection.None)
         {
-            return new StoryQuestionAnswer(first!.Trim(), UsedFallback: false, firstRejection, RetryRejection: null);
+            return new StoryQuestionAnswer(
+                first!.Trim(), UsedFallback: false, firstRejection, RetryRejection: null, promptChars);
         }
 
         var repairPrompt = LibraryStoryQuestionPromptBuilder.Build(
             story, guide, segmentIndex, childQuestion, repair: true);
+        promptChars += PromptChars(repairPrompt);
         var retry = await CompleteOrNullAsync(repairPrompt);
         var retryRejection = StoryAnswerFilter.Check(retry, story, guide);
         if (retryRejection == StoryAnswerRejection.None)
         {
-            return new StoryQuestionAnswer(retry!.Trim(), UsedFallback: false, firstRejection, retryRejection);
+            return new StoryQuestionAnswer(
+                retry!.Trim(), UsedFallback: false, firstRejection, retryRejection, promptChars);
         }
 
         return new StoryQuestionAnswer(
-            StoryAnswerFilter.SafeFallback, UsedFallback: true, firstRejection, retryRejection);
+            StoryAnswerFilter.SafeFallback, UsedFallback: true, firstRejection, retryRejection, promptChars);
     }
+
+    /// <summary>Characters handed to the model for one call: system prompt
+    /// plus user message, which is exactly what the input side is billed
+    /// on.</summary>
+    private static long PromptChars(StoryQuestionPrompt prompt)
+        => (prompt.SystemPrompt?.Length ?? 0) + (prompt.UserMessage?.Length ?? 0);
 
     /// <summary>The authored child-facing re-anchor line for a story
     /// segment, or null when the story has no recap for that index.
