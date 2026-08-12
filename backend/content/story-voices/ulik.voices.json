@@ -1,0 +1,122 @@
+{
+ "storyId": "ulik",
+ "title": "Ուլիկը",
+ "_status": "DRAFT — attribution pending the owner's review. This file changes no story text.",
+ "_why": "The tale turns on the wolf saying the mother's exact words in a different voice. The text says so three times («իր հաստ ձայնով», «Քո ձայնը կոշտ է ու կոպիտ», «Էնպե՜ս հաստ ձայն ունե՜ր») and the 2026-08-11 narration says them all identically.",
+ "speakers": {
+  "narrator": {
+   "role": "The storyteller",
+   "direction": null,
+   "pitch": 1.0
+  },
+  "mother": {
+   "role": "Այծը, Ուլիկի մայրը",
+   "direction": "warm gentle mother goat, sweet and light, calling to her child",
+   "pitch": 1.0,
+   "note": "Her call is the one the kid trusts, and the wolf's copy is measured against it. It must be unmistakably kind."
+  },
+  "wolf": {
+   "role": "Գայլը",
+   "direction": "deep thick growling wolf, badly pretending to be sweet",
+   "pitch": 0.88,
+   "note": "Says the mother's words EXACTLY — only the voice differs, and that IS the scene. Not frightening: the kid is unimpressed, not terrified, and sends him away."
+  },
+  "ulik": {
+   "role": "Ուլիկը",
+   "direction": "small young goat, bright, a little wary, then excited telling his mother",
+   "pitch": 1.06
+  }
+ },
+ "segments": [
+  {
+   "index": 0,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Խոր անտառում մի այծ է լինում։ Ունենում է մի գեղեցիկ ուլ։ Ուլին ամեն օր թողնում է տանը, ինքը գնում է արոտ անելու։ Արածում է և իրիկունը կուրծքը լիքը տուն է գալիս։ Տուն է գալիս, դուռը զարկում ու մկըկում, կանչում․ "
+    },
+    {
+     "speaker": "mother",
+     "text": "Սևուկ ուլիկ, Սիրուն բալիկ, Ման եմ եկել սարեսար, Կաթն եմ բերել քեզ համար, Դըռնակը բա՛ց, ներս գամ ես, Անուշ-անուշ կաթ տամ քեզ․ Սևուկ ուլիկ, Սիրուն բալիկ։"
+    }
+   ]
+  },
+  {
+   "index": 1,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Ուլիկն իսկույն վեր է թռչում, դուռը բաց անում։ Մայրը կաթ է տալիս նրան ու կրկին գնում արոտ։ Էս բոլորը թաքուն տեսնում է գայլը։"
+    }
+   ]
+  },
+  {
+   "index": 2,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Մի իրիկուն այծից առաջ գալիս է, դուռը զարկում ու իր հաստ ձայնով կանչում․ "
+    },
+    {
+     "speaker": "wolf",
+     "text": "Սևուկ ուլիկ, Սիրուն բալիկ, Ման եմ եկել սարեսար, Կաթն եմ բերել քեզ համար, Դըռնակը բա՛ց, ներս գամ ես, Անուշ-անուշ կաթ տամ քեզ․ Սևուկ ուլիկ, Սիրուն բալիկ։"
+    }
+   ]
+  },
+  {
+   "index": 3,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Ուլիկը լսում է, լսում ու պատասխանում․ "
+    },
+    {
+     "speaker": "ulik",
+     "text": "— Էդ ո՞վ ես դու, չեմ ճանաչում։ Իմ մայրը էդպես չի կանչում։ Նա քաղցր ու բարակ ձայն ունի։ Քո ձայնը կոշտ է ու կոպիտ։ Դուռը բաց չե՛մ անի․․․ Գնա՛․․․ Չեմ ուզում քեզ․․․։ "
+    },
+    {
+     "speaker": "narrator",
+     "text": "Ու գայլը հեռանում է, գնում։"
+    }
+   ]
+  },
+  {
+   "index": 4,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Գալիս է մայրը, դուռը ծեծում․ "
+    },
+    {
+     "speaker": "mother",
+     "text": "Սևուկ ուլիկ, Սիրուն բալիկ, Ման եմ եկել սարեսար, Կաթն եմ բերել քեզ համար, Դըռնակը բա՛ց, ներս գամ ես, Անուշ-անուշ կաթ տամ քեզ․ Սևուկ ուլիկ, Սիրուն բալիկ։ "
+    },
+    {
+     "speaker": "narrator",
+     "text": "Ուլիկը դուռը բաց է անում, կաթ է խմում ու մորը պատմում․ "
+    },
+    {
+     "speaker": "ulik",
+     "text": "— Գիտե՞ս, մայրիկ, ի՛նչ եղավ։ Մի քիչ առաջ մինը եկավ, դուռը զարկեց ու կանչում էր․ Սևուկ ուլիկ, Սիրուն բալիկ։ Ասում էր՝ դուռը բա՛ց արա։ Էնպե՜ս հաստ ձայն ունե՜ր։ Էնպե՜ս վախեցա՜, էնպե՜ս վախեցա՜․․․ Դուռը բաց չարի, ասի՝ չեմ ուզում, գնա՛․․․"
+    }
+   ]
+  },
+  {
+   "index": 5,
+   "spans": [
+    {
+     "speaker": "mother",
+     "text": "— Պա՛ պա՛, պա՛, պա՛, Սևուկ ջան, ի՜նչ լավ է եղել, որ բաց չես արել,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "— ասավ վախեցած մայրը։ "
+    },
+    {
+     "speaker": "mother",
+     "text": "— Էդ գայլն է եղել, եկել է, որ քեզ ուտի։ Մյուս անգամ էլ որ գա, բաց չանես, ասա՝ գնա՛, թե չէ՝ իմ մայրը քեզ կսպանի իր սուր պոզերով։"
+    }
+   ]
+  }
+ ]
+}

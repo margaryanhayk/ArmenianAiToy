@@ -1,0 +1,75 @@
+{
+ "storyId": "princess-and-pea",
+ "title": "Արքայադուստրը և սիսեռահատիկը",
+ "_status": "DRAFT — attribution pending the owner's review. This file changes no story text.",
+ "_rule": "Only DIRECT speech gets a character. Reported speech («Նա ասաց, որ…») stays narrator, because it is the narrator speaking about them, not them speaking.",
+ "_why": "Almost entirely narration; the girl and the queen are reported, not quoted. The single exception is the queen's private thought «հիմա կստուգենք».",
+ "speakers": {
+  "narrator": {
+   "role": "The storyteller",
+   "direction": null,
+   "pitch": 1.0
+  },
+  "queen": {
+   "role": "Ծեր թագուհին",
+   "direction": "an old queen thinking to herself, quiet, shrewd, amused",
+   "pitch": 1.0,
+   "note": "A thought, not a spoken line — she smiles silently. Should sound inward, almost under the breath."
+  }
+ },
+ "segments": [
+  {
+   "index": 0,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Լինում է, չի լինում՝ մի արքայազն։ Նա ուզում էր ամուսնանալ միայն իսկական արքայադստեր հետ։ Երկար ման եկավ աշխարհով մեկ, բայց ամեն անգամ մի բան այն չէր։ Տխուր վերադարձավ տուն։"
+    }
+   ]
+  },
+  {
+   "index": 1,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Մի երեկո եղանակը շատ վատացավ։ Որոտում էր, ու անձրևը թափվում էր առատ։ Հանկարծ պալատի դուռը թակեցին։ Դռան մոտ կանգնած էր մի աղջիկ՝ թրջված մազերով ու մաշիկների միջից հոսող ջրով։ Նա ասաց, որ իսկական արքայադուստր է։"
+    }
+   ]
+  },
+  {
+   "index": 2,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Ծեր թագուհին լուռ ժպտաց ու մտածեց՝ "
+    },
+    {
+     "speaker": "queen",
+     "text": "հիմա կստուգենք։ "
+    },
+    {
+     "speaker": "narrator",
+     "text": "Նա մահճակալի տախտակին դրեց մի փոքրիկ սիսեռ։ Սիսեռի վրա շարեց տասներկու ներքնակ, ներքնակների վրա էլ՝ տասներկու փետրալից բարձ։ Աղջիկը բարձրացավ ամենավերևն ու պառկեց քնելու։"
+    }
+   ]
+  },
+  {
+   "index": 3,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Առավոտյան թագուհին հարցրեց, թե ինչպես էր քնել։ Աղջիկն ասաց, որ ամբողջ գիշեր մի կոշտ բան էր խանգարում իրեն, ու աչքը չէր փակել։ Բոլորը հասկացան, որ նա իսկական արքայադուստր է․ միայն իսկականը կզգար փոքրիկ սիսեռն այդքան ներքնակի տակ։"
+    }
+   ]
+  },
+  {
+   "index": 4,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Արքայազնն ամուսնացավ նրա հետ, և պալատում բոլորն ուրախ էին։ Իսկ փոքրիկ սիսեռը տարան թանգարան։ Ասում են՝ այն մինչև հիմա էլ այնտեղ դրված է։"
+    }
+   ]
+  }
+ ]
+}

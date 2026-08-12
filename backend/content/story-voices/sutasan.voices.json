@@ -1,0 +1,158 @@
+{
+ "storyId": "sutasan",
+ "title": "Սուտասանը",
+ "_status": "DRAFT — attribution pending the owner's review. This file changes no story text.",
+ "_rule": "Only DIRECT speech gets a character. Reported speech («Նա ասաց, որ…») stays narrator, because it is the narrator speaking about them, not them speaking.",
+ "_why": "Four voices against the king, and the whole joke is in the last exchange — he cannot call it a lie without paying, so he must sound trapped.",
+ "speakers": {
+  "narrator": {
+   "role": "The storyteller",
+   "direction": null,
+   "pitch": 1.0
+  },
+  "king": {
+   "role": "Թագավորը",
+   "direction": "a king, confident and amused, enjoying the game until he is caught",
+   "pitch": 0.95,
+   "note": "He out-lies the first two happily. His last two lines are the joke: he must sound cornered, changing his story."
+  },
+  "shepherd": {
+   "role": "Հովիվը",
+   "direction": "a shepherd, plain and bold, telling a whopper with a straight face",
+   "pitch": 1.0
+  },
+  "tailor": {
+   "role": "Դերձակը",
+   "direction": "a tailor, apologetic and quick, as if the excuse were ordinary",
+   "pitch": 1.02
+  },
+  "peasant": {
+   "role": "Աղքատ գյուղացին",
+   "direction": "a poor villager, calm, patient, completely serious — the quietest voice wins",
+   "pitch": 0.98,
+   "note": "He must NOT sound clever or mocking. The trap only works because he sounds like he means it."
+  }
+ },
+ "segments": [
+  {
+   "index": 0,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Լինում է, չի լինում՝ մի թագավոր։ Էս թագավորը իր երկրում հայտնում է․ "
+    },
+    {
+     "speaker": "king",
+     "text": "— Ով էնպես սուտ ասի, որ ես ասեմ՝ սուտ է, իմ թագավորության կեսը կտամ նրան։"
+    }
+   ]
+  },
+  {
+   "index": 1,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Գալիս է մի հովիվ։ Ասում է․ "
+    },
+    {
+     "speaker": "shepherd",
+     "text": "— Թագավորն ապրած կենա, իմ հերը մի դագանակ ուներ, որ էստեղից մեկնում էր, երկնքում աստղերը խառնում։ "
+    },
+    {
+     "speaker": "king",
+     "text": "— Կպատահի՛,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "— պատասխանում է թագավորը։ "
+    },
+    {
+     "speaker": "king",
+     "text": "— Իմ պապն էլ մի չիբուխ ուներ, մի ծերը բերանին էր դնում, մյուս ծերը մեկնում, արեգակիցը վառում։ "
+    },
+    {
+     "speaker": "narrator",
+     "text": "Ստախոսը գլուխը քորելով դուրս է գնում։"
+    }
+   ]
+  },
+  {
+   "index": 2,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Գալիս է մի դերձակ։ Ասում է․ "
+    },
+    {
+     "speaker": "tailor",
+     "text": "— Ներողությո՛ւն, թագավո՛ր, ես վաղ պիտի գայի, ուշացա։ Երեկ շատ անձրև եկավ, կայծակները տրաքեցին, երկինքը պատռվեց, գնացել էի կարկատելու։ "
+    },
+    {
+     "speaker": "king",
+     "text": "— Հա՛, լավ ես արել,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "— ասում է թագավորը,"
+    },
+    {
+     "speaker": "king",
+     "text": "— բայց լավ չէիր կարկատել, էս առավոտ էլ մի քիչ անձրև թափվեց։ "
+    },
+    {
+     "speaker": "narrator",
+     "text": "Սա էլ է դուրս գնում։"
+    }
+   ]
+  },
+  {
+   "index": 3,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Ներս է մտնում մի աղքատ գյուղացի, կոտը կռնատակին։ "
+    },
+    {
+     "speaker": "king",
+     "text": "— Դո՞ւ ինչ ես ուզում, ա՛յ մարդ,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "— հարցնում է թագավորը։ "
+    },
+    {
+     "speaker": "peasant",
+     "text": "— Ինձ մի կոտ ոսկի ես պարտ, եկել եմ տանեմ։ "
+    },
+    {
+     "speaker": "king",
+     "text": "— Մի կոտ ոսկի՞"
+    },
+    {
+     "speaker": "narrator",
+     "text": "— զարմանում է թագավորը։ "
+    },
+    {
+     "speaker": "king",
+     "text": "— Սո՛ւտ ես ասում, ես քեզ ոսկի չեմ պարտ։ "
+    },
+    {
+     "speaker": "peasant",
+     "text": "— Թե որ սուտ եմ ասում, թագավորությանդ կեսը տուր։ "
+    },
+    {
+     "speaker": "king",
+     "text": "— Չէ՛, չէ՛, ճշմարիտ ես ասում,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "— խոսքը փոխում է թագավորը։ "
+    },
+    {
+     "speaker": "peasant",
+     "text": "— Ճշմարիտ եմ ասում՝ մի կոտ ոսկին տուր։"
+    }
+   ]
+  }
+ ]
+}

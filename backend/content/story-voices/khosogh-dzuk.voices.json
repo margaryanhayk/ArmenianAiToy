@@ -1,0 +1,373 @@
+{
+ "storyId": "khosogh-dzuk",
+ "title": "Խոսող ձուկը",
+ "_status": "DRAFT — attribution pending the owner's review. This file changes no story text.",
+ "_rule": "Only DIRECT speech gets a character. Reported speech («Նա ասաց, որ…») stays narrator, because it is the narrator speaking about them, not them speaking.",
+ "_why": "The riddle duel in segments 6-7 alternates with no attribution at all: the monster says «Ուրեմն՝…», the guest answers «Ի՜նչ…». Without a speaker map a renderer cannot tell them apart, and today's narration reads all of it in one voice.",
+ "speakers": {
+  "narrator": {
+   "role": "The storyteller",
+   "direction": null,
+   "pitch": 1.0
+  },
+  "poor_man": {
+   "role": "Աղքատ մարդը",
+   "direction": "a poor, gentle, wondering man — the kindness is in his voice before it is in his actions",
+   "pitch": 1.0
+  },
+  "fish": {
+   "role": "Խոսող ձուկը",
+   "direction": "very quiet, breathless, struggling — the text says «ցա՜ծ, շա՜տ ցած ձենով, ցամաքած բերանը բացուխուփ անելով»",
+   "pitch": 1.05,
+   "note": "The text prescribes this delivery explicitly. It must be hard to hear without being inaudible — that is what makes the man lean in."
+  },
+  "fisherman": {
+   "role": "Ձկնորսը",
+   "direction": "harsh, contemptuous, shouting at his servant",
+   "pitch": 0.93
+  },
+  "monster": {
+   "role": "Հրեշը",
+   "direction": "huge and calm, sure of itself, never shouting — its confidence is the threat",
+   "pitch": 0.85,
+   "note": "Not a roaring monster. It loses a riddle contest, so it must sound like something that expects to win, then quietly gives up."
+  },
+  "guest": {
+   "role": "Անծանոթ երիտասարդը — the fish",
+   "direction": "a calm young traveller, warm and completely unafraid",
+   "pitch": 1.0,
+   "note": "He IS the fish, revealed in the last line. Do NOT make him sound like the fish — the reveal must land as a surprise. If anything is shared, it is the calm, not the voice."
+  }
+ },
+ "segments": [
+  {
+   "index": 0,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Լինում է, չի լինում՝ մի աղքատ մարդ։ Էս աղքատ մարդը գնում է դառնում մի ձկնորսի շալակատար։ Օրական մի քանի ձուկն է աշխատում, տուն բերում, նրանով ապրում են ինքն ու կնիկը։ Մի անգամ էլ ձկնորսը մի սիրուն ձուկն է բռնում, տալիս իր շալակատարին, որ պահի, ինքն էլ ետ ջուրն է մտնում։ Էս շալակատարը գետափին նստած՝ նայում է, նայում էն սիրուն ձկանն ու միտք է անում։ "
+    },
+    {
+     "speaker": "poor_man",
+     "text": "- Տե՛ր աստված,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- ասում է,- "
+    },
+    {
+     "speaker": "poor_man",
+     "text": "սա էլ, որ մեզ նման շունչ-կենդանի է, դու ասա՝ սա՞ էլ մեզ նման ծնող ունի, ընկեր ունի, աշխարհքից բան է հասկանում, ուրախություն կամ ցավ է զգում, թե՞ չէ․․․ "
+    },
+    {
+     "speaker": "narrator",
+     "text": "Հենց էս մտածելու ժամանակ ձուկը լեզու է առնում։"
+    }
+   ]
+  },
+  {
+   "index": 1,
+   "spans": [
+    {
+     "speaker": "fish",
+     "text": "- Լսի՛,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- ասում է,- "
+    },
+    {
+     "speaker": "fish",
+     "text": "մարդ-ախպեր։ Ընկերներիս հետ ես խաղում էի գետի ալիքների մեջ։ Ուրախությունից ինձ մոռացա ու անզգույշ ընկա ձկնորսի ուռկանը։ Հիմի, ո՛վ գիտի, իմ ծնողը ինձ որոնում է ու լաց է լինում, հիմի ընկերներս տխրել են։ Ես էլ, տեսնում ես, ինչպես եմ տանջվում, շունչս կտրում է ջրից դուրս։ Ուզում եմ էլ ետ գնամ ապրեմ ու խաղ անեմ նրանց հետ էն պաղ ու պարզ ջրերում։ Էնպես եմ ուզո՜ւմ, էնպես եմ ուզո՜ւմ․․․ Եկ, խեղճ արի, ազատ արա ինձ, բա՛ց թող, բա՛ց թող գնամ․․․ "
+    },
+    {
+     "speaker": "narrator",
+     "text": "Էսպես էր ասում ցա՜ծ, շա՜տ ցած ձենով, ցամաքած բերանը բացուխուփ անելով։"
+    }
+   ]
+  },
+  {
+   "index": 2,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Էս շալակատարի մեղքը գալիս է, առնում է, ետ գցում գետը։ "
+    },
+    {
+     "speaker": "poor_man",
+     "text": "- Գնա՛, սիրուն ձկնիկ, թող լաց չլինի քու ծնողը։ Թող չտխրեն քու ընկերները։ Գնա՛, ապրի՛ ու խա՛ղ արա նրանց հետ։ "
+    },
+    {
+     "speaker": "narrator",
+     "text": "Ձկնորսը սաստիկ բարկանում է շալակատարի վրա։ "
+    },
+    {
+     "speaker": "fisherman",
+     "text": "- Տո՛, ախմախ,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- ասում է,- "
+    },
+    {
+     "speaker": "fisherman",
+     "text": "ես էստեղ ջրի մեջ թրջվելով ձուկն եմ բռնում, դու իմ աշխատանքն առնում ես էլ ետ ջուրը գցո՞ւմ․․․ Դե գնա՛ կորի՛, էլ իմ աչքին չերևա՛ս, էլ իմ շալակատարը չես էս օրից։ "
+    },
+    {
+     "speaker": "narrator",
+     "text": "Ձեռի տոպրակն էլ խլում է ու ճամփու դնում։"
+    }
+   ]
+  },
+  {
+   "index": 3,
+   "spans": [
+    {
+     "speaker": "poor_man",
+     "text": "- Հիմի ես ո՞ւր գնամ, ի՞նչ անեմ, ո՞նց ապրեմ․․․"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- տարակուսած մտածելով, դառն ու դատարկ վերադառնում է աղքատը դեպի տուն։ Էս տխուր մտածմունքի ժամանակ ճամփին դեմը դուրս է գալի մի մարդակերպ Հրեշ՝ առաջը մի գեղեցիկ կով։ "
+    },
+    {
+     "speaker": "monster",
+     "text": "- Բարի օր, ախպերացու, էդ ի՞նչ ես մոլորել, ի՞նչ ես միտք անում,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- հարցնում է Հրեշը։ Աղքատը պատմում է իր գլխին եկածը, թե ինչպես՝ հիմի մնացել է անգործ, անճար ու չի իմանում, թե ոնց պետք է ապրեն ինքն ու իր կնիկը։"
+    }
+   ]
+  },
+  {
+   "index": 4,
+   "spans": [
+    {
+     "speaker": "monster",
+     "text": "- Լսի՛, բարեկամ,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- ասում է Հրեշը։- "
+    },
+    {
+     "speaker": "monster",
+     "text": "Էս կաթնատու կովը ես քեզ կտամ երեք տարվան ժամանակով։ Ամեն օր էնքան կաթը տա, որ քու կնիկն ու դու կուշտ-կուշտ ուտեք, ապրեք։ Երեք տարին լրացավ թե չէ՝ հենց էն գիշերը կգամ ձեզ հարց կտամ։ Թե հարցիս պատասխանեցիք՝ իմ կովը ձեզ լինի, թե չէ՝ երկուսդ էլ իմն եք։ Համաձայն ե՞ս։ "
+    },
+    {
+     "speaker": "poor_man",
+     "text": "- Մի բան, որ առանց էն էլ սովից մեռնելու ենք,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- մտածում է աղքատը,- "
+    },
+    {
+     "speaker": "poor_man",
+     "text": "կովը կտանեմ, էս երեք տարին կապրենք, մինչև երեք տարվա լրանալն էլ աստված ողորմած է։ "
+    },
+    {
+     "speaker": "poor_man",
+     "text": "- Համաձայն եմ,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- ասում է ու կովն առաջն անում, տանում տուն։"
+    }
+   ]
+  },
+  {
+   "index": 5,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Երեք տարի կթում են, լիուլի ուտում, ապրում։ Չեն էլ նկատում, թե ինչպես անցավ երեք տարին, և ահա հասնում է նշանակած օրը, որ Հրեշն էն գիշեր պիտի գա։ Մարդ ու կնիկ վերջալուսի տակ տխուր նստում են դռանը, ու միտք են անում, թե ինչ պատասխան տան Հրեշին։ Էս ժամանակ նրանց մոտենում է մի անծանոթ գեղեցիկ երիտասարդ։ "
+    },
+    {
+     "speaker": "guest",
+     "text": "- Բարի իրիկո՛ւն,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- ասում է,- "
+    },
+    {
+     "speaker": "guest",
+     "text": "ճամփորդ մարդ եմ, մութն ընկնում է, ես էլ հոգնած եմ, հյուր չե՞ք ընդունի ձեր տանն էս գիշեր։ "
+    },
+    {
+     "speaker": "poor_man",
+     "text": "- Ընչի՛ չէ, ճամփորդ ախպեր, հյուրն աստծունն է։ Բայց մեզ մոտ վտանգավոր է էս գիշեր։ "
+    },
+    {
+     "speaker": "narrator",
+     "text": "Պատմում են Հրեշի հետ իրենց պայմանի մասին։ "
+    },
+    {
+     "speaker": "guest",
+     "text": "- Բան չկա, որտեղ դուք, էնտեղ էլ ես,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- պատասխանում է օտարականը։ Համաձայնում են, հյուրը մնում է։"
+    }
+   ]
+  },
+  {
+   "index": 6,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Մին էլ կեսգիշերին դուռը դղրդում է։ "
+    },
+    {
+     "speaker": "poor_man",
+     "text": "- Ո՞վ է։ "
+    },
+    {
+     "speaker": "monster",
+     "text": "- Հրեշը։ Եկել եմ որ եկել եմ, դե պատասխանս տվեք։ "
+    },
+    {
+     "speaker": "narrator",
+     "text": "Սարսափից մարդ ու կնկա լեզուն կապվում է, մնում են տեղները քարացած։ "
+    },
+    {
+     "speaker": "guest",
+     "text": "- Մի՛ վախենաք, ես ձեր տեղակ սրա պատասխանը կտամ,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- ասում է երիտասարդ հյուրը ու գնում է դեպի դուռը։ "
+    },
+    {
+     "speaker": "monster",
+     "text": "- Եկե՜լ եմ,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- դռան ետևից ձայն է տալի Հրեշը։ "
+    },
+    {
+     "speaker": "guest",
+     "text": "- Ես էլ եմ եկե՜լ,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- պատասխանում է ներսից հյուրը։ "
+    },
+    {
+     "speaker": "monster",
+     "text": "- Ո՞րտեղից ես եկել։ "
+    },
+    {
+     "speaker": "guest",
+     "text": "- Ծովի էն ափից։ "
+    },
+    {
+     "speaker": "monster",
+     "text": "- Ընչո՞վ ես եկել։ "
+    },
+    {
+     "speaker": "guest",
+     "text": "- Կաղ մոծակը թամքել եմ, վրեն նստել եմ, եկել։ "
+    },
+    {
+     "speaker": "monster",
+     "text": "- Ուրեմն՝ ծովը պստիկ է եղել։ "
+    },
+    {
+     "speaker": "guest",
+     "text": "- Ի՜նչ պստիկ, արծիվը չի կարող մի ափից մյուսը թռչի։ "
+    },
+    {
+     "speaker": "monster",
+     "text": "- Ուրեմն՝ արծիվը ճուտ է եղել։ "
+    },
+    {
+     "speaker": "guest",
+     "text": "- Ի՜նչ ճուտ․ թևերի շվաքը քաղաք է ծածկում։ "
+    },
+    {
+     "speaker": "monster",
+     "text": "- Ուրեմն՝ քաղաքը շատ է փոքրիկ։ "
+    },
+    {
+     "speaker": "guest",
+     "text": "- Ի՜նչ փոքրիկ․ նապաստակը մի ծայրից մյուսը չի հասնի։"
+    }
+   ]
+  },
+  {
+   "index": 7,
+   "spans": [
+    {
+     "speaker": "monster",
+     "text": "- Ուրեմն՝ նապաստակը ձագ է։ "
+    },
+    {
+     "speaker": "guest",
+     "text": "- Ի՜նչ ձագ․ մորթին մի մարդու քուրք դուրս կգա, գլխարկն ու տրեխն էլ՝ ավել։ "
+    },
+    {
+     "speaker": "monster",
+     "text": "- Ուրեմն՝ մարդը թզուկ է։ "
+    },
+    {
+     "speaker": "guest",
+     "text": "- Ի՜նչ թզուկ․ ծնկան ծերին աքլորը ծուղրուղու կանչի, ձենը ականջը չի հասնիլ։ "
+    },
+    {
+     "speaker": "monster",
+     "text": "- Ուրեմն՝ խուլ է։ "
+    },
+    {
+     "speaker": "guest",
+     "text": "- Ի՜նչ խուլ․ սարում որ պախրեն խոտ պոկի, նա կլսի։ "
+    },
+    {
+     "speaker": "narrator",
+     "text": "Հրեշը մնում է կապված-մոլորված, զգում է, որ ներսը մի ուժ կա իմաստուն, համարձակ, անհաղթելի, էլ չի իմանում՝ ինչ ասի, սուսուփուս քաշվում, կորչում է գիշերվա խավարի մեջ։"
+    }
+   ]
+  },
+  {
+   "index": 8,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Սրանք նոր մեռած տեղներիցը ետ են գալի, ուրախանում, աշխարհքովը մին են լինում։ Հետն էլ բացվում է բարի լուսը, և երիտասարդ հյուրը վեր է կենում, մնաք բարով է ասում, որ գնա իր ճանապարհը։ "
+    },
+    {
+     "speaker": "poor_man",
+     "text": "- Չենք թողնի որ չենք թողնի,"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- առաջը կտրում են մարդ ու կին,- "
+    },
+    {
+     "speaker": "poor_man",
+     "text": "դու, որ փրկեցիր մեր կյանքը, ասա՛, ինչով ետ վճարենք քո լավությունը․․․ "
+    },
+    {
+     "speaker": "guest",
+     "text": "- Չէ՛, անկարելի բան է, պետք է գնամ իմ ճանապարհը։ "
+    },
+    {
+     "speaker": "poor_man",
+     "text": "- Դե գոնե անունդ ասա, գոնե իմանանք, թե ում ենք օրհնելու․․․ "
+    },
+    {
+     "speaker": "guest",
+     "text": "- Լավությունը արա ու թեկուզ ջուրը գցի՝ չի կորչիլ։ Ես հենց էն Խոսող ձուկն եմ, որի կյանքը դու խնայեցիր․․․"
+    },
+    {
+     "speaker": "narrator",
+     "text": "- ասում է անծանոթն ու չքանում ապշած մարդ ու կնկա աչքերից։"
+    }
+   ]
+  }
+ ]
+}

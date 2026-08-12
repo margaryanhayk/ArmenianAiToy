@@ -1,0 +1,43 @@
+{
+ "storyId": "hedgehog-apple",
+ "title": "Ոզնիկն ու խնձորը",
+ "_status": "DRAFT — attribution pending the owner's review. This file changes no story text.",
+ "_rule": "Only DIRECT speech gets a character. Reported speech («Նա ասաց, որ…») stays narrator, because it is the narrator speaking about them, not them speaking.",
+ "_why": "Pure narration — no character speaks aloud anywhere in it. Recorded so a future render knows this was checked, not skipped.",
+ "speakers": {
+  "narrator": {
+   "role": "The storyteller",
+   "direction": null,
+   "pitch": 1.0
+  }
+ },
+ "segments": [
+  {
+   "index": 0,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Անտառում ապրում էր մի փոքրիկ ոզնիկ։ Մի առավոտ նա գտավ մի մեծ կարմիր խնձոր։ Խնձորը շատ համով էր երևում։ Բայց խնձորը ծանր էր, շատ ծանր։"
+    }
+   ]
+  },
+  {
+   "index": 1,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Ոզնիկը կանչեց իր ընկեր նապաստակին։ Նրանք միասին գլորեցին խնձորը։ Խնձորը դանդաղ գլորվեց մինչև ոզնիկի տնակը։"
+    }
+   ]
+  },
+  {
+   "index": 2,
+   "spans": [
+    {
+     "speaker": "narrator",
+     "text": "Ոզնիկն ու նապաստակը միասին կերան խնձորը։ Խնձորն իսկապես շատ քաղցր էր։ Հետո նրանք նստեցին ծառի տակ։ Անտառում խաղաղ էր ու հանգիստ։"
+    }
+   ]
+  }
+ ]
+}
