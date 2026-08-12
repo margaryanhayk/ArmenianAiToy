@@ -20,11 +20,46 @@ public sealed class OpenAIDailyCostCapOptions
     public bool Enabled { get; set; } = true;
 
     /// <summary>
-    /// Default per-device daily cap in USD. Conservative default of
-    /// <c>0.50</c> so a misbehaving client cannot rack up significant
-    /// cost in a single UTC day.
+    /// Default per-device daily cap in USD.
+    ///
+    /// <para>
+    /// <b>Set from a number of questions, not picked as a dollar figure.</b>
+    /// Nobody can say what $0.50 buys, so the intent gets lost the first time
+    /// someone edits it. The product intent is <b>30 in-story questions per
+    /// child per day</b>; measured cost is $0.0078 per question, so
+    /// 30 × $0.0078 ≈ <c>$0.234</c>, rounded to <c>0.25</c> — about $7.50 a
+    /// month per toy at the ceiling, against electronics that cost $17-27 to
+    /// make. Thirty questions is far more than a 4-7 year old asks in a day;
+    /// the limit exists for a stuck button, not for a curious child.
+    /// </para>
+    ///
+    /// <para>
+    /// This replaced <c>0.50</c> on 2026-08-12. That value was not what it
+    /// appeared: the meter counted the child's ~21-character question rather
+    /// than the ~8,343-character prompt sent with it, so the real ceiling was
+    /// about $1.49/day — roughly $45/month per toy. The counting is fixed in
+    /// the same commit, so this number is now honest.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>INTERIM — must be revisited before production</b> (owner decision,
+    /// 2026-08-12). One flat limit for everybody is the right call while no
+    /// real child has used the toy; tiers need a free-tier number that can
+    /// only be learned by watching one. See
+    /// <c>docs/usage-tiers-brainstorm.md</c>.
+    /// </para>
     /// </summary>
-    public decimal Default { get; set; } = 0.50m;
+    public decimal Default { get; set; } = 0.25m;
+
+    /// <summary>The number of in-story questions per device per day that
+    /// <see cref="Default"/> is derived from. Not read at runtime — it exists
+    /// so the intent survives the next edit, and so a test can pin the two
+    /// together.</summary>
+    public const int IntendedQuestionsPerDay = 30;
+
+    /// <summary>Measured USD cost of one in-story question, 2026-08-12.
+    /// Source: tools/quality-evidence/cost-per-hour-of-play-20260812.md.</summary>
+    public const decimal MeasuredUsdPerQuestion = 0.0078m;
 
     /// <summary>
     /// #022 — optional FLEET-wide daily ceiling in USD: a kill-switch on

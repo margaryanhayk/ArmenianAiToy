@@ -146,4 +146,76 @@ public class OpenAICostEstimatorTests
                 OpenAICostEstimator.DefaultChatOutputUsdPerMillionTokens);
         }
     }
+
+    // ---- pricing against what was actually sent (2026-08-12) ----
+
+    /// <summary>KEYSTONE. The old overload sees only the child's question, so
+    /// it prices the input side at almost nothing. Measured against the real
+    /// in-story prompt: ~21 characters of question versus ~8,343 of grounding.
+    /// This test states the size of the gap the fix closes, so a future edit
+    /// that quietly reverts to the cheap overload fails here.</summary>
+    [Fact]
+    public void PromptAwareEstimate_IsMateriallyHigherThanQuestionOnly()
+    {
+        const string question = "Ինչո՞ւ ձուկը խոսում է";
+        const string answer = "Որովհետև դա հեքիաթ է, և հեքիաթում ամեն ինչ հնարավոր է։";
+        const long realPromptChars = 8343;
+
+        var questionOnly = OpenAICostEstimator.EstimateChatCostUsd(question, answer);
+        var promptAware = OpenAICostEstimator.EstimateChatCostUsdFromPrompt(realPromptChars, answer);
+
+        Assert.True(promptAware > questionOnly * 3,
+            $"prompt-aware ({promptAware}) must dominate question-only ({questionOnly})");
+    }
+
+    /// <summary>A repair retry is a second billed call. The caller sums both
+    /// prompts into one number, so double the characters must cost more.</summary>
+    [Fact]
+    public void MorePromptChars_CostMore()
+    {
+        var once = OpenAICostEstimator.EstimateChatCostUsdFromPrompt(8343, "x");
+        var twice = OpenAICostEstimator.EstimateChatCostUsdFromPrompt(8343 * 2, "x");
+        Assert.True(twice > once);
+    }
+
+    /// <summary>Paths that never reached the model report 0 and must be free
+    /// on the input side — an empty transcript costs speech-to-text only.</summary>
+    [Fact]
+    public void ZeroOrNegativePromptChars_ChargesOutputOnly()
+    {
+        var zero = OpenAICostEstimator.EstimateChatCostUsdFromPrompt(0, "answer");
+        var negative = OpenAICostEstimator.EstimateChatCostUsdFromPrompt(-5, "answer");
+        var outputOnly = OpenAICostEstimator.EstimateChatCostUsd("", "answer");
+
+        Assert.Equal(outputOnly, zero);
+        Assert.Equal(outputOnly, negative);
+    }
+
+    /// <summary>The old overload keeps its exact behaviour. It is still used
+    /// by the online chat path, whose prompt is built inside ChatService and
+    /// cannot be reported without touching a HIGH-risk file.</summary>
+    [Fact]
+    public void LegacyOverload_IsUnchanged()
+    {
+        // 4 chars in, 4 chars out -> 1 token each at the documented rates.
+        var cost = OpenAICostEstimator.EstimateChatCostUsd("abcd", "wxyz");
+        Assert.Equal(
+            (1m / 1_000_000m * OpenAICostEstimator.ChatInputUsdPerMillionTokens)
+          + (1m / 1_000_000m * OpenAICostEstimator.ChatOutputUsdPerMillionTokens),
+            cost);
+    }
+
+    /// <summary>The daily cap is derived from a number of QUESTIONS, and the
+    /// two must not drift apart. If someone changes the dollar figure without
+    /// changing the intent (or vice versa), this fails and makes them say
+    /// which they meant.</summary>
+    [Fact]
+    public void ShippedDailyCap_MatchesTheIntendedQuestionsPerDay()
+    {
+        var derived = OpenAIDailyCostCapOptions.IntendedQuestionsPerDay
+                    * OpenAIDailyCostCapOptions.MeasuredUsdPerQuestion;
+        var shipped = new OpenAIDailyCostCapOptions().Default;
+
+        Assert.InRange(shipped, derived * 0.9m, derived * 1.2m);
+    }
 }

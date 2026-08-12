@@ -72,10 +72,45 @@ public static class OpenAICostEstimator
     /// Estimate the USD cost of one chat round-trip from the lengths of
     /// the user input and the assistant response. Pure character-count
     /// based — no token-counting dependency on a real tokenizer.
+    ///
+    /// <para>
+    /// <b>This overload UNDER-COUNTS whenever a system prompt was sent,</b>
+    /// because it sees only the user's message. Measured 2026-08-12: a real
+    /// in-story question is ~21 characters against an assembled prompt of
+    /// ~8,343, so the input side was counted at roughly 0.3% of what the API
+    /// actually billed, and a turn at 33% overall. Prefer
+    /// <see cref="EstimateChatCostUsdFromPrompt"/> wherever the caller can
+    /// obtain the real prompt size. Kept because the online chat path
+    /// (<c>ChatController</c> / <c>AudioChatController</c>) builds its prompt
+    /// inside <c>ChatService</c> and cannot report the size without changing
+    /// that file, which is HIGH risk — and no shipped firmware uses that path
+    /// today. See docs/usage-tiers-brainstorm.md.
+    /// </para>
     /// </summary>
     public static decimal EstimateChatCostUsd(string? userMessage, string? assistantResponse)
     {
         long inputTokens = EstimateTokenCount(userMessage);
+        long outputTokens = EstimateTokenCount(assistantResponse);
+        return TokensToUsd(inputTokens, ChatInputUsdPerMillionTokens)
+             + TokensToUsd(outputTokens, ChatOutputUsdPerMillionTokens);
+    }
+
+    /// <summary>
+    /// Estimate the USD cost of one or more chat round-trips from the ACTUAL
+    /// number of prompt characters sent, plus the response.
+    ///
+    /// <para>
+    /// <paramref name="promptChars"/> is the sum of every system prompt and
+    /// user message handed to the model for this turn — including a repair
+    /// retry, which is a second billed call the older overload never saw at
+    /// all. Callers that know what they sent should use this; two thirds of
+    /// the cost of answering a child is the grounding sent with the question.
+    /// </para>
+    /// </summary>
+    public static decimal EstimateChatCostUsdFromPrompt(long promptChars, string? assistantResponse)
+    {
+        if (promptChars < 0) promptChars = 0;
+        long inputTokens = (long)Math.Ceiling(promptChars / (double)CharsPerTokenEstimate);
         long outputTokens = EstimateTokenCount(assistantResponse);
         return TokensToUsd(inputTokens, ChatInputUsdPerMillionTokens)
              + TokensToUsd(outputTokens, ChatOutputUsdPerMillionTokens);

@@ -315,6 +315,11 @@ public class StoryQaController : ControllerBase
         // canned/pre-reviewed line (empty / input-blocked / garbled / filter
         // fallback) is already safe and skips that extra classifier call.
         var answerIsModelAuthored = false;
+        // Hoisted out of the answer block so the cost record below can price
+        // the turn against what was really sent. Stays 0 on every path that
+        // never reached the model (empty transcript, input-blocked, failure),
+        // which is correct — those cost nothing on the input side.
+        long answerPromptChars = 0;
         if (string.IsNullOrWhiteSpace(question))
         {
             answerText = StoryAnswerFilter.SafeFallback;
@@ -369,6 +374,7 @@ public class StoryQaController : ControllerBase
                     var answer = await _questions.AnswerAsync(story, segmentIndex, question);
                     gptMs = stage.ElapsedMilliseconds;
                     answerText = answer.Text;
+                    answerPromptChars = answer.PromptCharsSent;
                     answerIsModelAuthored = !answer.UsedFallback;
                     turnOutcome = answer.UsedFallback ? "answer_fallback" : "answered";
                     // Privacy (#005): never log the child's transcribed words.
@@ -488,7 +494,13 @@ public class StoryQaController : ControllerBase
             try
             {
                 var sttCost = OpenAICostEstimator.EstimateWhisperCostUsd(audioBytes.LongLength);
-                var chatCost = OpenAICostEstimator.EstimateChatCostUsd(question, answerText);
+                // Priced against what was ACTUALLY sent, not the child's
+                // question: the grounding prompt is ~8,300 characters against
+                // a ~21-character question, and it is two thirds of the cost
+                // of the turn. A repair retry is included, being a second
+                // billed call. See docs/usage-tiers-brainstorm.md.
+                var chatCost = OpenAICostEstimator.EstimateChatCostUsdFromPrompt(
+                    answerPromptChars, answerText);
                 var ttsCost = OpenAICostEstimator.EstimateTtsCostUsd(answerText);
                 _costMeter.Record(deviceId, sttCost + chatCost + ttsCost, DateTime.UtcNow);
             }
@@ -706,6 +718,11 @@ public class StoryQaController : ControllerBase
         // back to the deterministic rotated acknowledgement — the child
         // never hears unvalidated model text.
         string? reactionText = null;
+        // Recorded even when the reaction is discarded by output moderation:
+        // the call was made and billed either way, and a cost meter that only
+        // counts the answers we kept would understate a bad day exactly when
+        // it matters most.
+        long reactionPromptChars = 0;
         var aiRepliesEnabled =
             !bool.TryParse(_config["StoryQa:ReflectionAiReplies"], out var aiOn) || aiOn;
         if (affirm && aiRepliesEnabled && _reflectionDialogue is not null)
@@ -713,6 +730,7 @@ public class StoryQaController : ControllerBase
             try
             {
                 var reaction = await _reflectionDialogue.ReactAsync(story, questionIndex, answer);
+                reactionPromptChars = reaction.PromptCharsSent;
                 if (reaction.Text is not null)
                 {
                     var outputModeration = await _moderation.CheckContentAsync(reaction.Text);
@@ -847,7 +865,12 @@ public class StoryQaController : ControllerBase
             try
             {
                 var sttCost = OpenAICostEstimator.EstimateWhisperCostUsd(audioBytes.LongLength);
-                _costMeter.Record(deviceId, sttCost, DateTime.UtcNow);
+                // The AI reaction is a billed model call that this path did
+                // not record at all before 2026-08-12 — it counted STT only.
+                // Zero when the reaction was skipped or the gate is off.
+                var chatCost = OpenAICostEstimator.EstimateChatCostUsdFromPrompt(
+                    reactionPromptChars, reactionText);
+                _costMeter.Record(deviceId, sttCost + chatCost, DateTime.UtcNow);
             }
             catch (Exception ex)
             {

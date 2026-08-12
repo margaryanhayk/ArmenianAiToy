@@ -1,7 +1,14 @@
 # Usage tiers — thinking, not a spec
 
-*Written 2026-08-12, after measuring what a child's question actually costs.
-This is material for a decision, not a decision. Nothing in the code changed.*
+*Written 2026-08-12, after measuring what a child's question actually costs.*
+
+> **DECIDED, INTERIM — shape A is now live, and MUST be revisited before
+> production** (owner, 2026-08-12). One limit for everybody: 30 questions per
+> child per day, cap `$0.25`, counter fixed so the number is true, no tiers,
+> nothing gated. The owner's words were "do as you suggest, but need this to
+> change before production" — so this document is not archived. It is the
+> open question, and shipping to real families is the deadline for answering
+> it. Sections 4, 5 and 7 are what that answer needs.
 
 Companion to `docs/paid-tier-plan.md`, which asks a different question. That
 one is about **content** — should new story packs cost money. This one is about
@@ -179,9 +186,9 @@ anyone wants to pay.
 4. **Armenia or the diaspora?** `paid-tier-plan.md` already flags that one USD
    price serves neither market well.
 
-## 8. Recommendation, held loosely
+## 8. Recommendation — taken, as an interim
 
-If it must be decided before there is evidence: **shape A now, shape D later.**
+**Shape A now, shape D later.** Adopted 2026-08-12.
 
 One honest limit around 30 questions a day (~$7/month worst case), the counter
 fixed so it is true, no tiers, no billing, nothing gated. It ships without

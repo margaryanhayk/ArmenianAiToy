@@ -61,15 +61,31 @@ is 8,343. So the meter sees ~6 input tokens where the API billed ~2,086.
   It therefore fires after ~191 turns, by which point real spend is about
   **$1.49 — three times the cap.**
 
-This is a real gap but not an emergency: $1.49 is still small, the cap does
-still stop a runaway, and every other component (STT, TTS, output) is counted
-correctly. It is recorded rather than fixed because the estimator is
-cost-control code and changing what it counts changes when the cap fires for
-every device — an owner decision, not a tidy-up.
+**FIXED the same day.** The owner's decision was one honest limit for
+everybody rather than tiers, so:
 
-The honest fix, when it is wanted, is to pass the assembled prompt length into
-the estimate at each call site rather than the user's message, leaving the
-rates alone.
+- `EstimateChatCostUsdFromPrompt(promptChars, response)` prices against what
+  was actually sent. `LibraryStoryQuestionService` and
+  `ReflectionDialogueService` now report their real prompt size, summed across
+  the repair retry — a second billed call the meter never saw at all.
+- The reflection path recorded **speech-to-text only**; its AI reaction was a
+  billed model call counted as free. Now counted, including when the reaction
+  is discarded by output moderation, because it was billed either way.
+- The cap moved from `$0.50` to **`$0.25`**, derived as 30 questions × $0.0078
+  rather than picked as a dollar figure — about $7.50/month per toy at the
+  ceiling. A test pins the dollar value against the intended question count so
+  the two cannot drift.
+
+The online chat path (`ChatController`, `AudioChatController`) still uses the
+old overload and still under-counts. Its prompt is assembled inside
+`ChatService`, which is a HIGH-risk file, and **no shipped firmware uses that
+path** — the online chat flow is complete but has never been flashed. Recorded
+rather than forced.
+
+**INTERIM.** The owner's instruction was explicit: this must change before
+production. One flat limit is right while no real child has used the toy;
+tiers need a free-tier number that can only be learned by watching one. See
+`docs/usage-tiers-brainstorm.md`.
 
 ## Reproducing
 
