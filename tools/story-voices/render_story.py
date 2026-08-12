@@ -41,6 +41,10 @@ FADE_OUT = 0.030               # longer out: gives a loud ending a natural decay
 PAUSE_SENTENCE = 0.34
 PAUSE_CLAUSE   = 0.16
 PAUSE_SPEAKER  = 0.40
+# Between two segments the narrator turns the page. This gap is also load-
+# bearing arithmetic: a segment's start in the map is the running sum of the
+# audio AND the gaps before it, so changing it here changes the byte map.
+PAUSE_SEGMENT  = 0.60
 
 LATIN_RUN = re.compile(r"[A-Za-z]{3,}")
 
@@ -177,6 +181,35 @@ def stitch(parts, outdir, name):
                     "-ac","1","-ar","44100","-b:a","128k",out], capture_output=True)
     return out
 
+def assemble(sid, seg_files, outdir):
+    """Join the segments into the story, and write the map of where they are.
+
+    The map is in SECONDS because byte offsets cannot be known yet — they
+    depend on the re-encode Ship-StoryAudio.ps1 does afterwards. That is what
+    tools/story-audio/segments_to_bytes.py converts, and it must run last.
+    """
+    sil = os.path.join(outdir, f"_segsil.wav")
+    subprocess.run(["ffmpeg","-v","error","-y","-f","lavfi","-t",str(PAUSE_SEGMENT),
+                    "-i","anullsrc=r=44100:cl=mono",sil], capture_output=True)
+    lst = os.path.join(outdir, f"_{sid}.txt")
+    starts, t = [], 0.0
+    with open(lst, "w") as f:
+        for i, seg in enumerate(seg_files):
+            if i:
+                f.write(f"file '{sil}'\n")
+                t += PAUSE_SEGMENT
+            starts.append(round(t, 3))
+            f.write(f"file '{seg}'\n")
+            t += duration(seg)
+    out = os.path.join(outdir, f"{sid}.mp3")
+    subprocess.run(["ffmpeg","-v","error","-y","-f","concat","-safe","0","-i",lst,
+                    "-ac","1","-ar","44100","-b:a","192k",out], capture_output=True)
+    mp = os.path.join(outdir, f"{sid}.segments.json")
+    json.dump({"storyId": sid, "unit": "seconds", "starts": starts},
+              open(mp, "w", encoding="utf-8"))
+    print(f"  -> {out}  {duration(out):.1f}s, {len(starts)} segments -> {mp}")
+    return out
+
 def main():
     if len(sys.argv) < 3:
         print("usage: render_story.py <storyId> <outdir> [segmentIndex]"); return 2
@@ -186,12 +219,25 @@ def main():
     voice = os.environ.get(VOICE_ENV) or sys.exit(f"set {VOICE_ENV}")
     os.makedirs(outdir, exist_ok=True)
     smap = json.load(open(f"backend/content/story-voices/{sid}.voices.json", encoding="utf-8"))
+    seg_files = []
     for seg in smap["segments"]:
         if only is not None and seg["index"] != only:
             continue
+        f = os.path.join(outdir, f"{sid}-seg{seg['index']}.mp3")
+        # Resume. 211 paid requests where one chopped span at number 200 throws
+        # away the other 199 is the wrong shape: a finished segment is money
+        # already spent, so it is never re-requested.
+        if os.path.exists(f) and os.path.getsize(f) > 1000:
+            print(f"  segment {seg['index']} already rendered — keeping")
+            seg_files.append(f); continue
         print(f"  segment {seg['index']} ({len(seg['spans'])} spans)")
         parts = render_segment(smap, seg, outdir, token, voice)
         print("  ->", stitch(parts, outdir, f"{sid}-seg{seg['index']}.mp3"))
+        seg_files.append(f)
+    # A single-segment run is a spot check, not a story: assembling one segment
+    # into <sid>.mp3 would look exactly like a finished render and ship.
+    if only is None:
+        assemble(sid, seg_files, outdir)
     return 0
 
 if __name__ == "__main__":
