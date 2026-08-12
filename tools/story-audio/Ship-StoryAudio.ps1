@@ -25,7 +25,12 @@
 #   ./Ship-StoryAudio.ps1 -In <folder> -Fix         # + repair and level a copy
 #   ./Ship-StoryAudio.ps1 -In <folder> -Fix -Apply  # + install + patch config
 #
-#   <folder> holds one file per story named <storyId>.mp3, e.g. anban-huri.mp3.
+#   <folder> holds one file per story named <storyId>.mp3 or <storyId>.wav,
+#   e.g. anban-huri.mp3. WAV is accepted because mix_ambience.py deliberately
+#   writes one - it will not encode, since loudness must be measured on the
+#   FINISHED mix and an intermediate MP3 would be a second lossy generation for
+#   nothing. Its closing line points at this script, so this script has to be
+#   able to read what it wrote.
 #   Story ids must match backend/src/ArmenianAiToy.Application/Stories/Content.
 #   -Apply writes into story-audio/ and appsettings.json and bumps Version.
 #
@@ -157,12 +162,30 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ("areg-ship-" + [Guid]::NewGuid().T
 if ($Fix) { New-Item -ItemType Directory -Force -Path $work | Out-Null }
 
 $rows = @()
-foreach ($f in Get-ChildItem -Path $In -Filter *.mp3 -File | Sort-Object Name) {
+$inputs = @(Get-ChildItem -Path $In -File |
+            Where-Object { $_.Extension -in '.mp3', '.wav' } | Sort-Object Name)
+# A story delivered as both .wav and .mp3 would be checked twice and installed
+# twice, the second overwriting the first with whichever sorted later. Refuse.
+$dupes = $inputs | Group-Object { [IO.Path]::GetFileNameWithoutExtension($_.Name) } |
+         Where-Object Count -gt 1
+if ($dupes) {
+    Write-Error ("Both .wav and .mp3 present for: " + (($dupes.Name) -join ', ') +
+                 ". Keep one - which of the two ships would otherwise depend on " +
+                 "filename sort order.")
+    exit 1
+}
+foreach ($f in $inputs) {
     $id = [IO.Path]::GetFileNameWithoutExtension($f.Name)
     $chars = Get-StoryChars $id
     $expected = if ($chars -gt 0) { $chars / $CharsPerSecond } else { 0 }
 
     $src = $f.FullName
+    if ($f.Extension -eq '.wav' -and -not $Fix) {
+        Write-Error ("$($f.Name) is a WAV and -Fix was not given. The checks " +
+                     "below count MP3 frames and -Apply installs bytes as-is, " +
+                     "so this would ship a WAV named .mp3. Re-run with -Fix.")
+        exit 1
+    }
     if ($Fix) {
         $dst = Join-Path $work "$id.mp3"
         Repair-And-Level $src $dst
@@ -182,7 +205,7 @@ foreach ($f in Get-ChildItem -Path $In -Filter *.mp3 -File | Sort-Object Name) {
     }
 }
 
-if ($rows.Count -eq 0) { Write-Error "No .mp3 files in $In" }
+if ($rows.Count -eq 0) { Write-Error "No .mp3 or .wav files in $In" }
 
 # [int] in PowerShell ROUNDS, so [int](220/60) is 4 and a 3:40 story prints as
 # 4:40. Floor the minutes and take the remainder from the floored value.
