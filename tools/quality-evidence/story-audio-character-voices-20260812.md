@@ -1,5 +1,34 @@
 # Ten stories re-rendered span by span, each character in its own voice
 
+**Verdict: APPROVED by the owner, 2026-08-12 — "Keep".**
+
+He listened and accepted the character voices. Per the standing convention in
+`anban-huri-listen-test-TEMPLATE.md`, an agent must not fill in a verdict: what
+is recorded here is that the OWNER approved, not that a tool judged the audio.
+The approval attaches to these exact bytes.
+
+| story | size | sha256 (first 16) |
+|---|---|---|
+| anban-huri | 5,560,991 | `a501bb9cc2b19980` |
+| hedgehog-apple | 613,817 | `97bef3409e01612f` |
+| khosogh-dzuk | 8,044,922 | `2ec0d4458b0d26bd` |
+| little-cloud | 514,133 | `d47727754718e65f` |
+| pochat-aghves | 5,460,680 | `ea467bdf3d973cdd` |
+| princess-and-pea | 1,560,494 | `af2232d13976606e` |
+| sutasan | 1,880,233 | `0700361a8e814305` |
+| sutlik-orskan | 3,356,047 | `68f9762e5dc473b7` |
+| three-piglets | 2,010,009 | `ffcdc46192e37fe8` |
+| ulik | 2,549,177 | `e9d8f4685a2f9bdf` |
+
+**Ambience will move some of these hashes and not others.** The eight stories
+that carry ambience cues get new bytes when the mix lands and need a fresh
+listen for the mix — the VOICES are approved either way, and that is not
+re-opened by adding a forest under them. `hedgehog-apple` and `little-cloud`
+have no cues (owner decision, same day: they are 25 and 21 seconds long and a
+fading forest under a story that short reads as busier than it is), so those
+two keep these bytes unchanged.
+
+
 **Date:** 2026-08-12
 **Tool:** `tools/story-voices/render_story.py` (per SPAN), then
 `tools/story-audio/Ship-StoryAudio.ps1 -Fix -Apply`, then
@@ -109,9 +138,9 @@ re-download.
 
 ## What is NOT proven
 
-- **Nobody has listened.** 211 stitched requests. No tool can hear a seam, a
-  wrong emphasis, or a character voice that reads as silly rather than
-  different. That is the last gate and it is still open.
+- ~~**Nobody has listened.**~~ **Closed** — the owner listened and said Keep.
+  That was the open gate; 211 stitched requests, and no tool could have heard a
+  seam or a character voice that reads as silly rather than different.
 - **The pitch shift is a machine effect, not acting.** It makes the wolf
   distinct from the mother. It does not make him frightening, and a listener
   may find it artificial. If so, the answer is the human narrator in
