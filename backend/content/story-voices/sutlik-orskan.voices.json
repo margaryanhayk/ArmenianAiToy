@@ -7,20 +7,35 @@
  "speakers": {
   "narrator": {
    "role": "The storyteller",
-   "direction": null,
-   "pitch": 1.0
+   "pitch": 1.0,
+   "directionForHumanNarrator": null,
+   "voiceSettings": {
+    "stability": 0.55,
+    "similarity_boost": 0.8,
+    "style": 0.2
+   }
   },
   "boaster": {
    "role": "Սուտլիկ որսկանը — the tall-tale teller himself",
-   "direction": "a village braggart telling an impossible hunting story with total conviction, delighted with himself, never winking",
    "pitch": 1.0,
-   "note": "This story has no neutral narrator: the teller IS the liar, first person throughout. He must never signal that he knows it is nonsense — the child does the laughing."
+   "note": "This story has no neutral narrator: the teller IS the liar, first person throughout. He must never signal that he knows it is nonsense — the child does the laughing.",
+   "directionForHumanNarrator": "a village braggart telling an impossible hunting story with total conviction, delighted with himself, never winking",
+   "voiceSettings": {
+    "stability": 0.35,
+    "similarity_boost": 0.8,
+    "style": 0.55
+   }
   },
   "companion": {
    "role": "Հադի, Հյուդի, Չատի, Մատի — the companions",
-   "direction": "flat, unbothered, answering the same way every time — the joke is the repetition",
    "pitch": 0.97,
-   "note": "One voice for all four on purpose. They are a chorus, not four characters, and distinguishing them would slow the run of gags."
+   "note": "One voice for all four on purpose. They are a chorus, not four characters, and distinguishing them would slow the run of gags.",
+   "directionForHumanNarrator": "flat, unbothered, answering the same way every time — the joke is the repetition",
+   "voiceSettings": {
+    "stability": 0.75,
+    "similarity_boost": 0.8,
+    "style": 0.1
+   }
   }
  },
  "segments": [
@@ -121,5 +136,6 @@
     }
    ]
   }
- ]
+ ],
+ "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing)."
 }

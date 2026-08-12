@@ -7,31 +7,56 @@
  "speakers": {
   "narrator": {
    "role": "The storyteller",
-   "direction": null,
-   "pitch": 1.0
+   "pitch": 1.0,
+   "directionForHumanNarrator": null,
+   "voiceSettings": {
+    "stability": 0.55,
+    "similarity_boost": 0.8,
+    "style": 0.2
+   }
   },
   "huri": {
    "role": "Անբան Հուռին",
-   "direction": "lazy, unbothered, pleased with herself; the verse chewed out slowly like she is chewing mastic",
    "pitch": 1.04,
-   "note": "Never sly. She genuinely believes the frogs are spinning her cotton — the whole comedy rests on her sincerity."
+   "note": "Never sly. She genuinely believes the frogs are spinning her cotton — the whole comedy rests on her sincerity.",
+   "directionForHumanNarrator": "lazy, unbothered, pleased with herself; the verse chewed out slowly like she is chewing mastic",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   },
   "frogs": {
    "role": "Փեփելն ու Կեկելը — the frogs",
-   "direction": "croaking, two-note, flat and repetitive — a frog, not a character with feelings",
    "pitch": 0.9,
-   "note": "The narrator voices these himself and they are the story's best joke. The ambience cue sheet forbids a REAL frog sound over them for exactly this reason."
+   "note": "The narrator voices these himself and they are the story's best joke. The ambience cue sheet forbids a REAL frog sound over them for exactly this reason.",
+   "directionForHumanNarrator": "croaking, two-note, flat and repetitive — a frog, not a character with feelings",
+   "voiceSettings": {
+    "stability": 0.25,
+    "similarity_boost": 0.7,
+    "style": 0.6
+   }
   },
   "husband": {
    "role": "Վաճառական մարդը",
-   "direction": "a young merchant, warm and hasty, easily delighted and easily frightened",
-   "pitch": 0.96
+   "pitch": 0.96,
+   "directionForHumanNarrator": "a young merchant, warm and hasty, easily delighted and easily frightened",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   },
   "mother_in_law": {
    "role": "Զոքանչը",
-   "direction": "a sly old woman, honeyed and utterly straight-faced while inventing the beetle",
    "pitch": 1.0,
-   "note": "Her lie must be delivered with complete sincerity — she is saving her daughter, not being funny."
+   "note": "Her lie must be delivered with complete sincerity — she is saving her daughter, not being funny.",
+   "directionForHumanNarrator": "a sly old woman, honeyed and utterly straight-faced while inventing the beetle",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.85,
+    "style": 0.4
+   }
   }
  },
  "segments": [
@@ -204,5 +229,6 @@
     }
    ]
   }
- ]
+ ],
+ "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing)."
 }

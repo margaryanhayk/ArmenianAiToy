@@ -7,14 +7,24 @@
  "speakers": {
   "narrator": {
    "role": "The storyteller",
-   "direction": null,
-   "pitch": 1.0
+   "pitch": 1.0,
+   "directionForHumanNarrator": null,
+   "voiceSettings": {
+    "stability": 0.55,
+    "similarity_boost": 0.8,
+    "style": 0.2
+   }
   },
   "queen": {
    "role": "Ծեր թագուհին",
-   "direction": "an old queen thinking to herself, quiet, shrewd, amused",
    "pitch": 1.0,
-   "note": "A thought, not a spoken line — she smiles silently. Should sound inward, almost under the breath."
+   "note": "A thought, not a spoken line — she smiles silently. Should sound inward, almost under the breath.",
+   "directionForHumanNarrator": "an old queen thinking to herself, quiet, shrewd, amused",
+   "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.3
+   }
   }
  },
  "segments": [
@@ -71,5 +81,6 @@
     }
    ]
   }
- ]
+ ],
+ "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing)."
 }
