@@ -1,0 +1,20 @@
+{
+  "door-knock": {
+    "prompt": "Three firm knocks on a solid wooden door, then silence. Close and clear, firm but not violent. No howl, no growl, no animal. No music, no melody, no speech, no singing. A single event with silence after it.",
+    "durationSeconds": 4.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 2
+  },
+  "forest-day": {
+    "prompt": "A deep summer forest in the middle of the day. Leaves moving, several small birds at a distance, none of them close or in front. Warm, open, unhurried. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  },
+  "forest-evening": {
+    "prompt": "The same summer forest late in the day. Lower and thinner than the afternoon, a little wind in the canopy, one or two distant birds settling. Calm and safe, never eerie or tense. No music, no melody, no speech, no singing. Continuous even field recording that could loop.",
+    "durationSeconds": 10.0,
+    "promptInfluence": 0.45,
+    "cuesUsingIt": 1
+  }
+}

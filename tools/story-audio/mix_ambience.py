@@ -31,8 +31,24 @@ encode. Run `segments_to_bytes.py` against the shipped file to convert it, or
 the backend silently ignores the map and keeps guessing. See
 `docs/voice-narrator-brief.md` §3.
 
-A single whole-story file is still accepted (`--single`), but then cue times
-must be estimated from character counts and the segment map is not written —
+TWO WAYS IN, AND THE SECOND IS NOW THE USUAL ONE
+------------------------------------------------
+`--segments-dir` is the studio path: one WAV per segment, boundaries measured
+directly. It is what `docs/voice-narrator-brief.md` §3 asks a human narrator to
+deliver.
+
+`--narration <story.mp3> --map <story.segments.json>` is the path for audio
+that has ALREADY shipped. It reads the installed story and its committed BYTE
+map and walks the MP3 frames to turn those offsets back into seconds — the
+exact inverse of `segments_to_bytes.py`, whose frame walker it reuses. Prefer
+it whenever the story is already in `story-audio/`: the shipped file is
+192 kbps where an intermediate render is usually 128, the segment starts are
+the committed ones rather than re-measured, and — the reason it exists — the
+per-segment renders live in a scratch directory that does not survive the
+afternoon, while the map is in git.
+
+A single whole-story file with no map is still accepted (`--single`), but then
+cue times are estimated from character counts and no segment map is written,
 because a map that was guessed is worse than no map at all.
 
 DRY RUN BY DEFAULT
@@ -66,10 +82,18 @@ STORY_DIR = REPO / "backend/src/ArmenianAiToy.Application/Stories/Content"
 HOLD_UNDER_DROP_DB = 8.0
 FADE_IN_S = 0.5
 FADE_OUT_S = 1.0
+# A one-shot is an EVENT, and half a second of fade-in swallows it. Measured on
+# the first generated knock for «Ուլիկը»: the two strikes peak at 0.1s and 0.4s
+# and everything after 0.9s is silence, so the bed's 0.5s ramp would have taken
+# the wolf's knock down to a fifth of its volume — the one sound in that story
+# that has to land. A one-shot gets just enough ramp to kill the click at the
+# splice, and its tail is left alone.
+ONESHOT_FADE_IN_S = 0.01
+ONESHOT_FADE_OUT_S = 0.15
 # A bed shorter than its own two fades plus a little is not a bed, it is a
 # swell — and at exactly fade_in+fade_out the fade-out starts before the
 # fade-in has finished, which reads as a click. Found by the self-test.
-MIN_BED_S = FADE_IN_S + FADE_OUT_S + 0.5
+MIN_BED_S = FADE_IN_S + FADE_OUT_S + 0.5   # beds only; one-shots are events
 # Two cues landing within this of each other arrive as one muddled event. The
 # usual cause is a cue at the END of segment N and another at the START of
 # N+1 — which are the same instant, a fact that is not obvious in the cue
@@ -153,14 +177,17 @@ def build_filtergraph(n_segments: int, chains: list[dict]) -> str:
         idx = n_segments + k
         out = f"c{k}"
         labels.append(f"[{out}]")
-        fade_out_at = max(0.0, c["duration"] - FADE_OUT_S)
+        one = c["kind"] == "oneshot"
+        fade_in = ONESHOT_FADE_IN_S if one else FADE_IN_S
+        fade_out = ONESHOT_FADE_OUT_S if one else FADE_OUT_S
+        fade_out_at = max(0.0, c["duration"] - fade_out)
         delay_ms = int(round(c["start"] * 1000))
         parts.append(
             f"[{idx}:a]aloop=loop=-1:size=2e9,"          # sounds may be short
             f"atrim=0:{c['duration']:.3f},"
             f"volume={c['level']:.1f}dB,"
-            f"afade=t=in:st=0:d={FADE_IN_S},"
-            f"afade=t=out:st={fade_out_at:.3f}:d={FADE_OUT_S},"
+            f"afade=t=in:st=0:d={fade_in},"
+            f"afade=t=out:st={fade_out_at:.3f}:d={fade_out},"
             f"adelay={delay_ms}|{delay_ms},"
             f"asetpts=PTS-STARTPTS[{out}]"
         )
@@ -233,15 +260,53 @@ def segment_files(segments_dir: Path, story_id: str) -> list[Path]:
     return files
 
 
+def segments_from_shipped(narration: Path, map_path: Path) -> list[float]:
+    """Segment durations, recovered from a shipped MP3 and its byte map.
+
+    The backend stores a bare array of BYTE offsets because that is what it can
+    seek to. Byte -> second is a frame walk, and `segments_to_bytes.py` already
+    owns that walk; importing it keeps one implementation of the MP3 frame
+    tables rather than a second copy that could drift from it.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from segments_to_bytes import frame_offsets  # noqa: E402
+
+    offsets = json.loads(map_path.read_text(encoding="utf-8"))
+    if not isinstance(offsets, list) or not offsets:
+        raise SystemExit(f"{map_path} is not a byte map — expected a JSON array "
+                         f"of offsets, the shape StoryQaController reads.")
+    frames = frame_offsets(narration)
+    if not frames:
+        raise SystemExit(f"no MPEG frames found in {narration}")
+    total = frames[-1][1]
+
+    starts: list[float] = []
+    i = 0
+    for off in offsets:
+        while i + 1 < len(frames) and frames[i][0] < off:
+            i += 1
+        starts.append(frames[i][1])
+    # The first segment starts when the audio does, whatever byte the map says
+    # the first frame sits at (45 in this library, past the single ID3 tag).
+    if starts:
+        starts[0] = 0.0
+    return [b - a for a, b in zip(starts, starts[1:] + [total])]
+
+
 def mmss(s: float) -> str:
     return f"{int(s // 60)}:{s % 60:05.2f}"
 
 
-def run(story_id: str, segments_dir: Path, sounds_dir: Path, out_dir: Path,
-        render: bool) -> int:
+def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Path,
+        render: bool, narration: Path | None = None,
+        map_path: Path | None = None) -> int:
     cues = load_cues(story_id)
-    segs = segment_files(segments_dir, story_id)
-    durations = [wav_duration(f) for f in segs]
+    if narration is not None:
+        segs = [narration]
+        durations = segments_from_shipped(narration, map_path)
+    else:
+        segs = segment_files(segments_dir, story_id)
+        durations = [wav_duration(f) for f in segs]
     starts = segment_starts(durations)
     total = sum(durations)
     sounds = index_sounds(sounds_dir)
@@ -249,11 +314,11 @@ def run(story_id: str, segments_dir: Path, sounds_dir: Path, out_dir: Path,
     story_json = STORY_DIR / f"{story_id}.story.json"
     if story_json.exists():
         n_text = len(json.loads(story_json.read_text(encoding="utf-8"))["segments"])
-        if n_text != len(segs):
-            print(f"WARNING: {len(segs)} WAV files but the story has {n_text} "
-                  f"segments. Cue anchors will be wrong.", file=sys.stderr)
+        if n_text != len(durations):
+            print(f"WARNING: {len(durations)} segment(s) of audio but the story "
+                  f"has {n_text}. Cue anchors will be wrong.", file=sys.stderr)
 
-    problems = validate(cues, len(segs), sounds, total)
+    problems = validate(cues, len(durations), sounds, total)
     if problems:
         print(f"{story_id}: cannot mix —", file=sys.stderr)
         for p in problems:
@@ -262,7 +327,9 @@ def run(story_id: str, segments_dir: Path, sounds_dir: Path, out_dir: Path,
 
     chains = build_chains(cues, starts, durations, sounds)
 
-    print(f"{story_id}  {len(segs)} segments, {mmss(total)} total")
+    src_note = (f"from {narration.name} + {map_path.name}" if narration
+                else f"from {len(segs)} WAV file(s)")
+    print(f"{story_id}  {len(durations)} segments, {mmss(total)} total  ({src_note})")
     print(f"{'seg':>4} {'starts at':>10}  {'length':>8}")
     for i, (s, d) in enumerate(zip(starts, durations)):
         print(f"{i:>4} {mmss(s):>10}  {d:>7.2f}s")
@@ -284,6 +351,8 @@ def run(story_id: str, segments_dir: Path, sounds_dir: Path, out_dir: Path,
         cmd += ["-i", str(f)]
     for c in chains:
         cmd += ["-i", str(c["src"])]
+    # concat=n=1 is valid, so the shipped-MP3 path passes straight through the
+    # same graph with no special case.
     cmd += ["-filter_complex", build_filtergraph(len(segs), chains),
             "-map", "[out]", "-ar", "44100", "-ac", "1",
             "-c:a", "pcm_s16le", str(mixed)]
@@ -373,6 +442,20 @@ def self_test() -> int:
     check("concat covers every segment", "[0:a][1:a][2:a]concat=n=3" in graph, True)
     check("amix does not renormalize", "normalize=0" in graph, True)
     check("amix counts narration + chains", "amix=inputs=3" in graph, True)
+    # A one-shot must not be ramped like a bed.
+    one_graph = build_filtergraph(1, [
+        {"src": Path("k.mp3"), "start": 3.0, "duration": 2.0, "level": -18.0,
+         "kind": "oneshot", "label": "knock"}])
+    check("one-shot fades in almost instantly",
+          f"afade=t=in:st=0:d={ONESHOT_FADE_IN_S}" in one_graph, True)
+    check("one-shot is not given a bed's ramp",
+          f"afade=t=in:st=0:d={FADE_IN_S}" in one_graph, False)
+    bed_graph = build_filtergraph(1, [
+        {"src": Path("f.mp3"), "start": 0.0, "duration": 9.0, "level": -28.0,
+         "kind": "bed", "label": "forest~bed"}])
+    check("a bed keeps its slow ramp",
+          f"afade=t=in:st=0:d={FADE_IN_S}" in bed_graph, True)
+
     check("cue delayed to its time", "adelay=10000|10000" in graph, True)
 
     clash = build_chains(
@@ -398,6 +481,28 @@ def self_test() -> int:
         got = [round(wav_duration(f), 3) for f in segment_files(d, "demo")]
         check("wav_duration from header", got, [1.0, 0.5])
 
+    # The shipped-MP3 path, against a real committed story. No ffmpeg, no
+    # network: the frame walk is pure Python and the map is in git. The
+    # invariant is a ROUND TRIP — bytes to seconds and back must land on the
+    # same offsets, because a half-frame slip here would move every cue in
+    # every story and would be invisible until someone listened.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from segments_to_bytes import frame_offsets, seconds_to_bytes  # noqa: E402
+
+    mp3 = REPO / "backend/src/ArmenianAiToy.Api/story-audio/ulik.mp3"
+    mp = mp3.with_suffix(".segments.json")
+    if mp3.exists() and mp.exists():
+        want = json.loads(mp.read_text(encoding="utf-8"))
+        durs = segments_from_shipped(mp3, mp)
+        starts = segment_starts(durs)
+        check("shipped map yields one duration per segment", len(durs), len(want))
+        check("first segment starts at zero", starts[0], 0.0)
+        check("durations are all positive", all(d > 0 for d in durs), True)
+        back = seconds_to_bytes(starts, frame_offsets(mp3))
+        check("bytes -> seconds -> bytes round-trips", back, want)
+    else:
+        print("  skip shipped-map checks — ulik.mp3 not in the tree")
+
     print("\nSELF-TEST " + ("PASS" if ok else "FAIL"))
     return 0 if ok else 1
 
@@ -406,7 +511,12 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--story")
-    ap.add_argument("--segments-dir", type=Path)
+    ap.add_argument("--segments-dir", type=Path,
+                    help="directory of <storyId>-NN.wav (the studio path)")
+    ap.add_argument("--narration", type=Path,
+                    help="a shipped <storyId>.mp3 to mix under")
+    ap.add_argument("--map", dest="map_path", type=Path,
+                    help="its committed <storyId>.segments.json (byte offsets)")
     ap.add_argument("--sounds-dir", type=Path)
     ap.add_argument("--out", type=Path, default=Path("mixed"))
     ap.add_argument("--render", action="store_true",
@@ -417,9 +527,17 @@ def main() -> int:
 
     if a.self_test:
         return self_test()
-    if not (a.story and a.segments_dir and a.sounds_dir):
-        ap.error("--story, --segments-dir and --sounds-dir are required")
-    return run(a.story, a.segments_dir, a.sounds_dir, a.out, a.render)
+    if not (a.story and a.sounds_dir):
+        ap.error("--story and --sounds-dir are required")
+    if bool(a.narration) != bool(a.map_path):
+        ap.error("--narration and --map go together: mixing a shipped story "
+                 "without its committed byte map would guess the cue times.")
+    if not (a.segments_dir or a.narration):
+        ap.error("give either --segments-dir, or --narration with --map")
+    if a.segments_dir and a.narration:
+        ap.error("--segments-dir and --narration are two ways in; pick one")
+    return run(a.story, a.segments_dir, a.sounds_dir, a.out, a.render,
+               a.narration, a.map_path)
 
 
 if __name__ == "__main__":
