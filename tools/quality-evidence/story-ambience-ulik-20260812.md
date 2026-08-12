@@ -175,3 +175,85 @@ than the mechanism.
 checks; `check_story_audio.py` 10 of 10; ulik 1:46, 192 kbps, one ID3 tag; byte
 map regenerated after the re-encode and starting at 45; the double-mix guard
 observed refusing; `check_speaker_map.py` PASS; `dotnet test` 2554.
+
+## Round 3 — the story stops, the door is struck, the story continues
+
+The owner heard round 2 and said the knock was now about two seconds LATE, and
+that the answer was not another nudge: **"we can pause, we can play knocking,
+and then continue."**
+
+Both halves of that were right.
+
+**The two seconds.** There is exactly one pause 2.45 s earlier than where round
+2 put the knock, and it is the longest in the segment — **35.33–36.12 s
+(0.79 s)** against the 0.31 s gap at 37.78 s. That is what a change of speaker
+looks like, and round 2's arithmetic dismissed it as the narrator taking a
+breath. The estimate has now been wrong twice, in opposite directions, and both
+times an ear caught it. That is the finding: **a cue's position was being
+guessed and it needs to be measured.**
+
+**The pause.** A sound laid over continuous narration has to fit whatever gap
+the speech happens to leave, so a small placement error becomes an audible
+mistake. Cutting the story open removes the class entirely — and a beat before
+the door is struck is better storytelling than a knock competing with a
+sentence.
+
+`insert: true` now cuts the narration at a detected silence and concatenates
+`lead-in · sound · tail` into the hole. Result for «Ուլիկը»:
+
+| | round 1 | round 2 | round 3 |
+|---|---|---|---|
+| wolf's knock | 32.16 s | 37.78 s | **cut at 35.33 s, knock at 35.58 s** |
+| mother's knock | 63.35 s | 64.59 s | **cut at 64.59 s, knock at 66.56 s** |
+| story length | 1:46 | 1:46 | **1:49** |
+
+The hole is 1.72 s for 1.12 s of knock — sized from the sound's **measured**
+length, not the cue's `seconds`. The generated knock is a 4 s file with about a
+second of strikes in it; using `seconds: 2` would have opened a 2.6 s hole with
+1.7 s of nothing in the middle of it.
+
+Measured in the finished file, RMS in 0.5 s windows: narration **3490** right up
+to the cut, **702** through the knock, **102** in the tail. The knock is alone.
+
+### The bug that made the first attempt absurd
+
+The first insertion dry run opened a **10.6-second hole** and reported it as
+"10.03s of door-knock" for a 4-second file. `build_chains` emits a SECOND chain
+for every `holdUnder` scene, so chain order is not cue order — pairing them by
+position had put the wolf's knock onto the evening forest and sized its hole
+from the forest. Chains now carry their cue index. Worth recording because the
+output was obviously wrong; the same mistake with a 3-second sound would have
+been a plausible-looking hole in the wrong place.
+
+### Blocked: the measurement that should replace the guess
+
+The owner chose forced alignment — send the audio with the exact approved text
+and get the time of every word back. `tools/story-audio/align_story.py` is
+written and self-tested (ten checks, including that **all 29 cueLines in the
+library are findable in their story text**, so nothing will silently fall back
+to estimating).
+
+**It cannot run: the ElevenLabs key is missing the permission.**
+
+```
+forced_alignment  -> "The API key you used is missing the permission
+                      forced_alignment to execute this operation."
+speech_to_text    -> same
+```
+
+Until that is enabled, «Ուլիկը»'s two cut points are `insertAtSeconds` in the
+cue sheet — hand-placed from the owner's ear, labelled as such in the file, and
+still snapped to a real detected silence so a re-encode cannot drift the cut
+into the middle of a word. Every other one-shot in the library waits.
+
+### Verification, round 3
+
+`mix_ambience.py --self-test` PASS with ten new insertion checks (a moment
+before the first cut does not move; one cut shifts everything after it by
+exactly its gap; two cuts compound; a bed spanning a cut grows rather than
+stopping short; segment starts shift; the narration is split and rejoined with
+generated silence; only one filter stage produces `[narr]`; no insertions means
+no split at all). `align_story.py --self-test` PASS. `check_story_audio.py`
+10 of 10 — 1:49 against 1:48 expected, 192 kbps, one ID3 tag, -16.7 LUFS. Byte
+map regenerated against the **post-insertion** timeline. `check_speaker_map.py`
+PASS. `dotnet test` 2554.
