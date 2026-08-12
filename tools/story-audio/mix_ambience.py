@@ -118,6 +118,13 @@ SPAN_PAUSE_CLAUSE = 0.16
 # than this and it is no longer snapping to the boundary it estimated, it is
 # choosing a different one.
 SNAP_WINDOW_S = 1.5
+# `insert: true` — cut the narration open and put the sound in the hole, rather
+# than laying it over whatever gap the speech happens to leave. The owner's
+# idea, after hearing the knock land wrong twice: "we can pause, we can play
+# knocking, and then continue". It removes the whole class of error, because a
+# small placement mistake inside a silence still sounds deliberate.
+INSERT_LEAD_S = 0.25
+INSERT_TAIL_S = 0.35
 SILENCE_FLOOR_DB = -35     # MP3 + loudnorm lift the noise floor; -42 finds none
 SILENCE_MIN_S = 0.20
 VOICES_DIR = REPO / "backend/content/story-voices"
@@ -160,6 +167,33 @@ def span_boundary_estimate(spans: list[int], k: int, seg_duration: float,
     speech = max(0.0, seg_duration - sum(gaps[:len(spans) - 1]))
     total_chars = sum(spans) or 1
     return (speech * sum(spans[:k]) / total_chars) + sum(gaps[:max(0, k - 1)])
+
+
+def shift_for(t: float, insertions: list[tuple[float, float]]) -> float:
+    """Where a moment in the ORIGINAL narration lands after insertions.
+
+    Every cue, every bed and every segment start has to travel through this.
+    Missing one is how a file desynchronises silently: the audio would be right
+    and the segment map would describe a story that no longer exists, and the
+    only symptom is an in-story question answered about the wrong scene.
+    """
+    return t + sum(g for cut, g in insertions if cut <= t)
+
+
+def apply_insertions(chains: list[dict], starts: list[float],
+                     insertions: list[tuple[float, float]]) -> tuple[list[dict], list[float]]:
+    """Move everything onto the post-insertion timeline.
+
+    A chain's END is shifted too, not just its start — a bed that spans a cut
+    must grow by the gap, or it stops short of the segment it was meant to
+    cover.
+    """
+    moved = []
+    for c in chains:
+        a = shift_for(c["start"], insertions)
+        b = shift_for(c["start"] + c["duration"], insertions)
+        moved.append({**c, "start": a, "duration": b - a})
+    return moved, [shift_for(s, insertions) for s in starts]
 
 
 def snap_to_pause(estimate: float, silences: list[tuple[float, float]],
@@ -213,13 +247,17 @@ def build_chains(cues: list[dict], starts: list[float], durations: list[float],
     the times are readable in the dry run, which is where mistakes get caught.
     """
     chains = []
-    for cue in cues:
+    for ci, cue in enumerate(cues):
         at = resolve_cue_time(cue, starts, durations, lines)
         seconds = float(cue["seconds"])
         level = float(cue["level"])
         src = sound_index[cue["sound"]]
+        # `cue` is the index back into the cue list. A holdUnder scene adds a
+        # SECOND chain, so chain order is not cue order — pairing them by
+        # position put the wolf's knock on the evening forest and opened a
+        # ten-second hole for it.
         chains.append({
-            "sound": cue["sound"], "src": src, "start": at,
+            "sound": cue["sound"], "src": src, "start": at, "cue": ci,
             "duration": seconds, "level": level,
             "kind": cue["kind"], "label": f"{cue['sound']}@seg{cue['segment']}",
         })
@@ -231,17 +269,46 @@ def build_chains(cues: list[dict], starts: list[float], durations: list[float],
                 chains.append({
                     "sound": cue["sound"], "src": src, "start": bed_start,
                     "duration": bed_len, "level": level - HOLD_UNDER_DROP_DB,
-                    "kind": "bed", "label": f"{cue['sound']}@seg{cue['segment']}~bed",
+                    "cue": ci, "kind": "bed",
+                    "label": f"{cue['sound']}@seg{cue['segment']}~bed",
                 })
     return chains
 
 
-def build_filtergraph(n_segments: int, chains: list[dict]) -> str:
+def build_filtergraph(n_segments: int, chains: list[dict],
+                     insertions: list[tuple[float, float]] | None = None) -> str:
     """The ffmpeg filter_complex. Inputs 0..n-1 are the narration segments;
-    each chain gets the next input index in order."""
+    each chain gets the next input index in order.
+
+    With insertions, the narration is first cut at each point and silence
+    concatenated in, so a one-shot plays into a hole instead of over speech.
+    The cut times are in the ORIGINAL narration; every chain start passed in
+    must already be on the post-insertion timeline (see apply_insertions).
+    """
     parts = []
     narration = "".join(f"[{i}:a]" for i in range(n_segments))
-    parts.append(f"{narration}concat=n={n_segments}:v=0:a=1[narr]")
+    # A filter_complex label may be produced exactly once, so the joined
+    # narration is [narr0] and only the LAST stage claims [narr].
+    parts.append(f"{narration}concat=n={n_segments}:v=0:a=1"
+                 f"{'[narr0]' if insertions else '[narr]'}")
+
+    if insertions:
+        cuts = sorted(insertions)
+        n = len(cuts) + 1
+        parts.append(f"[narr0]asplit={n}" + "".join(f"[q{i}]" for i in range(n)))
+        pieces = []
+        for i in range(n):
+            a = 0.0 if i == 0 else cuts[i - 1][0]
+            trim = (f"atrim={a:.3f}" if i == n - 1
+                    else f"atrim={a:.3f}:{cuts[i][0]:.3f}")
+            parts.append(f"[q{i}]{trim},asetpts=PTS-STARTPTS[n{i}]")
+            pieces.append(f"[n{i}]")
+            if i < len(cuts):
+                # aevalsrc is a source filter, so the hole needs no extra input
+                # file and no temporary silence on disk.
+                parts.append(f"aevalsrc=0:d={cuts[i][1]:.3f}:s=44100[g{i}]")
+                pieces.append(f"[g{i}]")
+        parts.append(f"{''.join(pieces)}concat=n={len(pieces)}:v=0:a=1[narr]")
 
     labels = []
     for k, c in enumerate(chains):
@@ -424,6 +491,30 @@ def detect_silences(path: Path) -> list[tuple[float, float]]:
     return out
 
 
+def sound_content_length(path: Path) -> float:
+    """How long the sound actually SOUNDS, ignoring silence at the end.
+
+    The hole is sized from this, not from the cue's `seconds`. The generated
+    knock is a 4s file with 0.9s of strikes in it; opening a 2.6s hole for it
+    would be a pause with 1.7s of nothing in the middle.
+    """
+    total = 0.0
+    try:
+        out = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                              "format=duration", "-of", "csv=p=0", str(path)],
+                             capture_output=True, text=True).stdout.strip()
+        total = float(out) if out else 0.0
+    except Exception:
+        return 0.0
+    sil = detect_silences(path)
+    # Trailing silence only: a gap in the middle of three knocks is part of the
+    # sound and must not be trimmed away.
+    for a, b in sil:
+        if b >= total - 0.05:
+            return max(0.2, a)
+    return total
+
+
 def load_span_chars(story_id: str) -> dict[int, list[tuple[str, int]]]:
     """(speaker, character count) per span, per segment, from the speaker map."""
     p = VOICES_DIR / f"{story_id}.voices.json"
@@ -574,11 +665,62 @@ def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Pat
         story_id, cues, durations, starts, narration, audio_dir)
     chains = build_chains(cues, starts, durations, sounds, lines)
 
+    # Where the narration is cut open, and how wide. Sorted, because
+    # shift_for() sums every insertion at or before a moment and two cuts in
+    # the wrong order would compound wrongly.
+    insertions: list[tuple[float, float]] = []
+    inserted_at: dict[int, float] = {}
+    silences_all = detect_silences(narration) if narration else []
+    by_cue = {c["cue"]: i for i, c in enumerate(chains) if c["kind"] != "bed"}
+    for ci, cue in enumerate(cues):
+        if not cue.get("insert"):
+            continue
+        idx = by_cue[ci]
+        chain = chains[idx]
+        # insertAtSeconds is a hand-placed offset from the segment start, put
+        # there when the estimate was audibly wrong and there was no alignment
+        # to appeal to. It is still snapped to a real silence, so a re-encode
+        # cannot drift the cut into the middle of a word.
+        want = (starts[cue["segment"]] + float(cue["insertAtSeconds"])
+                if "insertAtSeconds" in cue else chain["start"])
+        cut = snap_to_pause(want, silences_all, SNAP_WINDOW_S)
+        if cut is None:
+            if silences_all:
+                raise SystemExit(
+                    f"segment {cue['segment']} / {cue['sound']}: insert=true but "
+                    f"no pause within {SNAP_WINDOW_S}s of {chain['start']:.2f}s. "
+                    f"Cutting anywhere else would slice a word in half.")
+            cut = chain["start"]
+            line_notes.append(f"seg {cue['segment']}: cutting at {cut:.2f}s "
+                              f"unchecked — no pause data (is ffmpeg present?)")
+        body = sound_content_length(chain["src"]) or float(cue["seconds"])
+        gap = INSERT_LEAD_S + body + INSERT_TAIL_S
+        insertions.append((cut, gap))
+        inserted_at[idx] = cut
+        line_notes.append(f"seg {cue['segment']}: cut at {cut:.2f}s, "
+                          f"{gap:.2f}s hole for {body:.2f}s of {cue['sound']}")
+
+    if insertions:
+        insertions.sort()
+        chains, starts = apply_insertions(chains, starts, insertions)
+        # The inserted sound plays INSIDE its own hole, not at the shifted
+        # position of the moment it was cut at — that would put it just before
+        # the silence it opened.
+        for idx, cut in inserted_at.items():
+            before = sum(g for c, g in insertions if c < cut)
+            chains[idx] = {**chains[idx],
+                           "start": cut + before + INSERT_LEAD_S,
+                           "duration": sound_content_length(chains[idx]["src"])
+                                       or chains[idx]["duration"]}
+        total = shift_for(total, insertions)
+
     src_note = (f"from {narration.name} + {map_path.name}" if narration
                 else f"from {len(segs)} WAV file(s)")
     print(f"{story_id}  {len(durations)} segments, {mmss(total)} total  ({src_note})")
     print(f"{'seg':>4} {'starts at':>10}  {'length':>8}")
-    for i, (s, d) in enumerate(zip(starts, durations)):
+    shown = [starts[i + 1] - starts[i] if i + 1 < len(starts) else total - starts[i]
+             for i in range(len(starts))]
+    for i, (s, d) in enumerate(zip(starts, shown)):
         print(f"{i:>4} {mmss(s):>10}  {d:>7.2f}s")
     print()
     print(f"{'at':>10} {'for':>7} {'level':>7}  sound")
@@ -605,7 +747,7 @@ def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Pat
         cmd += ["-i", str(c["src"])]
     # concat=n=1 is valid, so the shipped-MP3 path passes straight through the
     # same graph with no special case.
-    cmd += ["-filter_complex", build_filtergraph(len(segs), chains),
+    cmd += ["-filter_complex", build_filtergraph(len(segs), chains, insertions),
             "-map", "[out]", "-ar", "44100", "-ac", "1",
             "-c:a", "pcm_s16le", str(mixed)]
 
@@ -632,8 +774,9 @@ def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Pat
     # honest unit here; a byte map guessed from a WAV would be wrong after
     # encoding.
     seg_map.write_text(json.dumps(
-        {"storyId": story_id, "unit": "seconds", "starts": [round(s, 3) for s in starts],
-         "durations": [round(d, 3) for d in durations]},
+        {"storyId": story_id, "unit": "seconds",
+         "starts": [round(s, 3) for s in starts],
+         "durations": [round(d, 3) for d in shown]},
         indent=2), encoding="utf-8")
 
     # The marker travels with the story, so name where it must end up rather
@@ -794,6 +937,34 @@ def self_test() -> int:
           any("needs a cueLine" in p for p in validate(
               [{"segment": 0, "sound": "x", "level": -20, "seconds": 2,
                 "at": "line"}], 1, {"x": Path("x.mp3")}, 60.0)), True)
+
+    # --- insert: cut the story open --------------------------------------
+    ins = [(35.33, 1.50), (64.59, 1.50)]
+    check("before the first cut nothing moves", shift_for(10.0, ins), 10.0)
+    check("after one cut everything moves by it", shift_for(40.0, ins), 41.50)
+    check("two cuts compound", shift_for(70.0, ins), 73.00)
+    check("a moment exactly at a cut counts it", shift_for(35.33, ins), 36.83)
+
+    ch = [{"src": Path("f.mp3"), "start": 30.0, "duration": 10.0, "level": -28.0,
+           "kind": "bed", "label": "forest~bed"},
+          {"src": Path("k.mp3"), "start": 35.33, "duration": 1.0, "level": -18.0,
+           "kind": "oneshot", "label": "knock"}]
+    moved, mstarts = apply_insertions(ch, [0.0, 32.18, 63.37], ins)
+    check("a bed spanning a cut grows by the gap", moved[0]["duration"], 11.5)
+    check("its start is untouched before the cut", moved[0]["start"], 30.0)
+    check("segment starts shift too", mstarts, [0.0, 32.18, 64.87])
+
+    g = build_filtergraph(1, [], [(35.33, 1.5)])
+    check("the narration is split at the cut", "atrim=0.000:35.330" in g, True)
+    check("and the remainder is taken to the end", "atrim=35.330" in g, True)
+    check("silence is generated, not an input file",
+          "aevalsrc=0:d=1.500" in g, True)
+    # A label may be PRODUCED once (amix then consumes it, which is the
+    # second occurrence and is fine). Only one concat may claim it.
+    check("only one stage produces [narr]", g.count(":a=1[narr]"), 1)
+    check("the intermediate label is produced once", g.count(":a=1[narr0]"), 1)
+    check("no insertions means no split at all",
+          "asplit" in build_filtergraph(1, []), False)
 
     # The shipped-MP3 path, against a real committed story. No ffmpeg, no
     # network: the frame walk is pure Python and the map is in git. The

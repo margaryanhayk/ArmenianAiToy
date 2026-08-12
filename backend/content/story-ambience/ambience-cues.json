@@ -7,7 +7,8 @@
     "anchor": "segment is the index into the story's segments[] array; cueLine is the exact line it lands on. at=start fires at the segment boundary, at=end at the next one, and at=line lands where the cueLine ENDS - which is what a one-shot almost always wants. Before at=line existed, «Ուլիկը»'s wolf knocked 5.6s before the narrator said anyone had come to the door, because a 16-second segment has one anchor and the knock took it.",
     "loudness": "Mix first, then normalise the finished file to -16.4 LUFS. Never level narration and ambience separately.",
     "afterMixing": "Ship with tools/story-audio/Ship-StoryAudio.ps1 -Fix -Apply so sha256, size and Version are re-stamped. Then the human listen test.",
-    "prompt": "sounds[].prompt is the reviewed English text sent to the generator; cues[].avoid appends what must be ABSENT. The note field is for a human reading this file and is never sent — a note explains WHERE a cue goes and WHY, and asking a sound model for placement rationale produced prompts carrying sentences like \"anchored to the START of the segment\"."
+    "prompt": "sounds[].prompt is the reviewed English text sent to the generator; cues[].avoid appends what must be ABSENT. The note field is for a human reading this file and is never sent — a note explains WHERE a cue goes and WHY, and asking a sound model for placement rationale produced prompts carrying sentences like \"anchored to the START of the segment\".",
+    "insert": "insert:true cuts the narration open at a pause and plays the sound in the hole, instead of laying it over speech. The owner's idea after hearing a knock land wrong twice: stop, knock, continue. The hole is sized from the sound's real length, not the cue's seconds. Only for one-shots - a forest establishing under the opening line must not stop the story to do it."
   },
   "sounds": [
     {
@@ -351,7 +352,10 @@
           "holdUnder": false,
           "cueLine": "Մի իրիկուն այծից առաջ գալիս է, դուռը զարկում ու իր հաստ ձայնով կանչում․",
           "note": "The wolf at the door. No howl anywhere in this story - the menace is the voice, and that is the point the child is meant to notice.",
-          "avoid": "no howl, no growl, no animal"
+          "avoid": "no howl, no growl, no animal",
+          "insert": true,
+          "insertAtSeconds": 3.15,
+          "_insertAtSource": "placed by the owner's ear 2026-08-12; replace with forced alignment once the ElevenLabs key carries the forced_alignment permission"
         },
         {
           "segment": 4,
@@ -363,7 +367,10 @@
           "holdUnder": false,
           "cueLine": "Գալիս է մայրը, դուռը ծեծում․",
           "note": "The SAME knock, at the same level, as the wolf's. That is deliberate: the door sounds identical and only the voice differs, which is exactly what the kid had to work out.",
-          "avoid": "no howl, no growl, no animal"
+          "avoid": "no howl, no growl, no animal",
+          "insert": true,
+          "insertAtSeconds": 1.22,
+          "_insertAtSource": "placed by the owner's ear 2026-08-12; replace with forced alignment once the ElevenLabs key carries the forced_alignment permission"
         }
       ]
     },
