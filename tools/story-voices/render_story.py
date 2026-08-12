@@ -98,13 +98,18 @@ def tts(text, path, token, voice, settings):
     if not os.path.exists(path) or os.path.getsize(path) < 1000:
         raise SystemExit(f"render failed for {text[:40]!r}: {r.stderr.decode()[:200]}")
 
-def render_segment(smap, seg, outdir, token, voice):
+def render_segment(smap, seg, outdir, token, voice, sid):
     parts, problems = [], []
     for i, span in enumerate(seg["spans"]):
         who = span["speaker"]
         spk = smap["speakers"][who]
         text = guard(span["text"].strip())
-        raw = os.path.join(outdir, f"{seg['index']:02d}-{i:02d}-{who}.mp3")
+        # The story id is in the NAME. Without it, rendering ten stories into
+        # one directory silently overwrites every span of the first nine — the
+        # finished audio survived (each story is stitched before the next
+        # begins) but the pieces did not, and that is why the ambience mixer
+        # later had to INFER where a speaker changed instead of measuring it.
+        raw = os.path.join(outdir, f"{sid}-{seg['index']:02d}-{i:02d}-{who}.mp3")
 
         # Render, and re-ask if the model returns it with the tail cut off.
         for attempt in range(TAIL_RETRIES + 1):
@@ -145,7 +150,7 @@ def render_segment(smap, seg, outdir, token, voice):
                         f"afade=t=out:st={max(0, real-FADE_OUT):.3f}:d={FADE_OUT}",
                         "-ac","1","-ar","44100",wav], capture_output=True)
         os.remove(stage)
-        parts.append((who, wav, pause_after(text)))
+        parts.append((who, wav, pause_after(text), len(text), duration(wav)))
         print(f"    {i:02d} {who:14} {len(text):>4}ch {got:>5.1f}s "
               f"tail {tail_ratio(raw):.0%}"
               f"{'  pitch '+str(pitch) if pitch!=1.0 else ''}", flush=True)
@@ -168,7 +173,7 @@ def stitch(parts, outdir, name):
     lst = os.path.join(outdir, f"_{name}.txt")
     with open(lst, "w") as f:
         prev, prev_pause = None, None
-        for who, wav, pause in parts:
+        for who, wav, pause, _chars, _dur in parts:
             if prev is not None:
                 # the gap belongs to the span that just ENDED — its punctuation
                 # is what earned the air, not the one about to start
@@ -180,6 +185,53 @@ def stitch(parts, outdir, name):
     subprocess.run(["ffmpeg","-v","error","-y","-f","concat","-safe","0","-i",lst,
                     "-ac","1","-ar","44100","-b:a","128k",out], capture_output=True)
     return out
+
+def span_timings(parts):
+    """Where each span starts INSIDE its segment, and how long it runs.
+
+    The same arithmetic stitch() uses, kept next to it deliberately: these two
+    must agree exactly or the map describes audio that was never made.
+    """
+    out, t, prev, prev_pause = [], 0.0, None, None
+    for who, _wav, pause, chars, dur in parts:
+        if prev is not None:
+            t += PAUSE_SPEAKER if who != prev else prev_pause
+        out.append({"speaker": who, "chars": chars,
+                    "start": round(t, 3), "duration": round(dur, 3)})
+        t += dur
+        prev, prev_pause = who, pause
+    return out
+
+
+def write_span_map(sid, smap, span_map, outdir):
+    """Times are RELATIVE to each segment's start, on purpose.
+
+    The segment map is regenerated against the finished MP3 after the shipper
+    re-encodes; expressing spans absolutely would make them disagree with it by
+    whatever that encode shifted. Relative, they stay true and a consumer adds
+    the segment start it already has.
+
+    This is what lets an ambience cue land on a LINE. Without it the mixer has
+    to estimate a speaker change from character counts and then hunt for a
+    nearby pause, which works but is a guess dressed as a measurement.
+    """
+    # A resumed run skips segments it already has, so their spans were never
+    # measured. Writing what we do have would produce a map that is the right
+    # SHAPE and wrong — the exact failure mode this repo keeps paying for.
+    want = [seg["index"] for seg in smap["segments"]]
+    missing = [i for i in want if i not in span_map]
+    if missing:
+        print(f"  no span map: segments {missing} were resumed from disk, so "
+              f"their spans were never timed. Re-render the story to get one.")
+        return
+    doc = {"storyId": sid, "unit": "seconds", "relativeTo": "segment start",
+           "segments": [span_map[i] for i in want]}
+    p = os.path.join(outdir, f"{sid}.spans.json")
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(doc, f, ensure_ascii=False, indent=1)
+    n = sum(len(v) for v in span_map.values())
+    print(f"  -> {p}  {n} spans")
+
 
 def assemble(sid, seg_files, outdir):
     """Join the segments into the story, and write the map of where they are.
@@ -219,7 +271,7 @@ def main():
     voice = os.environ.get(VOICE_ENV) or sys.exit(f"set {VOICE_ENV}")
     os.makedirs(outdir, exist_ok=True)
     smap = json.load(open(f"backend/content/story-voices/{sid}.voices.json", encoding="utf-8"))
-    seg_files = []
+    seg_files, span_map = [], {}
     for seg in smap["segments"]:
         if only is not None and seg["index"] != only:
             continue
@@ -231,13 +283,15 @@ def main():
             print(f"  segment {seg['index']} already rendered — keeping")
             seg_files.append(f); continue
         print(f"  segment {seg['index']} ({len(seg['spans'])} spans)")
-        parts = render_segment(smap, seg, outdir, token, voice)
+        parts = render_segment(smap, seg, outdir, token, voice, sid)
         print("  ->", stitch(parts, outdir, f"{sid}-seg{seg['index']}.mp3"))
         seg_files.append(f)
+        span_map[seg["index"]] = span_timings(parts)
     # A single-segment run is a spot check, not a story: assembling one segment
     # into <sid>.mp3 would look exactly like a finished render and ship.
     if only is None:
         assemble(sid, seg_files, outdir)
+        write_span_map(sid, smap, span_map, outdir)
     return 0
 
 if __name__ == "__main__":

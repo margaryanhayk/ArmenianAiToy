@@ -1,0 +1,11 @@
+{
+  "storyId": "ulik",
+  "sounds": [
+    "door-knock",
+    "forest-day",
+    "forest-evening"
+  ],
+  "cues": 4,
+  "mixedFrom": "ulik.mp3",
+  "note": "Do not mix this file again \u2014 see refuse_if_already_mixed in tools/story-audio/mix_ambience.py. The narration-only master is in git history."
+}
