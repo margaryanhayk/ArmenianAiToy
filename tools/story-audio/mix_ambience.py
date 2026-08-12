@@ -102,6 +102,26 @@ COLLISION_S = 2.0
 # Only used by --single, where there are no real boundaries to measure.
 CHARS_PER_SECOND = 15.0
 
+# `at: "line"` — land a cue where its cueLine ENDS instead of where the segment
+# starts. The owner heard why this was needed: «Ուլիկը»'s wolf knocked 5.6s
+# before the narrator said anyone came to the door, because a 16-second segment
+# has only one anchor and the knock took it.
+#
+# The gaps the renderer stitches between spans, so a proportional estimate can
+# subtract silence it should not be charging to the words. These MUST match
+# tools/story-voices/render_story.py; if that file's pauses change, change
+# these, or every line anchor drifts by the difference.
+SPAN_PAUSE_SPEAKER = 0.40
+SPAN_PAUSE_SENTENCE = 0.34
+SPAN_PAUSE_CLAUSE = 0.16
+# How far a line anchor may move to find a real pause in the narration. Wider
+# than this and it is no longer snapping to the boundary it estimated, it is
+# choosing a different one.
+SNAP_WINDOW_S = 1.5
+SILENCE_FLOOR_DB = -35     # MP3 + loudnorm lift the noise floor; -42 finds none
+SILENCE_MIN_S = 0.20
+VOICES_DIR = REPO / "backend/content/story-voices"
+
 
 # --------------------------------------------------------------------------
 # Pure helpers — no ffmpeg, no IO beyond reading WAV headers. Testable.
@@ -122,19 +142,70 @@ def segment_starts(durations: list[float]) -> list[float]:
     return starts
 
 
-def resolve_cue_time(cue: dict, starts: list[float], durations: list[float]) -> float:
-    """Absolute seconds for a cue anchored to a segment index and start/end."""
+def span_boundary_estimate(spans: list[int], k: int, seg_duration: float,
+                           gaps: list[float]) -> float:
+    """Seconds into a segment where span k-1 STOPS — the start of the gap.
+
+    Not where span k begins, which is a fifth of a second later. The difference
+    is the whole point: a knock wants to land in the pause, so that the child
+    hears the narrator say the door was struck, then the strike, then the voice.
+    Landing it on the wolf's first syllable would be late in a way that sounds
+    like a mistake, the same way landing it at the segment start sounded early.
+
+    Speech is not uniform, so this is an estimate — but it is an estimate of
+    the WORDS only: the stitched pauses are subtracted first and added back
+    where they belong, instead of being smeared across every span in
+    proportion to its length.
+    """
+    speech = max(0.0, seg_duration - sum(gaps[:len(spans) - 1]))
+    total_chars = sum(spans) or 1
+    return (speech * sum(spans[:k]) / total_chars) + sum(gaps[:max(0, k - 1)])
+
+
+def snap_to_pause(estimate: float, silences: list[tuple[float, float]],
+                  window: float = SNAP_WINDOW_S) -> float | None:
+    """The start of the pause nearest the estimate, or None if none is near.
+
+    NEAREST, not longest. On «Ուլիկը» the longest pause within range of the
+    wolf's boundary was the model taking a breath in the middle of the
+    narrator's own sentence — 0.79s against the 0.31s of the real speaker
+    change. Picking the longest would have put the knock mid-sentence and
+    looked deliberate while doing it.
+    """
+    near = [(abs(a - estimate), a) for a, _b in silences
+            if abs(a - estimate) <= window]
+    return min(near)[1] if near else None
+
+
+def resolve_cue_time(cue: dict, starts: list[float], durations: list[float],
+                     lines: dict | None = None) -> float:
+    """Absolute seconds for a cue anchored to a segment index and start/end/line.
+
+    `lines` maps segment index -> seconds into that segment for an `at: "line"`
+    cue, worked out once by the caller (which is where the story text, the
+    speaker map and the narration audio all live). Passing it in keeps this
+    function pure and testable.
+    """
     i = cue["segment"]
-    if cue.get("at", "start") == "end":
+    at = cue.get("at", "start")
+    if at == "end":
         # "end" means the boundary, i.e. where the next segment begins - a cue
         # placed at the end of a segment should land on that transition, not a
         # second before it.
         return starts[i] + durations[i]
+    if at == "line":
+        if lines is None or i not in lines:
+            raise SystemExit(
+                f"segment {i} / {cue.get('sound')}: at=\"line\" but no line "
+                f"position was resolved. Falling back to the segment start "
+                f"would put the cue exactly where it was wrong before.")
+        return starts[i] + lines[i]
     return starts[i]
 
 
 def build_chains(cues: list[dict], starts: list[float], durations: list[float],
-                 sound_index: dict[str, Path]) -> list[dict]:
+                 sound_index: dict[str, Path],
+                 lines: dict | None = None) -> list[dict]:
     """One entry per audio stream to lay under the narration.
 
     A holdUnder scene becomes TWO chains — the establish, then a quieter bed to
@@ -143,7 +214,7 @@ def build_chains(cues: list[dict], starts: list[float], durations: list[float],
     """
     chains = []
     for cue in cues:
-        at = resolve_cue_time(cue, starts, durations)
+        at = resolve_cue_time(cue, starts, durations, lines)
         seconds = float(cue["seconds"])
         level = float(cue["level"])
         src = sound_index[cue["sound"]]
@@ -225,6 +296,10 @@ def validate(cues: list[dict], n_segments: int, sound_index: dict[str, Path],
             problems.append(f"{where}: level must be negative (narration stays loudest)")
         if float(cue.get("seconds", 0)) <= 0:
             problems.append(f"{where}: seconds must be positive")
+        if cue.get("at", "start") not in ("start", "end", "line"):
+            problems.append(f"{where}: at must be start, end or line")
+        if cue.get("at") == "line" and not cue.get("cueLine", "").strip():
+            problems.append(f"{where}: at=line needs a cueLine to land on")
     return problems
 
 
@@ -293,14 +368,184 @@ def segments_from_shipped(narration: Path, map_path: Path) -> list[float]:
     return [b - a for a, b in zip(starts, starts[1:] + [total])]
 
 
+def ambience_marker(narration: Path) -> Path:
+    return narration.with_suffix(".ambience.json")
+
+
+def refuse_if_already_mixed(narration: Path | None, force: bool) -> None:
+    """A mixed story mixed again gets a second forest laid over the first.
+
+    Nothing in the audio says whether ambience is already in it, so the mixer
+    leaves a marker beside the file it wrote. «Ուլիկը» was shipped with
+    ambience within an hour of the mixer existing, and the very next run would
+    have doubled it silently.
+
+    The way back is the narration-only master, which is in git: every mix is
+    committed, so `git show <commit-before-the-mix>:<path>` returns the exact
+    approved bytes.
+    """
+    if narration is None or force:
+        return
+    m = ambience_marker(narration)
+    if not m.exists():
+        return
+    doc = json.loads(m.read_text(encoding="utf-8"))
+    raise SystemExit(
+        f"{narration.name} already carries ambience "
+        f"({', '.join(doc.get('sounds', [])) or 'unknown sounds'}, mixed "
+        f"{doc.get('mixedFrom', 'unknown')}). Mixing it again would lay a "
+        f"second one on top.\n"
+        f"Point --narration at the narration-only master instead:\n"
+        f"  git log --oneline -- {narration}\n"
+        f"  git show <commit-before-the-mix>:{narration} > /tmp/clean.mp3\n"
+        f"Or pass --force if you really mean to mix what is already mixed.")
+
+
+def detect_silences(path: Path) -> list[tuple[float, float]]:
+    """Pauses in the narration, via ffmpeg. Empty list if ffmpeg is absent.
+
+    The floor is -35dB, not something stricter: this audio has been through
+    MP3 and two-pass loudnorm, and at -42dB it reports no silence at all in a
+    file that is plainly full of pauses.
+    """
+    if shutil.which("ffmpeg") is None:
+        return []
+    r = subprocess.run(
+        ["ffmpeg", "-v", "info", "-i", str(path), "-af",
+         f"silencedetect=noise={SILENCE_FLOOR_DB}dB:d={SILENCE_MIN_S}",
+         "-f", "null", "-"], capture_output=True, text=True)
+    out, start = [], None
+    for line in r.stderr.splitlines():
+        if "silence_start:" in line:
+            start = float(line.split("silence_start:")[1].split()[0])
+        elif "silence_end:" in line and start is not None:
+            out.append((start, float(line.split("silence_end:")[1].split()[0])))
+            start = None
+    return out
+
+
+def load_span_chars(story_id: str) -> dict[int, list[tuple[str, int]]]:
+    """(speaker, character count) per span, per segment, from the speaker map."""
+    p = VOICES_DIR / f"{story_id}.voices.json"
+    if not p.exists():
+        return {}
+    doc = json.loads(p.read_text(encoding="utf-8"))
+    return {seg["index"]: [(sp["speaker"], len(sp["text"].strip()))
+                           for sp in seg["spans"]]
+            for seg in doc["segments"]}
+
+
+def load_span_times(story_id: str, audio_dir: Path) -> dict[int, list[float]]:
+    """Measured span starts, if the render left a map. Relative to the segment.
+
+    When this exists nothing below has to be estimated. It does not exist for
+    the current library because the renderer's per-span files were not
+    namespaced by story and overwrote each other; it will for anything rendered
+    after that fix.
+    """
+    p = audio_dir / f"{story_id}.spans.json"
+    if not p.exists():
+        return {}
+    doc = json.loads(p.read_text(encoding="utf-8"))
+    return {i: [(sp["start"], sp["duration"]) for sp in seg]
+            for i, seg in enumerate(doc.get("segments", []))}
+
+
+def resolve_line_positions(story_id: str, cues: list[dict], durations: list[float],
+                           starts: list[float], narration: Path | None,
+                           audio_dir: Path) -> tuple[dict[int, float], list[str]]:
+    """Seconds into each segment where an `at: "line"` cue belongs.
+
+    Order of preference, best first:
+      1. a measured span map from the render;
+      2. a character-proportional estimate of the span boundary, snapped to a
+         real pause in the narration;
+      3. the estimate alone, said out loud.
+    """
+    notes: list[str] = []
+    wanted = sorted({c["segment"] for c in cues if c.get("at") == "line"})
+    if not wanted:
+        return {}, notes
+
+    spans = load_span_chars(story_id)
+    measured = load_span_times(story_id, audio_dir)
+    silences = detect_silences(narration) if narration else []
+    if wanted and not silences and narration:
+        notes.append("no pauses detected in the narration — line anchors are "
+                     "estimates only")
+
+    story_json = STORY_DIR / f"{story_id}.story.json"
+    texts = json.loads(story_json.read_text(encoding="utf-8"))["segments"] \
+        if story_json.exists() else []
+
+    out: dict[int, float] = {}
+    for cue in cues:
+        if cue.get("at") != "line":
+            continue
+        i = cue["segment"]
+        if i in out:
+            continue
+        line = cue.get("cueLine", "").strip()
+        if i >= len(texts) or not line:
+            raise SystemExit(f"segment {i}: at=line but the cueLine is not in "
+                             f"the story text — nothing to anchor to.")
+        text = texts[i]
+        pos = text.find(line[:40])
+        if pos < 0:
+            raise SystemExit(f"segment {i}: cueLine {line[:40]!r} does not "
+                             f"appear in the story text.")
+        end_char = pos + len(line)
+
+        # Which span boundary does the line end at? The nearest one, so a
+        # cueLine that is a whole span resolves exactly and one that stops
+        # mid-span resolves to the boundary it is closest to.
+        seg_spans = spans.get(i, [])
+        if not seg_spans:
+            raise SystemExit(f"segment {i}: no speaker map for {story_id}; "
+                             f"at=line needs one to find the boundary.")
+        chars = [c for _who, c in seg_spans]
+        cum, k, best = 0, 0, None
+        for j, c in enumerate(chars):
+            cum += c
+            d = abs(cum - end_char)
+            if best is None or d < best:
+                best, k = d, j + 1
+
+        if i in measured and 0 < k <= len(measured[i]):
+            # The END of the span the line finishes, not the start of the next.
+            start, dur = measured[i][k - 1]
+            out[i] = start + dur
+            notes.append(f"seg {i}: line anchor {out[i]:.2f}s (measured span map)")
+            continue
+
+        gaps = [SPAN_PAUSE_SPEAKER if seg_spans[j][0] != seg_spans[j + 1][0]
+                else SPAN_PAUSE_SENTENCE
+                for j in range(len(seg_spans) - 1)]
+        est = span_boundary_estimate(chars, k, durations[i], gaps)
+        snapped = snap_to_pause(est + starts[i], silences)
+        if snapped is None:
+            out[i] = est
+            notes.append(f"seg {i}: line anchor {est:.2f}s (estimate; no pause "
+                         f"within {SNAP_WINDOW_S}s)")
+        else:
+            out[i] = snapped - starts[i]
+            notes.append(f"seg {i}: line anchor {out[i]:.2f}s "
+                         f"(estimate {est:.2f}s, snapped {out[i] - est:+.2f}s "
+                         f"to a pause)")
+    return out, notes
+
+
 def mmss(s: float) -> str:
     return f"{int(s // 60)}:{s % 60:05.2f}"
 
 
 def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Path,
         render: bool, narration: Path | None = None,
-        map_path: Path | None = None) -> int:
+        map_path: Path | None = None, force: bool = False,
+        install_marker: Path | None = None) -> int:
     cues = load_cues(story_id)
+    refuse_if_already_mixed(narration, force)
+    audio_dir = narration.parent if narration is not None else Path(".")
     if narration is not None:
         segs = [narration]
         durations = segments_from_shipped(narration, map_path)
@@ -325,7 +570,9 @@ def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Pat
             print(f"  - {p}", file=sys.stderr)
         return 1
 
-    chains = build_chains(cues, starts, durations, sounds)
+    lines, line_notes = resolve_line_positions(
+        story_id, cues, durations, starts, narration, audio_dir)
+    chains = build_chains(cues, starts, durations, sounds, lines)
 
     src_note = (f"from {narration.name} + {map_path.name}" if narration
                 else f"from {len(segs)} WAV file(s)")
@@ -338,6 +585,11 @@ def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Pat
     for c in sorted(chains, key=lambda x: x["start"]):
         print(f"{mmss(c['start']):>10} {c['duration']:>6.2f}s "
               f"{c['level']:>6.1f}dB  {c['label']}")
+
+    for n in line_notes:
+        print(f"  {n}")
+    if line_notes:
+        print()
 
     for w in collisions(chains):
         print(f"WARNING: {w}", file=sys.stderr)
@@ -384,9 +636,24 @@ def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Pat
          "durations": [round(d, 3) for d in durations]},
         indent=2), encoding="utf-8")
 
+    # The marker travels with the story, so name where it must end up rather
+    # than dropping it in the scratch directory the mix was built in.
+    marker_target = install_marker or ambience_marker(
+        REPO / "backend/src/ArmenianAiToy.Api/story-audio" / f"{story_id}.mp3")
+    marker_target.write_text(json.dumps(
+        {"storyId": story_id,
+         "sounds": sorted({c["sound"] for c in chains}),
+         "cues": len([c for c in chains if c["kind"] != "bed"]),
+         "mixedFrom": narration.name if narration else str(segments_dir),
+         "note": "Do not mix this file again — see refuse_if_already_mixed in "
+                 "tools/story-audio/mix_ambience.py. The narration-only master "
+                 "is in git history."},
+        indent=2) + "\n", encoding="utf-8")
+
     print()
     print(f"wrote {mixed}")
     print(f"wrote {seg_map}")
+    print(f"wrote {marker_target}")
     print("Next: Ship-StoryAudio.ps1 -In <dir> -Fix -Apply  (levels, encodes,")
     print("installs, bumps Version). Then listen to it end to end.")
     return 0
@@ -481,6 +748,53 @@ def self_test() -> int:
         got = [round(wav_duration(f), 3) for f in segment_files(d, "demo")]
         check("wav_duration from header", got, [1.0, 0.5])
 
+    # --- at="line": the arithmetic only, no ffmpeg and no audio ------------
+    # narrator(72) then wolf(151) in a 15.57s segment with one speaker change:
+    # 15.17s of words, so the boundary is 72/223 of the way through them.
+    est = span_boundary_estimate([72, 151], 1, 15.57, [SPAN_PAUSE_SPEAKER])
+    check("span boundary lands inside the segment", 0 < est < 15.57, True)
+    check("span boundary from characters", round(est, 2), 4.90)
+    check("boundary 0 is the segment start",
+          span_boundary_estimate([72, 151], 0, 15.57, [SPAN_PAUSE_SPEAKER]), 0.0)
+    # Subtracting the stitched pause matters: smearing it across both spans
+    # would push the boundary later, and later is where the bug was.
+    naive = 15.57 * 72 / 223
+    check("gap subtraction pulls the boundary earlier than a naive split",
+          est < naive, True)
+
+    # NEAREST, not longest. This is the «Ուլիկը» case exactly: a 0.79s breath
+    # inside the narrator's sentence, and the 0.31s real speaker change.
+    sil = [(35.33, 36.12), (37.78, 38.09), (44.40, 44.61)]
+    check("snaps to the nearest pause", snap_to_pause(37.40, sil), 37.78)
+    check("does not prefer the longest", snap_to_pause(37.40, sil) != 35.33, True)
+    check("gives up rather than reach", snap_to_pause(41.00, sil), None)
+    # Inclusive at the edge: a pause exactly SNAP_WINDOW_S away is reachable.
+    check("a pause exactly at the window edge is reachable",
+          snap_to_pause(37.78 - SNAP_WINDOW_S, [(37.78, 38.09)]), 37.78)
+    check("and a hair beyond it is not",
+          snap_to_pause(37.78 - SNAP_WINDOW_S - 0.01, [(37.78, 38.09)]), None)
+
+    # A line cue with nothing resolved must fail loudly, because the fallback
+    # would be the segment start - precisely the position that was wrong.
+    try:
+        resolve_cue_time({"segment": 2, "at": "line"}, [0.0, 10.0, 32.0],
+                         [10.0, 22.0, 16.0], None)
+        check("unresolved line anchor refuses", "no exception", "SystemExit")
+    except SystemExit:
+        check("unresolved line anchor refuses", True, True)
+    check("a resolved line anchor is segment start plus the offset",
+          resolve_cue_time({"segment": 2, "at": "line"}, [0.0, 10.0, 32.0],
+                           [10.0, 22.0, 16.0], {2: 5.6}), 37.6)
+
+    check("validate rejects an unknown anchor",
+          any("at must be" in p for p in validate(
+              [{"segment": 0, "sound": "x", "level": -20, "seconds": 2,
+                "at": "middle"}], 1, {"x": Path("x.mp3")}, 60.0)), True)
+    check("validate rejects at=line with no cueLine",
+          any("needs a cueLine" in p for p in validate(
+              [{"segment": 0, "sound": "x", "level": -20, "seconds": 2,
+                "at": "line"}], 1, {"x": Path("x.mp3")}, 60.0)), True)
+
     # The shipped-MP3 path, against a real committed story. No ffmpeg, no
     # network: the frame walk is pure Python and the map is in git. The
     # invariant is a ROUND TRIP — bytes to seconds and back must land on the
@@ -521,6 +835,11 @@ def main() -> int:
     ap.add_argument("--out", type=Path, default=Path("mixed"))
     ap.add_argument("--render", action="store_true",
                     help="actually run ffmpeg (default is a dry run)")
+    ap.add_argument("--force", action="store_true",
+                    help="mix even if the narration already carries ambience")
+    ap.add_argument("--marker", type=Path,
+                    help="where to write the already-mixed marker "
+                         "(default: beside the shipped story)")
     ap.add_argument("--self-test", action="store_true",
                     help="verify the timing maths; needs no audio and no ffmpeg")
     a = ap.parse_args()
@@ -537,7 +856,7 @@ def main() -> int:
     if a.segments_dir and a.narration:
         ap.error("--segments-dir and --narration are two ways in; pick one")
     return run(a.story, a.segments_dir, a.sounds_dir, a.out, a.render,
-               a.narration, a.map_path)
+               a.narration, a.map_path, a.force, a.marker)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@
     "narrationIsLoudest": "The voice is never competed with. If a cue makes a sentence harder to understand, the cue is wrong.",
     "sparse": "A scene establishes in 3-5 seconds and fades out. It does not run under the whole story.",
     "levelIsRelative": "level is dB relative to the narration and is always negative.",
-    "anchor": "segment is the index into the story's segments[] array; cueLine is the exact line it lands on. Not timestamps - the shipped stories have no byte map and will be re-rendered.",
+    "anchor": "segment is the index into the story's segments[] array; cueLine is the exact line it lands on. at=start fires at the segment boundary, at=end at the next one, and at=line lands where the cueLine ENDS - which is what a one-shot almost always wants. Before at=line existed, «Ուլիկը»'s wolf knocked 5.6s before the narrator said anyone had come to the door, because a 16-second segment has one anchor and the knock took it.",
     "loudness": "Mix first, then normalise the finished file to -16.4 LUFS. Never level narration and ambience separately.",
     "afterMixing": "Ship with tools/story-audio/Ship-StoryAudio.ps1 -Fix -Apply so sha256, size and Version are re-stamped. Then the human listen test.",
     "prompt": "sounds[].prompt is the reviewed English text sent to the generator; cues[].avoid appends what must be ABSENT. The note field is for a human reading this file and is never sent — a note explains WHERE a cue goes and WHY, and asking a sound model for placement rationale produced prompts carrying sentences like \"anchored to the START of the segment\"."
@@ -343,7 +343,7 @@
         },
         {
           "segment": 2,
-          "at": "start",
+          "at": "line",
           "kind": "oneshot",
           "sound": "door-knock",
           "seconds": 2,
@@ -355,7 +355,7 @@
         },
         {
           "segment": 4,
-          "at": "start",
+          "at": "line",
           "kind": "oneshot",
           "sound": "door-knock",
           "seconds": 2,
