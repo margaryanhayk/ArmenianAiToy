@@ -66,6 +66,7 @@ GAME_HEAD = {
 # When each line is heard. One caption per family of ids — the id itself is an
 # engineering handle and says nothing to a reader.
 def when(game, cid):
+    if cid.startswith("kid-"): return NEW_WHEN.get(game, "")
     if cid == "intro":   return "Խաղի սկզբում"
     if game == "mind-reader":
         if cid.startswith("q-"): return "Հարց՝ գուշակելու ճանապարհին"
@@ -91,10 +92,24 @@ def when(game, cid):
     return ""
 
 SPEAKER = {"katrin":"Կատրին","vardan":"Վարդան"}
+NEW_WHEN = {"who-first":"Ռաունդների արանքում","mind-reader":"Գուշակից հետո",
+            "button-simon":"Ռաունդից հետո"}
 
 items = []                       # (key, section, group, when, speaker, text)
+# Lines the owner has not read yet go FIRST and in their own section. Burying
+# twelve new lines among ninety he has already approved is how they get missed.
 for gid, head in GAME_HEAD.items():
     for c in games[gid]["clips"]:
+        if not c.get("new"):
+            continue
+        items.append({"key": f"{gid}/{c['id']}", "section": "new", "group": gid,
+                      "when": when(gid, c["id"]),
+                      "who": SPEAKER.get(c.get("speaker","areg"), ""),
+                      "text": c["text"]})
+for gid, head in GAME_HEAD.items():
+    for c in games[gid]["clips"]:
+        if c.get("new"):
+            continue
         items.append({"key": f"{gid}/{c['id']}", "section": "games", "group": gid,
                       "when": when(gid, c["id"]),
                       "who": SPEAKER.get(c.get("speaker","areg"), ""),
@@ -110,6 +125,7 @@ for ep in serial["episodes"]:
 
 # ---- verify nothing was dropped or altered -------------------------------
 assert sum(1 for i in items if i["section"]=="games") == 90, "game clips"
+assert sum(1 for i in items if i["section"]=="new") == 12, "new kid lines"
 assert sum(1 for i in items if i["section"]=="endings") == 10, "endings"
 assert sum(1 for i in items if i["section"]=="serial") == 6, "episodes"
 raw = (REPO/"backend/content/offline-games/game-clips.json").read_text(encoding="utf-8")
@@ -123,7 +139,9 @@ cards = []
 seen_group = None
 n = 0
 SECTION_HEAD = {
- "games":   ("Խաղերի տեքստերը", "90 տող։ Սրանք են, որ սպասում են՝ ձայնագրելուց առաջ։"),
+ "new":     ("Նոր տողեր՝ Կատրին և Վարդան",
+             "12 տող։ Կատրինն ու Վարդանը հիմա խաղում են ևս երեք խաղում, ոչ միայն մեկում։ Սրանք դեռ ձայնագրված չեն։"),
+ "games":   ("Խաղերի տեքստերը", "90 տող։ Սրանք արդեն հաստատված են։"),
  "endings": ("Փոխարինող ավարտներ", "10 հեքիաթ։ Երեխան երկրորդ անգամ լսելիս այլ ավարտ է լսում։"),
  "serial":  ("Ծիվիկի շարքը", "6 մաս։ Օրական մեկ նոր մաս։"),
 }
@@ -135,7 +153,7 @@ for it in items:
         cards.append(f'<h2 class="sec">{esc(t)}<span>{esc(sub)}</span></h2>')
         last_section = it["section"]; seen_group = None
     if it["group"] != seen_group:
-        if it["section"] == "games":
+        if it["section"] in ("games", "new"):
             t, sub = GAME_HEAD[it["group"]]
             cards.append(f'<h3 class="grp">«{esc(t)}»<span>{esc(sub)}</span></h3>')
         elif it["section"] == "endings":

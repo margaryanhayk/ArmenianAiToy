@@ -75,6 +75,17 @@ SETTINGS = {
 }
 CHARS_PER_SECOND = 15.0
 MAX_OVERRUN = 2.5
+# ...but a RATIO alone is meaningless on a very short clip. «Մու-մու։» is eight
+# characters, so chars/15 expects half a second and 2.5x is 1.3s — and the file
+# is 1.4s, because a child stretches an animal sound. The render note says so
+# in as many words: "the kid performers stretch them naturally." The guard
+# rejected a perfectly good cow and stopped the batch at 62 of 109.
+#
+# So an overrun must be BOTH proportionally and absolutely large. Three seconds
+# is far more than any natural stretch and far less than the 4.3s an eight-
+# character line came back as on 2026-08-12 when eleven_v3 spoke a stage
+# direction — which is the thing this guard is actually for.
+MAX_OVERRUN_SECONDS = 3.0
 TAIL_WINDOW = 0.03
 TAIL_MAX_RATIO = 0.35
 TAIL_MIN_LENGTH_RATIO = 0.70
@@ -115,6 +126,12 @@ def jobs_all() -> list[dict]:
         if game.startswith("_"):
             continue
         for c in v["clips"]:
+            # A clip marked "new" is text the owner has not approved yet.
+            # Rendering it would spend money on words that may not survive his
+            # reading, and — worse — could put an unreviewed line in front of a
+            # child if it ever shipped by accident.
+            if c.get("new"):
+                continue
             out.append({"kind": "games", "group": game, "id": c["id"],
                         "speaker": c.get("speaker", "areg"), "text": c["text"]})
     e = json.loads((REPO / "backend/content/variant-endings/variant-endings.json")
@@ -201,7 +218,7 @@ def render(job: dict, out_dir: Path, token: str) -> None:
         print(f"      tail {ratio:.0%}, short — re-asking", flush=True)
 
     got = duration(raw)
-    if expect > 0.3 and got > expect * MAX_OVERRUN:
+    if got > expect * MAX_OVERRUN and got > expect + MAX_OVERRUN_SECONDS:
         raise SystemExit(f"{job['path']}: {len(text)} chars implies ~{expect:.1f}s, "
                          f"got {got:.1f}s — something was spoken that is not in "
                          f"the clip")
@@ -233,6 +250,15 @@ def self_test() -> int:
 
     jobs = jobs_all()
     check("every approved clip is a job", len(jobs), 109)   # 90 + 10 + 6 + 3
+
+    # Unapproved additions must never enter a render.
+    raw = json.loads((REPO / "backend/content/offline-games/game-clips.json")
+                     .read_text(encoding="utf-8"))
+    pending = {c["id"] for g, v in raw.items() if not g.startswith("_")
+               for c in v["clips"] if c.get("new")}
+    check("there are pending lines to exclude", len(pending) > 0, True)
+    check("and not one of them is a job",
+          {j["id"] for j in jobs} & pending, set())
     check("games", sum(1 for j in jobs if j["kind"] == "games"), 90)
     check("endings", sum(1 for j in jobs if j["kind"] == "endings"), 10)
     check("serial", sum(1 for j in jobs if j["kind"] == "serial"), 9)
@@ -259,6 +285,18 @@ def self_test() -> int:
         except SystemExit:
             check(f"guard refuses {bad[:18]!r}", True, True)
     check("guard allows plain Armenian", guard("Բարև՛ քեզ։"), "Բարև՛ քեզ։")
+
+    # The overrun rule, against the two cases that matter: a stretched animal
+    # sound (keep) and a spoken stage direction (fail).
+    def overruns(chars, got):
+        expect = chars / CHARS_PER_SECOND
+        return got > expect * MAX_OVERRUN and got > expect + MAX_OVERRUN_SECONDS
+    check("a stretched «Մու-մու։» is kept", overruns(8, 1.4), False)
+    check("a drawn-out «Ծուղրուղո՜ւ։» is kept", overruns(12, 2.5), False)
+    check("an 8-char line that ran 4.3s is caught", overruns(8, 4.3), True)
+    # 500 chars expects ~33s; the ratio rule needs >83s, the absolute one >36s.
+    check("a long line at three times its length is caught", overruns(500, 90.0), True)
+    check("a long line slightly over is kept", overruns(500, 40.0), False)
     for j in jobs:
         guard(j["text"])
     check("every approved clip passes the guard", True, True)
@@ -316,6 +354,12 @@ def main() -> int:
 
     print()
     for j in jobs:
+        dest = a.out / j["path"]
+        # Resume. The first batch died at clip 62 of 109 on a guard that was
+        # wrong; re-rendering the 62 would have paid for them twice.
+        if dest.exists() and dest.stat().st_size > 1000:
+            print(f"  {j['path']}  (already rendered)")
+            continue
         print(f"  {j['path']}")
         render(j, a.out, token)
     return 0
