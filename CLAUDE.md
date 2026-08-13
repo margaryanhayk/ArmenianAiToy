@@ -96,7 +96,7 @@ one message is not a rule, which is why it is written here.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2549 tests)
+dotnet test                                     # Run all tests (2554 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 ```
 
@@ -2338,13 +2338,16 @@ bumps `Version`, and the human listen test is still the last gate.
 
 ## Story ambience (owner request 2026-08-10)
 
-Ambient sound during storytelling — forest, river, rain — as
-`backend/content/story-ambience/{README.md,ambience-cues.json}`. Text only;
-**nothing at runtime reads it**, same convention as every other folder there.
-29 cues across the 8 stories that have audio, each anchored to a segment index
-plus an exact quoted line (verified against the story text) rather than a
-timestamp, because the shipped stories have no `.segments.json` byte map and
-are about to be re-rendered anyway.
+**SHIPPED and owner-approved 2026-08-13** — see the arc at the end of this
+section. Ambient sound during storytelling — forest, river, rain — specified in
+`backend/content/story-ambience/{README.md,ambience-cues.json}` with the
+generated audio beside it in `sounds/<storyId>/`. 29 cues across the 8 stories
+that carry them, each anchored to a segment index plus an exact quoted line
+rather than a timestamp.
+
+(The paragraph that used to stand here said the folder was text only and that
+nothing read it. That was true when the cues were written and is not now: the
+sounds are mixed into the shipped MP3s.)
 
 Two owner decisions shape it, and both are load-bearing:
 
@@ -2370,10 +2373,27 @@ the wolf's knock and the mother's knock are the **same** sound at the same
 level on purpose — the door is identical and only the voice differs, which is
 the thing the child is meant to notice.
 
-Sound licences are all `TBD`: nothing has been chosen or bought, so no file can
-quietly reach a toy without someone answering the question.
+**Sound licences: RESOLVED — the sounds are GENERATED, not recorded.** 18
+CC0/public-domain candidates were sourced from Wikimedia Commons and auditioned
+(they remain listed in `sound-candidates.md` as the fallback), but the owner
+preferred generated ones on listening and they remove the licence chain from
+the product's audio entirely. `tools/story-ambience/generate_sounds.py` calls
+ElevenLabs `POST /v1/sound-generation`; dry-run by default, `--render
+--confirm-paid-api` to spend. **The generation unit is the (story, sound)
+PAIR**, not the sound id: 18 ids across 29 cues resolve to 26 pairs, so every
+story gets its own forest and its own river — the owner's objection was hearing
+the same birds everywhere, and pair-keying makes repetition structurally
+impossible rather than merely avoided. *Within* one story a repeated sound stays
+ONE file, which three cue notes require (the two knocks are the same door, Huri
+returns to the same river, the hunter walks one road twice). Beds render 10 s so
+a `holdUnder` loop is inaudible; one-shots 4 s. Prompts are reviewed English in
+the cue sheet with per-cue `avoid` clauses, recorded beside the audio in
+`prompts.json`. The audio is committed — generation is paid and
+non-deterministic and would not come back the same. No licence FEE; output
+ownership comes from the ElevenLabs plan's terms, which the cue sheet says
+rather than implying the question does not exist.
 
-**The mixer exists: `tools/story-audio/mix_ambience.py`.** Per-segment WAVs +
+**The mixer: `tools/story-audio/mix_ambience.py`.** Per-segment WAVs +
 the cue sheet + a sounds folder → one mixed story plus a `.segments.json` map,
 then `Ship-StoryAudio.ps1` levels and ships it. Dry-run by default (prints the
 resolved cue times and the exact ffmpeg command, writes nothing); `--self-test`
@@ -2384,6 +2404,33 @@ carries `normalize=0`, because the default rescales every input by 1/N and would
 quietly pull the narration down as cues are added; and it warns when two cues
 land within 2 s, because a cue at the END of segment N and one at the START of
 N+1 are the same instant — that collision was real in «Ուլիկը» and is fixed.
+
+**Two more input modes it grew while being used for real (2026-08-12/13):**
+
+- `--narration <story.mp3> --map <story.segments.json>` mixes under an
+  ALREADY-SHIPPED story, walking the MP3 frames to turn the committed byte map
+  back into seconds (the inverse of `segments_to_bytes.py`, reusing its walker).
+  Better than the per-segment path in three ways: 192 kbps rather than 128,
+  committed segment starts rather than re-measured ones, and no dependence on a
+  scratch directory surviving the afternoon.
+- **`insert: true`** — the owner's idea after hearing a knock land wrong twice:
+  *"we can pause, we can play knocking, and then continue."* The narration is
+  CUT at the cue and `lead-in · sound · tail` concatenated into the hole, so the
+  sound never competes with speech and a small placement error still sounds
+  deliberate. Every later time then travels through one shift function — cues,
+  `holdUnder` beds (which GROW when a cut falls inside them), and the segment
+  starts written to the map. Missing one desynchronises silently: the audio
+  would be right and the map would describe a story that no longer exists, and
+  the only symptom is an in-story question answered about the wrong scene. The
+  hole is sized from the sound's MEASURED length, not the cue's `seconds` — the
+  generated knock is a 4 s file with ~1 s of strikes in it.
+
+**A mixed story refuses to be mixed again.** Nothing in the audio says whether
+ambience is already in it, and the first mix shipped within an hour of the mixer
+existing; the next run would have laid a second forest over the first. The mixer
+leaves a `<storyId>.ambience.json` marker beside the shipped file and refuses
+without `--force`, naming the git command that recovers the narration-only
+master. `align_story.py` refuses the same files for the same reason.
 
 **Why the narrator must deliver one WAV per SEGMENT** (recorded in
 `docs/voice-narrator-brief.md` §3, and it cannot be added after the session):
@@ -2430,6 +2477,115 @@ Pinned in both directions by
 `ContentManifestServiceTests.ShippedConfig_AdvertisesExactlyTheStoriesThatHaveAudio`
 and `ContentSyncAudioRootTests.ShippedConfiguration_PointsAtFilesThatActuallyExist`,
 so a half-filled row (real hash, no size) still fails.
+
+## Story audio — character voices and where a sound lands (2026-08-12/13)
+
+**The library is approved end to end** — text, character voices, ambience —
+against the sha256 recorded in
+`tools/quality-evidence/story-ambience-library-20260812.md`. Any edit to a
+story's audio invalidates that approval; it is pinned to bytes on purpose,
+because an approval that silently carries over is how this repo shipped three
+truncated stories.
+
+### Who speaks every word: `backend/content/story-voices/*.voices.json`
+
+The owner's finding: in «Ուլիկը» the mother and the wolf say the **same words**
+— «Սևուկ ուլիկ, ջա՛ն ուլիկ…» — and the shipped audio said them in the **same
+voice**, removing the very difference the scene asks a child to notice. "Such
+small things children like, you know?"
+
+So all ten stories carry a speaker map: `speakers` (role, a direction written
+for a future HUMAN narrator, `pitch`, `voiceSettings`) and `segments[].spans[]`
+of `{speaker, text}` — **211 spans**. `tools/story-voices/check_speaker_map.py`
+pins the invariant that joining a segment's spans reproduces the approved story
+text **byte for byte**, so the annotation can never become an edit.
+
+`tools/story-voices/render_story.py` renders ONE REQUEST PER SPAN and applies
+each speaker's pitch/formant shift afterwards (`asetrate`+`atempo`, which lowers
+the throat without slowing the speech). The wolf sits at 0.88, the strength the
+owner accepted; the mother's identical line stays at 1.00 because he asked that
+only the wolf's words change.
+
+**Three rules in that renderer, each bought with a defect:**
+
+- **Nothing but the story's own words is ever sent to TTS.** The first version
+  put the character direction in the text as `[deep growling wolf voice] …`.
+  `eleven_v3` treated it as a tag on long spans and **read it aloud** on short
+  ones — «- Ո՞վ է։», eight Armenian characters, came back 4.3 s long. A child
+  could have heard *"a poor, gentle, wondering man"* in English inside a
+  Tumanyan tale. Expression now comes only from `voice_settings` (API fields,
+  unspeakable) and post-processing. A guard refuses any text carrying brackets
+  or a run of Latin letters, and a per-span duration check fails the render
+  rather than shipping.
+- **A chopped tail needs TWO signals.** ElevenLabs sometimes returns a short
+  request with the last word cut. Peak-of-the-final-30 ms alone cries wolf —
+  «- Եկե՜լ եմ,» genuinely ends on an emphatic syllable — so truncation is
+  loud-at-the-end AND shorter-than-the-text-implies, then re-requested twice
+  before failing.
+- **Fades are timed against the file that exists.** Computing the fade-out from
+  the pre-`loudnorm` duration did nothing at all (a 67% ending stayed 66%), so
+  they run in a second pass.
+
+Joins carry the air the punctuation asks for — 0.34 s after a full stop, 0.16 s
+after a comma, 0.40 s at a change of speaker, 0.60 s between segments. The
+previous render had no pause at any join.
+
+**Two renderer bugs worth remembering:** per-span files were named
+`02-00-narrator.wav` with no story id, so rendering ten stories into one
+directory silently overwrote nine sets (the finished audio was fine; the pieces
+were lost, which is why ambience placement later had to be inferred). It now
+namespaces them and writes `<storyId>.spans.json`. And a resumed run refuses to
+write a partial span map — a map of the right shape and the wrong contents is
+the failure this repo keeps paying for.
+
+### Where a sound lands: `tools/story-audio/align_story.py`
+
+A cue is supposed to land on a LINE. Estimating that position was wrong twice
+in one evening — 5.6 s early, then 2.4 s late — and the owner heard both. A
+third method (fitting a per-story timing model by least squares against the
+segment map) returned **negative pause coefficients** and was thrown away. The
+position is now measured: ElevenLabs `POST /v1/forced-alignment`, sent with the
+**exact approved text**, so it cannot invent a word that is not in the story.
+Cached as `<storyId>.words.json` beside the audio. Requires the
+`forced_alignment` permission on the API key (a key without it fails with
+`missing_permissions`, which is how the first attempt was blocked).
+
+**Four things that go wrong, all pinned in the mixer:**
+
+1. **`cueLine` is not where a sound lands.** «Ուլիկը»'s cueLine is the whole
+   sentence — *"one evening the wolf comes, KNOCKS ON THE DOOR and calls in his
+   thick voice"* — so anchoring to its END put the knock after *calls*. A
+   separate **`landOn`** field carries the phrase the sound lands on; `cueLine`
+   stays documentation. Several cue notes already named the phrase and could
+   not be honoured until this existed.
+2. **A forced alignment does not agree with a byte map, and the disagreement is
+   LINEAR** — measured at **-0.60 s per segment**, exactly the silence the
+   stitcher puts between segments, reaching **-4.97 s** by the end of
+   «Խոսող ձուկը». Corrected from anchors (each segment's first words located in
+   the alignment, the two clocks paired and interpolated), never assumed.
+3. **A phrase repeats.** «դուռը զարկում» is also in segment 0 — the mother's
+   first knock — and the wolf's cue resolved to it, 20.5 s early. The search
+   floor is the segment's start **in alignment time**, which the drift anchors
+   already know; flooring it in file time rejects correct matches, because the
+   drift is larger than the gap being guarded.
+4. **Two instruments arguing is worse than one.** Snapping an aligned position
+   to the nearest detected silence pulled a cut 0.56 s back INSIDE a word, and
+   «Խոսող ձուկը» has no pause after «գետը։» at all. An alignment already gives
+   a word boundary and silence is inserted at the cut anyway, so hundredths
+   either way are inaudible while half a second inside a word is not. Aligned
+   positions are used as-is; the nearest pause is reported, not applied.
+
+### A gate bug worth not re-introducing
+
+`Ship-StoryAudio.ps1` refused to install a clean story reporting **2 ID3 tags**
+while `check_story_audio.py` passed it. The shipper was wrong: audio data
+happened to contain the bytes `49 44 33` followed by a syncsafe-looking size of
+29 MB inside a 2 MB file. It checked neither the major-version byte nor whether
+the tag fits. The false positive depends on the audio, so it would have refused
+a different random story on every render. Both gates now apply the same rules.
+The shipper also accepts `.wav` (which is what the mixer deliberately writes),
+refuses one without `-Fix`, and refuses a folder holding both forms of a story
+rather than letting filename sort order decide which ships.
 
 ## Spoken welcome flow (owner request 2026-08-04) — backend half
 
@@ -3836,13 +3992,15 @@ A second same-day owner batch, landing directly on top of the
 content-depth batch above. Test count at the time was **2509**; it is **2549**
 at HEAD (see § Build & Test).
 
-**This file is synced only to 2026-08-07 and the repo has moved past it.**
-Everything below documents that batch and stops there; **26 commits** have
-landed since (`git log bfc4068..HEAD`), including firmware releases up to
-**1.2.0**, the in-story Q&A latency work, the production fix where the slow AI
-models had silently been in use, the welcome flow going off and back on, the
-rev-A PCB layout and the story-audio findings above. Read `git log` before
-trusting a date in this file.
+**Everything BELOW this line documents the 2026-08-07 batch and stops there.**
+**93 commits** have landed since (`git log bfc4068..HEAD`) — firmware releases
+to **1.2.0**, the in-story Q&A latency work, the production fix where the slow
+AI models had silently been in use, the welcome flow going off and back on, the
+rev-A PCB layout, then the parent-dashboard redesign, second-parent invites,
+mobile parity, and the whole story-audio arc. The parts of that which change
+how the product behaves are documented ABOVE, in § Story narration pipeline,
+§ Story ambience and § Story audio — character voices. Read `git log` before
+trusting a date anywhere in this file.
 
 **Games ContentSync namespace — the fourth namespace.** The 92 offline-game
 clips (see the correction above) now reach the toy the same way stories,
@@ -4025,6 +4183,60 @@ names in `mobile/AregParent`'s activity feed — flagged as an out-of-scope
 follow-up in that batch, closed here with trilingual labels
 (`mobile/AregParent/src/i18n.ts` + `ActivityScreen.tsx`) mirroring the
 dashboard's already-reviewed wording.
+
+## Parent dashboard redesign, and the cost cap (2026-08-10..12)
+
+**The dashboard was rebuilt, not restyled.** ~20 commits over three days took
+`wwwroot/parent.html` and `mobile/AregParent` from a control panel that named
+its own database fields to something a tired parent reads on a phone. The
+shape, so a later change does not undo it by accident:
+
+- **One palette, in one place.** Design tokens landed first in a
+  pixel-identical commit, then the Armenian manuscript palette swapped into
+  them. `admin.html` follows the same tokens without becoming a parent page.
+- **Nine Save buttons became zero.** Every control saves itself.
+- **No field names on screen.** Times and units are written the way a parent
+  says them, and story titles, goals and lessons are translated rather than
+  shown in the id's language.
+- **A bottom tab bar — Today, Library, Diary, Settings** — so the app shows
+  what it has instead of hiding it behind a device chooser, which is skipped
+  entirely when there is one toy.
+- **The library is a bookshelf**: eleven drawn covers, and a card that is a
+  poster rather than a form.
+- **Settings are grouped under the four questions a parent actually arrives
+  with**, and the four Diary lists became one.
+- **The app never claims a behaviour the toy has switched off** — a screen
+  saying what Areg can do reads the device's own flags.
+- The phone app got the same treatment: theme, covers, plain words, grouped
+  settings, one diary, add-a-child and invite-the-other-parent.
+
+**The cost cap counted a third of what it spent (#fixed 2026-08-12).**
+`OpenAICostEstimator.EstimateChatCostUsd` priced the CHILD'S QUESTION — about
+21 characters — while the prompt actually sent is ~8,343. So `OpenAI:DailyCostCap`
+of $0.50 fired at roughly $1.49 of real spend, and one toy was permitted about
+**$45 a month** against $17-27 of electronics. A new
+`EstimateChatCostUsdFromPrompt(promptChars, response)` overload is passed the
+assembled prompt at the three call sites that have it (`StoryQaController` —
+including the reflection reaction, which had never been counted at all —
+`AudioChatController`, `ChatController`); the old overload is kept with an
+xmldoc naming the under-count. The cap is now set FROM a number of questions
+rather than a dollar figure nobody can read: `Default = 0.25` ≈ **30
+questions/day**, with `IntendedQuestionsPerDay` and `MeasuredUsdPerQuestion`
+beside it so the arithmetic cannot drift from the setting. Marked INTERIM —
+the owner's decision was to revisit tiers before production.
+
+**New documents.** `docs/privacy-parents.md` (retention in one page a parent
+could be handed, sourced from `RetentionPolicy` so it cannot drift from
+behaviour), `docs/ops-runbook.md` (restart, logs, OpenAI down, pull a backup,
+reach the console), `docs/usage-tiers-brainstorm.md` (the economics of metering
+the only thing in this product with a per-use cost — stories, games, music and
+greetings are pre-rendered files and cost nothing per play). Evidence for the
+cost-per-hour figure and for a verified clean-clone boot is in
+`tools/quality-evidence/`.
+
+**A clean clone did NOT boot from the documented steps** — `OpenAI:ApiKey` and
+`Jwt:Key` are both required and neither had a default; the first fails with an
+unhelpful NuGet stack trace. § Build & Test now says so.
 
 ## Key Design Decisions
 
