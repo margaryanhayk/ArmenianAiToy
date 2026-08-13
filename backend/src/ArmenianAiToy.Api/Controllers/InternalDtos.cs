@@ -91,6 +91,24 @@ public sealed record AdminDeviceDto(
     public int? ContentVoiceClips { get; init; }
     public int? ContentMusicTracks { get; init; }
     public DateTime? ContentReportedAt { get; init; }
+
+    /// <summary>
+    /// The rest of the device-reported identity. The toy has sent all three
+    /// on every heartbeat since the OTA foundation and the backend has
+    /// stored them since then, but nothing ever displayed them — so the
+    /// answer to "what board is this toy?" was a serial cable.
+    /// <para>
+    /// <c>BoardModel</c> is the one that bites: the firmware offer gate
+    /// skips a device whose board differs from the configured release, so a
+    /// mismatch here produces <c>updateAvailable:false</c> with no error and
+    /// no log — a silently blocked rollout. Being able to read it is how
+    /// that gets diagnosed. Null means firmware old enough not to report.
+    /// </para>
+    /// </summary>
+    public string? BoardModel { get; init; }
+    public string? FirmwareBuild { get; init; }
+    public string? PartitionName { get; init; }
+    public DateTime? FirmwareReportedAt { get; init; }
 }
 
 public sealed record AdminParentDto(

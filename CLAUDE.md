@@ -96,7 +96,7 @@ one message is not a rule, which is why it is written here.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2579 tests)
+dotnet test                                     # Run all tests (2580 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 ```
 

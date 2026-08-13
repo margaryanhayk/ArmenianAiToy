@@ -169,6 +169,10 @@ public class InternalController : ControllerBase
             ContentVoiceClips = d.ContentVoiceClips,
             ContentMusicTracks = d.ContentMusicTracks,
             ContentReportedAt = d.ContentReportedAt,
+            BoardModel = d.BoardModel,
+            FirmwareBuild = d.FirmwareBuild,
+            PartitionName = d.PartitionName,
+            FirmwareReportedAt = d.FirmwareReportedAt,
         })
             .OrderByDescending(d => d.LastSeenAt)
             .ToList();

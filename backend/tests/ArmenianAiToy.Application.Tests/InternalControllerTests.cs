@@ -168,6 +168,29 @@ public class InternalControllerTests
         Assert.Contains("\"contentGameClips\":104", json);
     }
 
+    [Fact]
+    public async Task Devices_ExposeTheReportedBoardAndBuild()
+    {
+        // The board gate silently skips a device whose BoardModel differs
+        // from the configured release — updateAvailable:false, no error, no
+        // log. Being able to READ what the toy reported is how a blocked
+        // rollout gets diagnosed instead of guessed at.
+        var db = NewDb();
+        var d = Dev();
+        d.FirmwareVersion = "1.2.0";
+        d.FirmwareBuild = "build-91";
+        d.BoardModel = "areg-s3-n8";
+        d.PartitionName = "app1";
+        db.Devices.Add(d);
+        await db.SaveChangesAsync();
+
+        var json = Json(await NewController(db).Devices(default));
+
+        Assert.Contains("areg-s3-n8", json);
+        Assert.Contains("build-91", json);
+        Assert.Contains("app1", json);
+    }
+
     // ── OTA attempt-vs-health split (bench caveat fix) ─────────────
 
     [Fact]

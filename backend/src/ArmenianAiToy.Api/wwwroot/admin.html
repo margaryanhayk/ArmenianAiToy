@@ -185,6 +185,17 @@ const tabs = {
       {h:'Name',f:r=>esc(r.name)+`<div class="mono mut">${esc(r.macAddress)}</div>`},
       {h:'Status',f:r=> (r.isRevoked?'<span class="pill blk">revoked</span> ':'')
         + (r.isPaused?'<span class="pill blk">paused</span>':'<span class="pill on">active</span>')},
+      // Device-reported identity. Stored since the OTA foundation, never
+      // displayed until now — "what board is this toy?" used to need a
+      // serial cable. The board matters for rollouts: the firmware offer
+      // gate silently skips a device whose board differs from the
+      // configured release.
+      {h:'Firmware',f:r=>r.firmwareVersion
+        ? esc(r.firmwareVersion)
+          + (r.firmwareBuild ? ` <span class="mut">${esc(r.firmwareBuild)}</span>` : '')
+          + `<div class="mono mut">${r.boardModel ? esc(r.boardModel) : 'board not reported'}`
+          + (r.partitionName ? ' · ' + esc(r.partitionName) : '') + '</div>'
+        : '<span class="mut">not reported</span>'},
       {h:'Last seen',f:r=>dt(r.lastSeenAt)},
       {h:'Bedtime',f:r=>r.bedtimeStart?`${esc(r.bedtimeStart)}–${esc(r.bedtimeEnd)}`:'<span class="mut">—</span>'},
       {h:'Modes (S/G/R/C)',f:r=>[r.storyEnabled,r.gameEnabled,r.riddleEnabled,r.curiosityEnabled].map(onoff).join(' ')},
