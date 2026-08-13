@@ -12,6 +12,7 @@
 #ifdef AREG_CONTENT_SYNC_BENCH
 
 #include "content_sync.h"
+#include "content_report.h"     // re-read the index after a sync
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -1177,6 +1178,10 @@ void content_sync_run() {
     // releasing it here gives the ~90-entry document's heap back for the
     // rest of the boot (a TLS handshake during audio wants 40-50 KB).
     s_games_index.clear();
+    // Re-read what is now on the card so the next heartbeat reports the
+    // library the child will actually hear. Reads the INDEX rather than
+    // s_active[] on purpose — see content_report.h.
+    content_report_refresh();
     Serial.flush();
 
     // ---- 6. Aggregate result (no credentials, no URLs, no headers) ----

@@ -207,6 +207,15 @@ public class DeviceService : IDeviceService
         if (report.PartitionName is not null) device.PartitionName = report.PartitionName;
         if (report.LastOtaStatus is not null) device.LastOtaStatus = report.LastOtaStatus;
         if (report.SdCardOk is not null) device.SdCardOk = report.SdCardOk;
+        // Content report — same partial-report rule. The toy sends this block
+        // only when its card changed, so most heartbeats leave it all null and
+        // the previously-reported snapshot must survive untouched.
+        if (report.ContentIndexSchema is not null) device.ContentIndexSchema = report.ContentIndexSchema;
+        if (report.ContentStories is not null) device.ContentStories = report.ContentStories;
+        if (report.ContentGameClips is not null) device.ContentGameClips = report.ContentGameClips;
+        if (report.ContentVoiceClips is not null) device.ContentVoiceClips = report.ContentVoiceClips;
+        if (report.ContentMusicTracks is not null) device.ContentMusicTracks = report.ContentMusicTracks;
+        if (report.HasAnyContentField) device.ContentReportedAt = nowUtc;
         device.FirmwareReportedAt = nowUtc;
         await _db.SaveChangesAsync();
     }

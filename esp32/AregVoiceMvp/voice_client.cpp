@@ -16,6 +16,7 @@
 #include "wifi_creds.h"     // Phase B.1 — NVS-backed Wi-Fi credentials
 #include "device_creds.h"   // Phase C   — NVS-backed device identity
 #include "ota_foundation.h" // Proof 2 — AREG_FW_* identity + running-partition label
+#include "content_report.h"
 #include "ota_state.h"      // OTA apply — lastOtaStatus for the heartbeat report
 #include "content_sync_rules.h"  // cs_copy_bounded — bounded intent-token copy
 
@@ -283,17 +284,55 @@ void voice_send_heartbeat() {
     // so it reports it here and the parent surface can say so in plain words.
     // Bounded boolean, no free-form strings, no PII — same discipline as the
     // metric tags.
-    char body[320];
-    snprintf(body, sizeof(body),
+    //
+    // CONTENT REPORT (contentStories / clip counts). What the toy actually
+    // HAS on its card, as opposed to what the backend advertises. Attached
+    // only when it CHANGED (plus once per boot), so the steady-state
+    // heartbeat is byte-identical to the pre-report one and a toy whose
+    // library is settled costs nothing extra every 60 s. See
+    // content_report.h for why it reads the index rather than
+    // content_sync's tables.
+    // 640, not 1024: the firmware fields are ~200 B and the content block
+    // is ~90 B plus content_report's own 320 B story cap. This sits on the
+    // 8 KB loop-task stack, so it is sized to what the report can actually
+    // be rather than to a round number.
+    char body[640];
+    int used = snprintf(body, sizeof(body),
              "{\"firmwareVersion\":\"%s\",\"firmwareBuild\":\"%s\","
              "\"boardModel\":\"%s\",\"partitionName\":\"%s\","
-             "\"lastOtaStatus\":\"%s\",\"sdCardOk\":%s}",
+             "\"lastOtaStatus\":\"%s\",\"sdCardOk\":%s",
              AREG_FW_VERSION, AREG_FW_BUILD, AREG_BOARD_MODEL,
              ota_running_partition_label(), ota_state_status_cstr(),
              audio_sd_available() ? "true" : "false");
+    if (used <= 0 || (size_t)used >= sizeof(body)) {
+        http.end();
+        return;   // cannot happen with compile-time constants; refuse to send junk
+    }
+    bool content_attached = false;
+    if (content_report_changed()
+        && (size_t)used + 2 < sizeof(body)) {
+        body[used++] = ',';
+        const size_t wrote = content_report_json_fields(
+            body + used, sizeof(body) - (size_t)used - 1);
+        if (wrote > 0) {
+            used += (int)wrote;
+            content_attached = true;
+        } else {
+            used--;   // undo the comma rather than send a trailing one
+        }
+    }
+    body[used++] = '}';
+    body[used] = '\0';
     http.addHeader("Content-Type", "application/json");
     const int status = http.POST(body);
     if (status == 200) {
+        // Only a 2xx marks the report as delivered. A failed heartbeat
+        // re-sends it next tick — dropping it silently would lose exactly
+        // the one report this feature exists to collect, the one right
+        // after a sync.
+        if (content_attached) {
+            content_report_mark_sent();
+        }
         // Slice E — the server tells us whether the bedtime window is
         // active right now (additive field; older backends omit it and the
         // cached value defaults false). Best-effort parse: a malformed

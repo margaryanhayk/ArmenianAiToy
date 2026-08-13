@@ -188,6 +188,22 @@ const tabs = {
       {h:'Last seen',f:r=>dt(r.lastSeenAt)},
       {h:'Bedtime',f:r=>r.bedtimeStart?`${esc(r.bedtimeStart)}–${esc(r.bedtimeEnd)}`:'<span class="mut">—</span>'},
       {h:'Modes (S/G/R/C)',f:r=>[r.storyEnabled,r.gameEnabled,r.riddleEnabled,r.curiosityEnabled].map(onoff).join(' ')},
+      // Story library on the card. The verdict alone is not enough for an
+      // operator: a stuck sync is diagnosed by knowing WHICH story never
+      // arrived, so the missing ids are listed (first three, then a count)
+      // rather than hidden behind a click. "not reported" is a firmware
+      // age, not a fault, and is greyed accordingly.
+      {h:'Library',f:r=>{
+        const h = r.contentHealth;
+        if (h === 'unknown') return '<span class="mut">not reported</span>';
+        if (h === 'offline') return '<span class="mut">offline</span>';
+        const miss = r.missingStoryIds || [];
+        if (h === 'up_to_date') return '<span class="pill on">current</span>';
+        const shown = miss.slice(0,3).map(esc).join(', ')
+          + (miss.length > 3 ? ` +${miss.length - 3}` : '');
+        return `<span class="pill blk">${h === 'stale' ? 'none' : 'partial'}</span>`
+          + (shown ? `<div class="mono mut">missing: ${shown}</div>` : '');
+      }},
       {h:'Parents',f:r=>r.linkedParents},
       {h:'Children',f:r=>r.childrenList.length?r.childrenList.map(c=>esc(c.name)+(c.age!=null?` (${c.age})`:'')).join(', '):'<span class="mut">—</span>'},
       {h:'Cost today',f:r=>'$'+(r.costTodayUsd||0).toFixed(4)},

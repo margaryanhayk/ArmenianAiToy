@@ -125,6 +125,13 @@ public class InternalController : ControllerBase
             .GroupBy(c => c.DeviceId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
+        // What the manifest currently advertises, resolved once for the whole
+        // response through the same helper the manifest service uses — the
+        // console and the parent dashboard must never disagree about what
+        // "up to date" means.
+        var advertisedStories =
+            ContentSyncOptions.Resolve(_config).AdvertisedStoryVersions();
+
         var rows = devices.Select(d => new AdminDeviceDto(
             Id: d.Id,
             Name: d.Name,
@@ -150,7 +157,19 @@ public class InternalController : ControllerBase
                 .Select(c => new AdminChildDto(
                     c.Id, c.Name, c.Gender.ToString(), c.GetAge(),
                     c.StoryEnabled, c.GameEnabled, c.RiddleEnabled, c.CuriosityEnabled))
-                .ToList()))
+                .ToList())
+        {
+            ContentHealth = DeviceContentHealth.Resolve(
+                d.ContentStories, advertisedStories, d.LastSeenAt, now),
+            MissingStoryIds = DeviceContentHealth.MissingStoryIds(
+                d.ContentStories, advertisedStories),
+            ContentStories = d.ContentStories,
+            ContentIndexSchema = d.ContentIndexSchema,
+            ContentGameClips = d.ContentGameClips,
+            ContentVoiceClips = d.ContentVoiceClips,
+            ContentMusicTracks = d.ContentMusicTracks,
+            ContentReportedAt = d.ContentReportedAt,
+        })
             .OrderByDescending(d => d.LastSeenAt)
             .ToList();
 

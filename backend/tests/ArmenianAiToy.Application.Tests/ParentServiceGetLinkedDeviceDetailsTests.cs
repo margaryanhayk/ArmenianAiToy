@@ -1,3 +1,5 @@
+using System.Linq;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Services;
 using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Domain.Enums;
@@ -609,4 +611,45 @@ public class ParentServiceGetLinkedDeviceDetailsTests
         Assert.Null(result.Summary.LastLoginAt);
         Assert.Null(result.Summary.EmailVerifiedAt);
     }
+
+    // ── Content report: what reaches a PARENT ──────────────────────
+
+    [Fact]
+    public void LinkedDeviceDto_NeverCarriesShaOrPath()
+    {
+        // KEYSTONE. The toy's content report is checksums and file paths at
+        // source. A parent gets ready / not ready and a count — nothing a
+        // support call would ever need to read aloud, and nothing that
+        // describes where a file sits on a child's card. This guards the
+        // shape against a future edit that "helpfully" passes the raw
+        // report through.
+        var names = typeof(ArmenianAiToy.Application.DTOs.LinkedDeviceDto)
+            .GetProperties()
+            .Select(p => p.Name)
+            .ToList();
+
+        Assert.DoesNotContain(names, n => n.Contains("Sha", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(names, n => n.Contains("Path", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(names, n => n.Contains("Url", StringComparison.OrdinalIgnoreCase));
+        // The three fields the parent surface actually reads.
+        Assert.Contains("ContentHealth", names);
+        Assert.Contains("StoriesOnToy", names);
+        Assert.Contains("StoriesAvailable", names);
+    }
+
+    [Fact]
+    public void LinkedDeviceDto_DefaultsToUnknown_NotToAFault()
+    {
+        // Construction sites that predate this slice must not silently
+        // claim a toy has no stories.
+        Assert.Equal(DeviceContentHealth.Unknown, NewDtoForShapeCheck().ContentHealth);
+        Assert.Equal(0, NewDtoForShapeCheck().StoriesOnToy);
+    }
+
+    private static ArmenianAiToy.Application.DTOs.LinkedDeviceDto NewDtoForShapeCheck()
+        => new(
+            Guid.NewGuid(), "toy", DateTime.UtcNow, DateTime.UtcNow, null,
+            new List<ArmenianAiToy.Application.DTOs.LinkedDeviceChildDto>(),
+            false, false, null, null, true, true, true, true, false, true,
+            DeviceStoryHealth.Unknown, string.Empty);
 }

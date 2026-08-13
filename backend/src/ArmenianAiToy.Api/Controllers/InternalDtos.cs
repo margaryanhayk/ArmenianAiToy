@@ -1,3 +1,4 @@
+using ArmenianAiToy.Application.Helpers;
 using System.Text.Json;
 
 namespace ArmenianAiToy.Api.Controllers;
@@ -59,7 +60,38 @@ public sealed record AdminDeviceDto(
     DateTime? DormancyWarnedAt,
     int LinkedParents,
     decimal CostTodayUsd,
-    IReadOnlyList<AdminChildDto> ChildrenList);
+    IReadOnlyList<AdminChildDto> ChildrenList)
+{
+    /// <summary>
+    /// What the toy reports it actually has on its card, and the derived
+    /// verdict against what the manifest advertises. The operator half of
+    /// the content report: a parent is told ready / not ready, but
+    /// diagnosing a stuck sync needs the NAMES — knowing that
+    /// «Խոսող ձուկը» specifically is missing is the difference between a
+    /// diagnosis and a shrug.
+    /// <para>
+    /// Init-props so every existing construction site and test double
+    /// compiles unchanged.
+    /// </para>
+    /// </summary>
+    public string ContentHealth { get; init; } = DeviceContentHealth.Unknown;
+
+    /// <summary>Advertised stories the toy does NOT hold at the advertised
+    /// version. Empty when it has never reported — naming every story as
+    /// missing would be a fabricated fault.</summary>
+    public IReadOnlyList<string> MissingStoryIds { get; init; } = Array.Empty<string>();
+
+    /// <summary>The raw device-reported <c>id:version</c> list, verbatim.
+    /// Verbatim on purpose: when the derived verdict looks wrong, the
+    /// operator needs to see what the toy actually said.</summary>
+    public string? ContentStories { get; init; }
+
+    public int? ContentIndexSchema { get; init; }
+    public int? ContentGameClips { get; init; }
+    public int? ContentVoiceClips { get; init; }
+    public int? ContentMusicTracks { get; init; }
+    public DateTime? ContentReportedAt { get; init; }
+}
 
 public sealed record AdminParentDto(
     Guid Id,

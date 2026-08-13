@@ -1,3 +1,4 @@
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Domain.Enums;
 
 namespace ArmenianAiToy.Application.DTOs;
@@ -68,6 +69,29 @@ public record LinkedDeviceDto(
 
     /// <summary>Slice E — bedtime-music opt-in (default OFF).</summary>
     public bool BedtimeMusicEnabled { get; init; }
+
+    /// <summary>
+    /// Whether the toy has the current story library on its card, derived at
+    /// read time by <c>DeviceContentHealth.Resolve</c>: "up_to_date" /
+    /// "syncing" / "stale" / "offline" / "unknown".
+    /// <para>
+    /// "unknown" means the toy is running firmware older than the
+    /// content-report slice and has never told us — NOT that anything is
+    /// wrong. The dashboard must say so in those words; "0 stories" would
+    /// accuse a healthy toy.
+    /// </para>
+    /// </summary>
+    public string ContentHealth { get; init; } = DeviceContentHealth.Unknown;
+
+    /// <summary>How many of the advertised stories the toy holds at the
+    /// advertised version. Meaningless unless <see cref="ContentHealth"/> is
+    /// one of up_to_date / syncing / stale — zero also means "never
+    /// reported".</summary>
+    public int StoriesOnToy { get; init; }
+
+    /// <summary>How many stories the library currently offers. Zero when
+    /// content sync is disabled.</summary>
+    public int StoriesAvailable { get; init; }
 }
 
 public record LinkedDeviceChildDto(

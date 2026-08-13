@@ -128,6 +128,46 @@ public class InternalControllerTests
         Assert.Contains(d.Name, json); // safe identity field present
     }
 
+    // ── Content report (what the toy HAS, vs what we advertise) ────
+
+    [Fact]
+    public async Task Devices_NeverReportedContent_IsUnknown_AndNamesNoMissingStories()
+    {
+        // KEYSTONE. Every toy in the field is in this state until the
+        // content-report firmware ships. Listing every advertised story as
+        // "missing" for a healthy toy would send an operator chasing a
+        // fault that does not exist.
+        var db = NewDb();
+        db.Devices.Add(Dev());
+        await db.SaveChangesAsync();
+
+        var json = Json(await NewController(db).Devices(default));
+
+        Assert.Contains("\"contentHealth\":\"unknown\"", json);
+        Assert.Contains("\"missingStoryIds\":[]", json);
+    }
+
+    [Fact]
+    public async Task Devices_ReportedContent_IsEchoedVerbatim()
+    {
+        // The derived verdict can be wrong (a manifest change, a parse bug);
+        // the operator needs to see what the toy actually said in order to
+        // tell which half is at fault.
+        var db = NewDb();
+        var d = Dev();
+        d.ContentStories = "ulik:12,anban-huri:9";
+        d.ContentIndexSchema = 7;
+        d.ContentGameClips = 104;
+        db.Devices.Add(d);
+        await db.SaveChangesAsync();
+
+        var json = Json(await NewController(db).Devices(default));
+
+        Assert.Contains("ulik:12,anban-huri:9", json);
+        Assert.Contains("\"contentIndexSchema\":7", json);
+        Assert.Contains("\"contentGameClips\":104", json);
+    }
+
     // ── OTA attempt-vs-health split (bench caveat fix) ─────────────
 
     [Fact]

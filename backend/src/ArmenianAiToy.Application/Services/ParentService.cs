@@ -1259,6 +1259,13 @@ public class ParentService : IParentService
     private const int DefaultOnlineThresholdSeconds = 180;
     private const int MinOnlineThresholdSeconds = 30;
 
+    /// <summary>What the content manifest currently advertises, for the
+    /// content-freshness verdict. The projection itself lives on
+    /// <see cref="ContentSyncOptions.AdvertisedStoryVersions"/> so this and
+    /// the operator console read the same definition.</summary>
+    private IReadOnlyCollection<(string StoryId, int Version)> ReadAdvertisedStories()
+        => ContentSyncOptions.Resolve(_config).AdvertisedStoryVersions();
+
     private int ReadOnlineThresholdSeconds()
     {
         var raw = _config["Presence:OnlineThresholdSeconds"];
@@ -1858,6 +1865,12 @@ public class ParentService : IParentService
         // Platform presence (online dot in the app): seen within the online
         // window. Same snapshot-once discipline as the dormancy cutoff.
         var onlineCutoff = nowUtc.AddSeconds(-ReadOnlineThresholdSeconds());
+        // What the content manifest currently advertises, resolved ONCE for
+        // the whole response through the same pure helper the manifest
+        // service uses — so "up to date" can never mean one thing here and
+        // another on the device endpoint. No constructor dependency: this
+        // reads config, exactly like the two cutoffs above.
+        var advertisedStories = ReadAdvertisedStories();
 
         return links.Select(l => new LinkedDeviceDto(
             l.Device.Id,
@@ -1888,6 +1901,12 @@ public class ParentService : IParentService
                 l.Device.SdCardOk, l.Device.LastSeenAt, nowUtc, ReadOnlineThresholdSeconds()))
         )
         {
+            ContentHealth = DeviceContentHealth.Resolve(
+                l.Device.ContentStories, advertisedStories, l.Device.LastSeenAt, nowUtc,
+                ReadOnlineThresholdSeconds()),
+            StoriesOnToy = DeviceContentHealth.Count(
+                l.Device.ContentStories, advertisedStories).Present,
+            StoriesAvailable = advertisedStories.Count,
             StoryIntroEnabled = l.Device.StoryIntroEnabled,
             StoryPausesEnabled = l.Device.StoryPausesEnabled,
             VariantEndingsEnabled = l.Device.VariantEndingsEnabled,

@@ -96,7 +96,7 @@ one message is not a rule, which is why it is written here.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2554 tests)
+dotnet test                                     # Run all tests (2579 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 ```
 
@@ -4237,6 +4237,71 @@ cost-per-hour figure and for a verified clean-clone boot is in
 **A clean clone did NOT boot from the documented steps** — `OpenAI:ApiKey` and
 `Jwt:Key` are both required and neither had a default; the first fails with an
 unhelpful NuGet stack trace. § Build & Test now says so.
+
+## The toy says what content it has (2026-08-13)
+
+The backend knew what it ADVERTISED in the content manifest and **nothing**
+about what any toy had actually downloaded. So "is my toy up to date after
+this library update?" had no answer anywhere in the product — not in the
+dashboard, not in the operator console, not in a log. The only confirmation
+was pressing the button and listening to a story. CLAUDE.md had recorded
+this as a deliberate omission (a server-side count labelled as the toy's
+would be a false statement about a child's device) with the honest fix
+named: the device reports its verified index on the existing heartbeat.
+This is that slice.
+
+- **Wire.** `DeviceHeartbeatRequest` gains five additive nullable fields —
+  `ContentIndexSchema`, `ContentStories` (a compact `"ulik:12,anban-huri:9"`
+  list), `ContentGameClips` / `ContentVoiceClips` / `ContentMusicTracks`.
+  A SUMMARY, never an inventory: the heartbeat runs every ~60 s and 104
+  game-clip ids would be a kilobyte a minute. `HasAnyContentField` is
+  separate from `HasAnyFirmwareField` so a **content-only** body — which is
+  exactly what a toy sends after a sync — is persisted rather than dropped
+  as a bare presence ping.
+- **Storage.** Six nullable `Device` columns (migration
+  `AddDeviceContentReport`), stamped with the same partial-report rule the
+  firmware fields use: a body that omits the content block never blanks the
+  previous snapshot. A SNAPSHOT each heartbeat replaces, not history — no
+  child table.
+- **`DeviceContentHealth.Resolve`** (`Application/Helpers/`) — pure,
+  clock-injected, built to the `DeviceOtaHealth` / `DeviceStoryHealth`
+  pattern and derived at READ time, never stored (shipping a new story
+  version makes every toy stale without the toy saying anything, so a
+  persisted verdict would be wrong the moment the manifest moves). Five
+  verdicts: `up_to_date` / `syncing` / `stale` / `offline` / `unknown`.
+- **Three invariants, each pinned:**
+  - **A story at an OLDER version counts as ABSENT.** Bumping `Version` is
+    how a re-render reaches a toy; counting v11 as "has the story" would
+    make the whole feature a comfortable lie.
+  - **`unknown` is not a fault.** A toy on firmware predating this slice
+    sends nothing, and every toy in the field is in that state until the
+    release lands. Silence must never render as "0 stories".
+  - **`offline` wins over a stale report**, same rule as
+    `DeviceStoryHealth`: an unplugged toy is not an out-of-date toy.
+  - A malformed entry costs only that entry — the string crosses a wire
+    from a device we do not control.
+- **One definition of "advertised."**
+  `ContentSyncOptions.AdvertisedStoryVersions()` — beside `ResolveStories()`
+  for the same reason `AudioRoot` lives there — so the parent dashboard and
+  the operator console can never disagree. Excludes alternate endings
+  (`AltOf`: a parent-toggled variant, not a missing story) and placeholder
+  rows (`SizeBytes <= 0`: the validator drops them, so no toy could have
+  downloaded one).
+- **Surfaces, same commit.** `parent.html` and `mobile/AregParent` show ONE
+  line — ready / updating / not arrived / not reported — no versions, no
+  ids, no megabytes, and nothing at all when offline (the online chip beside
+  it already says so). `admin.html` gains a Library column that NAMES the
+  missing stories, because an operator diagnosing a stuck sync needs which,
+  not just whether. `LinkedDeviceDto` carries no sha, path or URL — pinned
+  by reflection.
+- **Firmware** `content_report.{h,cpp}` + pure `content_report_rules.h`.
+  Reads the index (not `content_sync`'s `s_active[]`, which is empty on a
+  boot with nothing to sync), sends only on change, marks sent only on 2xx,
+  adds no sixth `CsStory` table. Host-tested with plain g++ via
+  `esp32/AregVoiceMvp/host_tests/content_report_rules_test.cpp`.
+  **NOT bench-run**: no Arduino compile, no card read, no heartbeat
+  observed, no free-RAM measurement. Ships as its own OTA release per the
+  1.1.0 field lesson.
 
 ## Key Design Decisions
 

@@ -339,6 +339,53 @@ then swapped in. A crash before the swap leaves the previous known-good
 index; a crash inside the remove/rename window leaves the `.new` file and
 the next boot rebuilds from the manifest. No MP3 is at risk either way.
 
+### Telling the backend what is on the card (`content_report.{h,cpp}`)
+
+Until this slice the backend knew what it ADVERTISED and nothing about what
+any toy had downloaded. So "did the new stories arrive?" — the question a
+parent asks the day after a library update — had no answer anywhere in the
+product. The only confirmation was pressing the button and listening.
+
+The toy now attaches a summary of `/content_index.json` to its existing
+heartbeat: the schema version, an `id:version` list of VERIFIED stories,
+and counts for the game / voice / music clip namespaces.
+
+Four decisions worth not undoing:
+
+- **It reads the INDEX, not `content_sync`'s tables.** `s_active[]` is only
+  populated on a boot where the sync pass actually ran and verified
+  something. A toy that booted with a complete, current library — nothing
+  to download — would otherwise report an empty card while holding ten
+  stories.
+- **Sent only when it CHANGED**, plus once per boot, and marked as sent only
+  on a 2xx. The steady-state heartbeat is therefore byte-identical to the
+  pre-report one, and a failed heartbeat re-sends rather than dropping the
+  one report that mattered (the one right after a sync).
+- **Verified entries only.** A story enters the index after its sha256
+  matched, so "6 of 10" always means six stories that will actually play.
+- **No sixth `CsStory` table.** The JSON is parsed for three fields
+  directly. Five `CsStory[CS_MAX_STORIES]` tables already exist (~3.4 KB
+  each) on a board that wants 40-50 KB free for a TLS handshake during
+  audio; the report costs two 320-byte buffers in `.bss` and a 640-byte
+  stack buffer in `voice_send_heartbeat()`.
+
+The buffer arithmetic — the only genuinely error-prone part, where a bug is
+not a compile error but a toy claiming to own a story called `anban-hu` —
+lives in the pure, Arduino-free `content_report_rules.h` and is tested on a
+host with plain g++:
+
+```
+g++ -std=c++17 -Wall -Wextra -o /tmp/cr_test esp32/AregVoiceMvp/host_tests/content_report_rules_test.cpp && /tmp/cr_test
+```
+
+**NOT yet bench-run.** Nothing here has touched real hardware: no compile
+against the Arduino core in this environment, no card read, no heartbeat
+observed, no free-RAM measurement against the 227,480 B baseline. Until an
+OTA release carrying this ships, every toy in the field reports nothing and
+the dashboard correctly says so ("this toy has not told us yet"). Per the
+1.1.0 field lesson, that release goes out on its own and is not bundled
+with anything else.
+
 ## Story selection (`story_select.{h,cpp}`)
 
 As of the `story-select-from-index` slice the toy **chooses** which cached

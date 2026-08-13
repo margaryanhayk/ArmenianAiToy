@@ -56,6 +56,43 @@ public class Device
     /// </summary>
     public bool? SdCardOk { get; set; }
 
+    /// <summary>
+    /// What content the toy actually HAS, stamped from the heartbeat. Null =
+    /// never reported (firmware older than the content-report slice), which
+    /// stays distinguishable from "reported, and empty".
+    ///
+    /// <para>
+    /// <b>Why this exists.</b> The backend knew what it ADVERTISED in the
+    /// content manifest and nothing about what any toy had downloaded, so the
+    /// only honest answer to "is my toy up to date?" was silence — printing a
+    /// server-side count labelled as the toy's would have been a false
+    /// statement about a child's device. These fields are the toy's own
+    /// answer, read from the <c>/content_index.json</c> it writes after each
+    /// sync.
+    /// </para>
+    ///
+    /// <para>
+    /// <see cref="ContentStories"/> is a compact <c>id:version</c> list
+    /// (<c>"ulik:12,anban-huri:9"</c>) of VERIFIED stories — the toy only
+    /// records an entry after the sha256 matched, so a half-downloaded story
+    /// never appears here. Stored as the reported string rather than a child
+    /// table: it is a SNAPSHOT that each heartbeat replaces, not history.
+    /// The clip namespaces are counts only, because no surface needs to name
+    /// an individual clip.
+    /// </para>
+    /// </summary>
+    public int? ContentIndexSchema { get; set; }
+    public string? ContentStories { get; set; }
+    public int? ContentGameClips { get; set; }
+    public int? ContentVoiceClips { get; set; }
+    public int? ContentMusicTracks { get; set; }
+
+    /// <summary>When the backend last received a content report. Distinct from
+    /// <see cref="FirmwareReportedAt"/>: the toy sends the content block only
+    /// when it changes, so this can be hours old on a perfectly healthy
+    /// toy.</summary>
+    public DateTime? ContentReportedAt { get; set; }
+
     public DateTime RegisteredAt { get; set; }
     public DateTime LastSeenAt { get; set; }
 

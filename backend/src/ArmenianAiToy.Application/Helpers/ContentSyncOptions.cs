@@ -327,6 +327,43 @@ public sealed class ContentSyncOptions
     /// empty manifest. Validation lives in exactly one place.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// The (storyId, version) pairs a toy is expected to hold, for the
+    /// content-freshness verdict (<c>DeviceContentHealth</c>). Lives here,
+    /// beside <see cref="ResolveStories"/>, for the same reason AudioRoot
+    /// does: the parent dashboard and the operator console must never
+    /// disagree about what "up to date" means, and two copies of this
+    /// projection would eventually drift.
+    ///
+    /// <para>
+    /// Three exclusions, each deliberate:
+    /// <list type="bullet">
+    /// <item>Sync disabled — nothing is offered, so no toy can be behind.</item>
+    /// <item>Alternate endings (<c>AltOf</c>) — a variant of a story the toy
+    /// already has, gated by a parent toggle. Counting one would tell a
+    /// parent their toy is missing a story when it is missing an optional
+    /// ending they may have switched off.</item>
+    /// <item>Placeholder rows (<c>SizeBytes &lt;= 0</c>) — the manifest
+    /// validator drops these, so nothing is advertised and no toy could
+    /// have downloaded it. Counting them would report every toy as
+    /// permanently incomplete.</item>
+    /// </list>
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<(string StoryId, int Version)> AdvertisedStoryVersions()
+    {
+        if (!Enabled)
+        {
+            return Array.Empty<(string, int)>();
+        }
+        return ResolveStories()
+            .Where(s => !string.IsNullOrWhiteSpace(s.StoryId)
+                        && string.IsNullOrWhiteSpace(s.AltOf)
+                        && s.SizeBytes > 0)
+            .Select(s => (s.StoryId!.Trim(), s.Version < 1 ? 1 : s.Version))
+            .ToList();
+    }
+
     public IReadOnlyList<ContentSyncStoryOptions> ResolveStories()
     {
         // AudioRoot is applied HERE, in the one place both the manifest

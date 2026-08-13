@@ -37,6 +37,96 @@ public class DeviceServiceOtaTests
 
     private static readonly DateTime Now = new(2026, 7, 3, 12, 0, 0, DateTimeKind.Utc);
 
+    // --- Content report ---------------------------------------------------
+    // Added 2026-08-13: the toy now also reports what is on its SD card, so a
+    // parent can be told whether a library update actually landed. Before
+    // this the only confirmation was listening to a story.
+
+    [Fact]
+    public async Task UpdateFirmwareReport_StampsTheContentReport()
+    {
+        var (svc, db) = Create();
+        var id = Guid.NewGuid();
+        db.Add(new Device { Id = id, MacAddress = "m", Name = "t" });
+        await db.SaveChangesAsync();
+
+        await svc.UpdateFirmwareReportAsync(id, new DeviceHeartbeatRequest(
+            ContentIndexSchema: 7,
+            ContentStories: "ulik:12,anban-huri:9",
+            ContentGameClips: 104,
+            ContentVoiceClips: 42,
+            ContentMusicTracks: 0), Now);
+
+        var d = await db.Set<Device>().FirstAsync(x => x.Id == id);
+        Assert.Equal(7, d.ContentIndexSchema);
+        Assert.Equal("ulik:12,anban-huri:9", d.ContentStories);
+        Assert.Equal(104, d.ContentGameClips);
+        Assert.Equal(42, d.ContentVoiceClips);
+        Assert.Equal(0, d.ContentMusicTracks);
+        Assert.Equal(Now, d.ContentReportedAt);
+    }
+
+    [Fact]
+    public async Task UpdateFirmwareReport_ContentOnlyBody_IsPersisted()
+    {
+        // KEYSTONE. The toy sends the content block only when its card
+        // CHANGED, so the report that matters most — the one right after a
+        // sync — carries no firmware fields at all. If HasAnyFirmwareField
+        // did not account for it, the controller would drop the very report
+        // this feature exists to collect.
+        var (svc, db) = Create();
+        var id = Guid.NewGuid();
+        db.Add(new Device { Id = id, MacAddress = "m", Name = "t" });
+        await db.SaveChangesAsync();
+
+        var report = new DeviceHeartbeatRequest(ContentStories: "ulik:12");
+        Assert.True(report.HasAnyContentField);
+        Assert.True(report.HasAnyFirmwareField);
+
+        await svc.UpdateFirmwareReportAsync(id, report, Now);
+
+        Assert.Equal("ulik:12",
+            (await db.Set<Device>().FirstAsync(x => x.Id == id)).ContentStories);
+    }
+
+    [Fact]
+    public async Task UpdateFirmwareReport_FirmwareOnlyBody_NeverBlanksTheContentReport()
+    {
+        // KEYSTONE. Most heartbeats carry firmware fields and no content
+        // block. Blanking on those would make the dashboard flip to "we don't
+        // know" every minute between syncs.
+        var (svc, db) = Create();
+        var id = Guid.NewGuid();
+        db.Add(new Device
+        {
+            Id = id, MacAddress = "m", Name = "t",
+            ContentStories = "ulik:12", ContentIndexSchema = 7,
+            ContentGameClips = 104, ContentVoiceClips = 42, ContentMusicTracks = 0,
+            ContentReportedAt = Now.AddHours(-3),
+        });
+        await db.SaveChangesAsync();
+
+        await svc.UpdateFirmwareReportAsync(
+            id, new DeviceHeartbeatRequest(FirmwareVersion: "1.2.1"), Now);
+
+        var d = await db.Set<Device>().FirstAsync(x => x.Id == id);
+        Assert.Equal("1.2.1", d.FirmwareVersion);
+        Assert.Equal("ulik:12", d.ContentStories);
+        Assert.Equal(7, d.ContentIndexSchema);
+        Assert.Equal(104, d.ContentGameClips);
+        // Not re-stamped: the toy said nothing about its content this time.
+        Assert.Equal(Now.AddHours(-3), d.ContentReportedAt);
+    }
+
+    [Fact]
+    public void BodylessHeartbeat_ReportsNothing()
+    {
+        // The legacy presence-only heartbeat must still do no DB write.
+        var empty = new DeviceHeartbeatRequest();
+        Assert.False(empty.HasAnyContentField);
+        Assert.False(empty.HasAnyFirmwareField);
+    }
+
     [Fact]
     public async Task UpdateFirmwareReport_StampsAllReportedFields()
     {

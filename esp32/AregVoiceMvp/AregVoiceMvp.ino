@@ -29,7 +29,8 @@
 #include "ble_provisioning.h"  // B.2 — BLE provisioning (gated; no-op when flag off)
 #include "ota_foundation.h"    // Proof 2 — phone-home command poll (no OTA apply)
 #include "sd_bench.h"          // microSD hardware proof (AREG_SD_BENCH_TEST builds only)
-#include "content_sync.h"      // Cloud→SD story sync (AREG_CONTENT_SYNC_BENCH builds only)
+#include "content_sync.h"      // Cloud→SD content sync
+#include "content_report.h"    // what this toy HAS on its card, for the heartbeat
 #include "content_sync_test.h" // content-sync decision-logic tests (AREG_CONTENT_SYNC_TEST_BENCH only)
 #include "sd_diag.h"           // standalone SD diagnostic (AREG_SD_DIAG_BENCH builds only)
 #include "sd_playback.h"       // cached-MP3 SD playback (AREG_SD_PLAYBACK_BENCH builds only)
@@ -1986,6 +1987,12 @@ void setup() {
         Serial.printf("[boot] SD mounted; offline narration %s = %s\n",
                       AREG_SD_STORY_NARRATION,
                       audio_sd_has_file(AREG_SD_STORY_NARRATION) ? "present" : "absent");
+        // Read what is on the card BEFORE the first heartbeat. Without this,
+        // a toy that boots with a complete, current library and finds
+        // nothing to sync would report nothing at all — and the dashboard
+        // would say "this toy has not told us yet" about a toy that is
+        // perfectly up to date.
+        content_report_refresh();
     } else {
         Serial.println("[boot] SD not mounted — Wi-Fi streaming only");
     }

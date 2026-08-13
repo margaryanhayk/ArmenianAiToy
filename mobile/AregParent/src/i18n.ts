@@ -300,6 +300,30 @@ const D = {
   },
   this_toy: { en: 'This toy', ru: 'Эта игрушка', hy: 'Այս խաղալիքը' },
   rename_failed: { en: 'Rename failed', ru: 'Не удалось переименовать', hy: 'Չհաջողվեց վերանվանել' },
+  // Story-library freshness on the toy card. Mirrors parent.html word for
+  // word — the same parent reads both, and two different sentences for one
+  // fact reads as two different products. Ready or not ready; no versions,
+  // no story ids, no megabytes.
+  library_ready: {
+    en: 'All {n} stories are on this toy.',
+    ru: 'Все {n} сказок загружены на игрушку.',
+    hy: 'Բոլոր {n} հեքիաթները խաղալիքի մեջ են։'
+  },
+  library_updating: {
+    en: 'Adding new stories — {have} of {total} so far. Keep it on Wi-Fi.',
+    ru: 'Загружаются новые сказки — пока {have} из {total}. Оставьте игрушку в Wi-Fi.',
+    hy: 'Նոր հեքիաթներ են ավելանում՝ առայժմ {have}-ը {total}-ից։ Թողեք Wi-Fi-ին միացած։'
+  },
+  library_none: {
+    en: 'The stories have not arrived yet. Keep the toy on Wi-Fi for a few minutes.',
+    ru: 'Сказки ещё не загрузились. Оставьте игрушку в Wi-Fi на несколько минут.',
+    hy: 'Հեքիաթները դեռ չեն հասել։ Թողեք խաղալիքը Wi-Fi-ին միացած մի քանի րոպե։'
+  },
+  library_unknown: {
+    en: 'This toy has not told us which stories it has yet.',
+    ru: 'Игрушка ещё не сообщила, какие сказки у неё есть.',
+    hy: 'Խաղալիքը դեռ չի հայտնել, թե որ հեքիաթներն ունի։'
+  },
   child_with_age: { en: '{name} (age {n})', ru: '{name} ({n} г.)', hy: '{name} ({n} տարեկան)' },
 
   // ---------- account ----------

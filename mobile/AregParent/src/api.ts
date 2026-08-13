@@ -51,6 +51,12 @@ export type LinkedDevice = {
   bedtimeStart: string | null; // "HH:mm:ss" or null
   bedtimeEnd: string | null;
   children: LinkedDeviceChild[];
+  // Story-library freshness, decided by the backend. Optional so the app
+  // keeps working against a server older than the content-report slice.
+  // "unknown" means the TOY has not reported (older firmware) — not a fault.
+  contentHealth?: 'up_to_date' | 'syncing' | 'stale' | 'offline' | 'unknown';
+  storiesOnToy?: number;
+  storiesAvailable?: number;
 };
 
 export type ModeFlags = {

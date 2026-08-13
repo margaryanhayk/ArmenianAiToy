@@ -1782,6 +1782,30 @@
         ru: 'Пожалуйста, свяжитесь с поддержкой и назовите этот код:',
         hy: 'Խնդրում ենք կապվել աջակցման ծառայության հետ և ասել այս կոդը՝'
       },
+      // Story library freshness. The parent is told READY or NOT READY and
+      // nothing else: no versions, no story ids, no megabytes. "We haven't
+      // heard yet" is its own line because a toy on older firmware never
+      // reports, and "0 stories" would read as a broken toy.
+      library_ready: {
+        en: 'All {n} stories are on this toy.',
+        ru: 'Все {n} сказок загружены на игрушку.',
+        hy: 'Բոլոր {n} հեքիաթները խաղալիքի մեջ են։'
+      },
+      library_updating: {
+        en: 'Adding new stories — {have} of {total} so far. Keep it on Wi-Fi.',
+        ru: 'Загружаются новые сказки — пока {have} из {total}. Оставьте игрушку в Wi-Fi.',
+        hy: 'Նոր հեքիաթներ են ավելանում՝ առայժմ {have}-ը {total}-ից։ Թողեք Wi-Fi-ին միացած։'
+      },
+      library_none: {
+        en: 'The stories have not arrived yet. Keep the toy on Wi-Fi for a few minutes.',
+        ru: 'Сказки ещё не загрузились. Оставьте игрушку в Wi-Fi на несколько минут.',
+        hy: 'Հեքիաթները դեռ չեն հասել։ Թողեք խաղալիքը Wi-Fi-ին միացած մի քանի րոպե։'
+      },
+      library_unknown: {
+        en: 'This toy has not told us which stories it has yet.',
+        ru: 'Игрушка ещё не сообщила, какие сказки у неё есть.',
+        hy: 'Խաղալիքը դեռ չի հայտնել, թե որ հեքիաթներն ունի։'
+      },
       modes_need_one: { en: 'Keep at least one mode on — otherwise the toy has nothing to do.', ru: 'Оставьте хотя бы один режим включённым — иначе игрушке нечем заняться.', hy: 'Թողեք գոնե մեկ ռեժիմ միացած, այլապես խաղալիքն անելիք չի ունենա։' },
       bedtime_need_both: { en: 'Set both a start and an end time (or clear both to turn bedtime off).', ru: 'Укажите и начало, и конец (или очистите оба, чтобы выключить).', hy: 'Նշեք և՛ սկիզբը, և՛ վերջը (կամ մաքրեք երկուսն էլ՝ անջատելու համար)։' },
       bedtime_same: { en: 'Start and end time cannot be the same.', ru: 'Начало и конец не могут совпадать.', hy: 'Սկիզբը և վերջը չեն կարող նույնը լինել։' },
@@ -3656,6 +3680,32 @@
         codeEl.textContent = d.faultCode;
         helpEl.appendChild(codeEl);
         header.appendChild(helpEl);
+      }
+
+      // Story library freshness. Placed under the badges, above everything
+      // else on the toy screen, because "did the new stories arrive?" is the
+      // question a parent asks the day after an update and had no way to
+      // answer — the only confirmation used to be listening to a story.
+      //
+      // The backend sends the verdict; this never derives one. Two states
+      // deliberately render NOTHING: "offline" (the online/offline chip
+      // above already says so, and repeating it as a library problem would
+      // send the parent chasing the wrong thing) and an absent field (an
+      // older backend).
+      if (d.contentHealth && d.contentHealth !== 'offline') {
+        var libEl = document.createElement('p');
+        libEl.style.cssText = 'margin:8px 0 0;font-size:13px;line-height:1.45;color:var(--ink-muted);';
+        if (d.contentHealth === 'up_to_date' && d.storiesAvailable > 0) {
+          libEl.textContent = tf('library_ready', { n: d.storiesAvailable });
+        } else if (d.contentHealth === 'syncing') {
+          libEl.textContent = tf('library_updating',
+            { have: d.storiesOnToy, total: d.storiesAvailable });
+        } else if (d.contentHealth === 'stale') {
+          libEl.textContent = t('library_none');
+        } else if (d.contentHealth === 'unknown') {
+          libEl.textContent = t('library_unknown');
+        }
+        if (libEl.textContent) { header.appendChild(libEl); }
       }
 
       // A toy with no child profile used to say so here and offer nothing -

@@ -479,6 +479,18 @@ function DeviceCard({
     .map((c) => (c.age != null ? tf('child_with_age', { name: c.name, n: c.age }) : c.name))
     .join(', ');
 
+  const libraryLine = (() => {
+    const health = device.contentHealth;
+    if (!health || health === 'offline') return null;
+    const have = device.storiesOnToy ?? 0;
+    const total = device.storiesAvailable ?? 0;
+    if (health === 'up_to_date' && total > 0) return tf('library_ready', { n: total });
+    if (health === 'syncing') return tf('library_updating', { have, total });
+    if (health === 'stale') return t('library_none');
+    if (health === 'unknown') return t('library_unknown');
+    return null;
+  })();
+
   return (
     <View style={styles.card}>
       {/* The card never showed the toy's own name — only an editable input
@@ -493,6 +505,13 @@ function DeviceCard({
         {device.isRevoked ? <Text style={styles.revokedTag}>{t('revoked')}</Text> : null}
         {device.isPaused ? <Text style={styles.pausedTag}>{t('paused')}</Text> : null}
       </View>
+
+      {/* Did the new stories actually arrive? The question a parent asks the
+          day after an update, which used to have no answer anywhere — the
+          only confirmation was listening to a story. Offline renders nothing:
+          the dot above already says so, and repeating it as a library problem
+          would send the parent chasing the wrong thing. */}
+      {libraryLine ? <Text style={styles.libraryLine}>{libraryLine}</Text> : null}
 
       {childLine ? (
         <Text style={styles.children}>{childLine}</Text>
@@ -624,6 +643,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   children: { color: theme.inkMuted, marginTop: 6 },
+  libraryLine: { color: theme.inkMuted, marginTop: 6, fontSize: 13, lineHeight: 19 },
   childBox: {
     marginTop: 10,
     padding: 12,
