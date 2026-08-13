@@ -103,3 +103,70 @@ Worth listening for specifically:
 - **«Երեք խոզուկները» marks the seasons** — summer, autumn, first rain,
   spring — which is the most cue-dense story in the library and the most likely
   to feel busy.
+
+## Round 2 — the five held cues are placed, by measurement
+
+The owner created a new ElevenLabs key with `forced_alignment`. All five held
+cues now sit on a word time rather than an estimate, and «Ուլիկը»'s two
+hand-placed offsets were deleted in favour of the same measurement.
+
+| story | sound | cut at | on the words |
+|---|---|---|---|
+| ulik | door-knock | 34.93 s | «դուռը զարկում» |
+| ulik | door-knock | 65.63 s | «դուռը ծեծում» |
+| khosogh-dzuk | water-splash | 78.27 s | «ետ գցում գետը։» |
+| khosogh-dzuk | door-knock | 215.48 s | «դուռը դղրդում է։» |
+| princess-and-pea | door-knock | 19.07 s | «դուռը թակեցին։» |
+| sutasan | thunder-distant | 41.29 s | «երկինքը պատռվեց» |
+| three-piglets | wind-gust | 46.80 s | «փչեց ամբողջ ուժով։» |
+
+**The measurement agrees with the owner's ear and refutes the estimate.** He
+had said the knock at 37.78 s was "~2 seconds late" and pointed at 35.33 s;
+alignment puts it at 34.93 s. The two are the same moment. Both earlier
+estimates are now explained rather than merely wrong.
+
+### Four things this took, each a real defect
+
+**1. `cueLine` is not where a sound lands.** «Ուլիկը»'s cueLine is the whole
+sentence — *"one evening the wolf comes, KNOCKS ON THE DOOR and calls in his
+thick voice"* — so anchoring to its END put the knock after *calls*, 2.4 s
+after the knocking. That is exactly what the owner heard, and no amount of
+better timing would have fixed it. A new `landOn` field carries the phrase the
+sound lands on; `cueLine` stays as documentation of the line. Several notes
+already named the phrase («must land exactly on «գցում գետը»», «on «թակեցին»»)
+and could not be honoured until now.
+
+**2. A forced alignment does not agree with a byte map, and the disagreement
+is linear.** Measured across «Ուլիկը» and «Խոսող ձուկը»: **-0.60 s per
+segment**, dead straight, which is exactly the silence the stitcher puts
+between segments — the aligner is not counting it. By the last segment of the
+five-minute story it is **-4.97 s**. A cue placed on an uncorrected time lands
+in the wrong sentence. Rather than assume 0.60, the offset is measured: each
+segment's first words are found in the alignment and the two clocks are paired,
+then interpolated. Nine anchors on «Խոսող ձուկը».
+
+**3. A phrase repeats.** «դուռը զարկում» appears in segment 0 too — the
+mother's first knock — and the wolf's cue resolved to it, 20.5 s before its own
+segment. The search floor is now the segment's start **in alignment time**,
+which the drift anchors already know. Flooring it in file time had rejected
+correct matches instead (the drift is bigger than the gap being guarded).
+
+**4. Two instruments arguing is worse than one.** Snapping an aligned position
+to the nearest detected silence pulled the «Երեք խոզուկները» cut **0.56 s back
+inside «ուժով։»**, and on «Խոսող ձուկը» there is no pause after «գետը։» at all
+— the narrator runs straight on — so demanding one refused to place the story's
+single most important sound. An alignment already gives a word boundary, and
+silence is being INSERTED at the cut anyway, so a few hundredths either way is
+inaudible while half a second inside a word is not. Aligned positions are now
+used as-is; the nearest pause is reported and not applied.
+
+### Verification, round 2
+
+Every self-test PASS. `check_story_audio.py` 10 of 10 — the five re-mixed
+stories are each 2-4 s longer, which is the inserted silence and is the point.
+-16.6..-16.7 LUFS, 192 kbps, one ID3 tag. Ten byte maps regenerated on the
+post-insertion timeline; manifest sizes match the bytes on disk. `dotnet test`
+2554.
+
+Still not proven: whether any of it sounds right. Seven one-shots now cut the
+narration open, and only an ear can say whether the beat lands.

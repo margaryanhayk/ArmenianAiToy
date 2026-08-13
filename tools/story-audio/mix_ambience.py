@@ -118,6 +118,10 @@ SPAN_PAUSE_CLAUSE = 0.16
 # than this and it is no longer snapping to the boundary it estimated, it is
 # choosing a different one.
 SNAP_WINDOW_S = 1.5
+# How far a forced alignment may disagree with the byte map before the match is
+# treated as wrong rather than merely imprecise. Measured drift on «Ուլիկը» is
+# ~1.1s over two minutes; 3s is generous and still far shorter than a segment.
+MAX_ALIGN_DRIFT_S = 3.0
 # `insert: true` — cut the narration open and put the sound in the hole, rather
 # than laying it over whatever gap the speech happens to leave. The owner's
 # idea, after hearing the knock land wrong twice: "we can pause, we can play
@@ -126,7 +130,7 @@ SNAP_WINDOW_S = 1.5
 INSERT_LEAD_S = 0.25
 INSERT_TAIL_S = 0.35
 SILENCE_FLOOR_DB = -35     # MP3 + loudnorm lift the noise floor; -42 finds none
-SILENCE_MIN_S = 0.20
+SILENCE_MIN_S = 0.15   # 0.20 missed a real 0.18s gap in «Երեք խոզուկները»
 VOICES_DIR = REPO / "backend/content/story-voices"
 
 
@@ -515,6 +519,74 @@ def sound_content_length(path: Path) -> float:
     return total
 
 
+def load_aligned_words(story_id: str, audio_dir: Path) -> list[dict]:
+    """Word times from tools/story-audio/align_story.py, if they exist."""
+    for d in (audio_dir, REPO / "backend/src/ArmenianAiToy.Api/story-audio"):
+        p = d / f"{story_id}.words.json"
+        if p.exists():
+            return json.loads(p.read_text(encoding="utf-8")).get("words", [])
+    return []
+
+
+def find_aligned_phrase_end(words: list[dict], phrase: str,
+                            search_from: float = 0.0) -> float | None:
+    """Delegates to align_story, so one implementation matches the words."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from align_story import find_phrase_end  # noqa: E402
+    return find_phrase_end(words, phrase, search_from)
+
+
+def drift_anchors(words: list[dict], seg_texts: list[str],
+                  starts: list[float]) -> list[tuple[float, float]]:
+    """Pair each segment's start in the ALIGNMENT with its start in the FILE.
+
+    A forced alignment does not agree with a byte map. Measured on «Ուլիկը» and
+    «Խոսող ձուկը», the disagreement is dead linear at about **0.60s per
+    segment** — which is exactly the silence the stitcher puts between
+    segments, so the aligner is not counting it. By the last segment of a
+    five-minute story it is nearly five seconds, and a cue placed on an
+    uncorrected time lands in the wrong sentence.
+
+    Rather than assume 0.60, the offset is MEASURED: find each segment's first
+    few words in the alignment and pair the two clocks.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from align_story import words_of, norm  # noqa: E402
+
+    have = [norm(w["text"]) for w in words]
+    out, k = [], 0
+    for i, text in enumerate(seg_texts):
+        want = [norm(x) for x in words_of(text)][:4]
+        if not want:
+            continue
+        for j in range(k, len(have) - len(want) + 1):
+            if have[j:j + len(want)] == want:
+                out.append((words[j]["start"], starts[i], i))
+                k = j + 1
+                break
+    return out
+
+
+def correct_drift(t: float, anchors: list[tuple[float, float]]) -> float:
+    """Aligned time -> file time, piecewise-linear through the anchors.
+
+    Piecewise rather than a single fitted line: the drift happens to be linear
+    here because every segment gap is the same, but a story stitched with
+    varying gaps would not be, and interpolating between measured pairs is
+    correct either way.
+    """
+    if not anchors:
+        return t
+    if t <= anchors[0][0]:
+        return t + (anchors[0][1] - anchors[0][0])
+    for (a0, f0, _), (a1, f1, _) in zip(anchors, anchors[1:]):
+        if a0 <= t <= a1:
+            span = a1 - a0
+            r = 0.0 if span <= 0 else (t - a0) / span
+            return f0 + r * (f1 - f0)
+    return t + (anchors[-1][1] - anchors[-1][0])
+
+
 def load_span_chars(story_id: str) -> dict[int, list[tuple[str, int]]]:
     """(speaker, character count) per span, per segment, from the speaker map."""
     p = VOICES_DIR / f"{story_id}.voices.json"
@@ -544,7 +616,9 @@ def load_span_times(story_id: str, audio_dir: Path) -> dict[int, list[float]]:
 
 def resolve_line_positions(story_id: str, cues: list[dict], durations: list[float],
                            starts: list[float], narration: Path | None,
-                           audio_dir: Path) -> tuple[dict[int, float], list[str]]:
+                           audio_dir: Path,
+                           source: dict[int, str] | None = None
+                           ) -> tuple[dict[int, float], list[str]]:
     """Seconds into each segment where an `at: "line"` cue belongs.
 
     Order of preference, best first:
@@ -554,11 +628,18 @@ def resolve_line_positions(story_id: str, cues: list[dict], durations: list[floa
       3. the estimate alone, said out loud.
     """
     notes: list[str] = []
+    src = source if source is not None else {}
     wanted = sorted({c["segment"] for c in cues if c.get("at") == "line"})
     if not wanted:
         return {}, notes
 
     spans = load_span_chars(story_id)
+    # Best source first: a forced alignment of this narration says when each
+    # word was actually spoken. Everything below it is an estimate, and the
+    # estimates were wrong twice — 5.6s early, then 2.4s late, both caught by
+    # ear. The alignment agreed with the ear.
+    words = load_aligned_words(story_id, audio_dir)
+    anchors: list[tuple[float, float]] = []
     measured = load_span_times(story_id, audio_dir)
     silences = detect_silences(narration) if narration else []
     if wanted and not silences and narration:
@@ -568,15 +649,92 @@ def resolve_line_positions(story_id: str, cues: list[dict], durations: list[floa
     story_json = STORY_DIR / f"{story_id}.story.json"
     texts = json.loads(story_json.read_text(encoding="utf-8"))["segments"] \
         if story_json.exists() else []
+    aligned_seg_start: dict[int, float] = {}
+    if words and texts:
+        anchors = drift_anchors(words, texts, starts)
+        if len(anchors) >= 2:
+            d0 = anchors[0][0] - anchors[0][1]
+            dn = anchors[-1][0] - anchors[-1][1]
+            aligned_seg_start = {i: a for a, _f, i in anchors}
+            notes.append(f"alignment drift corrected from {len(anchors)} "
+                         f"anchors ({d0:+.2f}s at the start, {dn:+.2f}s at "
+                         f"the end)")
 
     out: dict[int, float] = {}
+    # A story repeats itself — «Սևուկ ուլիկ, Սիրուն բալիկ» is sung three times
+    # in «Ուլիկը» by three characters — so each search starts after the last
+    # one ended, or every cue but the first lands on the first singing.
+    seen = 0.0
     for cue in cues:
         if cue.get("at") != "line":
             continue
         i = cue["segment"]
         if i in out:
             continue
-        line = cue.get("cueLine", "").strip()
+        # `landOn` is the phrase the SOUND lands on; `cueLine` is the line the
+        # cue belongs to. They are usually different and the difference is
+        # audible: «Ուլիկը»'s cueLine is the whole sentence "one evening the
+        # wolf comes, KNOCKS ON THE DOOR and calls in his thick voice", so
+        # anchoring to its end put the knock 2.4s late — after the calling —
+        # which is precisely what the owner heard. Anchored to «դուռը զարկում»
+        # it lands on the word that means knocked.
+        line = (cue.get("landOn") or cue.get("cueLine", "")).strip()
+
+        if words and line:
+            # Search from this segment's own start, never earlier. A story
+            # repeats itself — «Խոսող ձուկը» says «դուռը զարկեց» in more than
+            # one place — and without this the cue resolved to an occurrence
+            # BEFORE its segment and came out at a negative offset.
+            # Search from the previous cue's position, NOT from this
+            # segment's start. Measured on «Ուլիկը»: the aligner puts the
+            # first word of segment 2 at 31.02s where the byte map says the
+            # segment begins at 32.16s. Alignment drifts against a map built
+            # by walking MP3 frames, by about a second over a two-minute file.
+            # Flooring the search at the segment start therefore rejected
+            # CORRECT matches and fell back to estimating — which is how three
+            # of five stories silently lost their measurement.
+            #
+            # Chaining on `seen` is what disambiguates a repeated line, and it
+            # is enough: «Ուլիկը» sings the same verse three times and each
+            # cue still resolves to its own.
+            # The floor is this segment's start IN ALIGNMENT TIME. Using the
+            # file-time start would be wrong by the drift, and using the
+            # previous cue's position is not enough on its own: «դուռը զարկում»
+            # occurs in segment 0 too — the mother's first knock — and the
+            # wolf's cue resolved to it, 20.5s before its own segment.
+            floor = max(seen, aligned_seg_start.get(i, 0.0) - 0.05)
+            spoken_raw = find_aligned_phrase_end(words, line, floor)
+            spoken = (correct_drift(spoken_raw, anchors)
+                      if spoken_raw is not None else None)
+            if spoken is not None:
+                seen = spoken_raw
+                # No snapping. The alignment already gives a word boundary,
+                # and letting silencedetect override it made the two
+                # instruments argue: on «Երեք խոզուկները» it pulled the cut
+                # 0.56s back INSIDE «ուժով։». Where the two agree the
+                # difference is hundredths; where they disagree the alignment
+                # is the one that knows which word is which.
+                at = spoken - starts[i]
+                # A slightly negative offset is drift, not an error — the
+                # ABSOLUTE time is what the cue is placed at, and it is right.
+                # A grossly negative one means the phrase matched an earlier
+                # occurrence and the cue would land in the wrong scene.
+                if at < -MAX_ALIGN_DRIFT_S:
+                    raise SystemExit(
+                        f"segment {i} / {cue.get('sound')}: the aligned line "
+                        f"resolves to {spoken:.2f}s, {-at:.1f}s before the "
+                        f"segment starts at {starts[i]:.2f}s. That is past "
+                        f"drift — the cueLine is matching an earlier "
+                        f"occurrence. Make it longer or more specific.")
+                out[i] = at
+                src[i] = "aligned"
+                near = snap_to_pause(spoken, silences, SNAP_WINDOW_S)
+                notes.append(
+                    f"seg {i}: line anchor {at:.2f}s (ALIGNED word ends "
+                    f"{spoken_raw:.2f}s -> {spoken:.2f}s corrected"
+                    + (f"; nearest pause {near - spoken:+.2f}s away, not used)"
+                       if near is not None else "; no pause nearby)"))
+                continue
         if i >= len(texts) or not line:
             raise SystemExit(f"segment {i}: at=line but the cueLine is not in "
                              f"the story text — nothing to anchor to.")
@@ -683,8 +841,9 @@ def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Pat
             print(f"  - {p}", file=sys.stderr)
         return 1
 
+    line_source: dict[int, str] = {}
     lines, line_notes = resolve_line_positions(
-        story_id, cues, durations, starts, narration, audio_dir)
+        story_id, cues, durations, starts, narration, audio_dir, line_source)
     chains = build_chains(cues, starts, durations, sounds, lines)
 
     # Where the narration is cut open, and how wide. Sorted, because
@@ -705,7 +864,28 @@ def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Pat
         # cannot drift the cut into the middle of a word.
         want = (starts[cue["segment"]] + float(cue["insertAtSeconds"])
                 if "insertAtSeconds" in cue else chain["start"])
-        cut = snap_to_pause(want, silences_all, SNAP_WINDOW_S)
+        # A MEASURED position is already a word boundary — that is what a
+        # forced alignment gives — so it is safe to cut there outright. Only
+        # prefer a real breath if one is very close. «Խոսող ձուկը» has none
+        # after «գցում գետը։»: the narrator runs straight into the next line,
+        # and demanding a silence would have refused to place the story's
+        # single most important sound.
+        if line_source.get(cue["segment"]) == "aligned":
+            # Cut exactly where the alignment says the word ends, and do NOT
+            # snap. Snapping made two instruments argue: on «Երեք խոզուկները»
+            # silencedetect found a gap 0.56s BEFORE «ուժով։» finished and the
+            # cut landed inside the word. A forced alignment already gives a
+            # word boundary, and since a silence is INSERTED here anyway, being
+            # a few hundredths either side of it is inaudible — being half a
+            # second inside a word is not.
+            cut = want
+            near = snap_to_pause(want, silences_all, SNAP_WINDOW_S)
+            if near is not None:
+                line_notes.append(
+                    f"seg {cue['segment']}: nearest pause is {near - want:+.2f}s "
+                    f"away; cutting on the aligned word boundary instead")
+        else:
+            cut = snap_to_pause(want, silences_all, SNAP_WINDOW_S)
         if cut is None:
             if silences_all:
                 raise SystemExit(
