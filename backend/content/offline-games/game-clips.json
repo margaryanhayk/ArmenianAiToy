@@ -241,6 +241,34 @@
         "speaker": "areg",
         "text": "Էլի՞ խաղանք։ Հա՝ կանաչ, ոչ՝ կարմիր։",
         "note": "Second sentence is the same spliced mapping line as the guess clips."
+      },
+      {
+        "id": "kid-katrin-win",
+        "speaker": "katrin",
+        "text": "Վա՜յ, գուշակե՜ց։",
+        "new": true,
+        "note": "After GREEN. A child's delight lands harder than another Areg line, and it reports only what the button already established."
+      },
+      {
+        "id": "kid-vardan-win",
+        "speaker": "vardan",
+        "text": "Ի՞նչպես իմացավ։",
+        "new": true,
+        "note": "Wonder, not praise."
+      },
+      {
+        "id": "kid-katrin-lose",
+        "speaker": "katrin",
+        "text": "Ոչինչ, Արե՛գ, մյուս անգամ։",
+        "new": true,
+        "note": "After RED. Comforts AREG, not the child — the child just won, and consoling a winner would be strange."
+      },
+      {
+        "id": "kid-vardan-lose",
+        "speaker": "vardan",
+        "text": "Ես էլ չէի գուշակի։",
+        "new": true,
+        "note": "Takes Areg's side, which quietly tells the child their animal was a good one."
       }
     ]
   },
@@ -355,6 +383,34 @@
         "speaker": "areg",
         "text": "Երկուսդ էլ լավ խաղացիք։ Մյուս անգամ նորից կխաղանք։",
         "note": "No-loser closing. Second sentence is byte-identical to the quiz done clip's closing sentence — splice."
+      },
+      {
+        "id": "kid-katrin-1",
+        "speaker": "katrin",
+        "text": "Վա՜յ, ի՜նչ արագ էիք։",
+        "new": true,
+        "note": "Between rounds. Addresses BOTH players, so neither colour is favoured — the toy never announces a loser and a spectator must not either."
+      },
+      {
+        "id": "kid-vardan-1",
+        "speaker": "vardan",
+        "text": "Ես էլ եմ ուզում այսքան արագ սեղմել։",
+        "new": true,
+        "note": "Wanting to join, not judging. Claims nothing about who pressed first."
+      },
+      {
+        "id": "kid-katrin-2",
+        "speaker": "katrin",
+        "text": "Ի՜նչ լավ խաղ է։",
+        "new": true,
+        "note": "Pure energy, no claim."
+      },
+      {
+        "id": "kid-vardan-2",
+        "speaker": "vardan",
+        "text": "Դեռ չի վերջացել։ Առա՛ջ։",
+        "new": true,
+        "note": "Keeps the room going without telling anyone they are behind."
       }
     ]
   },
@@ -538,6 +594,34 @@
         "speaker": "areg",
         "text": "Լավ խաղացինք։ Մյուս անգամ նորից կխաղանք։",
         "note": "Byte-identical to the quiz done clip — reuse that render."
+      },
+      {
+        "id": "kid-katrin-up",
+        "speaker": "katrin",
+        "text": "Ես այսքան երկար չէի հիշի։",
+        "new": true,
+        "note": "After a correct round. Admiration by comparison, never a grade."
+      },
+      {
+        "id": "kid-vardan-up",
+        "speaker": "vardan",
+        "text": "Դու շա՜տ ուշադիր ես։",
+        "new": true,
+        "note": "Attention is derived from the measured presses, so the claim is honest."
+      },
+      {
+        "id": "kid-katrin-miss",
+        "speaker": "katrin",
+        "text": "Ոչինչ, ինձ մոտ էլ է այդպես լինում։",
+        "new": true,
+        "note": "After a miss. The one thing a child most needs to hear, and only another child can say it."
+      },
+      {
+        "id": "kid-vardan-miss",
+        "speaker": "vardan",
+        "text": "Նորի՛ց փորձենք։",
+        "new": true,
+        "note": "Inclusive «փորձենք», not «փորձիր» — nobody is being instructed, and it promises no outcome."
       }
     ]
   },
@@ -592,5 +676,6 @@
         "text": "Դե՛, լսի՛ր շարունակությունը։"
       }
     ]
-  }
+  },
+  "_kidLines": "Katrin and Vardan appear in three more games as of 2026-08-13 (owner request: they were only in sound-detective, which is what the texts said). Twelve lines, not forty - two characters who arrive at the right moment are memorable, two who chime in after every press are wallpaper. They are DELIBERATELY absent from story-pauses: the pause belongs to the narrator, and a second voice interrupting a Tumanyan tale is a third party talking over the story. Clips marked \"new\": true are pending the owner's review and are NOT rendered."
 }
