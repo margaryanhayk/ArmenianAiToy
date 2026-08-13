@@ -4314,6 +4314,39 @@ This is that slice.
   the gap is toolchain, not source, so the release image belongs to the
   machine that built the last one and none was staged.
 
+## A live device key in a release image (2026-08-13)
+
+The 1.2.1 image built for the content-report rollout carried the owner's
+**real device id and API key** instead of placeholders, and was committed
+and pushed before inspection caught it. Reverted (`d425c4e`); nothing was
+served, `Enabled` was never flipped.
+
+- **The rule already existed and was already written down.** The 1.1.x work
+  established that OTA images ship with placeholder credentials "because an
+  OTA image reaches every toy, and one toy's secret must never ride inside
+  it", and verified it by binary inspection at the time. It lived in
+  `docs/ota-release-runbook.md` as prose, as a step a human performs. It was
+  skipped on the first release cut after it was written.
+- **What it would have cost.** `device_creds` reads NVS first and falls back
+  to the compiled values, so every factory-fresh or re-flashed toy that
+  installed the image would have authenticated to the backend as that one
+  toy.
+- **The fix is a program, not a paragraph.**
+  `tools/firmware/check_release_image.py` — dependency-free (no toolchain,
+  so there is no excuse to skip it), exits non-zero, and refuses an image
+  that contains a `dtk_<32 hex>` device key or a GUID-shaped string, that
+  lacks the expected version, that still contains the version being
+  replaced, or that is the 8 MB `.merged.bin`. It never prints a secret it
+  finds — kind and count only. Verified to FAIL the leaked image and PASS
+  the field 1.2.0 one. It is now step 4 of the runbook, between build and
+  stage.
+- **Rotation, not deletion, is the remedy.** The binary was pushed to
+  GitHub, so the key must be treated as compromised whatever happens to the
+  file; the revert is hygiene. Revoking the device (§ Consumer platform —
+  `Device.IsRevoked`) and re-provisioning is the owner action.
+- The build-machine `config.h` is where the real credentials came from.
+  They belong in NVS, burned once, never in a build intended for OTA.
+
 ## Key Design Decisions
 
 - Devices auth via `X-Device-Id`/`X-Api-Key` headers. Parents use JWT.

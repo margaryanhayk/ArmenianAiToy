@@ -103,14 +103,38 @@ The build produces both. They are not interchangeable.
    python -c "import re;d=open('release/1.2.0/AregVoiceMvp.ino.bin','rb').read();print(sorted(set(m.decode() for m in re.findall(rb'1\.[0-9]\.[0-9]',d))))"
    ```
 
-4. **Hash and size** the app-only image:
+4. **Run the release gate. This is not optional.**
+
+   ```
+   python3 tools/firmware/check_release_image.py \
+     esp32/AregVoiceMvp/release/1.2.1/AregVoiceMvp.ino.bin \
+     --expect-version 1.2.1 --forbid-version 1.2.0
+   ```
+
+   It exits non-zero and refuses the image if it carries a real device API key
+   (`dtk_<32 hex>`) or a device id, if the expected version is missing, if the
+   old version is still inside, or if you pointed it at the 8 MB
+   `.merged.bin`. No toolchain needed — plain Python, so there is no excuse
+   to skip it.
+
+   **This step exists because step 1 was not followed.** On 2026-08-13 a 1.2.1
+   image was built and pushed carrying the owner's real device id and API key.
+   It was caught by inspection before it shipped; had it shipped, every
+   factory-fresh toy that installed it would have authenticated to the backend
+   as that one toy, because `device_creds` falls back to the compiled values
+   when NVS is empty. The rule against this was already in this repo, in
+   prose, and prose is what got skipped. If the gate refuses your image,
+   restore the `AREG_DEVICE_ID` / `AREG_DEVICE_API_KEY` placeholders from
+   `config.h.example`, rebuild, and revoke the leaked key.
+
+5. **Hash and size** the app-only image:
 
    ```
    sha256sum release/1.2.0/AregVoiceMvp.ino.bin
    stat -c %s  release/1.2.0/AregVoiceMvp.ino.bin
    ```
 
-5. **Stage it into the backend image:**
+6. **Stage it into the backend image:**
 
    ```
    cp release/1.2.0/AregVoiceMvp.ino.bin \
@@ -123,11 +147,11 @@ The build produces both. They are not interchangeable.
    in git is not in the container. (`.dockerignore` does not exclude it;
    `**/bin/` only matches directories literally named `bin`.)
 
-6. **Update `appsettings.json`** → `FirmwareUpdate`: `LatestVersion`,
+7. **Update `appsettings.json`** → `FirmwareUpdate`: `LatestVersion`,
    `SizeBytes`, `Sha256`. Leave `Enabled:false`, `ImagePath:""`,
    `SigningKey:""` — those are operator/env concerns (§ 3).
 
-7. **Deploy** (push → Railway rebuilds). Deploying changes nothing on its own:
+8. **Deploy** (push → Railway rebuilds). Deploying changes nothing on its own:
    `Enabled` is still false.
 
 ---
