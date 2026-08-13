@@ -1,5 +1,5 @@
 {
-  "_status": "Cues reviewed and in use. Sounds are GENERATED, not recorded - tools/story-ambience/generate_sounds.py, one file per (story, sound) pair, prompts recorded beside the audio in sounds/<storyId>/prompts.json. «Ուլիկը» is mixed and shipped as of 2026-08-12 and is the sample the owner judges; the other seven stories with cues are NOT mixed until he accepts it. hedgehog-apple and little-cloud carry no cues by owner decision.",
+  "_status": "Cues reviewed and in use. Sounds are GENERATED, not recorded - tools/story-ambience/generate_sounds.py, one file per (story, sound) pair, prompts recorded in sounds/<storyId>/prompts.json. One-shot positions come from tools/story-audio/align_story.py (forced alignment of the narration), snapped to a real pause. hedgehog-apple and little-cloud carry no cues by owner decision.",
   "_rules": {
     "narrationIsLoudest": "The voice is never competed with. If a cue makes a sentence harder to understand, the cue is wrong.",
     "sparse": "A scene establishes in 3-5 seconds and fades out. It does not run under the whole story.",
@@ -9,7 +9,8 @@
     "afterMixing": "Ship with tools/story-audio/Ship-StoryAudio.ps1 -Fix -Apply so sha256, size and Version are re-stamped. Then the human listen test.",
     "prompt": "sounds[].prompt is the reviewed English text sent to the generator; cues[].avoid appends what must be ABSENT. The note field is for a human reading this file and is never sent — a note explains WHERE a cue goes and WHY, and asking a sound model for placement rationale produced prompts carrying sentences like \"anchored to the START of the segment\".",
     "insert": "insert:true cuts the narration open at a pause and plays the sound in the hole, instead of laying it over speech. The owner's idea after hearing a knock land wrong twice: stop, knock, continue. The hole is sized from the sound's real length, not the cue's seconds. Only for one-shots - a forest establishing under the opening line must not stop the story to do it.",
-    "held": "a cue with `held` is skipped by the mixer and reported on every run. It means its POSITION is not known yet, not that it was dropped - mixing it at the segment start instead would be the placement that was rejected twice."
+    "held": "a cue with `held` is skipped by the mixer and reported on every run - it means its POSITION is not known yet, not that it was dropped. None are held now: the ElevenLabs key gained forced_alignment on 2026-08-12 and every one-shot is placed from a measured word time.",
+    "landOn": "landOn is the phrase the SOUND lands on; cueLine is the line the cue belongs to. They are usually different and the difference is audible - the cueLine for the wolf's knock is the whole sentence, ending on 'and calls in his thick voice', so anchoring to its end put the knock 2.4s late, after the calling. Anchored to 'dury zarkum' it lands on the word that means knocked. Set landOn on every one-shot."
   },
   "sounds": [
     {
@@ -193,7 +194,7 @@
         },
         {
           "segment": 2,
-          "at": "start",
+          "at": "line",
           "kind": "oneshot",
           "sound": "water-splash",
           "seconds": 1,
@@ -202,7 +203,7 @@
           "cueLine": "Էս շալակատարի մեղքը գալիս է, առնում է, ետ գցում գետը։",
           "note": "The kindness that the whole story pays back, in one sound. It must land exactly on «գցում գետը» and nowhere else.",
           "insert": true,
-          "held": "position needs forced alignment - the ElevenLabs key is missing the forced_alignment permission. Estimating it put a knock in the wrong place twice on 2026-08-12, in opposite directions; the owner heard both. Add with tools/story-audio/align_story.py once the key allows it, then re-mix this story from its narration master."
+          "landOn": "ետ գցում գետը։"
         },
         {
           "segment": 3,
@@ -217,7 +218,7 @@
         },
         {
           "segment": 6,
-          "at": "start",
+          "at": "line",
           "kind": "oneshot",
           "sound": "door-knock",
           "seconds": 2,
@@ -226,7 +227,7 @@
           "cueLine": "Մին էլ կեսգիշերին դուռը դղրդում է։",
           "note": "The tensest moment in the library. Firm knocks, not loud ones - the fear is already in the story and does not need help.",
           "insert": true,
-          "held": "position needs forced alignment - the ElevenLabs key is missing the forced_alignment permission. Estimating it put a knock in the wrong place twice on 2026-08-12, in opposite directions; the owner heard both. Add with tools/story-audio/align_story.py once the key allows it, then re-mix this story from its narration master."
+          "landOn": "դուռը դղրդում է։"
         },
         {
           "segment": 8,
@@ -359,8 +360,7 @@
           "note": "The wolf at the door. No howl anywhere in this story - the menace is the voice, and that is the point the child is meant to notice.",
           "avoid": "no howl, no growl, no animal",
           "insert": true,
-          "insertAtSeconds": 3.15,
-          "_insertAtSource": "placed by the owner's ear 2026-08-12; replace with forced alignment once the ElevenLabs key carries the forced_alignment permission"
+          "landOn": "դուռը զարկում"
         },
         {
           "segment": 4,
@@ -374,8 +374,7 @@
           "note": "The SAME knock, at the same level, as the wolf's. That is deliberate: the door sounds identical and only the voice differs, which is exactly what the kid had to work out.",
           "avoid": "no howl, no growl, no animal",
           "insert": true,
-          "insertAtSeconds": 1.22,
-          "_insertAtSource": "placed by the owner's ear 2026-08-12; replace with forced alignment once the ElevenLabs key carries the forced_alignment permission"
+          "landOn": "դուռը ծեծում"
         }
       ]
     },
@@ -418,7 +417,7 @@
         },
         {
           "segment": 3,
-          "at": "start",
+          "at": "line",
           "kind": "oneshot",
           "sound": "wind-gust",
           "seconds": 2,
@@ -428,7 +427,7 @@
           "note": "One gust on the first blow only, not on all three. A wind sound, never a growl - the wolf must stay a character in a story, not a thing in the room.",
           "avoid": "no growl, no animal, no voice",
           "insert": true,
-          "held": "position needs forced alignment - the ElevenLabs key is missing the forced_alignment permission. Estimating it put a knock in the wrong place twice on 2026-08-12, in opposite directions; the owner heard both. Add with tools/story-audio/align_story.py once the key allows it, then re-mix this story from its narration master."
+          "landOn": "փչեց ամբողջ ուժով։"
         },
         {
           "segment": 5,
@@ -460,7 +459,7 @@
         },
         {
           "segment": 2,
-          "at": "start",
+          "at": "line",
           "kind": "oneshot",
           "sound": "thunder-distant",
           "seconds": 3,
@@ -469,7 +468,7 @@
           "cueLine": "Երեկ շատ անձրև եկավ, կայծակները տրաքեցին, երկինքը պատռվեց, գնացել էի կարկատելու։",
           "note": "Thunder inside a lie - the tailor claims he went up to patch the torn sky. Far away and rounded, never a crack: it is a joke, not a storm.",
           "insert": true,
-          "held": "position needs forced alignment - the ElevenLabs key is missing the forced_alignment permission. Estimating it put a knock in the wrong place twice on 2026-08-12, in opposite directions; the owner heard both. Add with tools/story-audio/align_story.py once the key allows it, then re-mix this story from its narration master."
+          "landOn": "երկինքը պատռվեց"
         }
       ]
     },
@@ -490,7 +489,7 @@
         },
         {
           "segment": 1,
-          "at": "end",
+          "at": "line",
           "kind": "oneshot",
           "sound": "door-knock",
           "seconds": 2,
@@ -499,7 +498,7 @@
           "cueLine": "Հանկարծ պալատի դուռը թակեցին։",
           "note": "On «թակեցին», with the rain still under it. The rain fades out once she is indoors.",
           "insert": true,
-          "held": "position needs forced alignment - the ElevenLabs key is missing the forced_alignment permission. Estimating it put a knock in the wrong place twice on 2026-08-12, in opposite directions; the owner heard both. Add with tools/story-audio/align_story.py once the key allows it, then re-mix this story from its narration master."
+          "landOn": "դուռը թակեցին։"
         },
         {
           "segment": 3,
