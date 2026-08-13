@@ -99,8 +99,13 @@
     Unlike story-audio (resolved through ContentSync:AudioRoot, which is
     app-relative), FirmwareUpdate:ImagePath is required to be ABSOLUTE by
     DeviceController.GetFirmwareImage — so the deployment sets it by env
-    var (Railway: /app/firmware/areg-<ver>.bin; local bench: the full
+    var (Railway: /app/firmware/areg-current.bin; local bench: the full
     Windows path). Copying it here is what makes that path exist.
+    The staged filename is deliberately UNVERSIONED: each release overwrites
+    areg-current.bin so the env var is set once and never again. Staging a
+    versioned name instead leaves areg-current.bin holding the old bytes
+    while appsettings advertises the new sha, and every toy rejects the
+    download. See the appsettings //ImagePath note and the release runbook.
   -->
   <ItemGroup>
     <Content Include="firmware\*.bin" CopyToOutputDirectory="PreserveNewest" />

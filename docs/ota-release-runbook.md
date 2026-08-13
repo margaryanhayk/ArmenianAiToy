@@ -100,22 +100,37 @@ The build produces both. They are not interchangeable.
    the override trap above:
 
    ```
-   python -c "import re;d=open('release/1.2.0/AregVoiceMvp.ino.bin','rb').read();print(sorted(set(m.decode() for m in re.findall(rb'1\.[0-9]\.[0-9]',d))))"
+   python -c "import re;d=open('release/1.2.1/AregVoiceMvp.ino.bin','rb').read();print(sorted(set(m.decode() for m in re.findall(rb'1\.[0-9]\.[0-9]',d))))"
    ```
 
 4. **Run the release gate. This is not optional.**
 
    ```
-   python3 tools/firmware/check_release_image.py \
+   python tools/firmware/check_release_image.py \
      esp32/AregVoiceMvp/release/1.2.1/AregVoiceMvp.ino.bin \
      --expect-version 1.2.1 --forbid-version 1.2.0
    ```
+
+   **`python`, not `python3`.** On the Windows release machine `python3` is not
+   a real interpreter — it is the Microsoft Store stub, which prints
+   "Python was not found" and exits 49. That is a *skipped gate wearing the
+   costume of a failed one*, on the one step this document calls not optional.
+   `python` and `py` both work. Step 3 above already uses `python`.
 
    It exits non-zero and refuses the image if it carries a real device API key
    (`dtk_<32 hex>`) or a device id, if the expected version is missing, if the
    old version is still inside, or if you pointed it at the 8 MB
    `.merged.bin`. No toolchain needed — plain Python, so there is no excuse
    to skip it.
+
+   A pass looks like this (verified against the field 1.2.0 image, 2026-08-14):
+
+   ```
+   size    1,297,904 B (41.3% of the 3,145,728 B OTA slot)
+     ok    version 1.2.0 present
+
+   PASS - no credentials found; safe to stage.
+   ```
 
    **This step exists because step 1 was not followed.** On 2026-08-13 a 1.2.1
    image was built and pushed carrying the owner's real device id and API key.
@@ -130,16 +145,29 @@ The build produces both. They are not interchangeable.
 5. **Hash and size** the app-only image:
 
    ```
-   sha256sum release/1.2.0/AregVoiceMvp.ino.bin
-   stat -c %s  release/1.2.0/AregVoiceMvp.ino.bin
+   sha256sum release/1.2.1/AregVoiceMvp.ino.bin
+   stat -c %s  release/1.2.1/AregVoiceMvp.ino.bin
    ```
 
-6. **Stage it into the backend image:**
+6. **Stage it into the backend image — over `areg-current.bin`, keeping that
+   exact name:**
 
    ```
-   cp release/1.2.0/AregVoiceMvp.ino.bin \
-      backend/src/ArmenianAiToy.Api/firmware/areg-1.2.0.bin
+   cp release/1.2.1/AregVoiceMvp.ino.bin \
+      backend/src/ArmenianAiToy.Api/firmware/areg-current.bin
    ```
+
+   **Do not stage under a versioned filename** (`areg-1.2.1.bin`). Railway's
+   `FirmwareUpdate__ImagePath` points at `/app/firmware/areg-current.bin` and
+   is set once, never per release (§ 3). A versioned copy leaves
+   `areg-current.bin` holding the OLD bytes while `appsettings.json` advertises
+   the NEW sha256 — so every toy downloads the previous firmware, fails the
+   sha check, and refuses to flash. That is precisely the failure § 3 warns
+   about, and until 2026-08-14 this step caused it: it said `areg-1.2.0.bin`.
+
+   No image is ever lost by overwriting: the previous release stays in git
+   history, and `git show <prev-commit>:backend/src/ArmenianAiToy.Api/firmware/areg-current.bin`
+   recovers it.
 
    `ArmenianAiToy.Api.csproj` copies `firmware\*.bin` to the build output, so
    the file lands at `/app/firmware/` in the container. **The `.bin` must be
