@@ -52,7 +52,28 @@ public static class DeviceContentHealth
     public const string Offline = "offline";
 
     /// <summary>Checking in, but has never sent a content report — firmware
-    /// predating this slice. Absence of evidence, not a fault.</summary>
+    /// predating this slice. Absence of evidence, not a fault.
+    ///
+    /// <para>
+    /// <b>TODO — this verdict currently conflates two states, and the second
+    /// one IS a fault.</b> The firmware sends no content block when its SD
+    /// card is missing or dead (<c>content_report.cpp</c> returns early on
+    /// <c>!audio_sd_available()</c>), so a toy on CURRENT firmware with a
+    /// broken card lands here alongside a healthy toy on old firmware — and
+    /// that toy will never tell a story. Harmless today, because every toy
+    /// in the field genuinely predates the content-report release; wrong the
+    /// moment that OTA lands.
+    /// </para>
+    /// <para>
+    /// The fix needs no new wire field: the heartbeat already carries
+    /// <c>FirmwareVersion</c> beside <c>ContentStories</c>, so a device
+    /// reporting a version at or after the content-report release while
+    /// sending no stories is a card fault and deserves its own verdict with
+    /// a real instruction. Note <c>DeviceStoryHealth</c> already reports
+    /// <c>no_storage</c> from the separate <c>SdCardOk</c> flag, so such a
+    /// toy is not invisible today — it simply says nothing useful HERE.
+    /// </para>
+    /// </summary>
     public const string Unknown = "unknown";
 
     /// <summary>Mirrors the presence window used for the online dot.</summary>

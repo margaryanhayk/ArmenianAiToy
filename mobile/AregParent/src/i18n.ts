@@ -300,29 +300,45 @@ const D = {
   },
   this_toy: { en: 'This toy', ru: 'Эта игрушка', hy: 'Այս խաղալիքը' },
   rename_failed: { en: 'Rename failed', ru: 'Не удалось переименовать', hy: 'Չհաջողվեց վերանվանել' },
-  // Story-library freshness on the toy card. Mirrors parent.html word for
-  // word — the same parent reads both, and two different sentences for one
-  // fact reads as two different products. Ready or not ready; no versions,
-  // no story ids, no megabytes.
+  // Story library freshness. The parent is told READY or NOT READY and
+  // nothing else: no versions, no story ids, no megabytes.
+  //
+  // Key -> backend verdict: library_ready=up_to_date,
+  // library_updating=syncing, library_none=stale, library_unknown=unknown.
+  // (offline renders nothing — see the render block.)
+  //
+  // "In the first minutes after it is switched on" is not filler and is
+  // not softened advice: content_sync runs exactly ONCE per boot, armed
+  // 180 s in, and s_done is never reset (content_sync.cpp). The earlier
+  // draft said "keep it on Wi-Fi", which is false for the most common
+  // case this line exists for — a toy powered on before the library
+  // changed has already spent its one attempt, and an hour on Wi-Fi
+  // changes nothing. A parent who follows an instruction that cannot
+  // work is exactly the support contact this product avoids.
+  //
+  // library_unknown does NOT say "nothing is wrong": the toy also
+  // reports nothing when its SD card is dead, and that toy will never
+  // tell a story. It gives a self-check the parent can run in five
+  // seconds instead. See the TODO in DeviceContentHealth.cs.
   library_ready: {
     en: 'All {n} stories are on this toy.',
-    ru: 'Все {n} сказок загружены на игрушку.',
-    hy: 'Բոլոր {n} հեքիաթները խաղալիքի մեջ են։'
+    ru: 'Все сказки уже на игрушке — их {n}.',
+    hy: 'Բոլոր հեքիաթներն արդեն խաղալիքի մեջ են՝ {n} հատ։'
   },
   library_updating: {
-    en: 'Adding new stories — {have} of {total} so far. Keep it on Wi-Fi.',
-    ru: 'Загружаются новые сказки — пока {have} из {total}. Оставьте игрушку в Wi-Fi.',
-    hy: 'Նոր հեքիաթներ են ավելանում՝ առայժմ {have}-ը {total}-ից։ Թողեք Wi-Fi-ին միացած։'
+    en: '{have} of {total} stories are on this toy. New stories arrive over Wi‑Fi in the first minutes after it is switched on.',
+    ru: 'На игрушке {have} из {total} сказок. Новые сказки загружаются по Wi‑Fi в первые минуты после включения.',
+    hy: 'Խաղալիքի մեջ կա {total}-ից {have} հեքիաթ։ Նոր հեքիաթները ներբեռնվում են Wi‑Fi-ով՝ միացնելուց հետո առաջին րոպեներին։'
   },
   library_none: {
-    en: 'The stories have not arrived yet. Keep the toy on Wi-Fi for a few minutes.',
-    ru: 'Сказки ещё не загрузились. Оставьте игрушку в Wi-Fi на несколько минут.',
-    hy: 'Հեքիաթները դեռ չեն հասել։ Թողեք խաղալիքը Wi-Fi-ին միացած մի քանի րոպե։'
+    en: 'No stories have reached this toy yet. They arrive over Wi‑Fi in the first minutes after it is switched on.',
+    ru: 'На игрушку ещё не загрузилась ни одна сказка. Они загружаются по Wi‑Fi в первые минуты после включения.',
+    hy: 'Խաղալիքին դեռ ոչ մի հեքիաթ չի հասել։ Դրանք ներբեռնվում են Wi‑Fi-ով՝ միացնելուց հետո առաջին րոպեներին։'
   },
   library_unknown: {
-    en: 'This toy has not told us which stories it has yet.',
-    ru: 'Игрушка ещё не сообщила, какие сказки у неё есть.',
-    hy: 'Խաղալիքը դեռ չի հայտնել, թե որ հեքիաթներն ունի։'
+    en: 'We do not have the story list for this toy. If it still tells stories, nothing is wrong.',
+    ru: 'У нас нет списка сказок этой игрушки. Если она по-прежнему рассказывает сказки, всё в порядке.',
+    hy: 'Այս խաղալիքի հեքիաթների ցանկը մեզ մոտ չկա։ Եթե այն շարունակում է հեքիաթներ պատմել, ամեն ինչ կարգին է։'
   },
   child_with_age: { en: '{name} (age {n})', ru: '{name} ({n} г.)', hy: '{name} ({n} տարեկան)' },
 

@@ -506,13 +506,6 @@ function DeviceCard({
         {device.isPaused ? <Text style={styles.pausedTag}>{t('paused')}</Text> : null}
       </View>
 
-      {/* Did the new stories actually arrive? The question a parent asks the
-          day after an update, which used to have no answer anywhere — the
-          only confirmation was listening to a story. Offline renders nothing:
-          the dot above already says so, and repeating it as a library problem
-          would send the parent chasing the wrong thing. */}
-      {libraryLine ? <Text style={styles.libraryLine}>{libraryLine}</Text> : null}
-
       {childLine ? (
         <Text style={styles.children}>{childLine}</Text>
       ) : (
@@ -522,6 +515,20 @@ function DeviceCard({
            at all; the web page at least had a form buried in Settings. */
         <AddChildBlock deviceId={device.deviceId} onAdded={onRenamed} />
       )}
+
+      {/* Did the new stories actually arrive? The question a parent asks the
+          day after an update, which used to have no answer anywhere — the
+          only confirmation was listening to a story.
+
+          BELOW the child, not above: on the web the card reads name ->
+          status -> child -> library, and a maintenance note must not
+          outrank the child's name on the phone while ranking below it on
+          the dashboard.
+
+          Offline renders nothing — the dot above already says so, and
+          repeating it as a library problem would send the parent chasing
+          the wrong thing. */}
+      {libraryLine ? <Text style={styles.libraryLine}>{libraryLine}</Text> : null}
 
       <InviteBlock deviceId={device.deviceId} />
 
