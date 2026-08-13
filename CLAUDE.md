@@ -4238,6 +4238,14 @@ cost-per-hour figure and for a verified clean-clone boot is in
 `Jwt:Key` are both required and neither had a default; the first fails with an
 unhelpful NuGet stack trace. § Build & Test now says so.
 
+**Toy look (2026-08-13).** `docs/toy-design-brief.md` — the design brief for
+the physical toy (enclosure, brand visuals, packaging): the fixed constraints
+from the rev-A PCB and safety docs, the manuscript-identity direction, and the
+nine numbered owner decisions (face vs object, NFC fork, speaker size, material,
+colorway, EN 71-1 category, battery, pot grounding, mounting holes). No
+enclosure/CAD/character design exists yet; that brief is the source of truth for
+what is fixed vs open.
+
 ## Key Design Decisions
 
 - Devices auth via `X-Device-Id`/`X-Api-Key` headers. Parents use JWT.
