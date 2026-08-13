@@ -1,5 +1,32 @@
 # Ambience across the library — eight of ten stories
 
+**Verdict: APPROVED by the owner, 2026-08-13 — "Now it is ok, go ahead."**
+
+He listened to the placed sounds and accepted them. Per the convention in
+`anban-huri-listen-test-TEMPLATE.md` an agent must never fill in a verdict:
+what is recorded is that the OWNER approved, not that a tool judged the audio.
+
+This closes the story-audio workstream. The library is approved end to end —
+text, character voices, and ambience — and attaches to these exact bytes:
+
+| story | Version | size | sha256 (first 16) | ambience |
+|---|---|---|---|---|
+| anban-huri | 9 | 5,560,991 | `8fac3f2e1b917a21` | yes |
+| hedgehog-apple | 3 | 613,817 | `97bef3409e01612f` | no cues |
+| khosogh-dzuk | 10 | 8,138,336 | `6da54b89b894a3db` | yes |
+| little-cloud | 3 | 514,133 | `d47727754718e65f` | no cues |
+| pochat-aghves | 9 | 5,460,680 | `fa13c0b5630360ef` | yes |
+| princess-and-pea | 6 | 1,611,903 | `67b9f90d7d1eee47` | yes |
+| sutasan | 6 | 1,969,258 | `a58fb35381419177` | yes |
+| sutlik-orskan | 9 | 3,356,047 | `ce380c01fab7399a` | yes |
+| three-piglets | 6 | 2,078,973 | `afff7f5d5a9198ce` | yes |
+| ulik | 12 | 2,631,933 | `9196b307af974743` | yes |
+
+`hedgehog-apple` and `little-cloud` carry no cues by his decision (25 and 21
+seconds, too short to dress) and are unchanged since the character-voice
+render.
+
+
 **Date:** 2026-08-12
 **Prompted by:** the owner accepting «Ուլիկը» — "acceptable for now"
 
@@ -168,5 +195,6 @@ stories are each 2-4 s longer, which is the inserted silence and is the point.
 post-insertion timeline; manifest sizes match the bytes on disk. `dotnet test`
 2554.
 
-Still not proven: whether any of it sounds right. Seven one-shots now cut the
-narration open, and only an ear can say whether the beat lands.
+~~Still not proven: whether any of it sounds right.~~ **Closed** — the owner
+listened and approved, 2026-08-13. Seven one-shots cut the narration open and
+he accepted every one.
