@@ -249,17 +249,19 @@ def self_test() -> int:
             print(f"  ok   {name}")
 
     jobs = jobs_all()
-    check("every approved clip is a job", len(jobs), 109)   # 90 + 10 + 6 + 3
+    check("every approved clip is a job", len(jobs), 121)   # 102 + 10 + 6 + 3
 
-    # Unapproved additions must never enter a render.
+    # Unapproved additions must never enter a render. There are none today —
+    # the owner approved the twelve kid lines on 2026-08-13 — but the exclusion
+    # stays, because the next batch of new text will arrive the same way.
     raw = json.loads((REPO / "backend/content/offline-games/game-clips.json")
                      .read_text(encoding="utf-8"))
     pending = {c["id"] for g, v in raw.items() if not g.startswith("_")
                for c in v["clips"] if c.get("new")}
-    check("there are pending lines to exclude", len(pending) > 0, True)
-    check("and not one of them is a job",
-          {j["id"] for j in jobs} & pending, set())
-    check("games", sum(1 for j in jobs if j["kind"] == "games"), 90)
+    check("no pending line is a job", {j["id"] for j in jobs} & pending, set())
+    check("the children now play in three games",
+          len({j["group"] for j in jobs if j["speaker"] in ("katrin", "vardan")}), 4)
+    check("games", sum(1 for j in jobs if j["kind"] == "games"), 102)
     check("endings", sum(1 for j in jobs if j["kind"] == "endings"), 10)
     check("serial", sum(1 for j in jobs if j["kind"] == "serial"), 9)
     check("every speaker has a voice",

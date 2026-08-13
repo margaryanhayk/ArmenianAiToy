@@ -81,6 +81,34 @@ def patch_games(text: str, updates: dict[tuple[str, str], dict]) -> str:
     return text[:start] + "".join(out) + text[end:]
 
 
+def add_games(text: str, additions: dict[tuple[str, str], dict]) -> str:
+    """Append manifest entries for clips that have never shipped.
+
+    New clips have no entry to patch, so patch_games would refuse them. They
+    go in at Version 1 — a first version, not a bump — and in the same field
+    order as the entries already there, because that order is what
+    Ship-StoryAudio.ps1's regex family depends on elsewhere in this file.
+    """
+    if not additions:
+        return text
+    start, end = _find_array(text, "ContentSync", "Games")
+    array = text[start:end]
+    spans = _split_objects(array)
+    if not spans:
+        raise SystemExit("ContentSync:Games is empty; nothing to match indentation to")
+    last_a, last_b = spans[-1]
+    indent = array[:last_a].rsplit("\n", 1)[-1]
+    blocks = []
+    for (game, clip), u in sorted(additions.items()):
+        blocks.append(indent + json.dumps({
+            "GameKey": game, "ClipId": clip, "Version": 1,
+            "AudioPath": f"games/{game}/{clip}.mp3",
+            "Sha256": u["sha256"], "SizeBytes": u["size"],
+        }, indent=2).replace("\n", "\n" + indent))
+    inserted = array[:last_b] + ",\n" + ",\n".join(blocks) + array[last_b:]
+    return text[:start] + inserted + text[end:]
+
+
 def clip_texts() -> dict[tuple[str, str], str]:
     d = json.loads((REPO / "backend/content/offline-games/game-clips.json")
                    .read_text(encoding="utf-8"))
@@ -99,9 +127,6 @@ def build_plan(render_dir: Path, api_dir: Path, partial: bool) -> dict:
     for key in sorted(texts):
         game, clip = key
         src = render_dir / game / f"{clip}.mp3"
-        if key not in entries:
-            rows.append((key, "no manifest entry", None))
-            continue
         if not src.exists():
             rows.append((key, "not rendered", None))
             continue
@@ -110,14 +135,31 @@ def build_plan(render_dir: Path, api_dir: Path, partial: bool) -> dict:
         if info.get("problem"):
             rows.append((key, info["problem"], None))
             continue
+        known = key in entries
+        sha = hashlib.sha256(data).hexdigest()
+        # Identical bytes must not get a new Version. A bump is an instruction
+        # to every toy in the field to download the file again; issuing one for
+        # audio that did not change costs a needless sync and tells a later
+        # reader the clip was re-recorded when it was not. Re-running this
+        # script is normal, so it has to be idempotent — the first run bumped
+        # 90 unchanged clips from v2 to v3.
+        if known and entries[key]["Sha256"].lower() == sha and \
+                int(entries[key]["SizeBytes"]) == len(data):
+            rows.append((key, "unchanged", None))
+            continue
+        rel = (entries[key]["AudioPath"] if known
+               else f"games/{game}/{clip}.mp3")
         updates[key] = {
             "src": src,
-            "dest": api_dir / "story-audio" / entries[key]["AudioPath"],
-            "sha256": hashlib.sha256(data).hexdigest(),
+            "dest": api_dir / "story-audio" / rel,
+            "sha256": sha,
             "size": len(data),
-            "version": int(entries[key]["Version"]) + 1,
+            # A clip that has never shipped starts at 1. Bumping a version
+            # that does not exist would advertise a second copy of nothing.
+            "version": int(entries[key]["Version"]) + 1 if known else 1,
+            "new": not known,
         }
-        rows.append((key, "install", updates[key]))
+        rows.append((key, "install" if known else "add", updates[key]))
 
     untouched = [k for k in entries if k not in texts]
     return {"rows": rows, "updates": updates, "settings": settings,
@@ -126,7 +168,8 @@ def build_plan(render_dir: Path, api_dir: Path, partial: bool) -> dict:
 
 
 def apply_plan(plan: dict) -> None:
-    if not plan["partial"] and len(plan["updates"]) != plan["total"]:
+    unchanged = sum(1 for _k, st, _u in plan["rows"] if st == "unchanged")
+    if not plan["partial"] and len(plan["updates"]) + unchanged != plan["total"]:
         raise SystemExit(
             f"only {len(plan['updates'])} of {plan['total']} clips are ready. "
             f"Half a set means the toy plays the new performance on one clip "
@@ -136,16 +179,27 @@ def apply_plan(plan: dict) -> None:
         u["dest"].parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(u["src"], u["dest"])
     text = plan["settings"].read_text(encoding="utf-8-sig")
-    plan["settings"].write_text(patch_games(text, plan["updates"]), encoding="utf-8")
+    fresh = {k: v for k, v in plan["updates"].items() if v["new"]}
+    known = {k: v for k, v in plan["updates"].items() if not v["new"]}
+    text = patch_games(text, known)
+    text = add_games(text, fresh)
+    plan["settings"].write_text(text, encoding="utf-8")
 
 
 def report(plan: dict) -> int:
     bad = 0
+    added = sum(1 for _k, s, _u in plan["rows"] if s == "add")
+    if added:
+        print(f"  {added} clip(s) have never shipped and get a new entry at "
+              f"Version 1")
+    same = sum(1 for _k, st, _u in plan["rows"] if st == "unchanged")
+    if same:
+        print(f"  {same} clip(s) already ship these exact bytes — left alone")
     for key, state, _u in plan["rows"]:
-        if state != "install":
+        if state not in ("install", "add", "unchanged"):
             print(f"  {key[0]}/{key[1]:<16} {state}")
             bad += 1
-    print(f"\n{len(plan['updates'])} of {plan['total']} speech clips ready; "
+    print(f"\n{len(plan['updates'])} of {plan['total']} speech clips to write; "
           f"{len(plan['untouched'])} non-verbal entries left untouched "
           f"({', '.join(f'{a}/{b}' for a, b in sorted(plan['untouched'])) or 'none'})")
     return bad
@@ -163,14 +217,21 @@ def self_test() -> int:
             print(f"  ok   {name}")
 
     texts = clip_texts()
-    check("every speech clip is known", len(texts), 90)
-    check("pending lines are excluded",
-          any(k[1].startswith("kid-") for k in texts), False)
+    check("every speech clip is known", len(texts), 102)   # 90 + the 12 kid lines
+    raw = json.loads((REPO / "backend/content/offline-games/game-clips.json")
+                     .read_text(encoding="utf-8"))
+    pending = {(g, c["id"]) for g, v in raw.items() if not g.startswith("_")
+               for c in v["clips"] if c.get("new")}
+    check("nothing still marked new is shipped", set(texts) & pending, set())
 
     cfg = json.loads((REPO / "backend/src/ArmenianAiToy.Api/appsettings.json")
                      .read_text(encoding="utf-8-sig"))
     entries = {(g["GameKey"], g["ClipId"]) for g in cfg["ContentSync"]["Games"]}
-    check("the manifest covers every speech clip", set(texts) - entries, set())
+    # Anything the manifest does not cover must be a clip that has never
+    # shipped — never a typo'd id, which would silently ship nothing.
+    uncovered = set(texts) - entries
+    check("every uncovered clip is one of the new kid lines",
+          {k for k in uncovered if not k[1].startswith("kid-")}, set())
     check("and carries exactly the two non-verbal extras",
           entries - set(texts), NON_VERBAL)
 
@@ -191,6 +252,18 @@ def self_test() -> int:
     check("the other game's intro is untouched", got[0]["Version"], 1)
     check("the named one is patched", (got[1]["Version"], got[1]["SizeBytes"]),
           (2, 99))
+
+    # A clip with no entry is ADDED at Version 1, not bumped — there is no
+    # previous version to bump, and advertising v2 of something that never
+    # shipped tells every toy it has a stale copy it does not have.
+    out2 = add_games(sample, {("c", "cheer"): {"sha256": "a" * 64, "size": 7}})
+    got2 = json.loads(out2)["ContentSync"]["Games"]
+    check("the new entry is appended", len(got2), 3)
+    check("at version one", got2[2]["Version"], 1)
+    check("with the path the renderer wrote",
+          got2[2]["AudioPath"], "games/c/cheer.mp3")
+    check("and the existing entries are untouched",
+          [g["Version"] for g in got2[:2]], [1, 1])
 
     print("PASS" if ok else "FAIL")
     return 0 if ok else 1

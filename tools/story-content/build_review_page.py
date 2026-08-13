@@ -124,8 +124,10 @@ for ep in serial["episodes"]:
                   "who": "", "text": ep["text"], "eptitle": ep.get("title","")})
 
 # ---- verify nothing was dropped or altered -------------------------------
-assert sum(1 for i in items if i["section"]=="games") == 90, "game clips"
-assert sum(1 for i in items if i["section"]=="new") == 12, "new kid lines"
+# 102 = the 90 originals plus the twelve Katrin/Vardan lines the owner
+# approved on 2026-08-13. The "new" section is empty now and the code that
+# builds it stays, because the next batch of new text arrives the same way.
+assert sum(1 for i in items if i["section"]=="games") == 102, "game clips"
 assert sum(1 for i in items if i["section"]=="endings") == 10, "endings"
 assert sum(1 for i in items if i["section"]=="serial") == 6, "episodes"
 raw = (REPO/"backend/content/offline-games/game-clips.json").read_text(encoding="utf-8")
