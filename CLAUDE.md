@@ -4299,9 +4299,20 @@ This is that slice.
   boot with nothing to sync), sends only on change, marks sent only on 2xx,
   adds no sixth `CsStory` table. Host-tested with plain g++ via
   `esp32/AregVoiceMvp/host_tests/content_report_rules_test.cpp`.
-  **NOT bench-run**: no Arduino compile, no card read, no heartbeat
-  observed, no free-RAM measurement. Ships as its own OTA release per the
-  1.1.0 field lesson.
+  **COMPILED** 2026-08-13 against esp32:esp32@3.3.8 — no errors, no
+  `-Wall -Wextra` warnings, **+3,724 B flash / +672 B static RAM** measured
+  against a build of the same tree without it (51.5% of the 3 MB slot).
+  **Still NOT bench-run**: no card read, no heartbeat observed, no toy.
+  Ships as its own OTA release per the 1.1.0 field lesson.
+  Two corrections came out of that compile, both recorded in
+  `tools/quality-evidence/firmware-compile-content-report-20260813.md`:
+  the **227,480 B free-RAM baseline quoted around this repo is a runtime
+  `getFreeHeap()` reading, not a linker figure** (compare a build to a
+  build, never to that number); and a 1.2.1 image built here is **317,614 B
+  larger than the field 1.2.0 binary** while `git diff` over `esp32/` since
+  that release holds only this change plus 14 lines of `offline_quiz.cpp` —
+  the gap is toolchain, not source, so the release image belongs to the
+  machine that built the last one and none was staged.
 
 ## Key Design Decisions
 

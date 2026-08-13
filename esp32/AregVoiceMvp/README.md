@@ -378,12 +378,29 @@ host with plain g++:
 g++ -std=c++17 -Wall -Wextra -o /tmp/cr_test esp32/AregVoiceMvp/host_tests/content_report_rules_test.cpp && /tmp/cr_test
 ```
 
-**NOT yet bench-run.** Nothing here has touched real hardware: no compile
-against the Arduino core in this environment, no card read, no heartbeat
-observed, no free-RAM measurement against the 227,480 B baseline. Until an
-OTA release carrying this ships, every toy in the field reports nothing and
-the dashboard correctly says so ("this toy has not told us yet"). Per the
-1.1.0 field lesson, that release goes out on its own and is not bundled
+**COMPILED 2026-08-13** against esp32:esp32@3.3.8 at the canonical FQBN —
+first attempt, no errors, and zero `-Wall -Wextra` warnings from the new
+files. Cost measured against a build of the same tree without the change:
+**+3,724 B flash, +672 B static RAM** (the two 320-byte buffers plus a few
+ints — what was predicted). 51.5% of the 3 MB slot.
+
+Two things that measurement corrected:
+
+- The **227,480 B figure quoted elsewhere in this README is a runtime
+  `ESP.getFreeHeap()` reading, not a linker number.** They are not
+  comparable, and comparing a new build's linker output against it would
+  produce a frightening and meaningless delta. Compare a build to a build.
+- A 1.2.1 image was built and **deliberately not staged**: it is 317,614 B
+  larger than the field 1.2.0 binary while `git diff` over `esp32/` since
+  that release contains only this change and 14 lines of `offline_quiz.cpp`.
+  The difference is toolchain, not source. A release image belongs to the
+  machine that built the last one. Full measurement:
+  `tools/quality-evidence/firmware-compile-content-report-20260813.md`.
+
+**Still NOT bench-run.** No card read, no heartbeat observed, no toy. Until
+an OTA release carrying this ships, every toy in the field reports nothing
+and the dashboard correctly says so ("this toy has not told us yet"). Per
+the 1.1.0 field lesson, that release goes out on its own and is not bundled
 with anything else.
 
 ## Story selection (`story_select.{h,cpp}`)
