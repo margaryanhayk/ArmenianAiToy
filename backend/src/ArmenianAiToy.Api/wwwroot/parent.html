@@ -1802,6 +1802,12 @@
       // reports nothing when its SD card is dead, and that toy will never
       // tell a story. It gives a self-check the parent can run in five
       // seconds instead. See the TODO in DeviceContentHealth.cs.
+      // Armenian reviewed 2026-08-13. Two calls worth keeping:
+      // «գալիս են», not «ներբեռնվում են» — "download" is process language
+      // about the device, and the English says "arrive"; and the partitive
+      // trails the noun («{have} հեքիաթ՝ ընդհանուր {total}-ից») so a tired
+      // reader meets the number they care about beside the word "story"
+      // instead of holding two numerals before reaching it.
       library_ready: {
         en: 'All {n} stories are on this toy.',
         ru: 'Все сказки уже на игрушке — их {n}.',
@@ -1810,12 +1816,12 @@
       library_updating: {
         en: '{have} of {total} stories are on this toy. New stories arrive over Wi‑Fi in the first minutes after it is switched on.',
         ru: 'На игрушке {have} из {total} сказок. Новые сказки загружаются по Wi‑Fi в первые минуты после включения.',
-        hy: 'Խաղալիքի մեջ կա {total}-ից {have} հեքիաթ։ Նոր հեքիաթները ներբեռնվում են Wi‑Fi-ով՝ միացնելուց հետո առաջին րոպեներին։'
+        hy: 'Խաղալիքի մեջ կա {have} հեքիաթ՝ ընդհանուր {total}-ից։ Նոր հեքիաթները գալիս են Wi‑Fi-ով՝ միացնելուց հետո առաջին րոպեներին։'
       },
       library_none: {
         en: 'No stories have reached this toy yet. They arrive over Wi‑Fi in the first minutes after it is switched on.',
         ru: 'На игрушку ещё не загрузилась ни одна сказка. Они загружаются по Wi‑Fi в первые минуты после включения.',
-        hy: 'Խաղալիքին դեռ ոչ մի հեքիաթ չի հասել։ Դրանք ներբեռնվում են Wi‑Fi-ով՝ միացնելուց հետո առաջին րոպեներին։'
+        hy: 'Խաղալիքին դեռ ոչ մի հեքիաթ չի հասել։ Դրանք գալիս են Wi‑Fi-ով՝ միացնելուց հետո առաջին րոպեներին։'
       },
       library_unknown: {
         en: 'We do not have the story list for this toy. If it still tells stories, nothing is wrong.',
