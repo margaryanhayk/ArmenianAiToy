@@ -421,6 +421,16 @@
 // match the backend's FirmwareUpdate:BoardModel for a board-gated release
 // to be offered.
 #ifndef AREG_FW_VERSION
+// Cloud->SD content sync. LOAD-BEARING despite the "BENCH" in its name: a
+// build without it downloads NOTHING, silently, forever -- no story, game clip
+// or voice clip ever reaches the card. It used to live only on the compile
+// command line, hand-typed per release, which is one forgotten flag away from
+// shipping a toy that quietly stops receiving content. Defined here so it
+// cannot be forgotten; the compile line may still pass it harmlessly.
+#ifndef AREG_CONTENT_SYNC_BENCH
+#define AREG_CONTENT_SYNC_BENCH
+#endif
+
 #define AREG_FW_VERSION   "1.0.0"
 #endif
 #ifndef AREG_FW_BUILD

@@ -20,6 +20,7 @@
 #include "audio_io.h"    // audio_sd_available() — one bootDiag field
 #include "ota_apply.h"   // real apply pipeline (reboots on success)
 #include "ota_state.h"   // persisted cross-reboot OTA state (NVS)
+#include "content_sync.h" // refresh_story_manifest — request a sync + report its last outcome
 
 // Fallbacks mirrored from config.h.example so this module compiles even on
 // a config.h that predates them.
@@ -438,6 +439,32 @@ static void poll_commands() {
             Serial.printf("[ota] duplicate delivery of %s — re-ack only\n", id);
             Serial.flush();
             ack_command(id, "ok", nullptr, "{\"status\":\"deduped\"}");
+        } else if (strcmp(type, "refresh_story_manifest") == 0) {
+            dedup_add(id);
+#ifdef AREG_CONTENT_SYNC_BENCH
+            // "Sync this toy now". Only moves the schedule — every guard in
+            // content_sync_tick still applies, so this cannot interrupt a
+            // story, run without SD, or race an OTA. The ack carries the
+            // PREVIOUS attempt's outcome, which is the operator's answer to
+            // "why is this toy stale?"; the new attempt's result arrives on
+            // the heartbeat within a minute of it finishing.
+            content_sync_request_now();
+            char diag[224];
+            snprintf(diag, sizeof(diag),
+                     "{\"status\":\"sync_requested\",\"lastStatus\":\"%s\","
+                     "\"lastError\":\"%s\",\"failStreak\":%u,"
+                     "\"freeHeap\":%lu,\"freePsram\":%lu,\"sd\":%d}",
+                     content_sync_status(), content_sync_error(),
+                     (unsigned)content_sync_fail_streak(),
+                     (unsigned long)ESP.getFreeHeap(),
+                     (unsigned long)ESP.getFreePsram(),
+                     audio_sd_available() ? 1 : 0);
+            ack_command(id, "ok", nullptr, diag);
+#else
+            // Content sync is not compiled into this image, so the honest
+            // answer is that the command cannot be carried out — not "ok".
+            ack_command(id, "failed", "content_sync_not_built", nullptr);
+#endif
         } else {
             dedup_add(id);  // BEFORE handling: the dangerous-logic re-run guard
             // Unknown type: ack failed so the queue clears loudly instead of
@@ -488,6 +515,17 @@ void ota_foundation_tick() {
     }
     if (now - s_last_poll_ms >= AREG_HEARTBEAT_INTERVAL_MS) {  // rollover-safe
         s_last_poll_ms = now;
-        poll_commands();
+        // Only spend a request when the heartbeat said there is something to
+        // fetch. The heartbeat runs on this same cadence and already receives
+        // a reply, so asking a second time was an entire extra TLS handshake
+        // every minute for an answer we had just been given -- ~43,200 polls a
+        // month to deliver perhaps one command. Defaults TRUE until a
+        // hasCommands-aware backend answers, so this can only reduce traffic,
+        // never miss a command. The boot poll above is unconditional on
+        // purpose: a command enqueued while the toy was off must be picked up
+        // before any heartbeat has been exchanged.
+        if (voice_has_pending_commands()) {
+            poll_commands();
+        }
     }
 }

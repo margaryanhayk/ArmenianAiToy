@@ -61,6 +61,39 @@
 
 #ifdef AREG_CONTENT_SYNC_BENCH
 // Call every loop() iteration while IDLE. Cheap no-op until Wi-Fi AND the
-// SD mount are both up, then runs exactly ONE sync attempt per boot.
+// SD mount are both up, then runs a sync attempt on its own SCHEDULE.
+//
+// Not one-shot since 2026-08-14. It used to be: a static latch was set before
+// the run and never reset, so a single failed attempt — or a panic — meant the
+// toy never asked again until someone power-cycled it. A story added on the
+// backend could not reach a running toy at all. Now: ~6 h after a clean pass,
+// and 5/15/60/240 min after a failure, with the streak persisted so a
+// crash-reboot loop backs off instead of retrying every 3 minutes forever.
 void content_sync_tick();
+
+// Ask for an attempt on the next tick (the `refresh_story_manifest` command).
+// Honours every existing guard — IDLE-only, Wi-Fi, SD, OTA-pending — so a
+// console button can never interrupt a story or race a firmware update.
+void content_sync_request_now();
+
+// Last attempt's outcome, for the heartbeat. Bounded vocabulary:
+//   "never"   no attempt since boot
+//   "ok"      everything the manifest offered is now on the card
+//   "partial" some items failed; the rest are current
+//   "failed"  the attempt did not get far enough to sync anything
+const char *content_sync_status();
+
+// Short bounded reason for the last failure ("" when none). Never free text —
+// these are the same fixed strings the serial log prints, e.g. "no_space",
+// "sha256_mismatch", "manifest_fetch_failed".
+const char *content_sync_error();
+
+// Seconds since the last attempt that finished cleanly, or -1 if there has not
+// been one since boot. The backend turns this into an absolute timestamp.
+int32_t content_sync_seconds_since_ok();
+
+// Consecutive failed attempts, persisted across reboots. This is what makes a
+// crash loop visible: a toy that panics mid-sync reports a climbing streak on
+// the next boot even though it never got to report a status at all.
+uint16_t content_sync_fail_streak();
 #endif

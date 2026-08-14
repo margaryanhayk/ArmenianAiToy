@@ -73,6 +73,11 @@ void voice_send_heartbeat();
 // wall clock, so the server owns the clock). Defaults to false until the
 // first heartbeat lands; between heartbeats (~60 s) the cached value
 // stands, which bounds the staleness to one interval.
+// True when the last heartbeat said the backend has a command queued for this
+// device. Defaults true until a hasCommands-aware backend answers, so an older
+// server never silences the command poll.
+bool voice_has_pending_commands();
+
 bool voice_in_bedtime_window();
 
 // Last-known pause state from the heartbeat response. When true, the toy

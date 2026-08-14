@@ -17,6 +17,7 @@
 #include "device_creds.h"   // Phase C   — NVS-backed device identity
 #include "ota_foundation.h" // Proof 2 — AREG_FW_* identity + running-partition label
 #include "content_report.h"
+#include "content_sync.h"   // sync status/error/streak for the heartbeat
 #include "ota_state.h"      // OTA apply — lastOtaStatus for the heartbeat report
 #include "content_sync_rules.h"  // cs_copy_bounded — bounded intent-token copy
 
@@ -26,6 +27,8 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>         // Slice E — heartbeat-response parse (bedtime flag)
 #include <esp_heap_caps.h>
+#include <esp_system.h>          // esp_reset_reason() — a panic is the only
+                                 // evidence a toy that died mid-sync leaves behind
 #include <freertos/FreeRTOS.h>   // xTaskCreatePinnedToCore (S3 async upload, UNVERIFIED)
 #include <freertos/task.h>       // vTaskDelete, BaseType_t
 #include <freertos/semphr.h>     // #046 — mutex for the cross-core result handoff
@@ -108,6 +111,10 @@ static bool s_in_bedtime_window = false;
 // fully silent even for local SD playback (pause used to gate only online
 // chat). Defaults false; cached between heartbeats like the bedtime flag.
 static bool s_is_paused = false;
+// Last-known "the backend has something queued for you" flag, from the
+// heartbeat response. Defaults TRUE so a toy that has not heard from a
+// hasCommands-aware backend behaves exactly as it did before this change.
+static bool s_has_commands = true;
 
 // Welcome flow — both flags above are also mirrored into NVS so the boot
 // greeting can honor them BEFORE the first heartbeat of a power-on. Own
@@ -129,6 +136,8 @@ void voice_set_active_story_id(const char *story_id) {
     }
     snprintf(s_active_story_id, sizeof(s_active_story_id), "%s", story_id);
 }
+
+bool voice_has_pending_commands() { return s_has_commands; }
 
 const char *voice_active_story_id() {
     return s_active_story_id[0] ? s_active_story_id : AREG_STORY_ID;
@@ -248,6 +257,24 @@ uint32_t voice_wifi_down_duration_ms() {
     return millis() - s_wifi_down_since_ms;  // rollover-safe (unsigned wrap)
 }
 
+// Short, bounded reset-reason token for the heartbeat. PANIC is the one that
+// matters: a toy that dies mid-sync never reports a status, so the NEXT boot's
+// reset reason is the only surviving evidence that anything went wrong.
+static const char *reset_reason_short() {
+    switch (esp_reset_reason()) {
+        case ESP_RST_POWERON:  return "POWERON";
+        case ESP_RST_SW:       return "SW";
+        case ESP_RST_PANIC:    return "PANIC";
+        case ESP_RST_INT_WDT:  return "INT_WDT";
+        case ESP_RST_TASK_WDT: return "TASK_WDT";
+        case ESP_RST_WDT:      return "WDT";
+        case ESP_RST_BROWNOUT: return "BROWNOUT";
+        case ESP_RST_DEEPSLEEP: return "DEEPSLEEP";
+        case ESP_RST_EXT:      return "EXT";
+        default:               return "UNKNOWN";
+    }
+}
+
 void voice_send_heartbeat() {
     if (!voice_wifi_is_connected()) {
         return;  // nothing to do offline; the reconnect tick owns recovery
@@ -296,7 +323,7 @@ void voice_send_heartbeat() {
     // is ~90 B plus content_report's own 320 B story cap. This sits on the
     // 8 KB loop-task stack, so it is sized to what the report can actually
     // be rather than to a round number.
-    char body[640];
+    char body[768];
     int used = snprintf(body, sizeof(body),
              "{\"firmwareVersion\":\"%s\",\"firmwareBuild\":\"%s\","
              "\"boardModel\":\"%s\",\"partitionName\":\"%s\","
@@ -304,6 +331,30 @@ void voice_send_heartbeat() {
              AREG_FW_VERSION, AREG_FW_BUILD, AREG_BOARD_MODEL,
              ota_running_partition_label(), ota_state_status_cstr(),
              audio_sd_available() ? "true" : "false");
+#ifdef AREG_CONTENT_SYNC_BENCH
+    // Sync diagnostics — sent UNCONDITIONALLY, unlike the content block below.
+    // The content block is gated on the SD card being readable, which meant
+    // "I could not look at my card" was byte-identical on the wire to "I am
+    // settled and up to date". These four fields live in RAM and NVS, not on
+    // the card, so a toy with a dead card, or one that has been panicking all
+    // night, can still say so. That is the whole point of the 2026-08-14 slice.
+    if (used > 0 && (size_t)used < sizeof(body)) {
+        const int32_t since_ok = content_sync_seconds_since_ok();
+        int n = snprintf(body + used, sizeof(body) - (size_t)used,
+                 ",\"contentSyncStatus\":\"%s\",\"contentSyncError\":\"%s\""
+                 ",\"bootCount\":%u,\"resetReason\":\"%s\"",
+                 content_sync_status(), content_sync_error(),
+                 (unsigned)content_sync_fail_streak(), reset_reason_short());
+        if (n > 0 && (size_t)used + (size_t)n < sizeof(body)) {
+            used += n;
+            if (since_ok >= 0) {
+                n = snprintf(body + used, sizeof(body) - (size_t)used,
+                             ",\"contentSyncedSecondsAgo\":%ld", (long)since_ok);
+                if (n > 0 && (size_t)used + (size_t)n < sizeof(body)) used += n;
+            }
+        }
+    }
+#endif
     if (used <= 0 || (size_t)used >= sizeof(body)) {
         http.end();
         return;   // cannot happen with compile-time constants; refuse to send junk
@@ -342,6 +393,13 @@ void voice_send_heartbeat() {
         if (deserializeJson(doc, resp) == DeserializationError::Ok) {
             const bool bedtime = doc["inBedtimeWindow"] | false;
             const bool paused  = doc["isPaused"] | false;
+            // The toy used to make a SECOND HTTPS request every 60 s just to
+            // ask "any commands?" -- ~43,200 polls a month to deliver perhaps
+            // one command, each paying for its own TLS handshake, which is the
+            // expensive part in both battery and heap. The answer rides this
+            // reply instead. Absent (older backend) reads TRUE so the toy keeps
+            // polling on its own cadence and nothing regresses.
+            s_has_commands = doc["hasCommands"] | true;
             // Welcome flow — persist ONLY on a real change. The heartbeat
             // fires every ~60 s, so writing unconditionally would be
             // ~1,440 flash writes a day for a value that rarely moves.

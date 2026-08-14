@@ -20,6 +20,7 @@
 #include <ArduinoJson.h>
 #include <FS.h>
 #include <SD.h>
+#include <Preferences.h>   // NVS: the failure streak must survive a panic
 #include <esp_task_wdt.h>
 #include <mbedtls/sha256.h>
 
@@ -168,12 +169,32 @@ String resolve_url(const char *url) {
     return base + url;
 }
 
+// ---- last-attempt outcome, reported on the heartbeat ----
+// Before 2026-08-14 every failure below ended at a Serial.print and nothing
+// else: no NVS, no index field, no module state. Once the run returned,
+// NOTHING on the device knew a sync had even been attempted, so diagnosing a
+// stuck toy needed a cable. These four hold the answer instead.
+char     s_last_status[8]  = "never";  // never | ok | partial | failed
+char     s_last_error[24]  = "";       // bounded reason, "" when none
+uint32_t s_last_ok_ms      = 0;        // millis() of the last clean pass
+bool     s_had_ok          = false;
+uint16_t s_fail_streak     = 0;        // persisted; survives a panic
+
+void set_status(const char *status, const char *reason) {
+    snprintf(s_last_status, sizeof(s_last_status), "%s", status);
+    snprintf(s_last_error, sizeof(s_last_error), "%s", reason != nullptr ? reason : "");
+}
+
 void fail(const char *reason) {
+    set_status("failed", reason);
     Serial.printf("[content-sync] FAIL (%s)\n", reason);
     Serial.flush();
 }
 
 void story_fail(const char *story_id, const char *reason) {
+    // Per-ITEM failure. Deliberately does not overwrite a "failed" verdict:
+    // "the whole attempt died" outranks "one file of many did not land".
+    if (strcmp(s_last_status, "failed") != 0) set_status("partial", reason);
     Serial.printf("[content-sync] story %s FAILED (%s)\n", story_id, reason);
     Serial.flush();
 }
@@ -881,10 +902,27 @@ void sync_games(JsonDocument &manifest_doc, JsonArrayConst games) {
         if (work == nullptr) work = (CsGame *)malloc(cap * sizeof(CsGame));
         if (prevs == nullptr) prevs = (CsGame *)malloc(cap * sizeof(CsGame));
         if (work == nullptr || prevs == nullptr) {
-            Serial.println("[content-sync] games: work-list alloc failed");
+            // Carry the PREVIOUS index forward before bailing. Returning
+            // here used to leave s_games_active_count at 0, so
+            // cs_index_add_games omitted the key entirely and the rewritten
+            // index lost every game clip the card already had -- the next
+            // boot then re-downloaded ~90 files that were sitting there
+            // untouched. An allocation failure must cost this attempt, not
+            // the card.
+            Serial.println("[content-sync] games: work-list alloc failed "
+                           "(carrying previous index forward)");
+            if (prevs != nullptr) {
+                for (int i = 0; i < prevs_n && s_games_active_count < (int)cap; i++) {
+                    cs_index_append_game(out, &prevs[i]);
+                    s_games_active_count++;
+                }
+            }
             free(work);
             free(prevs);
             manifest_doc.clear();
+            if (strcmp(s_last_status, "failed") != 0) {
+                set_status("partial", "games_alloc_failed");
+            }
             return;
         }
 
@@ -1242,9 +1280,21 @@ void content_sync_run() {
     Serial.flush();
 
     if (failed > 0) {
+        // story_fail() already recorded WHICH reason; only the verdict is set
+        // here, and never over a whole-attempt "failed".
+        if (strcmp(s_last_status, "failed") != 0) {
+            snprintf(s_last_status, sizeof(s_last_status), "partial");
+        }
         Serial.printf("[content-sync] PARTIAL (%d ok, %d failed)\n",
                       already + downloaded, failed);
+    } else if (!index_written) {
+        // Everything downloaded but the card would not take the index. The
+        // next boot re-reads the OLD index and re-downloads the lot, so this
+        // is a failure however well the transfers went.
+        set_status("failed", "index_write_failed");
+        Serial.println("[content-sync] FAILED (index not written)");
     } else {
+        set_status("ok", "");
         Serial.println("[content-sync] PASS");
     }
     Serial.flush();
@@ -1262,13 +1312,68 @@ static constexpr uint32_t kBenchStartMs   = 180000UL;  // 3 min arm delay
 static constexpr uint32_t kStatusEveryMs  = 5000UL;
 static constexpr uint32_t kSdInitRetryMs  = 30000UL;   // remount retry cadence
 
+// A clean pass still re-checks, because the point of this slice is that a
+// story added on the backend reaches a toy that is never power-cycled. Six
+// hours is well inside "a child gets it the same day" and, with the
+// manifest-only fast path, a no-op attempt is a single small HTTPS GET.
+static constexpr uint32_t kCleanRetryMs = 6UL * 60UL * 60UL * 1000UL;
+
+// Failure backoff: 5 / 15 / 60 / 240 minutes, then hold. Capped so a toy with
+// a genuinely broken card is not hammering the backend or its own flash, and
+// floored at 5 min so a transient Wi-Fi blip recovers quickly.
+uint32_t backoff_ms(uint16_t streak) {
+    switch (streak) {
+        case 0:  case 1: return 5UL  * 60UL * 1000UL;
+        case 2:          return 15UL * 60UL * 1000UL;
+        case 3:          return 60UL * 60UL * 1000UL;
+        default:         return 240UL * 60UL * 1000UL;
+    }
+}
+
+uint32_t s_next_attempt_ms = 0;
+bool     s_requested_now   = false;
+
+// NVS namespace/keys — the aregstate/aregstory idiom used elsewhere. Only the
+// failure streak needs to survive a reboot; status and error are per-attempt
+// and a fresh boot has genuinely not attempted anything yet.
+constexpr const char *kNvsNamespace = "csync";
+constexpr const char *kNvsStreakKey = "streak";
+
+void persist_state() {
+    Preferences prefs;
+    if (!prefs.begin(kNvsNamespace, /*readOnly=*/false)) return;
+    prefs.putUShort(kNvsStreakKey, s_fail_streak);
+    prefs.end();
+}
+
+void restore_state() {
+    Preferences prefs;
+    if (!prefs.begin(kNvsNamespace, /*readOnly=*/true)) return;
+    s_fail_streak = prefs.getUShort(kNvsStreakKey, 0);
+    prefs.end();
+}
+
 void content_sync_tick() {
-    static bool s_done = false;
     static bool s_stamped = false;
+    static bool s_restored = false;
     static uint32_t s_last_status_ms = 0;
     static uint32_t s_last_sd_init_ms = 0;
-    if (s_done) {
-        return;
+
+    if (!s_restored) {
+        s_restored = true;
+        restore_state();
+        // A toy that panicked mid-sync comes back with the streak already
+        // standing, so its FIRST attempt this boot is already backed off.
+        // Without this the 2026-08-14 loop would simply repeat at 3-minute
+        // intervals with a scheduler bolted on.
+        if (s_fail_streak > 0) {
+            s_next_attempt_ms = kBenchStartMs + backoff_ms(s_fail_streak);
+            Serial.printf("[content-sync] resuming with fail streak=%u — first "
+                          "attempt deferred to ms>=%lu\n",
+                          (unsigned)s_fail_streak,
+                          (unsigned long)s_next_attempt_ms);
+            Serial.flush();
+        }
     }
 
     if (!s_stamped) {
@@ -1286,12 +1391,18 @@ void content_sync_tick() {
     if (now < kBenchStartMs) {
         if (status_due) {
             s_last_status_ms = now;
-            Serial.println("[content-sync] bench build enabled; waiting for "
+            Serial.println("[content-sync] enabled; waiting for "
                            "WiFi+SD; will start at ms>=180000");
             Serial.flush();
         }
         return;
     }
+    // Scheduled, not one-shot. `s_requested_now` lets the console command jump
+    // the queue without disturbing the schedule arithmetic.
+    if (!s_requested_now && s_next_attempt_ms != 0 && now < s_next_attempt_ms) {
+        return;
+    }
+    s_requested_now = false;
     if (!voice_wifi_is_connected()) {
         if (status_due) {
             s_last_status_ms = now;
@@ -1338,8 +1449,54 @@ void content_sync_tick() {
         }
     }
 
-    s_done = true;  // one attempt per boot, even if it fails (bench slice)
+    // ---- CRASH GUARD ----
+    // The streak is persisted BEFORE the risky work and cleared after it, not
+    // the other way round. On 2026-08-14 this sync panicked with
+    // ESP_ERR_NO_MEM part-way through and rebooted, ~184 s apart, all night:
+    // a device that dies mid-run can never report anything, so the only
+    // surviving evidence is what it wrote down BEFORE it died. Bumping first
+    // means the next boot sees a climbing streak and backs off, instead of
+    // retrying every three minutes forever.
+    s_fail_streak++;
+    persist_state();
+
     content_sync_run();
+
+    // Reaching here at all means no panic. A clean pass clears the streak; a
+    // partial or failed one leaves the increment standing so the backoff grows.
+    const bool clean = (strcmp(s_last_status, "ok") == 0);
+    if (clean) {
+        s_fail_streak = 0;
+        s_last_ok_ms  = millis();
+        s_had_ok      = true;
+    }
+    persist_state();
+
+    const uint32_t delay_ms = clean ? kCleanRetryMs : backoff_ms(s_fail_streak);
+    s_next_attempt_ms = millis() + delay_ms;
+    Serial.printf("[content-sync] status=%s error=%s streak=%u next in %lus\n",
+                  s_last_status, s_last_error, (unsigned)s_fail_streak,
+                  (unsigned long)(delay_ms / 1000UL));
+    Serial.flush();
+}
+
+void content_sync_request_now() {
+    // Only moves the schedule. Every guard in the tick still applies, so an
+    // operator pressing "Sync this toy now" cannot interrupt a story, race an
+    // OTA, or run without SD.
+    s_next_attempt_ms = millis();
+    s_requested_now   = true;
+    Serial.println("[content-sync] sync requested by command");
+    Serial.flush();
+}
+
+const char *content_sync_status() { return s_last_status; }
+const char *content_sync_error()  { return s_last_error; }
+uint16_t    content_sync_fail_streak() { return s_fail_streak; }
+
+int32_t content_sync_seconds_since_ok() {
+    if (!s_had_ok) return -1;
+    return (int32_t)((millis() - s_last_ok_ms) / 1000UL);
 }
 
 #endif  // AREG_CONTENT_SYNC_BENCH
