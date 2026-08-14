@@ -107,6 +107,32 @@ def main() -> int:
             f"service UUIDs are also GUID-shaped — check which this is before "
             f"overriding, and if it is legitimate say so in the release notes.")
 
+    # Wi-Fi credentials. Same rule as the device key and it was missed for the
+    # same reason: config.h compiles AREG_WIFI_SSID / AREG_WIFI_PASSWORD in as
+    # a fallback, so every image built on a bench that has a working toy
+    # carries a HOME network's name and password in plaintext -- and those
+    # images are committed to a git repo and served to every toy that polls.
+    # Found 2026-08-14: the staged image AND the shipped field image both had
+    # one. A factory-fresh toy installing that image would also try to join
+    # someone else's house.
+    #
+    # The gate cannot know the password, so it checks the shape instead: an
+    # image built from config.h.example has EMPTY Wi-Fi strings, and the SSID
+    # of a real home router is recognisable. This catches the common vendor
+    # prefixes; it is a net, not a proof, which is why the release still ends
+    # with a human reading the diff.
+    wifi_markers = [s for s in strings
+                    if re.match(r"^(OVIO|TP-Link|Ucom|Rostelecom|Beeline|MTS|"
+                                r"KTV|Team|VivaCell|Telecom)[-_ ]?[A-Za-z0-9_-]{2,}$", s)]
+    if wifi_markers:
+        failures.append(
+            f"{len(wifi_markers)} probable Wi-Fi SSID(s) compiled in. An OTA "
+            f"image reaches every toy, so a home network's name and password "
+            f"must never ride inside it — a factory-fresh toy would try to "
+            f"join that house. Set AREG_WIFI_SSID / AREG_WIFI_PASSWORD back to "
+            f"the config.h.example placeholders and provision Wi-Fi onto the "
+            f"toy instead. Values are not printed here.")
+
     present_placeholders = [p for p in PLACEHOLDERS if p in strings]
     if present_placeholders:
         notes.append(f"placeholders present: {', '.join(present_placeholders)}")
