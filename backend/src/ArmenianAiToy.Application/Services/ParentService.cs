@@ -1259,12 +1259,14 @@ public class ParentService : IParentService
     private const int DefaultOnlineThresholdSeconds = 180;
     private const int MinOnlineThresholdSeconds = 30;
 
-    /// <summary>What the content manifest currently advertises, for the
-    /// content-freshness verdict. The projection itself lives on
-    /// <see cref="ContentSyncOptions.AdvertisedStoryVersions"/> so this and
-    /// the operator console read the same definition.</summary>
-    private IReadOnlyCollection<(string StoryId, int Version)> ReadAdvertisedStories()
-        => ContentSyncOptions.Resolve(_config).AdvertisedStoryVersions();
+    /// <summary>The FLEET content catalogue, which
+    /// <see cref="ContentSyncOptions.AdvertisedStoryVersions"/> then projects
+    /// for the content-freshness verdict — one definition shared with the
+    /// operator console. Narrowed per device by
+    /// <see cref="DeviceContentEntitlement.Apply"/> before it is measured
+    /// against anything, so a withheld story never reads as a missing one.</summary>
+    private ContentSyncOptions ReadContentBaseline()
+        => ContentSyncOptions.Resolve(_config);
 
     private int ReadOnlineThresholdSeconds()
     {
@@ -1865,12 +1867,35 @@ public class ParentService : IParentService
         // Platform presence (online dot in the app): seen within the online
         // window. Same snapshot-once discipline as the dormancy cutoff.
         var onlineCutoff = nowUtc.AddSeconds(-ReadOnlineThresholdSeconds());
-        // What the content manifest currently advertises, resolved ONCE for
-        // the whole response through the same pure helper the manifest
-        // service uses — so "up to date" can never mean one thing here and
-        // another on the device endpoint. No constructor dependency: this
-        // reads config, exactly like the two cutoffs above.
-        var advertisedStories = ReadAdvertisedStories();
+        // What the content manifest currently advertises, resolved through the
+        // same pure helper the manifest service uses — so "up to date" can
+        // never mean one thing here and another on the device endpoint. No
+        // constructor dependency: this reads config, exactly like the two
+        // cutoffs above.
+        //
+        // PER DEVICE, not per response, since per-toy entitlement landed. A
+        // toy that has been denied a story is not behind on it, and measuring
+        // it against the fleet list would leave that toy reporting "stale"
+        // forever — to its own parent, on the strength of a withholding they
+        // did not ask about and cannot fix. One query for the whole page, then
+        // a pure in-memory narrowing per device; the common case (no override
+        // rows at all) hands the baseline straight back by reference.
+        var contentBaseline = ReadContentBaseline();
+        var fleetAdvertised = contentBaseline.AdvertisedStoryVersions();
+        var advertisedByDevice = (await _db.Set<DeviceContentOverride>()
+                .AsNoTracking()
+                .Where(o => deviceIds.Contains(o.DeviceId))
+                .Select(o => new { o.DeviceId, o.ItemKind, o.ItemKey, o.Mode })
+                .ToListAsync())
+            .GroupBy(o => o.DeviceId)
+            .ToDictionary(
+                g => g.Key,
+                g => DeviceContentEntitlement
+                    .Apply(contentBaseline, g.Select(r => (r.ItemKind, r.ItemKey, r.Mode)))
+                    .AdvertisedStoryVersions());
+
+        IReadOnlyCollection<(string StoryId, int Version)> AdvertisedFor(Guid id)
+            => advertisedByDevice.TryGetValue(id, out var own) ? own : fleetAdvertised;
 
         return links.Select(l => new LinkedDeviceDto(
             l.Device.Id,
@@ -1902,12 +1927,12 @@ public class ParentService : IParentService
         )
         {
             ContentHealth = DeviceContentHealth.Resolve(
-                l.Device.ContentStories, advertisedStories, l.Device.LastSeenAt, nowUtc,
+                l.Device.ContentStories, AdvertisedFor(l.Device.Id), l.Device.LastSeenAt, nowUtc,
                 ReadOnlineThresholdSeconds(),
                 l.Device.ContentSyncStatus, l.Device.ResetReason, l.Device.BootCount),
             StoriesOnToy = DeviceContentHealth.Count(
-                l.Device.ContentStories, advertisedStories).Present,
-            StoriesAvailable = advertisedStories.Count,
+                l.Device.ContentStories, AdvertisedFor(l.Device.Id)).Present,
+            StoriesAvailable = AdvertisedFor(l.Device.Id).Count,
             StoryIntroEnabled = l.Device.StoryIntroEnabled,
             StoryPausesEnabled = l.Device.StoryPausesEnabled,
             VariantEndingsEnabled = l.Device.VariantEndingsEnabled,

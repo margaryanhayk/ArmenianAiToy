@@ -215,6 +215,32 @@ public sealed record InternalDeviceActionRequest(bool Value, string Reason);
 /// mandatory reason that every console action must record.</summary>
 public sealed record InternalReasonRequest(string Reason);
 
+/// <summary>
+/// Per-toy content entitlement: give this toy this item
+/// (<c>Value = true</c> → allow) or take it away (<c>Value = false</c> →
+/// deny). <c>Value</c> rather than a mode string so this reads exactly like
+/// every other console device action and reuses the same reason-prompt UI.
+/// <para>
+/// <c>ItemKey</c> is the item's address within its namespace — a story id, a
+/// track id, a voice clip id, or for a game the <c>gameKey/clipId</c> PAIR.
+/// It is a lookup key, never a path.
+/// </para>
+/// </summary>
+public sealed record InternalDeviceContentRequest(
+    string? ItemKind, string? ItemKey, bool Value, string? Reason);
+
+/// <summary>One row of the console's per-device content list: a catalogue
+/// item and whether THIS toy currently gets it.</summary>
+public sealed record AdminDeviceContentItemDto(
+    string ItemKind,
+    string ItemKey,
+    string? Title,
+    int? Version,
+    bool Allowed,
+    string? OverrideMode,
+    string? OverrideReason,
+    DateTime? OverrideAt);
+
 /// <summary>Slice F — operator moves a story request through its
 /// lifecycle. Bounded status vocabulary validated at the action.</summary>
 public sealed record InternalStoryRequestStatusRequest(string? Status, string? Reason);

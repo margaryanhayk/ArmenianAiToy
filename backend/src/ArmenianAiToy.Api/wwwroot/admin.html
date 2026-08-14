@@ -107,6 +107,12 @@ const main = $('#main'), nav = $('#nav');
 let TOKEN = sessionStorage.getItem('aregAdminToken') || '';
 
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+// For a value landing inside '…' in an onclick. esc() is for text nodes — it
+// leaves ' and \ alone, which are exactly the characters that break out of
+// this context. Nothing can reach it today (item keys are held to an id
+// allowlist server-side), which is a reason to be correct rather than
+// incidentally safe.
+function jsq(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); }
 function err(m){ main.innerHTML = `<div class="msg err">${esc(m)}</div>`; }
 function info(m){ main.innerHTML = `<div class="msg info">${esc(m)}</div>`; }
 function dt(s){ return s ? new Date(s).toLocaleString() : '—'; }
@@ -461,6 +467,18 @@ window.openDevice = async function(id){
   info('Loading device…');
   try {
     const convs = (await api('/conversations?deviceId='+encodeURIComponent(id)+'&limit=100')).conversations;
+    // What this toy is entitled to. Fetched here rather than folded into
+    // /devices because it is per-device detail, and the devices table is
+    // already the widest response in this console.
+    let content = [], contentErr = '';
+    try { content = (await api('/devices/'+encodeURIComponent(id)+'/content')).items || []; }
+    catch(e){
+      // 404 is the older-backend case: show nothing rather than lie. Anything
+      // else is a live failure, and silently dropping the whole control
+      // surface would read as "this toy has no overrides" — its own lie.
+      content = null;
+      if (!/^404/.test(e.message)) contentErr = e.message;
+    }
     // The status card and the "last seen" card are the two the banner below
     // used to be contradicted by: a green Active and a fresh timestamp, on a
     // toy that had panicked all night. Fixed at source rather than argued
@@ -508,13 +526,43 @@ window.openDevice = async function(id){
         <button class="ghost" onclick="issueClaimCode('${id}')">New pairing code</button>
         <span class="mut">operator action — a reason is required and audit-logged</span>
       </div>` : '';
+    // Per-toy content. Every column here is about what this toy is SENT —
+    // withholding removes an item from this toy's manifest and from the set
+    // its library health is measured against, so the toy is never "missing"
+    // something it was never offered. What the toy has actually DOWNLOADED is
+    // a different question with a different answer (the Library column on the
+    // devices list), and the wording says so rather than letting an operator
+    // read "yes" as "it is on the card".
+    const contentRows = content !== null ? (`
+      <div class="row mut" style="margin-top:14px">What this toy is <b>sent</b> — withholding an item removes it from this toy's manifest only.
+        What the toy has actually <b>downloaded</b> is the Library column on the devices list.
+        Each button asks for a reason and is audit-logged.</div>`
+      + table([
+        {h:'Item', f:r=>esc(r.title || r.itemKey)},
+        {h:'Kind', f:r=>`<span class="mut mono">${esc(r.itemKind)}</span>`},
+        {h:'Catalogue v', f:r=>r.version==null?'<span class="mut">—</span>':r.version},
+        {h:'Sent to this toy', f:r=>r.allowed?'<span class="pill on">yes</span>':'<span class="pill blk">withheld</span>'},
+        // An untouched item and one an operator explicitly granted both read
+        // "sent: yes". Only overrideMode tells them apart, and that
+        // distinction becomes load-bearing the moment fleet-dark items exist.
+        {h:'Operator note', f:r=>r.overrideMode
+          ? `<span class="pill ${r.overrideMode==='deny'?'blk':'on'}">${r.overrideMode==='deny'?'withheld':'granted'}</span>
+             <span class="mut">${ago(r.overrideAt)}</span>`
+            + (r.overrideReason?`<div>${esc(r.overrideReason)}</div>`:'')
+          : '<span class="mut">default — never changed</span>'},
+        {h:'', f:r=>`<button class="ghost" onclick="contentAction('${id}','${jsq(r.itemKind)}','${jsq(r.itemKey)}',${!r.allowed})">${r.allowed?'Withhold':'Give back'}</button>`},
+      ], content))
+      : (contentErr
+        ? `<div class="row mut" style="margin-top:14px">Content entitlement unavailable — <b class="mono">${esc(contentErr)}</b>. Nothing was changed on this toy.</div>`
+        : '');
     main.innerHTML = `<div class="row"><button class="ghost" onclick="show('devices')">← devices</button>
         <span class="mut">${d?esc(d.name):''} <span class="mono">${esc(id.slice(0,8))}</span>${d?' · '+esc(d.macAddress):''}</span></div>`
       + syncBanner
       + head
       + syncDetail
       + actions
-      + `<div class="row mut">Conversations on this device — click to open in context.</div>`
+      + contentRows
+      + `<div class="row mut" style="margin-top:14px">Conversations on this device — click to open in context.</div>`
       + table([
         {h:'Started',f:r=>dt(r.startedAt)},
         {h:'Msgs',f:r=>r.messageCount},
@@ -539,6 +587,25 @@ window.opAction = async function(kind, id, value){
     await apiPost('/devices/'+id+'/'+kind, { value: value, reason: reason.trim() });
     _devices = (await api('/devices')).devices; // refresh cached flags
     openDevice(id);                             // re-render with the new state
+  } catch(e){ err(e.message); }
+};
+
+// Per-toy content entitlement — same reason-prompt idiom as opAction, because
+// it is the same kind of act: an operator changing one toy, recorded with a
+// reason. value=true gives the item back, value=false withholds it.
+window.contentAction = async function(id, kind, key, value){
+  const label = value
+    ? 'give "'+key+'" back to this toy'
+    : 'withhold "'+key+'" from this toy';
+  const reason = prompt('Reason to '+label+'\n(required — recorded in the audit log):', '');
+  if (reason === null) return;                 // cancelled
+  if (!reason.trim()){ alert('A reason is required.'); return; }
+  info('Saving…');            // three round trips follow — don't sit still
+  try {
+    await apiPost('/devices/'+id+'/content',
+      { itemKind: kind, itemKey: key, value: value, reason: reason.trim() });
+    _devices = (await api('/devices')).devices; // library health is derived from this
+    openDevice(id);
   } catch(e){ err(e.message); }
 };
 

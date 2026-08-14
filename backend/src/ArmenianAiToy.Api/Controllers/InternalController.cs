@@ -125,12 +125,32 @@ public class InternalController : ControllerBase
             .GroupBy(c => c.DeviceId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        // What the manifest currently advertises, resolved once for the whole
-        // response through the same helper the manifest service uses — the
-        // console and the parent dashboard must never disagree about what
-        // "up to date" means.
-        var advertisedStories =
-            ContentSyncOptions.Resolve(_config).AdvertisedStoryVersions();
+        // What the manifest currently advertises, through the same helper the
+        // manifest service uses — the console and the parent dashboard must
+        // never disagree about what "up to date" means.
+        //
+        // PER DEVICE since per-toy entitlement landed: a toy denied a story is
+        // not behind on it. Left fleet-wide, every restricted toy would report
+        // stale and name the withheld story as missing — the console would be
+        // accusing a toy of failing to fetch something the operator withheld
+        // from it on purpose. One query for the whole table, then a pure
+        // in-memory narrowing; a device with no rows gets the baseline back by
+        // reference.
+        var contentBaseline = ContentSyncOptions.Resolve(_config);
+        var fleetAdvertised = contentBaseline.AdvertisedStoryVersions();
+        var advertisedByDevice = (await _db.Set<DeviceContentOverride>()
+                .AsNoTracking()
+                .Select(o => new { o.DeviceId, o.ItemKind, o.ItemKey, o.Mode })
+                .ToListAsync(ct))
+            .GroupBy(o => o.DeviceId)
+            .ToDictionary(
+                g => g.Key,
+                g => DeviceContentEntitlement
+                    .Apply(contentBaseline, g.Select(r => (r.ItemKind, r.ItemKey, r.Mode)))
+                    .AdvertisedStoryVersions());
+
+        IReadOnlyCollection<(string StoryId, int Version)> AdvertisedFor(Guid id)
+            => advertisedByDevice.TryGetValue(id, out var own) ? own : fleetAdvertised;
 
         var rows = devices.Select(d => new AdminDeviceDto(
             Id: d.Id,
@@ -160,11 +180,11 @@ public class InternalController : ControllerBase
                 .ToList())
         {
             ContentHealth = DeviceContentHealth.Resolve(
-                d.ContentStories, advertisedStories, d.LastSeenAt, now,
+                d.ContentStories, AdvertisedFor(d.Id), d.LastSeenAt, now,
                 DeviceContentHealth.DefaultOnlineThresholdSeconds,
                 d.ContentSyncStatus, d.ResetReason, d.BootCount),
             MissingStoryIds = DeviceContentHealth.MissingStoryIds(
-                d.ContentStories, advertisedStories),
+                d.ContentStories, AdvertisedFor(d.Id)),
             ContentStories = d.ContentStories,
             ContentIndexSchema = d.ContentIndexSchema,
             ContentGameClips = d.ContentGameClips,
@@ -665,6 +685,168 @@ public class InternalController : ControllerBase
     public Task<IActionResult> PauseDeviceAction(
         Guid deviceId, [FromBody] InternalDeviceActionRequest req, CancellationToken ct)
         => DeviceFlagActionAsync(deviceId, req, "device_pause", ct);
+
+    /// <summary>
+    /// What this toy is entitled to: every catalogue story, plus any override
+    /// already recorded for another namespace, with the toy's current answer
+    /// for each. The read half of the allow/deny action below — the console
+    /// cannot offer a toggle without first knowing which way it points.
+    /// <para>
+    /// Not access-audited, deliberately, on the same rule the other aggregate
+    /// console reads follow (<c>/overview</c>, <c>/devices</c>,
+    /// <c>/parents</c>, <c>/stories</c>): this exposes catalogue configuration
+    /// and operator decisions, not a line of any child's transcript.
+    /// </para>
+    /// </summary>
+    [HttpGet("devices/{deviceId:guid}/content")]
+    public async Task<IActionResult> GetDeviceContent(Guid deviceId, CancellationToken ct)
+    {
+        var deviceExists = await _db.Devices.AnyAsync(d => d.Id == deviceId, ct);
+        if (!deviceExists)
+            return NotFound(new { error = "Device not found." });
+
+        var rows = await _db.Set<DeviceContentOverride>().AsNoTracking()
+            .Where(o => o.DeviceId == deviceId)
+            .ToListAsync(ct);
+        var byKey = rows.ToDictionary(
+            o => $"{DeviceContentEntitlement.NormalizeKind(o.ItemKind)} {DeviceContentEntitlement.NormalizeKey(o.ItemKey)}",
+            o => o,
+            StringComparer.OrdinalIgnoreCase);
+
+        AdminDeviceContentItemDto Row(string kind, string key, string? title, int? version)
+        {
+            byKey.TryGetValue($"{kind} {DeviceContentEntitlement.NormalizeKey(key)}", out var ov);
+            var denied = ov is not null && string.Equals(
+                DeviceContentEntitlement.NormalizeMode(ov.Mode),
+                DeviceContentEntitlement.ModeDeny, StringComparison.Ordinal);
+            return new AdminDeviceContentItemDto(
+                kind, key, title, version, !denied,
+                ov is null ? null : DeviceContentEntitlement.NormalizeMode(ov.Mode),
+                ov?.Reason, ov?.CreatedAt);
+        }
+
+        // Stories are listed in full because withholding a STORY is the thing
+        // the console exists to do. The ~140 game/voice/music clips are not
+        // listed — a wall of clip ids is not a control surface — but any
+        // override already made on one (through this endpoint's POST) is shown,
+        // so nothing an operator has done to a toy is invisible here.
+        var options = ContentSyncOptions.Resolve(_config);
+        var items = options.ResolveStories()
+            .Where(s => !string.IsNullOrWhiteSpace(s.StoryId))
+            .Select(s => Row(DeviceContentEntitlement.KindStory, s.StoryId.Trim(),
+                string.IsNullOrWhiteSpace(s.Title) ? null : s.Title,
+                s.Version < 1 ? 1 : s.Version))
+            .ToList();
+
+        var listedStoryKeys = items
+            .Select(i => DeviceContentEntitlement.NormalizeKey(i.ItemKey))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        items.AddRange(rows
+            .Where(o => !string.Equals(
+                             DeviceContentEntitlement.NormalizeKind(o.ItemKind),
+                             DeviceContentEntitlement.KindStory, StringComparison.Ordinal)
+                        || !listedStoryKeys.Contains(DeviceContentEntitlement.NormalizeKey(o.ItemKey)))
+            .Select(o => Row(
+                DeviceContentEntitlement.NormalizeKind(o.ItemKind),
+                DeviceContentEntitlement.NormalizeKey(o.ItemKey), null, null)));
+
+        return Ok(new { deviceId, items });
+    }
+
+    /// <summary>
+    /// Give this toy an item, or take it away. Same shape as every other
+    /// console device action — reason required, 404 on an unknown device,
+    /// idempotent (a no-op writes no audit row and saves nothing), one
+    /// system-actor audit row in the SAME SaveChanges as the mutation, one
+    /// loud log line.
+    /// <para>
+    /// The row is UPSERTED rather than deleted on the way back to the default,
+    /// so "this toy is entitled to this" stays a recorded operator decision
+    /// rather than an absence — which is what the upload slice needs when
+    /// sending a fleet-dark story to one toy first.
+    /// </para>
+    /// </summary>
+    [HttpPost("devices/{deviceId:guid}/content")]
+    public async Task<IActionResult> SetDeviceContent(
+        Guid deviceId, [FromBody] InternalDeviceContentRequest? req, CancellationToken ct)
+    {
+        if (req is null || string.IsNullOrWhiteSpace(req.Reason))
+            return BadRequest(new { error = "A reason is required for operator actions." });
+        if (!DeviceContentEntitlement.IsKnownKind(req.ItemKind))
+            return BadRequest(new
+            {
+                error = "itemKind must be one of: "
+                        + string.Join(", ", DeviceContentEntitlement.Kinds) + "."
+            });
+
+        var itemKey = DeviceContentEntitlement.NormalizeKey(req.ItemKey);
+        if (!DeviceContentEntitlement.IsValidItemKey(req.ItemKind, itemKey))
+            return BadRequest(new
+            {
+                error = "itemKey must be a content id (lowercase letters, digits, - and _), "
+                        + "or gameKey/clipId for a game clip."
+            });
+
+        var deviceExists = await _db.Devices.AnyAsync(d => d.Id == deviceId, ct);
+        if (!deviceExists)
+            return NotFound(new { error = "Device not found." });
+
+        var itemKind = DeviceContentEntitlement.NormalizeKind(req.ItemKind);
+        var mode = req.Value
+            ? DeviceContentEntitlement.ModeAllow
+            : DeviceContentEntitlement.ModeDeny;
+
+        var existing = await _db.Set<DeviceContentOverride>()
+            .FirstOrDefaultAsync(o => o.DeviceId == deviceId
+                                      && o.ItemKind == itemKind
+                                      && o.ItemKey == itemKey, ct);
+
+        var changed = existing is null
+                      || !string.Equals(DeviceContentEntitlement.NormalizeMode(existing.Mode),
+                                        mode, StringComparison.Ordinal);
+        if (changed)
+        {
+            var op = HttpContext?.Items["InternalOperator"] as string ?? "unknown";
+            var reason = req.Reason.Trim();
+            if (existing is null)
+            {
+                _db.Set<DeviceContentOverride>().Add(new DeviceContentOverride
+                {
+                    Id = Guid.NewGuid(),
+                    DeviceId = deviceId,
+                    ItemKind = itemKind,
+                    ItemKey = itemKey,
+                    Mode = mode,
+                    Reason = reason,
+                    CreatedBy = op,
+                    CreatedAt = DateTime.UtcNow,
+                });
+            }
+            else
+            {
+                existing.Mode = mode;
+                existing.Reason = reason;
+                existing.CreatedBy = op;
+                existing.CreatedAt = DateTime.UtcNow;
+            }
+            _db.AuditEvents.Add(AuditEvent.InternalConsoleContentOverride(
+                op, deviceId, itemKind, itemKey, req.Value, reason));
+            await _db.SaveChangesAsync(ct);
+            _logger.LogWarning(
+                "Operator {Operator} set content {ItemKind}/{ItemKey} to {Mode} on device {DeviceId}",
+                op, itemKind, itemKey, mode, deviceId);
+        }
+
+        return Ok(new
+        {
+            deviceId,
+            action = "device_content_override",
+            itemKind,
+            itemKey,
+            value = req.Value,
+            changed,
+        });
+    }
 
     /// <summary>
     /// Mint a FRESH pairing code (and QR payload) for an existing toy.

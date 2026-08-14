@@ -29,11 +29,15 @@ public sealed class ContentManifestService : IContentManifestService
         _logger = logger;
     }
 
-    public ContentManifestResponse Build()
+    public ContentManifestResponse Build() => Build(_options);
+
+    public ContentManifestResponse Build(ContentSyncOptions options)
     {
+        ArgumentNullException.ThrowIfNull(options);
+
         // Master switch short-circuits before anything else: a disabled
         // deployment offers nothing regardless of what is configured.
-        if (!_options.Enabled)
+        if (!options.Enabled)
         {
             return ContentManifestResponse.Empty();
         }
@@ -41,7 +45,7 @@ public sealed class ContentManifestService : IContentManifestService
         var items = new List<ContentStoryItem>();
         var seenStoryIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var story in _options.ResolveStories())
+        foreach (var story in options.ResolveStories())
         {
             // Fail-closed PER ITEM: one misconfigured story must not deny
             // the device the stories that ARE valid. sha256 must be 64 hex
@@ -98,9 +102,9 @@ public sealed class ContentManifestService : IContentManifestService
             });
         }
 
-        var music = BuildMusic();
-        var voice = BuildVoice();
-        var games = BuildGames();
+        var music = BuildMusic(options);
+        var voice = BuildVoice(options);
+        var games = BuildGames(options);
         if (items.Count == 0 && music is null && voice is null && games is null)
         {
             return ContentManifestResponse.Empty();
@@ -126,11 +130,11 @@ public sealed class ContentManifestService : IContentManifestService
     /// on parse — a card can be hand-edited — but nothing invalid should ever
     /// reach the wire in the first place.
     /// </para></summary>
-    private IReadOnlyList<ContentGameItem>? BuildGames()
+    private static IReadOnlyList<ContentGameItem>? BuildGames(ContentSyncOptions options)
     {
         var items = new List<ContentGameItem>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var clip in _options.ResolveGames())
+        foreach (var clip in options.ResolveGames())
         {
             if (!IsValidId(clip.GameKey)
                 || !IsValidId(clip.ClipId)
@@ -161,11 +165,11 @@ public sealed class ContentManifestService : IContentManifestService
     /// exactly (drop only the offending clip; dedupe keeps the first; default
     /// URL fill scoped by voiceId). Null when nothing valid is configured, so
     /// the wire stays byte-identical for deployments with no voice clips.</summary>
-    private IReadOnlyList<ContentVoiceItem>? BuildVoice()
+    private static IReadOnlyList<ContentVoiceItem>? BuildVoice(ContentSyncOptions options)
     {
         var items = new List<ContentVoiceItem>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var clip in _options.ResolveVoice())
+        foreach (var clip in options.ResolveVoice())
         {
             if (string.IsNullOrWhiteSpace(clip.VoiceId)
                 || clip.SizeBytes <= 0
@@ -191,11 +195,11 @@ public sealed class ContentManifestService : IContentManifestService
     /// (drop only the offending track; dedupe keeps the first; default URL
     /// fill scoped by trackId). Null when nothing valid is configured, so
     /// the wire stays byte-identical for music-less deployments.</summary>
-    private IReadOnlyList<ContentMusicItem>? BuildMusic()
+    private static IReadOnlyList<ContentMusicItem>? BuildMusic(ContentSyncOptions options)
     {
         var items = new List<ContentMusicItem>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var track in _options.ResolveMusic())
+        foreach (var track in options.ResolveMusic())
         {
             if (string.IsNullOrWhiteSpace(track.TrackId)
                 || track.SizeBytes <= 0

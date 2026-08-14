@@ -849,6 +849,40 @@ public class AuditEvent
     };
 
     /// <summary>
+    /// A superuser-console operator gave a toy an item, or took one away.
+    /// Same <see cref="AuditEventType.InternalConsoleAction"/> envelope as the
+    /// reversible device actions (so no migration and no new parent-facing
+    /// surface), with its own factory because the generic one has nowhere to
+    /// put WHICH item — and an entitlement audit row that cannot name the item
+    /// records nothing worth keeping.
+    /// <para>
+    /// <see cref="ActorParentId"/> null keeps it console-only;
+    /// <see cref="TargetDeviceId"/> is set so the affected toy is queryable.
+    /// The item kind and key are catalogue identifiers, not child data.
+    /// </para>
+    /// </summary>
+    public static AuditEvent InternalConsoleContentOverride(
+        string operatorName, Guid targetDeviceId,
+        string itemKind, string itemKey, bool allowed, string reason) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.InternalConsoleAction,
+        ActorParentId = null,
+        TargetDeviceId = targetDeviceId,
+        TargetChildId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            @operator = operatorName,
+            action = "device_content_override",
+            item_kind = itemKind,
+            item_key = itemKey,
+            value = allowed,
+            reason = reason
+        })
+    };
+
+    /// <summary>
     /// A superuser-console operator reset a parent's password (owner-recovery
     /// path). This is the console's highest-blast-radius mutation — full
     /// account takeover of any parent — so it gets the same DURABLE audit row

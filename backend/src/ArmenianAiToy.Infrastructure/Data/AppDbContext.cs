@@ -22,6 +22,7 @@ public class AppDbContext : DbContext
     public DbSet<StoryReflectionAnswer> StoryReflectionAnswers => Set<StoryReflectionAnswer>();
     public DbSet<StoryRequest> StoryRequests => Set<StoryRequest>();
     public DbSet<DeviceInvite> DeviceInvites => Set<DeviceInvite>();
+    public DbSet<DeviceContentOverride> DeviceContentOverrides => Set<DeviceContentOverride>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -157,6 +158,23 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(i => i.Selector).IsUnique();
             e.HasIndex(i => i.DeviceId);
+        });
+
+        // DeviceContentOverride — per-toy content entitlement exceptions. FK
+        // cascade to Device: an entitlement must not outlive the toy it
+        // describes. The unique (DeviceId, ItemKind, ItemKey) index is what
+        // keeps the resolution rule to one sentence — a device cannot hold a
+        // contradictory allow AND deny for the same item, so there is no
+        // precedence table to get wrong. Mode is a bounded string validated at
+        // the operator endpoint, not an enum (see the entity xmldoc).
+        modelBuilder.Entity<DeviceContentOverride>(e =>
+        {
+            e.HasKey(o => o.Id);
+            e.HasOne(o => o.Device)
+                .WithMany()
+                .HasForeignKey(o => o.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(o => new { o.DeviceId, o.ItemKind, o.ItemKey }).IsUnique();
         });
 
         // DeviceCommand — the OTA-foundation / device command queue. FK cascade

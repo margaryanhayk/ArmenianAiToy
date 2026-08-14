@@ -496,6 +496,13 @@ public static class DependencyInjection
         services.AddSingleton(ContentSyncOptions.Resolve(config));
         services.AddSingleton<IContentManifestService, ContentManifestService>();
 
+        // Per-toy entitlement: the fleet catalogue above narrowed by this
+        // device's DeviceContentOverrides rows. SCOPED because it reads the
+        // database; the baseline stays the singleton. A device with no rows
+        // gets the singleton back by reference, so this costs one indexed
+        // lookup and nothing else on the manifest path.
+        services.AddScoped<IContentCatalogService, ContentCatalogService>();
+
         // First scheduled-delete worker in the repo. Hard-deletes
         // conversations (and their cascaded messages) older than
         // Retention:Messages:MaxAgeDays (default 90). Missing config

@@ -430,15 +430,26 @@ public class DeviceController : ControllerBase
 
     // Cloud→SD content sync: the story-audio set this device should hold on
     // its SD card. Device-authed (middleware) — a revoked device 401s before
-    // reaching here. Static config for every device today (N stories, in
-    // configured order); per-device/per-tier entitlement is a later slice on
-    // the same contract.
+    // reaching here.
+    //
+    // Per-toy entitlement joins the eight per-device booleans already stamped
+    // in the `with` block below: the catalogue service narrows the fleet item
+    // set to this device's, and the manifest is built from THAT. The
+    // device-facing contract is unchanged and no firmware change is needed —
+    // a withheld story is simply absent from the list, which is a state the
+    // toy already handles (that is what carry-forward and eviction are for).
+    //
+    // `catalog` is optional so the many controller tests that exercise the
+    // per-device BOOLEAN stamping keep compiling; the real container always
+    // supplies it (pinned by
+    // DeviceContentEntitlementTests.DependencyInjection_RegistersContentCatalogService).
     [HttpGet("content-manifest")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     public async Task<IActionResult> GetContentManifest(
         [FromServices] IContentManifestService manifest,
-        [FromServices] IChildService childService)
+        [FromServices] IChildService childService,
+        [FromServices] IContentCatalogService? catalog = null)
     {
         // B3 — stamp this device's spoken-story-intro flag onto the static
         // manifest. Additive field: pre-B3 firmware ignores it; new firmware
@@ -459,7 +470,11 @@ public class DeviceController : ControllerBase
         var defaultChild = await childService.GetDefaultChildForDeviceAsync(deviceId);
         var childId = defaultChild?.Id;
 
-        return Ok(manifest.Build() with
+        var perDevice = catalog is null
+            ? manifest.Build()
+            : manifest.Build(await catalog.ResolveForDeviceAsync(deviceId, HttpContext.RequestAborted));
+
+        return Ok(perDevice with
         {
             StoryIntroEnabled = device?.StoryIntroEnabled ?? true,
             // The two story-shaping toggles ride the same manifest, with the
@@ -493,6 +508,13 @@ public class DeviceController : ControllerBase
     // than one, because guessing which story the device meant is worse than
     // refusing. storyId is ONLY a lookup key against configured items; it
     // never reaches the filesystem, so it carries no traversal risk.
+    //
+    // Deliberately still the FLEET options, not the per-device catalogue. A
+    // toy only ever asks for what its own manifest advertised, so withholding
+    // at the manifest is what decides what lands on a card. This endpoint has
+    // to move to the per-device catalogue when uploaded content lands — an
+    // uploaded story lives outside AudioRoot and would 404 here — and that is
+    // the slice that changes it.
     [HttpGet("content-file")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]

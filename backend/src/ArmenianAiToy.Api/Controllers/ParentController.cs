@@ -1069,7 +1069,8 @@ public class ParentController : ControllerBase
     public async Task<IActionResult> GetStoryLibrary(
         [FromServices] ICuratedStoryLibrary library,
         [FromServices] IContentManifestService manifest,
-        [FromQuery] Guid? deviceId = null)
+        [FromQuery] Guid? deviceId = null,
+        [FromServices] IContentCatalogService? catalog = null)
     {
         // deviceId scopes the listen counts to one toy (the library is
         // opened from inside a toy). Unowned/unknown ids simply yield zero
@@ -1078,16 +1079,36 @@ public class ParentController : ControllerBase
         var totals = (await _parentService.GetStoryPlayTotalsForParentAsync(parentId, deviceId))
             .ToDictionary(t => t.StoryId, StringComparer.OrdinalIgnoreCase);
 
+        // The library a parent opens FROM a toy must be that toy's library.
+        // Listing a story their toy has been denied is a promise the product
+        // cannot keep — they would press ▶ on a card for a story the child can
+        // never ask for. The device-scoped build only happens for a device
+        // this parent actually holds: an unowned id keeps the fleet view, so
+        // this cannot become a way to read another family's entitlement.
+        var fleet = manifest.Build();
+        var scoped = fleet;
+        if (catalog is not null && deviceId is Guid id
+            && (await _parentService.GetLinkedDeviceIdsAsync(parentId)).Contains(id))
+        {
+            scoped = manifest.Build(await catalog.ResolveForDeviceAsync(id, HttpContext.RequestAborted));
+        }
+
         // Alternate-ending entries are filtered out: they are the tail of a
         // story, not a story, and have no curated metadata of their own — a
         // parent browsing the library would see a card with a blank title and
         // no author. The variant is surfaced (when it becomes worth
         // surfacing) as a property of its base story, never as a sibling.
-        var shipped = manifest.Build().Stories
+        var shipped = scoped.Stories
             .Where(s => string.IsNullOrEmpty(s.AltOf))
             .ToList();
         List<StoryLibraryItemDto> items;
-        if (shipped.Count > 0)
+        // The curated fallback below is for a deployment with content sync
+        // OFF (dev / bench), and the test is deliberately the FLEET manifest,
+        // not the scoped one: a toy denied every story must show an empty
+        // shelf, not the whole catalogue. Reading the scoped list here would
+        // turn the strictest possible entitlement into the loosest possible
+        // library — the exact inversion that makes a feature untrustworthy.
+        if (fleet.Stories.Count > 0)
         {
             items = shipped.Select(item =>
             {

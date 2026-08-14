@@ -39,6 +39,12 @@ public class ParentServiceGetLinkedDeviceDetailsTests
             modelBuilder.Entity<Conversation>().Ignore(c => c.Device);
             modelBuilder.Entity<Conversation>().Ignore(c => c.Child);
             modelBuilder.Entity<Conversation>().Ignore(c => c.Messages);
+
+            // Per-toy content entitlement. The devices list resolves each
+            // toy's OWN advertised story set, so this set has to exist on the
+            // model even for the tests that never write a row.
+            modelBuilder.Entity<DeviceContentOverride>().HasKey(o => o.Id);
+            modelBuilder.Entity<DeviceContentOverride>().Ignore(o => o.Device);
         }
     }
 
