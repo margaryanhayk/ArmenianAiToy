@@ -1085,7 +1085,13 @@ public class ParentController : ControllerBase
         // never ask for. The device-scoped build only happens for a device
         // this parent actually holds: an unowned id keeps the fleet view, so
         // this cannot become a way to read another family's entitlement.
-        var fleet = manifest.Build();
+        // The fleet view now includes stories the owner uploaded and released,
+        // which live on the volume rather than in the image — read from the
+        // config singleton it would list only what shipped in this build, and a
+        // released story would be invisible to every parent.
+        var fleet = catalog is null
+            ? manifest.Build()
+            : manifest.Build(await catalog.ResolveFleetAsync(HttpContext.RequestAborted));
         var scoped = fleet;
         if (catalog is not null && deviceId is Guid id
             && (await _parentService.GetLinkedDeviceIdsAsync(parentId)).Contains(id))
@@ -1183,11 +1189,21 @@ public class ParentController : ControllerBase
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
-    public IActionResult GetStoryPreviewAudio(
+    public async Task<IActionResult> GetStoryPreviewAudio(
         string storyId,
-        [FromServices] ContentSyncOptions contentSync,
-        [FromServices] ILogger<ParentController> logger)
+        [FromServices] ContentSyncOptions fleetOptions,
+        [FromServices] ILogger<ParentController> logger,
+        [FromServices] IContentCatalogService? catalog = null)
     {
+        // The FLEET catalogue, not the config singleton: a story the owner
+        // uploaded lives on the volume, so previewing one would 404 here while
+        // the library card beside it offered a ▶ button. No device is in hand,
+        // so no per-toy entitlement applies — this is the released catalogue,
+        // which is exactly what the library lists.
+        var contentSync = catalog is null
+            ? fleetOptions
+            : await catalog.ResolveFleetAsync(HttpContext.RequestAborted);
+
         if (!contentSync.Enabled || string.IsNullOrWhiteSpace(storyId))
             return NotFound(new { error = "Audio not available." });
 

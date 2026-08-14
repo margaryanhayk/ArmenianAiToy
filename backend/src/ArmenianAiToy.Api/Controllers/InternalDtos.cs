@@ -239,7 +239,61 @@ public sealed record AdminDeviceContentItemDto(
     bool Allowed,
     string? OverrideMode,
     string? OverrideReason,
-    DateTime? OverrideAt);
+    DateTime? OverrideAt,
+    // Source: `catalogue` (shipped in the image) or `uploaded` (added from this
+    // console). Trailing and defaulted so the Stage-3 rows are unaffected.
+    string Source = "catalogue",
+    // FleetDefault: whether the FLEET default sends this item. False marks a
+    // fleet-dark upload — one that reaches this toy only because an operator
+    // granted it. Without it the console cannot tell "everyone gets this and
+    // nobody touched it" from "only this toy has it", and those are the two
+    // halves of a staged rollout.
+    bool FleetDefault = true,
+    // Retired: the item is in no manifest at all, whatever any override says.
+    // It is listed rather than hidden because an operator's own grant must
+    // never become invisible — but `Allowed` is false for it, because retiring
+    // an item is documented as removing it from every manifest and a console
+    // that then reported "sent: yes" would be contradicting the product.
+    bool Retired = false);
+
+/// <summary>
+/// One row of the console's CATALOGUE list — an owner-uploaded item, fleet-wide
+/// rather than per-toy.
+/// <para>
+/// Carries no <c>RelativePath</c> and no absolute path: a server filesystem
+/// path is internal, the same rule the parent export and every device DTO
+/// follow. <see cref="FileOnDisk"/> is the honest substitute — it answers "the
+/// row says this exists; does it?", which is the question an operator has after
+/// a volume is remounted or a backup is restored.
+/// </para>
+/// </summary>
+public sealed record AdminContentItemDto(
+    Guid Id,
+    string Kind,
+    string ItemKey,
+    string Title,
+    int Version,
+    string Sha256,
+    long SizeBytes,
+    bool DefaultEnabled,
+    DateTime? RetiredAt,
+    string CreatedBy,
+    DateTime CreatedAt,
+    bool FileOnDisk,
+    // How many toys were explicitly sent this item. The middle step of the
+    // whole workflow — "send it to ONE toy, listen, then release" — had no
+    // readout at all without it: granting a story changed nothing visible, so
+    // "uploaded and on nobody's toy" and "uploaded and on the bench toy" were
+    // the same screen.
+    int GrantedDeviceCount = 0);
+
+/// <summary>
+/// Release an uploaded item to the fleet (<c>Value = true</c>) or pull it back
+/// to fleet-dark (<c>Value = false</c>); or retire it (<c>Value = true</c>) and
+/// un-retire it (<c>Value = false</c>). Same <c>{ value, reason }</c> shape as
+/// every other console action so the console reuses one reason-prompt.
+/// </summary>
+public sealed record InternalContentItemActionRequest(bool Value, string? Reason);
 
 /// <summary>Slice F — operator moves a story request through its
 /// lifecycle. Bounded status vocabulary validated at the action.</summary>

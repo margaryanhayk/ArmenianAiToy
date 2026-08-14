@@ -1,8 +1,10 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Infrastructure.Data;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -70,6 +72,11 @@ public sealed class DatabaseBackupService : BackgroundService
     /// sidecars.</summary>
     public const string FilePrefix = "areg-backup-";
 
+    /// <summary>Uploaded-content archive prefix. Separate namespace from
+    /// <see cref="FilePrefix"/> so each prune pass only ever matches its own
+    /// files — the rule that keeps a prune from touching the live DB.</summary>
+    public const string UploadsFilePrefix = "areg-uploads-";
+
     private static readonly TimeSpan InitialDelay = TimeSpan.FromMinutes(1);
 
     private readonly IServiceScopeFactory _scopeFactory;
@@ -131,7 +138,8 @@ public sealed class DatabaseBackupService : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        if (!SqliteDatabaseSnapshot.IsSqliteFileDatabase(db, out var dbPath) || dbPath is null)
+        var dir = ResolveBackupDirectory(db);
+        if (dir is null)
         {
             if (!_loggedNotSqlite)
             {
@@ -141,13 +149,42 @@ public sealed class DatabaseBackupService : BackgroundService
             }
             return;
         }
-
-        var dir = _config["Backup:Database:DirectoryPath"];
-        if (string.IsNullOrWhiteSpace(dir))
-        {
-            dir = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(dbPath)) ?? ".", "backups");
-        }
         Directory.CreateDirectory(dir);
+
+        await BackupDatabaseAsync(db, dir, ct);
+
+        // Runs on EVERY tick, including the one where today's DB snapshot
+        // already existed and the pass above returned early. Uploaded content
+        // is the ONLY thing in this product that cannot be regenerated from
+        // git — a story the owner recorded and uploaded exists nowhere else —
+        // so skipping it because the database happened to be current would
+        // defeat the reason it is backed up at all.
+        BackupUploads(dir);
+    }
+
+    /// <summary>Where snapshots go: the configured directory, else
+    /// <c>backups/</c> beside the live DB. Null when neither is available
+    /// (a non-file provider with no configured directory — test hosts).</summary>
+    private string? ResolveBackupDirectory(AppDbContext db)
+    {
+        var configured = _config["Backup:Database:DirectoryPath"];
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured;
+        }
+        if (!SqliteDatabaseSnapshot.IsSqliteFileDatabase(db, out var dbPath) || dbPath is null)
+        {
+            return null;
+        }
+        return Path.Combine(Path.GetDirectoryName(Path.GetFullPath(dbPath)) ?? ".", "backups");
+    }
+
+    private async Task BackupDatabaseAsync(AppDbContext db, string dir, CancellationToken ct)
+    {
+        if (!SqliteDatabaseSnapshot.IsSqliteFileDatabase(db, out var dbPath) || dbPath is null)
+        {
+            return;
+        }
 
         // One snapshot per UTC day; an existing file makes the tick a
         // no-op so restarts don't churn.
@@ -156,7 +193,7 @@ public sealed class DatabaseBackupService : BackgroundService
         if (File.Exists(finalPath))
         {
             _logger.LogDebug("Database backup for today already exists at {Path}", finalPath);
-            Prune(dir);
+            Prune(dir, FilePrefix, "*.db");
             return;
         }
 
@@ -174,18 +211,82 @@ public sealed class DatabaseBackupService : BackgroundService
         _logger.LogInformation(
             "Database backup written: {Path} ({SizeBytes} bytes)", finalPath, sizeBytes);
 
-        Prune(dir);
+        Prune(dir, FilePrefix, "*.db");
+    }
+
+    /// <summary>
+    /// Archives <c>ContentSync:UploadRoot</c> — the stories the owner uploaded
+    /// from the console — beside the database snapshot, on the same
+    /// one-per-UTC-day, write-a-.part-then-move, keep-the-newest-N idiom.
+    ///
+    /// <para>
+    /// It exists because the catalogue row and its audio are useless apart: a
+    /// restored database that names a story whose MP3 is gone advertises a
+    /// download every toy in the fleet will fail. Both halves have to survive
+    /// the same event.
+    /// </para>
+    ///
+    /// <para>
+    /// A zip rather than a file copy so one artifact is one day, and so pruning
+    /// is the same one-file-per-day arithmetic as the DB. Skipped entirely when
+    /// no upload root is configured or the directory is empty — a deployment
+    /// that has never uploaded anything writes nothing. Failures are logged and
+    /// swallowed: this must never take the API down, and it must never prevent
+    /// the database snapshot, which is why it runs last.
+    /// </para>
+    /// </summary>
+    private void BackupUploads(string dir)
+    {
+        try
+        {
+            if (!ContentItemOverlay.TryResolveRoot(_config["ContentSync:UploadRoot"], out var root)
+                || !Directory.Exists(root)
+                || !Directory.EnumerateFileSystemEntries(root).Any())
+            {
+                return;
+            }
+
+            var finalPath = Path.Combine(dir, $"{UploadsFilePrefix}{DateTime.UtcNow:yyyyMMdd}.zip");
+            if (File.Exists(finalPath))
+            {
+                _logger.LogDebug("Uploaded-content backup for today already exists at {Path}", finalPath);
+                Prune(dir, UploadsFilePrefix, "*.zip");
+                return;
+            }
+
+            var partPath = finalPath + ".part";
+            if (File.Exists(partPath)) File.Delete(partPath);
+
+            // The archive is written OUTSIDE the directory being archived
+            // whenever the operator has kept them apart; when they are nested,
+            // the .part suffix keeps this run's own output from being swept
+            // into the zip it is still writing.
+            ZipFile.CreateFromDirectory(root, partPath, CompressionLevel.Fastest, false);
+            File.Move(partPath, finalPath);
+
+            _logger.LogInformation(
+                "Uploaded-content backup written: {Path} ({SizeBytes} bytes)",
+                finalPath, new FileInfo(finalPath).Length);
+
+            Prune(dir, UploadsFilePrefix, "*.zip");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Uploaded-content backup failed; the database snapshot is unaffected");
+        }
     }
 
     /// <summary>Keep the newest KeepCount snapshots (date-stamped names
     /// sort chronologically); delete the rest. Only files matching the
-    /// backup pattern are ever considered.</summary>
-    private void Prune(string dir)
+    /// given prefix AND extension are ever considered, so each family prunes
+    /// itself and neither can reach the live DB or its WAL sidecars.</summary>
+    private void Prune(string dir, string prefix, string extensionPattern)
     {
         var keep = ReadInt("Backup:Database:KeepCount", DefaultKeepCount);
         keep = Math.Clamp(keep, MinKeepCount, MaxKeepCount);
 
-        var stale = Directory.GetFiles(dir, FilePrefix + "*.db")
+        var stale = Directory.GetFiles(dir, prefix + extensionPattern)
             .OrderByDescending(f => Path.GetFileName(f), StringComparer.Ordinal)
             .Skip(keep)
             .ToList();

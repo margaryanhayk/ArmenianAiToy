@@ -173,6 +173,131 @@ public class DatabaseBackupServiceTests : IDisposable
 
         await service.RunTickAsync(CancellationToken.None); // must not throw
     }
+
+    // ── Uploaded content is archived beside the database ────────────
+    // The catalogue row and its audio are useless apart: a restored database
+    // that names a story whose MP3 is gone advertises a download every toy in
+    // the fleet will fail. An uploaded story is also the ONE thing in this
+    // product that cannot be regenerated from git.
+
+    private string SeedUploadRoot(params string[] fileNames)
+    {
+        var uploads = Path.Combine(_root, "content-uploads");
+        Directory.CreateDirectory(uploads);
+        foreach (var name in fileNames)
+        {
+            File.WriteAllBytes(Path.Combine(uploads, name), new byte[] { 0x49, 0x44, 0x33, 0x04 });
+        }
+        return uploads;
+    }
+
+    [Fact]
+    public async Task Tick_ArchivesTheUploadRoot_BesideTheDatabaseSnapshot()
+    {
+        var uploads = SeedUploadRoot("nor-heqiat-v1.mp3", "nor-heqiat-v2.mp3");
+        var backupDir = Path.Combine(_root, "backups");
+        var (service, _, provider) = MakeHarness(new Dictionary<string, string?>
+        {
+            ["Backup:Database:DirectoryPath"] = backupDir,
+            ["ContentSync:UploadRoot"] = uploads,
+        });
+        using (provider)
+        {
+            await service.RunTickAsync(CancellationToken.None);
+        }
+
+        var archive = Assert.Single(Directory.GetFiles(backupDir, "areg-uploads-*.zip"));
+        Assert.False(File.Exists(archive + ".part"));
+
+        using var zip = System.IO.Compression.ZipFile.OpenRead(archive);
+        Assert.Equal(
+            new[] { "nor-heqiat-v1.mp3", "nor-heqiat-v2.mp3" },
+            zip.Entries.Select(e => e.FullName).OrderBy(n => n, StringComparer.Ordinal).ToArray());
+    }
+
+    [Fact]
+    public async Task Tick_ArchivesUploads_EvenWhenTodaysDatabaseSnapshotAlreadyExists()
+    {
+        // The DB pass returns early on a same-day snapshot. Letting that skip
+        // the uploads archive would mean a restart on any day after the first
+        // silently stops backing up the only content that cannot be
+        // regenerated.
+        var uploads = SeedUploadRoot("nor-heqiat-v1.mp3");
+        var backupDir = Path.Combine(_root, "backups");
+        var config = new Dictionary<string, string?>
+        {
+            ["Backup:Database:DirectoryPath"] = backupDir,
+            ["ContentSync:UploadRoot"] = uploads,
+        };
+
+        var (first, _, p1) = MakeHarness(config);
+        using (p1) { await first.RunTickAsync(CancellationToken.None); }
+
+        // Second tick, same UTC day, with the archive removed but the DB
+        // snapshot left in place.
+        File.Delete(Directory.GetFiles(backupDir, "areg-uploads-*.zip").Single());
+        Assert.Single(Directory.GetFiles(backupDir, "areg-backup-*.db"));
+
+        var (second, _, p2) = MakeHarness(config);
+        using (p2) { await second.RunTickAsync(CancellationToken.None); }
+
+        Assert.Single(Directory.GetFiles(backupDir, "areg-uploads-*.zip"));
+    }
+
+    [Fact]
+    public async Task Tick_WithNoUploadRootConfigured_WritesNoArchive()
+    {
+        var backupDir = Path.Combine(_root, "backups");
+        var (service, _, provider) = MakeHarness(new Dictionary<string, string?>
+        {
+            ["Backup:Database:DirectoryPath"] = backupDir,
+        });
+        using (provider)
+        {
+            await service.RunTickAsync(CancellationToken.None);
+        }
+
+        Assert.Single(Directory.GetFiles(backupDir, "areg-backup-*.db"));
+        Assert.Empty(Directory.GetFiles(backupDir, "areg-uploads-*.zip"));
+    }
+
+    [Fact]
+    public async Task UploadsPrune_KeepsTheNewest_AndTouchesNothingElse()
+    {
+        var uploads = SeedUploadRoot("nor-heqiat-v1.mp3");
+        var backupDir = Path.Combine(_root, "backups");
+        Directory.CreateDirectory(backupDir);
+
+        // Three older archives, plus two files each prune pass must leave
+        // alone — the other family's snapshot and an unrelated name.
+        foreach (var day in new[] { "20260101", "20260102", "20260103" })
+        {
+            File.WriteAllText(Path.Combine(backupDir, $"areg-uploads-{day}.zip"), "x");
+        }
+        File.WriteAllText(Path.Combine(backupDir, "areg-backup-20260101.db"), "x");
+        File.WriteAllText(Path.Combine(backupDir, "something-else.zip"), "x");
+
+        var (service, _, provider) = MakeHarness(new Dictionary<string, string?>
+        {
+            ["Backup:Database:DirectoryPath"] = backupDir,
+            ["ContentSync:UploadRoot"] = uploads,
+            ["Backup:Database:KeepCount"] = "2",
+        });
+        using (provider)
+        {
+            await service.RunTickAsync(CancellationToken.None);
+        }
+
+        var archives = Directory.GetFiles(backupDir, "areg-uploads-*.zip")
+            .Select(Path.GetFileName).OrderBy(n => n, StringComparer.Ordinal).ToArray();
+        Assert.Equal(2, archives.Length);
+        // Today's is newest, so it survives with exactly one older one.
+        Assert.Contains($"areg-uploads-{DateTime.UtcNow:yyyyMMdd}.zip", archives);
+        Assert.Contains("areg-uploads-20260103.zip", archives);
+
+        Assert.True(File.Exists(Path.Combine(backupDir, "something-else.zip")));
+        Assert.NotEmpty(Directory.GetFiles(backupDir, "areg-backup-*.db"));
+    }
 }
 
 public class InternalControllerBackupTests : IDisposable

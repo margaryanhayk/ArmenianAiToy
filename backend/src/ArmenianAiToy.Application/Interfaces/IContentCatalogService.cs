@@ -23,4 +23,18 @@ public interface IContentCatalogService
 {
     Task<ContentSyncOptions> ResolveForDeviceAsync(
         Guid deviceId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The FLEET catalogue: config plus every uploaded item that has been
+    /// released to the fleet. No device, so no <c>deny</c> rows are applied and
+    /// no fleet-dark item is included.
+    ///
+    /// <para>
+    /// This is what a surface with no toy in hand must read — the parent's
+    /// story-audio preview, and the parent library's "no shipped stories, show
+    /// the whole curated catalogue" fallback. Reading the fleet SINGLETON there
+    /// instead would silently exclude everything the owner has uploaded.
+    /// </para>
+    /// </summary>
+    Task<ContentSyncOptions> ResolveFleetAsync(CancellationToken ct = default);
 }

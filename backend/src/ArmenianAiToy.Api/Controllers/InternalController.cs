@@ -709,20 +709,30 @@ public class InternalController : ControllerBase
             .Where(o => o.DeviceId == deviceId)
             .ToListAsync(ct);
         var byKey = rows.ToDictionary(
-            o => $"{DeviceContentEntitlement.NormalizeKind(o.ItemKind)} {DeviceContentEntitlement.NormalizeKey(o.ItemKey)}",
+            o => $"{DeviceContentEntitlement.NormalizeKind(o.ItemKind)}|{DeviceContentEntitlement.NormalizeKey(o.ItemKey)}",
             o => o,
             StringComparer.OrdinalIgnoreCase);
 
-        AdminDeviceContentItemDto Row(string kind, string key, string? title, int? version)
+        // fleetDefault=false is a FLEET-DARK uploaded item: absent from every
+        // toy's manifest unless an operator granted it. For those an allow row
+        // is the only thing that makes `allowed` true — the inverse of a
+        // catalogue item, where only a deny row makes it false. Getting this
+        // backwards would show a newly-uploaded story as "sent: yes" on every
+        // toy in the fleet while no toy had actually been offered it.
+        AdminDeviceContentItemDto Row(
+            string kind, string key, string? title, int? version,
+            string source = "catalogue", bool fleetDefault = true, bool retired = false)
         {
-            byKey.TryGetValue($"{kind} {DeviceContentEntitlement.NormalizeKey(key)}", out var ov);
-            var denied = ov is not null && string.Equals(
-                DeviceContentEntitlement.NormalizeMode(ov.Mode),
-                DeviceContentEntitlement.ModeDeny, StringComparison.Ordinal);
+            byKey.TryGetValue($"{kind}|{DeviceContentEntitlement.NormalizeKey(key)}", out var ov);
+            var mode = ov is null ? null : DeviceContentEntitlement.NormalizeMode(ov.Mode);
+            // Retirement beats both routes an item can reach a toy by, because
+            // that is exactly what it does to the manifest.
+            var allowed = !retired && (fleetDefault
+                ? !string.Equals(mode, DeviceContentEntitlement.ModeDeny, StringComparison.Ordinal)
+                : string.Equals(mode, DeviceContentEntitlement.ModeAllow, StringComparison.Ordinal));
             return new AdminDeviceContentItemDto(
-                kind, key, title, version, !denied,
-                ov is null ? null : DeviceContentEntitlement.NormalizeMode(ov.Mode),
-                ov?.Reason, ov?.CreatedAt);
+                kind, key, title, version, allowed,
+                mode, ov?.Reason, ov?.CreatedAt, source, fleetDefault, retired);
         }
 
         // Stories are listed in full because withholding a STORY is the thing
@@ -737,6 +747,22 @@ public class InternalController : ControllerBase
                 string.IsNullOrWhiteSpace(s.Title) ? null : s.Title,
                 s.Version < 1 ? 1 : s.Version))
             .ToList();
+
+        // Uploaded items join the same list. A fleet-dark one MUST appear here
+        // or "send this new story to the bench toy first" has no button: the
+        // grant is written against this row, and a row nobody can see is a
+        // feature nobody can use. A RETIRED one is listed too — an operator's
+        // own grant must never become invisible — but Row() reports it as not
+        // sent, because retirement removes it from the manifest whatever the
+        // grant says.
+        var uploaded = await _db.ContentItems.AsNoTracking()
+            .OrderBy(i => i.ItemKey)
+            .ToListAsync(ct);
+        items.AddRange(uploaded.Select(u => Row(
+            DeviceContentEntitlement.NormalizeKind(u.Kind),
+            DeviceContentEntitlement.NormalizeKey(u.ItemKey),
+            string.IsNullOrWhiteSpace(u.Title) ? null : u.Title,
+            u.Version, "uploaded", u.DefaultEnabled, u.RetiredAt is not null)));
 
         var listedStoryKeys = items
             .Select(i => DeviceContentEntitlement.NormalizeKey(i.ItemKey))
@@ -846,6 +872,369 @@ public class InternalController : ControllerBase
             value = req.Value,
             changed,
         });
+    }
+
+    // ── Catalogue: the owner adds and removes content himself ──────
+    // No git, no ffmpeg, no deploy, no developer. Upload an MP3, give it a
+    // title, send it to one toy, then release it to the fleet.
+    //
+    // Every mutation follows the Phase 3 operator discipline exactly: a reason
+    // is required (400 without), 404 on an unknown item, an idempotent no-op
+    // writes no audit row and saves nothing, the audit row lands in the SAME
+    // SaveChanges as the mutation, and one loud structured log line.
+
+    /// <summary>Largest audio file the console will accept. Comfortably above
+    /// the longest story in the library (~5 MB at 192 kbps) and far below
+    /// anything that would be a memory problem — the upload is streamed to
+    /// disk, never buffered.</summary>
+    private const long MaxContentUploadBytes = 64L * 1024 * 1024;
+
+    /// <summary>
+    /// The whole uploaded catalogue, newest first — including fleet-dark and
+    /// retired rows, because the operator's questions are "what did I upload"
+    /// and "what did I take away", and a list that hides either cannot answer
+    /// them.
+    /// <para>
+    /// Not access-audited, on the same rule as the other aggregate console
+    /// reads: this is catalogue configuration, not a line of any child's
+    /// transcript.
+    /// </para>
+    /// </summary>
+    [HttpGet("content")]
+    public async Task<IActionResult> GetContentItems(CancellationToken ct)
+    {
+        var rows = await _db.ContentItems.AsNoTracking()
+            .OrderByDescending(i => i.CreatedAt)
+            .ToListAsync(ct);
+
+        var uploadRoot = ContentSyncOptions.Resolve(_config).UploadRoot;
+
+        // One grouped query for the whole page rather than one per item — the
+        // same rule the device-list surfaces follow.
+        var grants = await _db.Set<DeviceContentOverride>().AsNoTracking()
+            .Where(o => o.Mode == DeviceContentEntitlement.ModeAllow)
+            .GroupBy(o => new { o.ItemKind, o.ItemKey })
+            .Select(g => new { g.Key.ItemKind, g.Key.ItemKey, Count = g.Count() })
+            .ToListAsync(ct);
+        var grantCounts = grants.ToDictionary(
+            g => DeviceContentEntitlement.NormalizeKind(g.ItemKind)
+                 + "|" + DeviceContentEntitlement.NormalizeKey(g.ItemKey),
+            g => g.Count,
+            StringComparer.OrdinalIgnoreCase);
+
+        var items = rows.Select(i => new AdminContentItemDto(
+            i.Id, i.Kind, i.ItemKey, i.Title, i.Version, i.Sha256, i.SizeBytes,
+            i.DefaultEnabled, i.RetiredAt, i.CreatedBy, i.CreatedAt,
+            // Derived, never stored: a stored "yes it exists" would be a claim
+            // about a volume that may since have been remounted or restored
+            // from a backup that did not carry the audio.
+            ContentItemOverlay.TryResolveUploadPath(uploadRoot, i.RelativePath, out var abs)
+                && System.IO.File.Exists(abs),
+            grantCounts.GetValueOrDefault(
+                DeviceContentEntitlement.NormalizeKind(i.Kind)
+                + "|" + DeviceContentEntitlement.NormalizeKey(i.ItemKey))));
+
+        return Ok(new { uploadRootConfigured = !string.IsNullOrWhiteSpace(uploadRoot), items });
+    }
+
+    /// <summary>
+    /// Upload a story: an MP3, a title, and a reason. The row lands
+    /// <c>DefaultEnabled=false</c> — FLEET-DARK — so nothing reaches a child
+    /// until the operator has sent it to one toy, heard it, and released it.
+    ///
+    /// <para>
+    /// <b>The SERVER computes the sha256 and the size.</b> That single fact is
+    /// what retires the hand-run <c>Ship-StoryAudio.ps1</c> ritual and the
+    /// hand-added placeholder config row — the two steps this repo has already
+    /// got wrong in the field, once by shipping bytes described by a stale
+    /// manifest and once by bumping no version so no toy re-downloaded.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>The filename is generated here</b> (<c>&lt;itemKey&gt;-v&lt;N&gt;.mp3</c>),
+    /// never taken from the upload. An uploaded filename is attacker- (or
+    /// typo-) controlled text, and the invariant the whole content contract
+    /// rests on is that a content id is a lookup key that never reaches the
+    /// filesystem.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Re-uploading the same key bumps the version</b> and writes a new
+    /// file. The old file is left where it is: a toy mid-download of v3 must
+    /// not have it pulled out from under it, and carry-forward keeps the old
+    /// copy playable until a sweep reclaims it.
+    /// </para>
+    /// </summary>
+    [HttpPost("content/stories")]
+    [RequestSizeLimit(MaxContentUploadBytes + (4L * 1024 * 1024))]
+    public async Task<IActionResult> UploadStoryContent(
+        [FromForm] string? itemKey,
+        [FromForm] string? title,
+        [FromForm] string? reason,
+        IFormFile? audio,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            return BadRequest(new { error = "A reason is required for operator actions." });
+
+        var key = DeviceContentEntitlement.NormalizeKey(itemKey);
+        if (!DeviceContentEntitlement.IsValidItemKey(DeviceContentEntitlement.KindStory, key))
+            return BadRequest(new
+            {
+                error = "itemKey must be a story id: lowercase letters, digits, - and _, up to 48 characters."
+            });
+
+        var storyTitle = (title ?? string.Empty).Trim();
+        if (storyTitle.Length is 0 or > 200)
+            return BadRequest(new { error = "A title of 1 to 200 characters is required." });
+
+        if (audio is null || audio.Length <= 0)
+            return BadRequest(new { error = "An audio file is required." });
+        if (audio.Length > MaxContentUploadBytes)
+            return BadRequest(new
+            {
+                error = $"Audio must be under {MaxContentUploadBytes / (1024 * 1024)} MB."
+            });
+
+        var options = ContentSyncOptions.Resolve(_config);
+        if (!ContentItemOverlay.TryResolveRoot(options.UploadRoot, out var root))
+        {
+            // Fail closed and say so plainly. Writing into the image instead
+            // would put operator content inside the git-tracked catalogue, and
+            // the next redeploy would silently delete it.
+            _logger.LogError(
+                "Content upload refused: ContentSync:UploadRoot is not configured, so there is nowhere durable to write.");
+            return StatusCode(503, new
+            {
+                error = "Uploads are not configured on this deployment (ContentSync:UploadRoot is unset)."
+            });
+        }
+
+        // A key that collides with a shipped story would be dropped by the
+        // manifest's keep-the-first dedupe and the upload would look like it
+        // worked forever. Refuse it here instead of storing a row that can
+        // never do anything.
+        if (options.ResolveStories().Any(s =>
+                string.Equals(s.StoryId?.Trim(), key, StringComparison.OrdinalIgnoreCase)))
+        {
+            return BadRequest(new
+            {
+                error = $"\"{key}\" is already a story shipped in this build. Choose a different id."
+            });
+        }
+
+        var existing = await _db.ContentItems.FirstOrDefaultAsync(
+            i => i.Kind == DeviceContentEntitlement.KindStory && i.ItemKey == key, ct);
+        var version = existing is null ? 1 : existing.Version + 1;
+
+        var fileName = $"{key}-v{version}.mp3";
+        // Belt and braces over the id allowlist: the ONE place a value that
+        // came off a wire becomes a path, re-checked against the same
+        // containment rule the read path uses.
+        if (!ContentItemOverlay.TryResolveUploadPath(options.UploadRoot, fileName, out var finalPath))
+            return BadRequest(new { error = "That id cannot be stored." });
+
+        string sha256;
+        long sizeBytes;
+        var partPath = finalPath + ".part";
+        try
+        {
+            Directory.CreateDirectory(root);
+            (sha256, sizeBytes) = await WriteAndHashAsync(audio, partPath, ct);
+        }
+        catch (InvalidDataException)
+        {
+            // Not an MP3. A caller error, not a server one — and caught here
+            // rather than swept into the 503 below, because "the file you
+            // picked is wrong" and "this deployment cannot store files" are
+            // different problems with different fixes.
+            TryDeleteFile(partPath);
+            return BadRequest(new { error = "That file is not an MP3." });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            TryDeleteFile(partPath);
+            _logger.LogError(ex, "Content upload failed while writing {FileName}", fileName);
+            return StatusCode(503, new { error = "Could not store the upload. Nothing was changed." });
+        }
+
+        // The file is written and verified BEFORE the row is committed. The
+        // other order would leave a manifest advertising a story that is not on
+        // disk, which every toy in the fleet would report as download_failed —
+        // the exact failure this slice exists to make impossible.
+        System.IO.File.Move(partPath, finalPath, overwrite: true);
+
+        var op = HttpContext?.Items["InternalOperator"] as string ?? "unknown";
+        var trimmedReason = reason.Trim();
+        if (existing is null)
+        {
+            existing = new ContentItem
+            {
+                Id = Guid.NewGuid(),
+                Kind = DeviceContentEntitlement.KindStory,
+                ItemKey = key,
+                // Fleet-dark on arrival. Nothing an owner uploads reaches a
+                // child's toy until he has heard it on one toy and said so.
+                DefaultEnabled = false,
+            };
+            _db.ContentItems.Add(existing);
+        }
+        existing.Title = storyTitle;
+        existing.Version = version;
+        existing.RelativePath = fileName;
+        existing.Sha256 = sha256;
+        existing.SizeBytes = sizeBytes;
+        // A re-upload of a retired item brings it back: the operator just
+        // supplied new audio for it, which is not something to do to a story
+        // meant to stay gone.
+        existing.RetiredAt = null;
+        existing.CreatedBy = op;
+        existing.CreatedAt = DateTime.UtcNow;
+
+        _db.AuditEvents.Add(AuditEvent.InternalConsoleContentItem(
+            op, "content_story_uploaded", existing.Kind, key, version, trimmedReason));
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogWarning(
+            "Operator {Operator} uploaded story {ItemKey} v{Version} ({SizeBytes} bytes, sha {Sha}): {Reason}",
+            op, key, version, sizeBytes, sha256, trimmedReason);
+
+        return Ok(new
+        {
+            id = existing.Id,
+            itemKey = key,
+            title = storyTitle,
+            version,
+            sha256,
+            sizeBytes,
+            defaultEnabled = existing.DefaultEnabled,
+        });
+    }
+
+    /// <summary>
+    /// Release an uploaded item to the whole fleet (<c>value: true</c>), or
+    /// pull it back to fleet-dark (<c>value: false</c>). Pulling back does NOT
+    /// remove it from a toy that was granted it explicitly — that grant is a
+    /// separate, deliberate decision recorded in <c>DeviceContentOverrides</c>,
+    /// and quietly undoing it here would make the bench toy stop matching what
+    /// the console says about it.
+    /// </summary>
+    [HttpPost("content/{id:guid}/release")]
+    public Task<IActionResult> ReleaseContentItem(
+        Guid id, [FromBody] InternalContentItemActionRequest? req, CancellationToken ct)
+        => ContentItemFlagAsync(id, req, "content_released", ct);
+
+    /// <summary>
+    /// Retire an item (<c>value: true</c>) or bring it back (<c>value:
+    /// false</c>). A SOFT delete: the item leaves every manifest at once, and
+    /// the file is deliberately left on disk and on every card. The toy's
+    /// carry-forward keeps playing it until a later sweep reclaims it, so no
+    /// child loses a story mid-listen because an adult pressed a button.
+    /// </summary>
+    [HttpPost("content/{id:guid}/retire")]
+    public Task<IActionResult> RetireContentItem(
+        Guid id, [FromBody] InternalContentItemActionRequest? req, CancellationToken ct)
+        => ContentItemFlagAsync(id, req, "content_retired", ct);
+
+    /// <summary>Shared body of the two catalogue flag actions, mirroring
+    /// <c>DeviceFlagActionAsync</c>: reason required, 404 on unknown, no-op
+    /// writes nothing, audit in the same SaveChanges, one loud log.</summary>
+    private async Task<IActionResult> ContentItemFlagAsync(
+        Guid id, InternalContentItemActionRequest? req, string action, CancellationToken ct)
+    {
+        if (req is null || string.IsNullOrWhiteSpace(req.Reason))
+            return BadRequest(new { error = "A reason is required for operator actions." });
+
+        var item = await _db.ContentItems.FirstOrDefaultAsync(i => i.Id == id, ct);
+        if (item is null)
+            return NotFound(new { error = "Content item not found." });
+
+        var isRetire = action == "content_retired";
+        var current = isRetire ? item.RetiredAt is not null : item.DefaultEnabled;
+        var changed = current != req.Value;
+        if (changed)
+        {
+            var op = HttpContext?.Items["InternalOperator"] as string ?? "unknown";
+            var reason = req.Reason.Trim();
+            if (isRetire) item.RetiredAt = req.Value ? DateTime.UtcNow : null;
+            else item.DefaultEnabled = req.Value;
+
+            _db.AuditEvents.Add(AuditEvent.InternalConsoleContentItem(
+                op, action + (req.Value ? "" : "_undone"),
+                item.Kind, item.ItemKey, item.Version, reason));
+            await _db.SaveChangesAsync(ct);
+
+            _logger.LogWarning(
+                "Operator {Operator} set {Action}={Value} on content {ItemKind}/{ItemKey} v{Version}: {Reason}",
+                op, action, req.Value, item.Kind, item.ItemKey, item.Version, reason);
+        }
+
+        return Ok(new
+        {
+            id = item.Id,
+            itemKey = item.ItemKey,
+            action,
+            value = req.Value,
+            changed,
+            defaultEnabled = item.DefaultEnabled,
+            retiredAt = item.RetiredAt,
+        });
+    }
+
+    /// <summary>
+    /// Streams the upload to disk while hashing it, and refuses anything that
+    /// is not an MP3 by its first bytes.
+    /// <para>
+    /// Streamed rather than buffered so a 60 MB upload costs 64 KB of memory.
+    /// Hashed in the same pass because reading the file back to hash it would
+    /// let the two disagree.
+    /// </para>
+    /// <para>
+    /// The header check is three bytes, not a parse: no decoding, no
+    /// transcoding, and no new dependency. It exists because a file that is not
+    /// an MP3 would be advertised, downloaded and sha-verified successfully by
+    /// every toy in the fleet, and only then fail — silently, at the speaker,
+    /// with nothing anywhere saying why.
+    /// </para>
+    /// </summary>
+    private static async Task<(string Sha256, long SizeBytes)> WriteAndHashAsync(
+        IFormFile audio, string partPath, CancellationToken ct)
+    {
+        using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var header = new byte[3];
+        var headerLength = 0;
+        long total = 0;
+
+        await using (var input = audio.OpenReadStream())
+        await using (var output = new FileStream(
+            partPath, FileMode.Create, FileAccess.Write, FileShare.None,
+            64 * 1024, useAsync: true))
+        {
+            var buffer = new byte[64 * 1024];
+            int read;
+            while ((read = await input.ReadAsync(buffer, ct)) > 0)
+            {
+                for (var i = 0; i < read && headerLength < header.Length; i++)
+                {
+                    header[headerLength++] = buffer[i];
+                }
+                hasher.AppendData(buffer, 0, read);
+                await output.WriteAsync(buffer.AsMemory(0, read), ct);
+                total += read;
+            }
+        }
+
+        // "ID3" tag, or an MPEG frame sync (11 set bits). Both are what every
+        // file in story-audio/ actually starts with.
+        var looksLikeMp3 =
+            (headerLength >= 3 && header[0] == 0x49 && header[1] == 0x44 && header[2] == 0x33)
+            || (headerLength >= 2 && header[0] == 0xFF && (header[1] & 0xE0) == 0xE0);
+        if (!looksLikeMp3)
+        {
+            throw new InvalidDataException("The uploaded file is not an MP3.");
+        }
+
+        return (Convert.ToHexString(hasher.GetHashAndReset()).ToLowerInvariant(), total);
     }
 
     /// <summary>

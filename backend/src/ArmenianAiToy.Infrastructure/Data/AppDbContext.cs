@@ -23,6 +23,7 @@ public class AppDbContext : DbContext
     public DbSet<StoryRequest> StoryRequests => Set<StoryRequest>();
     public DbSet<DeviceInvite> DeviceInvites => Set<DeviceInvite>();
     public DbSet<DeviceContentOverride> DeviceContentOverrides => Set<DeviceContentOverride>();
+    public DbSet<ContentItem> ContentItems => Set<ContentItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -175,6 +176,18 @@ public class AppDbContext : DbContext
                 .HasForeignKey(o => o.DeviceId)
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(o => new { o.DeviceId, o.ItemKind, o.ItemKey }).IsUnique();
+        });
+
+        // ContentItem — the owner-uploaded half of the catalogue. Deliberately
+        // NO foreign key: the catalogue is fleet-level, and the per-device
+        // relationship already lives in DeviceContentOverride keyed by the same
+        // ItemKey. The unique (Kind, ItemKey) index is what makes a re-upload an
+        // UPSERT that bumps the version rather than a second row racing the
+        // first for the same content-file lookup key.
+        modelBuilder.Entity<ContentItem>(e =>
+        {
+            e.HasKey(i => i.Id);
+            e.HasIndex(i => new { i.Kind, i.ItemKey }).IsUnique();
         });
 
         // DeviceCommand — the OTA-foundation / device command queue. FK cascade

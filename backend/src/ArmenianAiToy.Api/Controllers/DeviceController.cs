@@ -509,25 +509,55 @@ public class DeviceController : ControllerBase
     // refusing. storyId is ONLY a lookup key against configured items; it
     // never reaches the filesystem, so it carries no traversal risk.
     //
-    // Deliberately still the FLEET options, not the per-device catalogue. A
-    // toy only ever asks for what its own manifest advertised, so withholding
-    // at the manifest is what decides what lands on a card. This endpoint has
-    // to move to the per-device catalogue when uploaded content lands — an
-    // uploaded story lives outside AudioRoot and would 404 here — and that is
-    // the slice that changes it.
+    // Resolves THIS device's catalogue, then serves out of it.
+    //
+    // The fleet options are no longer enough. An uploaded story lives on the
+    // volume under UploadRoot, not in the image under AudioRoot, so it is
+    // absent from the singleton entirely: the manifest would advertise it and
+    // this endpoint would 404, and every toy in the fleet would report
+    // download_failed with nothing anywhere saying why. Per-device also keeps
+    // the two halves honest in the other direction — a toy cannot download a
+    // story its own manifest was never allowed to offer.
+    //
+    // `catalog` is optional so the existing content-file tests keep exercising
+    // the serving logic below unchanged; the real container always supplies it.
     [HttpGet("content-file")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
-    public IActionResult GetContentFile(
-        [FromServices] ContentSyncOptions options,
+    public async Task<IActionResult> GetContentFileForDevice(
+        [FromServices] ContentSyncOptions fleet,
         [FromServices] ILogger<DeviceController> logger,
         [FromQuery] string? storyId = null,
         [FromQuery] string? clip = null,
         [FromQuery] string? trackId = null,
         [FromQuery] string? voiceId = null,
         [FromQuery] string? gameKey = null,
-        [FromQuery] string? clipId = null)
+        [FromQuery] string? clipId = null,
+        [FromServices] IContentCatalogService? catalog = null)
+    {
+        var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
+        var options = catalog is null
+            ? fleet
+            : await catalog.ResolveForDeviceAsync(deviceId, HttpContext.RequestAborted);
+        return GetContentFile(options, logger, storyId, clip, trackId, voiceId, gameKey, clipId);
+    }
+
+    // The serving half: given a resolved catalogue, stream the requested file
+    // or fail closed. Kept as a separate [NonAction] method rather than folded
+    // into the action above so that "which catalogue does this toy have" and
+    // "does that catalogue point at a real file" stay two questions with two
+    // answers — and so the fail-closed matrix below keeps its own tests.
+    [NonAction]
+    public IActionResult GetContentFile(
+        ContentSyncOptions options,
+        ILogger<DeviceController> logger,
+        string? storyId = null,
+        string? clip = null,
+        string? trackId = null,
+        string? voiceId = null,
+        string? gameKey = null,
+        string? clipId = null)
     {
         if (!options.Enabled)
         {

@@ -91,6 +91,7 @@
   <a data-tab="devices">Devices</a>
   <a data-tab="parents">Parents</a>
   <a data-tab="stories">Stories</a>
+  <a data-tab="content">Content</a>
   <a data-tab="flagged">Flagged</a>
   <a data-tab="conversations">Conversations</a>
   <a data-tab="requests">Requests</a>
@@ -168,7 +169,7 @@ function table(cols, rows, rowAttrs){
 // ---- support-lookup + triage helpers (client-side, read-only) ----
 // Caches of the last-loaded lists so search/drill don't re-hit the server on
 // every keystroke. Re-fetched each time the tab is opened (no-store).
-let _devices = [], _parents = [], _flagged = [], _audit = [];
+let _devices = [], _parents = [], _flagged = [], _audit = [], _content = [];
 let _refreshTimer = null;
 function matchq(q, parts){
   if(!q) return true; const s=q.toLowerCase();
@@ -310,6 +311,142 @@ const tabs = {
       {h:'Conclusion',f:r=>onoff(r.hasReflectionText)},
       {h:'Questions',f:r=>r.reflectionQuestions},
     ], s);
+  },
+  async content(){
+    // Add a story without git, ffmpeg, a deploy or a developer. The order of
+    // this screen IS the safe order of the job: upload, send to one toy, listen,
+    // then release to the fleet. Nothing here reaches a child before that last
+    // step, and the screen says so rather than relying on the operator to know.
+    // Sequenced, not Promise.all: a 404 from /devices really is an expired
+    // session and must fall through to show()'s sign-out. A 404 from /content
+    // only means this backend predates uploads, and signing the operator out
+    // over that would be a lie about their session.
+    const devs = await api('/devices');
+    _devices = devs.devices;
+    let c;
+    try { c = await api('/content'); }
+    catch(e){
+      if (!/^404/.test(e.message)) throw e;
+      main.innerHTML = `<div class="msg err">This backend has no content uploads — it predates them.
+        Nothing else on the console is affected.</div>`;
+      return;
+    }
+    _content = c.items;
+
+    const dis = c.uploadRootConfigured ? '' : ' disabled';
+    const rootWarning = c.uploadRootConfigured ? '' :
+      `<div class="msg err"><b>Uploads are not configured.</b>
+        Set <b class="mono">ContentSync:UploadRoot</b> (on Railway:
+        <b class="mono">/data/content-uploads</b>, on the persistent volume) and restart.
+        The form below is disabled until then — deliberately, because content written into
+        the container image is deleted by the next redeploy.</div>`;
+
+    // Revoked toys are marked, not removed: pre-granting a story before a toy
+    // is re-provisioned is legitimate. Being surprised by silence is not.
+    const deviceOptions = _devices.slice()
+      .sort((a,b)=>(a.name||'').localeCompare(b.name||''))
+      .map(d=>`<option value="${esc(d.id)}">${esc(d.name||'(unnamed)')} · ${esc(d.id.slice(0,8))}`
+        + (d.isRevoked ? ' · revoked — cannot download' : d.isPaused ? ' · paused' : '')
+        + `</option>`).join('');
+
+    const form = `<div id="cMsg"></div>
+      <div class="row" style="display:block;border:1px solid var(--line);border-radius:8px;padding:12px;margin:10px 0">
+        <div><b>Add a story</b></div>
+        <div class="mut" style="margin:6px 0 10px">
+          Pick the MP3 and give it a title. The server measures the size and the checksum itself —
+          there is nothing to run and nothing to paste. A new id arrives <b>switched off for every
+          toy</b>: send it to one toy, listen to it there, then release it. Re-using an id that
+          already exists uploads a new version of that story and keeps its current setting.</div>
+        <div class="row">
+          <input id="cKey" type="text" placeholder="story id (e.g. nor-heqiat)" style="min-width:220px" autocomplete="off"${dis}>
+          <input id="cTitle" type="text" placeholder="Title as a parent will read it" style="min-width:260px" autocomplete="off"${dis}>
+        </div>
+        <div id="cWarn" class="mut" style="margin:4px 0"></div>
+        <div class="row">
+          <input id="cFile" type="file" accept="audio/mpeg,.mp3"${dis}>
+          <button id="cUpload"${dis}>Upload</button>
+          <span id="cLen" class="mut"></span>
+        </div>
+        <div class="mut">The id is lowercase letters, digits, - and _. It is never shown to a child;
+          the title is.</div>
+        ${c.uploadRootConfigured ? '' : '<div class="mut">Disabled until <b class="mono">ContentSync:UploadRoot</b> is set.</div>'}
+      </div>`;
+
+    main.innerHTML = rootWarning + form
+      + `<div class="row mut">Stories you have uploaded here — the built-in library is on the Stories tab.
+         “Reaches” is who is <b>offered</b> the story on their next sync. Whether a toy has actually
+         <b>downloaded</b> it is the Library column on the Devices tab.</div>`
+      + table([
+        {h:'Title', f:r=>esc(r.title)},
+        {h:'Id', f:r=>`<span class="mono mut">${esc(r.itemKey)}</span>`},
+        {h:'Version', f:r=>r.version},
+        {h:'Size', f:r=>r.sizeBytes < 1048576
+          ? Math.round(r.sizeBytes/1024)+' KB'
+          : (r.sizeBytes/1048576).toFixed(1)+' MB'},
+        // ONE verdict, asked in the order an operator asks it: is the file
+        // there, is it retired, who gets it. Two columns can disagree — a red
+        // MISSING beside a green "released" is the contradiction the devices
+        // list already had to fix at source, and red is reserved for faults so
+        // that a correctly-staged story does not read as one.
+        {h:'Reaches', f:r=>{
+          if (!r.fileOnDisk) return '<span class="pill blk">FILE MISSING</span>'
+            + '<div class="mut">no toy can download it</div>';
+          if (r.retiredAt) return '<span class="pill blk">retired</span>'
+            + `<div class="mut">no toy${r.defaultEnabled ? ' — would go back to EVERY toy if brought back' : ''}</div>`;
+          if (r.defaultEnabled) return '<span class="pill on">every toy</span>';
+          return '<span class="pill flag">not released</span>'
+            + `<div class="mut">${r.grantedDeviceCount
+                ? 'sent to '+r.grantedDeviceCount+' toy'+(r.grantedDeviceCount>1?'s':'')
+                : 'sent to no toy yet'}</div>`;
+        }},
+        {h:'Uploaded', f:r=>`${ago(r.createdAt)} <span class="mut">${esc(r.createdBy)}</span>`},
+        {h:'', f:r=>r.retiredAt
+          ? `<button class="ghost" onclick="contentItemAction('${r.id}','retire',false,${!!r.defaultEnabled})">Bring back</button>`
+          : `<div class="row" style="margin:0">
+               <select aria-label="Send this story to one toy" onchange="grantContentTo('${r.id}','${jsq(r.itemKey)}',this)">
+                 <option value="">Send to a toy…</option>${deviceOptions}
+               </select>
+               <button class="ghost" onclick="contentItemAction('${r.id}','release',${!r.defaultEnabled},${!!r.defaultEnabled})">${r.defaultEnabled?'Pull back from fleet':'Release to fleet'}</button>
+               <button class="ghost" onclick="contentItemAction('${r.id}','retire',true,${!!r.defaultEnabled})">Retire</button>
+             </div>`},
+      ], _content, r=>r.retiredAt?'class="mut"':'');
+
+    if (c.uploadRootConfigured){
+      $('#cUpload').addEventListener('click', uploadContentStory);
+
+      // Typing an id that already exists is a REPLACEMENT, and if that story is
+      // released it changes what the whole fleet plays. Say so while it is
+      // being typed, not after the upload.
+      $('#cKey').addEventListener('input', ()=>{
+        const k = $('#cKey').value.trim().toLowerCase();
+        const hit = _content.find(i=>i.itemKey===k);
+        $('#cWarn').innerHTML = !hit ? '' :
+          `<span class="pill ${hit.defaultEnabled?'blk':'flag'}">replaces “${esc(hit.title)}” v${hit.version}</span> `
+          + (hit.defaultEnabled
+              ? 'That story is released to <b>every toy</b> — uploading changes what the fleet plays on its next sync.'
+              : `Uploading adds v${hit.version+1}. It stays unreleased.`);
+      });
+
+      // Length is the check this repo has paid for three times — truncated
+      // renders shipped to children because nothing compared audio against
+      // text. The browser reads it off the file before a byte is uploaded, so
+      // it is free here.
+      $('#cFile').addEventListener('change', e=>{
+        const f = e.target.files[0], out = $('#cLen');
+        out.textContent = '';
+        if (!f) return;
+        const a = new Audio(URL.createObjectURL(f));
+        a.addEventListener('loadedmetadata', ()=>{
+          const s = Math.round(a.duration);
+          out.innerHTML = `<b>${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}</b>`
+            + ` · ${(f.size/1048576).toFixed(1)} MB — is that the whole story?`;
+          URL.revokeObjectURL(a.src);
+        });
+        a.addEventListener('error', ()=>{
+          out.textContent = 'Could not read that file as audio.'; URL.revokeObjectURL(a.src);
+        });
+      });
+    }
   },
   async requests(){
     // Slice F — the owner's custom-story-request queue. Read + reversible
@@ -541,7 +678,11 @@ window.openDevice = async function(id){
         {h:'Item', f:r=>esc(r.title || r.itemKey)},
         {h:'Kind', f:r=>`<span class="mut mono">${esc(r.itemKind)}</span>`},
         {h:'Catalogue v', f:r=>r.version==null?'<span class="mut">—</span>':r.version},
-        {h:'Sent to this toy', f:r=>r.allowed?'<span class="pill on">yes</span>':'<span class="pill blk">withheld</span>'},
+        {h:'Sent to this toy', f:r=>r.retired
+          ? '<span class="pill off">retired</span>'
+          : (r.allowed?'<span class="pill on">yes</span>'
+            : (r.fleetDefault?'<span class="pill blk">withheld</span>'
+              : '<span class="pill off">not sent yet</span>'))},
         // An untouched item and one an operator explicitly granted both read
         // "sent: yes". Only overrideMode tells them apart, and that
         // distinction becomes load-bearing the moment fleet-dark items exist.
@@ -550,7 +691,12 @@ window.openDevice = async function(id){
              <span class="mut">${ago(r.overrideAt)}</span>`
             + (r.overrideReason?`<div>${esc(r.overrideReason)}</div>`:'')
           : '<span class="mut">default — never changed</span>'},
-        {h:'', f:r=>`<button class="ghost" onclick="contentAction('${id}','${jsq(r.itemKind)}','${jsq(r.itemKey)}',${!r.allowed})">${r.allowed?'Withhold':'Give back'}</button>`},
+        // A retired item is in no manifest, so a give-back button here would be
+        // a control that does nothing — bringing it back is a CATALOGUE act,
+        // and it lives on the Content tab where the rest of them are.
+        {h:'', f:r=>r.retired
+          ? '<span class="mut">un-retire it on the Content tab</span>'
+          : `<button class="ghost" onclick="contentAction('${id}','${jsq(r.itemKind)}','${jsq(r.itemKey)}',${!r.allowed})">${r.allowed?'Withhold':(r.fleetDefault?'Give back':'Send to this toy')}</button>`},
       ], content))
       : (contentErr
         ? `<div class="row mut" style="margin-top:14px">Content entitlement unavailable — <b class="mono">${esc(contentErr)}</b>. Nothing was changed on this toy.</div>`
@@ -606,6 +752,104 @@ window.contentAction = async function(id, kind, key, value){
       { itemKind: kind, itemKey: key, value: value, reason: reason.trim() });
     _devices = (await api('/devices')).devices; // library health is derived from this
     openDevice(id);
+  } catch(e){ err(e.message); }
+};
+
+// Upload a story. Multipart rather than JSON because the file is the payload —
+// base64 in a JSON body would inflate a 5 MB MP3 by a third for nothing. The
+// reason prompt is the same one every console mutation uses.
+async function uploadContentStory(){
+  const key = $('#cKey').value.trim();
+  const title = $('#cTitle').value.trim();
+  const file = $('#cFile').files[0];
+  if (!key || !title || !file){ alert('An id, a title and an MP3 are all required.'); return; }
+
+  // The one path that bypasses "listen on one toy first" is the path taken
+  // when FIXING a story — i.e. exactly when the new file is least proven.
+  const hit = _content.find(i=>i.itemKey===key.toLowerCase());
+  if (hit && hit.defaultEnabled && !confirm(
+      '“'+hit.title+'” is already released to every toy. Uploading replaces what the whole fleet '
+      + 'downloads on its next sync. Continue?')) return;
+
+  const reason = prompt('Reason for adding "'+title+'"\n(required — recorded in the audit log):', '');
+  if (reason === null) return;
+  if (!reason.trim()){ alert('A reason is required.'); return; }
+
+  const btn = $('#cUpload');
+  btn.disabled = true;
+  // A story is megabytes over a phone connection; a button that looks idle
+  // invites a second press, and a second press is a second version.
+  btn.textContent = 'Uploading…';
+  try {
+    const body = new FormData();
+    body.append('itemKey', key);
+    body.append('title', title);
+    body.append('reason', reason.trim());
+    body.append('audio', file);
+    // No Content-Type header: the browser must set the multipart boundary.
+    const r = await fetch('/api/internal/content/stories', {
+      method:'POST', cache:'no-store',
+      headers:{ 'Authorization':'Bearer '+TOKEN }, body
+    });
+    if (!r.ok){
+      let m='HTTP '+r.status; try{ const j=await r.json(); if(j&&j.error) m=j.error; }catch{}
+      throw new Error(m);
+    }
+    await show('content');
+  } catch(e){
+    // Keep the form and everything typed into it. A 30-second upload that
+    // fails on a duplicate id must not cost the operator the id and title.
+    const m = $('#cMsg');
+    if (m) m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; else err(e.message);
+  }
+  finally { if (document.body.contains(btn)){ btn.disabled=false; btn.textContent='Upload'; } }
+}
+
+// Release / pull back / retire / un-retire — one shape, because they are one
+// kind of act: an operator changing the catalogue, recorded with a reason.
+// fleetLive = this item's DefaultEnabled. Retiring does NOT clear it, so
+// "Bring back" on a story that was released puts it on every toy again — the
+// one button labelled as an undo is the one with the widest blast radius, and
+// it must say so before it fires.
+window.contentItemAction = async function(id, kind, value, fleetLive){
+  const label = kind==='release'
+    ? (value ? 'release this story to EVERY toy' : 'pull this story back from the fleet')
+    : (value ? 'retire this story' : 'bring this story back');
+  const reason = prompt('Reason to '+label+'\n(required — recorded in the audit log):', '');
+  if (reason === null) return;
+  if (!reason.trim()){ alert('A reason is required.'); return; }
+  if (kind==='release' && value &&
+      !confirm('This sends the story to every toy on their next sync. Have you listened to it on one toy first?')) return;
+  if (kind==='retire' && fleetLive && !confirm(value
+      ? 'This story is released to every toy. Retiring pulls it out of every manifest. Continue?'
+      : 'This story is still marked for the whole fleet — bringing it back sends it to every toy on their next sync. Continue?')) return;
+  try {
+    await apiPost('/content/'+id+'/'+kind, { value: value, reason: reason.trim() });
+    await show('content');
+  } catch(e){ err(e.message); }
+};
+
+// "Send to a toy" writes the per-device grant the entitlement layer already
+// understands — the same row the device page's Give back/Withhold buttons
+// write, so there is one mechanism and one place to see it.
+window.grantContentTo = async function(id, itemKey, select){
+  const deviceId = select.value;
+  const label = deviceId ? select.options[select.selectedIndex].text : '';
+  select.value = '';
+  if (!deviceId) return;
+  const reason = prompt('Reason for sending "'+itemKey+'" to this toy\n(required — recorded in the audit log):', '');
+  if (reason === null) return;
+  if (!reason.trim()){ alert('A reason is required.'); return; }
+  try {
+    await apiPost('/devices/'+deviceId+'/content',
+      { itemKind: 'story', itemKey: itemKey, value: true, reason: reason.trim() });
+    await show('content');
+    // Say what happened and what to do next. The row's own count moves too,
+    // but the next step ("listen on that toy") is not something a count says.
+    const box = document.createElement('div');
+    box.className = 'msg info';
+    box.textContent = `Sent “${itemKey}” to ${label}. Listen on that toy, then Release to fleet.`;
+    main.insertBefore(box, main.firstChild);
   } catch(e){ err(e.message); }
 };
 

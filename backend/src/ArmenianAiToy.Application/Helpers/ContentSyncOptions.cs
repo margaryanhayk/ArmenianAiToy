@@ -120,6 +120,32 @@ public sealed class ContentSyncOptions
     /// </summary>
     public string AudioRoot { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Base directory for content the OWNER uploaded from the console
+    /// (<c>ContentItem</c> rows), as opposed to content shipped in the
+    /// container image under <see cref="AudioRoot"/>.
+    ///
+    /// <para>
+    /// <b>Two roots, permanently, and no mixed mode:</b> a config row's
+    /// <c>AudioPath</c> always resolves under <see cref="AudioRoot"/>; a DB
+    /// row's <c>RelativePath</c> always resolves under this. Sharing one root
+    /// would put operator-written files inside the git-tracked catalogue
+    /// directory, where the two keystone tests assert config↔disk
+    /// set-equality — an upload would break the build.
+    /// </para>
+    ///
+    /// <para>
+    /// Set to the persistent volume in production (<c>/data/content-uploads</c>
+    /// on Railway), exactly as <c>Audio:BlobStoreRoot</c> is. Ships EMPTY,
+    /// which is fail-closed in both directions: the upload endpoint refuses to
+    /// write anything, and any DB row that somehow exists cannot resolve to an
+    /// absolute path and is dropped from the manifest rather than advertised
+    /// and then 404'd (which is what would make every toy in the fleet report
+    /// <c>download_failed</c>).
+    /// </para>
+    /// </summary>
+    public string UploadRoot { get; set; } = string.Empty;
+
     /// <summary>Legacy single-item: lowercase hex SHA-256 of the MP3.</summary>
     public string Sha256 { get; set; } = string.Empty;
 
@@ -170,6 +196,7 @@ public sealed class ContentSyncOptions
             ? options.AudioUrl : section["AudioUrl"]!;
         options.AudioPath = section["AudioPath"] ?? "";
         options.AudioRoot = section["AudioRoot"] ?? "";
+        options.UploadRoot = section["UploadRoot"] ?? "";
         options.Sha256 = section["Sha256"] ?? "";
         if (long.TryParse(section["SizeBytes"], out var size)) options.SizeBytes = size;
 

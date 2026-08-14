@@ -88,6 +88,59 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                     b.ToTable("Children");
                 });
 
+            modelBuilder.Entity("ArmenianAiToy.Domain.Entities.ContentItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("DefaultEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ItemKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RelativePath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("RetiredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Kind", "ItemKey")
+                        .IsUnique();
+
+                    b.ToTable("ContentItems");
+                });
+
             modelBuilder.Entity("ArmenianAiToy.Domain.Entities.Conversation", b =>
                 {
                     b.Property<Guid>("Id")

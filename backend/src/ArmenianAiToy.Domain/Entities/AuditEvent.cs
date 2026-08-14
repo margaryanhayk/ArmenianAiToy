@@ -883,6 +883,45 @@ public class AuditEvent
     };
 
     /// <summary>
+    /// A superuser-console operator changed the CATALOGUE itself — uploaded a
+    /// story, released one to the fleet, or retired one.
+    /// <para>
+    /// Same <see cref="AuditEventType.InternalConsoleAction"/> envelope as the
+    /// device actions (no migration, no new parent-facing surface), but
+    /// <see cref="TargetDeviceId"/> is null because a catalogue item belongs to
+    /// no single toy — this is the first console action that is fleet-scoped
+    /// rather than device-scoped, and pretending otherwise by attributing it to
+    /// some device would make the audit feed lie.
+    /// </para>
+    /// <para>
+    /// Metadata carries the operator, the action, the item's identity and its
+    /// version, and the required reason. Never the file's bytes, never its
+    /// path — the same counts-and-identifiers discipline every other factory
+    /// here follows.
+    /// </para>
+    /// </summary>
+    public static AuditEvent InternalConsoleContentItem(
+        string operatorName, string action,
+        string itemKind, string itemKey, int version, string reason) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.InternalConsoleAction,
+        ActorParentId = null,
+        TargetDeviceId = null,
+        TargetChildId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            @operator = operatorName,
+            action = action,
+            item_kind = itemKind,
+            item_key = itemKey,
+            version = version,
+            reason = reason
+        })
+    };
+
+    /// <summary>
     /// A superuser-console operator reset a parent's password (owner-recovery
     /// path). This is the console's highest-blast-radius mutation — full
     /// account takeover of any parent — so it gets the same DURABLE audit row
