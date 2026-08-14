@@ -44,6 +44,40 @@ constexpr const char *kIndexTmpPath = "/content_index.json.new";
 // Free-space slack beyond sizeBytes (FAT allocation overhead headroom).
 constexpr uint64_t kFreeSpaceSlack = 256ULL * 1024ULL;
 
+// PSRAM allocator for every JsonDocument in this file (field failure
+// 2026-08-14). The manifest is now 156 items -- 10 stories, 42 voice clips
+// and 104 game clips, each carrying a 64-char sha256 -- and ArduinoJson's
+// elastic document for it does not fit in INTERNAL heap beside a TLS
+// session. With ~123 KB free the parse aborted the whole chip:
+//
+//   [content-sync] manifest status=200 stories=10 voice=42 games=104
+//   ESP_ERROR_CHECK failed: ESP_ERR_NO_MEM ... phy_track_pll_init
+//   abort() ... reset_reason=4/PANIC
+//
+// -- and since the sync arms 180 s after every boot, that was an endless
+// crash-reboot loop in which no content could ever arrive. The panic
+// surfaced inside a Wi-Fi PHY timer, which was a victim: internal heap was
+// already gone, so the next allocation anywhere died.
+//
+// This is the SAME failure class sync_games hit on 2026-08-07 (see its
+// two-phase comment) and it takes the same answer: JSON lives in PSRAM
+// (7.8 MB idle), internal heap stays free for TLS, which cannot use PSRAM.
+// Falls back to internal heap so a board without PSRAM still works.
+struct PsramJsonAllocator : ArduinoJson::Allocator {
+    void *allocate(size_t n) override {
+        void *p = heap_caps_malloc(n, MALLOC_CAP_SPIRAM);
+        return p != nullptr ? p : malloc(n);
+    }
+    void deallocate(void *p) override { heap_caps_free(p); }
+    void *reallocate(void *p, size_t n) override {
+        void *q = heap_caps_realloc(p, n, MALLOC_CAP_SPIRAM);
+        return q != nullptr ? q : realloc(p, n);
+    }
+};
+// File-scope so it outlives every document below, including the
+// module-level s_games_index.
+PsramJsonAllocator s_json_psram;
+
 // Bounded tables. static (not stack): the sync runs from the Arduino
 // loop task, whose stack is 8 KB — ~2.3 KB per table would be reckless
 // there, and this module is a one-shot so the .bss cost is paid once.
@@ -89,7 +123,7 @@ int s_voice_active_count   = 0;
 // of the pass only. The document lives at file scope solely so write_index()
 // can attach it after sync_games() has returned; it is cleared as soon as
 // the index is on disk.
-JsonDocument s_games_index;
+JsonDocument s_games_index(&s_json_psram);
 int s_games_active_count = 0;
 // Default TRUE for all four: a backend that does not send them, or a
 // pre-v4 card, must not silently stop the toy offering anything.
@@ -210,7 +244,7 @@ void load_previous_index() {
         Serial.println("[content-sync] index open failed — treating as empty");
         return;
     }
-    JsonDocument doc;
+    JsonDocument doc(&s_json_psram);
     const DeserializationError err = deserializeJson(doc, f);
     f.close();
     if (err != DeserializationError::Ok) {
@@ -258,7 +292,7 @@ bool active_contains(const char *story_id) {
 // leaves the .new file, and the next boot simply rebuilds the index from
 // the manifest. No MP3 is ever at risk either way.
 bool write_index() {
-    JsonDocument idx;
+    JsonDocument idx(&s_json_psram);
     // AREG_STORY_ID drives ONLY the legacy compatibility mirror, so the
     // three readers that still parse the flat shape keep behaving exactly
     // as they did in the single-story build. It has no effect on which
@@ -825,7 +859,7 @@ void sync_games(JsonDocument &manifest_doc, JsonArrayConst games) {
     CsGame *prevs = nullptr;     // previous-index entries (carry candidates)
     int work_n = 0, prevs_n = 0;
     {
-        JsonDocument prev;
+        JsonDocument prev(&s_json_psram);
         JsonArrayConst prev_games;
         if (SD.exists(kIndexPath)) {
             File f = SD.open(kIndexPath, FILE_READ);
@@ -1025,9 +1059,21 @@ void content_sync_run() {
         fail("manifest_fetch_failed");
         return;
     }
-    JsonDocument doc;
+    // The body still lands in an internal-heap String before parsing. That is
+    // ~1 KB per item and is the next thing to move if headroom gets tight
+    // again; streaming straight off the socket is NOT a free swap, because
+    // HTTPClient only de-chunks inside getString()/writeToStream(). Measured
+    // here rather than guessed, so the decision has a number behind it.
+    const size_t mbytes = (size_t)http.getSize();
+    const uint32_t heap_pre_parse = ESP.getFreeHeap();
+    JsonDocument doc(&s_json_psram);
     const DeserializationError jerr = deserializeJson(doc, http.getString());
     http.end();
+    Serial.printf("[content-sync] manifest bytes=%d heap parse %lu->%lu psram=%lu\n",
+                  (int)mbytes, (unsigned long)heap_pre_parse,
+                  (unsigned long)ESP.getFreeHeap(),
+                  (unsigned long)ESP.getFreePsram());
+    Serial.flush();
     if (jerr != DeserializationError::Ok) {
         fail("manifest_parse_failed");
         return;
