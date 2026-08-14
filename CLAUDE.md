@@ -4662,6 +4662,27 @@ stands on ("ship a new story to one toy first, then the fleet").
 - **Never bench-verified against a real toy** — unit/integration tests only.
   No story has actually been denied to, or granted on, the live toy.
 
+
+**BENCH-VERIFIED on the real toy, 2026-08-14** — evidence:
+`tools/quality-evidence/stage3-entitlement-bench-20260814.log`. Denying `ulik`
+on the owner's toy produced `manifest_items=9` on that device while a second
+device's entitlement was untouched, and the operator guards behaved: a blank
+reason was refused 400, and a repeat of the same value returned
+`changed:false` with no second audit row. The `AdvertisedStoryVersions()` trap
+is closed in practice as well as in test — the restricted toy reported
+`contentHealth up_to_date` with `missingStoryIds []`, not `stale`.
+
+**A LIMITATION THE BENCH RUN EXPOSED, and it is not a bug.** Denying a story
+stops it being OFFERED; it does not remove it from a toy that already has it.
+The same run shows `carried_forward=1` and `active_index_items=10` — the
+card kept `ulik` because carry-forward treats absence from a manifest as
+"not offered", never as retirement, so no child loses a story mid-listen.
+
+So per-toy entitlement is **forward-acting**: it decides what a toy will
+RECEIVE, not what it currently holds. Taking something off a card needs
+retirement plus the deferred orphan sweep. Anyone reading "give or withhold
+any story from any toy" should read it as "withhold" meaning "do not send",
+because a parent whose toy already cached a story will still hear it.
 ### Stage 4 — upload a story from the console (2026-08-14, `1ae3dbe`)
 
 Upload an MP3 from `admin.html`, give it a title, send it to one toy, then

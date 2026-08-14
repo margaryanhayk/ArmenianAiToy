@@ -1,0 +1,95 @@
+    1.3  [heartbeat] body={"firmwareVersion":"1.3.1","firmwareBuild":"hb-body-debug","boardModel":"areg-s3-n8","partitionName":"app0","lastOtaStatus":"confirmed","sdCardOk":true,"contentSyncStatus":"ok","contentSyncError":"","bootCount":0,"resetReason":"UNKNOWN","contentSyncedSecondsAgo":360}
+    4.1  [heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+    4.1  [alive] ms=867288 heap=123380 psram=7860912 wifi=3 ip=192.168.1.3 rssi=-42
+    9.1  [alive] ms=872290 heap=123428 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-43
+   14.1  [alive] ms=877292 heap=123428 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-43
+   19.1  [alive] ms=882294 heap=123376 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-45
+   24.1  [alive] ms=887297 heap=123428 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-44
+   29.1  [alive] ms=892299 heap=123428 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-44
+   34.1  [alive] ms=897301 heap=123428 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-44
+   39.1  [alive] ms=902303 heap=123428 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-43
+   44.1  [alive] ms=907305 heap=123428 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-42
+   49.1  [alive] ms=912307 heap=123428 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-43
+   54.1  [alive] ms=917309 heap=123428 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-43
+   59.2  [alive] ms=922311 heap=123428 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-43
+   61.3  [heartbeat] body={"firmwareVersion":"1.3.1","firmwareBuild":"hb-body-debug","boardModel":"areg-s3-n8","partitionName":"app0","lastOtaStatus":"confirmed","sdCardOk":true,"contentSyncStatus":"ok","contentSyncError":"","bootCount":0,"resetReason":"UNKNOWN","contentSyncedSecondsAgo":420}
+   64.0  [heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+   64.2  [alive] ms=927312 heap=123428 psram=7860912 wifi=3 ip=192.168.1.3 rssi=-44
+   69.2  [alive] ms=932314 heap=123428 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-44
+   74.2  [alive] ms=937316 heap=123428 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-43
+   81.6  [ota] 1 command(s) pending
+   81.6  [ota] command id=99cde46c-2585-48fd-885a-0259ad003e71 type=refresh_story_manifest expiresAt=2026-08-14T15:07:39.5035839Z
+   81.6  [content-sync] sync requested by command
+   84.3  [ota] ack 99cde46c-2585-48fd-885a-0259ad003e71 result=ok status=200
+   84.3  [content-sync] starting
+   84.3  [content-sync] heap before=123380
+   88.0  [content-sync] manifest bytes=-1 heap parse 79200->79060 psram=7806992
+   88.0  [content-sync] manifest status=200 stories=9 introEnabled=1 music=0 musicEnabled=0 voice=42 games=104 modes=1111 pauses=1 variants=1
+   88.3  [content-sync] index v7 loaded entries=10 music=0 voice=43
+   88.3  [content-sync] item anban-huri v9 "Անբան Հուռին" 5560991 bytes
+   88.3  [content-sync] anban-huri already current (index)
+   88.3  [content-sync] item hedgehog-apple v3 "Ոզնիկն ու խնձորը" 613817 bytes
+   88.3  [content-sync] hedgehog-apple already current (index)
+   88.3  [content-sync] item khosogh-dzuk v10 "Խոսող ձուկը" 8138336 bytes
+   88.3  [content-sync] khosogh-dzuk already current (index)
+   88.3  [content-sync] item little-cloud v3 "Փոքրիկ ամպիկը" 514133 bytes
+   88.3  [content-sync] little-cloud already current (index)
+   88.3  [content-sync] item pochat-aghves v9 "Պոչատ աղվեսը" 5460680 bytes
+   88.4  [content-sync] pochat-aghves already current (index)
+   88.4  [content-sync] item princess-and-pea v6 "Արքայադուստրը և սիսեռահատիկը" 1611903 bytes
+   88.4  [content-sync] princess-and-pea already current (index)
+   88.4  [content-sync] item sutasan v6 "Սուտասանը" 1969258 bytes
+   88.4  [content-sync] sutasan already current (index)
+   88.4  [content-sync] item sutlik-orskan v9 "Սուտլիկ որսկանը" 3356047 bytes
+   88.4  [content-sync] sutlik-orskan already current (index)
+   88.4  [content-sync] item three-piglets v6 "Երեք խոզուկները" 2078973 bytes
+   88.4  [content-sync] three-piglets already current (index)
+   89.0  [content-sync] voice summary offered=42 already=42 downloaded=0 failed=0 voice_active=43
+   90.3  [content-sync] games phase B: 0 to download, heap=79248
+   90.3  [content-sync] games summary offered=104 invalid=0 already=104 downloaded=0 failed=0 truncated=0 carried=0 games_active=104
+   90.6  [content-sync] index written
+   90.9  [content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=43 music=0
+   90.9  [content-sync] summary manifest_items=9 accepted_items=9 invalid_items=0 duplicate_items=0 disabled_items=0 truncated_items=0 already_current=9 downloaded=0 failed=0 carried_forward=1 active_index_items=10 index_written=1
+   90.9  [content-sync] heap after=79248
+   90.9  [content-sync] PASS
+   90.9  [content-sync] status=ok error= streak=0 next in 21600s
+   90.9  [alive] ms=954082 heap=123232 psram=7860656 wifi=3 ip=192.168.1.3 rssi=-45
+   95.9  [alive] ms=959084 heap=123228 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-44
+  100.9  [alive] ms=964086 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-45
+  105.9  [alive] ms=969088 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-43
+  110.9  [alive] ms=974090 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-43
+  115.9  [alive] ms=979092 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-45
+  120.9  [alive] ms=984094 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-45
+  121.3  [heartbeat] body={"firmwareVersion":"1.3.1","firmwareBuild":"hb-body-debug","boardModel":"areg-s3-n8","partitionName":"app0","lastOtaStatus":"confirmed","sdCardOk":true,"contentSyncStatus":"ok","contentSyncError":"","bootCount":0,"resetReason":"UNKNOWN","contentSyncedSecondsAgo":30}
+  123.9  [heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+  125.9  [alive] ms=989101 heap=123228 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-43
+  130.9  [alive] ms=994103 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-46
+  135.9  [alive] ms=999105 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-43
+  140.9  [alive] ms=1004107 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-45
+  145.9  [alive] ms=1009109 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-45
+  151.0  [alive] ms=1014111 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-44
+  156.0  [alive] ms=1019113 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-44
+  161.0  [alive] ms=1024115 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-43
+  166.0  [alive] ms=1029117 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-43
+  171.0  [alive] ms=1034119 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-45
+  176.0  [alive] ms=1039121 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-42
+  181.0  [alive] ms=1044123 heap=123280 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-44
+  181.3  [heartbeat] body={"firmwareVersion":"1.3.1","firmwareBuild":"hb-body-debug","boardModel":"areg-s3-n8","partitionName":"app0","lastOtaStatus":"confirmed","sdCardOk":true,"contentSyncStatus":"ok","contentSyncError":"","bootCount":0,"resetReason":"UNKNOWN","contentSyncedSecondsAgo":90}
+  184.4  [heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+  186.0  [alive] ms=1049126 heap=123280 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-45
+  191.0  [alive] ms=1054128 heap=123228 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-44
+  196.0  [alive] ms=1059130 heap=123280 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-44
+  201.0  [alive] ms=1064132 heap=123280 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-44
+  206.0  [alive] ms=1069134 heap=123280 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-45
+  211.0  [alive] ms=1074136 heap=123280 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-44
+  216.0  [alive] ms=1079138 heap=123280 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-43
+  221.0  [alive] ms=1084140 heap=123280 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-44
+  226.0  [alive] ms=1089142 heap=123280 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-44
+  231.0  [alive] ms=1094144 heap=123280 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-44
+  236.0  [alive] ms=1099146 heap=123280 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-42
+  241.0  [alive] ms=1104148 heap=123280 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-44
+  241.3  [heartbeat] body={"firmwareVersion":"1.3.1","firmwareBuild":"hb-body-debug","boardModel":"areg-s3-n8","partitionName":"app0","lastOtaStatus":"confirmed","sdCardOk":true,"contentSyncStatus":"ok","contentSyncError":"","bootCount":0,"resetReason":"UNKNOWN","contentSyncedSecondsAgo":150}
+  244.0  [heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+  246.0  [alive] ms=1109156 heap=123280 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-46
+  251.0  [alive] ms=1114158 heap=123280 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-43
+  256.0  [alive] ms=1119160 heap=123228 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-41
