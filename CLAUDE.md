@@ -4751,6 +4751,40 @@ PowerShell shipper needing ffmpeg, ~38 MB of audio committed to git).
   uploaded end to end (upload → grant to one toy → download → release to
   fleet) on real hardware.
 
+
+**BENCH-VERIFIED against the live backend, 2026-08-14.** A real 514,133-byte
+MP3 was uploaded through the console endpoint and the chain proved out end to
+end:
+
+```
+server-computed sha256   d47727754718e65f...  == the local file's sha256
+defaultEnabled           false                 (fleet-dark on arrival)
+traversal-shaped itemKey 400                   (../../etc/passwd refused)
+before entitlement       manifest: 10 stories, upload ABSENT; content-file 404
+after  entitlement       manifest: +bench-upload-check v1 514133 bytes
+content-file             200 audio/mpeg 514133 bytes, sha IDENTICAL to source
+```
+
+The last line is the one that mattered. `content-file` took the SINGLETON
+options before this stage, which would have advertised an uploaded story and
+then 404'd its download — every toy reporting `download_failed` for a story
+the console insisted it had. Proven closed with a byte-perfect round trip
+through the console upload, the Railway volume, the per-device catalogue and
+the device endpoint.
+
+**Method note:** the proof used a THROWAWAY registered device, not the
+owner's toy, and deliberately so. A story cached on a real card becomes
+eligible for `story_select` and could be played to a child; a bench item must
+never be able to reach one. The throwaway device was revoked and the item
+retired afterwards.
+
+**Two operator-error findings, both mine, both worth keeping** because the
+next person will make them too. The retire endpoint takes `{value:true}` —
+calling it with only a reason defaults `value` to false, which means "bring
+back", and it correctly no-ops with `changed:false`. And granting an item to
+a toy for a test leaves the grant in place: retiring the ITEM does not undo a
+per-device ALLOW, so the toy row must be cleared separately. Both read as
+bugs at a glance and neither is one.
 ### Stage 5 (backend) — sync on demand, and audited enqueue (2026-08-14, `5659944`)
 
 Backend half of "sync this toy now" and the traffic fix; see Stage 2 above
