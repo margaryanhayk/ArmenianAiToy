@@ -1292,15 +1292,20 @@ public class InternalController : ControllerBase
         return Ok(new { deviceId = device.Id, claimCode, qrPayload });
     }
 
-    /// <summary>OTA foundation — BENCH/TEST enqueue of a device command so an
-    /// operator can push e.g. <c>firmware_update</c> without editing the DB.
-    /// Behind the same internal gate as every other <c>/api/internal/*</c>
-    /// action (fail-closed 404 when unconfigured). Only known
-    /// <see cref="DeviceCommandTypes"/> values are accepted; the device picks
-    /// the command up on its next poll of <c>GET /api/devices/commands</c>.
-    /// Deliberately NOT parent-facing and NOT in the admin.html UI yet; when
-    /// this becomes a real operator surface it gains the reason + audit-row
-    /// discipline of the Phase 3 actions (today: one loud structured log).</summary>
+    /// <summary>Operator enqueue of a device command — <c>firmware_update</c>
+    /// for an OTA rollout, <c>refresh_story_manifest</c> for the console's
+    /// "Sync this toy now". Behind the same internal gate as every other
+    /// <c>/api/internal/*</c> action (fail-closed 404 when unconfigured). Only
+    /// known <see cref="DeviceCommandTypes"/> values are accepted; the device
+    /// picks the command up on its next poll of <c>GET /api/devices/commands</c>.
+    /// <para>
+    /// Reason required (400 without) + one system-actor
+    /// <c>InternalConsoleAction</c> audit row, matching the Phase 3 device
+    /// actions. The audit row is written AFTER the enqueue rather than in the
+    /// same SaveChanges, because <see cref="IDeviceCommandService.EnqueueAsync"/>
+    /// owns its own commit — so a REFUSED enqueue (unknown type) writes no row,
+    /// which is the property that matters.
+    /// </para></summary>
     [HttpPost("devices/{deviceId:guid}/commands")]
     public async Task<IActionResult> EnqueueDeviceCommand(
         Guid deviceId,
@@ -1310,6 +1315,8 @@ public class InternalController : ControllerBase
     {
         if (req is null || string.IsNullOrWhiteSpace(req.Type))
             return BadRequest(new { error = "A command type is required." });
+        if (string.IsNullOrWhiteSpace(req.Reason))
+            return BadRequest(new { error = "A reason is required for operator actions." });
 
         var deviceExists = await _db.Devices.AnyAsync(d => d.Id == deviceId, ct);
         if (!deviceExists)
@@ -1327,9 +1334,18 @@ public class InternalController : ControllerBase
             return BadRequest(new { error = "Unknown command type." });
 
         var op = HttpContext?.Items["InternalOperator"] as string ?? "unknown";
+        var reason = req.Reason.Trim();
+        // The command TYPE is the action name, so the audit feed reads
+        // "device_command:refresh_story_manifest" rather than a bare
+        // "a command was sent" — which of the two was pushed is the whole
+        // question when a toy misbehaves after an operator touched it.
+        _db.AuditEvents.Add(AuditEvent.InternalConsoleAction(
+            op, "device_command:" + cmd.Type, deviceId, true, reason));
+        await _db.SaveChangesAsync(ct);
+
         _logger.LogWarning(
-            "Operator {Operator} enqueued device command {CommandType} ({CommandId}) for device {DeviceId} (ttl {Ttl}s)",
-            op, cmd.Type, cmd.Id, deviceId, ttlSeconds);
+            "Operator {Operator} enqueued device command {CommandType} ({CommandId}) for device {DeviceId} (ttl {Ttl}s): {Reason}",
+            op, cmd.Type, cmd.Id, deviceId, ttlSeconds, reason);
         return Ok(new { commandId = cmd.Id, deviceId, type = cmd.Type, expiresAt = cmd.ExpiresAt });
     }
 

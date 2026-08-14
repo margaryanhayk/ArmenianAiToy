@@ -107,6 +107,87 @@ public class DeviceCommandServiceTests
         Assert.Equal(Now, stored.SentAt);
     }
 
+    // ── hasCommands on the heartbeat: the toy stops polling on its own cadence ──
+
+    [Fact]
+    public async Task HasDeliverableCommand_PendingCommand_IsTrue_AndConsumesNothing()
+    {
+        var (svc, db) = Create();
+        var dev = Guid.NewGuid();
+        var cmd = await svc.EnqueueAsync(dev, DeviceCommandTypes.FirmwareUpdate, null, null, Now);
+
+        Assert.True(await svc.HasDeliverableCommandAsync(dev, Now));
+
+        // KEYSTONE: read-only. If this ever marked Pending → Sent, the flag
+        // would consume the delivery the poll is still responsible for.
+        var stored = await db.Set<DeviceCommand>().FirstAsync(c => c.Id == cmd!.Id);
+        Assert.Equal(DeviceCommandStatus.Pending, stored.Status);
+        Assert.Null(stored.SentAt);
+    }
+
+    [Fact]
+    public async Task HasDeliverableCommand_AlreadySentButUnacked_IsTrue()
+    {
+        // At-least-once transport: a Sent command is re-delivered until acked,
+        // so a toy that rebooted mid-command must still be told to come back.
+        var (svc, _) = Create();
+        var dev = Guid.NewGuid();
+        await svc.EnqueueAsync(dev, DeviceCommandTypes.FirmwareUpdate, null, null, Now);
+        await svc.PollAsync(dev, Now);
+
+        Assert.True(await svc.HasDeliverableCommandAsync(dev, Now));
+    }
+
+    [Fact]
+    public async Task HasDeliverableCommand_NoRows_IsFalse()
+    {
+        var (svc, _) = Create();
+
+        Assert.False(await svc.HasDeliverableCommandAsync(Guid.NewGuid(), Now));
+    }
+
+    [Fact]
+    public async Task HasDeliverableCommand_OnlyAckedOrExpired_IsFalse()
+    {
+        var (svc, _) = Create();
+        var dev = Guid.NewGuid();
+
+        // Acked — terminal.
+        var acked = await svc.EnqueueAsync(dev, DeviceCommandTypes.FirmwareUpdate, null, null, Now);
+        await svc.AckAsync(dev, acked!.Id, new DeviceCommandAckRequest(Result: "ok"), Now);
+
+        // Expired but never swept: still Pending in the row, past its TTL.
+        // Reading this as deliverable would keep the toy polling forever for
+        // something it can never be given.
+        await svc.EnqueueAsync(
+            dev, DeviceCommandTypes.RefreshStoryManifest, null, Now.AddMinutes(-1), Now);
+
+        Assert.False(await svc.HasDeliverableCommandAsync(dev, Now));
+    }
+
+    [Fact]
+    public async Task HasDeliverableCommand_AnotherDevicesCommand_IsFalse()
+    {
+        var (svc, _) = Create();
+        var other = Guid.NewGuid();
+        await svc.EnqueueAsync(other, DeviceCommandTypes.FirmwareUpdate, null, null, Now);
+
+        Assert.False(await svc.HasDeliverableCommandAsync(Guid.NewGuid(), Now));
+    }
+
+    [Fact]
+    public async Task Enqueue_RefreshStoryManifest_IsAKnownType()
+    {
+        var (svc, _) = Create();
+
+        var cmd = await svc.EnqueueAsync(
+            Guid.NewGuid(), DeviceCommandTypes.RefreshStoryManifest, null, null, Now);
+
+        Assert.NotNull(cmd);
+        Assert.Equal("refresh_story_manifest", cmd!.Type);
+        Assert.Equal(DeviceCommandStatus.Pending, cmd.Status);
+    }
+
     [Fact]
     public async Task Ack_ChangesStatusToAcked_AndStoresDiagnostics()
     {

@@ -130,6 +130,34 @@ function ago(s){
   if(secs < 172800) return Math.round(secs/3600) + 'h ago';
   return Math.round(secs/86400) + 'd ago';
 }
+// Ack diagnostics are stored verbatim as free-form JSON — that is the whole
+// point of the channel: the firmware adds a field without a backend change.
+// So this renders whatever arrives as flat "path value" lines instead of
+// naming fields it would then have to keep in step with the firmware. A
+// payload that is not JSON at all is shown raw rather than swallowed: an
+// unparseable diagnostic is itself a diagnostic.
+function renderDiag(raw){
+  if (raw == null || raw === '') return '<span class="mut">—</span>';
+  let v;
+  try { v = JSON.parse(raw); }
+  catch { return `<div class="mono" style="white-space:pre-wrap">${esc(raw)}</div>`; }
+  const lines = [];
+  (function walk(node, path, depth){
+    if (node === null || typeof node !== 'object'){ lines.push([path, String(node)]); return; }
+    // Depth cap: a runaway nested payload must not be able to hang the console.
+    if (depth > 6){ lines.push([path, '…']); return; }
+    const keys = Array.isArray(node) ? node.map((_,i)=>i) : Object.keys(node);
+    if (!keys.length){ lines.push([path, Array.isArray(node) ? '[]' : '{}']); return; }
+    keys.forEach(k => walk(node[k], path ? path+'.'+k : String(k), depth+1));
+  })(v, '', 0);
+  if (!lines.length) return '<span class="mut">—</span>';
+  return '<div class="mono" style="font-size:12px;line-height:1.5">'
+    + lines.slice(0, 40).map(kv =>
+        `<div><span class="mut">${esc(kv[0] || 'value')}</span> ${esc(kv[1])}</div>`).join('')
+    + (lines.length > 40 ? `<div class="mut">…${lines.length-40} more</div>` : '')
+    + '</div>';
+}
+
 function onoff(b){ return b ? '<span class="pill on">on</span>' : '<span class="pill off">off</span>'; }
 function tri(v){ return v===null||v===undefined ? '<span class="mut">inherit</span>' : onoff(v); }
 
@@ -660,9 +688,39 @@ window.openDevice = async function(id){
     const actions = d ? `<div class="row">
         <button ${revokeDanger} onclick="opAction('revoke','${id}',${!d.isRevoked})">${d.isRevoked?'Restore access':'Revoke (kill switch)'}</button>
         <button class="ghost" onclick="opAction('pause','${id}',${!d.isPaused})">${d.isPaused?'Resume':'Pause'}</button>
+        <button class="ghost" onclick="syncNow('${id}')">Sync this toy now</button>
         <button class="ghost" onclick="issueClaimCode('${id}')">New pairing code</button>
         <span class="mut">operator action — a reason is required and audit-logged</span>
       </div>` : '';
+    // Command history. The two questions it answers are the ones no other
+    // surface can: did this toy ever POLL (status leaves Pending), and what
+    // did it ACK. The ack diagnostics are free-form JSON by design — the
+    // firmware's payload grows without a backend change — so they are
+    // rendered generically rather than against a schema this console would
+    // then have to keep in step.
+    let cmds = [], cmdErr = '';
+    try { cmds = (await api('/devices/'+encodeURIComponent(id)+'/commands?limit=10')).commands || []; }
+    catch(e){ cmds = null; if (!/^404/.test(e.message)) cmdErr = e.message; }
+    const cmdRows = cmds !== null ? (`
+      <div class="row mut" style="margin-top:14px">Recent commands sent to this toy.
+        A row stuck on <b class="mono">pending</b> means the toy has not polled — it may be running firmware without the command client.</div>`
+      + table([
+        {h:'Sent', f:r=>`${esc(dt(r.createdAt))}<div class="mut">${ago(r.createdAt)}</div>`},
+        {h:'Type', f:r=>`<span class="mono">${esc(r.type)}</span>`},
+        {h:'Status', f:r=>{
+          const s = String(r.status||'').toLowerCase();
+          const cls = s==='acked' ? 'on' : (s==='failed'||s==='expired' ? 'blk' : 'off');
+          return `<span class="pill ${cls}">${esc(s||'—')}</span>`
+            + (r.ackedAt?`<div class="mut">${ago(r.ackedAt)}</div>`:'');
+        }},
+        {h:'Outcome', f:r=>(r.result?`<span class="mono">${esc(r.result)}</span>`:'<span class="mut">—</span>')
+          + (r.error?`<div class="mut mono">${esc(r.error)}</div>`:'')
+          + (r.ackFirmwareVersion?`<div class="mut">fw ${esc(r.ackFirmwareVersion)}</div>`:'')},
+        {h:'Diagnostics', f:r=>renderDiag(r.ackDiagnostics)},
+      ], cmds))
+      : (cmdErr
+        ? `<div class="row mut" style="margin-top:14px">Command history unavailable — <b class="mono">${esc(cmdErr)}</b>.</div>`
+        : '');
     // Per-toy content. Every column here is about what this toy is SENT —
     // withholding removes an item from this toy's manifest and from the set
     // its library health is measured against, so the toy is never "missing"
@@ -707,6 +765,7 @@ window.openDevice = async function(id){
       + head
       + syncDetail
       + actions
+      + cmdRows
       + contentRows
       + `<div class="row mut" style="margin-top:14px">Conversations on this device — click to open in context.</div>`
       + table([
@@ -733,6 +792,28 @@ window.opAction = async function(kind, id, value){
     await apiPost('/devices/'+id+'/'+kind, { value: value, reason: reason.trim() });
     _devices = (await api('/devices')).devices; // refresh cached flags
     openDevice(id);                             // re-render with the new state
+  } catch(e){ err(e.message); }
+};
+
+// "Sync this toy now" — enqueue a refresh_story_manifest command. Same
+// reason-prompt idiom as opAction; the endpoint requires the reason and
+// audit-logs it exactly like revoke and pause.
+//
+// It is a REQUEST, not a push: the toy acts on it when it next checks in and
+// is idle, so the wording promises a delivery rather than an instant sync. A
+// toy that is off, revoked or mid-story simply gets it later — and firmware
+// that predates the handler acks `unsupported_type`, which shows in the
+// command history below rather than looking like silence.
+window.syncNow = async function(id){
+  const reason = prompt('Reason to ask this toy to sync its content now'
+    + '\n(required — recorded in the audit log):', '');
+  if (reason === null) return;                 // cancelled
+  if (!reason.trim()){ alert('A reason is required.'); return; }
+  info('Queueing…');
+  try {
+    await apiPost('/devices/'+id+'/commands',
+      { type: 'refresh_story_manifest', reason: reason.trim() });
+    openDevice(id);   // re-render so the new row appears in the command history
   } catch(e){ err(e.message); }
 };
 

@@ -70,6 +70,17 @@ public sealed class DeviceCommandService : IDeviceCommandService
         return deliver.Select(ToDto).ToList();
     }
 
+    public Task<bool> HasDeliverableCommandAsync(Guid deviceId, DateTime nowUtc) =>
+        // Same predicate PollAsync delivers on, minus the mutation — and it
+        // rides the existing (DeviceId, Status) index. An expired-but-unswept
+        // row must read false here or the toy would poll forever for a command
+        // it can never be given.
+        _db.Set<DeviceCommand>()
+            .AnyAsync(c => c.DeviceId == deviceId
+                        && (c.Status == DeviceCommandStatus.Pending
+                            || c.Status == DeviceCommandStatus.Sent)
+                        && (c.ExpiresAt == null || c.ExpiresAt > nowUtc));
+
     public async Task<DeviceCommandAckOutcome> AckAsync(
         Guid deviceId, Guid commandId, DeviceCommandAckRequest ack, DateTime nowUtc)
     {

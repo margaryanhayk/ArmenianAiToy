@@ -18,12 +18,15 @@ using NSubstitute;
 namespace ArmenianAiToy.Application.Tests;
 
 /// <summary>
-/// Tests for the bench/test operator enqueue endpoint
-/// <c>POST /api/internal/devices/{deviceId}/commands</c> (OTA foundation).
+/// Tests for the operator enqueue endpoint
+/// <c>POST /api/internal/devices/{deviceId}/commands</c>.
 /// Pins: known-type enqueue creates a Pending DeviceCommand with a clamped
 /// TTL; unknown type → 400 (nothing queued); unknown device → 404; missing
-/// type → 400. The internal token gate itself is middleware
-/// (InternalAdminAuthTests); these tests exercise the action behind it.
+/// type → 400; missing reason → 400; and — since this became a real operator
+/// surface (the console's "Sync this toy now") — exactly one
+/// <c>InternalConsoleAction</c> audit row on success and none on any refusal.
+/// The internal token gate itself is middleware (InternalAdminAuthTests);
+/// these tests exercise the action behind it.
 /// </summary>
 public class InternalControllerEnqueueCommandTests
 {
@@ -72,7 +75,8 @@ public class InternalControllerEnqueueCommandTests
 
         var result = await controller.EnqueueDeviceCommand(
             device.Id,
-            new InternalEnqueueCommandRequest(DeviceCommandTypes.FirmwareUpdate, payload, TtlSeconds: 120),
+            new InternalEnqueueCommandRequest(
+                DeviceCommandTypes.FirmwareUpdate, payload, TtlSeconds: 120, Reason: "bench rollout"),
             new DeviceCommandService(db),
             CancellationToken.None);
 
@@ -100,7 +104,8 @@ public class InternalControllerEnqueueCommandTests
 
         await NewController(db).EnqueueDeviceCommand(
             device.Id,
-            new InternalEnqueueCommandRequest(DeviceCommandTypes.FirmwareUpdate, TtlSeconds: 1),
+            new InternalEnqueueCommandRequest(
+                DeviceCommandTypes.FirmwareUpdate, TtlSeconds: 1, Reason: "bench"),
             new DeviceCommandService(db),
             CancellationToken.None);
 
@@ -118,12 +123,15 @@ public class InternalControllerEnqueueCommandTests
 
         var result = await NewController(db).EnqueueDeviceCommand(
             device.Id,
-            new InternalEnqueueCommandRequest("reboot_device"),
+            new InternalEnqueueCommandRequest("reboot_device", Reason: "typo"),
             new DeviceCommandService(db),
             CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result);
         Assert.Empty(db.DeviceCommands.ToList());
+        // A refused enqueue must leave no trace: an audit row for a command
+        // that was never queued would read as an operator action that happened.
+        Assert.Empty(db.AuditEvents.ToList());
     }
 
     [Fact]
@@ -133,12 +141,13 @@ public class InternalControllerEnqueueCommandTests
 
         var result = await NewController(db).EnqueueDeviceCommand(
             Guid.NewGuid(),
-            new InternalEnqueueCommandRequest(DeviceCommandTypes.FirmwareUpdate),
+            new InternalEnqueueCommandRequest(DeviceCommandTypes.FirmwareUpdate, Reason: "bench"),
             new DeviceCommandService(db),
             CancellationToken.None);
 
         Assert.IsType<NotFoundObjectResult>(result);
         Assert.Empty(db.DeviceCommands.ToList());
+        Assert.Empty(db.AuditEvents.ToList());
     }
 
     [Fact]
@@ -151,10 +160,82 @@ public class InternalControllerEnqueueCommandTests
 
         var result = await NewController(db).EnqueueDeviceCommand(
             device.Id,
-            new InternalEnqueueCommandRequest(Type: "  "),
+            new InternalEnqueueCommandRequest(Type: "  ", Reason: "bench"),
             new DeviceCommandService(db),
             CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    // ── Stage 5: a real operator surface, so it carries operator discipline ──
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Enqueue_BlankReason_Returns400_AndQueuesNothing(string? reason)
+    {
+        var db = NewDb();
+        var device = Dev();
+        db.Devices.Add(device);
+        await db.SaveChangesAsync();
+
+        var result = await NewController(db).EnqueueDeviceCommand(
+            device.Id,
+            new InternalEnqueueCommandRequest(DeviceCommandTypes.FirmwareUpdate, Reason: reason),
+            new DeviceCommandService(db),
+            CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Empty(db.DeviceCommands.ToList());
+        Assert.Empty(db.AuditEvents.ToList());
+    }
+
+    [Fact]
+    public async Task Enqueue_Success_WritesExactlyOneInternalConsoleActionAudit()
+    {
+        var db = NewDb();
+        var device = Dev();
+        db.Devices.Add(device);
+        await db.SaveChangesAsync();
+
+        await NewController(db).EnqueueDeviceCommand(
+            device.Id,
+            new InternalEnqueueCommandRequest(
+                DeviceCommandTypes.RefreshStoryManifest, Reason: "library re-render landed"),
+            new DeviceCommandService(db),
+            CancellationToken.None);
+
+        var audit = Assert.Single(db.AuditEvents.ToList());
+        Assert.Equal(AuditEventType.InternalConsoleAction, audit.EventType);
+        // System-actor: null parent keeps it out of every parent-facing feed.
+        Assert.Null(audit.ActorParentId);
+        Assert.Equal(device.Id, audit.TargetDeviceId);
+        Assert.Contains("bench-op", audit.Metadata);
+        Assert.Contains("library re-render landed", audit.Metadata);
+        // The command TYPE is in the action name — "an operator sent a command"
+        // is not enough to diagnose a toy that misbehaved afterwards.
+        Assert.Contains("refresh_story_manifest", audit.Metadata);
+    }
+
+    [Fact]
+    public async Task Enqueue_RefreshStoryManifest_IsAccepted()
+    {
+        var db = NewDb();
+        var device = Dev();
+        db.Devices.Add(device);
+        await db.SaveChangesAsync();
+
+        var result = await NewController(db).EnqueueDeviceCommand(
+            device.Id,
+            new InternalEnqueueCommandRequest(
+                DeviceCommandTypes.RefreshStoryManifest, Reason: "sync now"),
+            new DeviceCommandService(db),
+            CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        var stored = Assert.Single(db.DeviceCommands.ToList());
+        Assert.Equal("refresh_story_manifest", stored.Type);
+        Assert.Equal(DeviceCommandStatus.Pending, stored.Status);
     }
 }

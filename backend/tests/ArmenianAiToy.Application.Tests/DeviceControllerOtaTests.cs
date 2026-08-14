@@ -34,7 +34,7 @@ public class DeviceControllerOtaTests
         var (controller, device, deviceId) = Create();
         var body = new DeviceHeartbeatRequest(FirmwareVersion: "1.0.0", BoardModel: "areg-s3-n8");
 
-        var result = await controller.Heartbeat(body);
+        var result = await controller.Heartbeat(Substitute.For<IDeviceCommandService>(), body);
 
         Assert.IsType<OkObjectResult>(result);
         await device.Received(1).UpdateFirmwareReportAsync(deviceId, body, Arg.Any<DateTime>());
@@ -45,7 +45,8 @@ public class DeviceControllerOtaTests
     {
         var (controller, device, _) = Create();
 
-        var result = await controller.Heartbeat(null); // legacy presence-only heartbeat
+        // legacy presence-only heartbeat
+        var result = await controller.Heartbeat(Substitute.For<IDeviceCommandService>(), null);
 
         Assert.IsType<OkObjectResult>(result);
         await device.DidNotReceiveWithAnyArgs()

@@ -83,6 +83,7 @@ public class DeviceController : ControllerBase
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     public async Task<IActionResult> Heartbeat(
+        [FromServices] IDeviceCommandService commandService,
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] DeviceHeartbeatRequest? request = null)
     {
         // DeviceId is guaranteed present: the middleware sets it for this path
@@ -105,6 +106,15 @@ public class DeviceController : ControllerBase
         // fully silent even for local SD playback (pause used to gate only
         // the online chat path). Cached last-known between heartbeats.
         var isPaused = await _deviceService.IsDevicePausedAsync(deviceId);
+        // The toy used to make a SECOND HTTPS request every ~60 s to
+        // GET /api/devices/commands — ~43,200 command polls a month, each a
+        // fresh TLS handshake (the expensive part in both battery and heap),
+        // to deliver perhaps one command. This flag lets the toy skip that
+        // poll entirely until there is something to fetch. Read-only: it never
+        // marks a command Sent, so the poll still owns delivery.
+        // Additive field — firmware that predates it ignores it and keeps
+        // polling on its own cadence, unchanged.
+        var hasCommands = await commandService.HasDeliverableCommandAsync(deviceId, DateTime.UtcNow);
         return Ok(new
         {
             ok = true,
@@ -112,6 +122,7 @@ public class DeviceController : ControllerBase
             serverTimeUtc = DateTime.UtcNow,
             inBedtimeWindow,
             isPaused,
+            hasCommands,
         });
     }
 

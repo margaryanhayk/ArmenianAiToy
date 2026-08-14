@@ -31,7 +31,8 @@ public class DeviceControllerHeartbeatTests
     public async Task Heartbeat_AuthedDevice_Returns200WithDeviceId()
     {
         var deviceId = Guid.NewGuid();
-        var result = await NewController(deviceId).Heartbeat();
+        var result = await NewController(deviceId)
+            .Heartbeat(Substitute.For<IDeviceCommandService>());
 
         var ok = Assert.IsType<OkObjectResult>(result);
         // Shape: { ok = true, deviceId, serverTimeUtc } — anonymously typed, so
@@ -42,5 +43,29 @@ public class DeviceControllerHeartbeatTests
         Assert.Contains("\"ok\":true", json);
         Assert.Contains(deviceId.ToString(), json);
         Assert.Contains("serverTimeUtc", json);
+    }
+
+    // The toy used to poll GET /api/devices/commands every ~60 s on its own
+    // cadence — a second TLS handshake a minute to deliver almost nothing.
+    // The heartbeat it already sends now carries the answer.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Heartbeat_CarriesHasCommands_FromTheCommandQueue(bool queued)
+    {
+        var deviceId = Guid.NewGuid();
+        var commands = Substitute.For<IDeviceCommandService>();
+        commands.HasDeliverableCommandAsync(deviceId, Arg.Any<DateTime>()).Returns(queued);
+
+        var result = await NewController(deviceId).Heartbeat(commands);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value,
+            new System.Text.Json.JsonSerializerOptions
+            { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+        Assert.Contains("\"hasCommands\":" + (queued ? "true" : "false"), json);
+        // Read-only: the heartbeat asks, it never delivers. Marking a command
+        // Sent here would consume a delivery the poll still owns.
+        await commands.DidNotReceiveWithAnyArgs().PollAsync(default, default);
     }
 }

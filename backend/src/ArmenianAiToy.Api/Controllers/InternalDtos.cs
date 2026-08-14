@@ -299,14 +299,17 @@ public sealed record InternalContentItemActionRequest(bool Value, string? Reason
 /// lifecycle. Bounded status vocabulary validated at the action.</summary>
 public sealed record InternalStoryRequestStatusRequest(string? Status, string? Reason);
 
-// OTA foundation — bench/test enqueue of a device command. Type must be a
-// known DeviceCommandTypes value; Payload is an optional JSON object stored
+// Operator enqueue of a device command. Type must be a known
+// DeviceCommandTypes value; Payload is an optional JSON object stored
 // verbatim; TtlSeconds bounds how long the command stays deliverable
-// (default 3600, clamped 60..86400).
+// (default 3600, clamped 60..86400). Reason is REQUIRED — this is a real
+// operator surface (the console's "Sync this toy now"), so it carries the
+// same accountability as revoke and pause.
 public sealed record InternalEnqueueCommandRequest(
     string? Type,
     System.Text.Json.JsonElement? Payload = null,
-    int? TtlSeconds = null);
+    int? TtlSeconds = null,
+    string? Reason = null);
 
 // Owner recovery — set a locked-out parent's password. Console-gated
 // (fail-closed 404 unless the admin token is configured). Reason required;
