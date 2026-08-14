@@ -93,6 +93,65 @@ public class Device
     /// toy.</summary>
     public DateTime? ContentReportedAt { get; set; }
 
+    /// <summary>
+    /// What the toy's last sync ATTEMPT did, as opposed to what it now HAS.
+    /// Null = never reported (firmware older than the sync-diagnostics slice).
+    ///
+    /// <para>
+    /// <b>Why the content report above was not enough.</b> A sync that fails
+    /// leaves the card exactly as it was, and the firmware's carry-forward
+    /// then re-advertises the OLD entry as verified — so a failed sync
+    /// reports a healthy library. The toy has to say what it TRIED, or the
+    /// only remaining diagnosis is a serial cable, which is not something a
+    /// toy in a stranger's home can offer.
+    /// </para>
+    ///
+    /// <para>
+    /// <see cref="ContentSyncStatus"/> is the bounded verdict
+    /// (<c>ok</c>/<c>partial</c>/<c>failed</c>/<c>never</c> — see
+    /// <c>DeviceContentHealth</c>) and <see cref="ContentSyncError"/> a short
+    /// reason such as <c>sha256_mismatch</c> or <c>no_space</c>. Both are
+    /// stored as the device sent them (trimmed and length-capped): the
+    /// derived verdict reacts only to the bounded set, while an operator
+    /// diagnosing a wrong-looking verdict needs to read what the toy
+    /// actually said.
+    /// </para>
+    ///
+    /// <para>
+    /// <see cref="ResetReason"/> and <see cref="BootCount"/> answer the
+    /// question a status field structurally CANNOT: a device that dies
+    /// mid-sync never reports a status, so the next boot's reset reason is
+    /// the only surviving evidence. Firmware 1.2.1 crash-looped all night on
+    /// 2026-08-14 — panicking on the manifest parse, rebooting every ~184 s —
+    /// and because it heartbeat normally for the first 180 s of every cycle,
+    /// <see cref="LastSeenAt"/> stayed fresh and every surface showed it
+    /// online. <see cref="BootCount"/> (boots since the last clean sync) is
+    /// what makes a loop visible: one panic is an incident, a number is a
+    /// loop.
+    /// </para>
+    /// </summary>
+    public string? ContentSyncStatus { get; set; }
+    public string? ContentSyncError { get; set; }
+    public string? ResetReason { get; set; }
+    public int? BootCount { get; set; }
+
+    /// <summary>When the backend last received a sync diagnostic. Distinct
+    /// from <see cref="ContentReportedAt"/>: a toy whose card is dead has no
+    /// content to report but can still report the failure, and that is
+    /// precisely the toy this timestamp exists for.</summary>
+    public DateTime? ContentSyncReportedAt { get; set; }
+
+    /// <summary>
+    /// When the toy last completed a sync, server-stamped from the
+    /// heartbeat's relative <c>ContentSyncedSecondsAgo</c>. The toy has no
+    /// wall clock, so it reports an age off its boot timer and the server
+    /// turns it into an absolute time — the same treatment
+    /// <c>StoryPlay.PlayedAtUtc</c> gives <c>secondsAgo</c>. Null = never
+    /// reported. Ages outside a sane window are ignored rather than turned
+    /// into a nonsense timestamp.
+    /// </summary>
+    public DateTime? ContentSyncedAt { get; set; }
+
     public DateTime RegisteredAt { get; set; }
     public DateTime LastSeenAt { get; set; }
 

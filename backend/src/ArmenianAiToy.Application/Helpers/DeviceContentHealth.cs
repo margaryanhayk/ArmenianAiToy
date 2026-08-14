@@ -51,30 +51,76 @@ public static class DeviceContentHealth
     /// switched off would send them chasing the wrong thing.</summary>
     public const string Offline = "offline";
 
-    /// <summary>Checking in, but has never sent a content report — firmware
-    /// predating this slice. Absence of evidence, not a fault.
+    /// <summary>Checking in, but has never sent a content report NOR a sync
+    /// diagnostic — firmware predating both slices. Absence of evidence, not
+    /// a fault.
     ///
     /// <para>
-    /// <b>TODO — this verdict currently conflates two states, and the second
-    /// one IS a fault.</b> The firmware sends no content block when its SD
-    /// card is missing or dead (<c>content_report.cpp</c> returns early on
-    /// <c>!audio_sd_available()</c>), so a toy on CURRENT firmware with a
-    /// broken card lands here alongside a healthy toy on old firmware — and
-    /// that toy will never tell a story. Harmless today, because every toy
-    /// in the field genuinely predates the content-report release; wrong the
-    /// moment that OTA lands.
-    /// </para>
-    /// <para>
-    /// The fix needs no new wire field: the heartbeat already carries
-    /// <c>FirmwareVersion</c> beside <c>ContentStories</c>, so a device
-    /// reporting a version at or after the content-report release while
-    /// sending no stories is a card fault and deserves its own verdict with
-    /// a real instruction. Note <c>DeviceStoryHealth</c> already reports
-    /// <c>no_storage</c> from the separate <c>SdCardOk</c> flag, so such a
-    /// toy is not invisible today — it simply says nothing useful HERE.
+    /// <b>The conflation this verdict used to carry is now resolved.</b> The
+    /// firmware sends no content block when its SD card is missing or dead
+    /// (<c>content_report.cpp</c> returns early on <c>!audio_sd_available()</c>),
+    /// so a toy on CURRENT firmware with a broken card used to land here
+    /// alongside a healthy toy on old firmware — and that toy will never tell
+    /// a story. The sync-diagnostics slice closes it: a toy that can report
+    /// nothing about its card can still report <see cref="SyncStatusFailed"/>
+    /// with a reason, and that now resolves to <see cref="SyncFailed"/>
+    /// rather than silence. A toy reaching <c>Unknown</c> today is one that
+    /// sent neither, which really is firmware age.
     /// </para>
     /// </summary>
     public const string Unknown = "unknown";
+
+    /// <summary>The toy's last sync attempt did not complete. Ranks above
+    /// the count-derived verdicts on purpose: the card looking complete is
+    /// precisely the lie this verdict exists to break. A failed sync leaves
+    /// the card untouched and the firmware's carry-forward re-advertises the
+    /// OLD entry as verified, so counting alone can report a healthy library
+    /// on a toy that will never receive another story.</summary>
+    public const string SyncFailed = "sync_failed";
+
+    /// <summary>The toy is rebooting on a fault rather than running. Ranks
+    /// above <see cref="SyncFailed"/> because it is the deeper fault — a toy
+    /// that panics before finishing a sync reports the failure as a symptom,
+    /// and naming the crash is what sends an operator to the right
+    /// place.</summary>
+    public const string CrashLooping = "crash_looping";
+
+    // --- Bounded sync-status vocabulary ----------------------------------
+    // The wire value space, closed. The DERIVED verdict reacts only to these
+    // four; anything else the toy sends is stored verbatim for an operator
+    // to read but never moves the verdict, so a firmware typo degrades to
+    // "no opinion" instead of inventing a fault on a healthy toy.
+
+    /// <summary>Last attempt completed; everything it tried, it got.</summary>
+    public const string SyncStatusOk = "ok";
+
+    /// <summary>Last attempt completed, but some items failed.</summary>
+    public const string SyncStatusPartial = "partial";
+
+    /// <summary>Last attempt did not complete at all.</summary>
+    public const string SyncStatusFailed = "failed";
+
+    /// <summary>The toy has never attempted a sync. Not a fault — a toy that
+    /// has only just been switched on is in exactly this state.</summary>
+    public const string SyncStatusNever = "never";
+
+    /// <summary>
+    /// How many boots since the last clean sync before the toy is judged to
+    /// be looping rather than merely restarting.
+    ///
+    /// <para>
+    /// <b>Three, and it is a conjunction, not a count on its own.</b> A boot
+    /// count alone is not a loop signal: a family that switches the toy off
+    /// every night runs up boots without anything being wrong, and a toy that
+    /// simply has no Wi-Fi accumulates boots with no clean sync for a
+    /// perfectly ordinary reason. A fault reset alone is not one either — one
+    /// panic is an incident. Both together are: the 2026-08-14 failure
+    /// rebooted every ~184 s, so a real loop crosses this threshold inside
+    /// ten minutes, while a toy power-cycled by a child never reports a fault
+    /// reason at all.
+    /// </para>
+    /// </summary>
+    public const int CrashLoopBootThreshold = 3;
 
     /// <summary>Mirrors the presence window used for the online dot.</summary>
     public const int DefaultOnlineThresholdSeconds =
@@ -98,12 +144,21 @@ public static class DeviceContentHealth
     /// reported.</param>
     /// <param name="advertised">What the content manifest currently offers,
     /// as (storyId, version) pairs.</param>
+    /// <param name="contentSyncStatus">The toy's own verdict on its last sync
+    /// attempt. Only the bounded vocabulary moves the result; null (never
+    /// reported) and any unrecognised value are treated as no opinion.</param>
+    /// <param name="resetReason">How the toy's last boot ended, e.g.
+    /// <c>PANIC</c> or <c>SW</c>.</param>
+    /// <param name="bootCount">Boots since the toy's last clean sync.</param>
     public static string Resolve(
         string? reportedStories,
         IReadOnlyCollection<(string StoryId, int Version)> advertised,
         DateTime lastSeenAtUtc,
         DateTime nowUtc,
-        int onlineThresholdSeconds = DefaultOnlineThresholdSeconds)
+        int onlineThresholdSeconds = DefaultOnlineThresholdSeconds,
+        string? contentSyncStatus = null,
+        string? resetReason = null,
+        int? bootCount = null)
     {
         var threshold = onlineThresholdSeconds > 0
             ? onlineThresholdSeconds
@@ -111,6 +166,19 @@ public static class DeviceContentHealth
         if ((nowUtc - lastSeenAtUtc).TotalSeconds >= threshold)
         {
             return Offline;
+        }
+        // Both fault verdicts sit ABOVE the "never reported" branch on
+        // purpose. A toy that dies mid-sync, or whose card cannot be read,
+        // sends no story list at all — reading that silence as Unknown is
+        // exactly the blindness that let a crash loop run all night looking
+        // merely online.
+        if (IsCrashLooping(resetReason, bootCount))
+        {
+            return CrashLooping;
+        }
+        if (IsFailedSyncStatus(contentSyncStatus))
+        {
+            return SyncFailed;
         }
         if (reportedStories is null)
         {
@@ -128,6 +196,58 @@ public static class DeviceContentHealth
         if (counts.Present == 0) return Stale;
         return Syncing;
     }
+
+    /// <summary>
+    /// Whether a device-reported status is one this backend understands.
+    /// The vocabulary is closed so an unrecognised value — a firmware typo, a
+    /// future status this build predates — degrades to "no opinion" rather
+    /// than being rendered to a parent as a fault on a healthy toy.
+    /// </summary>
+    public static bool IsKnownSyncStatus(string? status)
+        => status is not null
+           && (Matches(status, SyncStatusOk)
+               || Matches(status, SyncStatusPartial)
+               || Matches(status, SyncStatusFailed)
+               || Matches(status, SyncStatusNever));
+
+    /// <summary>
+    /// Whether the toy's last sync attempt is one to surface as a fault.
+    /// <c>partial</c> counts: it means the toy tried and did not get
+    /// everything, which is the state the carry-forward would otherwise
+    /// disguise as a complete library.
+    /// </summary>
+    private static bool IsFailedSyncStatus(string? status)
+        => Matches(status, SyncStatusFailed) || Matches(status, SyncStatusPartial);
+
+    /// <summary>
+    /// Whether the toy is rebooting on a fault rather than running. See
+    /// <see cref="CrashLoopBootThreshold"/> for why this is a conjunction —
+    /// neither half alone distinguishes a loop from ordinary use.
+    /// </summary>
+    public static bool IsCrashLooping(string? resetReason, int? bootCount)
+        => bootCount is int boots
+           && boots >= CrashLoopBootThreshold
+           && IsFaultResetReason(resetReason);
+
+    /// <summary>
+    /// A reset the toy did not choose. <c>PANIC</c> is the crash; anything
+    /// naming a watchdog (<c>WDT</c>, <c>TASK_WDT</c>, <c>INT_WDT</c>,
+    /// <c>RTC_WDT</c>) is a hang the hardware broke out of. Deliberately
+    /// excludes <c>SW</c>, <c>POWERON</c> and <c>DEEPSLEEP</c>: an OTA
+    /// reboots by software and a child switches the toy off at the wall, and
+    /// neither is a fault.
+    /// </summary>
+    private static bool IsFaultResetReason(string? resetReason)
+    {
+        if (string.IsNullOrWhiteSpace(resetReason)) return false;
+        var value = resetReason.Trim();
+        return value.Contains("PANIC", StringComparison.OrdinalIgnoreCase)
+               || value.Contains("WDT", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool Matches(string? value, string expected)
+        => value is not null
+           && string.Equals(value.Trim(), expected, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Counts how many advertised stories the toy holds AT THE ADVERTISED

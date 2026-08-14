@@ -1903,7 +1903,8 @@ public class ParentService : IParentService
         {
             ContentHealth = DeviceContentHealth.Resolve(
                 l.Device.ContentStories, advertisedStories, l.Device.LastSeenAt, nowUtc,
-                ReadOnlineThresholdSeconds()),
+                ReadOnlineThresholdSeconds(),
+                l.Device.ContentSyncStatus, l.Device.ResetReason, l.Device.BootCount),
             StoriesOnToy = DeviceContentHealth.Count(
                 l.Device.ContentStories, advertisedStories).Present,
             StoriesAvailable = advertisedStories.Count,

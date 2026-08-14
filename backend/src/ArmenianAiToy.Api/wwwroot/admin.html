@@ -65,6 +65,12 @@
   .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; }
   .pill.on { background:var(--ok-bg); color:var(--ok); } .pill.off { background:var(--bad-bg); color:var(--bad); }
   .pill.flag { background:var(--warn-bg); color:var(--warn); } .pill.blk { background:var(--bad-bg); color:var(--bad); }
+  /* One state on this console outranks every other pill: a toy rebooting on a
+     fault. .blk and .off are the same tinted red, which is right for states an
+     operator scans PAST (paused, revoked, partial). A crash loop must not be
+     scanned past, so it gets the solid destructive ground the revoke button
+     already uses. */
+  .pill.crit { background:var(--bad-solid); color:var(--on-danger); font-weight:700; }
   .mut { color:var(--mut); } .mono { font-family:ui-monospace,Consolas,monospace; font-size:12px; }
   code { background:var(--sunken); padding:1px 5px; border-radius:4px; }
   .hide { display:none; }
@@ -104,6 +110,19 @@ function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g, c => ({'&':'&a
 function err(m){ main.innerHTML = `<div class="msg err">${esc(m)}</div>`; }
 function info(m){ main.innerHTML = `<div class="msg info">${esc(m)}</div>`; }
 function dt(s){ return s ? new Date(s).toLocaleString() : '—'; }
+// Relative age. A sync diagnostic is read as "how long has this been true?" —
+// an absolute timestamp makes the operator do the arithmetic, and "4 days ago"
+// is the whole signal for a toy that stopped receiving content.
+function ago(s){
+  if(!s) return 'never';
+  const secs = Math.floor((Date.now() - new Date(s).getTime())/1000);
+  if(!isFinite(secs)) return '—';
+  if(secs < 0) return 'just now';
+  if(secs < 60) return secs + 's ago';
+  if(secs < 5400) return Math.round(secs/60) + 'm ago';
+  if(secs < 172800) return Math.round(secs/3600) + 'h ago';
+  return Math.round(secs/86400) + 'd ago';
+}
 function onoff(b){ return b ? '<span class="pill on">on</span>' : '<span class="pill off">off</span>'; }
 function tri(v){ return v===null||v===undefined ? '<span class="mut">inherit</span>' : onoff(v); }
 
@@ -183,8 +202,17 @@ const tabs = {
       + searchBar('devQ','Search devices — name, MAC, id') + '<div id="devList"></div>';
     const cols = [
       {h:'Name',f:r=>esc(r.name)+`<div class="mono mut">${esc(r.macAddress)}</div>`},
+      // A crash loop OWNS this column, because this is the column that already
+      // means "is this toy okay". It used to render a green "active" beside a
+      // red Library pill — two signals saying fine, one saying not, on the row
+      // of a toy that had panicked 400 times overnight. "active" here only
+      // ever meant "not revoked, not paused", which is perfectly true of a toy
+      // rebooting every three minutes, and that truth is the whole trap.
       {h:'Status',f:r=> (r.isRevoked?'<span class="pill blk">revoked</span> ':'')
-        + (r.isPaused?'<span class="pill blk">paused</span>':'<span class="pill on">active</span>')},
+        + (r.contentHealth === 'crash_looping'
+            ? `<span class="pill crit">CRASH LOOP</span><div class="mono mut">${esc(r.resetReason || 'fault')}`
+              + (r.bootCount != null ? ` · ${r.bootCount} boots` : '') + '</div>'
+            : r.isPaused?'<span class="pill blk">paused</span>':'<span class="pill on">active</span>')},
       // Device-reported identity. Stored since the OTA foundation, never
       // displayed until now — "what board is this toy?" used to need a
       // serial cable. The board matters for rollouts: the firmware offer
@@ -206,6 +234,18 @@ const tabs = {
       // age, not a fault, and is greyed accordingly.
       {h:'Library',f:r=>{
         const h = r.contentHealth;
+        // The crash loop is reported in Status, not here: it is device health,
+        // and an operator scanning for "which toy is broken" does not read a
+        // column called Library. This column stays about the library.
+        if (h === 'crash_looping') return '<span class="mut">see status</span>';
+        // The toy tried and did not finish. Distinct from "partial" below,
+        // which is only ever inferred from counts: this is the toy's own
+        // verdict, and it is the one that survives when a failed sync leaves
+        // the card looking complete via carry-forward.
+        if (h === 'sync_failed') {
+          return '<span class="pill blk">sync failed</span>'
+            + `<div class="mono mut">${esc(r.contentSyncError || r.contentSyncStatus || 'no reason reported')}</div>`;
+        }
         if (h === 'unknown') return '<span class="mut">not reported</span>';
         if (h === 'offline') return '<span class="mut">offline</span>';
         const miss = r.missingStoryIds || [];
@@ -421,12 +461,46 @@ window.openDevice = async function(id){
   info('Loading device…');
   try {
     const convs = (await api('/conversations?deviceId='+encodeURIComponent(id)+'&limit=100')).conversations;
+    // The status card and the "last seen" card are the two the banner below
+    // used to be contradicted by: a green Active and a fresh timestamp, on a
+    // toy that had panicked all night. Fixed at source rather than argued
+    // with in prose — a tired operator resolves a conflict in favour of the
+    // calm signal.
+    const crash = d && d.contentHealth === 'crash_looping';
     const head = d ? `<div class="cards" style="margin-bottom:12px">
-        <div class="card"><div class="n" style="color:var(--${d.isRevoked||d.isPaused?'warn':'ok'})">${d.isRevoked?'Revoked':d.isPaused?'Paused':'Active'}</div><div class="l">status</div></div>
-        <div class="card"><div class="n" style="font-size:15px">${esc(dt(d.lastSeenAt))}</div><div class="l">last seen</div></div>
+        <div class="card"><div class="n" style="color:var(--${crash?'bad':d.isRevoked||d.isPaused?'warn':'ok'})">${crash?'Crash loop':d.isRevoked?'Revoked':d.isPaused?'Paused':'Active'}</div><div class="l">status</div></div>
+        <div class="card"><div class="n" style="font-size:15px">${esc(dt(d.lastSeenAt))}</div><div class="l">${crash?'last seen — between crashes':'last seen'}</div></div>
         <div class="card"><div class="n">$${(d.costTodayUsd||0).toFixed(4)}</div><div class="l">cost today</div></div>
         <div class="card"><div class="n">${d.linkedParents}</div><div class="l">parents</div></div>
       </div>` : '';
+    // Content sync diagnostics. This block is why the whole slice exists: on
+    // 2026-08-14 a toy crash-looped all night and every surface in this
+    // console said it was online and slightly behind on stories, because it
+    // heartbeat normally for the first 180 s of each ~184 s crash cycle. The
+    // banner is deliberately loud and deliberately first — a crash loop is
+    // not a row in a details table.
+    const syncBanner = crash
+      ? `<div class="msg err"><b>CRASH LOOP.</b> This toy is rebooting on a fault, not running.
+          Last reset <b>${esc(d.resetReason || 'fault')}</b>${d.bootCount != null ? `, <b>${d.bootCount}</b> boots since its last clean sync` : ''}.
+          It heartbeats between crashes, so "last seen" stays fresh — that is not evidence this toy is working.</div>`
+      : (d && d.contentHealth === 'sync_failed'
+        ? `<div class="msg err"><b>Last content sync failed.</b>
+            ${esc(d.contentSyncError || 'no reason reported')}
+            — the card keeps its previous stories, so the library on the devices list can look complete.</div>`
+        : '');
+    // The detail line runs for EVERY reporting toy, not just a failing one:
+    // "when did this toy last sync at all" is the first question of any
+    // content investigation, and it had no answer anywhere before now.
+    const syncDetail = d && (d.contentSyncStatus || d.contentSyncedAt || d.contentSyncReportedAt || d.resetReason)
+      ? `<div class="row mut" style="gap:14px;flex-wrap:wrap">
+          <span>sync <b class="mono">${esc(d.contentSyncStatus || 'not reported')}</b></span>
+          ${d.contentSyncError ? `<span>reason <b class="mono">${esc(d.contentSyncError)}</b></span>` : ''}
+          <span>last synced <b>${ago(d.contentSyncedAt)}</b></span>
+          <span>reported <b>${ago(d.contentSyncReportedAt)}</b></span>
+          ${d.resetReason ? `<span>last reset <b class="mono">${esc(d.resetReason)}</b></span>` : ''}
+          ${d.bootCount != null ? `<span>boots since clean sync <b>${d.bootCount}</b></span>` : ''}
+        </div>`
+      : (d ? '<div class="row mut">No sync diagnostics reported — firmware predates this report.</div>' : '');
     const revokeDanger = d && !d.isRevoked ? 'style="background:var(--bad-solid);color:var(--on-danger)"' : '';
     const actions = d ? `<div class="row">
         <button ${revokeDanger} onclick="opAction('revoke','${id}',${!d.isRevoked})">${d.isRevoked?'Restore access':'Revoke (kill switch)'}</button>
@@ -436,7 +510,9 @@ window.openDevice = async function(id){
       </div>` : '';
     main.innerHTML = `<div class="row"><button class="ghost" onclick="show('devices')">← devices</button>
         <span class="mut">${d?esc(d.name):''} <span class="mono">${esc(id.slice(0,8))}</span>${d?' · '+esc(d.macAddress):''}</span></div>`
+      + syncBanner
       + head
+      + syncDetail
       + actions
       + `<div class="row mut">Conversations on this device — click to open in context.</div>`
       + table([

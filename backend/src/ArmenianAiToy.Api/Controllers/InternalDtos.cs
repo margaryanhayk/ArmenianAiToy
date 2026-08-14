@@ -93,6 +93,29 @@ public sealed record AdminDeviceDto(
     public DateTime? ContentReportedAt { get; init; }
 
     /// <summary>
+    /// What the toy's last sync ATTEMPT did, beside the report of what it
+    /// HAS. The content report answers "which stories are on the card"; it
+    /// cannot answer "why did nothing new arrive", because a failed sync
+    /// leaves the card as it was and the firmware's carry-forward then
+    /// re-advertises the old entry as verified.
+    /// <para>
+    /// The raw strings are surfaced verbatim, like <c>ContentStories</c>
+    /// above and for the same reason: when the derived verdict looks wrong,
+    /// the operator needs to see what the toy actually said.
+    /// <c>ResetReason</c> and <c>BootCount</c> are what make a crash loop
+    /// visible at all — a toy that panics and reboots every ~184 s heartbeats
+    /// normally in between, so <c>LastSeenAt</c> stays fresh and it reads as
+    /// online right up until someone attaches a serial cable.
+    /// </para>
+    /// </summary>
+    public string? ContentSyncStatus { get; init; }
+    public string? ContentSyncError { get; init; }
+    public DateTime? ContentSyncReportedAt { get; init; }
+    public DateTime? ContentSyncedAt { get; init; }
+    public string? ResetReason { get; init; }
+    public int? BootCount { get; init; }
+
+    /// <summary>
     /// The rest of the device-reported identity. The toy has sent all three
     /// on every heartbeat since the OTA foundation and the backend has
     /// stored them since then, but nothing ever displayed them — so the

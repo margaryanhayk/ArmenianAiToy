@@ -479,15 +479,35 @@ function DeviceCard({
     .map((c) => (c.age != null ? tf('child_with_age', { name: c.name, n: c.age }) : c.name))
     .join(', ');
 
-  const libraryLine = (() => {
+  // Returns the sentence AND whether it is a fault, because the two fault
+  // verdicts must not sit in the same quiet grey as a progress note.
+  const library = ((): { text: string; alert: boolean } | null => {
     const health = device.contentHealth;
     if (!health || health === 'offline') return null;
     const have = device.storiesOnToy ?? 0;
     const total = device.storiesAvailable ?? 0;
-    if (health === 'up_to_date' && total > 0) return tf('library_ready', { n: total });
-    if (health === 'syncing') return tf('library_updating', { have, total });
-    if (health === 'stale') return t('library_none');
-    if (health === 'unknown') return t('library_unknown');
+    if (health === 'up_to_date' && total > 0) {
+      return { text: tf('library_ready', { n: total }), alert: false };
+    }
+    if (health === 'syncing') {
+      return { text: tf('library_updating', { have, total }), alert: false };
+    }
+    if (health === 'stale') return { text: t('library_none'), alert: false };
+    if (health === 'sync_failed') {
+      // GUARDED on the stories actually being short. The verdict covers the
+      // WHOLE sync — game, voice and music clips too — and fires on "partial"
+      // as well as "failed", so a toy whose story library is complete but
+      // which missed one game clip lands here. Telling that parent the
+      // stories did not arrive would be a plainly false statement about
+      // their child's toy.
+      if (have < total) return { text: t('library_failed'), alert: true };
+      if (total > 0) return { text: tf('library_ready', { n: total }), alert: false };
+      return null;
+    }
+    if (health === 'crash_looping') {
+      return { text: t('library_crash'), alert: true };
+    }
+    if (health === 'unknown') return { text: t('library_unknown'), alert: false };
     return null;
   })();
 
@@ -504,6 +524,13 @@ function DeviceCard({
         <Text style={styles.dotLabel}>{device.isOnline ? t('online') : t('offline')}</Text>
         {device.isRevoked ? <Text style={styles.revokedTag}>{t('revoked')}</Text> : null}
         {device.isPaused ? <Text style={styles.pausedTag}>{t('paused')}</Text> : null}
+        {/* A crash loop is a device fault, not a library fact, and this row
+            is where the card says "something is wrong". Without it the row
+            reads a lone green "Online" on a toy that has been rebooting on
+            a fault all night — the same defect caught in parent.html. */}
+        {device.contentHealth === 'crash_looping' ? (
+          <Text style={styles.faultTag}>{t('fault_chip')}</Text>
+        ) : null}
       </View>
 
       {childLine ? (
@@ -528,7 +555,11 @@ function DeviceCard({
           Offline renders nothing — the dot above already says so, and
           repeating it as a library problem would send the parent chasing
           the wrong thing. */}
-      {libraryLine ? <Text style={styles.libraryLine}>{libraryLine}</Text> : null}
+      {library ? (
+        <Text style={[styles.libraryLine, library.alert && styles.libraryLineAlert]}>
+          {library.text}
+        </Text>
+      ) : null}
 
       <InviteBlock deviceId={device.deviceId} />
 
@@ -649,8 +680,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     overflow: 'hidden',
   },
+  faultTag: {
+    marginLeft: 8,
+    color: theme.danger,
+    backgroundColor: theme.dangerBg,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    fontSize: 12,
+    overflow: 'hidden',
+  },
   children: { color: theme.inkMuted, marginTop: 6 },
   libraryLine: { color: theme.inkMuted, marginTop: 6, fontSize: 13, lineHeight: 19 },
+  // Something went wrong rather than "not finished yet", so it is coloured
+  // like a fault rather than sitting in the same grey as a progress note.
+  // Colour is never the only signal — the tag above and the sentence itself
+  // both carry it.
+  libraryLineAlert: { color: theme.danger },
   childBox: {
     marginTop: 10,
     padding: 12,

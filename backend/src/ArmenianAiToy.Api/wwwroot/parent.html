@@ -1828,6 +1828,43 @@
         ru: 'У нас нет списка сказок этой игрушки. Если она по-прежнему рассказывает сказки, всё в порядке.',
         hy: 'Այս խաղալիքի հեքիաթների ցանկը մեզ մոտ չկա։ Եթե այն շարունակում է հեքիաթներ պատմել, ամեն ինչ կարգին է։'
       },
+      // library_failed = sync_failed. The toy TRIED and did not finish, which
+      // the story count alone cannot show: a failed sync leaves the card as it
+      // was, so the library can read as complete on a toy that will not
+      // receive another story. Never names the reason — "sha256_mismatch" is
+      // not a sentence a parent should be handed.
+      //
+      // The instruction is the one that actually works, for the same reason
+      // library_updating's does: content_sync runs exactly ONCE per boot, so
+      // a power cycle is a genuine fresh attempt and waiting is not. (Stage 2
+      // makes the toy retry on its own; until then this is the honest
+      // action.) It is deliberately the only self-service step offered.
+      library_failed: {
+        en: 'New stories could not reach this toy the last time it tried. Switching it off and on again gives it a fresh attempt.',
+        ru: 'В прошлый раз новые сказки не смогли загрузиться на игрушку. Выключите и снова включите её — она попробует заново.',
+        // «խաղալիքը», not «այն»: as a direct object the pronoun wants the
+        // oblique «նրան», which personifies an inanimate toy — the same trap
+        // that already forced «նրա»→«դրա» elsewhere in this file. Repeating
+        // the noun sidesteps the pronoun question entirely.
+        hy: 'Վերջին անգամ նոր հեքիաթները չհասան խաղալիքին։ Անջատեք և նորից միացրեք խաղալիքը՝ նոր փորձի համար։'
+      },
+      // library_crash = crash_looping. Deliberately offers NO self-service
+      // step: the toy is restarting on a fault, a power cycle does not fix
+      // that, and an instruction that cannot work is exactly the support
+      // contact this product avoids (same rule as library_updating). It also
+      // does not say "it is broken" in device language — it says what the
+      // parent can observe and who to tell.
+      library_crash: {
+        en: 'This toy keeps restarting by itself and is not working properly. Please contact support.',
+        ru: 'Игрушка постоянно перезагружается сама и работает неправильно. Пожалуйста, свяжитесь с поддержкой.',
+        // «անջատվում ու միանում է», not «վերագործարկվում է». The latter is
+        // real Armenian (it is the word Windows and Android use) but it names
+        // an internal device operation, and this block's whole discipline is
+        // that a parent reads what they can SEE — the same reason the keys
+        // above say «գալիս են» rather than «ներբեռնվում են». Nobody watches a
+        // reboot; they watch the toy go dark and light up again.
+        hy: 'Խաղալիքն ինքն իրեն անընդհատ անջատվում ու միանում է և ճիշտ չի աշխատում։ Խնդրում ենք կապվել աջակցման ծառայության հետ։'
+      },
       modes_need_one: { en: 'Keep at least one mode on — otherwise the toy has nothing to do.', ru: 'Оставьте хотя бы один режим включённым — иначе игрушке нечем заняться.', hy: 'Թողեք գոնե մեկ ռեժիմ միացած, այլապես խաղալիքն անելիք չի ունենա։' },
       bedtime_need_both: { en: 'Set both a start and an end time (or clear both to turn bedtime off).', ru: 'Укажите и начало, и конец (или очистите оба, чтобы выключить).', hy: 'Նշեք և՛ սկիզբը, և՛ վերջը (կամ մաքրեք երկուսն էլ՝ անջատելու համար)։' },
       bedtime_same: { en: 'Start and end time cannot be the same.', ru: 'Начало и конец не могут совпадать.', hy: 'Սկիզբը և վերջը չեն կարող նույնը լինել։' },
@@ -3684,7 +3721,13 @@
       // Fault indicator. The backend decides whether there is anything worth
       // reporting (faultCode is empty when there is not), so the UI never has
       // to know which conditions count.
-      if (d.faultCode) {
+      // A crash loop is a device fault, not a library fact, and this badge row
+      // is where the product says "something is wrong". Without the second
+      // clause the row reads a lone green "● Online" on a toy that has been
+      // rebooting on a fault all night — which is exactly the reassurance this
+      // slice exists to stop giving. (It has no faultCode of its own yet:
+      // DeviceFaultCode maps only NoStorage → E-101. See the note below.)
+      if (d.faultCode || d.contentHealth === 'crash_looping') {
         var sb = document.createElement('span');
         sb.textContent = t('fault_chip');
         sb.className = 'chip chip-danger';
@@ -3724,6 +3767,28 @@
             { have: d.storiesOnToy, total: d.storiesAvailable });
         } else if (d.contentHealth === 'stale') {
           libEl.textContent = t('library_none');
+        } else if (d.contentHealth === 'sync_failed') {
+          // Something went wrong rather than "not finished yet", so it is
+          // coloured like the fault line above rather than sitting in the
+          // same grey as a progress note. Still a sentence, never a code:
+          // the toy tried and did not manage, and there is one thing the
+          // parent can do about it.
+          //
+          // GUARDED on the stories actually being short. The verdict covers
+          // the WHOLE sync — game, voice and music clips too — and fires on
+          // "partial" as well as "failed", so a toy whose story library is
+          // complete but which missed one game clip lands here. Telling that
+          // parent the stories did not arrive would be a plainly false
+          // statement about their child's toy.
+          if (d.storiesOnToy < d.storiesAvailable) {
+            libEl.textContent = t('library_failed');
+            libEl.style.color = 'var(--danger-ink-7)';
+          } else if (d.storiesAvailable > 0) {
+            libEl.textContent = tf('library_ready', { n: d.storiesAvailable });
+          }
+        } else if (d.contentHealth === 'crash_looping') {
+          libEl.textContent = t('library_crash');
+          libEl.style.color = 'var(--danger-ink-7)';
         } else if (d.contentHealth === 'unknown') {
           libEl.textContent = t('library_unknown');
         }

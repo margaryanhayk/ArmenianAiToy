@@ -54,7 +54,19 @@ export type LinkedDevice = {
   // Story-library freshness, decided by the backend. Optional so the app
   // keeps working against a server older than the content-report slice.
   // "unknown" means the TOY has not reported (older firmware) — not a fault.
-  contentHealth?: 'up_to_date' | 'syncing' | 'stale' | 'offline' | 'unknown';
+  //
+  // "sync_failed" and "crash_looping" are FAULTS, not progress states, and
+  // the union must list them: a verdict this type does not know falls
+  // through every rendering branch and the library line vanishes entirely,
+  // so the parent whose toy is worst off is the one told nothing.
+  contentHealth?:
+    | 'up_to_date'
+    | 'syncing'
+    | 'stale'
+    | 'offline'
+    | 'unknown'
+    | 'sync_failed'
+    | 'crash_looping';
   storiesOnToy?: number;
   storiesAvailable?: number;
 };

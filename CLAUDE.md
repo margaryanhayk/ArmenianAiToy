@@ -96,7 +96,7 @@ one message is not a rule, which is why it is written here.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2580 tests)
+dotnet test                                     # Run all tests (2622 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 ```
 
@@ -4381,6 +4381,94 @@ This is that slice.
   that release holds only this change plus 14 lines of `offline_quiz.cpp` —
   the gap is toolchain, not source, so the release image belongs to the
   machine that built the last one and none was staged.
+
+### Stage 1 — sync failure reporting (2026-08-14, uncommitted)
+
+Directly motivated by the crash-loop paragraph above: `contentHealth` could
+say a toy was `stale`, but nothing could say WHY — a failed sync leaves the
+card exactly as it was, and the firmware's carry-forward re-advertises the
+old entry as verified, so a failed sync still reads as a healthy library. And
+a device that dies mid-sync sends no content report at all, so it landed in
+`unknown` indistinguishable from old firmware. This slice gives the toy a
+second, independent way to report: what it TRIED, not just what it HAS.
+
+- **Wire.** `DeviceHeartbeatRequest` (`DTOs/`) gains four more optional
+  fields — `ContentSyncStatus` (bounded `ok|partial|failed|never`),
+  `ContentSyncError` (free text, e.g. `sha256_mismatch`), `ResetReason` (how
+  the last boot ended, e.g. `PANIC`), `BootCount` (boots since the last clean
+  sync). A new `HasAnySyncDiagnosticField` is folded INTO the existing
+  `HasAnyContentField`, so a diagnostics-only body — the one report a toy
+  with a dead card can still send, since it has no `ContentStories` to
+  report — persists rather than being dropped as a bare presence ping.
+- **Storage.** Six nullable `Device` columns (migration
+  `AddDeviceSyncDiagnostics`, hand-written like the others —
+  `dotnet-ef` cannot run here), same partial-report discipline: an absent
+  field leaves the stored value alone, an explicitly-sent EMPTY string is a
+  present field that means "no error now" and correctly clears it.
+  `ContentSyncStatus` / `ContentSyncError` / `ResetReason` are trimmed and
+  length-capped server-side (16 / 48 / 24 chars) since they cross a wire from
+  a device we do not control; `BootCount` is stored verbatim.
+  `ContentSyncReportedAt` stamps on any diagnostic field, separately from
+  `ContentReportedAt`.
+- **`DeviceContentHealth.Resolve`** gains two more verdicts, both ranked
+  ABOVE the existing `unknown` branch — the whole point is that a toy which
+  can say what went wrong must never be read as merely old firmware:
+  - `sync_failed` — last sync status was `failed` or `partial`.
+  - `crash_looping` — `BootCount >= CrashLoopBootThreshold` (3) AND
+    `ResetReason` names a fault (`PANIC` or any `*WDT`); explicitly excludes
+    `SW`/`POWERON`/`DEEPSLEEP`, which are not faults. It is a conjunction on
+    purpose — boot count alone can just mean the family switches the toy off
+    nightly, and a fault reason alone can just mean one incident.
+  `offline` still wins over both (an unplugged toy is not a syncing-badly
+  toy). Unrecognized `ContentSyncStatus` values move nothing — a firmware
+  typo degrades to "no opinion," never a fabricated fault.
+- **Surfaces, same commit.** `parent.html`, `mobile/AregParent`
+  (`api.ts`/`i18n.ts`/`DevicesScreen.tsx`) and `admin.html` all render the
+  two new verdicts with new trilingual copy keys (`library_failed`,
+  `library_crash`); the Armenian was reviewed and is byte-identical across
+  web and mobile. `library_failed` keeps the one self-service step this
+  product offers ("switch it off and on again," since content-sync runs once
+  per boot). `library_crash` deliberately offers none — a power cycle does
+  not fix a panic loop — and reads "contact support," same posture as
+  `library_updating`. `admin.html`'s device drill-down and the internal
+  `/api/internal/devices` list (`AdminDeviceDto`, `InternalController.cs`)
+  additionally surface the raw `ContentSyncStatus`/`ContentSyncError`/
+  `ResetReason`/`BootCount`/`ContentSyncReportedAt`/`ContentSyncedAt` fields
+  verbatim, for when the derived verdict needs a human to read what the toy
+  actually said.
+- **Open item — `library_crash` has no fault code.** Every other
+  parent-visible toy fault (see `DeviceFaultCode`, § storage unavailable
+  `E-101`) hands the parent a stable, quotable code and keeps the
+  explanation with support. `library_crash` breaks that pattern: it tells a
+  parent to "contact support" with nothing to read back over the phone. No
+  code has been allocated for `sync_failed` or `crash_looping` yet — should
+  follow the same `DeviceFaultCode` convention before this ships to a real
+  family.
+
+**Correction to the § "The toy says what content it has" write-up above:**
+that section, and an earlier plan, both implied `ContentSyncedSecondsAgo`
+was already persisted. It was not — verified against HEAD before this slice:
+the field existed only on the DTO record and inside `HasAnyContentField`;
+`DeviceService.UpdateFirmwareReportAsync` never read it, so every value a
+toy might have sent was silently discarded since the field was added, with
+no column to hold it and no test to catch the gap. This slice adds the real
+`ContentSyncedAt` column and the `ResolveSyncedAt` conversion (relative
+seconds off the toy's boot timer → absolute UTC, out-of-range values
+ignored) — the same treatment `StoryPlay.PlayedAtUtc` already gives its own
+`secondsAgo`. Recorded here rather than silently fixed, per this repo's
+convention of naming a wrong prior claim instead of overwriting it.
+
+**Not done — the firmware half does not exist.** Every field, column,
+verdict and UI string above is backend/dashboard only. No firmware code
+sends `ContentSyncStatus`, `ContentSyncError`, `ResetReason`, or `BootCount`
+today — `content_sync.cpp` and `ota_foundation.cpp` were not touched by this
+slice. `sync_failed` and `crash_looping` are therefore **unreachable in the
+field** until a firmware release (tracked as 1.3.0) adds the reporting side.
+Do not read this section as describing anything a real toy currently does;
+it describes what the backend is now ready to receive. Test count above
+(2622) includes only the backend-side coverage
+(`DeviceContentHealthTests`, `DeviceServiceOtaTests`) — there is no
+corresponding firmware host-test yet.
 
 ## A live device key in a release image (2026-08-13)
 

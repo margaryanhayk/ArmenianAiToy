@@ -83,6 +83,11 @@ const D = {
   offline: { en: 'Offline', ru: 'Не в сети', hy: 'Անցանց' },
   revoked: { en: 'Access off', ru: 'Доступ отключён', hy: 'Մուտքը կասեցված է' },
   paused: { en: 'Paused', ru: 'На паузе', hy: 'Դադարեցված' },
+  // Sits in the status row beside the online dot. Without it a toy that has
+  // been rebooting on a fault all night shows a lone green "Online" — which
+  // is exactly the reassurance this must not give. Says the state, never a
+  // code: the sentence under the card carries what to do.
+  fault_chip: { en: '⚠ Needs attention', ru: '⚠ Требуется внимание', hy: '⚠ Ուշադրություն է պետք' },
 
   // ---------- errors ----------
   e_generic: {
@@ -345,6 +350,43 @@ const D = {
     en: 'We do not have the story list for this toy. If it still tells stories, nothing is wrong.',
     ru: 'У нас нет списка сказок этой игрушки. Если она по-прежнему рассказывает сказки, всё в порядке.',
     hy: 'Այս խաղալիքի հեքիաթների ցանկը մեզ մոտ չկա։ Եթե այն շարունակում է հեքիաթներ պատմել, ամեն ինչ կարգին է։'
+  },
+  // library_failed = sync_failed. The toy TRIED and did not finish, which
+  // the story count alone cannot show: a failed sync leaves the card as it
+  // was, so the library can read as complete on a toy that will not
+  // receive another story. Never names the reason — "sha256_mismatch" is
+  // not a sentence a parent should be handed.
+  //
+  // The instruction is the one that actually works, for the same reason
+  // library_updating's does: content_sync runs exactly ONCE per boot, so
+  // a power cycle is a genuine fresh attempt and waiting is not. (Stage 2
+  // makes the toy retry on its own; until then this is the honest
+  // action.) It is deliberately the only self-service step offered.
+  library_failed: {
+    en: 'New stories could not reach this toy the last time it tried. Switching it off and on again gives it a fresh attempt.',
+    ru: 'В прошлый раз новые сказки не смогли загрузиться на игрушку. Выключите и снова включите её — она попробует заново.',
+    // «խաղալիքը», not «այն»: as a direct object the pronoun wants the
+    // oblique «նրան», which personifies an inanimate toy — the same trap
+    // that already forced «նրա»→«դրա» elsewhere. Repeating the noun
+    // sidesteps the pronoun question entirely.
+    hy: 'Վերջին անգամ նոր հեքիաթները չհասան խաղալիքին։ Անջատեք և նորից միացրեք խաղալիքը՝ նոր փորձի համար։'
+  },
+  // library_crash = crash_looping. Deliberately offers NO self-service
+  // step: the toy is restarting on a fault, a power cycle does not fix
+  // that, and an instruction that cannot work is exactly the support
+  // contact this product avoids (same rule as library_updating). It also
+  // does not say "it is broken" in device language — it says what the
+  // parent can observe and who to tell.
+  library_crash: {
+    en: 'This toy keeps restarting by itself and is not working properly. Please contact support.',
+    ru: 'Игрушка постоянно перезагружается сама и работает неправильно. Пожалуйста, свяжитесь с поддержкой.',
+    // «անջատվում ու միանում է», not «վերագործարկվում է». The latter is
+    // real Armenian (it is the word Windows and Android use) but it names
+    // an internal device operation, and this block's whole discipline is
+    // that a parent reads what they can SEE — the same reason the keys
+    // above say «գալիս են» rather than «ներբեռնվում են». Nobody watches a
+    // reboot; they watch the toy go dark and light up again.
+    hy: 'Խաղալիքն ինքն իրեն անընդհատ անջատվում ու միանում է և ճիշտ չի աշխատում։ Խնդրում ենք կապվել աջակցման ծառայության հետ։'
   },
   child_with_age: { en: '{name} (age {n})', ru: '{name} ({n} г.)', hy: '{name} ({n} տարեկան)' },
 

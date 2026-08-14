@@ -141,6 +141,9 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                     b.Property<string>("BoardModel")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("BootCount")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ClaimCodeHash")
                         .HasColumnType("TEXT");
 
@@ -160,6 +163,18 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ContentStories")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentSyncError")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ContentSyncReportedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentSyncStatus")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ContentSyncedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("ContentVoiceClips")
@@ -211,6 +226,9 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("RegisteredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResetReason")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("RiddleEnabled")

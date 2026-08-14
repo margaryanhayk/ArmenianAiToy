@@ -160,7 +160,9 @@ public class InternalController : ControllerBase
                 .ToList())
         {
             ContentHealth = DeviceContentHealth.Resolve(
-                d.ContentStories, advertisedStories, d.LastSeenAt, now),
+                d.ContentStories, advertisedStories, d.LastSeenAt, now,
+                DeviceContentHealth.DefaultOnlineThresholdSeconds,
+                d.ContentSyncStatus, d.ResetReason, d.BootCount),
             MissingStoryIds = DeviceContentHealth.MissingStoryIds(
                 d.ContentStories, advertisedStories),
             ContentStories = d.ContentStories,
@@ -169,6 +171,12 @@ public class InternalController : ControllerBase
             ContentVoiceClips = d.ContentVoiceClips,
             ContentMusicTracks = d.ContentMusicTracks,
             ContentReportedAt = d.ContentReportedAt,
+            ContentSyncStatus = d.ContentSyncStatus,
+            ContentSyncError = d.ContentSyncError,
+            ContentSyncReportedAt = d.ContentSyncReportedAt,
+            ContentSyncedAt = d.ContentSyncedAt,
+            ResetReason = d.ResetReason,
+            BootCount = d.BootCount,
             BoardModel = d.BoardModel,
             FirmwareBuild = d.FirmwareBuild,
             PartitionName = d.PartitionName,

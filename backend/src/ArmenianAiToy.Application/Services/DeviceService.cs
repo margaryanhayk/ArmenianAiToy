@@ -216,8 +216,59 @@ public class DeviceService : IDeviceService
         if (report.ContentVoiceClips is not null) device.ContentVoiceClips = report.ContentVoiceClips;
         if (report.ContentMusicTracks is not null) device.ContentMusicTracks = report.ContentMusicTracks;
         if (report.HasAnyContentField) device.ContentReportedAt = nowUtc;
+        // Sync diagnostics — same partial-report rule again. An ABSENT field
+        // leaves the stored value alone; an explicitly-sent EMPTY string is a
+        // present field meaning "no error now" and correctly clears it, which
+        // is how a toy reports that its next sync succeeded.
+        if (report.ContentSyncStatus is not null)
+            device.ContentSyncStatus = NormalizeReported(report.ContentSyncStatus, MaxSyncStatusLength);
+        if (report.ContentSyncError is not null)
+            device.ContentSyncError = NormalizeReported(report.ContentSyncError, MaxSyncErrorLength);
+        if (report.ResetReason is not null)
+            device.ResetReason = NormalizeReported(report.ResetReason, MaxResetReasonLength);
+        if (report.BootCount is not null) device.BootCount = report.BootCount;
+        if (report.ContentSyncedSecondsAgo is not null)
+        {
+            var syncedAt = ResolveSyncedAt(report.ContentSyncedSecondsAgo.Value, nowUtc);
+            if (syncedAt is not null) device.ContentSyncedAt = syncedAt;
+        }
+        if (report.HasAnySyncDiagnosticField) device.ContentSyncReportedAt = nowUtc;
         device.FirmwareReportedAt = nowUtc;
         await _db.SaveChangesAsync();
+    }
+
+    // Length caps on device-writable free text. The firmware sends short
+    // bounded tokens (24 chars is its own buffer), but this crosses a wire
+    // from a device we do not control, so the column is bounded here rather
+    // than trusted. Truncate rather than reject: half a reason still names
+    // the failure, and dropping it would leave the operator with nothing.
+    private const int MaxSyncStatusLength = 16;
+    private const int MaxSyncErrorLength = 48;
+    private const int MaxResetReasonLength = 24;
+
+    /// <summary>Trims, caps, and maps blank to null. Null means "the toy has
+    /// nothing to say here", which for an error field is the same thing the
+    /// toy means by sending an empty string after a clean sync.</summary>
+    private static string? NormalizeReported(string value, int maxLength)
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0) return null;
+        return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
+    }
+
+    /// <summary>
+    /// Turns the toy's relative "seconds ago" into an absolute UTC time. The
+    /// toy has no wall clock; it counts from boot. Same bounded-relative-age
+    /// treatment <c>ReportStoryPlaysAsync</c> gives its own secondsAgo:
+    /// anything negative or older than the window is ignored outright rather
+    /// than persisted as a nonsense timestamp that a dashboard would then
+    /// render as fact.
+    /// </summary>
+    private static DateTime? ResolveSyncedAt(int secondsAgo, DateTime nowUtc)
+    {
+        if (secondsAgo < 0) return null;
+        if (secondsAgo > (int)TimeSpan.FromDays(90).TotalSeconds) return null;
+        return nowUtc.AddSeconds(-secondsAgo);
     }
 
     public async Task<int> ReportStoryPlaysAsync(
