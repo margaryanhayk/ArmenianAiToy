@@ -156,6 +156,39 @@ public class DeviceController : ControllerBase
         return Ok(new { accepted });
     }
 
+    // Store-and-forward upload of OFFLINE game sessions — the same shape and
+    // the same transport as story-plays above, for the same gap: the offline
+    // games run entirely on the toy from SD clips and make no network call, so
+    // without this a child can play all afternoon and the dashboard shows
+    // nothing. At-least-once, so `accepted` may legitimately be 0 on a
+    // re-upload. Device-authed (middleware).
+    //
+    // The body carries no free text and never will: these games have no
+    // microphone, and the toy may report only what the buttons measured.
+    [HttpPost("game-plays")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> ReportGamePlays(
+        [FromBody] GamePlayReportRequest request)
+    {
+        var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
+        if (request?.Events is null || request.Events.Count == 0)
+        {
+            return BadRequest(new { error = "At least one event is required." });
+        }
+        if (request.Events.Count > GamePlayReportRequest.MaxEvents)
+        {
+            return BadRequest(new
+            {
+                error = $"At most {GamePlayReportRequest.MaxEvents} events per upload."
+            });
+        }
+        var accepted = await _deviceService.ReportGamePlaysAsync(
+            deviceId, request, DateTime.UtcNow);
+        return Ok(new { accepted });
+    }
+
     /// <summary>
     /// Welcome-flow — turns the child's spoken answer to a menu question into
     /// ONE bounded intent token. The toy asks «ի՞նչ անենք» (or offers a story)

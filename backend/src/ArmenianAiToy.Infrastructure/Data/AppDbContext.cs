@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<ParentEmailVerificationToken> ParentEmailVerificationTokens => Set<ParentEmailVerificationToken>();
     public DbSet<DeviceCommand> DeviceCommands => Set<DeviceCommand>();
     public DbSet<StoryPlay> StoryPlays => Set<StoryPlay>();
+    public DbSet<GamePlay> GamePlays => Set<GamePlay>();
     public DbSet<StoryReflectionAnswer> StoryReflectionAnswers => Set<StoryReflectionAnswer>();
     public DbSet<StoryRequest> StoryRequests => Set<StoryRequest>();
     public DbSet<DeviceInvite> DeviceInvites => Set<DeviceInvite>();
@@ -222,6 +223,25 @@ public class AppDbContext : DbContext
             e.HasIndex(p => new { p.DeviceId, p.ClientEventKey }).IsUnique();
             e.HasIndex(p => new { p.DeviceId, p.PlayedAtUtc });
             e.HasIndex(p => new { p.DeviceId, p.StoryId });
+        });
+
+        // GamePlay — device-reported OFFLINE game sessions (store-and-forward
+        // from the toy, exactly as StoryPlay above). Same FK cascade for the
+        // same reason: play history is parent-facing activity data, not audit
+        // material, so it dies with the device. Same three indexes — the
+        // unique (DeviceId, ClientEventKey) is the idempotency contract for
+        // the at-least-once upload, (DeviceId, PlayedAtUtc) backs the
+        // newest-first list, (DeviceId, GameKey) backs the per-game counts.
+        modelBuilder.Entity<GamePlay>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.HasOne(p => p.Device)
+                .WithMany()
+                .HasForeignKey(p => p.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(p => new { p.DeviceId, p.ClientEventKey }).IsUnique();
+            e.HasIndex(p => new { p.DeviceId, p.PlayedAtUtc });
+            e.HasIndex(p => new { p.DeviceId, p.GameKey });
         });
 
         // StoryReflectionAnswer — append-only per-listen child answers to the

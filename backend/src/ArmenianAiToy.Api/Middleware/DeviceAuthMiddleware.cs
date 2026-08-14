@@ -18,6 +18,7 @@ public class DeviceAuthMiddleware
         "/api/audio",
         "/api/devices/heartbeat",
         "/api/devices/story-plays",
+        "/api/devices/game-plays",
         "/api/devices/commands",
         "/api/devices/firmware-manifest",
         "/api/devices/firmware-image",

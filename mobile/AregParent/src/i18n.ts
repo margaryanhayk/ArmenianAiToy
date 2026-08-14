@@ -181,7 +181,11 @@ const D = {
   // ---------- the diary ----------
   // Named as things that happened, not as screens. Short enough for three
   // pills across a 390px phone in all three languages.
-  diary_talk: { en: 'Talked', ru: 'Разговоры', hy: 'Խոսել է' },
+  // «Беседы», not «Разговоры»: with a fourth pill in the row each one is
+  // ~55px wide on a 320px phone, and the 9-character word was the only label
+  // that could not render at full size — one pill shrinking beside three
+  // others reads as a rendering bug.
+  diary_talk: { en: 'Talked', ru: 'Беседы', hy: 'Խոսել է' },
   diary_heard: { en: 'Heard', ru: 'Слушал', hy: 'Լսել է' },
   diary_held: { en: 'Held back', ru: 'Задержано', hy: 'Կասեցված' },
 
@@ -603,6 +607,63 @@ const D = {
     en: "Your child's answers",
     ru: 'Ответы вашего ребёнка',
     hy: 'Ձեր երեխայի պատասխանները',
+  },
+
+  // ---------- games played on the toy ----------
+  // The offline games run on the toy itself and make no network call, so
+  // without the toy's upload this screen is the only place they exist.
+  // Describes, never grades: no best, no streak, no comparison.
+  //
+  // The Armenian names are the ones authored in
+  // backend/content/offline-games/game-clips.json rather than new
+  // inventions — a game must not have one name in the clips and another on
+  // its parent's screen. mind-reader has no authored title, so it uses the
+  // spoken frame that file suggests.
+  // Armenian uses the instrumental here — «խաղալիքի վրա» is an English
+  // calque, and «խաղացածը» over-nominalizes.
+  games_title: { en: 'Games on the toy', ru: 'Игры на игрушке', hy: 'Խաղեր՝ խաղալիքով' },
+  // Kept short: it sits in a row of pills beside three others. Russian is
+  // PLURAL past («Играли»), because the masculine singular «Играл» reads as
+  // "he played" to the parent of a girl.
+  diary_played: { en: 'Played', ru: 'Играли', hy: 'Խաղաց' },
+  game_mind_reader: { en: "I'll guess your animal", ru: 'Я угадаю животное', hy: 'Ես կգուշակեմ' },
+  game_who_first: { en: "Who's first", ru: 'Кто первый', hy: 'Ո՞վ առաջինը' },
+  game_button_simon: { en: 'Repeat after me', ru: 'Повтори за мной', hy: 'Կրկնի՛ր իմ հետևից' },
+  game_sound_detective: { en: 'Guess the sound', ru: 'Угадай звук', hy: 'Գուշակի՛ր ձայնը' },
+  // Says "after the next update", not "when it is online": no shipped
+  // firmware sends these events yet, so promising that an online toy will
+  // upload them would leave a parent waiting on a toy they think is broken.
+  // Change this line when the firmware reporter ships. Byte-identical to the
+  // web dashboard's no_game_plays_yet — the two must not drift.
+  no_games: {
+    en: 'Nothing here yet. Your toy starts sending these once it has the latest update.',
+    ru: 'Пока пусто. Игрушка начнёт присылать это после ближайшего обновления.',
+    hy: 'Այստեղ դեռ ոչինչ չկա։ Խաղալիքը կսկսի ուղարկել դրանք մոտակա թարմացումից հետո։',
+  },
+  games_note: {
+    en: 'These games are played on the toy itself, with the buttons. The toy is not listening — it can only report which buttons were pressed.',
+    ru: 'В эти игры играют на самой игрушке, кнопками. Игрушка не слушает — она сообщает только о нажатиях кнопок.',
+    hy: 'Այս խաղերը խաղում են խաղալիքի կոճակներով։ Խաղալիքը չի լսում — այն հաղորդում է միայն, թե որ կոճակներն են սեղմվել։',
+  },
+  // The Russian avoids a counted noun on purpose: «играли 2 раз» is
+  // ungrammatical («раза»), and a static string cannot decline.
+  games_count: { en: 'played {n}×', ru: 'сыграно: {n}', hy: 'խաղացվել է {n} անգամ' },
+  // How the SESSION ended, never how the child did.
+  //
+  // "ended without a win", NOT "ended in a loss": one vocabulary covers four
+  // games and the token names no subject. In mind-reader a `lost` session is
+  // AREG failing to guess — i.e. the child won — so "a loss" would report a
+  // child's win as a defeat. In the two-player buzzer the toy is forbidden
+  // from ever naming a loser.
+  game_won: { en: 'ended in a win', ru: 'закончилась победой', hy: 'ավարտվեց հաղթանակով' },
+  game_lost: { en: 'ended without a win', ru: 'закончилась без победы', hy: 'ավարտվեց առանց հաղթանակի' },
+  game_stopped: { en: 'stopped partway', ru: 'остановилась на середине', hy: 'ընդհատվեց' },
+  game_rounds: { en: '{n} rounds', ru: 'раундов: {n}', hy: '{n} փուլ' },
+  game_reached: { en: 'reached {n}', ru: 'дошло до {n}', hy: 'հասավ {n} քայլի' },
+  showing_recent_games: {
+    en: 'Showing the {n} most recent.',
+    ru: 'Показаны только последние записи ({n}).',
+    hy: 'Ցուցադրված են վերջին {n} խաղը։',
   },
 
   // ---------- story library ----------

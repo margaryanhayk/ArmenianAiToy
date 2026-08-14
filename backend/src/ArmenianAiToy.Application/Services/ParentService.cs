@@ -770,6 +770,8 @@ public class ParentService : IParentService
             _db.Set<Child>().Where(c => c.DeviceId == deviceId));
         _db.Set<StoryPlay>().RemoveRange(
             _db.Set<StoryPlay>().Where(p => p.DeviceId == deviceId));
+        _db.Set<GamePlay>().RemoveRange(
+            _db.Set<GamePlay>().Where(p => p.DeviceId == deviceId));
         _db.Set<StoryReflectionAnswer>().RemoveRange(
             _db.Set<StoryReflectionAnswer>().Where(a => a.DeviceId == deviceId));
         _db.Set<DeviceCommand>().RemoveRange(
@@ -2076,6 +2078,12 @@ public class ParentService : IParentService
                 .ToListAsync())
             .GroupBy(p => p.DeviceId)
             .ToDictionary(g => g.Key, g => g.ToList());
+        var gamePlaysByDevice = (await _db.Set<GamePlay>()
+                .Where(p => linkedIds.Contains(p.DeviceId))
+                .OrderByDescending(p => p.PlayedAtUtc)
+                .ToListAsync())
+            .GroupBy(p => p.DeviceId)
+            .ToDictionary(g => g.Key, g => g.ToList());
         var reflectionAnswersByDevice = (await _db.Set<StoryReflectionAnswer>()
                 .Where(a => linkedIds.Contains(a.DeviceId))
                 .OrderByDescending(a => a.CreatedAtUtc)
@@ -2135,6 +2143,11 @@ public class ParentService : IParentService
                 ? devicePlays.Select(p => new StoryPlayDto(
                     p.StoryId, p.Finished, p.Source, p.PlayedAtUtc, p.TimeIsApproximate)).ToList()
                 : new List<StoryPlayDto>(),
+            GamePlays = gamePlaysByDevice.TryGetValue(d.Id, out var deviceGames)
+                ? deviceGames.Select(p => new GamePlayDto(
+                    p.GameKey, p.Rounds, p.Outcome, p.Score,
+                    p.PlayedAtUtc, p.TimeIsApproximate)).ToList()
+                : new List<GamePlayDto>(),
             ReflectionAnswers = reflectionAnswersByDevice.TryGetValue(d.Id, out var deviceAnswers)
                 ? deviceAnswers.Select(a => new StoryReflectionAnswerDto(
                     a.StoryId, a.QuestionIndex, a.AnswerText,
@@ -2301,6 +2314,57 @@ public class ParentService : IParentService
                 .OrderByDescending(t => t.Count)
                 .ThenBy(t => t.StoryId, StringComparer.Ordinal)
                 .Select(t => new StoryPlayTotalDto(t.StoryId, t.Count, t.FinishedCount))
+                .ToList(),
+            total);
+    }
+
+    public async Task<GamePlaysResponse?> GetGamePlaysAsync(
+        Guid parentId, Guid deviceId, int limit, int offset)
+    {
+        // Same ownership gate + silent-null shape as GetStoryPlaysAsync — an
+        // unlinked device is indistinguishable from an unknown one.
+        var linked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!linked)
+        {
+            return null;
+        }
+
+        var query = _db.Set<GamePlay>().Where(p => p.DeviceId == deviceId);
+
+        var total = await query.CountAsync();
+
+        var plays = await query
+            .OrderByDescending(p => p.PlayedAtUtc)
+            .Skip(offset)
+            .Take(limit)
+            .Select(p => new
+            {
+                p.GameKey,
+                p.Rounds,
+                p.Outcome,
+                p.Score,
+                p.PlayedAtUtc,
+                p.TimeIsApproximate,
+            })
+            .ToListAsync();
+
+        // Whole-history per-game counters (not paginated), so they do not
+        // depend on the page the parent happens to be on. A COUNT and nothing
+        // else — see GamePlayTotalDto on why there is no best-score column.
+        var totals = await query
+            .GroupBy(p => p.GameKey)
+            .Select(g => new { GameKey = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        return new GamePlaysResponse(
+            plays.Select(p => new GamePlayDto(
+                p.GameKey, p.Rounds, p.Outcome, p.Score,
+                p.PlayedAtUtc, p.TimeIsApproximate)).ToList(),
+            totals
+                .OrderByDescending(t => t.Count)
+                .ThenBy(t => t.GameKey, StringComparer.Ordinal)
+                .Select(t => new GamePlayTotalDto(t.GameKey, t.Count))
                 .ToList(),
             total);
     }

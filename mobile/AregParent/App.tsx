@@ -14,6 +14,8 @@ import FlaggedScreen from './src/screens/FlaggedScreen';
 import AccountScreen from './src/screens/AccountScreen';
 import ProvisioningScreen from './src/screens/ProvisioningScreen';
 import StoryPlaysScreen from './src/screens/StoryPlaysScreen';
+import GamePlaysScreen from './src/screens/GamePlaysScreen';
+import { DiaryView } from './src/screens/DiaryFilter';
 import StoryLibraryScreen from './src/screens/StoryLibraryScreen';
 import MusicScreen from './src/screens/MusicScreen';
 import StoryRequestScreen from './src/screens/StoryRequestScreen';
@@ -30,6 +32,9 @@ type Screen =
   // Per-toy: stories play from the toy's own memory, and the library's listen
   // counts are scoped to one toy.
   | { name: 'plays'; deviceId: string; deviceName: string }
+  // Per-toy for the same reason: the offline games run on the toy itself and
+  // are the only activity that never becomes a conversation.
+  | { name: 'gameplays'; deviceId: string; deviceName: string }
   | { name: 'library'; deviceId: string; deviceName: string }
   // Account-wide: music is the same for every toy, and requests and the
   // activity feed belong to the parent, not to a toy.
@@ -83,16 +88,23 @@ function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
     );
   }
 
-  // The diary's three views are one destination with three shapes, so the
-  // routing for them lives in one place rather than being spelled out three
-  // times with three chances to differ.
-  const goDiary = (deviceId: string, deviceName: string) => (v: 'conversations' | 'plays' | 'flagged') =>
+  // The diary's views are one destination with several shapes, so the routing
+  // for them lives in one place rather than being spelled out per screen with
+  // that many chances to differ.
+  //
+  // Typed as DiaryView, NOT as an inline union: when the filter grew a fourth
+  // pill, a hand-copied union here would have compiled happily and dropped
+  // every tap on it into the conversations branch — the wrong screen, with no
+  // error anywhere.
+  const goDiary = (deviceId: string, deviceName: string) => (v: DiaryView) =>
     setScreen(
       v === 'plays'
         ? { name: 'plays', deviceId, deviceName }
-        : v === 'flagged'
-          ? { name: 'flagged', deviceId, deviceName }
-          : { name: 'conversations', deviceId, deviceName },
+        : v === 'gameplays'
+          ? { name: 'gameplays', deviceId, deviceName }
+          : v === 'flagged'
+            ? { name: 'flagged', deviceId, deviceName }
+            : { name: 'conversations', deviceId, deviceName },
     );
 
   if (screen.name === 'capabilities') {
@@ -102,6 +114,18 @@ function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
   if (screen.name === 'plays') {
     return (
       <StoryPlaysScreen
+        deviceId={screen.deviceId}
+        deviceName={screen.deviceName}
+        onBack={() => setScreen({ name: 'devices' })}
+        onDiary={goDiary(screen.deviceId, screen.deviceName)}
+        onLogout={onLogout}
+      />
+    );
+  }
+
+  if (screen.name === 'gameplays') {
+    return (
+      <GamePlaysScreen
         deviceId={screen.deviceId}
         deviceName={screen.deviceName}
         onBack={() => setScreen({ name: 'devices' })}

@@ -51,6 +51,9 @@ public class ParentServiceAuthTests
             modelBuilder.Entity<Child>().Ignore(c => c.Device);
             modelBuilder.Entity<Child>().Ignore(c => c.Conversations);
             modelBuilder.Entity<StoryPlay>().HasKey(p => p.Id);
+            // UnlinkDeviceAsync erases every per-family row hanging off the
+            // toy, GamePlays included, so this model must know the type.
+            modelBuilder.Entity<GamePlay>().HasKey(p => p.Id);
             modelBuilder.Entity<StoryReflectionAnswer>().HasKey(a => a.Id);
             modelBuilder.Entity<DeviceCommand>().HasKey(c => c.Id);
         }

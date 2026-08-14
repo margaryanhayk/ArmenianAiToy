@@ -962,6 +962,41 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Device-reported OFFLINE game history for a linked device — the "Games
+    /// played" dashboard list. Exact mirror of the story-plays endpoint above,
+    /// and it exists for the same reason: the offline games run on the toy
+    /// itself and never become conversations, so this is the only record that
+    /// they happened. <c>timeIsApproximate</c> marks rows played while the toy
+    /// was offline, where only the upload time is known. Paginated
+    /// newest-first; <c>totals</c> carries whole-history per-game play counts.
+    /// Ownership-checked; silent 404 on a device not linked to this account.
+    /// Same pagination contract as the conversation endpoints
+    /// (offset &lt; 0 / limit &lt; 1 → 400; limit clamped to 100).
+    /// </summary>
+    [HttpGet("devices/{deviceId}/game-plays")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetGamePlays(
+        Guid deviceId, [FromQuery] int limit = 20, [FromQuery] int offset = 0)
+    {
+        if (offset < 0)
+            return BadRequest(new { error = "offset must be >= 0" });
+        if (limit < 1)
+            return BadRequest(new { error = "limit must be between 1 and 100" });
+        if (limit > 100)
+            limit = 100;
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var result = await _parentService.GetGamePlaysAsync(parentId, deviceId, limit, offset);
+        if (result is null)
+            return NotFound(new { error = "Device not found or not linked to this account." });
+        return Ok(result);
+    }
+
+    /// <summary>
     /// B4: append-only history of the child's answers to the after-story
     /// meaning question — one row per listen, never overwritten, so a parent
     /// can watch understanding grow across repeat listens. Newest-first,

@@ -314,6 +314,34 @@ export type StoryPlaysResult = {
   total: number;
 };
 
+/**
+ * One offline-game session reported by the toy. `outcome` is a bounded token
+ * from the backend (`won` | `lost` | `stopped`) but it arrives as runtime
+ * JSON, so it is typed as a plain string with null: a narrower union would
+ * only lie to the compiler, and every render branch must handle a value it
+ * does not recognise rather than showing nothing.
+ *
+ * `rounds` / `outcome` / `score` are nullable because null means "the toy did
+ * not measure it", which is a different statement from zero.
+ */
+export type GamePlay = {
+  gameKey: string;
+  rounds: number | null;
+  outcome: string | null;
+  score: number | null;
+  playedAtUtc: string;
+  timeIsApproximate: boolean;
+};
+
+/** A count and nothing else — no best, no streak. See GamePlayTotalDto. */
+export type GamePlayTotal = { gameKey: string; count: number };
+
+export type GamePlaysResult = {
+  plays: GamePlay[];
+  totals: GamePlayTotal[];
+  total: number;
+};
+
 export type ReflectionAnswer = {
   storyId: string;
   questionIndex: number;
@@ -373,6 +401,17 @@ export type AuditEntry = {
 export function getStoryPlays(deviceId: string, limit = 100): Promise<StoryPlaysResult> {
   return getJson<StoryPlaysResult>(
     `/api/parents/devices/${encodeURIComponent(deviceId)}/story-plays?limit=${limit}&offset=0`,
+  );
+}
+
+/**
+ * GET /api/parents/devices/{id}/game-plays — the games played on the toy
+ * itself. These never become conversations (no network call is made while
+ * they run), so this endpoint is the only record that they happened.
+ */
+export function getGamePlays(deviceId: string, limit = 100): Promise<GamePlaysResult> {
+  return getJson<GamePlaysResult>(
+    `/api/parents/devices/${encodeURIComponent(deviceId)}/game-plays?limit=${limit}&offset=0`,
   );
 }
 

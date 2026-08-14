@@ -177,6 +177,16 @@ public interface IParentService
         Guid parentId, Guid deviceId, int limit, int offset);
 
     /// <summary>
+    /// Device-reported OFFLINE game history + per-game play totals for a
+    /// linked device. Exact mirror of <see cref="GetStoryPlaysAsync"/>:
+    /// null when the device is not linked to this parent (silent 404 at the
+    /// controller), <paramref name="limit"/>/<paramref name="offset"/>
+    /// paginate the session list only, totals are always whole-history.
+    /// </summary>
+    Task<GamePlaysResponse?> GetGamePlaysAsync(
+        Guid parentId, Guid deviceId, int limit, int offset);
+
+    /// <summary>
     /// B4 — append-only reflection-answer history for a linked device,
     /// newest-first, optionally filtered by story. Null when the device is
     /// not linked to this parent (silent 404 at the controller).

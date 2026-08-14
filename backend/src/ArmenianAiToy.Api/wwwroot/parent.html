@@ -1428,6 +1428,35 @@
       <div id="playsStatus" class="status muted" aria-live="polite"></div>
     </section>
 
+    <!-- Games played view — the offline games (mind-reader, the two-player
+         buzzer, Button Simon, the sound quiz) run entirely on the toy from
+         its SD card and never become conversations, so this list is the only
+         record that they happened at all.
+
+         Describes, never grades. There is no best score, no streak, no
+         "improving" and no comparison with last week anywhere on this
+         screen: a child who stopped Simon at three is not behind a child who
+         reached six, and a parent screen that implies otherwise turns a game
+         into a test. -->
+    <section id="gamesPlayedView" class="card" hidden>
+      <h2>
+        <button class="link" id="gamesPlayedBackToDevices" data-i18n-aria="nav_toy" data-i18n="nav_toy">← Toy</button>
+      </h2>
+      <div class="filter-row" id="gamesPlayedDiaryFilter"></div>
+      <div id="gamesPlayedDeviceContext" class="device-context"></div>
+      <div id="gamesPlayedTotals" style="margin:8px 0 12px;"></div>
+      <div id="gamesPlayedList"></div>
+      <!-- Same honest tail as the plays list: the counters above are
+           whole-history while this list is one page. -->
+      <div id="gamesPlayedTruncated" class="pager-info" hidden></div>
+      <!-- Static, NOT in the aria-live status region below: a screen reader
+           would announce this whole paragraph as a live update on every load,
+           and that region is also where errors land. -->
+      <div id="gamesPlayedNote" class="pager-info" style="text-align:left;" hidden
+           data-i18n="games_played_note"></div>
+      <div id="gamesPlayedStatus" class="status muted" aria-live="polite"></div>
+    </section>
+
     <!-- Story library view (Slice D) — what the toy can play, with the
          story metadata (author / goal / lesson), the parent's own listen
          counts, and a ▶ preview of the shipped narration. -->
@@ -1762,6 +1791,20 @@
       // than as the names of screens.
       filter_flagged: { en: 'Only what was held back', ru: 'Только задержанное', hy: 'Միայն այն, ինչ կասեցվել է' },
       filter_plays: { en: 'Stories heard', ru: 'Прослушанные сказки', hy: 'Լսած հեքիաթները' },
+      // Deliberately not "Games": the diary already offers «Խաղ» as a
+      // CONVERSATION mode (games Areg plays over Wi-Fi). This one is the
+      // offline games played on the toy itself, and two entries reading
+      // "Games" would be a riddle rather than a menu.
+      // Armenian uses the instrumental here — «խաղալիքի վրա» is an English
+      // calque, and «խաղացածը» over-nominalizes.
+      filter_game_plays: { en: 'Games on the toy', ru: 'Игры на игрушке', hy: 'Խաղեր՝ խաղալիքով' },
+      // The diary select mixes two kinds of answer, so it is grouped: the
+      // first group filters CONVERSATIONS by the mode Areg was in, the second
+      // opens a different list entirely. Flat, "Games" (a conversation mode)
+      // sat four rows above "Games on the toy" (offline sessions) with
+      // nothing saying they were different species.
+      filter_grp_modes: { en: 'Talking with Areg', ru: 'Разговоры с Арегом', hy: 'Զրույցներ Արեգի հետ' },
+      filter_grp_lists: { en: 'Other records', ru: 'Другие записи', hy: 'Այլ գրառումներ' },
       filter_journal: { en: 'What my child said', ru: 'Что сказал мой ребёнок', hy: 'Իմ երեխայի ասածը' },
       bedtime_label: { en: '🌙 Bedtime:', ru: '🌙 Сон:', hy: '🌙 Քնի ժամ՝' },
       modes_label: { en: '🎮 Modes:', ru: '🎮 Режимы:', hy: '🎮 Ռեժիմներ՝' },
@@ -2072,6 +2115,44 @@
       listened_on_toy: { en: 'Toy', ru: 'Игрушка', hy: 'Խաղալիքը' },
       listened_all_toys: { en: 'Across all your toys', ru: 'По всем вашим игрушкам', hy: 'Ձեր բոլոր խաղալիքներով' },
       plays_more: { en: 'Showing the {n} most recent.', ru: 'Показаны только последние записи ({n}).', hy: 'Ցուցադրված են վերջին {n} լսումը։' },
+
+      // ---------- games played on the toy ----------
+      // The Armenian names are the ones authored in
+      // backend/content/offline-games/game-clips.json, not new inventions:
+      // a game must not have one name in the clips and another on its
+      // parent's screen. mind-reader has no authored title, so it uses the
+      // spoken frame that file suggests.
+      game_mind_reader: { en: "I'll guess your animal", ru: 'Я угадаю животное', hy: 'Ես կգուշակեմ' },
+      game_who_first: { en: "Who's first", ru: 'Кто первый', hy: 'Ո՞վ առաջինը' },
+      game_button_simon: { en: 'Repeat after me', ru: 'Повтори за мной', hy: 'Կրկնի՛ր իմ հետևից' },
+      game_sound_detective: { en: 'Guess the sound', ru: 'Угадай звук', hy: 'Գուշակի՛ր ձայնը' },
+      // Its own key rather than reusing plays_more: that string's Armenian
+      // counts «լսում» (listens), which is the wrong noun over games.
+      game_plays_more: { en: 'Showing the {n} most recent.', ru: 'Показаны только последние записи ({n}).', hy: 'Ցուցադրված են վերջին {n} խաղը։' },
+      // These describe how the SESSION ended, never how the child did. No
+      // best, no streak, no comparison — see the view's comment.
+      //
+      // "ended without a win", NOT "ended in a loss": one vocabulary covers
+      // four games and the token names no subject. In mind-reader a `lost`
+      // session is AREG failing to guess — i.e. the child won — so "a loss"
+      // would report a child's win as a defeat. In the two-player buzzer the
+      // toy is forbidden from ever naming a loser. Only Simon and the sound
+      // quiz mean what the word implies, so the label has to be true for all
+      // four or it is simply wrong.
+      game_won: { en: 'ended in a win', ru: 'закончилась победой', hy: 'ավարտվեց հաղթանակով' },
+      game_lost: { en: 'ended without a win', ru: 'закончилась без победы', hy: 'ավարտվեց առանց հաղթանակի' },
+      game_stopped: { en: 'stopped partway', ru: 'остановилась на середине', hy: 'ընդհատվեց' },
+      game_rounds: { en: '{n} rounds', ru: 'раундов: {n}', hy: '{n} փուլ' },
+      game_reached: { en: 'reached {n}', ru: 'дошло до {n}', hy: 'հասավ {n} քայլի' },
+      // The Russian avoids a counted noun on purpose: «играли 2 раз» is
+      // ungrammatical («раза»), and a static string cannot decline.
+      games_count: { en: 'played {n}×', ru: 'сыграно: {n}', hy: 'խաղացվել է {n} անգամ' },
+      // Says "after the next update", not "when it is online": no shipped
+      // firmware sends these events yet, so promising that an online toy will
+      // upload them would leave a parent waiting on a toy they think is
+      // broken. Change this line when the firmware reporter ships.
+      no_game_plays_yet: { en: 'Nothing here yet. Your toy starts sending these once it has the latest update.', ru: 'Пока пусто. Игрушка начнёт присылать это после ближайшего обновления.', hy: 'Այստեղ դեռ ոչինչ չկա։ Խաղալիքը կսկսի ուղարկել դրանք մոտակա թարմացումից հետո։' },
+      games_played_note: { en: 'These games are played on the toy itself, with the buttons. The toy is not listening — it can only report which buttons were pressed.', ru: 'В эти игры играют на самой игрушке, кнопками. Игрушка не слушает — она сообщает только о нажатиях кнопок.', hy: 'Այս խաղերը խաղում են խաղալիքի կոճակներով։ Խաղալիքը չի լսում — այն հաղորդում է միայն, թե որ կոճակներն են սեղմվել։' },
       no_requests_yet: { en: "You haven't asked for a story yet.", ru: 'Вы ещё не заказывали сказку.', hy: 'Դուք դեռ հեքիաթ չեք պատվիրել։' },
       err_request_empty: { en: 'Please describe the story, or attach a photo.', ru: 'Опишите сказку или приложите фото.', hy: 'Նկարագրեք հեքիաթը կամ կցեք լուսանկար։' },
       photo_only: { en: '(photo only)', ru: '(только фото)', hy: '(միայն լուսանկար)' },
@@ -2304,7 +2385,7 @@
       toyView: 'today', devicesView: 'today',
       libraryView: 'library', musicView: 'library',
       summariesView: 'diary', flaggedView: 'diary', playsView: 'diary',
-      journalView: 'diary', detailView: 'diary',
+      gamesPlayedView: 'diary', journalView: 'diary', detailView: 'diary',
       settingsView: 'settings', accountView: 'settings', auditView: 'settings',
       capabilitiesView: 'settings'
     };
@@ -2367,7 +2448,7 @@
                  'verifyEmailRequestView', 'verifyEmailCompleteView',
                  'devicesView', 'toyView', 'settingsView', 'accountView',
                  'capabilitiesView', 'summariesView', 'flaggedView',
-                 'playsView', 'libraryView', 'journalView', 'musicView',
+                 'playsView', 'gamesPlayedView', 'libraryView', 'journalView', 'musicView',
                  'detailView', 'auditView'];
       for (var i = 0; i < ids.length; i++) {
         var node = document.getElementById(ids[i]);
@@ -2542,7 +2623,10 @@
     // Monotonic request tokens, one per list. A reply from a superseded
     // request must never paint: without this, opening toy A's flagged
     // list and then toy B's could leave A's messages under B's name.
-    var reqSeq = { summaries: 0, flagged: 0, plays: 0, library: 0,
+    // Every list that calls nextReq MUST have a key here. Without one,
+    // ++reqSeq[name] is NaN, isCurrentReq compares NaN === NaN, and the view
+    // silently never paints.
+    var reqSeq = { summaries: 0, flagged: 0, plays: 0, gameplays: 0, library: 0,
                    music: 0, audit: 0, requests: 0, tonight: 0, journal: 0 };
     function nextReq(name) { return ++reqSeq[name]; }
     function isCurrentReq(name, id) { return reqSeq[name] === id; }
@@ -2592,6 +2676,7 @@
     var DIARY_VIEWS = {
       flagged:  { load: function () { loadFlagged(); },           label: 'filter_flagged' },
       plays:    { load: function () { loadStoryPlays(); },        label: 'filter_plays' },
+      gameplays:{ load: function () { loadGamePlays(); },          label: 'filter_game_plays' },
       journal:  { load: function () { state.journalOffset = 0;
                                       loadReflectionJournal(); }, label: 'filter_journal' }
     };
@@ -2610,15 +2695,28 @@
       var sel = document.createElement('select');
       sel.className = 'filter-select';
       sel.id = selId;
-      [['', 'filter_all'], ['story', 'tab_stories'], ['game', 'tab_games'],
-       ['riddle', 'tab_riddles'], ['curiosity', 'tab_questions'],
-       ['calm', 'tab_bedtime'], ['journal', 'filter_journal'],
-       ['plays', 'filter_plays'], ['flagged', 'filter_flagged']
-      ].forEach(function (pair) {
-        var o = document.createElement('option');
-        o.value = pair[0];
-        o.textContent = t(pair[1]);
-        sel.appendChild(o);
+      // Two groups, because the list mixes two kinds of answer: the first
+      // filters CONVERSATIONS by the mode Areg was in, the second opens a
+      // different list. Flat, "Games" (a conversation mode) sat four rows
+      // above "Games on the toy" (offline sessions played on the toy itself)
+      // with nothing between them. optgroup does not affect value lookup, so
+      // the sel.value assignment below still works unchanged.
+      [['filter_grp_modes', [['', 'filter_all'], ['story', 'tab_stories'],
+          ['game', 'tab_games'], ['riddle', 'tab_riddles'],
+          ['curiosity', 'tab_questions'], ['calm', 'tab_bedtime']]],
+       ['filter_grp_lists', [['journal', 'filter_journal'],
+          ['plays', 'filter_plays'], ['gameplays', 'filter_game_plays'],
+          ['flagged', 'filter_flagged']]]
+      ].forEach(function (grp) {
+        var og = document.createElement('optgroup');
+        og.label = t(grp[0]);
+        grp[1].forEach(function (pair) {
+          var o = document.createElement('option');
+          o.value = pair[0];
+          o.textContent = t(pair[1]);
+          og.appendChild(o);
+        });
+        sel.appendChild(og);
       });
       sel.value = current || '';
       sel.addEventListener('change', function () {
@@ -6273,6 +6371,7 @@
       backFromContentView();
     });
     document.getElementById('playsBackToDevices').addEventListener('click', loadDevices);
+    document.getElementById('gamesPlayedBackToDevices').addEventListener('click', loadDevices);
     document.getElementById('toggleSetupCardBtn').addEventListener('click', function () {
       var f = document.getElementById('linkDeviceEmptyState');
       f.hidden = !f.hidden;
@@ -6551,6 +6650,132 @@
           answersEl.appendChild(row);
         });
       }).catch(function () { /* answers are additive — quiet failure */ });
+    }
+
+    // Friendly name for one of the offline games. The raw key is the SD
+    // directory name; a parent should never be shown "button-simon". An
+    // unknown key falls through verbatim rather than being hidden — the
+    // backend rejects unknown keys at ingest, so seeing one here would mean
+    // a newer toy than this page, and a silent blank would be worse.
+    function gameName(key) {
+      var map = {
+        'mind-reader': 'game_mind_reader',
+        'who-first': 'game_who_first',
+        'button-simon': 'game_button_simon',
+        'sound-detective': 'game_sound_detective'
+      };
+      return map[key] ? t(map[key]) : key;
+    }
+
+    // The supporting detail on one game row: how it ended, how many rounds,
+    // and — Simon only — how long a sequence was echoed back. Every part is
+    // omitted when the toy did not measure it, because null here means "not
+    // measured", which is not the same as zero.
+    function gameRowDetail(p) {
+      var parts = [];
+      if (p.outcome === 'won') parts.push(t('game_won'));
+      else if (p.outcome === 'lost') parts.push(t('game_lost'));
+      else if (p.outcome === 'stopped') parts.push(t('game_stopped'));
+      if (typeof p.rounds === 'number') parts.push(tf('game_rounds', { n: p.rounds }));
+      if (typeof p.score === 'number') parts.push(tf('game_reached', { n: p.score }));
+      return parts.join(' · ');
+    }
+
+    // Games played on the toy itself. Same shape as loadStoryPlays, because
+    // it closes the same gap: the offline games make no network call, so
+    // without this upload the dashboard showed nothing at all.
+    function loadGamePlays() {
+      show('gamesPlayedView');
+      setViewHash('gameplays', state.currentDeviceId);
+      renderDiaryFilter('gamesPlayedDiaryFilter', 'gameplays');
+      renderDeviceContext('gamesPlayedDeviceContext');
+      setStatus('gamesPlayedStatus', t('busy_loading'), 'muted');
+      var totalsEl = document.getElementById('gamesPlayedTotals');
+      var listEl = document.getElementById('gamesPlayedList');
+      var truncEl = document.getElementById('gamesPlayedTruncated');
+      var noteEl = document.getElementById('gamesPlayedNote');
+      clearChildren(totalsEl);
+      clearChildren(listEl);
+      truncEl.hidden = true;
+      noteEl.hidden = true;
+
+      var GAMES_PAGE = 100;
+      var reqId = nextReq('gameplays');
+      authedFetch('/api/parents/devices/'
+        + encodeURIComponent(state.currentDeviceId)
+        + '/game-plays?limit=' + GAMES_PAGE + '&offset=0'
+      ).then(function (data) {
+        // A language switch re-runs this loader while the previous run may
+        // still be in flight — same guard the plays list needs.
+        if (!isCurrentReq('gameplays', reqId)) return;
+        var totals = (data && data.totals) || [];
+        var plays = (data && data.plays) || [];
+        if (plays.length === 0) {
+          setStatus('gamesPlayedStatus', t('no_game_plays_yet'), 'muted');
+          return;
+        }
+        setStatus('gamesPlayedStatus', '', '');
+        // Says plainly what the toy can and cannot know. The honesty rule is
+        // not only for the child's ear.
+        noteEl.hidden = false;
+
+        // Per-game counters. A count and nothing else: no best, no streak.
+        totals.forEach(function (tt) {
+          var line = document.createElement('div');
+          line.style.cssText = 'padding:4px 0;font-size:14px;';
+          var name = document.createElement('strong');
+          name.textContent = '🎲 ' + gameName(tt.gameKey);
+          line.appendChild(name);
+          var counts = document.createElement('span');
+          counts.style.cssText = 'color:var(--ink-4);margin-left:8px;font-size:13px;';
+          counts.textContent = tf('games_count', { n: tt.count });
+          line.appendChild(counts);
+          totalsEl.appendChild(line);
+        });
+
+        // Newest-first session rows.
+        plays.forEach(function (p) {
+          var row = document.createElement('div');
+          row.className = 'row';
+          // Not tappable — nothing opens from here, so kill the affordance.
+          row.style.cursor = 'default';
+          row.style.pointerEvents = 'none';
+          var top = document.createElement('div');
+          top.className = 'top';
+          var left = document.createElement('span');
+          left.textContent = '🎲 ' + gameName(p.gameKey);
+          // The time ALONE on this line. `.row .top span:last-child` renders
+          // in the accent colour — it was written for a short timestamp, and
+          // appending the whole description put three wrapped lines of purple
+          // beside the game's own name, louder than the name itself.
+          var right = document.createElement('span');
+          right.textContent = fmtTime(p.playedAtUtc)
+            + (p.timeIsApproximate ? ' (~' + t('approx_time') + ')' : '');
+          top.appendChild(left);
+          top.appendChild(right);
+          row.appendChild(top);
+          var detail = gameRowDetail(p);
+          if (detail) {
+            var detailEl = document.createElement('div');
+            detailEl.style.cssText = 'color:var(--ink-muted);font-size:12px;';
+            detailEl.textContent = detail;
+            row.appendChild(detailEl);
+          }
+          listEl.appendChild(row);
+        });
+
+        // The counters above are whole-history while this list is one page,
+        // so a toy with 140 sessions would otherwise contradict itself.
+        var total = (typeof data.total === 'number') ? data.total : plays.length;
+        if (total > plays.length) {
+          truncEl.textContent = tf('game_plays_more', { n: plays.length });
+          truncEl.hidden = false;
+        }
+      }).catch(function (err) {
+        if (err && err.status === 401) return;
+        if (!isCurrentReq('gameplays', reqId)) return;
+        setStatus('gamesPlayedStatus', friendlyError(err), 'err');
+      });
     }
 
     // ---------- the toy page's two story cards ----------
@@ -7870,6 +8095,7 @@
         summariesView: loadSummaries,
         flaggedView: loadFlagged,
         playsView: loadStoryPlays,
+        gamesPlayedView: loadGamePlays,
         libraryView: function () { loadStoryLibrary(state.libraryDeviceId); },
         journalView: loadReflectionJournal,
         musicView: loadMusicLibrary,
@@ -7951,6 +8177,10 @@
           state.currentDeviceId = d; state.offset = 0; state.flaggedOffset = 0;
           state.currentToyId = d;
           primeDevicesThen(loadStoryPlays);
+        } else if (v === 'gameplays' && d) {
+          state.currentDeviceId = d; state.offset = 0; state.flaggedOffset = 0;
+          state.currentToyId = d;
+          primeDevicesThen(loadGamePlays);
         } else if (v === 'journal' && d) {
           state.currentDeviceId = d;
           state.currentToyId = d;

@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { t } from '../i18n';
 import { theme } from '../theme';
 
-export type DiaryView = 'conversations' | 'plays' | 'flagged';
+export type DiaryView = 'conversations' | 'plays' | 'gameplays' | 'flagged';
 
 /**
  * "What happened?" had three answers in three places: a Conversations screen,
@@ -15,8 +15,14 @@ export type DiaryView = 'conversations' | 'plays' | 'flagged';
  * endpoints, three shapes - and interleaving them would either lie about the
  * order or drop rows. What was needed was one place to ASK, not one list.
  *
- * Pills rather than the web's dropdown: three options is under the threshold
- * where a picker earns its extra tap, and a phone has the width for them.
+ * Pills rather than the web's dropdown: four options is still under the
+ * threshold where a picker earns its extra tap, and a phone has the width for
+ * them - the labels are one word each and `adjustsFontSizeToFit` absorbs the
+ * longest translation rather than truncating it.
+ *
+ * The fourth destination is the offline games, which run on the toy itself
+ * and make no network call: without it a child could play all afternoon and
+ * this control would have no answer for "what happened?".
  */
 export default function DiaryFilter({
   current,
@@ -28,6 +34,7 @@ export default function DiaryFilter({
   const items: [DiaryView, string][] = [
     ['conversations', t('diary_talk')],
     ['plays', t('diary_heard')],
+    ['gameplays', t('diary_played')],
     ['flagged', t('diary_held')],
   ];
   return (
@@ -48,7 +55,15 @@ export default function DiaryFilter({
             accessibilityState={{ selected: on }}
             aria-selected={on}
           >
-            <Text style={[styles.pillText, on && styles.pillTextOn]} numberOfLines={1}>
+            {/* adjustsFontSizeToFit, not truncation: a fourth pill narrows
+                every one of them, and «Խաղալիքի» clipped to «Խաղալ…» would
+                name a different thing. */}
+            <Text
+              style={[styles.pillText, on && styles.pillTextOn]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               {label}
             </Text>
           </Pressable>
@@ -62,7 +77,10 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 6, marginBottom: 10 },
   pill: {
     flex: 1,
-    paddingVertical: 8,
+    // 12, not 8: at 8 the pill is ~33px tall, under the 44px minimum tap
+    // target. A fourth pill makes each one narrower, so the row is now
+    // harder to hit in both directions unless the height carries it.
+    paddingVertical: 12,
     paddingHorizontal: 6,
     borderRadius: 999,
     borderWidth: 1,

@@ -371,6 +371,127 @@ public class DeviceService : IDeviceService
         return accepted;
     }
 
+    /// <summary>Keeps a reported count only when it is plausible. Null in
+    /// means "not measured" and stays null; a negative or absurd value is a
+    /// bug or a hostile device, and null is the honest record of it — the
+    /// session still happened, so the row is kept either way.</summary>
+    private static int? NormalizeReportedCount(int? value)
+    {
+        if (value is not { } n) return null;
+        if (n < 0 || n > GamePlayReportRequest.MaxCount) return null;
+        return n;
+    }
+
+    public async Task<int> ReportGamePlaysAsync(
+        Guid deviceId, GamePlayReportRequest request, DateTime nowUtc)
+    {
+        var events = request?.Events;
+        if (events is null || events.Count == 0)
+        {
+            return 0;
+        }
+
+        // Same bounded relative age as ReportStoryPlaysAsync — the toy has no
+        // wall clock and reports a best-effort "seconds ago" from its boot
+        // timer. Past this window the age is treated as unknown (approximate
+        // upload-time stamp) rather than becoming a nonsense historical
+        // timestamp a dashboard would then render as fact.
+        var maxSecondsAgo = (long)TimeSpan.FromDays(90).TotalSeconds;
+
+        var seenKeys = new HashSet<string>(StringComparer.Ordinal);
+        var accepted = 0;
+        foreach (var ev in events.Take(GamePlayReportRequest.MaxEvents))
+        {
+            var key = ev?.Key?.Trim();
+            var gameKey = ev?.GameKey?.Trim().ToLowerInvariant();
+            // Malformed events are skipped, not rejected wholesale — one bad
+            // entry must not make the device re-upload its good siblings
+            // forever.
+            if (ev is null || string.IsNullOrEmpty(key) || key.Length > 64)
+            {
+                continue;
+            }
+            // The game key is REJECTED rather than collapsed to a catch-all
+            // (where an unknown story Source becomes "other"). A game key is a
+            // label a parent reads and the dashboard translates; an unknown
+            // one has no honest rendering, so the row is not written at all.
+            if (gameKey is null
+                || !GamePlayReportRequest.AllowedGameKeys.Contains(gameKey, StringComparer.Ordinal))
+            {
+                continue;
+            }
+            if (!seenKeys.Add(key))
+            {
+                continue; // in-batch duplicate — keep the first
+            }
+
+            // Idempotency: the upload is at-least-once, so a key we already
+            // hold is a silent no-op (the unique DB index is the backstop for
+            // the concurrent-upload race below).
+            var exists = await _db.Set<GamePlay>()
+                .AnyAsync(p => p.DeviceId == deviceId && p.ClientEventKey == key);
+            if (exists)
+            {
+                continue;
+            }
+
+            // Bounded outcome vocabulary. Unlike the game key this one has an
+            // honest fallback — null reads as "the toy did not say", which is
+            // exactly what an unrecognised value means.
+            var outcome = ev.Outcome?.Trim().ToLowerInvariant();
+            if (outcome is null
+                || !GamePlayReportRequest.AllowedOutcomes.Contains(outcome, StringComparer.Ordinal))
+            {
+                outcome = null;
+            }
+
+            var playedAt = nowUtc;
+            var approximate = true;
+            if (ev.SecondsAgo is { } ago && ago >= 0 && ago <= maxSecondsAgo)
+            {
+                playedAt = nowUtc.AddSeconds(-ago);
+                approximate = false;
+            }
+
+            var row = new GamePlay
+            {
+                Id = Guid.NewGuid(),
+                DeviceId = deviceId,
+                GameKey = gameKey,
+                ClientEventKey = key,
+                PlayedAtUtc = playedAt,
+                TimeIsApproximate = approximate,
+                Rounds = NormalizeReportedCount(ev.Rounds),
+                Outcome = outcome,
+                Score = NormalizeReportedCount(ev.Score),
+            };
+            _db.Set<GamePlay>().Add(row);
+            try
+            {
+                // Per-event save, same reasoning as the story-play ingest: a
+                // unique-index race (a concurrently retried upload) fails only
+                // ITS row, and the 2xx the device gets still covers every
+                // event actually persisted.
+                await _db.SaveChangesAsync();
+                accepted++;
+            }
+            catch (DbUpdateException ex)
+            {
+                _db.Entry(row).State = EntityState.Detached;
+                _logger.LogWarning(ex,
+                    "Game-play insert skipped for device {DeviceId} key {EventKey} (likely duplicate)",
+                    deviceId, key);
+            }
+        }
+
+        if (accepted > 0)
+        {
+            _logger.LogInformation(
+                "Device {DeviceId} reported {Count} new game play(s)", deviceId, accepted);
+        }
+        return accepted;
+    }
+
     public async Task AddStoryReflectionAnswerAsync(
         Guid deviceId, string storyId, int questionIndex,
         string answerText, SafetyFlag safetyFlag, DateTime nowUtc)

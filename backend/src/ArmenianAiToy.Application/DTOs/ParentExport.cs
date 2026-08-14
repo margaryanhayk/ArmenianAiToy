@@ -118,6 +118,14 @@ public record ParentExportDevice(
     /// export must carry them.</summary>
     public List<StoryPlayDto> StoryPlays { get; init; } = new();
     public List<StoryReflectionAnswerDto> ReflectionAnswers { get; init; } = new();
+
+    /// <summary>Device-reported OFFLINE game sessions. Additive for the same
+    /// reason and by the same mechanism as the two above: the offline games
+    /// never become conversations, so an export without them under-reports
+    /// what the child actually did with the toy. Counts and bounded tokens
+    /// only — these games have no microphone, so nothing here is a child's
+    /// words.</summary>
+    public List<GamePlayDto> GamePlays { get; init; } = new();
 }
 
 /// <summary>

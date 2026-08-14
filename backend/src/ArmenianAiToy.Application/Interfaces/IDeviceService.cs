@@ -33,6 +33,16 @@ public interface IDeviceService
     /// the number of NEW rows written.</summary>
     Task<int> ReportStoryPlaysAsync(Guid deviceId, StoryPlayReportRequest request, DateTime nowUtc);
 
+    /// <summary>Ingest a batch of device-reported OFFLINE game sessions
+    /// (store-and-forward upload). Same contract as
+    /// <see cref="ReportStoryPlaysAsync"/> — idempotent per (device, event
+    /// key), malformed events skipped rather than failing their siblings —
+    /// with one difference: an event naming a game outside
+    /// <c>GamePlayReportRequest.AllowedGameKeys</c> is REJECTED, because an
+    /// unknown key has no honest rendering on a parent's screen. Returns the
+    /// number of NEW rows written.</summary>
+    Task<int> ReportGamePlaysAsync(Guid deviceId, GamePlayReportRequest request, DateTime nowUtc);
+
     /// <summary>B4 — append one child reflection answer (per-listen row,
     /// never an overwrite). Called by the reflection voice endpoint after
     /// STT + moderation; best-effort at the call site (a persistence failure
