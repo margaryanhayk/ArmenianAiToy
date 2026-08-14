@@ -179,8 +179,25 @@ The build produces both. They are not interchangeable.
    `SizeBytes`, `Sha256`. Leave `Enabled:false`, `ImagePath:""`,
    `SigningKey:""` — those are operator/env concerns (§ 3).
 
-8. **Deploy** (push → Railway rebuilds). Deploying changes nothing on its own:
-   `Enabled` is still false.
+8. **Deploy — onto `main`, which is the only branch Railway builds.** A release
+   sitting on a feature branch is not deployed no matter how correctly it was
+   built, gated, hashed and committed; the container keeps serving the old
+   `appsettings.json`, and every toy is honestly told `updateAvailable:false`.
+   This cost three enqueued commands on 2026-08-14 before anyone looked.
+
+   ```
+   git rev-list --left-right --count origin/main...HEAD   # left must be 0
+   git merge-base --is-ancestor origin/main HEAD          # fast-forward is safe
+   git push origin HEAD:main
+   ```
+
+   Then wait for the BUILD, not just the restart — `railway status` should show
+   a new deployment whose `meta.commitHash` is your commit and whose status is
+   `SUCCESS`. Editing a Railway variable restarts the container without
+   rebuilding the image, so it looks like a deploy and ships none of your code.
+
+   Deploying still changes nothing on its own: `Enabled` is false in the file,
+   and the toy applies nothing until a command is enqueued (§ 5).
 
 ---
 
@@ -288,10 +305,30 @@ and is the one to trust for "is this toy okay right now".
 
 ## 7. When `updateAvailable` is false and you expected true
 
+**Check this one FIRST — it is free, and on 2026-08-14 it was the answer.**
+`LatestVersion` is read from `appsettings.json` **inside the deployed
+container**, and Railway builds from `main`. A release staged on a branch is
+not deployed, however carefully it was built, hashed and committed. Setting
+`FirmwareUpdate__Enabled=true` then changes nothing, because there is nothing
+newer to offer, and the toy is told `updateAvailable:false` — which is *true*
+of the code that is running. Confirm before touching anything else:
+
+```
+git log --oneline -1 origin/main          # what Railway will build
+grep '"LatestVersion"' backend/src/ArmenianAiToy.Api/appsettings.json
+git rev-list --left-right --count origin/main...HEAD
+```
+
+Env-var changes are the reason this hides: they restart the container without
+rebuilding the image, so a variable edit *appears* to deploy while
+`appsettings.json` stays exactly as stale as it was. The token you just set
+starts working; the version you just wrote does not appear.
+
 The gates, in the order the backend applies them:
 
 | Gate | Silent-failure cause |
 |---|---|
+| **Deployed code** | the release is on a branch; `main` still carries the old `LatestVersion` |
 | `Enabled` | env var not set / not redeployed |
 | `LatestVersion` non-empty and `Url` non-empty | one of them blank ⇒ no offer, no error |
 | **Board** | `FirmwareUpdate:BoardModel` is set **and** the device's stored `BoardModel` differs — **including when the device's is null** |
@@ -498,3 +535,68 @@ Two real faults were cleared to get here, both worth remembering:
 
 Content sync on the same boot: 8 stories already current, 43/43 voice
 clips present, game clips downloading with per-clip sha256 verified.
+
+---
+
+### 1.2.1 — 2026-08-14 — the content report, and two traps
+
+Applied over the air, cleanly, on the first attempt that reached the toy:
+
+```
+status  Acked | result ok | ackFirmwareVersion 1.2.1
+{"status":"ota_applied","version":"1.2.1","partition":"app1",
+ "bootDiag":{"rst":3,"up":5,"heap":123300,"wifi":3,"rssi":-44,"sd":1,"boots":1}}
+device fw 1.2.1 | lastOtaStatus confirmed | otaHealth ok
+sha256 8638486df4994b33df3925d747208acc7a8ff91a168a0485c845d2955aa9c3f8
+size   1,326,144 B
+```
+
+**Trap 1 — the release was staged on a branch, and nothing said so.** Three
+`firmware_update` commands were enqueued before anyone noticed. All three were
+delivered and acked in ~40 seconds with
+`{"status":"manifest_checked","updateAvailable":false}`. Every candidate cause
+was checked and cleared in turn — `Enabled` was `true`, `ImagePath` correct,
+`SigningKey` present, no overriding `LatestVersion`/`BoardModel` variables —
+because the actual cause was upstream of all of them: Railway builds `main`,
+the work was on a feature branch, and `main`'s `appsettings.json` still said
+`LatestVersion: 1.2.0`. The backend was answering correctly. § 7 now checks
+this first.
+
+Two things made it hard to see. Setting a Railway variable restarts the
+container *without* rebuilding, so the operator token started working
+immediately and looked like proof of a fresh deploy. And `updateAvailable:false`
+is the same answer for "you are up to date" and "your release was never
+deployed" — the failure this document has warned about since 1.1.0, arriving
+by a route it did not list.
+
+**Trap 2 — the release gate caught a real leak, on the artifact it was written
+for.** The `1.2.1` binary already on the release machine carried the owner's
+real device id and API key. `tools/firmware/check_release_image.py` refused it
+(`1 device API key(s) compiled in`); it was quarantined and rebuilt from a
+`config.h` holding the placeholders. The clean image is **32 bytes smaller**,
+which is what swapping real credentials for placeholder strings costs — a
+useful signal that nothing else moved.
+
+**Settled while diagnosing:** the 317,614 B size anomaly recorded against an
+earlier container build was the ESP32 core version (3.3.8 there, 3.3.6 on the
+release machine), not the source. Proven by sha256: the machine's
+`release/1.2.0/AregVoiceMvp.ino.bin` is byte-identical to the field image.
+
+**First content report ever received** — the feature this release exists for,
+working on its first boot, and the news was bad in the useful way:
+
+```
+schema 7 · 8 stories · 92/104 game clips · 43 voice clips · contentHealth stale
+every story on the toy is a PRE-RE-RENDER version (ulik 6 vs 12 advertised)
+hedgehog-apple and little-cloud absent entirely
+```
+
+So the toy has been playing the truncated narrations, without ambience, and
+nothing in the product could say so until now. It also reported
+`boardModel: areg-s3-n8` for the first time — § 7's board gate can be
+reconsidered once a second board exists.
+
+**Not verified:** nobody has listened to this toy since it updated, and the
+content sync had not completed at the time of writing. Free heap read 123,300
+against 210,020 on the 1.2.0 rollout at the same 5 s uptime; the content report
+accounts for 672 B of that and the rest is unexplained.

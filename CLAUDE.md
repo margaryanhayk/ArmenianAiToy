@@ -4302,8 +4302,42 @@ This is that slice.
   **COMPILED** 2026-08-13 against esp32:esp32@3.3.8 — no errors, no
   `-Wall -Wextra` warnings, **+3,724 B flash / +672 B static RAM** measured
   against a build of the same tree without it (51.5% of the 3 MB slot).
-  **Still NOT bench-run**: no card read, no heartbeat observed, no toy.
-  Ships as its own OTA release per the 1.1.0 field lesson.
+  **PROVEN ON THE TOY 2026-08-14** (this line previously read "Still NOT
+  bench-run: no card read, no heartbeat observed, no toy"). Shipped as its own
+  OTA release per the 1.1.0 field lesson — 1.2.1, applied over the air,
+  `ota_applied` into `app1`, checked in and `confirmed`. The first report
+  arrived on its first boot:
+
+  ```
+  schema 7 · 8 stories · 92 game clips · 43 voice clips · 0 music
+  contentHealth: stale
+  ```
+
+  **And the news was bad in exactly the way this feature exists to deliver.**
+  Every story on the toy is a PRE-RE-RENDER version — `ulik` 6 against 12
+  advertised, `khosogh-dzuk` 6 against 10 — so the toy has been playing the
+  truncated narrations, without ambience, and `hedgehog-apple` and
+  `little-cloud` are not on it at all (8 of 10 stories, 92 of 104 game clips).
+  None of that was visible anywhere in the product before this release; the
+  only way to find it was to press the button and listen.
+
+  The same boot also produced the first `boardModel` any toy has ever
+  reported (`areg-s3-n8`) — the § "Owner batch (2026-08-07)" note that
+  `FirmwareUpdate:BoardModel` must ship EMPTY because no toy reports a board
+  can be revisited once a second board model exists.
+
+  **OPEN — the toy is not pulling the new content.** Seventeen minutes after
+  boot it was still heartbeating on a ~30 s cadence, which means it is NOT
+  inside `content_sync_tick()` (that downloads the whole library in one
+  blocking loop iteration and would stall the heartbeat). The deployed backend
+  does advertise all ten stories. So the sync either ran and did nothing or
+  failed early, and distinguishing those needs the serial console — a cable and
+  a bench session, not a dashboard.
+
+  **Free heap read 123,300 B** in the 1.2.1 boot diagnostic against **210,020 B**
+  on the 1.2.0 rollout at the same 5 s uptime. The content report accounts for
+  672 B of that; the remaining ~86 KB is unexplained and should be measured
+  before another RAM-hungry slice lands.
   Two corrections came out of that compile, both recorded in
   `tools/quality-evidence/firmware-compile-content-report-20260813.md`:
   the **227,480 B free-RAM baseline quoted around this repo is a runtime
