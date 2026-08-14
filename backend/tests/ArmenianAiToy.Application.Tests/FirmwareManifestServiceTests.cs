@@ -119,9 +119,14 @@ public class FirmwareManifestServiceTests
         var manifest = svc.Build("1.0.0", null, Now);
         Assert.True(manifest.UpdateAvailable);
 
-        var json = System.Text.Json.JsonSerializer.Serialize(manifest,
-            new System.Text.Json.JsonSerializerOptions
-            { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+        // Serialize the way the API ACTUALLY does — including the
+        // UtcDateTimeConverter registered in Program.cs. Without it this test
+        // built its own idea of the wire, reproduced Sign()'s own trailing-zero
+        // bug, and passed green while production refused ~1 update in 10.
+        var wireOptions = new System.Text.Json.JsonSerializerOptions
+        { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
+        wireOptions.Converters.Add(new WireUtcDateTimeConverter());
+        var json = System.Text.Json.JsonSerializer.Serialize(manifest, wireOptions);
         using var doc = System.Text.Json.JsonDocument.Parse(json);
         var root = doc.RootElement;
 
@@ -138,5 +143,33 @@ public class FirmwareManifestServiceTests
             h.ComputeHash(System.Text.Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
 
         Assert.Equal(recomputed, root.GetProperty("signature").GetString());
+    }
+}
+
+/// <summary>
+/// Mirrors <c>ArmenianAiToy.Api.Serialization.UtcDateTimeConverter</c> for the
+/// signature test. The test project does not reference Api, so this asserts on
+/// the SHARED <see cref="ArmenianAiToy.Application.Helpers.JsonWireFormats"/>
+/// constant that both the real converter and the real signer read — which is
+/// what makes drift between them impossible to reintroduce silently.
+/// </summary>
+internal sealed class WireUtcDateTimeConverter
+    : System.Text.Json.Serialization.JsonConverter<DateTime>
+{
+    public override DateTime Read(ref System.Text.Json.Utf8JsonReader reader, Type t,
+        System.Text.Json.JsonSerializerOptions o) => reader.GetDateTime();
+
+    public override void Write(System.Text.Json.Utf8JsonWriter writer, DateTime value,
+        System.Text.Json.JsonSerializerOptions o)
+    {
+        var utc = value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+        };
+        writer.WriteStringValue(utc.ToString(
+            ArmenianAiToy.Application.Helpers.JsonWireFormats.UtcDateTime,
+            System.Globalization.CultureInfo.InvariantCulture));
     }
 }

@@ -40,7 +40,8 @@ public sealed class UtcDateTimeConverter : JsonConverter<DateTime>
             DateTimeKind.Local => value.ToUniversalTime(),
             _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
         };
-        writer.WriteStringValue(utc.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ"));
+        writer.WriteStringValue(utc.ToString(ArmenianAiToy.Application.Helpers.JsonWireFormats.UtcDateTime,
+            System.Globalization.CultureInfo.InvariantCulture));
     }
 }
 

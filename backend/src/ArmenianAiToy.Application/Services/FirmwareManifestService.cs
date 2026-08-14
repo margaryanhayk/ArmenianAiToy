@@ -68,7 +68,18 @@ public sealed class FirmwareManifestService : IFirmwareManifestService
         {
             return string.Empty;
         }
-        var expiresAtWire = System.Text.Json.JsonSerializer.Serialize(expiresAt).Trim('"');
+        // MUST match UtcDateTimeConverter byte-for-byte — see JsonWireFormats.
+        // JsonSerializer.Serialize was used here and TRIMS trailing fractional
+        // zeros, which the converter does not, so ~1 manifest in 10 was signed
+        // over text the device never received and every toy refused it.
+        var utc = expiresAt.Kind switch
+        {
+            DateTimeKind.Utc => expiresAt,
+            DateTimeKind.Local => expiresAt.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(expiresAt, DateTimeKind.Utc),
+        };
+        var expiresAtWire = utc.ToString(Helpers.JsonWireFormats.UtcDateTime,
+            System.Globalization.CultureInfo.InvariantCulture);
         var canonical = $"{version}\n{url}\n{sha256}\n{size}\n{expiresAtWire}";
         using var h = new HMACSHA256(Encoding.UTF8.GetBytes(_options.SigningKey));
         var mac = h.ComputeHash(Encoding.UTF8.GetBytes(canonical));
