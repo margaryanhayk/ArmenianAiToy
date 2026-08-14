@@ -4326,13 +4326,47 @@ This is that slice.
   `FirmwareUpdate:BoardModel` must ship EMPTY because no toy reports a board
   can be revisited once a second board model exists.
 
-  **OPEN — the toy is not pulling the new content.** Seventeen minutes after
-  boot it was still heartbeating on a ~30 s cadence, which means it is NOT
-  inside `content_sync_tick()` (that downloads the whole library in one
-  blocking loop iteration and would stall the heartbeat). The deployed backend
-  does advertise all ten stories. So the sync either ran and did nothing or
-  failed early, and distinguishing those needs the serial console — a cable and
-  a bench session, not a dashboard.
+  **The toy was NOT pulling the new content — it was PANICKING, every ~184 s,
+  for the whole night.** Found on the bench over serial and fixed the same
+  morning in **1.2.2**; full transcript and analysis in
+  `tools/quality-evidence/content-sync-oom-crash-20260814.{md,log}` and
+  `content-sync-fix-verified-20260814.log`.
+
+  The sync parsed the 156-item manifest (10 stories + 42 voice + 104 game
+  clips, each with a 64-char sha256) into INTERNAL heap beside a TLS session.
+  With ~123 KB free it did not fit: `ESP_ERR_NO_MEM` → `abort()` →
+  `reset_reason=4/PANIC` → rearm 180 s later → panic again. The panic surfaced
+  inside a Wi-Fi PHY timer, which was a **victim** — internal heap was already
+  gone, so the next allocation anywhere died. Two things had moved the wrong
+  way at once: the manifest grew (92→104 game clips, 8→10 stories) while free
+  heap fell from 210,020 B to 123,528 B.
+
+  **Fix: every `JsonDocument` in `content_sync.cpp` allocates from PSRAM**
+  (7.8 MB idle; TLS cannot use PSRAM, plain data can). This is not a new idea
+  here — `sync_games` hit the SAME failure class on 2026-08-07 and its
+  two-phase comment already records the answer; it had simply never been
+  applied to the document one frame up the stack. +139 B of flash. Verified:
+  `heap parse 79312->79312` — internal heap **unchanged** across the parse —
+  then `[content-sync] PASS`, and the backend reports `up_to_date`,
+  `missingStoryIds []`, all ten stories at the re-rendered versions, 104 game
+  clips, 43 voice clips.
+
+  **Three things that survived the fix and must not be forgotten:**
+  - **A crash loop is invisible to the product.** The toy heartbeats normally
+    for the first 180 s of every cycle, so `lastSeenAt` stayed fresh and the
+    console showed it online and merely `stale`. Nothing said "this device has
+    panicked 400 times." The reset reason IS already computed
+    (`ota_foundation.cpp:101-112`) but rides only on an OTA ack, never the
+    heartbeat.
+  - **The index is written once, at the very end.** Every story was found
+    `already cached PASS (hashed)` at the NEW version — the downloads had
+    succeeded on earlier crash cycles and the panic discarded the record of
+    them, so the toy re-downloaded the library every ~3 minutes. Writing the
+    index per namespace is the real fix and is NOT done.
+  - **`manifest bytes=-1`** — the backend sends the manifest chunked, so
+    swapping `getString()` for a raw stream parse would BREAK it (`HTTPClient`
+    de-chunks only inside `getString()`/`writeToStream()`). Measured, not
+    assumed.
 
   **Free heap read 123,300 B** in the 1.2.1 boot diagnostic against **210,020 B**
   on the 1.2.0 rollout at the same 5 s uptime. The content report accounts for

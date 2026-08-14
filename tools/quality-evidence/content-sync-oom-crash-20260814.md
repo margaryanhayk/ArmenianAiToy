@@ -110,3 +110,51 @@ offered") and both dashboards would show the toy as ready while it is not.
 `python` + `pyserial` on COM7 at 115200, DTR/RTS pulse to force a clean boot, 260 s
 capture. `arduino-cli monitor` was tried first and exits immediately without a TTY —
 worth knowing, since it is the command the runbook and README both recommend.
+
+---
+
+# RESOLVED — 1.2.2, verified on the toy the same morning
+
+Fix: every `JsonDocument` in `content_sync.cpp` allocates from PSRAM
+(`PsramJsonAllocator`), the same answer `sync_games` took for the same failure
+class in 1.1.6. +139 bytes of flash. Full transcript:
+`content-sync-fix-verified-20260814.log`.
+
+```
+ 95.0  [ota] APPLYING 1.2.2 -> reboot into pending-verify
+102.8  [ota] ack result=ok status=200 ... image marked VALID (confirmed)
+275.5  [content-sync] starting
+278.9  [content-sync] manifest bytes=-1 heap parse 79312->79312 psram=7806564
+465.9  [content-sync] summary ... active_index_items=10 index_written=1
+465.9  [content-sync] PASS
+```
+
+Backend, minutes later: `contentHealth up_to_date`, `missingStoryIds []`,
+`anban-huri:9 hedgehog-apple:3 khosogh-dzuk:10 little-cloud:3 pochat-aghves:9
+princess-and-pea:6 sutasan:6 sutlik-orskan:9 three-piglets:6 ulik:12`,
+104 game clips, 43 voice clips.
+
+## Three measurements worth keeping
+
+**`heap parse 79312->79312`.** Internal heap is *unchanged* across the parse —
+the document went entirely to PSRAM. That is the fix working exactly as
+intended, not merely "it didn't crash this time."
+
+**`manifest bytes=-1`.** Content-Length is absent: the backend sends the
+manifest **chunked**. So swapping `http.getString()` for a raw stream parse
+would have broken the parse outright, because `HTTPClient` only de-chunks
+inside `getString()`/`writeToStream()`. The cautious choice was the correct
+one, and now it is measured rather than assumed.
+
+**Every story reported `already cached PASS (hashed)` at the NEW version.**
+The re-rendered files were *already on the card* — earlier crash cycles had
+downloaded them successfully and then panicked before the index could be
+written. The index is written once, at the very end, so a crash anywhere after
+the downloads discards the record of them and the next boot re-reads the old
+index and re-downloads everything. The toy had been doing this every ~3
+minutes.
+
+That is a second, independent defect: **the index should be written
+incrementally, or at least after each namespace completes.** It is not fixed
+here. It is the strongest argument yet for the Stage 2 work, and it means the
+crash cost far more bandwidth and card writes than the outage alone suggests.

@@ -1,0 +1,1380 @@
+    4.3  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+    4.4  [alive] ms=90369 heap=123528 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-41
+    9.3  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+    9.4  [alive] ms=95372 heap=123528 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-35
+   14.4  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+   14.4  [alive] ms=100375 heap=123528 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-35
+   19.4  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+   19.4  [alive] ms=105378 heap=123528 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-40
+   24.4  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+   24.4  [alive] ms=110381 heap=123528 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-41
+   29.4  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+   29.4  [alive] ms=115384 heap=123528 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-35
+   36.6  [heartbeat] status=200 (fw=1.2.1 bedtime=0 paused=0)
+   36.6  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+   36.6  [alive] ms=122648 heap=123480 psram=7860392 wifi=3 ip=192.168.1.3 rssi=-40
+   41.6  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+   41.6  [alive] ms=127651 heap=123528 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-42
+   46.6  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+   46.6  [alive] ms=132654 heap=123476 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-33
+   51.6  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+   51.6  [alive] ms=137657 heap=123528 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-41
+   59.0  [ota] 1 command(s) pending
+   59.0  [ota] command id=78fb62f0-fb62-47e5-aff4-3c268b4f2cac type=firmware_update expiresAt=2026-08-14T11:43:05.2877257Z
+   61.6  [ota] manifest signature OK
+   61.6  [ota] expiresAt=2026-08-14T10:48:55.1456523Z (device-side expiry skipped — no RTC; server-enforced)
+   61.6  [ota] manifest: UPDATE 1.2.1 -> 1.2.2 (sig=ok board=ok size=1326496)
+   67.7  [ota] downloading 10% (134304/1326496)
+   71.1  [ota] downloading 20% (266480/1326496)
+   77.4  [ota] downloading 30% (397984/1326496)
+   77.4  [ota] downloading 40% (531920/1326496)
+   80.6  [ota] downloading 50% (665952/1326496)
+   83.7  [ota] downloading 60% (798672/1326496)
+   86.4  [ota] downloading 70% (931552/1326496)
+   89.1  [ota] downloading 80% (1065184/1326496)
+   92.3  [ota] downloading 90% (1195168/1326496)
+   94.8  [ota] downloading 100% (1326496/1326496)
+   94.8  [ota] sha256 ok
+   95.0  [ota] APPLYING 1.2.2 -> reboot into pending-verify
+   95.2  [wifi] event=disconnected reason=8
+   95.3  ESP-ROM:esp32s3-20210327
+   95.3  Build:Mar 27 2021
+   95.3  rst:0xc (RTC_SW_CPU_RST),boot:0xb (SPI_FAST_FLASH_BOOT)
+   95.3  Saved PC:0x4037f3ad
+   95.3  SPIWP:0xee
+   95.3  mode:DIO, clock div:1
+   95.3  load:0x3fce2820,len:0x116c
+   95.3  load:0x403c8700,len:0xc2c
+   95.3  load:0x403cb700,len:0x3108
+   95.3  entry 0x403c88b8
+   95.8  
+   95.8  [boot] AregVoiceMvp starting
+   95.8  [boot] backend = https://armenianaitoy-production.up.railway.app
+   95.8  [net] TLS: verifying (ISRG Root X1 pinned)
+   95.8  [boot] reset_reason=3/SW
+   95.8  [boot] diag_boot_counter=0 (cold)
+   95.8  [boot] previous_step=(none)
+   95.8  [boot] backend=https://armenianaitoy-production.up.railway.app/api/chat/audio
+   95.8  [boot] pins button=0 led=48
+   95.8  [boot] mic_i2s bck=4 ws=5 sd=6
+   95.8  [boot] amp_i2s bck=15 lrc=16 din=7
+   95.8  E (257) task_wdt: esp_task_wdt_init(517): TWDT already initialized
+   95.8  [boot] task watchdog enabled (30s)
+   95.8  [boot] sd_spi cs=10 sck=12 mosi=11 miso=13
+   95.8  [sd] mounted; type=3 size=7680MB
+   95.8  [boot] SD mounted; offline narration /stories/anban-huri/narration.mp3 = absent
+   96.1  [content-report] schema=7 stories=[anban-huri:6,khosogh-dzuk:6,pochat-aghves:6,princess-and-pea:2,sutasan:2,sutlik-orskan:6,three-piglets:2,ulik:6] games=92 voice=43 music=0
+   96.1  [wifi] using provisioned creds (ssid=OVIO_0114707)
+   96.1  [wifi] connecting to OVIO_0114707 ...
+   96.2  [wifi] event=connected
+   97.3  [wifi] event=got_ip
+   97.4  [wifi] ip=192.168.1.3
+   97.4  [boot] ready — press button to speak
+   97.4  [state] 0 -> 0
+   97.4  [ota] running fw=1.2.2 partition=app0 img_state=valid ota_state=rebooting (pending_ver=1.2.2 cmd=78fb62f0-fb62-47e5-aff4-3c268b4f2cac boots=1)
+   97.4  [device] using provisioned identity (id=248729da-08d8-4144-afc0-e6af8a3fe471)
+  100.1  [heartbeat] status=200 (fw=1.2.2 bedtime=0 paused=0)
+  102.8  [ota] ack 78fb62f0-fb62-47e5-aff4-3c268b4f2cac result=ok status=200
+  102.8  [ota] image marked VALID (confirmed)
+  105.3  [heartbeat] status=200 (fw=1.2.2 bedtime=0 paused=0)
+  106.1  [welcome] greeting greet-33
+  106.1  [state] 0 -> 3
+  106.1  [story] SD open: /voice/greet-33-v1.mp3 @ 0
+  108.7  [story] SD end interrupted=false
+  109.9  [welcome] ask ask-sgrc
+  109.9  [state] 3 -> 3
+  109.9  [story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+  114.5  [story] SD end interrupted=false
+  114.5  [welcome] listening (mode)
+  122.5  [welcome] no answer — closing quietly
+  122.5  [state] 3 -> 0
+  122.5  [alive] ms=26911 heap=123528 psram=7861276 wifi=3 ip=192.168.1.3 rssi=-42
+  122.5  [ota] boot poll (fw=1.2.2 build=sync-psram-fix board=areg-s3-n8 partition=app0)
+  125.1  [content-sync] bench fw built Aug 14 2026 14:36:55
+  125.1  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  127.5  [alive] ms=31911 heap=123528 psram=7861044 wifi=3 ip=192.168.1.3 rssi=-42
+  130.1  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  132.5  [alive] ms=36914 heap=123528 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-41
+  135.1  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  137.5  [alive] ms=41917 heap=123476 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-41
+  140.1  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  142.5  [alive] ms=46920 heap=123528 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-40
+  145.1  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  147.5  [alive] ms=51923 heap=123528 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-40
+  150.1  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  152.5  [alive] ms=56926 heap=123528 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-34
+  155.1  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  158.2  [heartbeat] status=200 (fw=1.2.2 bedtime=0 paused=0)
+  158.2  [alive] ms=62637 heap=123268 psram=7860616 wifi=3 ip=192.168.1.3 rssi=-42
+  160.1  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  163.2  [alive] ms=67640 heap=123528 psram=7860756 wifi=3 ip=192.168.1.3 rssi=-41
+  165.1  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  168.2  [alive] ms=72643 heap=123476 psram=7860756 wifi=3 ip=192.168.1.3 rssi=-41
+  170.1  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  173.2  [alive] ms=77646 heap=123528 psram=7860756 wifi=3 ip=192.168.1.3 rssi=-34
+  175.1  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  178.2  [alive] ms=82649 heap=123528 psram=7860756 wifi=3 ip=192.168.1.3 rssi=-41
+  180.1  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  185.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  185.2  [alive] ms=89664 heap=123472 psram=7860360 wifi=3 ip=192.168.1.3 rssi=-35
+  190.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  190.2  [alive] ms=94667 heap=123528 psram=7860540 wifi=3 ip=192.168.1.3 rssi=-40
+  195.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  195.2  [alive] ms=99670 heap=123528 psram=7860540 wifi=3 ip=192.168.1.3 rssi=-40
+  200.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  200.2  [alive] ms=104673 heap=123528 psram=7860540 wifi=3 ip=192.168.1.3 rssi=-41
+  205.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  205.2  [alive] ms=109676 heap=123528 psram=7860540 wifi=3 ip=192.168.1.3 rssi=-40
+  210.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  210.2  [alive] ms=114679 heap=123528 psram=7860540 wifi=3 ip=192.168.1.3 rssi=-39
+  215.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  215.2  [alive] ms=119682 heap=123528 psram=7860540 wifi=3 ip=192.168.1.3 rssi=-40
+  218.2  [heartbeat] status=200 (fw=1.2.2 bedtime=0 paused=0)
+  220.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  220.2  [alive] ms=124684 heap=123528 psram=7860284 wifi=3 ip=192.168.1.3 rssi=-41
+  225.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  225.2  [alive] ms=129687 heap=123528 psram=7860540 wifi=3 ip=192.168.1.3 rssi=-41
+  230.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  230.2  [alive] ms=134690 heap=123528 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-40
+  235.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  235.2  [alive] ms=139693 heap=123528 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-40
+  240.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  240.2  [alive] ms=144696 heap=123528 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-40
+  245.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  245.2  [alive] ms=149705 heap=123476 psram=7860540 wifi=3 ip=192.168.1.3 rssi=-40
+  250.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  250.3  [alive] ms=154708 heap=123528 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-41
+  255.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  255.3  [alive] ms=159711 heap=123528 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-40
+  260.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  260.3  [alive] ms=164714 heap=123528 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-41
+  265.2  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  265.3  [alive] ms=169717 heap=123476 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-35
+  270.3  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  270.3  [alive] ms=174720 heap=123528 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-35
+  275.3  [content-sync] bench build enabled; waiting for WiFi+SD; will start at ms>=180000
+  275.3  [alive] ms=179723 heap=123528 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-40
+  275.5  [content-sync] starting
+  275.5  [content-sync] heap before=123528
+  278.9  [content-sync] manifest bytes=-1 heap parse 79312->79312 psram=7806564
+  279.0  [content-sync] manifest status=200 stories=10 introEnabled=1 music=0 musicEnabled=0 voice=42 games=104 modes=1111 pauses=1 variants=1
+  279.6  [content-sync] index v7 loaded entries=8 music=0 voice=43
+  279.6  [content-sync] item anban-huri v9 "Անբան Հուռին" 5560991 bytes
+  283.9  [content-sync] anban-huri already cached PASS (hashed)
+  283.9  [content-sync] item hedgehog-apple v3 "Ոզնիկն ու խնձորը" 613817 bytes
+  284.3  [content-sync] hedgehog-apple already cached PASS (hashed)
+  284.3  [content-sync] item khosogh-dzuk v10 "Խոսող ձուկը" 8138336 bytes
+  290.5  [content-sync] khosogh-dzuk already cached PASS (hashed)
+  290.5  [content-sync] item little-cloud v3 "Փոքրիկ ամպիկը" 514133 bytes
+  290.9  [content-sync] little-cloud already cached PASS (hashed)
+  290.9  [content-sync] item pochat-aghves v9 "Պոչատ աղվեսը" 5460680 bytes
+  295.1  [content-sync] pochat-aghves already cached PASS (hashed)
+  295.1  [content-sync] item princess-and-pea v6 "Արքայադուստրը և սիսեռահատիկը" 1611903 bytes
+  296.3  [content-sync] princess-and-pea already cached PASS (hashed)
+  296.4  [content-sync] item sutasan v6 "Սուտասանը" 1969258 bytes
+  297.9  [content-sync] sutasan already cached PASS (hashed)
+  297.9  [content-sync] item sutlik-orskan v9 "Սուտլիկ որսկանը" 3356047 bytes
+  300.4  [content-sync] sutlik-orskan already cached PASS (hashed)
+  300.4  [content-sync] item three-piglets v6 "Երեք խոզուկները" 2078973 bytes
+  302.0  [content-sync] three-piglets already cached PASS (hashed)
+  302.0  [content-sync] item ulik v12 "Ուլիկը" 2631933 bytes
+  304.1  [content-sync] ulik already cached PASS (hashed)
+  306.8  [content-sync] v:greet-08 download 11% (4096/35570)
+  306.9  [content-sync] v:greet-08 download 23% (8192/35570)
+  307.0  [content-sync] v:greet-08 download 34% (12288/35570)
+  307.1  [content-sync] v:greet-08 download 46% (16415/35570)
+  307.2  [content-sync] v:greet-08 download 60% (21471/35570)
+  307.4  [content-sync] v:greet-08 download 74% (26527/35570)
+  307.4  [content-sync] v:greet-08 download 86% (30623/35570)
+  307.4  [content-sync] v:greet-08 download 97% (34719/35570)
+  307.4  [content-sync] v:greet-08 download 100% (35570/35570)
+  307.4  [content-sync] v:greet-08 sha256 ok
+  307.4  [content-sync] moved /tmp/v-greet-08-v2.mp3.part -> /voice/greet-08-v2.mp3
+  308.0  [content-sync] v:greet-09 download 19% (8192/41839)
+  308.0  [content-sync] v:greet-09 download 29% (12288/41839)
+  308.1  [content-sync] v:greet-09 download 39% (16415/41839)
+  308.2  [content-sync] v:greet-09 download 49% (20511/41839)
+  308.6  [content-sync] v:greet-09 download 58% (24607/41839)
+  308.6  [content-sync] v:greet-09 download 68% (28703/41839)
+  308.6  [content-sync] v:greet-09 download 78% (32799/41839)
+  308.6  [content-sync] v:greet-09 download 88% (36895/41839)
+  308.7  [content-sync] v:greet-09 download 97% (40991/41839)
+  308.7  [content-sync] v:greet-09 download 100% (41839/41839)
+  308.7  [content-sync] v:greet-09 sha256 ok
+  308.8  [content-sync] moved /tmp/v-greet-09-v2.mp3.part -> /voice/greet-09-v2.mp3
+  309.3  [content-sync] voice summary offered=42 already=40 downloaded=2 failed=0 voice_active=43
+  309.6  [content-sync] games phase B: 102 to download, heap=78756
+  310.3  [content-sync] g:button-simon/best download 13% (8192/58558)
+  310.3  [content-sync] g:button-simon/best download 20% (12288/58558)
+  310.6  [content-sync] g:button-simon/best download 35% (20511/58558)
+  310.6  [content-sync] g:button-simon/best download 42% (24607/58558)
+  310.7  [content-sync] g:button-simon/best download 56% (32799/58558)
+  310.8  [content-sync] g:button-simon/best download 63% (36895/58558)
+  310.9  [content-sync] g:button-simon/best download 70% (40991/58558)
+  311.0  [content-sync] g:button-simon/best download 83% (49183/58558)
+  311.1  [content-sync] g:button-simon/best download 90% (53279/58558)
+  311.2  [content-sync] g:button-simon/best download 100% (58558/58558)
+  311.2  [content-sync] g:button-simon/best sha256 ok
+  311.3  [content-sync] moved /tmp/g-button-simon-best.mp3.part -> /games/button-simon/best.mp3
+  311.8  [content-sync] g:button-simon/done download 18% (8192/44765)
+  311.8  [content-sync] g:button-simon/done download 21% (9791/44765)
+  311.9  [content-sync] g:button-simon/done download 31% (13887/44765)
+  311.9  [content-sync] g:button-simon/done download 40% (17983/44765)
+  312.2  [content-sync] g:button-simon/done download 58% (26175/44765)
+  312.2  [content-sync] g:button-simon/done download 67% (30271/44765)
+  312.3  [content-sync] g:button-simon/done download 76% (34367/44765)
+  312.6  [content-sync] g:button-simon/done download 87% (39167/44765)
+  312.6  [content-sync] g:button-simon/done download 96% (43263/44765)
+  312.6  [content-sync] g:button-simon/done download 100% (44765/44765)
+  312.6  [content-sync] g:button-simon/done sha256 ok
+  312.6  [content-sync] moved /tmp/g-button-simon-done.mp3.part -> /games/button-simon/done.mp3
+  313.5  [content-sync] g:button-simon/intro download 10% (16414/157196)
+  313.5  [content-sync] g:button-simon/intro download 20% (32798/157196)
+  314.2  [content-sync] g:button-simon/intro download 32% (51150/157196)
+  314.5  [content-sync] g:button-simon/intro download 40% (63790/157196)
+  314.8  [content-sync] g:button-simon/intro download 51% (80878/157196)
+  314.8  [content-sync] g:button-simon/intro download 61% (97262/157196)
+  315.1  [content-sync] g:button-simon/intro download 70% (110254/157196)
+  315.8  [content-sync] g:button-simon/intro download 80% (126638/157196)
+  315.8  [content-sync] g:button-simon/intro download 92% (144624/157196)
+  316.0  [content-sync] g:button-simon/intro download 100% (157196/157196)
+  316.0  [content-sync] g:button-simon/intro sha256 ok
+  316.0  [content-sync] moved /tmp/g-button-simon-intro.mp3.part -> /games/button-simon/intro.mp3
+  316.6  [content-sync] g:button-simon/level-up-1 download 16% (8192/49781)
+  316.6  [content-sync] g:button-simon/level-up-1 download 24% (12288/49781)
+  316.7  [content-sync] g:button-simon/level-up-1 download 32% (16415/49781)
+  316.7  [content-sync] g:button-simon/level-up-1 download 41% (20511/49781)
+  317.1  [content-sync] g:button-simon/level-up-1 download 57% (28703/49781)
+  317.1  [content-sync] g:button-simon/level-up-1 download 65% (32799/49781)
+  317.1  [content-sync] g:button-simon/level-up-1 download 74% (36895/49781)
+  317.1  [content-sync] g:button-simon/level-up-1 download 82% (40991/49781)
+  317.3  [content-sync] g:button-simon/level-up-1 download 93% (46751/49781)
+  317.3  [content-sync] g:button-simon/level-up-1 download 100% (49781/49781)
+  317.3  [content-sync] g:button-simon/level-up-1 sha256 ok
+  317.3  [content-sync] moved /tmp/g-button-simon-level-up-1.mp3.part -> /games/button-simon/level-up-1.mp3
+  317.7  [content-sync] g:button-simon/level-up-2 download 10% (4096/40586)
+  317.9  [content-sync] g:button-simon/level-up-2 download 20% (8192/40586)
+  317.9  [content-sync] g:button-simon/level-up-2 download 30% (12288/40586)
+  318.0  [content-sync] g:button-simon/level-up-2 download 40% (16415/40586)
+  318.1  [content-sync] g:button-simon/level-up-2 download 50% (20511/40586)
+  318.2  [content-sync] g:button-simon/level-up-2 download 60% (24607/40586)
+  318.4  [content-sync] g:button-simon/level-up-2 download 70% (28703/40586)
+  318.6  [content-sync] g:button-simon/level-up-2 download 80% (32799/40586)
+  318.6  [content-sync] g:button-simon/level-up-2 download 90% (36895/40586)
+  318.7  [content-sync] g:button-simon/level-up-2 download 100% (40586/40586)
+  318.7  [content-sync] g:button-simon/level-up-2 sha256 ok
+  318.7  [content-sync] moved /tmp/g-button-simon-level-up-2.mp3.part -> /games/button-simon/level-up-2.mp3
+  319.2  [content-sync] g:button-simon/level-up-3 download 16% (8192/49781)
+  319.3  [content-sync] g:button-simon/level-up-3 download 24% (12288/49781)
+  319.4  [content-sync] g:button-simon/level-up-3 download 32% (16415/49781)
+  319.5  [content-sync] g:button-simon/level-up-3 download 41% (20511/49781)
+  319.6  [content-sync] g:button-simon/level-up-3 download 50% (24959/49781)
+  319.9  [content-sync] g:button-simon/level-up-3 download 66% (33151/49781)
+  319.9  [content-sync] g:button-simon/level-up-3 download 74% (37247/49781)
+  320.0  [content-sync] g:button-simon/level-up-3 download 83% (41695/49781)
+  320.1  [content-sync] g:button-simon/level-up-3 download 91% (45791/49781)
+  320.1  [content-sync] g:button-simon/level-up-3 download 100% (49781/49781)
+  320.1  [content-sync] g:button-simon/level-up-3 sha256 ok
+  320.2  [content-sync] moved /tmp/g-button-simon-level-up-3.mp3.part -> /games/button-simon/level-up-3.mp3
+  320.8  [content-sync] g:button-simon/miss download 13% (8192/59812)
+  320.8  [content-sync] g:button-simon/miss download 20% (12288/59812)
+  320.9  [content-sync] g:button-simon/miss download 34% (20511/59812)
+  321.3  [content-sync] g:button-simon/miss download 42% (25263/59812)
+  321.3  [content-sync] g:button-simon/miss download 55% (33455/59812)
+  321.3  [content-sync] g:button-simon/miss download 62% (37551/59812)
+  321.6  [content-sync] g:button-simon/miss download 76% (45791/59812)
+  321.6  [content-sync] g:button-simon/miss download 83% (49887/59812)
+  321.8  [content-sync] g:button-simon/miss download 91% (54512/59812)
+  321.8  [content-sync] g:button-simon/miss download 100% (59812/59812)
+  321.8  [content-sync] g:button-simon/miss sha256 ok
+  322.2  [content-sync] moved /tmp/g-button-simon-miss.mp3.part -> /games/button-simon/miss.mp3
+  322.2  [content-sync] g:button-simon/your-turn download 20% (4096/20106)
+  322.4  [content-sync] g:button-simon/your-turn download 40% (8192/20106)
+  322.4  [content-sync] g:button-simon/your-turn download 61% (12288/20106)
+  322.5  [content-sync] g:button-simon/your-turn download 81% (16415/20106)
+  322.6  [content-sync] g:button-simon/your-turn download 100% (20106/20106)
+  322.6  [content-sync] g:button-simon/your-turn sha256 ok
+  322.7  [content-sync] moved /tmp/g-button-simon-your-turn.mp3.part -> /games/button-simon/your-turn.mp3
+  323.5  [content-sync] g:mind-reader/g-0000 download 14% (12288/85725)
+  323.5  [content-sync] g:mind-reader/g-0000 download 23% (20511/85725)
+  323.6  [content-sync] g:mind-reader/g-0000 download 30% (26223/85725)
+  323.9  [content-sync] g:mind-reader/g-0000 download 42% (36639/85725)
+  324.0  [content-sync] g:mind-reader/g-0000 download 53% (45791/85725)
+  324.2  [content-sync] g:mind-reader/g-0000 download 61% (52767/85725)
+  324.8  [content-sync] g:mind-reader/g-0000 download 71% (60959/85725)
+  324.8  [content-sync] g:mind-reader/g-0000 download 80% (69151/85725)
+  325.2  [content-sync] g:mind-reader/g-0000 download 90% (77343/85725)
+  325.2  [content-sync] g:mind-reader/g-0000 download 100% (85725/85725)
+  325.2  [content-sync] g:mind-reader/g-0000 sha256 ok
+  325.2  [content-sync] moved /tmp/g-mind-reader-g-0000.mp3.part -> /games/mind-reader/g-0000.mp3
+  325.9  [content-sync] g:mind-reader/g-0001 download 14% (12288/85725)
+  326.1  [content-sync] g:mind-reader/g-0001 download 23% (20511/85725)
+  326.4  [content-sync] g:mind-reader/g-0001 download 30% (26527/85725)
+  326.4  [content-sync] g:mind-reader/g-0001 download 40% (34719/85725)
+  326.7  [content-sync] g:mind-reader/g-0001 download 53% (45791/85725)
+  326.7  [content-sync] g:mind-reader/g-0001 download 62% (53983/85725)
+  327.0  [content-sync] g:mind-reader/g-0001 download 74% (63487/85725)
+  327.3  [content-sync] g:mind-reader/g-0001 download 81% (69632/85725)
+  327.3  [content-sync] g:mind-reader/g-0001 download 90% (77824/85725)
+  327.4  [content-sync] g:mind-reader/g-0001 download 100% (85725/85725)
+  327.4  [content-sync] g:mind-reader/g-0001 sha256 ok
+  327.4  [content-sync] moved /tmp/g-mind-reader-g-0001.mp3.part -> /games/mind-reader/g-0001.mp3
+  327.9  [content-sync] g:mind-reader/g-0010 download 14% (12288/86979)
+  328.3  [content-sync] g:mind-reader/g-0010 download 23% (20511/86979)
+  328.3  [content-sync] g:mind-reader/g-0010 download 31% (27487/86979)
+  328.7  [content-sync] g:mind-reader/g-0010 download 41% (35679/86979)
+  328.8  [content-sync] g:mind-reader/g-0010 download 52% (45791/86979)
+  329.1  [content-sync] g:mind-reader/g-0010 download 62% (53983/86979)
+  329.1  [content-sync] g:mind-reader/g-0010 download 71% (62175/86979)
+  329.5  [content-sync] g:mind-reader/g-0010 download 80% (70367/86979)
+  329.5  [content-sync] g:mind-reader/g-0010 download 90% (78559/86979)
+  329.7  [content-sync] g:mind-reader/g-0010 download 100% (86979/86979)
+  329.7  [content-sync] g:mind-reader/g-0010 sha256 ok
+  329.7  [content-sync] moved /tmp/g-mind-reader-g-0010.mp3.part -> /games/mind-reader/g-0010.mp3
+  330.4  [content-sync] g:mind-reader/g-0011 download 10% (8192/81546)
+  330.5  [content-sync] g:mind-reader/g-0011 download 20% (16415/81546)
+  330.9  [content-sync] g:mind-reader/g-0011 download 30% (24607/81546)
+  331.0  [content-sync] g:mind-reader/g-0011 download 44% (36639/81546)
+  331.1  [content-sync] g:mind-reader/g-0011 download 51% (41695/81546)
+  331.3  [content-sync] g:mind-reader/g-0011 download 61% (49887/81546)
+  331.6  [content-sync] g:mind-reader/g-0011 download 71% (58431/81546)
+  331.8  [content-sync] g:mind-reader/g-0011 download 80% (65711/81546)
+  331.8  [content-sync] g:mind-reader/g-0011 download 90% (73903/81546)
+  331.9  [content-sync] g:mind-reader/g-0011 download 100% (81546/81546)
+  331.9  [content-sync] g:mind-reader/g-0011 sha256 ok
+  332.0  [content-sync] moved /tmp/g-mind-reader-g-0011.mp3.part -> /games/mind-reader/g-0011.mp3
+  332.8  [content-sync] g:mind-reader/g-0100 download 14% (12288/85725)
+  332.8  [content-sync] g:mind-reader/g-0100 download 23% (20480/85725)
+  332.9  [content-sync] g:mind-reader/g-0100 download 32% (27487/85725)
+  333.1  [content-sync] g:mind-reader/g-0100 download 41% (35679/85725)
+  333.2  [content-sync] g:mind-reader/g-0100 download 51% (44223/85725)
+  333.6  [content-sync] g:mind-reader/g-0100 download 61% (52415/85725)
+  333.6  [content-sync] g:mind-reader/g-0100 download 70% (60607/85725)
+  333.8  [content-sync] g:mind-reader/g-0100 download 80% (68799/85725)
+  333.9  [content-sync] g:mind-reader/g-0100 download 92% (79311/85725)
+  334.0  [content-sync] g:mind-reader/g-0100 download 100% (85725/85725)
+  334.0  [content-sync] g:mind-reader/g-0100 sha256 ok
+  334.0  [content-sync] moved /tmp/g-mind-reader-g-0100.mp3.part -> /games/mind-reader/g-0100.mp3
+  334.5  [content-sync] g:mind-reader/g-0101 download 14% (12623/86979)
+  335.0  [content-sync] g:mind-reader/g-0101 download 23% (20815/86979)
+  335.0  [content-sync] g:mind-reader/g-0101 download 33% (29007/86979)
+  335.1  [content-sync] g:mind-reader/g-0101 download 42% (37199/86979)
+  335.3  [content-sync] g:mind-reader/g-0101 download 52% (45791/86979)
+  335.6  [content-sync] g:mind-reader/g-0101 download 62% (54335/86979)
+  335.6  [content-sync] g:mind-reader/g-0101 download 71% (62527/86979)
+  335.7  [content-sync] g:mind-reader/g-0101 download 80% (69632/86979)
+  336.0  [content-sync] g:mind-reader/g-0101 download 93% (81312/86979)
+  336.0  [content-sync] g:mind-reader/g-0101 download 100% (86979/86979)
+  336.0  [content-sync] g:mind-reader/g-0101 sha256 ok
+  336.0  [content-sync] moved /tmp/g-mind-reader-g-0101.mp3.part -> /games/mind-reader/g-0101.mp3
+  336.5  [content-sync] g:mind-reader/g-0110 download 10% (8192/79038)
+  336.6  [content-sync] g:mind-reader/g-0110 download 20% (16415/79038)
+  336.9  [content-sync] g:mind-reader/g-0110 download 31% (24607/79038)
+  337.2  [content-sync] g:mind-reader/g-0110 download 41% (32799/79038)
+  337.3  [content-sync] g:mind-reader/g-0110 download 50% (40127/79038)
+  337.4  [content-sync] g:mind-reader/g-0110 download 61% (48319/79038)
+  337.5  [content-sync] g:mind-reader/g-0110 download 71% (56511/79038)
+  337.8  [content-sync] g:mind-reader/g-0110 download 84% (66975/79038)
+  337.8  [content-sync] g:mind-reader/g-0110 download 90% (71727/79038)
+  337.9  [content-sync] g:mind-reader/g-0110 download 100% (79038/79038)
+  337.9  [content-sync] g:mind-reader/g-0110 sha256 ok
+  338.0  [content-sync] moved /tmp/g-mind-reader-g-0110.mp3.part -> /games/mind-reader/g-0110.mp3
+  338.5  [content-sync] g:mind-reader/g-0111 download 10% (8192/76530)
+  338.7  [content-sync] g:mind-reader/g-0111 download 25% (19247/76530)
+  339.0  [content-sync] g:mind-reader/g-0111 download 31% (23999/76530)
+  339.0  [content-sync] g:mind-reader/g-0111 download 42% (32191/76530)
+  339.2  [content-sync] g:mind-reader/g-0111 download 54% (41999/76530)
+  339.2  [content-sync] g:mind-reader/g-0111 download 60% (46095/76530)
+  339.7  [content-sync] g:mind-reader/g-0111 download 70% (54287/76530)
+  339.7  [content-sync] g:mind-reader/g-0111 download 81% (62479/76530)
+  340.1  [content-sync] g:mind-reader/g-0111 download 94% (72335/76530)
+  340.3  [content-sync] g:mind-reader/g-0111 download 100% (76530/76530)
+  340.3  [content-sync] g:mind-reader/g-0111 sha256 ok
+  340.3  [content-sync] moved /tmp/g-mind-reader-g-0111.mp3.part -> /games/mind-reader/g-0111.mp3
+  341.0  [content-sync] g:mind-reader/g-1000 download 10% (8192/80292)
+  341.0  [content-sync] g:mind-reader/g-1000 download 20% (16384/80292)
+  341.3  [content-sync] g:mind-reader/g-1000 download 30% (24576/80292)
+  341.3  [content-sync] g:mind-reader/g-1000 download 40% (32768/80292)
+  341.4  [content-sync] g:mind-reader/g-1000 download 51% (40960/80292)
+  341.6  [content-sync] g:mind-reader/g-1000 download 63% (50847/80292)
+  342.0  [content-sync] g:mind-reader/g-1000 download 73% (59039/80292)
+  342.0  [content-sync] g:mind-reader/g-1000 download 83% (67231/80292)
+  342.1  [content-sync] g:mind-reader/g-1000 download 93% (75423/80292)
+  342.2  [content-sync] g:mind-reader/g-1000 download 100% (80292/80292)
+  342.2  [content-sync] g:mind-reader/g-1000 sha256 ok
+  342.2  [content-sync] moved /tmp/g-mind-reader-g-1000.mp3.part -> /games/mind-reader/g-1000.mp3
+  342.9  [content-sync] g:mind-reader/g-1001 download 13% (12288/90741)
+  342.9  [content-sync] g:mind-reader/g-1001 download 22% (20511/90741)
+  343.0  [content-sync] g:mind-reader/g-1001 download 30% (27487/90741)
+  343.3  [content-sync] g:mind-reader/g-1001 download 43% (39775/90741)
+  343.3  [content-sync] g:mind-reader/g-1001 download 50% (45791/90741)
+  343.8  [content-sync] g:mind-reader/g-1001 download 64% (58079/90741)
+  343.8  [content-sync] g:mind-reader/g-1001 download 73% (66271/90741)
+  344.0  [content-sync] g:mind-reader/g-1001 download 82% (74463/90741)
+  344.0  [content-sync] g:mind-reader/g-1001 download 90% (81839/90741)
+  344.2  [content-sync] g:mind-reader/g-1001 download 100% (90741/90741)
+  344.2  [content-sync] g:mind-reader/g-1001 sha256 ok
+  344.2  [content-sync] moved /tmp/g-mind-reader-g-1001.mp3.part -> /games/mind-reader/g-1001.mp3
+  344.7  [content-sync] g:mind-reader/g-1010 download 10% (8192/80292)
+  345.0  [content-sync] g:mind-reader/g-1010 download 20% (16415/80292)
+  345.1  [content-sync] g:mind-reader/g-1010 download 30% (24607/80292)
+  345.4  [content-sync] g:mind-reader/g-1010 download 40% (32799/80292)
+  345.7  [content-sync] g:mind-reader/g-1010 download 51% (41695/80292)
+  345.7  [content-sync] g:mind-reader/g-1010 download 62% (49887/80292)
+  345.9  [content-sync] g:mind-reader/g-1010 download 72% (58079/80292)
+  345.9  [content-sync] g:mind-reader/g-1010 download 81% (65407/80292)
+  346.1  [content-sync] g:mind-reader/g-1010 download 91% (73599/80292)
+  346.1  [content-sync] g:mind-reader/g-1010 download 100% (80292/80292)
+  346.1  [content-sync] g:mind-reader/g-1010 sha256 ok
+  346.2  [content-sync] moved /tmp/g-mind-reader-g-1010.mp3.part -> /games/mind-reader/g-1010.mp3
+  346.8  [content-sync] g:mind-reader/g-1011 download 14% (12288/85725)
+  347.1  [content-sync] g:mind-reader/g-1011 download 23% (20511/85725)
+  347.1  [content-sync] g:mind-reader/g-1011 download 33% (28703/85725)
+  347.4  [content-sync] g:mind-reader/g-1011 download 43% (36895/85725)
+  347.4  [content-sync] g:mind-reader/g-1011 download 52% (45087/85725)
+  347.7  [content-sync] g:mind-reader/g-1011 download 64% (54943/85725)
+  347.7  [content-sync] g:mind-reader/g-1011 download 73% (63135/85725)
+  348.0  [content-sync] g:mind-reader/g-1011 download 83% (71327/85725)
+  348.0  [content-sync] g:mind-reader/g-1011 download 91% (78351/85725)
+  348.1  [content-sync] g:mind-reader/g-1011 download 100% (85725/85725)
+  348.1  [content-sync] g:mind-reader/g-1011 sha256 ok
+  348.1  [content-sync] moved /tmp/g-mind-reader-g-1011.mp3.part -> /games/mind-reader/g-1011.mp3
+  348.7  [content-sync] g:mind-reader/g-1100 download 14% (12288/86979)
+  348.9  [content-sync] g:mind-reader/g-1100 download 23% (20511/86979)
+  349.2  [content-sync] g:mind-reader/g-1100 download 30% (26527/86979)
+  349.2  [content-sync] g:mind-reader/g-1100 download 43% (37599/86979)
+  349.4  [content-sync] g:mind-reader/g-1100 download 52% (45791/86979)
+  349.5  [content-sync] g:mind-reader/g-1100 download 60% (52767/86979)
+  349.8  [content-sync] g:mind-reader/g-1100 download 70% (60959/86979)
+  349.9  [content-sync] g:mind-reader/g-1100 download 84% (73247/86979)
+  350.0  [content-sync] g:mind-reader/g-1100 download 91% (79615/86979)
+  350.2  [content-sync] g:mind-reader/g-1100 download 100% (86979/86979)
+  350.2  [content-sync] g:mind-reader/g-1100 sha256 ok
+  350.2  [content-sync] moved /tmp/g-mind-reader-g-1100.mp3.part -> /games/mind-reader/g-1100.mp3
+  350.7  [content-sync] g:mind-reader/g-1101 download 13% (12288/88233)
+  351.2  [content-sync] g:mind-reader/g-1101 download 23% (20511/88233)
+  351.2  [content-sync] g:mind-reader/g-1101 download 32% (28703/88233)
+  351.3  [content-sync] g:mind-reader/g-1101 download 41% (36895/88233)
+  351.5  [content-sync] g:mind-reader/g-1101 download 51% (45791/88233)
+  351.8  [content-sync] g:mind-reader/g-1101 download 63% (55903/88233)
+  351.8  [content-sync] g:mind-reader/g-1101 download 72% (64095/88233)
+  352.0  [content-sync] g:mind-reader/g-1101 download 81% (72287/88233)
+  352.2  [content-sync] g:mind-reader/g-1101 download 93% (82447/88233)
+  352.2  [content-sync] g:mind-reader/g-1101 download 100% (88233/88233)
+  352.2  [content-sync] g:mind-reader/g-1101 sha256 ok
+  352.3  [content-sync] moved /tmp/g-mind-reader-g-1101.mp3.part -> /games/mind-reader/g-1101.mp3
+  352.9  [content-sync] g:mind-reader/g-1110 download 14% (12288/85725)
+  353.1  [content-sync] g:mind-reader/g-1110 download 23% (20480/85725)
+  353.3  [content-sync] g:mind-reader/g-1110 download 33% (29055/85725)
+  353.4  [content-sync] g:mind-reader/g-1110 download 41% (35375/85725)
+  353.6  [content-sync] g:mind-reader/g-1110 download 53% (45791/85725)
+  353.8  [content-sync] g:mind-reader/g-1110 download 62% (53983/85725)
+  354.0  [content-sync] g:mind-reader/g-1110 download 72% (61919/85725)
+  354.0  [content-sync] g:mind-reader/g-1110 download 82% (70767/85725)
+  354.4  [content-sync] g:mind-reader/g-1110 download 92% (78959/85725)
+  354.4  [content-sync] g:mind-reader/g-1110 download 100% (85725/85725)
+  354.4  [content-sync] g:mind-reader/g-1110 sha256 ok
+  354.4  [content-sync] moved /tmp/g-mind-reader-g-1110.mp3.part -> /games/mind-reader/g-1110.mp3
+  355.0  [content-sync] g:mind-reader/g-1111 download 13% (12288/88233)
+  355.2  [content-sync] g:mind-reader/g-1111 download 23% (20511/88233)
+  355.5  [content-sync] g:mind-reader/g-1111 download 32% (28703/88233)
+  355.6  [content-sync] g:mind-reader/g-1111 download 41% (36895/88233)
+  355.7  [content-sync] g:mind-reader/g-1111 download 51% (45791/88233)
+  355.8  [content-sync] g:mind-reader/g-1111 download 60% (53071/88233)
+  356.2  [content-sync] g:mind-reader/g-1111 download 71% (63183/88233)
+  356.2  [content-sync] g:mind-reader/g-1111 download 83% (73295/88233)
+  356.4  [content-sync] g:mind-reader/g-1111 download 91% (80575/88233)
+  356.6  [content-sync] g:mind-reader/g-1111 download 100% (88233/88233)
+  356.6  [content-sync] g:mind-reader/g-1111 sha256 ok
+  356.7  [content-sync] moved /tmp/g-mind-reader-g-1111.mp3.part -> /games/mind-reader/g-1111.mp3
+  357.7  [content-sync] g:mind-reader/intro download 11% (20510/185199)
+  357.9  [content-sync] g:mind-reader/intro download 20% (37598/185199)
+  358.4  [content-sync] g:mind-reader/intro download 30% (57166/185199)
+  358.6  [content-sync] g:mind-reader/intro download 40% (74384/185199)
+  359.0  [content-sync] g:mind-reader/intro download 50% (93952/185199)
+  359.9  [content-sync] g:mind-reader/intro download 62% (115088/185199)
+  360.3  [content-sync] g:mind-reader/intro download 71% (131872/185199)
+  360.6  [content-sync] g:mind-reader/intro download 81% (150832/185199)
+  360.6  [content-sync] g:mind-reader/intro download 90% (167216/185199)
+  360.8  [content-sync] g:mind-reader/intro download 100% (185199/185199)
+  360.8  [content-sync] g:mind-reader/intro sha256 ok
+  360.8  [content-sync] moved /tmp/g-mind-reader-intro.mp3.part -> /games/mind-reader/intro.mp3
+  361.5  [content-sync] g:mind-reader/lose download 13% (12288/90741)
+  361.7  [content-sync] g:mind-reader/lose download 22% (20511/90741)
+  362.1  [content-sync] g:mind-reader/lose download 31% (28703/90741)
+  362.2  [content-sync] g:mind-reader/lose download 40% (36639/90741)
+  362.3  [content-sync] g:mind-reader/lose download 50% (45791/90741)
+  362.5  [content-sync] g:mind-reader/lose download 61% (55903/90741)
+  362.8  [content-sync] g:mind-reader/lose download 74% (67279/90741)
+  362.9  [content-sync] g:mind-reader/lose download 81% (74255/90741)
+  363.0  [content-sync] g:mind-reader/lose download 90% (82447/90741)
+  363.1  [content-sync] g:mind-reader/lose download 100% (90741/90741)
+  363.2  [content-sync] g:mind-reader/lose sha256 ok
+  363.2  [content-sync] moved /tmp/g-mind-reader-lose.mp3.part -> /games/mind-reader/lose.mp3
+  363.5  [content-sync] g:mind-reader/q-0 download 11% (4096/36824)
+  363.7  [content-sync] g:mind-reader/q-0 download 22% (8192/36824)
+  363.7  [content-sync] g:mind-reader/q-0 download 33% (12288/36824)
+  363.8  [content-sync] g:mind-reader/q-0 download 44% (16415/36824)
+  363.8  [content-sync] g:mind-reader/q-0 download 55% (20511/36824)
+  364.0  [content-sync] g:mind-reader/q-0 download 66% (24607/36824)
+  364.0  [content-sync] g:mind-reader/q-0 download 77% (28703/36824)
+  364.1  [content-sync] g:mind-reader/q-0 download 89% (32799/36824)
+  364.1  [content-sync] g:mind-reader/q-0 download 100% (36824/36824)
+  364.1  [content-sync] g:mind-reader/q-0 sha256 ok
+  364.2  [content-sync] moved /tmp/g-mind-reader-q-0.mp3.part -> /games/mind-reader/q-0.mp3
+  364.7  [content-sync] g:mind-reader/q-00 download 11% (4096/35570)
+  365.0  [content-sync] g:mind-reader/q-00 download 23% (8192/35570)
+  365.1  [content-sync] g:mind-reader/q-00 download 35% (12623/35570)
+  365.1  [content-sync] g:mind-reader/q-00 download 41% (14847/35570)
+  365.1  [content-sync] g:mind-reader/q-00 download 53% (18943/35570)
+  365.2  [content-sync] g:mind-reader/q-00 download 64% (23039/35570)
+  365.4  [content-sync] g:mind-reader/q-00 download 76% (27135/35570)
+  365.5  [content-sync] g:mind-reader/q-00 download 87% (31231/35570)
+  365.5  [content-sync] g:mind-reader/q-00 download 99% (35327/35570)
+  365.5  [content-sync] g:mind-reader/q-00 download 100% (35570/35570)
+  365.5  [content-sync] g:mind-reader/q-00 sha256 ok
+  365.5  [content-sync] moved /tmp/g-mind-reader-q-00.mp3.part -> /games/mind-reader/q-00.mp3
+  366.1  [content-sync] g:mind-reader/q-000 download 13% (4096/30555)
+  366.1  [content-sync] g:mind-reader/q-000 download 26% (8192/30555)
+  366.1  [content-sync] g:mind-reader/q-000 download 40% (12288/30555)
+  366.2  [content-sync] g:mind-reader/q-000 download 53% (16415/30555)
+  366.3  [content-sync] g:mind-reader/q-000 download 67% (20511/30555)
+  366.6  [content-sync] g:mind-reader/q-000 download 80% (24607/30555)
+  366.6  [content-sync] g:mind-reader/q-000 download 93% (28703/30555)
+  366.6  [content-sync] g:mind-reader/q-000 download 100% (30555/30555)
+  366.6  [content-sync] g:mind-reader/q-000 sha256 ok
+  366.6  [content-sync] moved /tmp/g-mind-reader-q-000.mp3.part -> /games/mind-reader/q-000.mp3
+  367.0  [content-sync] g:mind-reader/q-001 download 10% (4096/40586)
+  367.3  [content-sync] g:mind-reader/q-001 download 20% (8192/40586)
+  367.3  [content-sync] g:mind-reader/q-001 download 30% (12288/40586)
+  367.4  [content-sync] g:mind-reader/q-001 download 40% (16415/40586)
+  367.5  [content-sync] g:mind-reader/q-001 download 50% (20511/40586)
+  367.7  [content-sync] g:mind-reader/q-001 download 60% (24607/40586)
+  367.9  [content-sync] g:mind-reader/q-001 download 70% (28703/40586)
+  367.9  [content-sync] g:mind-reader/q-001 download 80% (32543/40586)
+  368.0  [content-sync] g:mind-reader/q-001 download 90% (36639/40586)
+  368.0  [content-sync] g:mind-reader/q-001 download 100% (40586/40586)
+  368.1  [content-sync] g:mind-reader/q-001 sha256 ok
+  368.1  [content-sync] moved /tmp/g-mind-reader-q-001.mp3.part -> /games/mind-reader/q-001.mp3
+  368.6  [content-sync] g:mind-reader/q-01 download 12% (4096/31808)
+  368.6  [content-sync] g:mind-reader/q-01 download 25% (8192/31808)
+  368.6  [content-sync] g:mind-reader/q-01 download 38% (12288/31808)
+  369.1  [content-sync] g:mind-reader/q-01 download 51% (16415/31808)
+  369.1  [content-sync] g:mind-reader/q-01 download 64% (20511/31808)
+  369.1  [content-sync] g:mind-reader/q-01 download 77% (24607/31808)
+  369.1  [content-sync] g:mind-reader/q-01 download 90% (28703/31808)
+  369.1  [content-sync] g:mind-reader/q-01 download 100% (31808/31808)
+  369.1  [content-sync] g:mind-reader/q-01 sha256 ok
+  369.2  [content-sync] moved /tmp/g-mind-reader-q-01.mp3.part -> /games/mind-reader/q-01.mp3
+  369.5  [content-sync] g:mind-reader/q-010 download 10% (4096/39332)
+  369.7  [content-sync] g:mind-reader/q-010 download 20% (8192/39332)
+  369.7  [content-sync] g:mind-reader/q-010 download 31% (12288/39332)
+  369.8  [content-sync] g:mind-reader/q-010 download 41% (16415/39332)
+  370.0  [content-sync] g:mind-reader/q-010 download 52% (20511/39332)
+  370.1  [content-sync] g:mind-reader/q-010 download 62% (24607/39332)
+  370.4  [content-sync] g:mind-reader/q-010 download 72% (28703/39332)
+  370.5  [content-sync] g:mind-reader/q-010 download 83% (32799/39332)
+  370.6  [content-sync] g:mind-reader/q-010 download 99% (39167/39332)
+  370.6  [content-sync] g:mind-reader/q-010 download 100% (39332/39332)
+  370.7  [content-sync] g:mind-reader/q-010 sha256 ok
+  370.7  [content-sync] moved /tmp/g-mind-reader-q-010.mp3.part -> /games/mind-reader/q-010.mp3
+  371.3  [content-sync] g:mind-reader/q-011 download 19% (8192/41839)
+  371.3  [content-sync] g:mind-reader/q-011 download 29% (12288/41839)
+  371.5  [content-sync] g:mind-reader/q-011 download 39% (16415/41839)
+  371.5  [content-sync] g:mind-reader/q-011 download 49% (20511/41839)
+  371.5  [content-sync] g:mind-reader/q-011 download 53% (22431/41839)
+  371.7  [content-sync] g:mind-reader/q-011 download 63% (26527/41839)
+  371.7  [content-sync] g:mind-reader/q-011 download 73% (30623/41839)
+  371.7  [content-sync] g:mind-reader/q-011 download 82% (34719/41839)
+  371.8  [content-sync] g:mind-reader/q-011 download 93% (39167/41839)
+  371.9  [content-sync] g:mind-reader/q-011 download 100% (41839/41839)
+  371.9  [content-sync] g:mind-reader/q-011 sha256 ok
+  371.9  [content-sync] moved /tmp/g-mind-reader-q-011.mp3.part -> /games/mind-reader/q-011.mp3
+  372.7  [content-sync] g:mind-reader/q-1 download 16% (8192/48527)
+  372.7  [content-sync] g:mind-reader/q-1 download 20% (9791/48527)
+  372.9  [content-sync] g:mind-reader/q-1 download 37% (17983/48527)
+  373.1  [content-sync] g:mind-reader/q-1 download 45% (22079/48527)
+  373.1  [content-sync] g:mind-reader/q-1 download 53% (26175/48527)
+  373.2  [content-sync] g:mind-reader/q-1 download 62% (30271/48527)
+  373.3  [content-sync] g:mind-reader/q-1 download 70% (34367/48527)
+  373.5  [content-sync] g:mind-reader/q-1 download 87% (42559/48527)
+  373.6  [content-sync] g:mind-reader/q-1 download 96% (46655/48527)
+  373.6  [content-sync] g:mind-reader/q-1 download 100% (48527/48527)
+  373.6  [content-sync] g:mind-reader/q-1 sha256 ok
+  373.6  [content-sync] moved /tmp/g-mind-reader-q-1.mp3.part -> /games/mind-reader/q-1.mp3
+  374.1  [content-sync] g:mind-reader/q-10 download 13% (8192/59812)
+  374.1  [content-sync] g:mind-reader/q-10 download 20% (12288/59812)
+  374.5  [content-sync] g:mind-reader/q-10 download 34% (20511/59812)
+  374.5  [content-sync] g:mind-reader/q-10 download 41% (24607/59812)
+  374.5  [content-sync] g:mind-reader/q-10 download 50% (30015/59812)
+  374.7  [content-sync] g:mind-reader/q-10 download 63% (38207/59812)
+  374.8  [content-sync] g:mind-reader/q-10 download 70% (42303/59812)
+  375.1  [content-sync] g:mind-reader/q-10 download 84% (50495/59812)
+  375.3  [content-sync] g:mind-reader/q-10 download 92% (55599/59812)
+  375.3  [content-sync] g:mind-reader/q-10 download 100% (59812/59812)
+  375.4  [content-sync] g:mind-reader/q-10 sha256 ok
+  375.4  [content-sync] moved /tmp/g-mind-reader-q-10.mp3.part -> /games/mind-reader/q-10.mp3
+  375.8  [content-sync] g:mind-reader/q-100 download 12% (4096/33062)
+  376.0  [content-sync] g:mind-reader/q-100 download 24% (8192/33062)
+  376.0  [content-sync] g:mind-reader/q-100 download 37% (12288/33062)
+  376.1  [content-sync] g:mind-reader/q-100 download 49% (16415/33062)
+  376.3  [content-sync] g:mind-reader/q-100 download 62% (20511/33062)
+  376.5  [content-sync] g:mind-reader/q-100 download 76% (25263/33062)
+  376.5  [content-sync] g:mind-reader/q-100 download 86% (28751/33062)
+  376.6  [content-sync] g:mind-reader/q-100 download 99% (32847/33062)
+  376.6  [content-sync] g:mind-reader/q-100 download 100% (33062/33062)
+  376.6  [content-sync] g:mind-reader/q-100 sha256 ok
+  376.6  [content-sync] moved /tmp/g-mind-reader-q-100.mp3.part -> /games/mind-reader/q-100.mp3
+  377.0  [content-sync] g:mind-reader/q-101 download 11% (4096/35570)
+  377.3  [content-sync] g:mind-reader/q-101 download 23% (8192/35570)
+  377.3  [content-sync] g:mind-reader/q-101 download 34% (12288/35570)
+  377.4  [content-sync] g:mind-reader/q-101 download 46% (16415/35570)
+  377.8  [content-sync] g:mind-reader/q-101 download 57% (20511/35570)
+  377.8  [content-sync] g:mind-reader/q-101 download 69% (24607/35570)
+  377.8  [content-sync] g:mind-reader/q-101 download 80% (28703/35570)
+  377.8  [content-sync] g:mind-reader/q-101 download 92% (32799/35570)
+  377.8  [content-sync] g:mind-reader/q-101 download 100% (35570/35570)
+  377.8  [content-sync] g:mind-reader/q-101 sha256 ok
+  377.8  [content-sync] moved /tmp/g-mind-reader-q-101.mp3.part -> /games/mind-reader/q-101.mp3
+  378.2  [content-sync] g:mind-reader/q-11 download 13% (4096/29301)
+  378.3  [content-sync] g:mind-reader/q-11 download 27% (8192/29301)
+  378.3  [content-sync] g:mind-reader/q-11 download 41% (12288/29301)
+  378.5  [content-sync] g:mind-reader/q-11 download 56% (16415/29301)
+  378.7  [content-sync] g:mind-reader/q-11 download 73% (21471/29301)
+  378.7  [content-sync] g:mind-reader/q-11 download 85% (24959/29301)
+  378.7  [content-sync] g:mind-reader/q-11 download 99% (29055/29301)
+  378.7  [content-sync] g:mind-reader/q-11 download 100% (29301/29301)
+  378.8  [content-sync] g:mind-reader/q-11 sha256 ok
+  378.8  [content-sync] moved /tmp/g-mind-reader-q-11.mp3.part -> /games/mind-reader/q-11.mp3
+  379.2  [content-sync] g:mind-reader/q-110 download 14% (4096/28047)
+  379.5  [content-sync] g:mind-reader/q-110 download 29% (8192/28047)
+  379.5  [content-sync] g:mind-reader/q-110 download 43% (12288/28047)
+  379.5  [content-sync] g:mind-reader/q-110 download 58% (16384/28047)
+  379.5  [content-sync] g:mind-reader/q-110 download 73% (20511/28047)
+  379.7  [content-sync] g:mind-reader/q-110 download 87% (24607/28047)
+  379.7  [content-sync] g:mind-reader/q-110 download 100% (28047/28047)
+  379.7  [content-sync] g:mind-reader/q-110 sha256 ok
+  379.7  [content-sync] moved /tmp/g-mind-reader-q-110.mp3.part -> /games/mind-reader/q-110.mp3
+  380.2  [content-sync] g:mind-reader/q-111 download 15% (4096/26793)
+  380.3  [content-sync] g:mind-reader/q-111 download 30% (8192/26793)
+  380.5  [content-sync] g:mind-reader/q-111 download 51% (13887/26793)
+  380.5  [content-sync] g:mind-reader/q-111 download 67% (17983/26793)
+  380.6  [content-sync] g:mind-reader/q-111 download 82% (22079/26793)
+  380.8  [content-sync] g:mind-reader/q-111 download 97% (26175/26793)
+  380.8  [content-sync] g:mind-reader/q-111 download 100% (26793/26793)
+  380.8  [content-sync] g:mind-reader/q-111 sha256 ok
+  380.8  [content-sync] moved /tmp/g-mind-reader-q-111.mp3.part -> /games/mind-reader/q-111.mp3
+  381.5  [content-sync] g:mind-reader/q-root download 12% (8192/66499)
+  381.5  [content-sync] g:mind-reader/q-root download 24% (16415/66499)
+  381.6  [content-sync] g:mind-reader/q-root download 30% (20511/66499)
+  381.8  [content-sync] g:mind-reader/q-root download 43% (28703/66499)
+  381.9  [content-sync] g:mind-reader/q-root download 51% (34111/66499)
+  382.0  [content-sync] g:mind-reader/q-root download 62% (41695/66499)
+  382.1  [content-sync] g:mind-reader/q-root download 75% (49887/66499)
+  382.2  [content-sync] g:mind-reader/q-root download 81% (53983/66499)
+  382.6  [content-sync] g:mind-reader/q-root download 93% (62175/66499)
+  382.6  [content-sync] g:mind-reader/q-root download 100% (66499/66499)
+  382.6  [content-sync] g:mind-reader/q-root sha256 ok
+  382.6  [content-sync] moved /tmp/g-mind-reader-q-root.mp3.part -> /games/mind-reader/q-root.mp3
+  383.1  [content-sync] g:mind-reader/replay download 16% (8192/49781)
+  383.1  [content-sync] g:mind-reader/replay download 24% (12288/49781)
+  383.2  [content-sync] g:mind-reader/replay download 32% (16415/49781)
+  383.3  [content-sync] g:mind-reader/replay download 41% (20511/49781)
+  383.5  [content-sync] g:mind-reader/replay download 57% (28703/49781)
+  383.5  [content-sync] g:mind-reader/replay download 62% (31279/49781)
+  383.6  [content-sync] g:mind-reader/replay download 71% (35375/49781)
+  383.7  [content-sync] g:mind-reader/replay download 83% (41695/49781)
+  383.8  [content-sync] g:mind-reader/replay download 91% (45791/49781)
+  383.9  [content-sync] g:mind-reader/replay download 100% (49781/49781)
+  383.9  [content-sync] g:mind-reader/replay sha256 ok
+  383.9  [content-sync] moved /tmp/g-mind-reader-replay.mp3.part -> /games/mind-reader/replay.mp3
+  384.5  [content-sync] g:mind-reader/win download 13% (8192/61066)
+  384.5  [content-sync] g:mind-reader/win download 20% (12288/61066)
+  384.8  [content-sync] g:mind-reader/win download 33% (20511/61066)
+  384.8  [content-sync] g:mind-reader/win download 40% (24607/61066)
+  385.0  [content-sync] g:mind-reader/win download 53% (32543/61066)
+  385.1  [content-sync] g:mind-reader/win download 61% (37599/61066)
+  385.3  [content-sync] g:mind-reader/win download 74% (45791/61066)
+  385.3  [content-sync] g:mind-reader/win download 81% (49887/61066)
+  385.5  [content-sync] g:mind-reader/win download 95% (58431/61066)
+  385.5  [content-sync] g:mind-reader/win download 100% (61066/61066)
+  385.5  [content-sync] g:mind-reader/win sha256 ok
+  385.5  [content-sync] moved /tmp/g-mind-reader-win.mp3.part -> /games/mind-reader/win.mp3
+  386.2  [content-sync] g:sound-detective/intro download 10% (13886/130447)
+  386.6  [content-sync] g:sound-detective/intro download 20% (26174/130447)
+  386.9  [content-sync] g:sound-detective/intro download 31% (41694/130447)
+  387.1  [content-sync] g:sound-detective/intro download 41% (53982/130447)
+  387.4  [content-sync] g:sound-detective/intro download 52% (68238/130447)
+  387.6  [content-sync] g:sound-detective/intro download 60% (79310/130447)
+  387.9  [content-sync] g:sound-detective/intro download 70% (91598/130447)
+  388.3  [content-sync] g:sound-detective/intro download 80% (105502/130447)
+  388.7  [content-sync] g:sound-detective/intro download 90% (118142/130447)
+  388.9  [content-sync] g:sound-detective/intro download 100% (130447/130447)
+  388.9  [content-sync] g:sound-detective/intro sha256 ok
+  388.9  [content-sync] moved /tmp/g-sound-detective-intro.mp3.part -> /games/sound-detective/intro.mp3
+  389.4  [content-sync] g:sound-detective/r01-ask download 16% (8192/49781)
+  389.4  [content-sync] g:sound-detective/r01-ask download 24% (12288/49781)
+  389.6  [content-sync] g:sound-detective/r01-ask download 32% (16415/49781)
+  389.9  [content-sync] g:sound-detective/r01-ask download 45% (22735/49781)
+  389.9  [content-sync] g:sound-detective/r01-ask download 53% (26831/49781)
+  389.9  [content-sync] g:sound-detective/r01-ask download 62% (30927/49781)
+  389.9  [content-sync] g:sound-detective/r01-ask download 70% (35023/49781)
+  390.0  [content-sync] g:sound-detective/r01-ask download 83% (41695/49781)
+  390.2  [content-sync] g:sound-detective/r01-ask download 91% (45791/49781)
+  390.2  [content-sync] g:sound-detective/r01-ask download 100% (49781/49781)
+  390.2  [content-sync] g:sound-detective/r01-ask sha256 ok
+  390.2  [content-sync] moved /tmp/g-sound-detective-r01-ask.mp3.part -> /games/sound-detective/r01-ask.mp3
+  390.5  [content-sync] g:sound-detective/r01-sound download 17% (4096/23031)
+  390.8  [content-sync] g:sound-detective/r01-sound download 35% (8192/23031)
+  390.8  [content-sync] g:sound-detective/r01-sound download 53% (12288/23031)
+  391.0  [content-sync] g:sound-detective/r01-sound download 71% (16415/23031)
+  391.0  [content-sync] g:sound-detective/r01-sound download 89% (20511/23031)
+  391.0  [content-sync] g:sound-detective/r01-sound download 100% (23031/23031)
+  391.0  [content-sync] g:sound-detective/r01-sound sha256 ok
+  391.1  [content-sync] moved /tmp/g-sound-detective-r01-sound.mp3.part -> /games/sound-detective/r01-sound.mp3
+  391.7  [content-sync] g:sound-detective/r02-ask download 12% (8192/63991)
+  392.0  [content-sync] g:sound-detective/r02-ask download 21% (13887/63991)
+  392.2  [content-sync] g:sound-detective/r02-ask download 34% (22079/63991)
+  392.2  [content-sync] g:sound-detective/r02-ask download 40% (26175/63991)
+  392.3  [content-sync] g:sound-detective/r02-ask download 50% (32543/63991)
+  392.5  [content-sync] g:sound-detective/r02-ask download 62% (40127/63991)
+  392.8  [content-sync] g:sound-detective/r02-ask download 75% (48319/63991)
+  393.0  [content-sync] g:sound-detective/r02-ask download 81% (52415/63991)
+  393.0  [content-sync] g:sound-detective/r02-ask download 94% (60607/63991)
+  393.0  [content-sync] g:sound-detective/r02-ask download 100% (63991/63991)
+  393.0  [content-sync] g:sound-detective/r02-ask sha256 ok
+  393.1  [content-sync] moved /tmp/g-sound-detective-r02-ask.mp3.part -> /games/sound-detective/r02-ask.mp3
+  393.4  [content-sync] g:sound-detective/r02-sound download 19% (4096/21359)
+  393.6  [content-sync] g:sound-detective/r02-sound download 38% (8192/21359)
+  393.6  [content-sync] g:sound-detective/r02-sound download 51% (11055/21359)
+  393.8  [content-sync] g:sound-detective/r02-sound download 70% (15151/21359)
+  393.9  [content-sync] g:sound-detective/r02-sound download 90% (19247/21359)
+  393.9  [content-sync] g:sound-detective/r02-sound download 100% (21359/21359)
+  393.9  [content-sync] g:sound-detective/r02-sound sha256 ok
+  394.0  [content-sync] moved /tmp/g-sound-detective-r02-sound.mp3.part -> /games/sound-detective/r02-sound.mp3
+  395.0  [content-sync] g:sound-detective/r03-ask download 13% (8192/58558)
+  395.0  [content-sync] g:sound-detective/r03-ask download 20% (12288/58558)
+  395.4  [content-sync] g:sound-detective/r03-ask download 35% (20511/58558)
+  395.8  [content-sync] g:sound-detective/r03-ask download 42% (24607/58558)
+  395.8  [content-sync] g:sound-detective/r03-ask download 56% (32799/58558)
+  395.9  [content-sync] g:sound-detective/r03-ask download 66% (39167/58558)
+  396.2  [content-sync] g:sound-detective/r03-ask download 73% (43263/58558)
+  396.2  [content-sync] g:sound-detective/r03-ask download 80% (47359/58558)
+  396.6  [content-sync] g:sound-detective/r03-ask download 94% (55551/58558)
+  396.6  [content-sync] g:sound-detective/r03-ask download 100% (58558/58558)
+  396.6  [content-sync] g:sound-detective/r03-ask sha256 ok
+  396.6  [content-sync] moved /tmp/g-sound-detective-r03-ask.mp3.part -> /games/sound-detective/r03-ask.mp3
+  397.0  [content-sync] g:sound-detective/r03-sound download 20% (4096/20106)
+  397.4  [content-sync] g:sound-detective/r03-sound download 40% (8192/20106)
+  397.4  [content-sync] g:sound-detective/r03-sound download 61% (12288/20106)
+  397.8  [content-sync] g:sound-detective/r03-sound download 81% (16415/20106)
+  397.8  [content-sync] g:sound-detective/r03-sound download 100% (20106/20106)
+  397.8  [content-sync] g:sound-detective/r03-sound sha256 ok
+  397.8  [content-sync] moved /tmp/g-sound-detective-r03-sound.mp3.part -> /games/sound-detective/r03-sound.mp3
+  398.6  [content-sync] g:sound-detective/r04-ask download 13% (8192/61066)
+  398.6  [content-sync] g:sound-detective/r04-ask download 20% (12288/61066)
+  398.9  [content-sync] g:sound-detective/r04-ask download 33% (20511/61066)
+  399.0  [content-sync] g:sound-detective/r04-ask download 43% (26527/61066)
+  399.4  [content-sync] g:sound-detective/r04-ask download 50% (30623/61066)
+  399.6  [content-sync] g:sound-detective/r04-ask download 61% (37599/61066)
+  399.6  [content-sync] g:sound-detective/r04-ask download 74% (45791/61066)
+  399.9  [content-sync] g:sound-detective/r04-ask download 81% (49887/61066)
+  399.9  [content-sync] g:sound-detective/r04-ask download 95% (58079/61066)
+  399.9  [content-sync] g:sound-detective/r04-ask download 100% (61066/61066)
+  399.9  [content-sync] g:sound-detective/r04-ask sha256 ok
+  400.0  [content-sync] moved /tmp/g-sound-detective-r04-ask.mp3.part -> /games/sound-detective/r04-ask.mp3
+  400.3  [content-sync] g:sound-detective/r04-sound download 16% (4096/24285)
+  400.5  [content-sync] g:sound-detective/r04-sound download 33% (8192/24285)
+  400.5  [content-sync] g:sound-detective/r04-sound download 50% (12288/24285)
+  400.6  [content-sync] g:sound-detective/r04-sound download 67% (16415/24285)
+  400.7  [content-sync] g:sound-detective/r04-sound download 84% (20511/24285)
+  400.7  [content-sync] g:sound-detective/r04-sound download 100% (24285/24285)
+  400.8  [content-sync] g:sound-detective/r04-sound sha256 ok
+  400.8  [content-sync] moved /tmp/g-sound-detective-r04-sound.mp3.part -> /games/sound-detective/r04-sound.mp3
+  401.3  [content-sync] g:sound-detective/r05-ask download 15% (8192/52288)
+  401.3  [content-sync] g:sound-detective/r05-ask download 23% (12288/52288)
+  401.5  [content-sync] g:sound-detective/r05-ask download 31% (16415/52288)
+  401.8  [content-sync] g:sound-detective/r05-ask download 47% (24607/52288)
+  402.2  [content-sync] g:sound-detective/r05-ask download 55% (29055/52288)
+  402.2  [content-sync] g:sound-detective/r05-ask download 63% (33151/52288)
+  402.2  [content-sync] g:sound-detective/r05-ask download 71% (37247/52288)
+  402.3  [content-sync] g:sound-detective/r05-ask download 82% (43263/52288)
+  402.6  [content-sync] g:sound-detective/r05-ask download 90% (47359/52288)
+  402.6  [content-sync] g:sound-detective/r05-ask download 100% (52288/52288)
+  402.6  [content-sync] g:sound-detective/r05-ask sha256 ok
+  402.7  [content-sync] moved /tmp/g-sound-detective-r05-ask.mp3.part -> /games/sound-detective/r05-ask.mp3
+  403.0  [content-sync] g:sound-detective/r05-sound download 21% (4096/18852)
+  403.3  [content-sync] g:sound-detective/r05-sound download 43% (8192/18852)
+  403.3  [content-sync] g:sound-detective/r05-sound download 58% (11055/18852)
+  403.4  [content-sync] g:sound-detective/r05-sound download 80% (15151/18852)
+  403.5  [content-sync] g:sound-detective/r05-sound download 100% (18852/18852)
+  403.5  [content-sync] g:sound-detective/r05-sound sha256 ok
+  403.5  [content-sync] moved /tmp/g-sound-detective-r05-sound.mp3.part -> /games/sound-detective/r05-sound.mp3
+  404.1  [content-sync] g:sound-detective/r06-ask download 13% (8192/61066)
+  404.1  [content-sync] g:sound-detective/r06-ask download 20% (12288/61066)
+  404.2  [content-sync] g:sound-detective/r06-ask download 33% (20511/61066)
+  404.6  [content-sync] g:sound-detective/r06-ask download 40% (24607/61066)
+  404.6  [content-sync] g:sound-detective/r06-ask download 53% (32799/61066)
+  404.6  [content-sync] g:sound-detective/r06-ask download 60% (36895/61066)
+  404.9  [content-sync] g:sound-detective/r06-ask download 74% (45791/61066)
+  404.9  [content-sync] g:sound-detective/r06-ask download 81% (49887/61066)
+  405.0  [content-sync] g:sound-detective/r06-ask download 95% (58079/61066)
+  405.0  [content-sync] g:sound-detective/r06-ask download 100% (61066/61066)
+  405.0  [content-sync] g:sound-detective/r06-ask sha256 ok
+  405.1  [content-sync] moved /tmp/g-sound-detective-r06-ask.mp3.part -> /games/sound-detective/r06-ask.mp3
+  405.4  [content-sync] g:sound-detective/r06-sound download 15% (4096/26793)
+  405.5  [content-sync] g:sound-detective/r06-sound download 30% (8192/26793)
+  405.5  [content-sync] g:sound-detective/r06-sound download 45% (12288/26793)
+  405.6  [content-sync] g:sound-detective/r06-sound download 61% (16415/26793)
+  405.8  [content-sync] g:sound-detective/r06-sound download 76% (20511/26793)
+  405.9  [content-sync] g:sound-detective/r06-sound download 91% (24607/26793)
+  406.1  [content-sync] g:sound-detective/r06-sound download 100% (26793/26793)
+  406.1  [content-sync] g:sound-detective/r06-sound sha256 ok
+  406.1  [content-sync] moved /tmp/g-sound-detective-r06-sound.mp3.part -> /games/sound-detective/r06-sound.mp3
+  406.8  [content-sync] g:sound-detective/r07-ask download 14% (8192/56050)
+  406.8  [content-sync] g:sound-detective/r07-ask download 21% (12288/56050)
+  407.0  [content-sync] g:sound-detective/r07-ask download 36% (20511/56050)
+  407.0  [content-sync] g:sound-detective/r07-ask download 40% (22431/56050)
+  407.3  [content-sync] g:sound-detective/r07-ask download 54% (30623/56050)
+  407.4  [content-sync] g:sound-detective/r07-ask download 61% (34719/56050)
+  407.4  [content-sync] g:sound-detective/r07-ask download 72% (40431/56050)
+  407.6  [content-sync] g:sound-detective/r07-ask download 86% (48623/56050)
+  407.7  [content-sync] g:sound-detective/r07-ask download 94% (52719/56050)
+  407.7  [content-sync] g:sound-detective/r07-ask download 100% (56050/56050)
+  407.7  [content-sync] g:sound-detective/r07-ask sha256 ok
+  407.7  [content-sync] moved /tmp/g-sound-detective-r07-ask.mp3.part -> /games/sound-detective/r07-ask.mp3
+  408.0  [content-sync] g:sound-detective/r07-sound download 19% (4096/21359)
+  408.3  [content-sync] g:sound-detective/r07-sound download 38% (8192/21359)
+  408.3  [content-sync] g:sound-detective/r07-sound download 57% (12288/21359)
+  408.5  [content-sync] g:sound-detective/r07-sound download 76% (16415/21359)
+  408.6  [content-sync] g:sound-detective/r07-sound download 96% (20511/21359)
+  408.6  [content-sync] g:sound-detective/r07-sound download 100% (21359/21359)
+  408.6  [content-sync] g:sound-detective/r07-sound sha256 ok
+  408.7  [content-sync] moved /tmp/g-sound-detective-r07-sound.mp3.part -> /games/sound-detective/r07-sound.mp3
+  409.2  [content-sync] g:sound-detective/r08-ask download 13% (8192/59812)
+  409.3  [content-sync] g:sound-detective/r08-ask download 21% (12623/59812)
+  409.4  [content-sync] g:sound-detective/r08-ask download 34% (20815/59812)
+  409.9  [content-sync] g:sound-detective/r08-ask download 41% (24911/59812)
+  409.9  [content-sync] g:sound-detective/r08-ask download 55% (33103/59812)
+  409.9  [content-sync] g:sound-detective/r08-ask download 62% (37199/59812)
+  410.0  [content-sync] g:sound-detective/r08-ask download 76% (45791/59812)
+  410.1  [content-sync] g:sound-detective/r08-ask download 83% (49887/59812)
+  410.3  [content-sync] g:sound-detective/r08-ask download 90% (53983/59812)
+  410.3  [content-sync] g:sound-detective/r08-ask download 100% (59812/59812)
+  410.3  [content-sync] g:sound-detective/r08-ask sha256 ok
+  410.3  [content-sync] moved /tmp/g-sound-detective-r08-ask.mp3.part -> /games/sound-detective/r08-ask.mp3
+  410.7  [content-sync] g:sound-detective/r08-sound download 19% (4096/21359)
+  410.9  [content-sync] g:sound-detective/r08-sound download 38% (8192/21359)
+  410.9  [content-sync] g:sound-detective/r08-sound download 57% (12288/21359)
+  411.1  [content-sync] g:sound-detective/r08-sound download 76% (16415/21359)
+  411.1  [content-sync] g:sound-detective/r08-sound download 96% (20511/21359)
+  411.1  [content-sync] g:sound-detective/r08-sound download 100% (21359/21359)
+  411.1  [content-sync] g:sound-detective/r08-sound sha256 ok
+  411.1  [content-sync] moved /tmp/g-sound-detective-r08-sound.mp3.part -> /games/sound-detective/r08-sound.mp3
+  411.6  [content-sync] g:sound-detective/r09-ask download 14% (8192/54796)
+  411.6  [content-sync] g:sound-detective/r09-ask download 22% (12288/54796)
+  412.0  [content-sync] g:sound-detective/r09-ask download 37% (20511/54796)
+  412.0  [content-sync] g:sound-detective/r09-ask download 44% (24607/54796)
+  412.0  [content-sync] g:sound-detective/r09-ask download 52% (28703/54796)
+  412.2  [content-sync] g:sound-detective/r09-ask download 67% (36895/54796)
+  412.2  [content-sync] g:sound-detective/r09-ask download 71% (39167/54796)
+  412.4  [content-sync] g:sound-detective/r09-ask download 86% (47359/54796)
+  412.4  [content-sync] g:sound-detective/r09-ask download 91% (50239/54796)
+  412.5  [content-sync] g:sound-detective/r09-ask download 100% (54796/54796)
+  412.5  [content-sync] g:sound-detective/r09-ask sha256 ok
+  412.6  [content-sync] moved /tmp/g-sound-detective-r09-ask.mp3.part -> /games/sound-detective/r09-ask.mp3
+  412.9  [content-sync] g:sound-detective/r09-sound download 21% (4096/18852)
+  413.1  [content-sync] g:sound-detective/r09-sound download 43% (8192/18852)
+  413.1  [content-sync] g:sound-detective/r09-sound download 65% (12288/18852)
+  413.3  [content-sync] g:sound-detective/r09-sound download 87% (16415/18852)
+  413.3  [content-sync] g:sound-detective/r09-sound download 100% (18852/18852)
+  413.3  [content-sync] g:sound-detective/r09-sound sha256 ok
+  413.3  [content-sync] moved /tmp/g-sound-detective-r09-sound.mp3.part -> /games/sound-detective/r09-sound.mp3
+  413.8  [content-sync] g:sound-detective/r10-ask download 14% (8192/57304)
+  413.9  [content-sync] g:sound-detective/r10-ask download 26% (15151/57304)
+  414.0  [content-sync] g:sound-detective/r10-ask download 33% (19247/57304)
+  414.3  [content-sync] g:sound-detective/r10-ask download 40% (23343/57304)
+  414.3  [content-sync] g:sound-detective/r10-ask download 55% (31535/57304)
+  414.3  [content-sync] g:sound-detective/r10-ask download 61% (35071/57304)
+  414.4  [content-sync] g:sound-detective/r10-ask download 75% (43263/57304)
+  414.5  [content-sync] g:sound-detective/r10-ask download 82% (47359/57304)
+  414.7  [content-sync] g:sound-detective/r10-ask download 96% (55551/57304)
+  414.7  [content-sync] g:sound-detective/r10-ask download 100% (57304/57304)
+  414.7  [content-sync] g:sound-detective/r10-ask sha256 ok
+  414.7  [content-sync] moved /tmp/g-sound-detective-r10-ask.mp3.part -> /games/sound-detective/r10-ask.mp3
+  415.1  [content-sync] g:sound-detective/r10-sound download 15% (4096/26793)
+  415.5  [content-sync] g:sound-detective/r10-sound download 30% (8192/26793)
+  415.5  [content-sync] g:sound-detective/r10-sound download 45% (12288/26793)
+  415.6  [content-sync] g:sound-detective/r10-sound download 61% (16415/26793)
+  415.8  [content-sync] g:sound-detective/r10-sound download 80% (21471/26793)
+  415.8  [content-sync] g:sound-detective/r10-sound download 99% (26527/26793)
+  415.8  [content-sync] g:sound-detective/r10-sound download 100% (26793/26793)
+  415.8  [content-sync] g:sound-detective/r10-sound sha256 ok
+  415.9  [content-sync] moved /tmp/g-sound-detective-r10-sound.mp3.part -> /games/sound-detective/r10-sound.mp3
+  416.5  [content-sync] g:story-pauses/resume-1 download 16% (8192/49781)
+  416.5  [content-sync] g:story-pauses/resume-1 download 24% (12288/49781)
+  416.6  [content-sync] g:story-pauses/resume-1 download 32% (16415/49781)
+  416.7  [content-sync] g:story-pauses/resume-1 download 41% (20511/49781)
+  416.9  [content-sync] g:story-pauses/resume-1 download 57% (28703/49781)
+  417.2  [content-sync] g:story-pauses/resume-1 download 65% (32799/49781)
+  417.2  [content-sync] g:story-pauses/resume-1 download 74% (36895/49781)
+  417.2  [content-sync] g:story-pauses/resume-1 download 82% (40991/49781)
+  417.3  [content-sync] g:story-pauses/resume-1 download 93% (46751/49781)
+  417.3  [content-sync] g:story-pauses/resume-1 download 100% (49781/49781)
+  417.3  [content-sync] g:story-pauses/resume-1 sha256 ok
+  417.3  [content-sync] moved /tmp/g-story-pauses-resume-1.mp3.part -> /games/story-pauses/resume-1.mp3
+  417.7  [content-sync] g:story-pauses/resume-2 download 11% (4096/35570)
+  417.8  [content-sync] g:story-pauses/resume-2 download 23% (8192/35570)
+  417.9  [content-sync] g:story-pauses/resume-2 download 34% (12288/35570)
+  418.2  [content-sync] g:story-pauses/resume-2 download 46% (16415/35570)
+  418.3  [content-sync] g:story-pauses/resume-2 download 57% (20511/35570)
+  418.3  [content-sync] g:story-pauses/resume-2 download 69% (24607/35570)
+  418.3  [content-sync] g:story-pauses/resume-2 download 80% (28703/35570)
+  418.4  [content-sync] g:story-pauses/resume-2 download 92% (32799/35570)
+  418.4  [content-sync] g:story-pauses/resume-2 download 100% (35570/35570)
+  418.4  [content-sync] g:story-pauses/resume-2 sha256 ok
+  418.4  [content-sync] moved /tmp/g-story-pauses-resume-2.mp3.part -> /games/story-pauses/resume-2.mp3
+  418.9  [content-sync] g:story-pauses/resume-3 download 11% (4096/36824)
+  418.9  [content-sync] g:story-pauses/resume-3 download 22% (8192/36824)
+  418.9  [content-sync] g:story-pauses/resume-3 download 33% (12288/36824)
+  419.0  [content-sync] g:story-pauses/resume-3 download 44% (16415/36824)
+  419.1  [content-sync] g:story-pauses/resume-3 download 55% (20511/36824)
+  419.2  [content-sync] g:story-pauses/resume-3 download 66% (24607/36824)
+  419.3  [content-sync] g:story-pauses/resume-3 download 77% (28703/36824)
+  419.5  [content-sync] g:story-pauses/resume-3 download 89% (32799/36824)
+  419.5  [content-sync] g:story-pauses/resume-3 download 100% (36824/36824)
+  419.5  [content-sync] g:story-pauses/resume-3 sha256 ok
+  419.5  [content-sync] moved /tmp/g-story-pauses-resume-3.mp3.part -> /games/story-pauses/resume-3.mp3
+  420.2  [content-sync] g:story-pauses/resume-4 download 12% (4096/31808)
+  420.2  [content-sync] g:story-pauses/resume-4 download 25% (8192/31808)
+  420.2  [content-sync] g:story-pauses/resume-4 download 38% (12288/31808)
+  420.3  [content-sync] g:story-pauses/resume-4 download 51% (16415/31808)
+  420.4  [content-sync] g:story-pauses/resume-4 download 64% (20511/31808)
+  420.5  [content-sync] g:story-pauses/resume-4 download 77% (24607/31808)
+  420.6  [content-sync] g:story-pauses/resume-4 download 82% (26223/31808)
+  420.6  [content-sync] g:story-pauses/resume-4 download 95% (30319/31808)
+  420.6  [content-sync] g:story-pauses/resume-4 download 100% (31808/31808)
+  420.6  [content-sync] g:story-pauses/resume-4 sha256 ok
+  420.6  [content-sync] moved /tmp/g-story-pauses-resume-4.mp3.part -> /games/story-pauses/resume-4.mp3
+  421.3  [content-sync] g:story-pauses/shout-1 download 13% (8192/59812)
+  421.3  [content-sync] g:story-pauses/shout-1 download 25% (15151/59812)
+  421.4  [content-sync] g:story-pauses/shout-1 download 32% (19247/59812)
+  421.8  [content-sync] g:story-pauses/shout-1 download 45% (27439/59812)
+  421.8  [content-sync] g:story-pauses/shout-1 download 52% (31535/59812)
+  421.8  [content-sync] g:story-pauses/shout-1 download 62% (37599/59812)
+  422.0  [content-sync] g:story-pauses/shout-1 download 76% (45791/59812)
+  422.1  [content-sync] g:story-pauses/shout-1 download 83% (49887/59812)
+  422.2  [content-sync] g:story-pauses/shout-1 download 90% (54335/59812)
+  422.2  [content-sync] g:story-pauses/shout-1 download 100% (59812/59812)
+  422.3  [content-sync] g:story-pauses/shout-1 sha256 ok
+  422.3  [content-sync] moved /tmp/g-story-pauses-shout-1.mp3.part -> /games/story-pauses/shout-1.mp3
+  422.9  [content-sync] g:story-pauses/shout-2 download 10% (4096/38078)
+  422.9  [content-sync] g:story-pauses/shout-2 download 21% (8192/38078)
+  422.9  [content-sync] g:story-pauses/shout-2 download 32% (12288/38078)
+  423.0  [content-sync] g:story-pauses/shout-2 download 43% (16415/38078)
+  423.1  [content-sync] g:story-pauses/shout-2 download 53% (20511/38078)
+  423.1  [content-sync] g:story-pauses/shout-2 download 62% (23695/38078)
+  423.3  [content-sync] g:story-pauses/shout-2 download 72% (27791/38078)
+  423.3  [content-sync] g:story-pauses/shout-2 download 83% (31887/38078)
+  423.3  [content-sync] g:story-pauses/shout-2 download 94% (35983/38078)
+  423.3  [content-sync] g:story-pauses/shout-2 download 100% (38078/38078)
+  423.4  [content-sync] g:story-pauses/shout-2 sha256 ok
+  423.4  [content-sync] moved /tmp/g-story-pauses-shout-2.mp3.part -> /games/story-pauses/shout-2.mp3
+  423.9  [content-sync] g:story-pauses/shout-3 download 10% (4096/40586)
+  423.9  [content-sync] g:story-pauses/shout-3 download 20% (8192/40586)
+  423.9  [content-sync] g:story-pauses/shout-3 download 30% (12288/40586)
+  424.0  [content-sync] g:story-pauses/shout-3 download 40% (16415/40586)
+  424.1  [content-sync] g:story-pauses/shout-3 download 50% (20511/40586)
+  424.3  [content-sync] g:story-pauses/shout-3 download 60% (24607/40586)
+  424.3  [content-sync] g:story-pauses/shout-3 download 70% (28703/40586)
+  424.7  [content-sync] g:story-pauses/shout-3 download 84% (34111/40586)
+  424.7  [content-sync] g:story-pauses/shout-3 download 94% (38207/40586)
+  424.7  [content-sync] g:story-pauses/shout-3 download 100% (40586/40586)
+  424.7  [content-sync] g:story-pauses/shout-3 sha256 ok
+  424.8  [content-sync] moved /tmp/g-story-pauses-shout-3.mp3.part -> /games/story-pauses/shout-3.mp3
+  425.3  [content-sync] g:story-pauses/shout-4 download 15% (8192/52288)
+  425.3  [content-sync] g:story-pauses/shout-4 download 23% (12288/52288)
+  425.4  [content-sync] g:story-pauses/shout-4 download 31% (16415/52288)
+  425.8  [content-sync] g:story-pauses/shout-4 download 47% (24607/52288)
+  425.8  [content-sync] g:story-pauses/shout-4 download 54% (28703/52288)
+  425.9  [content-sync] g:story-pauses/shout-4 download 62% (32799/52288)
+  426.0  [content-sync] g:story-pauses/shout-4 download 70% (36895/52288)
+  426.0  [content-sync] g:story-pauses/shout-4 download 81% (42655/52288)
+  426.2  [content-sync] g:story-pauses/shout-4 download 97% (50847/52288)
+  426.2  [content-sync] g:story-pauses/shout-4 download 100% (52288/52288)
+  426.2  [content-sync] g:story-pauses/shout-4 sha256 ok
+  426.2  [content-sync] moved /tmp/g-story-pauses-shout-4.mp3.part -> /games/story-pauses/shout-4.mp3
+  426.8  [content-sync] g:who-first/between-1 download 14% (4096/28047)
+  426.8  [content-sync] g:who-first/between-1 download 29% (8192/28047)
+  426.9  [content-sync] g:who-first/between-1 download 43% (12288/28047)
+  427.2  [content-sync] g:who-first/between-1 download 58% (16415/28047)
+  427.2  [content-sync] g:who-first/between-1 download 73% (20511/28047)
+  427.2  [content-sync] g:who-first/between-1 download 87% (24607/28047)
+  427.2  [content-sync] g:who-first/between-1 download 100% (28047/28047)
+  427.2  [content-sync] g:who-first/between-1 sha256 ok
+  427.2  [content-sync] moved /tmp/g-who-first-between-1.mp3.part -> /games/who-first/between-1.mp3
+  427.6  [content-sync] g:who-first/between-2 download 11% (4096/35570)
+  427.9  [content-sync] g:who-first/between-2 download 23% (8192/35570)
+  428.2  [content-sync] g:who-first/between-2 download 34% (12288/35570)
+  428.2  [content-sync] g:who-first/between-2 download 46% (16415/35570)
+  428.2  [content-sync] g:who-first/between-2 download 57% (20511/35570)
+  428.2  [content-sync] g:who-first/between-2 download 69% (24607/35570)
+  428.3  [content-sync] g:who-first/between-2 download 80% (28703/35570)
+  428.3  [content-sync] g:who-first/between-2 download 91% (32543/35570)
+  428.3  [content-sync] g:who-first/between-2 download 100% (35570/35570)
+  428.3  [content-sync] g:who-first/between-2 sha256 ok
+  428.4  [content-sync] moved /tmp/g-who-first-between-2.mp3.part -> /games/who-first/between-2.mp3
+  428.7  [content-sync] g:who-first/between-3 download 10% (4096/39332)
+  429.0  [content-sync] g:who-first/between-3 download 20% (8192/39332)
+  429.1  [content-sync] g:who-first/between-3 download 35% (13887/39332)
+  429.2  [content-sync] g:who-first/between-3 download 45% (17983/39332)
+  429.5  [content-sync] g:who-first/between-3 download 56% (22079/39332)
+  429.5  [content-sync] g:who-first/between-3 download 66% (26175/39332)
+  429.5  [content-sync] g:who-first/between-3 download 76% (30271/39332)
+  429.5  [content-sync] g:who-first/between-3 download 87% (34367/39332)
+  429.5  [content-sync] g:who-first/between-3 download 95% (37599/39332)
+  429.5  [content-sync] g:who-first/between-3 download 100% (39332/39332)
+  429.5  [content-sync] g:who-first/between-3 sha256 ok
+  429.5  [content-sync] moved /tmp/g-who-first-between-3.mp3.part -> /games/who-first/between-3.mp3
+  430.2  [content-sync] g:who-first/between-4 download 19% (8192/41839)
+  430.3  [content-sync] g:who-first/between-4 download 29% (12288/41839)
+  430.3  [content-sync] g:who-first/between-4 download 39% (16415/41839)
+  430.7  [content-sync] g:who-first/between-4 download 49% (20511/41839)
+  430.7  [content-sync] g:who-first/between-4 download 58% (24607/41839)
+  430.7  [content-sync] g:who-first/between-4 download 68% (28703/41839)
+  430.7  [content-sync] g:who-first/between-4 download 78% (32799/41839)
+  430.8  [content-sync] g:who-first/between-4 download 88% (36895/41839)
+  430.8  [content-sync] g:who-first/between-4 download 99% (41695/41839)
+  430.8  [content-sync] g:who-first/between-4 download 100% (41839/41839)
+  430.8  [content-sync] g:who-first/between-4 sha256 ok
+  430.8  [content-sync] moved /tmp/g-who-first-between-4.mp3.part -> /games/who-first/between-4.mp3
+  431.4  [content-sync] g:who-first/between-5 download 16% (8192/49781)
+  431.5  [content-sync] g:who-first/between-5 download 24% (12288/49781)
+  431.8  [content-sync] g:who-first/between-5 download 32% (16415/49781)
+  431.8  [content-sync] g:who-first/between-5 download 48% (23999/49781)
+  431.8  [content-sync] g:who-first/between-5 download 56% (28095/49781)
+  431.8  [content-sync] g:who-first/between-5 download 64% (32191/49781)
+  432.2  [content-sync] g:who-first/between-5 download 72% (36287/49781)
+  432.2  [content-sync] g:who-first/between-5 download 83% (41695/49781)
+  432.2  [content-sync] g:who-first/between-5 download 91% (45791/49781)
+  432.2  [content-sync] g:who-first/between-5 download 100% (49781/49781)
+  432.2  [content-sync] g:who-first/between-5 sha256 ok
+  432.2  [content-sync] moved /tmp/g-who-first-between-5.mp3.part -> /games/who-first/between-5.mp3
+  432.9  [content-sync] g:who-first/close download 16% (8192/49781)
+  432.9  [content-sync] g:who-first/close download 24% (12288/49781)
+  433.0  [content-sync] g:who-first/close download 32% (16415/49781)
+  433.1  [content-sync] g:who-first/close download 41% (20511/49781)
+  433.5  [content-sync] g:who-first/close download 57% (28703/49781)
+  433.5  [content-sync] g:who-first/close download 65% (32799/49781)
+  433.5  [content-sync] g:who-first/close download 74% (36895/49781)
+  433.5  [content-sync] g:who-first/close download 82% (40991/49781)
+  433.6  [content-sync] g:who-first/close download 91% (45487/49781)
+  433.7  [content-sync] g:who-first/close download 100% (49781/49781)
+  433.7  [content-sync] g:who-first/close sha256 ok
+  433.7  [content-sync] moved /tmp/g-who-first-close.mp3.part -> /games/who-first/close.mp3
+  434.2  [content-sync] g:who-first/end-both download 11% (8192/69007)
+  434.3  [content-sync] g:who-first/end-both download 23% (16415/69007)
+  434.7  [content-sync] g:who-first/end-both download 35% (24607/69007)
+  434.7  [content-sync] g:who-first/end-both download 41% (28703/69007)
+  435.0  [content-sync] g:who-first/end-both download 53% (36895/69007)
+  435.0  [content-sync] g:who-first/end-both download 61% (42655/69007)
+  435.1  [content-sync] g:who-first/end-both download 73% (50847/69007)
+  435.2  [content-sync] g:who-first/end-both download 80% (55295/69007)
+  435.5  [content-sync] g:who-first/end-both download 92% (63487/69007)
+  435.5  [content-sync] g:who-first/end-both download 100% (69007/69007)
+  435.5  [content-sync] g:who-first/end-both sha256 ok
+  435.5  [content-sync] moved /tmp/g-who-first-end-both.mp3.part -> /games/who-first/end-both.mp3
+  436.1  [content-sync] g:who-first/go-2 download 18% (8192/44765)
+  436.1  [content-sync] g:who-first/go-2 download 27% (12288/44765)
+  436.2  [content-sync] g:who-first/go-2 download 36% (16415/44765)
+  436.3  [content-sync] g:who-first/go-2 download 45% (20511/44765)
+  436.6  [content-sync] g:who-first/go-2 download 54% (24607/44765)
+  436.6  [content-sync] g:who-first/go-2 download 64% (28703/44765)
+  436.6  [content-sync] g:who-first/go-2 download 73% (32799/44765)
+  436.8  [content-sync] g:who-first/go-2 download 87% (39167/44765)
+  436.8  [content-sync] g:who-first/go-2 download 96% (43263/44765)
+  436.9  [content-sync] g:who-first/go-2 download 100% (44765/44765)
+  436.9  [content-sync] g:who-first/go-2 sha256 ok
+  436.9  [content-sync] moved /tmp/g-who-first-go-2.mp3.part -> /games/who-first/go-2.mp3
+  437.4  [content-sync] g:who-first/go-3 download 16% (8192/51035)
+  437.4  [content-sync] g:who-first/go-3 download 21% (11055/51035)
+  437.6  [content-sync] g:who-first/go-3 download 37% (19247/51035)
+  437.7  [content-sync] g:who-first/go-3 download 45% (23343/51035)
+  437.7  [content-sync] g:who-first/go-3 download 53% (27439/51035)
+  437.9  [content-sync] g:who-first/go-3 download 61% (31535/51035)
+  437.9  [content-sync] g:who-first/go-3 download 76% (39167/51035)
+  438.0  [content-sync] g:who-first/go-3 download 84% (43263/51035)
+  438.1  [content-sync] g:who-first/go-3 download 92% (47359/51035)
+  438.2  [content-sync] g:who-first/go-3 download 100% (51035/51035)
+  438.2  [content-sync] g:who-first/go-3 sha256 ok
+  438.2  [content-sync] moved /tmp/g-who-first-go-3.mp3.part -> /games/who-first/go-3.mp3
+  438.7  [content-sync] g:who-first/go-4 download 14% (8192/57304)
+  438.8  [content-sync] g:who-first/go-4 download 24% (13887/57304)
+  438.9  [content-sync] g:who-first/go-4 download 31% (17983/57304)
+  439.0  [content-sync] g:who-first/go-4 download 45% (26175/57304)
+  439.2  [content-sync] g:who-first/go-4 download 52% (30271/57304)
+  439.2  [content-sync] g:who-first/go-4 download 61% (35071/57304)
+  439.4  [content-sync] g:who-first/go-4 download 75% (43263/57304)
+  439.6  [content-sync] g:who-first/go-4 download 82% (47359/57304)
+  439.6  [content-sync] g:who-first/go-4 download 97% (55599/57304)
+  439.6  [content-sync] g:who-first/go-4 download 100% (57304/57304)
+  439.7  [content-sync] g:who-first/go-4 sha256 ok
+  439.7  [content-sync] moved /tmp/g-who-first-go-4.mp3.part -> /games/who-first/go-4.mp3
+  440.0  [content-sync] g:who-first/go download 14% (4096/28047)
+  440.1  [content-sync] g:who-first/go download 29% (8192/28047)
+  440.2  [content-sync] g:who-first/go download 43% (12288/28047)
+  440.4  [content-sync] g:who-first/go download 58% (16415/28047)
+  440.4  [content-sync] g:who-first/go download 73% (20511/28047)
+  440.5  [content-sync] g:who-first/go download 87% (24607/28047)
+  440.5  [content-sync] g:who-first/go download 100% (28047/28047)
+  440.5  [content-sync] g:who-first/go sha256 ok
+  440.5  [content-sync] moved /tmp/g-who-first-go.mp3.part -> /games/who-first/go.mp3
+  441.2  [content-sync] g:who-first/intro download 12% (16414/134208)
+  441.6  [content-sync] g:who-first/intro download 21% (28702/134208)
+  441.7  [content-sync] g:who-first/intro download 31% (41694/134208)
+  442.0  [content-sync] g:who-first/intro download 41% (55776/134208)
+  442.6  [content-sync] g:who-first/intro download 52% (70896/134208)
+  442.6  [content-sync] g:who-first/intro download 61% (83184/134208)
+  442.9  [content-sync] g:who-first/intro download 71% (95472/134208)
+  443.2  [content-sync] g:who-first/intro download 80% (107760/134208)
+  443.3  [content-sync] g:who-first/intro download 91% (122272/134208)
+  443.5  [content-sync] g:who-first/intro download 100% (134208/134208)
+  443.5  [content-sync] g:who-first/intro sha256 ok
+  443.6  [content-sync] moved /tmp/g-who-first-intro.mp3.part -> /games/who-first/intro.mp3
+  444.2  [content-sync] g:who-first/win-green-2 download 16% (8192/49781)
+  444.2  [content-sync] g:who-first/win-green-2 download 24% (12288/49781)
+  444.2  [content-sync] g:who-first/win-green-2 download 32% (16384/49781)
+  444.3  [content-sync] g:who-first/win-green-2 download 41% (20511/49781)
+  444.4  [content-sync] g:who-first/win-green-2 download 57% (28703/49781)
+  444.4  [content-sync] g:who-first/win-green-2 download 65% (32799/49781)
+  444.6  [content-sync] g:who-first/win-green-2 download 76% (37903/49781)
+  444.6  [content-sync] g:who-first/win-green-2 download 80% (40127/49781)
+  444.9  [content-sync] g:who-first/win-green-2 download 97% (48319/49781)
+  444.9  [content-sync] g:who-first/win-green-2 download 100% (49781/49781)
+  444.9  [content-sync] g:who-first/win-green-2 sha256 ok
+  445.0  [content-sync] moved /tmp/g-who-first-win-green-2.mp3.part -> /games/who-first/win-green-2.mp3
+  445.5  [content-sync] g:who-first/win-green-3 download 16% (8192/51035)
+  445.5  [content-sync] g:who-first/win-green-3 download 24% (12288/51035)
+  445.9  [content-sync] g:who-first/win-green-3 download 32% (16415/51035)
+  445.9  [content-sync] g:who-first/win-green-3 download 40% (20511/51035)
+  445.9  [content-sync] g:who-first/win-green-3 download 56% (28703/51035)
+  446.1  [content-sync] g:who-first/win-green-3 download 64% (32799/51035)
+  446.1  [content-sync] g:who-first/win-green-3 download 76% (39167/51035)
+  446.3  [content-sync] g:who-first/win-green-3 download 84% (43263/51035)
+  446.3  [content-sync] g:who-first/win-green-3 download 92% (47359/51035)
+  446.3  [content-sync] g:who-first/win-green-3 download 100% (51035/51035)
+  446.3  [content-sync] g:who-first/win-green-3 sha256 ok
+  446.4  [content-sync] moved /tmp/g-who-first-win-green-3.mp3.part -> /games/who-first/win-green-3.mp3
+  446.9  [content-sync] g:who-first/win-green download 18% (8192/43511)
+  447.2  [content-sync] g:who-first/win-green download 28% (12288/43511)
+  447.2  [content-sync] g:who-first/win-green download 37% (16415/43511)
+  447.2  [content-sync] g:who-first/win-green download 47% (20511/43511)
+  447.6  [content-sync] g:who-first/win-green download 56% (24607/43511)
+  447.6  [content-sync] g:who-first/win-green download 65% (28703/43511)
+  447.6  [content-sync] g:who-first/win-green download 75% (32799/43511)
+  447.6  [content-sync] g:who-first/win-green download 84% (36895/43511)
+  447.7  [content-sync] g:who-first/win-green download 95% (41695/43511)
+  447.8  [content-sync] g:who-first/win-green download 100% (43511/43511)
+  447.8  [content-sync] g:who-first/win-green sha256 ok
+  447.8  [content-sync] moved /tmp/g-who-first-win-green.mp3.part -> /games/who-first/win-green.mp3
+  448.4  [content-sync] g:who-first/win-red-2 download 16% (8192/48527)
+  448.4  [content-sync] g:who-first/win-red-2 download 20% (9791/48527)
+  448.5  [content-sync] g:who-first/win-red-2 download 37% (17983/48527)
+  448.9  [content-sync] g:who-first/win-red-2 download 45% (22079/48527)
+  448.9  [content-sync] g:who-first/win-red-2 download 54% (26527/48527)
+  449.0  [content-sync] g:who-first/win-red-2 download 63% (30623/48527)
+  449.0  [content-sync] g:who-first/win-red-2 download 75% (36639/48527)
+  449.1  [content-sync] g:who-first/win-red-2 download 83% (40735/48527)
+  449.1  [content-sync] g:who-first/win-red-2 download 96% (47055/48527)
+  449.1  [content-sync] g:who-first/win-red-2 download 100% (48527/48527)
+  449.1  [content-sync] g:who-first/win-red-2 sha256 ok
+  449.2  [content-sync] moved /tmp/g-who-first-win-red-2.mp3.part -> /games/who-first/win-red-2.mp3
+  449.7  [content-sync] g:who-first/win-red-3 download 15% (8192/52288)
+  449.8  [content-sync] g:who-first/win-red-3 download 23% (12288/52288)
+  449.8  [content-sync] g:who-first/win-red-3 download 31% (16415/52288)
+  450.1  [content-sync] g:who-first/win-red-3 download 41% (21471/52288)
+  450.1  [content-sync] g:who-first/win-red-3 download 56% (29663/52288)
+  450.2  [content-sync] g:who-first/win-red-3 download 64% (33759/52288)
+  450.3  [content-sync] g:who-first/win-red-3 download 72% (37855/52288)
+  450.4  [content-sync] g:who-first/win-red-3 download 87% (45791/52288)
+  450.4  [content-sync] g:who-first/win-red-3 download 95% (49887/52288)
+  450.4  [content-sync] g:who-first/win-red-3 download 100% (52288/52288)
+  450.4  [content-sync] g:who-first/win-red-3 sha256 ok
+  450.5  [content-sync] moved /tmp/g-who-first-win-red-3.mp3.part -> /games/who-first/win-red-3.mp3
+  451.0  [content-sync] g:who-first/win-red download 17% (8192/46019)
+  451.0  [content-sync] g:who-first/win-red download 26% (12288/46019)
+  451.2  [content-sync] g:who-first/win-red download 35% (16415/46019)
+  451.5  [content-sync] g:who-first/win-red download 44% (20511/46019)
+  451.5  [content-sync] g:who-first/win-red download 53% (24607/46019)
+  451.5  [content-sync] g:who-first/win-red download 62% (28703/46019)
+  451.5  [content-sync] g:who-first/win-red download 71% (32799/46019)
+  451.5  [content-sync] g:who-first/win-red download 80% (36895/46019)
+  451.6  [content-sync] g:who-first/win-red download 90% (41695/46019)
+  451.6  [content-sync] g:who-first/win-red download 100% (46019/46019)
+  451.7  [content-sync] g:who-first/win-red sha256 ok
+  451.7  [content-sync] moved /tmp/g-who-first-win-red.mp3.part -> /games/who-first/win-red.mp3
+  452.4  [content-sync] g:button-simon/kid-katrin-miss download 18% (8192/44765)
+  452.4  [content-sync] g:button-simon/kid-katrin-miss download 27% (12288/44765)
+  452.5  [content-sync] g:button-simon/kid-katrin-miss download 36% (16415/44765)
+  452.5  [content-sync] g:button-simon/kid-katrin-miss download 45% (20511/44765)
+  452.6  [content-sync] g:button-simon/kid-katrin-miss download 54% (24607/44765)
+  452.9  [content-sync] g:button-simon/kid-katrin-miss download 64% (28703/44765)
+  452.9  [content-sync] g:button-simon/kid-katrin-miss download 73% (32799/44765)
+  452.9  [content-sync] g:button-simon/kid-katrin-miss download 82% (36895/44765)
+  453.1  [content-sync] g:button-simon/kid-katrin-miss download 93% (41695/44765)
+  453.1  [content-sync] g:button-simon/kid-katrin-miss download 100% (44765/44765)
+  453.1  [content-sync] g:button-simon/kid-katrin-miss sha256 ok
+  453.1  [content-sync] moved /tmp/g-button-simon-kid-katrin-miss.mp3.part -> /games/button-simon/kid-katrin-miss.mp3
+  453.4  [content-sync] g:button-simon/kid-katrin-up download 11% (4096/34316)
+  453.5  [content-sync] g:button-simon/kid-katrin-up download 23% (8192/34316)
+  453.6  [content-sync] g:button-simon/kid-katrin-up download 40% (13887/34316)
+  453.7  [content-sync] g:button-simon/kid-katrin-up download 52% (17983/34316)
+  453.7  [content-sync] g:button-simon/kid-katrin-up download 64% (22079/34316)
+  454.0  [content-sync] g:button-simon/kid-katrin-up download 77% (26527/34316)
+  454.0  [content-sync] g:button-simon/kid-katrin-up download 89% (30623/34316)
+  454.0  [content-sync] g:button-simon/kid-katrin-up download 100% (34316/34316)
+  454.0  [content-sync] g:button-simon/kid-katrin-up sha256 ok
+  454.0  [content-sync] moved /tmp/g-button-simon-kid-katrin-up.mp3.part -> /games/button-simon/kid-katrin-up.mp3
+  454.4  [content-sync] g:button-simon/kid-vardan-miss download 16% (4096/25539)
+  454.7  [content-sync] g:button-simon/kid-vardan-miss download 32% (8192/25539)
+  454.8  [content-sync] g:button-simon/kid-vardan-miss download 49% (12623/25539)
+  454.8  [content-sync] g:button-simon/kid-vardan-miss download 65% (16719/25539)
+  455.1  [content-sync] g:button-simon/kid-vardan-miss download 81% (20815/25539)
+  455.1  [content-sync] g:button-simon/kid-vardan-miss download 97% (24911/25539)
+  455.1  [content-sync] g:button-simon/kid-vardan-miss download 100% (25539/25539)
+  455.1  [content-sync] g:button-simon/kid-vardan-miss sha256 ok
+  455.6  [content-sync] moved /tmp/g-button-simon-kid-vardan-miss.mp3.part -> /games/button-simon/kid-vardan-miss.mp3
+  455.6  [content-sync] g:button-simon/kid-vardan-up download 12% (8192/66499)
+  455.7  [content-sync] g:button-simon/kid-vardan-up download 24% (16415/66499)
+  455.8  [content-sync] g:button-simon/kid-vardan-up download 30% (20511/66499)
+  456.0  [content-sync] g:button-simon/kid-vardan-up download 43% (28703/66499)
+  456.1  [content-sync] g:button-simon/kid-vardan-up download 55% (36639/66499)
+  456.1  [content-sync] g:button-simon/kid-vardan-up download 61% (40735/66499)
+  456.3  [content-sync] g:button-simon/kid-vardan-up download 73% (48927/66499)
+  456.7  [content-sync] g:button-simon/kid-vardan-up download 85% (57119/66499)
+  456.7  [content-sync] g:button-simon/kid-vardan-up download 92% (61215/66499)
+  456.7  [content-sync] g:button-simon/kid-vardan-up download 100% (66499/66499)
+  456.7  [content-sync] g:button-simon/kid-vardan-up sha256 ok
+  456.7  [content-sync] moved /tmp/g-button-simon-kid-vardan-up.mp3.part -> /games/button-simon/kid-vardan-up.mp3
+  457.3  [content-sync] g:mind-reader/kid-katrin-lose download 11% (4096/34316)
+  457.5  [content-sync] g:mind-reader/kid-katrin-lose download 23% (8192/34316)
+  457.5  [content-sync] g:mind-reader/kid-katrin-lose download 35% (12288/34316)
+  457.7  [content-sync] g:mind-reader/kid-katrin-lose download 47% (16415/34316)
+  457.7  [content-sync] g:mind-reader/kid-katrin-lose download 59% (20511/34316)
+  457.7  [content-sync] g:mind-reader/kid-katrin-lose download 65% (22431/34316)
+  457.9  [content-sync] g:mind-reader/kid-katrin-lose download 77% (26527/34316)
+  457.9  [content-sync] g:mind-reader/kid-katrin-lose download 89% (30623/34316)
+  457.9  [content-sync] g:mind-reader/kid-katrin-lose download 100% (34316/34316)
+  458.0  [content-sync] g:mind-reader/kid-katrin-lose sha256 ok
+  458.0  [content-sync] moved /tmp/g-mind-reader-kid-katrin-lose.mp3.part -> /games/mind-reader/kid-katrin-lose.mp3
+  458.3  [content-sync] g:mind-reader/kid-katrin-win download 12% (4096/31808)
+  458.6  [content-sync] g:mind-reader/kid-katrin-win download 25% (8192/31808)
+  458.6  [content-sync] g:mind-reader/kid-katrin-win download 30% (9791/31808)
+  458.6  [content-sync] g:mind-reader/kid-katrin-win download 43% (13887/31808)
+  458.7  [content-sync] g:mind-reader/kid-katrin-win download 56% (17983/31808)
+  458.8  [content-sync] g:mind-reader/kid-katrin-win download 69% (22079/31808)
+  459.1  [content-sync] g:mind-reader/kid-katrin-win download 82% (26175/31808)
+  459.1  [content-sync] g:mind-reader/kid-katrin-win download 95% (30271/31808)
+  459.1  [content-sync] g:mind-reader/kid-katrin-win download 100% (31808/31808)
+  459.1  [content-sync] g:mind-reader/kid-katrin-win sha256 ok
+  459.1  [content-sync] moved /tmp/g-mind-reader-kid-katrin-win.mp3.part -> /games/mind-reader/kid-katrin-win.mp3
+  459.4  [content-sync] g:mind-reader/kid-vardan-lose download 14% (4096/28047)
+  459.6  [content-sync] g:mind-reader/kid-vardan-lose download 29% (8192/28047)
+  459.6  [content-sync] g:mind-reader/kid-vardan-lose download 43% (12288/28047)
+  459.8  [content-sync] g:mind-reader/kid-vardan-lose download 58% (16415/28047)
+  459.8  [content-sync] g:mind-reader/kid-vardan-lose download 66% (18639/28047)
+  459.9  [content-sync] g:mind-reader/kid-vardan-lose download 81% (22735/28047)
+  459.9  [content-sync] g:mind-reader/kid-vardan-lose download 95% (26831/28047)
+  459.9  [content-sync] g:mind-reader/kid-vardan-lose download 100% (28047/28047)
+  459.9  [content-sync] g:mind-reader/kid-vardan-lose sha256 ok
+  460.0  [content-sync] moved /tmp/g-mind-reader-kid-vardan-lose.mp3.part -> /games/mind-reader/kid-vardan-lose.mp3
+  460.3  [content-sync] g:mind-reader/kid-vardan-win download 15% (4096/26793)
+  460.4  [content-sync] g:mind-reader/kid-vardan-win download 30% (8192/26793)
+  460.6  [content-sync] g:mind-reader/kid-vardan-win download 51% (13887/26793)
+  460.7  [content-sync] g:mind-reader/kid-vardan-win download 67% (17983/26793)
+  460.7  [content-sync] g:mind-reader/kid-vardan-win download 82% (22079/26793)
+  460.8  [content-sync] g:mind-reader/kid-vardan-win download 97% (26175/26793)
+  460.8  [content-sync] g:mind-reader/kid-vardan-win download 100% (26793/26793)
+  460.8  [content-sync] g:mind-reader/kid-vardan-win sha256 ok
+  460.8  [content-sync] moved /tmp/g-mind-reader-kid-vardan-win.mp3.part -> /games/mind-reader/kid-vardan-win.mp3
+  461.3  [content-sync] g:who-first/kid-katrin-1 download 11% (4096/36824)
+  461.3  [content-sync] g:who-first/kid-katrin-1 download 22% (8192/36824)
+  461.3  [content-sync] g:who-first/kid-katrin-1 download 33% (12288/36824)
+  461.4  [content-sync] g:who-first/kid-katrin-1 download 44% (16415/36824)
+  461.6  [content-sync] g:who-first/kid-katrin-1 download 55% (20511/36824)
+  461.6  [content-sync] g:who-first/kid-katrin-1 download 66% (24607/36824)
+  461.9  [content-sync] g:who-first/kid-katrin-1 download 78% (29055/36824)
+  461.9  [content-sync] g:who-first/kid-katrin-1 download 90% (33151/36824)
+  461.9  [content-sync] g:who-first/kid-katrin-1 download 100% (36824/36824)
+  461.9  [content-sync] g:who-first/kid-katrin-1 sha256 ok
+  461.9  [content-sync] moved /tmp/g-who-first-kid-katrin-1.mp3.part -> /games/who-first/kid-katrin-1.mp3
+  462.3  [content-sync] g:who-first/kid-katrin-2 download 19% (4096/21359)
+  462.5  [content-sync] g:who-first/kid-katrin-2 download 38% (8192/21359)
+  462.5  [content-sync] g:who-first/kid-katrin-2 download 57% (12288/21359)
+  462.8  [content-sync] g:who-first/kid-katrin-2 download 76% (16415/21359)
+  462.8  [content-sync] g:who-first/kid-katrin-2 download 96% (20511/21359)
+  462.8  [content-sync] g:who-first/kid-katrin-2 download 100% (21359/21359)
+  462.8  [content-sync] g:who-first/kid-katrin-2 sha256 ok
+  462.8  [content-sync] moved /tmp/g-who-first-kid-katrin-2.mp3.part -> /games/who-first/kid-katrin-2.mp3
+  463.2  [content-sync] g:who-first/kid-vardan-1 download 10% (4096/40586)
+  463.5  [content-sync] g:who-first/kid-vardan-1 download 20% (8192/40586)
+  463.5  [content-sync] g:who-first/kid-vardan-1 download 30% (12288/40586)
+  463.6  [content-sync] g:who-first/kid-vardan-1 download 40% (16415/40586)
+  463.7  [content-sync] g:who-first/kid-vardan-1 download 52% (21471/40586)
+  463.8  [content-sync] g:who-first/kid-vardan-1 download 62% (25567/40586)
+  464.0  [content-sync] g:who-first/kid-vardan-1 download 73% (29663/40586)
+  464.0  [content-sync] g:who-first/kid-vardan-1 download 83% (33759/40586)
+  464.0  [content-sync] g:who-first/kid-vardan-1 download 96% (39167/40586)
+  464.1  [content-sync] g:who-first/kid-vardan-1 download 100% (40586/40586)
+  464.1  [content-sync] g:who-first/kid-vardan-1 sha256 ok
+  464.1  [content-sync] moved /tmp/g-who-first-kid-vardan-1.mp3.part -> /games/who-first/kid-vardan-1.mp3
+  465.0  [content-sync] g:who-first/kid-vardan-2 download 11% (4096/34316)
+  465.0  [content-sync] g:who-first/kid-vardan-2 download 23% (8192/34316)
+  465.0  [content-sync] g:who-first/kid-vardan-2 download 35% (12288/34316)
+  465.0  [content-sync] g:who-first/kid-vardan-2 download 47% (16384/34316)
+  465.3  [content-sync] g:who-first/kid-vardan-2 download 59% (20511/34316)
+  465.3  [content-sync] g:who-first/kid-vardan-2 download 71% (24607/34316)
+  465.3  [content-sync] g:who-first/kid-vardan-2 download 83% (28703/34316)
+  465.3  [content-sync] g:who-first/kid-vardan-2 download 95% (32799/34316)
+  465.3  [content-sync] g:who-first/kid-vardan-2 download 100% (34316/34316)
+  465.3  [content-sync] g:who-first/kid-vardan-2 sha256 ok
+  465.3  [content-sync] moved /tmp/g-who-first-kid-vardan-2.mp3.part -> /games/who-first/kid-vardan-2.mp3
+  465.4  [content-sync] games summary offered=104 invalid=0 already=2 downloaded=102 failed=0 truncated=0 carried=0 games_active=104
+  465.6  [content-sync] index written
+  465.9  [content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=43 music=0
+  465.9  [content-sync] summary manifest_items=10 accepted_items=10 invalid_items=0 duplicate_items=0 disabled_items=0 truncated_items=0 already_current=10 downloaded=0 failed=0 carried_forward=0 active_index_items=10 index_written=1
+  465.9  [content-sync] heap after=78724
+  465.9  [content-sync] PASS
+  465.9  [alive] ms=370388 heap=122868 psram=7861456 wifi=3 ip=192.168.1.3 rssi=-35
+  468.5  [heartbeat] status=200 (fw=1.2.2 bedtime=0 paused=0)
+  471.2  [alive] ms=375676 heap=122868 psram=7860912 wifi=3 ip=192.168.1.3 rssi=-40
+  476.2  [alive] ms=380678 heap=122916 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-41
+  481.2  [alive] ms=385680 heap=122916 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-41
+  486.2  [alive] ms=390682 heap=122916 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-34
+  491.2  [alive] ms=395684 heap=122916 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-34
+  496.2  [alive] ms=400686 heap=122916 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-34
+  501.2  [alive] ms=405688 heap=122916 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-35
+  506.2  [alive] ms=410690 heap=122916 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-40
+  511.2  [alive] ms=415692 heap=122916 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-40
+  516.2  [alive] ms=420694 heap=122916 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-33
+  521.2  [alive] ms=425696 heap=122916 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-40
+  528.7  [heartbeat] status=200 (fw=1.2.2 bedtime=0 paused=0)
+  531.1  [alive] ms=435514 heap=122868 psram=7860380 wifi=3 ip=192.168.1.3 rssi=-39
+  536.1  [alive] ms=440516 heap=122916 psram=7860528 wifi=3 ip=192.168.1.3 rssi=-39
+  541.1  [alive] ms=445518 heap=122916 psram=7860528 wifi=3 ip=192.168.1.3 rssi=-40
+  546.1  [alive] ms=450520 heap=122916 psram=7860528 wifi=3 ip=192.168.1.3 rssi=-33
+  551.1  [alive] ms=455522 heap=122864 psram=7860528 wifi=3 ip=192.168.1.3 rssi=-42
+  556.1  [alive] ms=460524 heap=122916 psram=7860560 wifi=3 ip=192.168.1.3 rssi=-45
+  561.1  [alive] ms=465526 heap=122916 psram=7860560 wifi=3 ip=192.168.1.3 rssi=-42
+  566.1  [alive] ms=470528 heap=122916 psram=7860560 wifi=3 ip=192.168.1.3 rssi=-41
+  571.1  [alive] ms=475530 heap=122916 psram=7860560 wifi=3 ip=192.168.1.3 rssi=-41
+  576.1  [alive] ms=480532 heap=122916 psram=7860560 wifi=3 ip=192.168.1.3 rssi=-34
+  581.1  [alive] ms=485534 heap=122916 psram=7860560 wifi=3 ip=192.168.1.3 rssi=-39
+  588.6  [heartbeat] status=200 (fw=1.2.2 bedtime=0 paused=0)
+  588.6  [alive] ms=493033 heap=122868 psram=7860380 wifi=3 ip=192.168.1.3 rssi=-41
+  593.6  [alive] ms=498034 heap=122916 psram=7860784 wifi=3 ip=192.168.1.3 rssi=-40
+  598.6  [alive] ms=503036 heap=122864 psram=7860784 wifi=3 ip=192.168.1.3 rssi=-35
+  603.6  [alive] ms=508038 heap=122916 psram=7860784 wifi=3 ip=192.168.1.3 rssi=-35
+  608.6  [alive] ms=513040 heap=122916 psram=7860784 wifi=3 ip=192.168.1.3 rssi=-33
+  613.6  [alive] ms=518042 heap=122916 psram=7860784 wifi=3 ip=192.168.1.3 rssi=-40
+  618.6  [alive] ms=523044 heap=122916 psram=7860816 wifi=3 ip=192.168.1.3 rssi=-42
