@@ -96,7 +96,7 @@ one message is not a rule, which is why it is written here.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2622 tests)
+dotnet test                                     # Run all tests (2727 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 ```
 
@@ -720,6 +720,15 @@ bound parameter):
 - **Residual risk (documented, deliberate):** audio blobs
   (`/data/audio-blobs`) are NOT covered — child voice recordings are
   the non-regenerable part; object-storage migration is a later slice.
+  **Sharper than "not backed up" (open item, 2026-08-14): `Audio__BlobStoreRoot`
+  is not set on Railway at all**, so child voice recordings are written
+  INSIDE the container rather than onto the persistent volume and are
+  destroyed on every redeploy — not merely un-backed-up, but not durable in
+  the first place. Flagged, owner decision pending (privacy posture), not
+  fixed. Contrast with `ContentSync:UploadRoot` (§ "The toy says what
+  content it has" → Stage 4), which fails CLOSED (503, upload form
+  disabled) until it is configured, rather than silently writing into the
+  ephemeral container the way the audio blob store does today.
 
 Pinned by `DatabaseBackupTests` (keystones: snapshot bytes carry the
 `SQLite format 3` header; prune touches only backup-named files;
@@ -3286,7 +3295,9 @@ toy.
   `AckedAt`, `Result`, `Error`, `AckFirmwareVersion`, `AckDiagnosticsJson`.
   Index `(DeviceId, Status)`. The only wire type this slice enqueues is
   `firmware_update` (`DeviceCommandTypes`); an unknown type is rejected at
-  enqueue (never delivered).
+  enqueue (never delivered). **A second type, `refresh_story_manifest`
+  ("sync this toy now"), joined it in Stage 5 (2026-08-14)** — see
+  § "The toy says what content it has" below.
 - **Poll** `GET /api/devices/commands` (device-authed): returns only THIS
   device's deliverable commands (`Pending`/`Sent`, not expired), marks
   `Pending → Sent`, and lazily marks overdue ones `Expired` (never
@@ -3314,14 +3325,20 @@ toy.
   device). `/api/devices/register` stays provisioning-secret gated.
 - Pinned by `DeviceCommandServiceTests`, `FirmwareManifestServiceTests`,
   `DeviceServiceOtaTests`, `DeviceControllerOtaTests`.
-- **Bench enqueue** `POST /api/internal/devices/{deviceId}/commands`
-  (`{ type, payload?, ttlSeconds? }` → `{ commandId, … }`) — operator-gated
+- **Enqueue** `POST /api/internal/devices/{deviceId}/commands`
+  (`{ type, payload?, ttlSeconds?, reason }` → `{ commandId, … }`) — operator-gated
   like every `/api/internal/*` action (fail-closed 404 when unconfigured),
   known `DeviceCommandTypes` only (400 otherwise), 404 on unknown device,
-  TTL clamped 60..86400 s (default 3600). Bench/test-only: NOT parent-facing,
-  not in admin.html; one loud structured log (operator + type + command id)
-  instead of an audit row until it becomes a real console surface. Pinned by
+  TTL clamped 60..86400 s (default 3600). Pinned by
   `InternalControllerEnqueueCommandTests`.
+  **As of Stage 5 (2026-08-14, see § "The toy says what content it has" below)
+  this is no longer bench/test-only**: `reason` is now required (400 without
+  it) and every successful enqueue writes a system-actor `InternalConsoleAction`
+  audit row (`device_command:<type>`) — the log-line-only posture this bullet
+  used to describe is gone, and `admin.html` now has a "Sync now" button over
+  this endpoint plus a command-history diagnostics viewer. `DeviceCommandTypes`
+  also gained a second value, `refresh_story_manifest` ("sync this toy now"),
+  beside `firmware_update`.
 
 ### Firmware skeleton (device half — no OTA apply)
 
@@ -3801,6 +3818,28 @@ TLS (Stage A runs over the HTTP LAN bench; `ota_http_begin()` in
   canonical string from the raw JSON text it received. Pinned by
   `FirmwareManifestServiceTests.Signature_VerifiesAgainstJsonWireForm` —
   do not change either side without the other.
+  **A real signing bug shipped and was field-caught (2026-08-14, fixed
+  `9f8fb8a`): the server signed a different string than it sent.**
+  `UtcDateTimeConverter` (the API's JSON output) always writes 7 fractional
+  digits; `FirmwareManifestService.Sign` built its canonical string with
+  plain `JsonSerializer.Serialize`, which TRIMS trailing zeros. Whenever
+  `expiresAt` landed on a tick ending in zero the two texts differed, the
+  HMAC differed, and the toy correctly refused the update with
+  `manifest_sig_invalid` — reading as tampering rather than a server bug.
+  Roughly **1 update in 10**, silently, since manifest signing shipped; this
+  is what blocked firmware 1.3.0's first rollout attempt. **The regression
+  test meant to catch this had the same bug**: it built its own
+  `JsonSerializerOptions` without registering the converter, so it
+  reproduced `Sign()`'s mistake and agreed with it, and its fixture
+  timestamp (`12:00:00.0000000`, all seven fractional digits zero) sat
+  exactly on the bug while passing. Fixed by moving both the API converter
+  and the signer onto one shared constant, `JsonWireFormats.UtcDateTime`,
+  and rewriting the test to serialize through a real converter. Verified
+  the fixed test FAILS against the old `Sign()` line and passes against the
+  new one — a regression test that has never been seen to fail is a guess.
+  No firmware change; the device was right to refuse. Test count unchanged
+  by this fix (2727) — one existing test now tests the wire instead of a
+  copy of the bug.
 - **Firmware apply pipeline** (`ota_apply.{h,cpp}`): fetch manifest at
   execution time → gates in order: HMAC signature (`AREG_MANIFEST_HMAC_KEY`;
   empty key = skip with loud warning, Stage-A bench only) → boardModel →
@@ -4382,7 +4421,7 @@ This is that slice.
   the gap is toolchain, not source, so the release image belongs to the
   machine that built the last one and none was staged.
 
-### Stage 1 — sync failure reporting (2026-08-14, uncommitted)
+### Stage 1 — sync failure reporting (2026-08-14, committed `69bcbd1`)
 
 Directly motivated by the crash-loop paragraph above: `contentHealth` could
 say a toy was `stale`, but nothing could say WHY — a failed sync leaves the
@@ -4458,17 +4497,302 @@ ignored) — the same treatment `StoryPlay.PlayedAtUtc` already gives its own
 `secondsAgo`. Recorded here rather than silently fixed, per this repo's
 convention of naming a wrong prior claim instead of overwriting it.
 
-**Not done — the firmware half does not exist.** Every field, column,
-verdict and UI string above is backend/dashboard only. No firmware code
-sends `ContentSyncStatus`, `ContentSyncError`, `ResetReason`, or `BootCount`
-today — `content_sync.cpp` and `ota_foundation.cpp` were not touched by this
-slice. `sync_failed` and `crash_looping` are therefore **unreachable in the
-field** until a firmware release (tracked as 1.3.0) adds the reporting side.
-Do not read this section as describing anything a real toy currently does;
-it describes what the backend is now ready to receive. Test count above
-(2622) includes only the backend-side coverage
-(`DeviceContentHealthTests`, `DeviceServiceOtaTests`) — there is no
-corresponding firmware host-test yet.
+**CORRECTED 2026-08-14 — the firmware half exists and the wire contract is
+now PROVEN on hardware** (firmware 1.3.0/1.3.2, see Stage 2 below). This
+paragraph previously said no firmware sent these fields at all; it was then
+briefly replaced by a claim that the output was untrustworthy, which was
+itself wrong — that was a misreading of two fields sampled at two different
+moments, disproved by the 1.3.1 debug capture. Both wrong versions are named
+here rather than overwritten, because the second one is the more instructive:
+`contentSyncStatus` is PER-BOOT state, so `never` means "not since this boot",
+not "broken", and it is only meaningful read alongside the toy's uptime.
+
+### Stage 2 & Stage 5 (firmware) — scheduled retry with a crash-safe backoff, unconditional diagnostics, and "sync now" (firmware 1.3.0, `059df03`)
+
+Firmware 1.3.0 shipped Stages 1 (device-side), 2 and 5 (device-side) **in one
+release** rather than three separate OTA rollouts — each release is a chance
+to brick a toy, and the owner's own rule (the 1.1.0 field lesson, see
+§ "Owner batch (2026-08-07)") is to minimize how many times that risk is
+taken.
+
+- **The one-shot latch is gone.** `content_sync_tick()` used to set a static
+  "already tried this boot" flag before the run and never clear it — one
+  attempt per boot, forever, so a single dropped Wi-Fi moment or a 500 from
+  the manifest endpoint silently stopped a toy from ever syncing again until
+  someone power-cycled it. Replaced with a real schedule: ~6 hours after a
+  clean pass, 5 / 15 / 60 / 240 minutes after a failure (bounded backoff, not
+  a tight retry loop).
+- **The failure streak is persisted to NVS BEFORE the risky work and cleared
+  after it.** This is the actual point of Stage 2, not the scheduler: a
+  device that panics mid-sync never gets to report anything on that boot, so
+  the only surviving evidence of a crash loop is what it wrote down before it
+  died. Without this, a naive scheduler would have made the 2026-08-14
+  overnight crash loop (documented above) *worse* — a panicking toy would
+  have kept retrying every few minutes with a nicer log line instead of
+  coming back already backed off.
+- **The heartbeat's four Stage-1 diagnostic fields
+  (`ContentSyncStatus`/`ContentSyncError`/`ResetReason`/`BootCount`) are now
+  sent UNCONDITIONALLY**, not gated on the SD card being readable — a toy
+  whose card has died, or that panicked all night, can still say so; before
+  this, "I could not look at my card" was byte-identical on the wire to "I am
+  settled and up to date."
+- **`refresh_story_manifest` handler** ("sync this toy now", backend half in
+  Stage 5 below): only moves the retry schedule forward, so every existing
+  guard still applies — it cannot interrupt a story, run without SD, or race
+  an OTA. Its ack carries the PREVIOUS attempt's outcome, which is the
+  operator's direct answer to "why is this toy stale?"
+- **The toy stops polling for commands twice a minute.** It was calling both
+  `/api/devices/heartbeat` and `/api/devices/commands` every 60 s purely to
+  ask "any commands for me?" (the owner noticed this): ~43,200 command polls
+  a month to deliver perhaps one command, each paying for its own TLS
+  handshake — the expensive part in both battery and heap. The heartbeat
+  response already carried `isPaused`/`inBedtimeWindow`; it now also carries
+  `hasCommands` (backend Stage 5, `5659944`), and firmware 1.3.0 honours it —
+  polling `GET /api/devices/commands` only when the flag is true. Defaults
+  `true` against an old backend that doesn't send the field, so this can only
+  *reduce* traffic, never miss a command. The boot poll stays unconditional
+  (a command enqueued while the toy was off must still be picked up before
+  any heartbeat exists).
+- **Bug fixed in the same release**: `sync_games`'s allocation-failure path
+  returned before the carry-forward loop, so on an alloc failure
+  `cs_index_add_games` silently omitted the games key and the rewritten
+  index lost every game clip the card already had — the next boot then
+  re-downloaded ~90 files that were already sitting on the card untouched.
+  An allocation failure must cost only the attempt, not the card.
+- **An index write failure now counts as a sync FAILURE**, even when every
+  download in that pass succeeded — previously the next boot just re-read
+  the stale index and re-downloaded everything, which is exactly what the
+  overnight crash loop did and it reported as healthy.
+- `AREG_CONTENT_SYNC_BENCH` moved from a hand-typed compile-command flag into
+  `config.h` — its name undersells it: content sync is load-bearing in
+  production, and a forgotten flag on a release build silently ships a toy
+  that never syncs content again.
+- Heartbeat buffer grew 640 → 768 bytes; the existing overflow check still
+  refuses to send a truncated body either way, so the change is fail-safe.
+- +2,192 bytes of flash. No backend/C# code touched by this firmware
+  release — test count unaffected (2727).
+
+**BENCH-VERIFIED ON THE REAL TOY, 2026-08-14** (`tools/quality-evidence/`):
+1.3.0 applied over the air, manifest `signature OK` (after the OTA signing
+fix below), confirmed, then `[content-sync] PASS` and
+`status=ok streak=0 next in 21600s` — the 6-hour reschedule proving the
+one-shot latch is gone. Zero watchdog resets, zero panics, and **zero**
+command polls observed after boot (`hasCommands` working as intended).
+
+**Reporting VERIFIED end to end — and the "defect" that was recorded here
+first was my own misreading.** It briefly said the fields were untrustworthy
+because the toy's log read `status=ok` while the backend stored
+`contentSyncStatus="never"`. Debug firmware 1.3.1 (`79516d5`) printed the
+actual heartbeat body and proved the pipeline correct: the toy had just
+rebooted for the OTA and had not yet reached its 180-second sync arm, so
+`never` was the TRUTHFUL answer for that boot, and `contentSyncedAt` still
+held its pre-reboot value precisely because the partial-report rule leaves
+absent fields untouched. Two fields from two different moments, read as one
+snapshot.
+
+Once the sync ran, the body carried `"contentSyncStatus":"ok"` plus
+`contentSyncedSecondsAgo`, and the backend stored `ok` / `SW` /
+`bootCount 0` / `up_to_date`. The debug print was removed in **1.3.2**,
+whose sketch size is byte-identical to 1.3.0 — which is the proof it is
+gone. Worth keeping: a diagnostic that reads `never` is meaningful only
+alongside the toy's uptime, because it is per-boot state.
+
+### Stage 3 — per-toy content entitlement (2026-08-14, `03d1fba`)
+
+The owner can now give or withhold any single content item on any one toy,
+from the console, with a typed reason and an audit row — the floor Stage 4
+stands on ("ship a new story to one toy first, then the fleet").
+
+- **`DeviceContentOverride` entity** (migration
+  `20260814140000_AddDeviceContentOverrides`, hand-written — `dotnet-ef`
+  cannot run here). One row per `(DeviceId, ItemKind, ItemKey)`, enforced by
+  a unique index; FK cascade to `Device`. `ItemKind` ∈ `story|game|voice|music`
+  (`DeviceContentEntitlement.Kinds`); `ItemKey` is the same lookup key the
+  manifest already uses for that namespace — for a game clip specifically
+  the PAIR `gameKey/clipId` (`DeviceContentEntitlement.GameItemKey`), because
+  four of the five offline games each define a clip literally called
+  `intro`. `Mode` is `allow` or `deny`. **Overrides deliberately SURVIVE an
+  unlink** — entitlement is an operator decision about the hardware, not a
+  household preference, and reversing it on unlink would silently re-grant a
+  withheld item when a family changes.
+- **`DeviceContentEntitlement.Apply(baseline, overrides)`**
+  (`Application/Helpers/`, pure, no DB/IO/config/clock) — default-plus-
+  exceptions: a `deny` row removes an item from that one toy; an `allow` row
+  admits an item that is fleet-dark (inert until Stage 4 introduces
+  fleet-dark items, built anyway because Stage 4 is the reason it exists). A
+  device with no override rows gets the baseline **by reference** — byte-
+  identical to yesterday's manifest, and true by construction, not by
+  careful copying.
+- **`IContentCatalogService`** (`Application/Interfaces` + `Services/`,
+  scoped, DB-backed) resolves a per-device `ContentSyncOptions`; a new
+  `Build(ContentSyncOptions)` overload on `IContentManifestService` takes
+  it. Wired into the existing per-device `with`-expression in
+  `DeviceController` — no new seam, the docstring already promised this.
+- **Operator endpoints** (both under the existing fail-closed
+  `/api/internal/*` gate, following the Phase-3 reason+audit pattern):
+  `GET /api/internal/devices/{deviceId}/content` (every catalogue story
+  listed in full, plus any override already recorded on another namespace;
+  404 on unknown device) and
+  `POST /api/internal/devices/{deviceId}/content` `{ itemKind, itemKey,
+  value, reason }` (upserts the override row; idempotent — a no-op writes
+  no row; audited `InternalConsoleContentOverride`).
+- **Two traps closed, both load-bearing:**
+  - `ContentSyncOptions.AdvertisedStoryVersions()` — which feeds
+    `DeviceContentHealth` — is now resolved **per device**, not fleet-wide.
+    Left fleet-wide, every story-restricted toy would report `stale` forever
+    and name the withheld story as "missing," on both the console and the
+    parent dashboard — accusing a toy of failing to fetch something an
+    operator withheld on purpose.
+  - `ParentController.GetStoryLibrary` now resolves through the per-device
+    catalogue too, but ONLY for a device the calling parent actually owns —
+    the `deviceId` query parameter cannot be used to read another family's
+    entitlement.
+  - **Two bugs caught before landing** (not shipped, recorded for the
+    pattern): denying every story emptied `Stories`, and an empty `Stories`
+    makes `ResolveStories()` fall back to the LEGACY single-item scalars —
+    re-serving the exact story just withheld (`Apply` now filters the
+    resolved list and blanks the legacy scalars). And the parent library's
+    "no shipped stories → show the whole curated catalogue" fallback was
+    being tested against the scoped (per-device) manifest, which would have
+    made the STRICTEST entitlement produce the LOOSEST library; it now tests
+    the fleet manifest.
+- `content-file` still resolves **fleet-wide** in Stage 3 — Stage 4 makes
+  per-device resolution mandatory there, because an uploaded story lives
+  outside `AudioRoot`.
+- **Never bench-verified against a real toy** — unit/integration tests only.
+  No story has actually been denied to, or granted on, the live toy.
+
+### Stage 4 — upload a story from the console (2026-08-14, `1ae3dbe`)
+
+Upload an MP3 from `admin.html`, give it a title, send it to one toy, then
+release it to the fleet — no git commit, no PowerShell shipper, no
+redeploy. **The server computes the sha256 and the size**, which is what
+retires the old ritual (a hand-authored embedded resource, a hand-added
+placeholder config row with a hash a human could not actually compute, a
+PowerShell shipper needing ffmpeg, ~38 MB of audio committed to git).
+
+- **`ContentItem` entity** (migration `20260814160000_AddContentItems`, no
+  FK — the catalogue is fleet-level, entitlement is the separate
+  `DeviceContentOverride` table keyed by the same `ItemKey`). Fields:
+  `Kind` (today only `story` is writable), `ItemKey`, `Title`, `Version`
+  (bumped on every re-upload of the same key), `RelativePath`
+  (server-generated `<itemKey>-v<N>.mp3`, never derived from the uploaded
+  filename), `Sha256` / `SizeBytes` (both server-computed while the upload
+  streams), `DefaultEnabled` (**false on arrival — fleet-dark**; nothing an
+  owner uploads reaches a child until it's been heard on one toy and
+  released), `RetiredAt` (soft delete), `CreatedBy`, `CreatedAt`.
+- **New config key `ContentSync:UploadRoot`** (Railway:
+  `/data/content-uploads`) — the exact precedent of
+  `Audio:BlobStoreRoot=/data/audio-blobs`. **Two content roots,
+  permanently, with no mixed mode**: a config-driven catalogue row's audio
+  always resolves under `AudioRoot` (git-tracked, inside the image); a
+  `ContentItem` row's audio always resolves under `UploadRoot` (the Railway
+  volume). Until `UploadRoot` is set, the upload endpoint returns **503**
+  and the console form is disabled — writing into the container image
+  instead would be silently deleted by the next redeploy, and failing loud
+  beats losing a story quietly.
+- **Endpoints** (all under the fail-closed `/api/internal/*` gate):
+  `GET /api/internal/content` (catalogue + uploaded items, with per-item
+  grant counts); `POST /api/internal/content/stories` (multipart
+  `itemKey`/`title`/`reason` + an MP3 file; validates id allowlist, title
+  1–200 chars, MP3-only, size cap; refuses an `itemKey` that collides with a
+  shipped catalogue story); `POST /api/internal/content/{id}/release`
+  `{ value, reason }` (fleet-wide `DefaultEnabled` flip); `POST
+  /api/internal/content/{id}/retire` `{ value, reason }` (soft delete — the
+  item leaves every manifest immediately, but the FILE is deliberately left
+  on disk and on every card; carry-forward keeps it playable until a later
+  sweep, so no child loses a story mid-listen because an adult pressed a
+  button).
+- **The trap that would have broken it, closed**: `content-file` used to
+  resolve through the SINGLETON fleet-wide options, so an uploaded story
+  would have been advertised in a device's per-catalogue manifest and then
+  404'd on download — every toy reporting `download_failed` for a story the
+  console insists it has. It now resolves through the requesting device's
+  own catalogue (`[NonAction]`; the existing 25 fail-closed serving tests
+  pass unmodified as regression proof). Same fix applied on both parent
+  read paths.
+- **Filenames are always server-generated**, never derived from operator
+  input — the invariant that a content id is a lookup key which never
+  reaches the filesystem survives the one feature whose whole purpose is
+  writing a file an operator chose.
+- **Uploads ARE backed up** (owner decision): `DatabaseBackupService` now
+  archives the upload root on EVERY tick, not only when it also writes a DB
+  snapshot — the DB pass returns early on a same-day snapshot, and letting
+  that skip the upload-root archive would have silently stopped backing up
+  the one thing here that cannot be regenerated from git.
+- No new NuGet: hashing is BCL `IncrementalHash`, the archive step is
+  `System.IO.Compression`. The server never parses or transcodes audio —
+  the client-side duration readout the UI shows before upload is the only
+  length check, deliberately, because this repo has already shipped three
+  truncated stories from nothing comparing audio length against text (see
+  § Story narration pipeline).
+- **Never exercised against a real toy** — unit tests only. No MP3 has been
+  uploaded end to end (upload → grant to one toy → download → release to
+  fleet) on real hardware.
+
+### Stage 5 (backend) — sync on demand, and audited enqueue (2026-08-14, `5659944`)
+
+Backend half of "sync this toy now" and the traffic fix; see Stage 2 above
+for the firmware half that ships them.
+
+- **`refresh_story_manifest` added to `DeviceCommandTypes`** — one constant,
+  one set entry, no migration, no entity change (`DeviceCommand.PayloadJson`
+  is opaque). Enqueuing it against firmware older than 1.3.0 is harmless: an
+  unknown type just acks `failed/unsupported_type`, a recorded outcome
+  rather than silence.
+- **The existing operator enqueue endpoint now requires a `reason` and
+  writes an audit row** — see the updated "Enqueue" bullet under § Device
+  OTA foundation above. It never had either before this; the log-line-only
+  posture was defensible while the endpoint was an unreachable bench hook
+  and is not defensible now that a console button fires it.
+- **One documented asymmetry**: the audit row is written AFTER the enqueue
+  completes, not in the same `SaveChangesAsync`, because
+  `IDeviceCommandService.EnqueueAsync` owns its own commit and restructuring
+  the service was out of scope. The property that actually matters — a
+  REFUSED enqueue (bad type, unknown device) writes no row — still holds and
+  is pinned by three tests.
+- **`hasCommands` added to the heartbeat response** (`DeviceController`) —
+  `commandService.HasDeliverableCommandAsync(deviceId, DateTime.UtcNow)`, one
+  `AnyAsync` riding the existing `(DeviceId, Status)` index. An
+  expired-but-unswept row deliberately reads **false** — telling a toy to
+  poll for a command it can never receive would be a loop, not a
+  notification. Two keystone tests: reading the flag consumes nothing
+  (`Pending` stays `Pending`, `SentAt` stays null), and the heartbeat path
+  never calls `PollAsync`.
+- **`admin.html`** gains the "Sync now" button (fires the enqueue endpoint
+  with `refresh_story_manifest`) and a diagnostics viewer over the existing
+  `GET /api/internal/devices/{deviceId}/commands` read endpoint — it walks
+  whatever JSON arrives rather than assuming a shape (the firmware payload
+  is expected to grow) and prints unparseable content raw rather than
+  swallowing it, because a diagnostic that cannot be parsed is itself a
+  diagnostic.
+
+### Open items across Stages 1–5 (2026-08-14) — recorded honestly, not yet closed
+
+1. ~~**The sync-reporting fields are wrong on the backend.**~~ **CLOSED —
+   there was no defect.** Debug firmware 1.3.1 captured the wire body and
+   showed the toy reporting correctly; the contradiction was two fields read
+   from two different moments (see the Stage 2/5 section above). Reporting is
+   verified end to end on hardware. Clean image is 1.3.2.
+
+2. **Stages 3 and 4 have never been exercised against a real toy** — unit
+   tests only. No story has been denied to, or granted on, the live toy;
+   no MP3 has been uploaded end to end.
+3. **Orphan sweep and per-namespace index writes remain deferred.** The
+   2026-08-13 crash-loop analysis (above) already named the missing
+   per-namespace index write as "the real fix and is NOT done"; it is still
+   not done. A filesystem-level orphan sweep for uploaded content (parallel
+   to the audio-blob orphan sweeper, § Voice chat C2.3) does not exist.
+4. **`Audio__BlobStoreRoot` is NOT set on Railway.** Child voice recordings
+   (§ Voice chat C1/C2) are therefore written INSIDE the container and
+   destroyed on every redeploy — the same "ephemeral unless a durable root
+   is configured" trap Stage 4 deliberately avoided for story uploads by
+   fail-closing to 503 until `ContentSync:UploadRoot` is set. The audio
+   blob store has no such fail-closed guard: it silently writes into the
+   container and silently loses the data. This is a flagged, deliberate
+   owner decision (privacy posture pending), **not fixed** — see also the
+   "Residual risk" bullet in § Backups, which already notes audio blobs are
+   not covered by backups; this is the sharper version of that same gap.
 
 ## A live device key in a release image (2026-08-13)
 

@@ -375,12 +375,6 @@ void voice_send_heartbeat() {
     body[used++] = '}';
     body[used] = '\0';
     http.addHeader("Content-Type", "application/json");
-    // TEMPORARY (2026-08-14): the backend stores contentSyncStatus="never"
-    // while this toy's own log says status=ok. Both sides read correct on
-    // inspection, so print the exact bytes rather than keep reasoning about
-    // them. Remove once the mismatch is understood.
-    Serial.printf("[heartbeat] body=%s\n", body);
-    Serial.flush();
     const int status = http.POST(body);
     if (status == 200) {
         // Only a 2xx marks the report as delivered. A failed heartbeat

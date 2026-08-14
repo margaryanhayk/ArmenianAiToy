@@ -1,0 +1,260 @@
+    4.0  [alive] ms=1084443 heap=123432 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-45
+    9.3  [heartbeat] status=200 (fw=1.3.0 bedtime=0 paused=0)
+    9.3  [alive] ms=1089706 heap=123372 psram=7861168 wifi=3 ip=192.168.1.3 rssi=-45
+   14.3  [alive] ms=1094708 heap=123432 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-46
+   19.3  [alive] ms=1099710 heap=123380 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-45
+   24.3  [alive] ms=1104712 heap=123432 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-45
+   29.3  [alive] ms=1109714 heap=123432 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-44
+   34.3  [alive] ms=1114716 heap=123432 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-43
+   39.3  [alive] ms=1119718 heap=123432 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-47
+   44.3  [alive] ms=1124720 heap=123432 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-45
+   49.3  [alive] ms=1129722 heap=123432 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-45
+   54.3  [alive] ms=1134724 heap=123432 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-42
+   59.3  [alive] ms=1139726 heap=123432 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-45
+   64.3  [alive] ms=1144728 heap=123432 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-44
+   68.9  [heartbeat] status=200 (fw=1.3.0 bedtime=0 paused=0)
+   69.3  [alive] ms=1149737 heap=123432 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-45
+   74.3  [alive] ms=1154739 heap=123432 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-45
+   79.3  [alive] ms=1159741 heap=123432 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-43
+   84.5  [ota] 1 command(s) pending
+   84.6  [ota] command id=065d6b9d-e040-4310-ab68-9efa30f4a26a type=firmware_update expiresAt=2026-08-14T15:33:02.4788569Z
+   87.1  [ota] manifest signature OK
+   87.1  [ota] expiresAt=2026-08-14T14:39:16.8530260Z (device-side expiry skipped — no RTC; server-enforced)
+   87.1  [ota] manifest: UPDATE 1.3.0 -> 1.3.1 (sig=ok board=ok size=1328736)
+   93.3  [ota] downloading 10% (133392/1328736)
+   96.9  [ota] downloading 20% (266416/1328736)
+  100.5  [ota] downloading 30% (401056/1328736)
+  103.3  [ota] downloading 40% (534896/1328736)
+  106.7  [ota] downloading 50% (664928/1328736)
+  109.8  [ota] downloading 60% (799216/1328736)
+  112.9  [ota] downloading 70% (931232/1328736)
+  119.5  [ota] downloading 80% (1065520/1328736)
+  119.5  [ota] downloading 90% (1197136/1328736)
+  122.2  [ota] downloading 100% (1328736/1328736)
+  122.2  [ota] sha256 ok
+  122.3  [ota] APPLYING 1.3.1 -> reboot into pending-verify
+  122.6  [wifi] event=disconnected reason=8
+  122.6  ESP-ROM:esp32s3-20210327
+  122.6  Build:Mar 27 2021
+  122.6  rst:0xc (RTC_SW_CPU_RST),boot:0xb (SPI_FAST_FLASH_BOOT)
+  122.6  Saved PC:0x4037a9ae
+  122.6  SPIWP:0xee
+  122.6  mode:DIO, clock div:1
+  122.6  load:0x3fce2820,len:0x116c
+  122.6  load:0x403c8700,len:0xc2c
+  122.6  load:0x403cb700,len:0x3108
+  122.6  entry 0x403c88b8
+  123.2  
+  123.2  [boot] AregVoiceMvp starting
+  123.2  [boot] backend = https://armenianaitoy-production.up.railway.app
+  123.2  [net] TLS: verifying (ISRG Root X1 pinned)
+  123.2  [boot] reset_reason=3/SW
+  123.2  [boot] diag_boot_counter=0 (cold)
+  123.2  [boot] previous_step=(none)
+  123.2  [boot] backend=https://armenianaitoy-production.up.railway.app/api/chat/audio
+  123.2  [boot] pins button=0 led=48
+  123.2  [boot] mic_i2s bck=4 ws=5 sd=6
+  123.2  [boot] amp_i2s bck=15 lrc=16 din=7
+  123.2  E (257) task_wdt: esp_task_wdt_init(517): TWDT already initialized
+  123.2  [boot] task watchdog enabled (30s)
+  123.2  [boot] sd_spi cs=10 sck=12 mosi=11 miso=13
+  123.2  [sd] mounted; type=3 size=7680MB
+  123.2  [boot] SD mounted; offline narration /stories/anban-huri/narration.mp3 = absent
+  123.5  [content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=43 music=0
+  123.5  [wifi] using provisioned creds (ssid=OVIO_0114707)
+  123.5  [wifi] connecting to OVIO_0114707 ...
+  123.6  [wifi] event=connected
+  124.6  [wifi] event=got_ip
+  124.8  [wifi] ip=192.168.1.3
+  124.8  [boot] ready — press button to speak
+  124.8  [state] 0 -> 0
+  124.8  [ota] running fw=1.3.1 partition=app0 img_state=valid ota_state=rebooting (pending_ver=1.3.1 cmd=065d6b9d-e040-4310-ab68-9efa30f4a26a boots=1)
+  124.8  [device] using provisioned identity (id=248729da-08d8-4144-afc0-e6af8a3fe471)
+  124.8  [heartbeat] body={"firmwareVersion":"1.3.1","firmwareBuild":"hb-body-debug","boardModel":"areg-s3-n8","partitionName":"app0","lastOtaStatus":"rebooting","sdCardOk":true,"contentSyncStatus":"never","contentSyncError":"","bootCount":0,"resetReason":"SW","contentIndexSchema":7,"contentStories":"anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12","contentGameClips":104,"contentVoiceClips":43,"contentMusicTracks":0}
+  127.5  [heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+  129.9  [ota] ack 065d6b9d-e040-4310-ab68-9efa30f4a26a result=ok status=200
+  129.9  [ota] image marked VALID (confirmed)
+  129.9  [heartbeat] body={"firmwareVersion":"1.3.1","firmwareBuild":"hb-body-debug","boardModel":"areg-s3-n8","partitionName":"app0","lastOtaStatus":"confirmed","sdCardOk":true,"contentSyncStatus":"never","contentSyncError":"","bootCount":0,"resetReason":"SW"}
+  132.5  [heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+  133.3  [welcome] greeting greet-38
+  133.3  [state] 0 -> 3
+  133.3  [story] SD open: /voice/greet-38-v1.mp3 @ 0
+  135.6  [story] SD end interrupted=false
+  136.9  [welcome] ask ask-sgrc
+  136.9  [state] 3 -> 3
+  136.9  [story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+  142.3  [story] SD end interrupted=false
+  142.3  [welcome] listening (mode)
+  150.3  [welcome] no answer — closing quietly
+  150.3  [state] 3 -> 0
+  150.3  [alive] ms=27384 heap=123432 psram=7861268 wifi=3 ip=192.168.1.3 rssi=-44
+  150.3  [ota] boot poll (fw=1.3.1 build=hb-body-debug board=areg-s3-n8 partition=app0)
+  152.8  [content-sync] bench fw built Aug 14 2026 18:27:32
+  152.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  155.3  [alive] ms=32389 heap=123432 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-41
+  157.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  160.3  [alive] ms=37392 heap=123432 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-43
+  162.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  165.3  [alive] ms=42395 heap=123432 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-41
+  167.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  170.3  [alive] ms=47398 heap=123432 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-41
+  172.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  175.3  [alive] ms=52401 heap=123432 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-42
+  177.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  180.3  [alive] ms=57404 heap=123432 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-43
+  182.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  182.9  [heartbeat] body={"firmwareVersion":"1.3.1","firmwareBuild":"hb-body-debug","boardModel":"areg-s3-n8","partitionName":"app0","lastOtaStatus":"confirmed","sdCardOk":true,"contentSyncStatus":"never","contentSyncError":"","bootCount":0,"resetReason":"SW"}
+  185.6  [heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+  185.6  [alive] ms=62726 heap=123384 psram=7860616 wifi=3 ip=192.168.1.3 rssi=-43
+  187.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  190.6  [alive] ms=67729 heap=123432 psram=7860756 wifi=3 ip=192.168.1.3 rssi=-44
+  192.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  195.6  [alive] ms=72732 heap=123380 psram=7860756 wifi=3 ip=192.168.1.3 rssi=-41
+  197.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  200.6  [alive] ms=77735 heap=123432 psram=7860756 wifi=3 ip=192.168.1.3 rssi=-43
+  202.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  205.6  [alive] ms=82738 heap=123432 psram=7860756 wifi=3 ip=192.168.1.3 rssi=-42
+  207.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  210.7  [alive] ms=87741 heap=123432 psram=7860756 wifi=3 ip=192.168.1.3 rssi=-44
+  212.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  215.7  [alive] ms=92744 heap=123432 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-40
+  217.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  220.7  [alive] ms=97747 heap=123432 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-39
+  222.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  225.7  [alive] ms=102750 heap=123432 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-42
+  227.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  230.7  [alive] ms=107753 heap=123380 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-41
+  232.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  235.7  [alive] ms=112756 heap=123432 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-35
+  237.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  240.7  [alive] ms=117759 heap=123432 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-44
+  242.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  242.9  [heartbeat] body={"firmwareVersion":"1.3.1","firmwareBuild":"hb-body-debug","boardModel":"areg-s3-n8","partitionName":"app0","lastOtaStatus":"confirmed","sdCardOk":true,"contentSyncStatus":"never","contentSyncError":"","bootCount":0,"resetReason":"SW"}
+  245.6  [heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+  245.7  [alive] ms=122761 heap=123384 psram=7860540 wifi=3 ip=192.168.1.3 rssi=-43
+  247.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  250.7  [alive] ms=127763 heap=123432 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-43
+  252.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  255.7  [alive] ms=132766 heap=123432 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-42
+  257.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  260.7  [alive] ms=137769 heap=123432 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-44
+  262.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  265.7  [alive] ms=142772 heap=123432 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-41
+  267.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  270.7  [alive] ms=147775 heap=123432 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-46
+  272.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  275.7  [alive] ms=152778 heap=123432 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-45
+  277.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  280.7  [alive] ms=157781 heap=123432 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-41
+  282.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  285.7  [alive] ms=162784 heap=123432 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-40
+  287.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  290.7  [alive] ms=167787 heap=123432 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-42
+  292.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  295.7  [alive] ms=172790 heap=123432 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-45
+  297.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  300.7  [alive] ms=177793 heap=123432 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-42
+  302.8  [content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+  302.9  [content-sync] starting
+  302.9  [content-sync] heap before=123272
+  306.6  [content-sync] manifest bytes=-1 heap parse 78392->79028 psram=7807076
+  306.6  [content-sync] manifest status=200 stories=10 introEnabled=1 music=0 musicEnabled=0 voice=42 games=104 modes=1111 pauses=1 variants=1
+  306.9  [content-sync] index v7 loaded entries=10 music=0 voice=43
+  306.9  [content-sync] item anban-huri v9 "Անբան Հուռին" 5560991 bytes
+  306.9  [content-sync] anban-huri already current (index)
+  306.9  [content-sync] item hedgehog-apple v3 "Ոզնիկն ու խնձորը" 613817 bytes
+  306.9  [content-sync] hedgehog-apple already current (index)
+  306.9  [content-sync] item khosogh-dzuk v10 "Խոսող ձուկը" 8138336 bytes
+  306.9  [content-sync] khosogh-dzuk already current (index)
+  306.9  [content-sync] item little-cloud v3 "Փոքրիկ ամպիկը" 514133 bytes
+  306.9  [content-sync] little-cloud already current (index)
+  306.9  [content-sync] item pochat-aghves v9 "Պոչատ աղվեսը" 5460680 bytes
+  306.9  [content-sync] pochat-aghves already current (index)
+  306.9  [content-sync] item princess-and-pea v6 "Արքայադուստրը և սիսեռահատիկը" 1611903 bytes
+  307.0  [content-sync] princess-and-pea already current (index)
+  307.0  [content-sync] item sutasan v6 "Սուտասանը" 1969258 bytes
+  307.0  [content-sync] sutasan already current (index)
+  307.0  [content-sync] item sutlik-orskan v9 "Սուտլիկ որսկանը" 3356047 bytes
+  307.0  [content-sync] sutlik-orskan already current (index)
+  307.0  [content-sync] item three-piglets v6 "Երեք խոզուկները" 2078973 bytes
+  307.0  [content-sync] three-piglets already current (index)
+  307.0  [content-sync] item ulik v12 "Ուլիկը" 2631933 bytes
+  307.0  [content-sync] ulik already current (index)
+  307.6  [content-sync] voice summary offered=42 already=42 downloaded=0 failed=0 voice_active=43
+  308.9  [content-sync] games phase B: 0 to download, heap=79088
+  308.9  [content-sync] games summary offered=104 invalid=0 already=104 downloaded=0 failed=0 truncated=0 carried=0 games_active=104
+  309.2  [content-sync] index written
+  309.5  [content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=43 music=0
+  309.5  [content-sync] summary manifest_items=10 accepted_items=10 invalid_items=0 duplicate_items=0 disabled_items=0 truncated_items=0 already_current=10 downloaded=0 failed=0 carried_forward=0 active_index_items=10 index_written=1
+  309.5  [content-sync] heap after=79088
+  309.5  [content-sync] PASS
+  309.5  [content-sync] status=ok error= streak=0 next in 21600s
+  309.5  [alive] ms=186600 heap=123212 psram=7861168 wifi=3 ip=192.168.1.3 rssi=-41
+  309.5  [heartbeat] body={"firmwareVersion":"1.3.1","firmwareBuild":"hb-body-debug","boardModel":"areg-s3-n8","partitionName":"app0","lastOtaStatus":"confirmed","sdCardOk":true,"contentSyncStatus":"ok","contentSyncError":"","bootCount":0,"resetReason":"SW","contentSyncedSecondsAgo":0}
+  312.0  [heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+  314.5  [alive] ms=191607 heap=123272 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-42
+  319.5  [alive] ms=196609 heap=123272 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-44
+  324.5  [alive] ms=201611 heap=123272 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-42
+  329.5  [alive] ms=206613 heap=123272 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-42
+  334.5  [alive] ms=211615 heap=123272 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-43
+  339.5  [alive] ms=216617 heap=123272 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-44
+  344.5  [alive] ms=221619 heap=123272 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-45
+  349.5  [alive] ms=226621 heap=123272 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-41
+  354.5  [alive] ms=231623 heap=123272 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-42
+  359.5  [alive] ms=236625 heap=123272 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-42
+  364.5  [alive] ms=241627 heap=123272 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-43
+  369.5  [heartbeat] body={"firmwareVersion":"1.3.1","firmwareBuild":"hb-body-debug","boardModel":"areg-s3-n8","partitionName":"app0","lastOtaStatus":"confirmed","sdCardOk":true,"contentSyncStatus":"ok","contentSyncError":"","bootCount":0,"resetReason":"SW","contentSyncedSecondsAgo":60}
+  372.2  [heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+  372.2  [alive] ms=249306 heap=123224 psram=7860912 wifi=3 ip=192.168.1.3 rssi=-42
+  377.2  [alive] ms=254308 heap=123272 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-42
+  382.2  [alive] ms=259310 heap=123220 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-43
+  387.2  [alive] ms=264312 heap=123272 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-43
+  392.2  [alive] ms=269314 heap=123272 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-45
+  397.2  [alive] ms=274316 heap=123272 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-44
+  402.2  [alive] ms=279318 heap=123272 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-42
+  407.2  [alive] ms=284320 heap=123272 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-42
+  412.2  [alive] ms=289322 heap=123272 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-43
+  417.2  [alive] ms=294324 heap=123272 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-45
+  422.2  [alive] ms=299326 heap=123272 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-42
+  427.2  [alive] ms=304328 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-41
+  429.5  [heartbeat] body={"firmwareVersion":"1.3.1","firmwareBuild":"hb-body-debug","boardModel":"areg-s3-n8","partitionName":"app0","lastOtaStatus":"confirmed","sdCardOk":true,"contentSyncStatus":"ok","contentSyncError":"","bootCount":0,"resetReason":"SW","contentSyncedSecondsAgo":120}
+  432.1  [heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+  433.2  [alive] ms=
+  437.2  309332 heap=123272 psram=7861168 wifi=3 ip=192.168.1.3 rssi=-44
+  437.2  [alive] ms=314334 heap=123272 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-45
+  442.2  [alive] ms=319336 heap=123272 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-44
+  447.2  [alive] ms=324338 heap=123272 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-43
+  452.2  [alive] ms=329340 heap=123272 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-43
+  457.2  [alive] ms=334342 heap=123272 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-42
+  462.3  [alive] ms=339344 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-44
+  467.3  [alive] ms=344346 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-42
+  472.3  [alive] ms=349348 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-44
+  477.3  [alive] ms=354350 heap=123220 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-43
+  482.3  [alive] ms=359352 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-42
+  487.3  [alive] ms=364354 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-44
+  489.5  [heartbeat] body={"firmwareVersion":"1.3.1","firmwareBuild":"hb-body-debug","boardModel":"areg-s3-n8","partitionName":"app0","lastOtaStatus":"confirmed","sdCardOk":true,"contentSyncStatus":"ok","contentSyncError":"","bootCount":0,"resetReason":"SW","contentSyncedSecondsAgo":180}
+  492.2  [heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+  492.3  [alive] ms=369363 heap=123224 psram=7860912 wifi=3 ip=192.168.1.3 rssi=-42
+  497.3  [alive] ms=374365 heap=123272 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-43
+  502.3  [alive] ms=379367 heap=123272 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-43
+  507.3  [alive] ms=384369 heap=123272 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-43
+  512.3  [alive] ms=389371 heap=123272 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-44
+  517.3  [alive] ms=394373 heap=123272 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-42
+  522.3  [alive] ms=399375 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-44
+  527.3  [alive] ms=404377 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-41
+  532.3  [alive] ms=409379 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-41
+  537.3  [alive] ms=414381 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-42
+  542.3  [alive] ms=419383 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-41
+  547.3  [alive] ms=424385 heap=123220 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-41
+  549.5  [heartbeat] body={"firmwareVersion":"1.3.1","firmwareBuild":"hb-body-debug","boardModel":"areg-s3-n8","partitionName":"app0","lastOtaStatus":"confirmed","sdCardOk":true,"contentSyncStatus":"ok","contentSyncError":"","bootCount":0,"resetReason":"SW","contentSyncedSecondsAgo":240}
+  552.3  [heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+  552.3  [alive] ms=429431 heap=123224 psram=7861168 wifi=3 ip=192.168.1.3 rssi=-42
+  557.3  [alive] ms=434433 heap=123272 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-43
+  562.3  [alive] ms=439435 heap=123220 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-42
+  567.3  [alive] ms=444437 heap=123272 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-43
+  572.3  [alive] ms=449439 heap=123272 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-42
+  577.3  [alive] ms=454441 heap=123272 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-41
+  582.3  [alive] ms=459443 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-41
+  587.3  [alive] ms=464445 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-42
+  592.4  [alive] ms=469447 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-41
+  597.4  [alive] ms=474449 heap=123272 psram=7861340 wifi=3 ip=192.168.1.3 rssi=-43
