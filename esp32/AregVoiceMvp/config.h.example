@@ -256,6 +256,21 @@
 // hold to answer. No press in this window â†’ quiet close (never force an answer).
 #define AREG_REFLECTION_LISTEN_MS 8000
 
+// The toy asks exactly ONE reflection question per story, and rotates which
+// one, so a re-listen is not the same question again. That needs a cursor per
+// story, kept in NVS (namespace `aregqidx`) — this is how many stories it
+// remembers, one slot each, dropping the oldest when full (a dropped story
+// simply starts its rotation over).
+//
+// Defined as CS_MAX_STORIES rather than a number so it can never drift out of
+// step with the heard set, which is bounded the same way. story_select.cpp
+// carries the identical guarded default, so the override that reaches EVERY
+// translation unit is a build flag (-DAREG_QUESTION_CURSOR_SLOTS=N); editing
+// it here alone changes only the units that include config.h.
+#ifndef AREG_QUESTION_CURSOR_SLOTS
+#define AREG_QUESTION_CURSOR_SLOTS CS_MAX_STORIES
+#endif
+
 // --- Welcome flow (power-on greeting + spoken menu) ----------
 // The toy greets the child at power-on, asks what they want to do (only
 // the modes the parent left enabled), and offers a story by name. Every

@@ -578,6 +578,12 @@ inline bool cs_is_valid_clip_kind(const char *kind) {
 /// longer name here would need the bound raised in lockstep on both sides.
 #define CS_CLIP_KIND_SERIALNEXT "serialnext"
 
+/// How many reflection-question kinds exist. Derived from
+/// cs_question_clip_kind below, NOT a tunable: raising it without adding
+/// the matching case there would ask for a NULL kind and the toy would
+/// silently skip the question. The two move together or not at all.
+#define CS_QUESTION_KINDS 3
+
 /// Clip kind for dialogue question `index` (0 → "question",
 /// 1 → "question1", 2 → "question2"); NULL for any other index.
 inline const char *cs_question_clip_kind(int index) {

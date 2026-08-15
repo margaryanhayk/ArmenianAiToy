@@ -444,6 +444,46 @@ int story_heard_count();
 /// for the bench and for a future factory-reset gesture.
 void story_heard_clear();
 
+// ---- per-story reflection-question cursor ---------------------------
+//
+// The toy asks exactly ONE question after a story (owner request
+// 2026-08-15) — it used to ask all three back to back, which is two
+// questions more than a four-year-old will answer. So the question has
+// to ROTATE, or a child who re-listens to a favourite is asked the same
+// thing every time.
+//
+// The cursor is PER STORY, because the stories are heard in rotation:
+// one global cursor would advance while other stories were playing and
+// a child would never work through a single story's three questions.
+//
+// Stored like the heard set — ONE whole-set NVS blob (namespace
+// `aregqidx`), not a key per story: Preferences keys are capped at 15
+// characters and a key per story would multiply flash wear for no gain.
+// Bounded to AREG_QUESTION_CURSOR_SLOTS with drop-OLDEST on overflow,
+// the same sliding-window behaviour the heard set documents. Losing the
+// oldest entry costs a child one repeated question, which is why
+// eviction is preferred to refusing to record.
+
+/// The question index to ask NOW for `story_id`: one past whatever was
+/// last asked, wrapping at CS_QUESTION_KINDS. Returns 0 for a story with
+/// no record — a first listen always gets question 0, the one every
+/// story is most likely to have rendered.
+///
+/// Never fails: an unavailable, absent or corrupt NVS blob degrades to 0
+/// rather than blocking the reflection flow.
+int story_question_cursor_next(const char *story_id);
+
+/// Records `index` as the question just asked for `story_id`. Writes
+/// ONLY when the value actually changes, mirroring
+/// story_select_save_last — a story whose cursor is already there must
+/// not re-write flash.
+///
+/// Call this ONLY once the question clip has genuinely started playing
+/// (see audio_play_story_file's `out_started`), under the same gate as
+/// story_select_save_last and story_heard_mark: a question that made no
+/// sound has not been asked, and moving past it would skip it forever.
+void story_question_cursor_commit(const char *story_id, int index);
+
 // ---- serial episodes: the boot-scoped "one new episode" latch --------
 //
 // HONEST LIMITATION, read this before relying on it: the toy has no wall
