@@ -126,6 +126,11 @@ int s_voice_active_count   = 0;
 // the index is on disk.
 JsonDocument s_games_index(&s_json_psram);
 int s_games_active_count = 0;
+// How many entries the previous index carried for games. The other three
+// namespaces keep their previous count in a file static already; games
+// streams, so its count lives inside sync_games() and has to be hoisted out
+// by hand for the shrink alarm in write_index() to be able to see it.
+int s_games_previous_count = 0;
 // Default TRUE for all four: a backend that does not send them, or a
 // pre-v4 card, must not silently stop the toy offering anything.
 bool s_mode_story     = true;
@@ -248,36 +253,102 @@ long sd_file_size(const char *path) {
     return n;
 }
 
+// ---- sync preferences (NVS) ---------------------------------------
+//
+// The aregstate/aregstory idiom used elsewhere. TWO facts have to survive a
+// reboot: the failure streak (a toy that panicked mid-sync must come back
+// already backed off) and the unreadable-index strike count below. Status
+// and error are per-attempt — a fresh boot has genuinely not attempted
+// anything yet.
+//
+// These sit up here, above write_index(), because write_index() is the
+// reader of the strike count. persist_state()/restore_state() further down
+// share the same names, so there is exactly one spelling of "csync" in the
+// file and the two cannot drift onto different namespaces.
+constexpr const char *kNvsNamespace   = "csync";
+constexpr const char *kNvsStreakKey   = "streak";
+// Consecutive runs that found the previous index unreadable. write_index()
+// refuses to publish over an index it could not read — and this counter is
+// the escape hatch that keeps that refusal from being permanent.
+constexpr const char *kNvsIndexBadKey = "idx_bad";
+// Two strikes, i.e. exactly ONE refused run, then rebuild anyway. The bound
+// is what makes deadlock structurally impossible: without it a card whose
+// index is genuinely corrupt could never be replaced, and the toy would be
+// stuck refusing forever with no way back except a wipe.
+constexpr uint8_t kIndexBadRebuildAfter = 2;
+
+uint8_t index_bad_count() {
+    Preferences prefs;
+    if (!prefs.begin(kNvsNamespace, /*readOnly=*/true)) return 0;
+    const uint8_t n = prefs.getUChar(kNvsIndexBadKey, 0);
+    prefs.end();
+    return n;
+}
+
+void index_bad_set(uint8_t n) {
+    Preferences prefs;
+    if (!prefs.begin(kNvsNamespace, /*readOnly=*/false)) return;
+    prefs.putUChar(kNvsIndexBadKey, n);
+    prefs.end();
+}
+
 // ---- on-card index ------------------------------------------------
 
 // Reads /content_index.json into s_previous via the model layer, which
 // understands BOTH the v2 stories[] shape and the pre-multi-story flat
 // v1 object (migration). A malformed or absent index yields zero entries
 // and is NOT an error — and never deletes anything.
+
+// "No previous index" and "could not READ the previous index" are different
+// facts and were being treated as the same one. Conflating them cost the
+// owner's toy 15 voice clips on 2026-08-15: a failed parse read as "we had
+// nothing", carry-forward ran zero iterations, and the rewritten index
+// dropped every entry whose download had failed that run. The MP3s survived;
+// their index entries did not, and the index is what playback resolves on.
+enum CsPrevIndexState { CS_PREV_ABSENT, CS_PREV_READABLE, CS_PREV_UNREADABLE };
+static CsPrevIndexState s_prev_index_state = CS_PREV_ABSENT;
+
 void load_previous_index() {
-    s_previous_count = 0;
+    // All three counts reset here, not just the story one. Only s_previous_count
+    // was cleared before — harmless while this runs once per attempt, and a
+    // latent trap the day it does not.
+    s_previous_count       = 0;
+    s_music_previous_count = 0;
+    s_voice_previous_count = 0;
+    s_prev_index_state     = CS_PREV_ABSENT;
     if (!SD.exists(kIndexPath)) {
         Serial.println("[content-sync] no existing index");
         return;
     }
     File f = SD.open(kIndexPath, FILE_READ);
     if (!f) {
-        Serial.println("[content-sync] index open failed — treating as empty");
+        s_prev_index_state = CS_PREV_UNREADABLE;
+        Serial.println("[content-sync] index open FAILED — previous contents UNKNOWN");
         return;
     }
     JsonDocument doc(&s_json_psram);
     const DeserializationError err = deserializeJson(doc, f);
     f.close();
     if (err != DeserializationError::Ok) {
-        // Malformed index must fail SAFELY: we lose the fast path and
-        // re-verify by hashing, but no cached MP3 is touched.
-        Serial.println("[content-sync] index parse failed — cached files preserved");
+        // The message here used to say "cached files preserved", which is
+        // false in the way that matters: the MP3s are preserved, their INDEX
+        // ENTRIES are not, and an entry is what playback resolves a clip
+        // through. Saying the reassuring half of the truth is why nothing
+        // looked wrong on 2026-08-15.
+        s_prev_index_state = CS_PREV_UNREADABLE;
+        Serial.println("[content-sync] index parse FAILED — previous contents UNKNOWN "
+                       "(cached MP3s untouched)");
         return;
     }
     int schema = 0;
     s_previous_count = cs_index_parse(doc, s_previous, CS_MAX_STORIES, &schema);
     s_music_previous_count = cs_index_parse_music(doc, s_music_previous, CS_MAX_MUSIC);
     s_voice_previous_count = cs_index_parse_voice(doc, s_voice_previous, CS_MAX_VOICE);
+    s_prev_index_state = CS_PREV_READABLE;
+    // A readable index clears the strike count: whatever went wrong before,
+    // the card is back to a state the next boot can build on. Read first so a
+    // healthy toy is not writing NVS on every clean sync.
+    if (index_bad_count() != 0) index_bad_set(0);
     Serial.printf("[content-sync] index v%d loaded entries=%d music=%d voice=%d\n",
                   schema, s_previous_count, s_music_previous_count,
                   s_voice_previous_count);
@@ -313,6 +384,33 @@ bool active_contains(const char *story_id) {
 // leaves the .new file, and the next boot simply rebuilds the index from
 // the manifest. No MP3 is ever at risk either way.
 bool write_index() {
+    // Refuse to publish an index built on top of a previous one we could not
+    // read. Everything this run learned about the card came from the manifest
+    // and the downloads it managed; the entries the OLD index carried — the
+    // clips already sitting on the card, downloaded on some earlier boot — are
+    // exactly what carry-forward cannot see when the parse failed. Publishing
+    // here is what turned one bad file into 15 unreachable voice clips.
+    //
+    // The escape below is not optional. A refusal with no way out means a
+    // corrupt index is never replaced and the toy is stuck for good.
+    bool rebuilding = false;
+    if (s_prev_index_state == CS_PREV_UNREADABLE) {
+        const uint8_t prior   = index_bad_count();
+        const uint8_t strikes = prior < 255 ? (uint8_t)(prior + 1) : (uint8_t)255;
+        index_bad_set(strikes);
+        if (strikes < kIndexBadRebuildAfter) {
+            Serial.printf("[content-sync] previous index UNREADABLE — refusing to "
+                          "publish (strike %u of %u); cached MP3s untouched\n",
+                          (unsigned)strikes, (unsigned)kIndexBadRebuildAfter);
+            Serial.flush();
+            return false;
+        }
+        rebuilding = true;
+        Serial.printf("[content-sync] index unreadable x%u — REBUILDING from "
+                      "manifest (previous entries lost)\n", (unsigned)strikes);
+        Serial.flush();
+    }
+
     JsonDocument idx(&s_json_psram);
     // AREG_STORY_ID drives ONLY the legacy compatibility mirror, so the
     // three readers that still parse the flat shape keep behaving exactly
@@ -328,6 +426,42 @@ bool write_index() {
                        s_mode_riddle, s_mode_curiosity);
     cs_index_add_story_flags(idx, s_pauses_enabled, s_variants_enabled);
 
+    // Shrink alarm. This is an ALARM, NOT A BLOCK: a namespace legitimately
+    // shrinks when a file is genuinely deleted or its size changed on the
+    // card, and the carry-forward loops are right to drop those entries. It
+    // is here because NOTHING said a word on 2026-08-15 when voice went
+    // 43 -> 28 and fifteen clips — including say-again, the "I didn't hear
+    // you" line — became unreachable. One line naming the namespace and the
+    // two counts would have pointed straight at it.
+    {
+        const char *prev_state =
+            s_prev_index_state == CS_PREV_READABLE   ? "readable"
+          : s_prev_index_state == CS_PREV_UNREADABLE ? "UNREADABLE"
+                                                     : "absent";
+        bool shrank = false;
+        if (s_previous_count > s_active_count) {
+            Serial.printf("[content-sync] INDEX SHRINK stories %d->%d prev=%s\n",
+                          s_previous_count, s_active_count, prev_state);
+            shrank = true;
+        }
+        if (s_music_previous_count > s_music_active_count) {
+            Serial.printf("[content-sync] INDEX SHRINK music %d->%d prev=%s\n",
+                          s_music_previous_count, s_music_active_count, prev_state);
+            shrank = true;
+        }
+        if (s_voice_previous_count > s_voice_active_count) {
+            Serial.printf("[content-sync] INDEX SHRINK voice %d->%d prev=%s\n",
+                          s_voice_previous_count, s_voice_active_count, prev_state);
+            shrank = true;
+        }
+        if (s_games_previous_count > s_games_active_count) {
+            Serial.printf("[content-sync] INDEX SHRINK games %d->%d prev=%s\n",
+                          s_games_previous_count, s_games_active_count, prev_state);
+            shrank = true;
+        }
+        if (shrank) Serial.flush();
+    }
+
     if (SD.exists(kIndexTmpPath)) {
         SD.remove(kIndexTmpPath);
     }
@@ -341,6 +475,59 @@ bool write_index() {
         SD.remove(kIndexTmpPath);
         return false;
     }
+
+    // Only `written == 0` was rejected before, so a SHORT write — a full card,
+    // an I/O error — replaced the known-good index with a truncated one. That
+    // poisoned file then failed to parse on the next boot, which was read as
+    // "there was nothing before", and the toy lost 15 voice clips. Three
+    // checks, cheapest first; the temp file never becomes live unless all
+    // three pass.
+
+    // 1. Did the serializer get all its bytes onto the card?
+    const size_t expect = measureJson(idx);
+    if (written != expect) {
+        Serial.printf("[content-sync] index write TRUNCATED (%u of %u bytes)\n",
+                      (unsigned)written, (unsigned)expect);
+        Serial.flush();
+        SD.remove(kIndexTmpPath);
+        return false;
+    }
+    // 2. Does the file on the card actually hold them? Catches a close that
+    //    reported success without flushing.
+    File vf = SD.open(kIndexTmpPath, FILE_READ);
+    if (!vf) {
+        Serial.println("[content-sync] index verify FAILED — temp file will not reopen");
+        Serial.flush();
+        SD.remove(kIndexTmpPath);
+        return false;
+    }
+    const size_t on_card = (size_t)vf.size();
+    if (on_card != written) {
+        Serial.printf("[content-sync] index verify FAILED — %u bytes on card, %u written\n",
+                      (unsigned)on_card, (unsigned)written);
+        Serial.flush();
+        vf.close();
+        SD.remove(kIndexTmpPath);
+        return false;
+    }
+    // 3. Can the bytes be READ BACK as JSON? Right length and clean
+    //    serialization still do not prove the next boot can parse it, and
+    //    parseability is the one property the whole index depends on.
+    //    PSRAM-allocated like every other document in this file — internal
+    //    heap stays free for TLS.
+    {
+        JsonDocument verify(&s_json_psram);
+        const DeserializationError verr = deserializeJson(verify, vf);
+        vf.close();
+        if (verr != DeserializationError::Ok) {
+            Serial.printf("[content-sync] index verify FAILED — written file will not "
+                          "parse (%s)\n", verr.c_str());
+            Serial.flush();
+            SD.remove(kIndexTmpPath);
+            return false;
+        }
+    }
+
     // FAT rename cannot overwrite in place.
     if (SD.exists(kIndexPath)) {
         SD.remove(kIndexPath);
@@ -349,6 +536,10 @@ bool write_index() {
         SD.remove(kIndexTmpPath);
         return false;
     }
+    // Cleared only once a good index is genuinely live. Clearing it before the
+    // write would throw away the strike count on a rebuild that then failed,
+    // and the block would start again from zero.
+    if (rebuilding) index_bad_set(0);
     return true;
 }
 
@@ -861,6 +1052,7 @@ bool find_previous_game(JsonArrayConst prev_games, const char *game_key,
 void sync_games(JsonDocument &manifest_doc, JsonArrayConst games) {
     JsonArray out = s_games_index.to<JsonArray>();
     s_games_active_count = 0;
+    s_games_previous_count = 0;
 
     // TWO-PHASE since 1.1.6 (field failure 2026-08-07): downloading while
     // the manifest doc, the previous-index doc AND the growing output doc
@@ -901,6 +1093,21 @@ void sync_games(JsonDocument &manifest_doc, JsonArrayConst games) {
                                            MALLOC_CAP_SPIRAM);
         if (work == nullptr) work = (CsGame *)malloc(cap * sizeof(CsGame));
         if (prevs == nullptr) prevs = (CsGame *)malloc(cap * sizeof(CsGame));
+
+        // Harvest BEFORE the allocation check, not after it. The carry-forward
+        // in the bail-out below reads prevs_n, and prevs_n was only filled in
+        // down here -- AFTER that bail-out had already returned -- so the loop
+        // 1.3.0 added to save the card's game clips has never executed once,
+        // in any build, since the day it was written. The order that makes it
+        // real is: allocate, harvest, THEN check.
+        if (prevs != nullptr) {
+            for (JsonObjectConst e : prev_games) {
+                if (prevs_n >= (int)cap) break;
+                if (cs_index_read_game(e, &prevs[prevs_n])) prevs_n++;
+            }
+        }
+        s_games_previous_count = prevs_n;   // hoisted for the shrink alarm
+
         if (work == nullptr || prevs == nullptr) {
             // Carry the PREVIOUS index forward before bailing. Returning
             // here used to leave s_games_active_count at 0, so
@@ -913,6 +1120,17 @@ void sync_games(JsonDocument &manifest_doc, JsonArrayConst games) {
                            "(carrying previous index forward)");
             if (prevs != nullptr) {
                 for (int i = 0; i < prevs_n && s_games_active_count < (int)cap; i++) {
+                    // Same on-card check the normal carry-forward runs at the
+                    // end of this function. Appending blind here would let the
+                    // two carry paths disagree about what "still on the card"
+                    // means, and the index would claim a clip the child cannot
+                    // hear -- the exact shape of the defect this slice fixes.
+                    char cache_path[CS_MAX_PATH_LEN];
+                    if (!cs_build_game_cache_path(cache_path, sizeof(cache_path),
+                                                  prevs[i].game_key, prevs[i].clip_id)
+                        || sd_file_size(cache_path) != prevs[i].size_bytes) {
+                        continue;
+                    }
                     cs_index_append_game(out, &prevs[i]);
                     s_games_active_count++;
                 }
@@ -924,11 +1142,6 @@ void sync_games(JsonDocument &manifest_doc, JsonArrayConst games) {
                 set_status("partial", "games_alloc_failed");
             }
             return;
-        }
-
-        for (JsonObjectConst e : prev_games) {
-            if (prevs_n >= (int)cap) break;
-            if (cs_index_read_game(e, &prevs[prevs_n])) prevs_n++;
         }
 
         if (!games.isNull()) {
@@ -1333,11 +1546,9 @@ uint32_t backoff_ms(uint16_t streak) {
 uint32_t s_next_attempt_ms = 0;
 bool     s_requested_now   = false;
 
-// NVS namespace/keys — the aregstate/aregstory idiom used elsewhere. Only the
-// failure streak needs to survive a reboot; status and error are per-attempt
-// and a fresh boot has genuinely not attempted anything yet.
-constexpr const char *kNvsNamespace = "csync";
-constexpr const char *kNvsStreakKey = "streak";
+// NVS namespace/keys are declared up beside index_bad_count(), because
+// write_index() needs them and sits far above this point. One spelling of
+// "csync" in the file, shared by the failure streak and the strike count.
 
 void persist_state() {
     Preferences prefs;
@@ -1356,6 +1567,7 @@ void restore_state() {
 void content_sync_tick() {
     static bool s_stamped = false;
     static bool s_restored = false;
+    static bool s_prearm_logged = false;
     static uint32_t s_last_status_ms = 0;
     static uint32_t s_last_sd_init_ms = 0;
 
@@ -1388,11 +1600,20 @@ void content_sync_tick() {
     const bool status_due =
         (s_last_status_ms == 0) || (now - s_last_status_ms >= kStatusEveryMs);
 
-    if (now < kBenchStartMs) {
-        if (status_due) {
-            s_last_status_ms = now;
-            Serial.println("[content-sync] enabled; waiting for "
-                           "WiFi+SD; will start at ms>=180000");
+    // An operator "Sync now" outranks the boot arm delay. Without the
+    // s_requested_now term the command is silently swallowed whenever it
+    // lands in the first three minutes — which is exactly when someone
+    // watching a freshly-rebooted toy reaches for that button.
+    if (!s_requested_now && now < kBenchStartMs) {
+        // Once per boot, not every 5 s: this is a countdown, not a problem,
+        // and repeating it buries the lines that are. The deadline is
+        // printed FROM the constant — a hardcoded number inside a message
+        // describing a constant is how this text goes stale.
+        if (!s_prearm_logged) {
+            s_prearm_logged = true;
+            Serial.printf("[content-sync] enabled; waiting for WiFi+SD; "
+                          "will start at ms>=%lu\n",
+                          (unsigned long)kBenchStartMs);
             Serial.flush();
         }
         return;
@@ -1402,7 +1623,6 @@ void content_sync_tick() {
     if (!s_requested_now && s_next_attempt_ms != 0 && now < s_next_attempt_ms) {
         return;
     }
-    s_requested_now = false;
     if (!voice_wifi_is_connected()) {
         if (status_due) {
             s_last_status_ms = now;
@@ -1448,6 +1668,13 @@ void content_sync_tick() {
             return;
         }
     }
+
+    // The request is consumed HERE, not at the schedule check: every return
+    // above this line is a tick that could not sync (radio down, card not
+    // mounted yet). Clearing the flag up there threw the operator's "Sync
+    // now" away on exactly the ticks where it had not run — it survives now
+    // until a tick that actually reaches the work.
+    s_requested_now = false;
 
     // ---- CRASH GUARD ----
     // The streak is persisted BEFORE the risky work and cleared after it, not
