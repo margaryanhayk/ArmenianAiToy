@@ -75,6 +75,12 @@ char s_path[64];
 bool s_done = false;
 uint32_t s_last_status_ms = 0;
 
+// Set where a game RETURNS, consumed by loop(). Separate from s_done: that
+// one is the boot latch ("a game has already run"), this one is the edge
+// ("a game just ended"), and conflating them would make the menu fire once
+// per boot instead of once per game.
+bool s_finished = false;
+
 // ---- shared primitives (mirroring offline_quiz.cpp) ------------------
 
 // Play one clip to natural end through the existing decoder path.
@@ -395,9 +401,17 @@ void run_simon() {
 
 // ---- entry points ----------------------------------------------------
 
-void offline_games_run_mindreader() { run_mindreader(); Serial.flush(); }
-void offline_games_run_buzzer()     { run_buzzer();     Serial.flush(); }
-void offline_games_run_simon()      { run_simon();      Serial.flush(); }
+// Each sets the finished latch on the way out, so every quiet exit inside
+// a game is covered without touching the games themselves.
+void offline_games_run_mindreader() { run_mindreader(); s_finished = true; Serial.flush(); }
+void offline_games_run_buzzer()     { run_buzzer();     s_finished = true; Serial.flush(); }
+void offline_games_run_simon()      { run_simon();      s_finished = true; Serial.flush(); }
+
+bool offline_games_consume_finished() {
+    const bool f = s_finished;
+    s_finished = false;
+    return f;
+}
 
 // Which game a bench build runs. 1 = mind-reader, 2 = buzzer, 3 = simon.
 //
@@ -410,6 +424,19 @@ void offline_games_run_simon()      { run_simon();      Serial.flush(); }
 #ifndef AREG_OFFLINE_GAMES_PICK
 #define AREG_OFFLINE_GAMES_PICK 1
 #endif
+
+// The build-time pick, on its own so it can be run without consuming the
+// boot latch. Leaving s_done alone is the whole point: the "what next"
+// menu can replay a game later in the same boot.
+void offline_games_run_picked() {
+#if AREG_OFFLINE_GAMES_PICK == 2
+    offline_games_run_buzzer();
+#elif AREG_OFFLINE_GAMES_PICK == 3
+    offline_games_run_simon();
+#else
+    offline_games_run_mindreader();
+#endif
+}
 
 void offline_games_tick() {
     if (s_done) return;
@@ -424,13 +451,7 @@ void offline_games_tick() {
         return;
     }
     s_done = true;   // one game per boot, whatever the outcome
-#if AREG_OFFLINE_GAMES_PICK == 2
-    offline_games_run_buzzer();
-#elif AREG_OFFLINE_GAMES_PICK == 3
-    offline_games_run_simon();
-#else
-    offline_games_run_mindreader();
-#endif
+    offline_games_run_picked();
 }
 
 #endif // AREG_OFFLINE_GAMES_BENCH
