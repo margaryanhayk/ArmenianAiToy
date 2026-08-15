@@ -118,9 +118,18 @@ public class CuratedStoryLibraryTests
 
         Assert.Equal(ExpectedReflection, story.ReflectionText);
         // Reflection-dialogue slice (2026-08-03): stories carry up to 3
-        // questions; the ORIGINAL reviewed question stays pinned at index 0,
-        // and every question must pair with a conclusion.
-        Assert.Equal(ExpectedQuestion, story.ReflectionQuestions[0]);
+        // questions, and every question must pair with a conclusion.
+        //
+        // REORDERED 2026-08-15 (owner decision). The originally-reviewed
+        // question is still pinned verbatim, but it is now asked LAST rather
+        // than first: it asks the child about himself, and every other story
+        // in the library asks about the STORY first and the child last.
+        // It began to matter the day the toy started asking ONE question per
+        // listen beginning at index 0 — a child's very first question after
+        // this story would have been about himself, before he had been asked
+        // anything at all about what he just heard.
+        Assert.Equal(ExpectedQuestion, story.ReflectionQuestions[^1]);
+        Assert.Equal("Ինչո՞ւ էր ծաղիկը տխուր։", story.ReflectionQuestions[0]);
         Assert.InRange(story.ReflectionQuestions.Count, 1, 3);
         Assert.NotNull(story.ReflectionConclusions);
         Assert.Equal(story.ReflectionQuestions.Count, story.ReflectionConclusions!.Count);
@@ -162,9 +171,12 @@ public class CuratedStoryLibraryTests
             Assert.Equal(ExpectedHedgehogSegments[i], story.Segments[i].Text);
         }
         Assert.Equal(ExpectedHedgehogReflection, story.ReflectionText);
-        // Reflection-dialogue slice: original question pinned at index 0
-        // (see the note in Story_ReflectionTextAndQuestion_ArePinnedVerbatim).
-        Assert.Equal(ExpectedHedgehogQuestion, story.ReflectionQuestions[0]);
+        // Reordered on the same owner decision as little-cloud, 2026-08-15,
+        // and for the same reason — see the note in
+        // Story_ReflectionTextAndQuestion_ArePinnedVerbatim. The reviewed
+        // question is still pinned verbatim; it is simply asked last now.
+        Assert.Equal(ExpectedHedgehogQuestion, story.ReflectionQuestions[^1]);
+        Assert.Equal("Ինչպե՞ս ոզնիկը տարավ ծանր խնձորը։", story.ReflectionQuestions[0]);
         Assert.InRange(story.ReflectionQuestions.Count, 1, 3);
     }
 
