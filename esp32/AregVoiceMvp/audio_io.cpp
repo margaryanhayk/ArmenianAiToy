@@ -16,6 +16,7 @@
 #include "audio_io.h"
 #include "config.h"
 #include "diag.h"
+#include "volume_pot.h"   // hardware volume knob; folds to a fixed 0.6f when no pot pin is defined
 
 #include <driver/i2s_std.h>
 #include <esp_err.h>
@@ -317,9 +318,10 @@ bool audio_play_mp3_buffer(const uint8_t *data, size_t length) {
     AudioFileSourcePROGMEM source((const void *)data, (uint32_t)length);
     AudioOutputI2S out;
     out.SetPinout(AREG_PIN_AMP_BCK, AREG_PIN_AMP_LRC, AREG_PIN_AMP_DATA);
-    // Output gain is conservative — raise in config.h later if
-    // needed. 0.0f .. ~4.0f; 1.0f is unity.
-    out.SetGain(0.6f);
+    // Output gain now comes from the volume knob. 0.0f .. ~4.0f; 1.0f is
+    // unity. With no pot pin defined this is the same fixed 0.6f that was
+    // hardcoded here before, so a knobless build is unchanged.
+    out.SetGain(volume_pot_gain());
     DIAG_MARK(4011, "play_audio_out_setup_after");
 
     AudioGeneratorMP3 mp3;
@@ -344,6 +346,14 @@ bool audio_play_mp3_buffer(const uint8_t *data, size_t length) {
         if (millis() - last_watchdog_tickle > 50) {
             delay(1);
             last_watchdog_tickle = millis();
+            // A child turns the knob WHILE something is playing — which is
+            // exactly when loop()'s IDLE branch cannot run, since we are
+            // blocked in here for the whole clip. That is the only reason
+            // this lives on the decode hot path. It rides the existing yield
+            // throttle rather than adding a timer, and volume_pot_tick() is
+            // itself rate-limited, so the ADC is read a few times a second
+            // and SetGain only touches a member when the knob really moved.
+            if (volume_pot_tick()) out.SetGain(volume_pot_gain());
         }
     }
     DIAG_MARK(4030, "play_mp3_loop_exit");
@@ -394,7 +404,7 @@ bool audio_play_story_stream(const char *url,
 
     AudioOutputI2S out;
     out.SetPinout(AREG_PIN_AMP_BCK, AREG_PIN_AMP_LRC, AREG_PIN_AMP_DATA);
-    out.SetGain(0.6f);
+    out.SetGain(volume_pot_gain());
 
     AudioGeneratorMP3 mp3;
     if (!mp3.begin(&http, &out)) {
@@ -436,6 +446,12 @@ bool audio_play_story_stream(const char *url,
         if (millis() - last_yield > 50) {
             delay(1);
             last_yield = millis();
+            // A child turns the knob WHILE the story plays — precisely when
+            // loop()'s IDLE branch cannot run, because we are blocked in here
+            // for minutes. Hence the hot path. Placed after the barge-in check
+            // above so button latency is untouched, and riding the existing
+            // yield throttle rather than adding a second timer.
+            if (volume_pot_tick()) out.SetGain(volume_pot_gain());
         }
     }
     out.stop();
@@ -568,7 +584,7 @@ bool audio_play_story_file(const char *path,
 
     AudioOutputI2S out;
     out.SetPinout(AREG_PIN_AMP_BCK, AREG_PIN_AMP_LRC, AREG_PIN_AMP_DATA);
-    out.SetGain(0.6f);
+    out.SetGain(volume_pot_gain());
 
     AudioGeneratorMP3 mp3;
     if (!mp3.begin(&file, &out)) {
@@ -611,6 +627,12 @@ bool audio_play_story_file(const char *path,
         if (millis() - last_yield > 50) {
             delay(1);
             last_yield = millis();
+            // The SD story is the long one — four minutes blocked in here,
+            // with loop()'s IDLE branch unable to run, which is exactly the
+            // window in which a child reaches for the knob. Placed after the
+            // barge-in check above so button latency is untouched, and riding
+            // the existing yield throttle rather than adding a second timer.
+            if (volume_pot_tick()) out.SetGain(volume_pot_gain());
         }
     }
     out.stop();
@@ -749,7 +771,7 @@ bool audio_play_thinking_earcon_abortable(audio_abort_fn abort) {
     // default constructor on ESP8266Audio AudioOutputI2S uses I2S mode.
     // HARDWARE ASSUMPTION: SetBitsPerSample(16) is the default; not
     // calling it explicitly here to match audio_play_mp3_buffer style.
-    out.SetGain(0.6f);
+    out.SetGain(volume_pot_gain());
     // The synth path MUST set the I2S sample rate. The MP3 path gets it from
     // the decoder (mp3.begin → out.SetRate); without it here the channel runs
     // at ESP8266Audio's default 44.1 kHz, so the 16 kHz-generated tone is
@@ -810,7 +832,7 @@ bool audio_play_qa_stream(const char *url) {
 
     AudioOutputI2S out;
     out.SetPinout(AREG_PIN_AMP_BCK, AREG_PIN_AMP_LRC, AREG_PIN_AMP_DATA);
-    out.SetGain(0.6f);
+    out.SetGain(volume_pot_gain());
 
     AudioGeneratorMP3 mp3;
     if (!mp3.begin(&http, &out)) {
@@ -1010,7 +1032,7 @@ bool audio_play_qa_stream_response(Stream *body, int content_length) {
 
     AudioOutputI2S out;
     out.SetPinout(AREG_PIN_AMP_BCK, AREG_PIN_AMP_LRC, AREG_PIN_AMP_DATA);
-    out.SetGain(0.6f);
+    out.SetGain(volume_pot_gain());
 
     AudioGeneratorMP3 mp3;
     if (!mp3.begin(&source, &out)) {
