@@ -55,6 +55,26 @@ the BOOT button on DevKitC-1, so don't hold it while resetting
 (you'll land in flash-mode); use the EN/RESET button for a clean
 restart instead.
 
+### What the button does in idle
+
+| Gesture | What happens |
+|---|---|
+| **Quick press** | starts the story, or resumes it from the last barge-in offset — unchanged |
+| **Hold ~2 s** (`AREG_MENU_HOLD_MS`) | opens the «what shall we do?» menu — the same `handle_welcome_flow` the toy runs at power-on |
+| **Hold inside the bedtime window** | behaves as a quick press (music if the parent opted in, else the story) |
+
+The hold gesture is the **only** route to Game / Riddle / Curiosity.
+Those modes live behind the spoken menu, and before the hold existed
+that menu ran once at the tail of `setup()` and never again — so a
+power cycle was the only way back to them. Inside the bedtime window a
+hold is deliberately demoted to a press: `handle_welcome_flow` would
+refuse to speak there anyway (its own bedtime guard), and a hold that
+did nothing at all reads as a broken toy.
+
+Gestures during playback are unchanged: a press cuts the audio
+instantly (barge-in), hold-and-speak asks a question, a quick tap is a
+sticky pause.
+
 ## Arduino IDE setup
 
 - **Board**: "ESP32S3 Dev Module"
@@ -232,6 +252,11 @@ arduino-cli compile --upload -p COM7 --fqbn "esp32:esp32:esp32s3:PSRAM=opi,Flash
 4. Press the button again and say *"Ա"* — the story continues.
 5. Repeat once more. Three-turn success is the C1 exit
    condition.
+6. Back in idle, **hold** the button for ~2 s
+   (`AREG_MENU_HOLD_MS`) — the toy opens the «what shall we do?»
+   menu instead of starting a story. A quick press still starts or
+   resumes the story. Inside the bedtime window a hold behaves as a
+   press. The menu is the only route to Game / Riddle / Curiosity.
 
 On any failure (Wi-Fi down, backend unreachable, non-200
 response, decoder error), LED turns orange and the canned
@@ -777,7 +802,9 @@ None of that has been run. Do not mark A6 DONE without recorded evidence.
 ## Welcome flow — the toy's opening (`handle_welcome_flow`)
 
 Before this, the toy was **silent at power-on** and one button press always
-started or resumed a story. Now, at the end of `setup()`:
+started or resumed a story. Now, at the end of `setup()` — and, since the
+hold gesture landed, on a ~2 s button hold in idle as well (see "What the
+button does in idle"):
 
 ```
 greeting  → "what shall we do?" → child answers OUT LOUD
@@ -805,12 +832,14 @@ like a story session is a blocking call from the IDLE branch.
 | No SD card | silent | Every line lives on the card |
 | No greetings synced yet | skips to the ask | A half-synced card degrades quietly, never mid-sentence |
 | Offline | one short line, then a story | Hearing the child needs the cloud, and the owner chose voice-only — so the fallback is a graceful DEFAULT, not a second menu |
-| Nobody answers | goes quiet | Silence usually means nobody is there. A toy that keeps asking an empty room is the opposite of what a parent wants |
+| Nobody answers, **at power-on** | goes quiet | Silence usually means nobody is there. A toy that keeps asking an empty room is the opposite of what a parent wants |
+| Nobody answers, **after a hold** | falls through to the graceful default — one short line, then a story | A hand was on the button seconds ago, so the room is not empty: silence means "did not understand", and asking a child what they want and then going dead silent is worse than playing something. This is the `child_present` argument threaded through `handle_welcome_flow` / `welcome_offer_story` |
 | Mis-heard | «say again» once, then a story | Two tries. A third reads as nagging to a five-year-old |
 | Child asks for game / riddle / curiosity | **opens the online chat session** (`handle_online_chat_session`) | The child's own recorded utterance is POSTed to `/api/chat/audio` — the backend's ModeDetector routes it and speaks the opener. Loop: play reply → press-to-talk within `AREG_CHAT_LISTEN_MS` (default 12 s) → upload → play, until silence closes it quietly. Turn cap `AREG_CHAT_SESSION_MAX_TURNS` (default 30) bounds cost. Parent gates re-checked server-side every turn. **NOT yet bench-verified on hardware.** |
 | Every mode disabled | greeting only, then stop | Never promise something the parent switched off |
 | A story has no `offer` clip | plays it instead of offering | A missing recording must never be why a child hears nothing |
-| A press (not power-on) | unchanged — starts/resumes a story | A child who wants the next story should not be interrogated every time |
+| A quick press (not power-on) | unchanged — starts/resumes a story | A child who wants the next story should not be interrogated every time |
+| A ~2 s hold in idle | opens this flow, with `child_present=true` | The menu is the only door to Game / Riddle / Curiosity, and before the hold it ran once at the tail of `setup()` — a power cycle was the only way back to it |
 
 ### What it added on the device
 

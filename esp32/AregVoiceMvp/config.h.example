@@ -164,6 +164,37 @@
 // #define AREG_PIN_BUTTON_YES  21
 // #define AREG_PIN_BUTTON_NO   47
 
+// --- Hardware volume knob (10 kOhm linear pot) ---
+// Wiring: wiper -> the pin below, the two end legs to 3V3 and GND. Use an
+// ADC1 pin (GPIO1-10 on the S3) — ADC2 is unusable while Wi-Fi holds the
+// radio. GPIO8 = ADC1_CH7 is free on WROOM-1-N8R8: not strapping, no clash
+// with mic 4/5/6, amp 15/16/7, SD 10/11/12/13, LED 48, buttons 0/21/47.
+// Uncomment to compile volume_pot.{h,cpp} in; left commented, the module
+// folds to no-ops returning AREG_VOLUME_FIXED_GAIN and the build behaves
+// exactly as it did before the knob existed. That opt-in is deliberate: an
+// ADC pin with nothing wired to it floats, and a floating read mapped to
+// gain is random volume that drifts on its own and looks like a fault.
+// #define AREG_PIN_VOLUME_POT 8
+
+// 0.6f is the value all six out.SetGain() sites in audio_io.cpp hardcoded
+// before the knob existed, so it stays the no-knob fallback. The old advice
+// of raising that SetGain call when the speaker is too quiet is obsolete on
+// a build with the knob — editing source is not something a parent can do.
+// #define AREG_VOLUME_FIXED_GAIN 0.6f
+// Knob travel maps linearly onto MIN..MAX. MIN is deliberately not 0.0f — a
+// knob at its stop should be quiet, not broken-sounding-silent. MAX is well
+// above 0.6f because "too quiet" is what the knob exists to answer;
+// ESP8266Audio clamps at 4.0f.
+// #define AREG_VOLUME_MIN_GAIN 0.15f
+// #define AREG_VOLUME_MAX_GAIN 3.0f
+// Sampling period. 200 ms is under the ~300 ms a hand takes to turn a knob,
+// so the change is heard as continuous, while staying rare enough to be free
+// inside the story decode loop.
+// #define AREG_VOLUME_READ_MS 200
+// Gain must move by more than this before it is republished; without it the
+// residual ADC noise re-sets the gain every read and the sound breathes.
+// #define AREG_VOLUME_DEADBAND_GAIN 0.03f
+
 // Offline quiz (bench flag -DAREG_OFFLINE_QUIZ_BENCH) answer window:
 // how long the toy waits for a GREEN/RED press after a question. The
 // offline games (-DAREG_OFFLINE_GAMES_BENCH) deliberately share this same
@@ -233,6 +264,10 @@
 #define AREG_WELCOME_LISTEN_MS   8000   // listening window, ms
 #define AREG_WELCOME_MAX_TRIES   2      // mis-hears before it just starts a story
 #define AREG_WELCOME_MAX_OFFERS  2      // stories offered by name before it plays one
+// Hold the button this long in IDLE to open the "what shall we do?" menu.
+// Anything shorter is an ordinary story press. Before this existed the menu
+// ran only at the tail of setup(), so a power cycle was the only way back to it.
+#define AREG_MENU_HOLD_MS        2000   // hold, ms, that opens the menu
 
 // --- Audio parameters ----------------------------------------
 #define AREG_SAMPLE_RATE_HZ     16000  // Whisper-friendly, bandwidth-friendly

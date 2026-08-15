@@ -35,6 +35,7 @@
 #include "sd_diag.h"           // standalone SD diagnostic (AREG_SD_DIAG_BENCH builds only)
 #include "sd_playback.h"       // cached-MP3 SD playback (AREG_SD_PLAYBACK_BENCH builds only)
 #include "answer_buttons.h"    // optional GREEN/RED answer buttons (no-op unless pins defined)
+#include "volume_pot.h"        // optional hardware volume knob (no-op unless pot pin defined)
 #include "offline_quiz.h"      // offline true/false quiz (AREG_OFFLINE_QUIZ_BENCH builds only)
 #include "offline_games.h"     // mind-reader / buzzer / Simon (AREG_OFFLINE_GAMES_BENCH builds only)
 
@@ -859,7 +860,13 @@ static void handle_online_chat_session(uint8_t *payload, size_t payload_len) {
 // Offers stories by name until the child says yes, then plays one.
 // Always ends by starting SOME story — falling silent after asking a
 // child what they want is worse than playing something.
-static void welcome_offer_story() {
+//
+// child_present: true when a human physically held the button seconds
+// ago, so the room is known to be occupied and silence means "did not
+// understand", not "nobody is there". False at power-on, where the toy
+// has no such evidence. Not a default argument on purpose: the Arduino
+// auto-prototype generator mishandles them (see welcome_listen above).
+static void welcome_offer_story(bool child_present) {
     // Filtered IN PLACE in the shared table: the offer pool is a subset
     // of the eligible list, so a second CsStory[CS_MAX_STORIES] would be
     // ~10 KB of .bss for nothing.
@@ -913,8 +920,16 @@ static void welcome_offer_story() {
 
         char intent[16];
         if (!welcome_listen("yesno", intent, sizeof(intent), nullptr, nullptr)) {
-            led_for_state(ST_IDLE);
-            return;   // silence — do not start a story into an empty room
+            // The asymmetry is the whole point: at power-on silence almost
+            // always means the room is empty, so we close quietly. After a
+            // hold it means a child who is standing right there did not
+            // answer — and asking «shall I tell you X?» and then going dead
+            // silent is the exact failure this function's header rejects.
+            if (!child_present) {
+                led_for_state(ST_IDLE);
+                return;   // silence — do not start a story into an empty room
+            }
+            break;        // a child is here — play the story we just named
         }
         if (strcmp(intent, "yes") == 0) {
             break;
@@ -947,7 +962,11 @@ static void welcome_offer_story() {
     handle_story_session();
 }
 
-static void handle_welcome_flow() {
+// child_present: true when a human physically held the button seconds ago
+// (the IDLE hold-to-menu gesture), so silence means "did not understand"
+// rather than "nobody is there". False at power-on. Not a default argument
+// on purpose: the Arduino auto-prototype generator mishandles them.
+static void handle_welcome_flow(bool child_present) {
     // ---- preconditions: return SILENTLY, no sound, no LED change ----
     // A paused toy is fully silent, and the greeting is the first thing
     // that would break that promise. The pause flag is seeded from NVS in
@@ -1003,7 +1022,7 @@ static void handle_welcome_flow() {
         Serial.flush();
         if (story_ok) {
             welcome_say(CS_VOICE_ID_JUST_STORY);
-            welcome_offer_story();
+            welcome_offer_story(child_present);
         } else {
             led_for_state(ST_IDLE);
         }
@@ -1031,7 +1050,7 @@ static void handle_welcome_flow() {
         // silence — just do the thing they most likely wanted.
         Serial.println("[welcome] no ask clip — going straight to a story");
         Serial.flush();
-        if (story_ok) welcome_offer_story(); else led_for_state(ST_IDLE);
+        if (story_ok) welcome_offer_story(child_present); else led_for_state(ST_IDLE);
         return;
     }
 
@@ -1041,13 +1060,24 @@ static void handle_welcome_flow() {
         uint8_t *heard = nullptr;
         size_t heard_len = 0;
         if (!welcome_listen("mode", intent, sizeof(intent), &heard, &heard_len)) {
-            led_for_state(ST_IDLE);
-            return;   // silence — never badger
+            // Same asymmetry as welcome_offer_story: at power-on silence
+            // means an empty room, so close quietly. After a hold a child
+            // is standing there — falling silent right after asking them
+            // what they want is the failure this flow exists to avoid, so
+            // break out to the graceful default below.
+            // No heap_caps_free(heard) here: welcome_listen nulls
+            // *keep_payload at entry and only assigns it after both of its
+            // `return false` paths, so on this branch it is provably null.
+            if (!child_present) {
+                led_for_state(ST_IDLE);
+                return;   // silence — never badger
+            }
+            break;
         }
 
         if (strcmp(intent, "story") == 0) {
             if (heard != nullptr) heap_caps_free(heard);
-            if (story_ok) { welcome_offer_story(); return; }
+            if (story_ok) { welcome_offer_story(child_present); return; }
             break;
         }
         // Calm is always available (MODES.md), and a bedtime cue must not
@@ -1085,7 +1115,7 @@ static void handle_welcome_flow() {
     // One short line, then a story — the graceful default.
     welcome_say(CS_VOICE_ID_JUST_STORY);
     if (story_ok) {
-        welcome_offer_story();
+        welcome_offer_story(child_present);
     } else {
         led_for_state(ST_IDLE);
     }
@@ -1954,6 +1984,10 @@ void setup() {
 
     button_begin();
     answer_buttons_begin();   // no-op unless AREG_PIN_BUTTON_YES/NO defined
+    // Before anything can make a sound: this takes the first ADC reading, so
+    // the greeting already comes out at the knob's position instead of opening
+    // at the default and correcting itself audibly a moment later.
+    volume_pot_begin();       // no-op unless AREG_PIN_VOLUME_POT defined
     DIAG_MARK(120, "button_initialised");
 
     // Seed the last-known pause / bedtime state from NVS before anything
@@ -2129,7 +2163,10 @@ void setup() {
     if (voice_wifi_is_connected()) {
         voice_send_heartbeat();
     }
-    handle_welcome_flow();
+    // child_present=false: at power-on the toy has no evidence anyone is in
+    // the room, so silence must stay a quiet close. Only the IDLE hold
+    // gesture (a hand on the button seconds ago) passes true.
+    handle_welcome_flow(/*child_present=*/false);
 #else
     (void)handle_welcome_flow;   // keep it compiled (and warning-free) while unused
     Serial.println("[boot] welcome flow disabled - press the button to talk");
@@ -2194,6 +2231,16 @@ void loop() {
                 (int)WiFi.RSSI());
             Serial.flush();
         }
+
+        // Read the volume knob while nothing is playing, so a turn made
+        // between stories is already applied when the next one starts. The
+        // three long decode loops in audio_io.cpp do their own reading — this
+        // branch cannot run while they are blocked. Deliberately NOT wrapped
+        // in an s_last_..._ms gate like the ticks around it: volume_pot_tick()
+        // self-throttles to AREG_VOLUME_READ_MS, and a second timer on top
+        // would beat against the first and could stretch the effective period
+        // to twice that. Unthrottled here it is a millis() compare per pass.
+        volume_pot_tick();
 
         // Phase A.1 (toy side) — periodic presence heartbeat so the parent
         // app's online dot reflects an idle-but-powered toy. Best-effort and
@@ -2321,37 +2368,71 @@ void loop() {
             // online chat path, so a child could still play cached stories).
             // The pause state is heartbeat-cached; when offline the last-known
             // value stands. A paused press just flicks the LED, no sound.
-            char music_path[CS_MAX_PATH_LEN];
             if (voice_is_paused()) {
                 Serial.println("[button] ignored — toy is paused");
                 Serial.flush();
                 led_for_state(ST_IDLE);
-            } else if (s_story_offset == 0
-                       && voice_in_bedtime_window()
-                       && story_select_music_enabled()
-                       && music_select_next(music_path, sizeof(music_path))) {
-                // Slice E — bedtime music: while the server says the bedtime
-                // window is active (heartbeat-cached; the toy has no clock)
-                // AND the parent opted in (index-cached) AND a verified track
-                // is on the card, a press plays calm music instead of a
-                // story. A press during music stops it quietly (no Q&A, no
-                // resume bookkeeping — it's music, not a narrative). Never
-                // touches a paused story's resume offset.
-                transition_to(ST_PLAYING);
-                audio_speaker_begin();
-                Serial.printf("[music] playing %s\n", music_path);
-                Serial.flush();
-                audio_play_story_file(music_path, 0, story_barge_in_poll, nullptr);
-                Serial.println("[music] done");
-                Serial.flush();
-                transition_to(ST_IDLE);
+            } else if (voice_in_bedtime_window()) {
+                // Inside the bedtime window a hold is just a press — never
+                // the menu. A cheerful greeting at 21:30 is what
+                // handle_welcome_flow's own bedtime guard exists to prevent,
+                // and a hold that did nothing at all would read as a broken
+                // toy. Behaviour here is byte-identical to before this change.
+                char music_path[CS_MAX_PATH_LEN];
+                if (s_story_offset == 0
+                    && story_select_music_enabled()
+                    && music_select_next(music_path, sizeof(music_path))) {
+                    // Slice E — bedtime music: while the server says the bedtime
+                    // window is active (heartbeat-cached; the toy has no clock)
+                    // AND the parent opted in (index-cached) AND a verified track
+                    // is on the card, a press plays calm music instead of a
+                    // story. A press during music stops it quietly (no Q&A, no
+                    // resume bookkeeping — it's music, not a narrative). Never
+                    // touches a paused story's resume offset.
+                    transition_to(ST_PLAYING);
+                    audio_speaker_begin();
+                    Serial.printf("[music] playing %s\n", music_path);
+                    Serial.flush();
+                    audio_play_story_file(music_path, 0, story_barge_in_poll, nullptr);
+                    Serial.println("[music] done");
+                    Serial.flush();
+                    transition_to(ST_IDLE);
+                } else {
+                    handle_story_session();
+                }
             } else {
-                // Continuous story: a press starts the story (or resumes
-                // it from the last barge-in offset). During playback a
-                // press cuts the audio instantly; holding + speaking asks
-                // a question (answered, then the story auto-resumes), a
-                // quick tap just pauses. All handled in handle_story_session.
-                handle_story_session();
+                // Classify hold vs quick press. Local timer on purpose:
+                // button_poll() has four callers and three of them run during
+                // playback where a duration is meaningless, so widening its
+                // signature would put hold state on the barge-in hot path for
+                // one consumer's benefit.
+                const uint32_t press_started = millis();
+                bool released_early = false;
+                while (millis() - press_started < AREG_MENU_HOLD_MS) {
+                    if (button_poll() == 'R') { released_early = true; break; }
+                    delay(AREG_BUTTON_POLL_MS);
+                    esp_task_wdt_reset();
+                }
+                if (!released_early) {
+                    Serial.println("[button] hold — opening the menu");
+                    Serial.flush();
+                    handle_welcome_flow(/*child_present=*/true);
+                    // MANDATORY. handle_welcome_flow was written to be called
+                    // only from setup(), which restores the state itself. Six
+                    // of its exits return with s_state still ST_PLAYING, and
+                    // loop() only accepts input while s_state == ST_IDLE —
+                    // without this line the toy takes one hold and then
+                    // ignores the button until a power cycle, which is the
+                    // exact failure this whole change exists to remove.
+                    transition_to(ST_IDLE);
+                } else {
+                    // Continuous story: a press starts the story (or resumes
+                    // it from the last barge-in offset). During playback a
+                    // press cuts the audio instantly; holding + speaking asks
+                    // a question (answered, then the story auto-resumes), a
+                    // quick tap just pauses. All handled in handle_story_session.
+                    handle_story_session();
+                }
             }
         }
     }
