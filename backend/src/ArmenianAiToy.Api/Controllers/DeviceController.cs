@@ -248,12 +248,12 @@ public class DeviceController : ControllerBase
         if (await _deviceService.IsDevicePausedAsync(deviceId))
         {
             AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "paused"));
-            return VoiceIntentResult(VoiceIntents.Unknown);
+            return VoiceIntentResult(VoiceIntents.Unknown, VoiceIntentReasons.GatedPaused);
         }
         if (await _deviceService.IsDeviceInBedtimeWindowAsync(deviceId, DateTime.UtcNow))
         {
             AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "bedtime"));
-            return VoiceIntentResult(VoiceIntents.Unknown);
+            return VoiceIntentResult(VoiceIntents.Unknown, VoiceIntentReasons.GatedBedtime);
         }
 
         var costCapOpts = costCapOptions.Value;
@@ -264,13 +264,35 @@ public class DeviceController : ControllerBase
             {
                 AppMeter.OpenAICostCapTrip.Add(
                     1, new KeyValuePair<string, object?>("kind", "voice_intent"));
-                return VoiceIntentResult(VoiceIntents.Unknown);
+                // This path used to write NOTHING — the only paid endpoint in the
+                // codebase whose cap trip was silent (chat / audio-chat / story-qa
+                // all log here). A capped welcome turn is byte-identical on the
+                // wire to a classifier miss, so without this line an operator
+                // cannot tell "the toy stopped answering" from "the toy stopped
+                // being allowed to answer". Flood-controlled to one line per UTC
+                // day across the fleet.
+                if (costMeter.ShouldLogGlobalCapTrip(nowUtc))
+                {
+                    logger.LogWarning(
+                        "OpenAI GLOBAL daily cost ceiling reached (fleet kill-switch). CurrentEstimatedUsd={Current:F4} GlobalCapUsd={Cap:F4} UtcDate={Date:yyyy-MM-dd}",
+                        costMeter.GetGlobalTotal(nowUtc), costCapOpts.Global, nowUtc.Date);
+                }
+                return VoiceIntentResult(VoiceIntents.Unknown, VoiceIntentReasons.CostCapGlobal);
             }
-            if (costMeter.IsOverCap(deviceId, costCapOpts.CapForDevice(deviceId), nowUtc))
+            var cap = costCapOpts.CapForDevice(deviceId);
+            if (costMeter.IsOverCap(deviceId, cap, nowUtc))
             {
                 AppMeter.OpenAICostCapTrip.Add(
                     1, new KeyValuePair<string, object?>("kind", "voice_intent"));
-                return VoiceIntentResult(VoiceIntents.Unknown);
+                // Same omission, per device — and this is the likelier of the two
+                // to fire in a real house. One warning per device per UTC day.
+                if (costMeter.ShouldLogCapTrip(deviceId, nowUtc))
+                {
+                    logger.LogWarning(
+                        "OpenAI daily cost cap reached. DeviceId={DeviceId} Kind=voice_intent CurrentEstimatedUsd={Current:F4} CapUsd={Cap:F4} UtcDate={Date:yyyy-MM-dd}",
+                        deviceId, costMeter.GetCurrentTotal(deviceId, nowUtc), cap, nowUtc.Date);
+                }
+                return VoiceIntentResult(VoiceIntents.Unknown, VoiceIntentReasons.CostCap);
             }
         }
 
@@ -308,7 +330,7 @@ public class DeviceController : ControllerBase
             // A transient STT failure is indistinguishable, to the child, from
             // not being heard — and the toy already handles that.
             logger.LogWarning(ex, "Voice-intent: STT failure for device {DeviceId}", deviceId);
-            return VoiceIntentResult(VoiceIntents.Unknown);
+            return VoiceIntentResult(VoiceIntents.Unknown, VoiceIntentReasons.SttFailed);
         }
 
         try
@@ -326,7 +348,7 @@ public class DeviceController : ControllerBase
 
         if (string.IsNullOrWhiteSpace(transcript))
         {
-            return VoiceIntentResult(VoiceIntents.Unknown);
+            return VoiceIntentResult(VoiceIntents.Unknown, VoiceIntentReasons.SttEmpty);
         }
 
         // Input moderation, fail-closed like everywhere else. An unsafe
@@ -338,17 +360,17 @@ public class DeviceController : ControllerBase
             logger.LogWarning(
                 "Voice-intent blocked for device {DeviceId}. Categories: {Categories}",
                 deviceId, string.Join(", ", inputModeration.FlaggedCategories));
-            return VoiceIntentResult(VoiceIntents.Unknown);
+            return VoiceIntentResult(VoiceIntents.Unknown, VoiceIntentReasons.ModerationBlocked);
         }
 
         if (yesNoQuestion)
         {
-            return VoiceIntentResult(WelcomeIntentDetector.DetectYesNo(transcript) switch
+            return WelcomeIntentDetector.DetectYesNo(transcript) switch
             {
-                YesNo.Yes => VoiceIntents.Yes,
-                YesNo.No => VoiceIntents.No,
-                _ => VoiceIntents.Unknown,
-            });
+                YesNo.Yes => VoiceIntentResult(VoiceIntents.Yes, VoiceIntentReasons.Matched),
+                YesNo.No => VoiceIntentResult(VoiceIntents.No, VoiceIntentReasons.Matched),
+                _ => VoiceIntentResult(VoiceIntents.Unknown, VoiceIntentReasons.YesNoUnclear),
+            };
         }
 
         // Deterministic keyword classification — no model call. hasActiveStorySession
@@ -364,6 +386,20 @@ public class DeviceController : ControllerBase
             _ => VoiceIntents.Unknown,
         };
 
+        if (intent == VoiceIntents.Unknown)
+        {
+            // LENGTH ONLY, never the text. A child's utterance is PII-adjacent
+            // and this endpoint deliberately persists nothing; how many
+            // characters came back is not. That one number is what separates
+            // "STT heard almost nothing" from "STT heard a sentence and the
+            // keyword matcher genuinely did not match it" — the two halves of a
+            // welcome-menu failure that were previously indistinguishable.
+            logger.LogInformation(
+                "Voice-intent: no mode matched for device {DeviceId}. TranscriptLength={Length}",
+                deviceId, transcript.Trim().Length);
+            return VoiceIntentResult(VoiceIntents.Unknown, VoiceIntentReasons.NoMatch);
+        }
+
         // Belt and braces over the manifest's client-side filtering: even if a
         // toy asks with a stale mode list, a disabled mode is never returned.
         var childId = (await childService.GetDefaultChildForDeviceAsync(deviceId))?.Id;
@@ -373,18 +409,26 @@ public class DeviceController : ControllerBase
         {
             AppMeter.ChatGateTrip.Add(
                 1, new KeyValuePair<string, object?>("gate", "mode_disabled"));
-            intent = VoiceIntents.Unknown;
+            return VoiceIntentResult(VoiceIntents.Unknown, VoiceIntentReasons.ModeDisabled);
         }
 
-        return VoiceIntentResult(intent);
+        return VoiceIntentResult(intent, VoiceIntentReasons.Matched);
     }
 
     /// <summary>The one and only shape this endpoint returns: a single
-    /// bounded token, no transcript, no confidence, no free text.</summary>
-    private OkObjectResult VoiceIntentResult(string intent)
+    /// bounded token, no transcript, no confidence, no free text.
+    /// <para>
+    /// <paramref name="reason"/> is a metric tag ONLY and must never reach the
+    /// response body — see <see cref="VoiceIntentReasons"/> for why the ten
+    /// paths that all answer <c>unknown</c> have to be separable somewhere
+    /// other than the wire.
+    /// </para></summary>
+    private OkObjectResult VoiceIntentResult(string intent, string reason)
     {
         AppMeter.VoiceIntentTurn.Add(
-            1, new KeyValuePair<string, object?>("intent", intent));
+            1,
+            new KeyValuePair<string, object?>("intent", intent),
+            new KeyValuePair<string, object?>("reason", reason));
         return Ok(new { intent });
     }
 
