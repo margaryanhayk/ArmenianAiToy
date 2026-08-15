@@ -16,11 +16,20 @@ static float read_gain_now(uint32_t *out_mv) {
     // it wobbles by tens of millivolts. Mapped straight to gain that wobble
     // is audible as the sound breathing, so four reads are averaged; they
     // cost well under a millisecond together.
+    // Four reads was enough on an idle bench and nowhere near enough with the
+    // amplifier running. Measured on the toy 2026-08-15 with the knob held at
+    // its top stop: the wiper swung 2929..3149 mV DURING PLAYBACK — ~200 mV,
+    // six times the deadband — so the gain re-published on almost every tick
+    // and flooded the log. The pot divides the 3V3 rail, and at full volume
+    // the class-D amp pulls its current in bursts off that same rail, so the
+    // knob is partly measuring the amplifier. Sixteen reads plus the wider
+    // deadband absorb it; a 100 nF from wiper to GND is the hardware half and
+    // is the better fix if it is ever fitted.
     uint32_t sum = 0;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 16; i++) {
         sum += analogReadMilliVolts(AREG_PIN_VOLUME_POT);
     }
-    const uint32_t mv = sum / 4;
+    const uint32_t mv = sum / 16;
     if (out_mv != nullptr) {
         *out_mv = mv;
     }
