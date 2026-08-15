@@ -423,6 +423,34 @@
 // Phase B.2 â€” BLE Wi-Fi provisioning (OPT-IN; bench default = OFF)
 // -------------------------------------------------------------
 // Uncomment AREG_USE_BLE_PROVISIONING to build the provisioning variant.
+//
+// WHY THIS MATTERS, learned the hard way on 2026-08-15: with the flag OFF, a
+// toy's Wi-Fi lives ONLY in the compile-time credentials below. The owner's
+// router was replaced, the toy went permanently deaf (wifi reason=201), and
+// the only cure was a cable, a PC and a code edit. A family that moves house
+// would have a dead toy. The rescue was already written and simply not
+// compiled: AregVoiceMvp.ino's B.3 fallback reopens provisioning by itself
+// after AREG_PROV_FALLBACK_AFTER_MS with no gesture at all.
+//
+// ORDERING TRAP — read before switching it on. With this flag ON and the
+// aregwifi NVS namespace EMPTY, setup() opens provisioning and never calls
+// voice_wifi_begin(), so the credentials below are not consulted and a
+// working toy drops off the network. Flash it the first time together with
+// AREG_PROVISION_WIFI_ONCE (below), which copies them into NVS at boot.
+//
+// CORRECTED 2026-08-16: the note that used to sit here demanding
+// PartitionScheme=huge_app is wrong for this sketch. It was true of the
+// `default` table's 1.25 MB slots; this project ships its own 8 MB dual-OTA
+// partitions.csv with 3 MB slots. Measured with the flag on: 1,631,423 bytes,
+// 51.9% of the slot. Use PartitionScheme=custom — huge_app cannot do OTA.
+
+// One-shot: copy AREG_WIFI_SSID / AREG_WIFI_PASSWORD into NVS at boot, so the
+// toy is genuinely provisioned before the BLE branch decides what to do.
+// Guarded three ways (flag defined, NVS empty, SSID not a placeholder) and it
+// never overwrites a toy a parent already provisioned. Burn once, confirm the
+// serial line, then comment it out. NEVER build an OTA image with it — an OTA
+// image reaches every toy, and that is one household's password. See c9e6593.
+// #define AREG_PROVISION_WIFI_ONCE 1
 // IMPORTANT: the BLE stack does NOT fit the `default` partition â€” compile and
 // flash the flag-on build with PartitionScheme=huge_app (see
 // PLATFORM-ARCHITECTURE.txt, Phase B.2 build spec). With the flag OFF (default),

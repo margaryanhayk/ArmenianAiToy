@@ -2220,6 +2220,35 @@ void setup() {
     Serial.flush();
 #endif
 
+    // Same one-shot burn, for Wi-Fi. Added 2026-08-16 as the ORDERING FIX that
+    // makes BLE provisioning safe to switch on.
+    //
+    // With AREG_USE_BLE_PROVISIONING on, setup() branches on
+    // voice_wifi_is_provisioned() and, when NVS is empty, opens provisioning
+    // and NEVER calls voice_wifi_begin() -- the config.h fallback is not
+    // consulted at all. The owner's toy has real Wi-Fi ONLY in config.h and an
+    // empty aregwifi namespace, so enabling the flag alone would have taken a
+    // working toy off the network and left it waiting for a phone app that has
+    // no Android build yet. This burn runs first, so the toy is genuinely
+    // provisioned before that branch is reached.
+    //
+    // Guarded the same three ways as the identity burn: flag defined, NVS
+    // empty (never overwrites a toy a parent has already provisioned), and the
+    // compile-time SSID not a placeholder. Burn once, then drop the flag --
+    // and never build an OTA image with it, for the reason c9e6593 records.
+#ifdef AREG_PROVISION_WIFI_ONCE
+    if (wifi_creds_present()) {
+        Serial.println("[wifi] credentials already in NVS — burn skipped");
+    } else if (strlen(AREG_WIFI_SSID) == 0
+               || strcmp(AREG_WIFI_SSID, "YOUR_WIFI_SSID") == 0) {
+        Serial.println("[wifi] refusing to burn a placeholder SSID");
+    } else {
+        wifi_creds_save(AREG_WIFI_SSID, AREG_WIFI_PASSWORD);
+        Serial.printf("[wifi] credentials burned to NVS (ssid=%s)\n", AREG_WIFI_SSID);
+    }
+    Serial.flush();
+#endif
+
     // Diag: reset reason. Distinguishes power-on / EN / panic /
     // brownout / watchdog so a "monitor came back" after a hang
     // can be classified without guessing.
