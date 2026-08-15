@@ -293,10 +293,19 @@ foreach (var story in stories)
         ? $"Հեքիաթ՝ «{story.Title}»։"
         : $"Հեքիաթ՝ «{story.Title}»։ Հեղինակ՝ {story.Author}։";
     jobs.Add(($"{story.Id}--intro.mp3", $"{story.Id} intro", [intro]));
-    if (story.ReflectionQuestions.Count > 0)
+    // ALL the reflection questions, not just the first. Every story has
+    // carried three since 2026-08-03 and this loop only ever rendered index 0,
+    // so `question1` and `question2` — kinds that exist on the backend
+    // (ContentSyncClipOptions) and in the firmware (cs_question_clip_kind) —
+    // had no audio that could ever fill them. The kind names must stay in
+    // lockstep with cs_question_clip_kind(): 0 -> question, 1 -> question1,
+    // 2 -> question2. The toy resolves clips BY KIND, so a mismatch here is a
+    // clip that silently never plays.
+    for (var qi = 0; qi < story.ReflectionQuestions.Count; qi++)
     {
-        jobs.Add(($"{story.Id}--question.mp3", $"{story.Id} question",
-            [story.ReflectionQuestions[0]]));
+        var kind = qi == 0 ? "question" : $"question{qi}";
+        jobs.Add(($"{story.Id}--{kind}.mp3", $"{story.Id} {kind}",
+            [story.ReflectionQuestions[qi]]));
     }
     var summary = story.Lesson ?? story.ReflectionText;
     if (!string.IsNullOrWhiteSpace(summary))

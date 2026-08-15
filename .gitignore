@@ -67,3 +67,7 @@ esp32/AregVoiceMvp/config.h
 # Voice-audition intermediates â€” the finished renders are kept, the
 # per-chunk pieces are regenerable and just bulk.
 tools/voice-audition/_chunks/
+
+# Scratch output from tools/ElevenLabsRender — the installed copies under
+# story-audio/ are the shipped ones; these are the pre-levelling renders.
+tools/.render-out/
