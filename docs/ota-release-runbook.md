@@ -600,3 +600,34 @@ reconsidered once a second board exists.
 content sync had not completed at the time of writing. Free heap read 123,300
 against 210,020 on the 1.2.0 rollout at the same 5 s uptime; the content report
 accounts for 672 B of that and the rest is unexplained.
+
+---
+
+### 1.3.3 — 2026-08-15 — CABLE-FLASHED ONLY, never staged for OTA
+
+Fixes the hold-to-menu / silence-after-a-hold defect (see CLAUDE.md
+§ "Firmware 1.3.3 — hold-to-menu" for the full change list and the hardware
+evidence). This entry exists to record the release-management side of it,
+not the fix itself.
+
+**This image MUST NOT become an OTA release as built.** It was compiled from
+a bench `config.h` carrying the owner's real device id, real API key, and a
+real Wi-Fi password — exactly the leak class `check_release_image.py` exists
+to catch (see § 2 step 4 and the 1.2.1 "Trap 2" entry above). Anyone turning
+1.3.3 into a staged release must:
+
+1. Rebuild from a `config.h` holding only placeholder credentials.
+2. Run `tools/firmware/check_release_image.py` against the rebuilt binary
+   and confirm it PASSES before it goes anywhere near
+   `FirmwareUpdate:ImagePath`.
+
+`FirmwareUpdate:LatestVersion` in `appsettings.json` stays at **`1.3.2`**
+deliberately — it was never advanced for 1.3.3. The offer gate in
+`FirmwareManifestService` is strictly-older-than-`LatestVersion`, so a toy
+already running 1.3.3 is never offered what would look like a downgrade to
+1.3.2; nothing needed to change on the backend to keep this release off the
+air.
+
+Delivery method: cable (`esptool`/`arduino-cli` upload), not OTA. NVS was not
+in the erase list, so device identity, Wi-Fi credentials, the story rotation
+cursor and the heard-set survived the flash untouched.

@@ -1,0 +1,99 @@
+﻿[wifi] connecting to <home-ssid-redacted> ...
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x8 (SPI_FAST_FLASH_BOOT)
+Saved PC:0x4037a9ae
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x116c
+load:0x403c8700,len:0xc2c
+load:0x403cb700,len:0x3108
+entry 0x403c88b8
+
+[boot] AregVoiceMvp starting
+[boot] backend = https://armenianaitoy-production.up.railway.app
+[net] TLS: verifying (ISRG Root X1 pinned)
+[boot] reset_reason=11/UNKNOWN
+[boot] diag_boot_counter=0 (cold)
+[boot] previous_step=(none)
+[boot] backend=https://armenianaitoy-production.up.railway.app/api/chat/audio
+[boot] pins button=0 led=48
+[boot] mic_i2s bck=4 ws=5 sd=6
+[boot] amp_i2s bck=15 lrc=16 din=7
+E (223) task_wdt: esp_task_wdt_init(517): TWDT already initialized
+[boot] task watchdog enabled (30s)
+[boot] sd_spi cs=10 sck=12 mosi=11 miso=13
+[sd] mounted; type=3 size=7680MB
+[boot] SD mounted; offline narration /stories/anban-huri/narration.mp3 = absent
+[content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=28 music=0
+[wifi] using compile-time fallback creds (ssid=<home-ssid-redacted>)
+[wifi] connecting to <home-ssid-redacted> ...
+[wifi] event=connected
+[wifi] event=got_ip
+[wifi] ip=192.168.1.3
+[boot] ready ??? press button to speak
+[state] 0 -> 0
+[ota] running fw=1.3.3 partition=app0 img_state=undefined ota_state=idle (pending_ver=- cmd=- boots=0)
+[device] using provisioned identity (id=248729da-08d8-4144-afc0-e6af8a3fe471)
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[welcome] greeting greet-15
+[state] 0 -> 3
+[story] SD open: /voice/greet-15-v1.mp3 @ 0
+[story] SD end interrupted=false
+[state] 3 -> 3
+[story] SD open: /voice/ask-any-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[state] 3 -> 1
+[audio] record_begin
+[audio] i2s_new_channel err=0/ESP_OK
+[audio] i2s_channel_init_std_mode err=0/ESP_OK
+[audio] i2s_channel_enable err=0/ESP_OK
+[audio] record_progress samples=16128 bytes=32256 heap=120408 psram=7861532
+[audio] record_progress samples=32256 bytes=64512 heap=120408 psram=7861532
+[audio] record_end bytes=81408
+[state] 1 -> 2
+[audio] earcon_begin
+[audio] earcon_end
+[welcome] intent=unknown
+[welcome] clip say-again not on card ??? skipping
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 2 -> 0
+[alive] ms=33119 heap=123496 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-56
+[ota] boot poll (fw=1.3.3 build=games-bench board=areg-s3-n8 partition=app0)
+[content-sync] bench fw built Aug 15 2026 17:32:04
+[content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+[story] SD open: /games/mind-reader/intro.mp3 @ 0
+[story] SD end interrupted=false
+[story] SD open: /games/mind-reader/q-root.mp3 @ 0
+[story] SD end interrupted=false
+[story] SD open: /games/mind-reader/q-1.mp3 @ 0
+[story] SD end interrupted=false
+[story] SD open: /games/mind-reader/q-11.mp3 @ 0
+[story] SD end interrupted=false
+[story] SD open: /games/mind-reader/q-110.mp3 @ 0
+[story] SD end interrupted=false
+[games] mind-reader: guessing g-1101
+[story] SD open: /games/mind-reader/g-1101.mp3 @ 0
+[story] SD end interrupted=false
+[games] mind-reader: guessed right
+[story] SD open: /games/mind-reader/win.mp3 @ 0
+[story] SD end interrupted=false
+[alive] ms=74556 heap=123496 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-52
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=79562 heap=123496 psram=7860756 wifi=3 ip=192.168.1.3 rssi=-53
+[alive] ms=84564 heap=123496 psram=7860756 wifi=3 ip=192.168.1.3 rssi=-51
+[alive] ms=89566 heap=123448 psram=7860756 wifi=3 ip=192.168.1.3 rssi=-50
+[alive] ms=94568 heap=123496 psram=7860756 wifi=3 ip=192.168.1.3 rssi=-50
+[alive] ms=99570 heap=123496 psram=7860756 wifi=3 ip=192.168.1.3 rssi=-51
+[alive] ms=104572 heap=123496 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-58
+[alive] ms=109574 heap=123496 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-59
+[alive] ms=114576 heap=123496 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-64
+[alive] ms=119578 heap=123496 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-54
+[alive] ms=124580 heap=123496 psram=7860828 wifi=3 ip=192.168.1.3 rssi=-57
+[alive] ms=129582 heap=123496 psram=7861084 wifi=3 ip=192.168.1.3 rssi=-53
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=137116 heap=123436 psram=7860656 wifi=3 ip=192.168.1.3 rssi=-58
+[alive] ms=142118 heap=123496 psram=7860796 wifi=3 ip=192.168.1.3 rssi=-56
+[alive] ms=147120 heap=123448 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-53

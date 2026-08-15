@@ -35,6 +35,7 @@
 #include "sd_diag.h"           // standalone SD diagnostic (AREG_SD_DIAG_BENCH builds only)
 #include "sd_playback.h"       // cached-MP3 SD playback (AREG_SD_PLAYBACK_BENCH builds only)
 #include "answer_buttons.h"    // optional GREEN/RED answer buttons (no-op unless pins defined)
+#include "volume_pot.h"        // optional hardware volume knob (no-op unless pot pin defined)
 #include "offline_quiz.h"      // offline true/false quiz (AREG_OFFLINE_QUIZ_BENCH builds only)
 #include "offline_games.h"     // mind-reader / buzzer / Simon (AREG_OFFLINE_GAMES_BENCH builds only)
 
@@ -239,6 +240,49 @@ static char s_current_story_id[CS_MAX_STORY_ID_LEN + 1] = "";
 // goes back to the normal rotation.
 static bool s_story_preselected = false;
 
+// --- "What shall we do next?" after an activity ends ----------
+// An activity (a story reaching its natural end, a finished offline game)
+// asks the child what to do next. The flag is DEFERRED on purpose and is
+// consumed ONLY at the top of loop(): handle_welcome_flow ->
+// welcome_offer_story -> handle_story_session is already a call chain, so
+// opening the menu from INSIDE a story session would be unbounded mutual
+// recursion through the largest stack frame in the sketch — story ends,
+// menu, story, ends, menu, until the stack is gone.
+static bool s_ask_next_pending = false;
+// Consecutive menus the toy opened by itself, with no press in between.
+// Bounded so a child who walks away is not offered a story forever: two
+// auto-menus, then the toy goes quiet until someone touches it again.
+// Reset by any real button press.
+static uint8_t s_auto_menu_chain = 0;
+
+// --- Story browsing on the GREEN / RED buttons ---------------
+// GREEN = the next story, RED = the previous one, while a story plays.
+// story_barge_in_poll() returns a bare bool ("stop now") and cannot say
+// WHY it stopped, so the reason is left here for the session loop to pick
+// up — the same shape story_pause_take_pending() already uses to tell a
+// self-inflicted pause apart from a child's press.
+//
+// Every declaration folds away without the answer-button pins, so a
+// one-button build compiles exactly the code it compiled before (the
+// AREG_HAS_ANSWER_BUTTONS idiom from answer_buttons.h).
+#if AREG_HAS_ANSWER_BUTTONS
+static char s_browse_request = 0;    // 'Y' = next story, 'N' = previous
+static bool s_browse_restart  = false;  // the session must restart on a new story
+static inline bool browse_pending() { return s_browse_request != 0; }
+// One press is one hop: the request is cleared as it is read, so a single
+// press can never be acted on twice.
+static inline char browse_take_request() {
+    const char r = s_browse_request;
+    s_browse_request = 0;
+    return r;
+}
+#else
+// Only browse_pending() has a caller outside the guarded blocks (the
+// rotation bookkeeping reads it unconditionally, and folds to a constant
+// here). browse_take_request has none, so it is not defined at all.
+static inline bool browse_pending() { return false; }
+#endif
+
 // --- Failure clip playback ----------------------------------
 static void play_canned_failure_clip() {
     if (canned_clip_mp3_len < 8) {
@@ -431,6 +475,24 @@ static bool story_barge_in_poll() {
     if (button_poll() == 'P') {
         return true;
     }
+#if AREG_HAS_ANSWER_BUTTONS
+    // Story browsing: GREEN = next story, RED = previous. Polled HERE
+    // rather than in the decode loops because this callback is already
+    // wired into all three of them — the same reason the volume knob is
+    // read beside this call. The MAIN button is polled first and
+    // unchanged, so barge-in latency and the sticky pause are untouched.
+    const char ab = answer_buttons_poll();
+    if (ab == 'Y' || ab == 'N') {
+        if (!voice_in_bedtime_window()) {
+            s_browse_request = ab;
+            return true;
+        }
+        // Bedtime: swallow it. The same rule the shout-it-out pauses
+        // already follow — being asked to choose is what 21:30 is not for,
+        // and a story that jumped to a different one at bedtime would be
+        // the loudest possible version of that.
+    }
+#endif
     // A shout-it-out pause is a self-inflicted barge-in — same stop, same
     // resume offset, no second decoder. story_pause_take_pending() is how
     // the session loop tells the two apart afterwards. Returns false
@@ -492,137 +554,151 @@ static void handle_post_story_flow() {
         audio_play_story_file(summary_clip, 0, nullptr, nullptr);
     }
 
-    // 2..N — the reflection DIALOGUE (owner request 2026-08-03): up to 3
-    // questions per story (clip kinds question / question1 / question2),
-    // each round = ask → listen → record → upload → play the backend's
-    // reaction + conclusion. The FINAL round's reply carries the goodbye
-    // line (the `last` flag tells the backend which round that is). The
-    // child is never badgered: no press in the window, a too-short answer,
-    // or any failure ends the dialogue quietly.
-    for (int q = 0; q < 3; q++) {
-        // Resolve THIS round's question clip. Question 0 keeps the legacy
-        // SD-pack fallback; later questions exist only via content sync.
-        char question_path[CS_MAX_PATH_LEN];
-        const char *question_clip = nullptr;
-        const char *kind = cs_question_clip_kind(q);
+    // 2. The reflection question — exactly ONE (owner request 2026-08-15).
+    //    This used to loop rounds 0..2, asking every rendered question back
+    //    to back; that is two questions more than a four-year-old will
+    //    answer, and the third arrived long after the child had wandered
+    //    off. One round = ask → listen → record → upload → play the
+    //    backend's reaction. The child is never badgered: no press in the
+    //    window, a too-short answer, or any failure closes quietly.
+    //
+    //    Because only one is asked, WHICH one has to rotate, or a child who
+    //    re-listens to a favourite is asked the same thing every time. The
+    //    cursor is per story and persisted (see story_select.h).
+    const int wanted = story_question_cursor_next(post_story_id);
+
+    // Resolve with FALLBACK. The cursor names the question this story owes
+    // the child, but a story may only ever have rendered `question` — most
+    // do, and today none has any of the three. Probing the remaining kinds
+    // in ascending order is what stops the toy going silent merely because
+    // the cursor landed on a kind nobody authored.
+    char question_path[CS_MAX_PATH_LEN];
+    const char *question_clip = nullptr;
+    int q = -1;
+    for (int probe = 0; probe < CS_QUESTION_KINDS && question_clip == nullptr; probe++) {
+        const int idx = (wanted + probe) % CS_QUESTION_KINDS;
+        const char *kind = cs_question_clip_kind(idx);
         if (kind != nullptr
             && story_select_resolve_clip_path(post_story_id, kind,
                                               question_path, sizeof(question_path))) {
             question_clip = question_path;
-        } else if (q == 0 && audio_sd_has_file(AREG_SD_STORY_QUESTION0)) {
-            question_clip = AREG_SD_STORY_QUESTION0;
-        }
-        if (question_clip == nullptr) {
-            // No clip for this round → the dialogue is over (round 0 with no
-            // clip means the story ships no reflection at all).
-            if (q == 0) return;
-            break;
-        }
-
-        // Is there a NEXT question after this one? Decides the `last` flag
-        // so the backend appends the goodbye exactly once per dialogue.
-        bool has_next = false;
-        if (q < 2) {
-            char next_path[CS_MAX_PATH_LEN];
-            const char *next_kind = cs_question_clip_kind(q + 1);
-            has_next = next_kind != nullptr
-                && story_select_resolve_clip_path(post_story_id, next_kind,
-                                                  next_path, sizeof(next_path));
-        }
-
-        transition_to(ST_PLAYING);
-        audio_speaker_begin();
-        Serial.printf("[post] question %d (%s)\n", q, question_clip);
-        Serial.flush();
-        audio_play_story_file(question_clip, 0, nullptr, nullptr);
-
-        // The ANSWER needs the cloud (STT + the bounded reaction). Offline →
-        // optional close, stop the dialogue.
-        if (!voice_wifi_is_connected()) {
-            Serial.println("[post] offline — answer needs connectivity; closing");
-            Serial.flush();
-            if (audio_sd_has_file(AREG_SD_OFFLINE_CLOSE)) {
-                audio_speaker_begin();
-                audio_play_story_file(AREG_SD_OFFLINE_CLOSE, 0, nullptr, nullptr);
-            }
-            led_for_state(ST_IDLE);
-            return;
-        }
-
-        // Listening window: the recording color is the "your turn" cue. No
-        // press → quiet close (never force an answer from a small child).
-        Serial.printf("[post] listening for answer %d (press & hold to talk)\n", q);
-        Serial.flush();
-        led_for_state(ST_RECORDING);
-        bool got_press = false;
-        const uint32_t listen_started = millis();
-        while (millis() - listen_started < AREG_REFLECTION_LISTEN_MS) {
-            if (button_poll() == 'P') {
-                got_press = true;
-                break;
-            }
-            delay(AREG_BUTTON_POLL_MS);
-        }
-        if (!got_press) {
-            Serial.println("[post] no answer in window; closing quietly");
-            Serial.flush();
-            led_for_state(ST_IDLE);
-            return;
-        }
-
-        // Record the answer while held, then POST to the reflection endpoint.
-        transition_to(ST_RECORDING);
-        const size_t captured = record_question();
-        const uint32_t ms_held = (captured * 1000) / AREG_SAMPLE_RATE_HZ;
-        if (ms_held < AREG_MIN_RECORD_MS) {
-            Serial.printf("[post] answer too short (%u ms); closing\n", (unsigned)ms_held);
-            Serial.flush();
-            led_for_state(ST_IDLE);
-            return;
-        }
-
-        const size_t pcm_bytes = captured * sizeof(int16_t);
-        const size_t payload_bytes = 44 + pcm_bytes;
-        uint8_t *payload = (uint8_t *)heap_caps_malloc(payload_bytes, MALLOC_CAP_SPIRAM);
-        if (payload == nullptr) {
-            Serial.println("[post] payload alloc failed; closing");
-            Serial.flush();
-            led_for_state(ST_IDLE);
-            return;
-        }
-        audio_write_wav_header(payload, (uint32_t)captured);
-        memcpy(payload + 44, s_capture_buf, pcm_bytes);
-
-        transition_to(ST_UPLOADING);
-        audio_speaker_begin();
-        audio_play_thinking_earcon();  // immediate acoustic ack while we upload
-        Serial.printf("[post] uploading answer %d (last=%d)\n", q, has_next ? 0 : 1);
-        Serial.flush();
-
-        VoiceTurnResult turn = voice_upload_reflection_answer(
-            payload, payload_bytes, q, /*last=*/!has_next);
-        heap_caps_free(payload);
-        payload = nullptr;
-
-        if (turn.ok) {
-            transition_to(ST_PLAYING);
-            audio_speaker_begin();
-            audio_play_mp3_buffer(turn.response_bytes, turn.response_length);
-            Serial.printf("[post] reply %d played\n", q);
-            Serial.flush();
-        } else {
-            Serial.printf("[post] reflection upload failed (status=%d)\n", turn.http_status);
-            Serial.flush();
-            voice_release_last_response();
-            led_for_state(ST_IDLE);
-            return;  // a failed round ends the dialogue quietly
-        }
-        voice_release_last_response();
-
-        if (!has_next) {
-            break;   // that reply carried the goodbye — dialogue complete
+            q = idx;
         }
     }
+    if (question_clip == nullptr && audio_sd_has_file(AREG_SD_STORY_QUESTION0)) {
+        // Legacy SD-pack fallback. It only ever held question 0, so it is
+        // tried once, after every synced kind has been ruled out.
+        question_clip = AREG_SD_STORY_QUESTION0;
+        q = 0;
+    }
+    if (question_clip == nullptr) {
+        // The story ships no reflection at all. This is the ORDINARY path
+        // today — no story has a question clip configured — so it stays a
+        // silent return rather than a line printed after every story end.
+        return;
+    }
+    if (q != wanted) {
+        Serial.printf("[post] question %d not on the card — asking %d instead\n",
+                      wanted, q);
+        Serial.flush();
+    }
+
+    transition_to(ST_PLAYING);
+    audio_speaker_begin();
+    Serial.printf("[post] question %d (%s)\n", q, question_clip);
+    Serial.flush();
+    bool question_started = false;
+    audio_play_story_file(question_clip, 0, nullptr, nullptr, &question_started);
+
+    // Advance the cursor only once the clip GENUINELY PLAYED — the same
+    // rule story_select uses for `last_id` and the heard set. A question
+    // that made no sound was not asked, and moving past it would skip it
+    // for good on the next listen.
+    if (question_started) {
+        story_question_cursor_commit(post_story_id, q);
+    }
+
+    // The ANSWER needs the cloud (STT + the bounded reaction). Offline →
+    // optional close, then stop.
+    if (!voice_wifi_is_connected()) {
+        Serial.println("[post] offline — answer needs connectivity; closing");
+        Serial.flush();
+        if (audio_sd_has_file(AREG_SD_OFFLINE_CLOSE)) {
+            audio_speaker_begin();
+            audio_play_story_file(AREG_SD_OFFLINE_CLOSE, 0, nullptr, nullptr);
+        }
+        led_for_state(ST_IDLE);
+        return;
+    }
+
+    // Listening window: the recording color is the "your turn" cue. No
+    // press → quiet close (never force an answer from a small child).
+    Serial.printf("[post] listening for answer %d (press & hold to talk)\n", q);
+    Serial.flush();
+    led_for_state(ST_RECORDING);
+    bool got_press = false;
+    const uint32_t listen_started = millis();
+    while (millis() - listen_started < AREG_REFLECTION_LISTEN_MS) {
+        if (button_poll() == 'P') {
+            got_press = true;
+            break;
+        }
+        delay(AREG_BUTTON_POLL_MS);
+    }
+    if (!got_press) {
+        Serial.println("[post] no answer in window; closing quietly");
+        Serial.flush();
+        led_for_state(ST_IDLE);
+        return;
+    }
+
+    // Record the answer while held, then POST to the reflection endpoint.
+    transition_to(ST_RECORDING);
+    const size_t captured = record_question();
+    const uint32_t ms_held = (captured * 1000) / AREG_SAMPLE_RATE_HZ;
+    if (ms_held < AREG_MIN_RECORD_MS) {
+        Serial.printf("[post] answer too short (%u ms); closing\n", (unsigned)ms_held);
+        Serial.flush();
+        led_for_state(ST_IDLE);
+        return;
+    }
+
+    const size_t pcm_bytes = captured * sizeof(int16_t);
+    const size_t payload_bytes = 44 + pcm_bytes;
+    uint8_t *payload = (uint8_t *)heap_caps_malloc(payload_bytes, MALLOC_CAP_SPIRAM);
+    if (payload == nullptr) {
+        Serial.println("[post] payload alloc failed; closing");
+        Serial.flush();
+        led_for_state(ST_IDLE);
+        return;
+    }
+    audio_write_wav_header(payload, (uint32_t)captured);
+    memcpy(payload + 44, s_capture_buf, pcm_bytes);
+
+    transition_to(ST_UPLOADING);
+    audio_speaker_begin();
+    audio_play_thinking_earcon();  // immediate acoustic ack while we upload
+    Serial.printf("[post] uploading answer %d (last=1)\n", q);
+    Serial.flush();
+
+    // last=true unconditionally: one question is always the final round, and
+    // `last` is what makes the backend append the goodbye line.
+    VoiceTurnResult turn = voice_upload_reflection_answer(
+        payload, payload_bytes, q, /*last=*/true);
+    heap_caps_free(payload);
+    payload = nullptr;
+
+    if (turn.ok) {
+        transition_to(ST_PLAYING);
+        audio_speaker_begin();
+        audio_play_mp3_buffer(turn.response_bytes, turn.response_length);
+        Serial.printf("[post] reply %d played\n", q);
+        Serial.flush();
+    } else {
+        Serial.printf("[post] reflection upload failed (status=%d)\n", turn.http_status);
+        Serial.flush();
+    }
+    voice_release_last_response();
     led_for_state(ST_IDLE);
 }
 
@@ -650,6 +726,46 @@ static void handle_post_story_flow() {
 
 static void handle_story_session();   // defined below; the flow ends in it
 
+// May the toy open the menu BY ITSELF, because an activity just ended?
+// Every clause is a reason it must not.
+static bool ask_next_is_allowed() {
+    // A paused toy is fully silent. handle_welcome_flow checks this too;
+    // the constraint must not depend on a guard living in another
+    // function, and checking here also keeps the chain counter still.
+    if (voice_is_paused()) {
+        return false;
+    }
+    // MODES.md forbids this at bedtime in two separate clauses: Calm mode
+    // is "no tension, no cliffhangers, no choices that demand a decision",
+    // and "questions of any kind" are listed under Forbidden. «What shall
+    // we do next?» is exactly a question that demands a decision, and the
+    // whole point of the window is winding down, not choosing.
+    if (voice_in_bedtime_window()) {
+        return false;
+    }
+    // A child who walked away must not be offered a story forever.
+    if (s_auto_menu_chain >= 2) {
+        return false;
+    }
+    // Never over a story that is only stickily PAUSED: the next press is
+    // owed to that story, not to a menu.
+    if (s_story_offset != 0) {
+        return false;
+    }
+    // Never open a menu we cannot ask. Without the ask clip the flow's own
+    // fallback is to start a story into a room nobody answered from, and a
+    // missing clip turning into silence is the exact failure the owner hit
+    // on the bench. If we cannot ask, the activity's own ending audio stays
+    // the last thing heard, which is honest and quiet.
+    char ask_path[CS_MAX_PATH_LEN];
+    if (!voice_clip_resolve_path(CS_VOICE_ID_ASK_ANY, ask_path, sizeof(ask_path))) {
+        Serial.println("[menu] ask clip missing — not opening the menu");
+        Serial.flush();
+        return false;
+    }
+    return true;
+}
+
 // The ONE eligible-story table in the sketch (~10 KB), shared by the
 // welcome flow's offer loop and story_pick_for_session. They are never
 // live at the same time: welcome_offer_story finishes with it — it has
@@ -658,6 +774,71 @@ static void handle_story_session();   // defined below; the flow ends in it
 // added AFTER that call must not expect this table to still hold the
 // offer pool.
 static CsStory s_eligible_stories[CS_MAX_STORIES];
+
+#if AREG_HAS_ANSWER_BUTTONS
+// Picks the story one hop from `current_id` — 'Y' forward, 'N' back —
+// and writes its id into `out_id`. False means "nothing to browse to",
+// and the caller must then leave the current story playing.
+//
+// ORDER: unheard stories first, then heard ones, each group keeping index
+// order. That is the honest reading of the owner's "prioritize by which
+// one is less told": the toy stores a heard / not-heard SET (NVS
+// `aregheard`), NOT a play count, so a true least-played ordering does not
+// exist to be computed. Do not assume counts are available here.
+//
+// Reuses s_eligible_stories rather than a second ~10 KB table. Safe by the
+// same argument the table's own comment makes: every earlier user is
+// finished with it by the time a story is playing.
+static bool browse_pick(char dir, const char *current_id,
+                        char *out_id, size_t out_len) {
+    // One bit per eligible story. Keep the mask wide enough for the table.
+    static_assert(CS_MAX_STORIES <= 16, "browse_pick's heard mask is 16 bits");
+
+    CsStory *pool = s_eligible_stories;
+    const int count = story_select_load_eligible(pool, CS_MAX_STORIES);
+    if (count <= 1) {
+        // 0 = nothing cached. 1 = one story is not a library: there is
+        // nowhere to browse TO, and restarting the only story from the top
+        // would read as a bug rather than as a choice.
+        return false;
+    }
+
+    // Ask the heard-set ONCE per story. story_heard_contains re-reads the
+    // whole NVS set on every call and builds a ~780-byte HeardSet on the
+    // stack to do it, so the obvious two-pass loop would pay for that
+    // thirty-two times on a button press, inside a story's stack frame.
+    uint16_t heard = 0;
+    for (int i = 0; i < count; i++) {
+        if (story_heard_contains(pool[i].story_id)) {
+            heard |= (uint16_t)(1u << i);
+        }
+    }
+
+    // The browse order as INDICES — nothing in the shared table moves, so
+    // this costs 16 bytes of stack instead of shuffling ~640-byte records.
+    uint8_t order[CS_MAX_STORIES];
+    int n = 0;
+    for (int i = 0; i < count; i++) {
+        if (!(heard & (uint16_t)(1u << i))) order[n++] = (uint8_t)i;
+    }
+    for (int i = 0; i < count; i++) {
+        if (heard & (uint16_t)(1u << i)) order[n++] = (uint8_t)i;
+    }
+
+    // Where we are now. A story that is no longer in the list (denied by
+    // the operator, retired, or its file vanished) is not an error — start
+    // the walk at the top rather than refusing to browse.
+    int at = 0;
+    for (int k = 0; k < n; k++) {
+        if (cs_story_ids_equal(pool[order[k]].story_id, current_id)) { at = k; break; }
+    }
+
+    const int step = (dir == 'N') ? -1 : 1;
+    const int next = (at + step + n) % n;   // wraps both ways
+    cs_copy_bounded(out_id, out_len, pool[order[next]].story_id);
+    return true;
+}
+#endif  // AREG_HAS_ANSWER_BUTTONS
 
 // Plays a device-global clip by id if it is on the card. Returns false
 // when the clip has not been synced yet, which every caller treats as
@@ -859,7 +1040,13 @@ static void handle_online_chat_session(uint8_t *payload, size_t payload_len) {
 // Offers stories by name until the child says yes, then plays one.
 // Always ends by starting SOME story — falling silent after asking a
 // child what they want is worse than playing something.
-static void welcome_offer_story() {
+//
+// child_present: true when a human physically held the button seconds
+// ago, so the room is known to be occupied and silence means "did not
+// understand", not "nobody is there". False at power-on, where the toy
+// has no such evidence. Not a default argument on purpose: the Arduino
+// auto-prototype generator mishandles them (see welcome_listen above).
+static void welcome_offer_story(bool child_present) {
     // Filtered IN PLACE in the shared table: the offer pool is a subset
     // of the eligible list, so a second CsStory[CS_MAX_STORIES] would be
     // ~10 KB of .bss for nothing.
@@ -913,8 +1100,16 @@ static void welcome_offer_story() {
 
         char intent[16];
         if (!welcome_listen("yesno", intent, sizeof(intent), nullptr, nullptr)) {
-            led_for_state(ST_IDLE);
-            return;   // silence — do not start a story into an empty room
+            // The asymmetry is the whole point: at power-on silence almost
+            // always means the room is empty, so we close quietly. After a
+            // hold it means a child who is standing right there did not
+            // answer — and asking «shall I tell you X?» and then going dead
+            // silent is the exact failure this function's header rejects.
+            if (!child_present) {
+                led_for_state(ST_IDLE);
+                return;   // silence — do not start a story into an empty room
+            }
+            break;        // a child is here — play the story we just named
         }
         if (strcmp(intent, "yes") == 0) {
             break;
@@ -947,7 +1142,11 @@ static void welcome_offer_story() {
     handle_story_session();
 }
 
-static void handle_welcome_flow() {
+// child_present: true when a human physically held the button seconds ago
+// (the IDLE hold-to-menu gesture), so silence means "did not understand"
+// rather than "nobody is there". False at power-on. Not a default argument
+// on purpose: the Arduino auto-prototype generator mishandles them.
+static void handle_welcome_flow(bool child_present) {
     // ---- preconditions: return SILENTLY, no sound, no LED change ----
     // A paused toy is fully silent, and the greeting is the first thing
     // that would break that promise. The pause flag is seeded from NVS in
@@ -1003,7 +1202,7 @@ static void handle_welcome_flow() {
         Serial.flush();
         if (story_ok) {
             welcome_say(CS_VOICE_ID_JUST_STORY);
-            welcome_offer_story();
+            welcome_offer_story(child_present);
         } else {
             led_for_state(ST_IDLE);
         }
@@ -1031,7 +1230,7 @@ static void handle_welcome_flow() {
         // silence — just do the thing they most likely wanted.
         Serial.println("[welcome] no ask clip — going straight to a story");
         Serial.flush();
-        if (story_ok) welcome_offer_story(); else led_for_state(ST_IDLE);
+        if (story_ok) welcome_offer_story(child_present); else led_for_state(ST_IDLE);
         return;
     }
 
@@ -1041,13 +1240,24 @@ static void handle_welcome_flow() {
         uint8_t *heard = nullptr;
         size_t heard_len = 0;
         if (!welcome_listen("mode", intent, sizeof(intent), &heard, &heard_len)) {
-            led_for_state(ST_IDLE);
-            return;   // silence — never badger
+            // Same asymmetry as welcome_offer_story: at power-on silence
+            // means an empty room, so close quietly. After a hold a child
+            // is standing there — falling silent right after asking them
+            // what they want is the failure this flow exists to avoid, so
+            // break out to the graceful default below.
+            // No heap_caps_free(heard) here: welcome_listen nulls
+            // *keep_payload at entry and only assigns it after both of its
+            // `return false` paths, so on this branch it is provably null.
+            if (!child_present) {
+                led_for_state(ST_IDLE);
+                return;   // silence — never badger
+            }
+            break;
         }
 
         if (strcmp(intent, "story") == 0) {
             if (heard != nullptr) heap_caps_free(heard);
-            if (story_ok) { welcome_offer_story(); return; }
+            if (story_ok) { welcome_offer_story(child_present); return; }
             break;
         }
         // Calm is always available (MODES.md), and a bedtime cue must not
@@ -1085,7 +1295,7 @@ static void handle_welcome_flow() {
     // One short line, then a story — the graceful default.
     welcome_say(CS_VOICE_ID_JUST_STORY);
     if (story_ok) {
-        welcome_offer_story();
+        welcome_offer_story(child_present);
     } else {
         led_for_state(ST_IDLE);
     }
@@ -1172,7 +1382,10 @@ static bool story_pick_for_session(char *out, size_t out_len) {
     return true;
 }
 
-static void handle_story_session() {
+// ONE story, start to finish. Called only by handle_story_session() below,
+// which re-runs it when the child browses to a different story — a loop in
+// ONE stack frame, never a recursive call into this frame again.
+static void handle_story_session_once() {
     // Story-audio access token (gap 1). UNVERIFIED — not compiled/flashed.
     // When the backend has StoryAudio:SigningKey set, the header-less
     // /api/story-audio stream requires ?token=. Fetch it once per session
@@ -1188,7 +1401,24 @@ static void handle_story_session() {
 
     if (s_story_offset == 0) {
         // NEW story.
-        s_current_story_id[0] = '\0';
+        //
+        // The wipe MUST NOT run when a caller has preselected a story, and for
+        // a year it did. story_pick_for_session() opens with
+        //     if (s_story_preselected && s_current_story_id[0] != '\0')
+        // and this line cleared that id on the line above it, so the branch has
+        // been unreachable since the day it was written. The wipe landed in
+        // ee358ba (2026-07-27, story selection); the preselect consumer in
+        // e137d9d (2026-08-04, welcome flow) was added BELOW a wipe that had
+        // already been there a week, and nobody read the two together.
+        //
+        // What it cost: every time the welcome flow asked a child «do you want
+        // «X»?» and the child said yes, the toy played whatever the rotation
+        // picked instead. It always played SOMETHING, so it never looked broken.
+        // The story browser depends on the same seam and would have restarted
+        // the same story on every press.
+        if (!s_story_preselected) {
+            s_current_story_id[0] = '\0';
+        }
         cache_hit = story_pick_for_session(sd_cache_path, sizeof(sd_cache_path));
     } else if (s_current_story_id[0] != '\0') {
         // RESUME: re-resolve the SAME story, never re-select. The variant
@@ -1349,7 +1579,15 @@ static void handle_story_session() {
         // Guarded by selection_settled so a Q&A barge-in, a resume, or the
         // token retry cannot re-run it mid-session; and it does nothing at
         // all unless THIS session selected a story from the index.
-        if (!selection_settled && s_current_story_id[0] != '\0') {
+        //
+        // browse_pending() is the fourth guard, and it is the reason this
+        // line moved: the child has just asked for a DIFFERENT story, so
+        // this one is abandoned, not heard. Without it a browse would both
+        // advance the rotation cursor and mark the abandoned story heard —
+        // the toy would stop offering a story nobody ever listened to. It
+        // must not mark a failed start either: an abandoned story has not
+        // failed at anything. Folds to a constant on a one-button build.
+        if (!selection_settled && s_current_story_id[0] != '\0' && !browse_pending()) {
             if (started) {
                 selection_settled = true;
                 story_select_save_last(s_current_story_id);   // failure is logged + ignored
@@ -1425,12 +1663,75 @@ static void handle_story_session() {
             // child's answer → warm acknowledgement. Self-gates on the SD pack,
             // so it is a no-op when playing the Wi-Fi stream.
             handle_post_story_flow();
+            // A story that reached its natural END asks what to do next.
+            // ORDER IS LOAD-BEARING, twice over. It sits AFTER
+            // handle_post_story_flow() so the reflection dialogue finishes
+            // first — and because it only SETS A FLAG it could not
+            // pre-empt that dialogue even if it ran early. And it is
+            // inside the !interrupted branch ONLY: every interrupted path
+            // (shout-pause, sticky pause, a Q&A barge-in, the token retry,
+            // a browse) leaves the flag alone, so a story the child merely
+            // paused is never followed by a menu.
+            s_ask_next_pending = ask_next_is_allowed();
             Serial.println("[story] finished — press to play again");
             Serial.flush();
             break;
         }
         s_story_offset = resume_offset;
         token_retry_used = false;  // a real segment played; allow a fresh retry later
+
+#if AREG_HAS_ANSWER_BUTTONS
+        // Story browsing: this stop was a GREEN/RED press, not the main
+        // button. Runs BEFORE the pause and barge-in handling below so the
+        // press is never also read as a question or a sticky pause.
+        //
+        // The chosen story starts from the beginning immediately — the
+        // story IS the preview. Nothing announces its title, because no
+        // per-story name clip exists on any card (the offer/reoffer clip
+        // texts are written but none is rendered or configured), and
+        // inventing a spoken title here would mean a clip that is not
+        // there, i.e. silence.
+        if (const char dir = browse_take_request()) {
+            char picked[CS_MAX_STORY_ID_LEN + 1];
+            if (browse_pick(dir, s_current_story_id, picked, sizeof(picked))) {
+                Serial.printf("[browse] %s -> %s (%s)\n",
+                              s_current_story_id[0] ? s_current_story_id : "(none)",
+                              picked, dir == 'N' ? "prev" : "next");
+                Serial.flush();
+                // Exactly the commit pattern welcome_offer_story uses. The
+                // offset of 0 is what makes the restart a genuine NEW-story
+                // session, so story_pause_session_begin re-runs and the
+                // abandoned story's pause state is cleared for free.
+                //
+                // BLOCKED — DO NOT FLASH AND EXPECT THIS TO WORK YET.
+                // That pattern has never worked. The new-story boundary at
+                // the top of this function clears s_current_story_id on the
+                // line BEFORE it calls story_pick_for_session, whose
+                // preselect branch then tests s_current_story_id[0] != '\0'
+                // and is therefore unreachable. The wipe landed 2026-07-27
+                // (story selection), the preselect consumer 2026-08-04
+                // (welcome flow), and nothing since has read the two
+                // together — so «yes, tell me that one» in the welcome flow
+                // has always played the rotation's pick instead. Browsing
+                // inherits the same fault: without the ordering fix, every
+                // press restarts whatever the rotation cursor points at
+                // rather than the story picked here. Flagged for the owner,
+                // deliberately NOT fixed here — repairing it changes live
+                // welcome-flow behaviour that has never been bench-run.
+                s_story_offset = 0;
+                cs_copy_bounded(s_current_story_id, sizeof(s_current_story_id), picked);
+                s_story_preselected = true;
+                s_browse_restart = true;
+                break;   // the wrapper re-enters on the picked story
+            }
+            // Nothing to browse to (an empty or one-story card). Fall
+            // through to the normal interrupted handling rather than
+            // swallowing the press — a press that does nothing at all
+            // reads as a broken toy.
+            Serial.println("[browse] nothing to browse to");
+            Serial.flush();
+        }
+#endif
 
         // Shout-it-out pause: this stop was OUR timer, not the child. Play
         // the invite, hold a short silent beat, play the resume line, then
@@ -1660,6 +1961,29 @@ static void handle_story_session() {
     // never be cut by a timer belonging to a story that stopped.
     story_pause_disarm();
     transition_to(ST_IDLE);
+}
+
+// The story session every caller sees. Browsing restarts the session on
+// the picked story from HERE — a loop in one stack frame — instead of
+// handle_story_session_once calling itself. Recursion would grow the
+// sketch's largest frame once per button press, and the child holding
+// GREEN is exactly the case that would find the bottom of the stack.
+//
+// One pass per story played; each pass re-does precisely what a fresh
+// new-story session does, because s_story_offset was reset to 0 and the
+// picked id was handed over through the existing preselect flag.
+static void handle_story_session() {
+#if AREG_HAS_ANSWER_BUTTONS
+    for (;;) {
+        s_browse_restart = false;
+        handle_story_session_once();
+        if (!s_browse_restart) {
+            break;
+        }
+    }
+#else
+    handle_story_session_once();
+#endif
 }
 
 // ---------------------------------------------------------------
@@ -1954,6 +2278,10 @@ void setup() {
 
     button_begin();
     answer_buttons_begin();   // no-op unless AREG_PIN_BUTTON_YES/NO defined
+    // Before anything can make a sound: this takes the first ADC reading, so
+    // the greeting already comes out at the knob's position instead of opening
+    // at the default and correcting itself audibly a moment later.
+    volume_pot_begin();       // no-op unless AREG_PIN_VOLUME_POT defined
     DIAG_MARK(120, "button_initialised");
 
     // Seed the last-known pause / bedtime state from NVS before anything
@@ -2129,7 +2457,10 @@ void setup() {
     if (voice_wifi_is_connected()) {
         voice_send_heartbeat();
     }
-    handle_welcome_flow();
+    // child_present=false: at power-on the toy has no evidence anyone is in
+    // the room, so silence must stay a quiet close. Only the IDLE hold
+    // gesture (a hand on the button seconds ago) passes true.
+    handle_welcome_flow(/*child_present=*/false);
 #else
     (void)handle_welcome_flow;   // keep it compiled (and warning-free) while unused
     Serial.println("[boot] welcome flow disabled - press the button to talk");
@@ -2194,6 +2525,16 @@ void loop() {
                 (int)WiFi.RSSI());
             Serial.flush();
         }
+
+        // Read the volume knob while nothing is playing, so a turn made
+        // between stories is already applied when the next one starts. The
+        // three long decode loops in audio_io.cpp do their own reading — this
+        // branch cannot run while they are blocked. Deliberately NOT wrapped
+        // in an s_last_..._ms gate like the ticks around it: volume_pot_tick()
+        // self-throttles to AREG_VOLUME_READ_MS, and a second timer on top
+        // would beat against the first and could stretch the effective period
+        // to twice that. Unthrottled here it is a millis() compare per pass.
+        volume_pot_tick();
 
         // Phase A.1 (toy side) — periodic presence heartbeat so the parent
         // app's online dot reflects an idle-but-powered toy. Best-effort and
@@ -2309,10 +2650,43 @@ void loop() {
         // which one is a build-time pick (AREG_OFFLINE_GAMES_PICK). Zero
         // bytes of this in production.
         offline_games_tick();
+        // A finished game asks what to do next, exactly as a finished
+        // story does. Same deferred flag, for the same reason: the menu
+        // can start a story, and starting one from inside a game's own
+        // call stack is the recursion this flag exists to avoid.
+        if (offline_games_consume_finished() && ask_next_is_allowed()) {
+            s_ask_next_pending = true;
+        }
 #endif
+
+        // An activity ended and the toy owes the child a question. Consumed
+        // HERE, at the top level, and nowhere else — see s_ask_next_pending.
+        if (s_ask_next_pending) {
+            s_ask_next_pending = false;
+            s_auto_menu_chain++;
+            Serial.printf("[menu] activity ended — asking what next (chain=%u)\n",
+                          (unsigned)s_auto_menu_chain);
+            Serial.flush();
+            // child_present = FALSE, and this is load-bearing: nobody
+            // touched the toy when a story or a game ended. False is what
+            // selects the quiet-close path on silence — which is exactly
+            // "the child walked away". True would make the toy say
+            // «I didn't hear you», ask again, and then start four minutes
+            // of story into an empty room.
+            handle_welcome_flow(/*child_present=*/false);
+            // MANDATORY, same reason as the hold-to-menu call below.
+            transition_to(ST_IDLE);
+            return;   // one action per loop pass
+        }
 
         char ev = button_poll();
         if (ev == 'P') {
+            // A real press means the child is driving. Drop anything the
+            // toy had queued for itself: an auto-menu must never stack on
+            // top of a deliberate action, and the chain that bounds those
+            // menus starts again from here.
+            s_auto_menu_chain = 0;
+            s_ask_next_pending = false;
             Serial.println("[button] pressed");
             Serial.flush();
             DIAG_MARK(200, "button_press");
@@ -2321,37 +2695,74 @@ void loop() {
             // online chat path, so a child could still play cached stories).
             // The pause state is heartbeat-cached; when offline the last-known
             // value stands. A paused press just flicks the LED, no sound.
-            char music_path[CS_MAX_PATH_LEN];
             if (voice_is_paused()) {
                 Serial.println("[button] ignored — toy is paused");
                 Serial.flush();
                 led_for_state(ST_IDLE);
-            } else if (s_story_offset == 0
-                       && voice_in_bedtime_window()
-                       && story_select_music_enabled()
-                       && music_select_next(music_path, sizeof(music_path))) {
-                // Slice E — bedtime music: while the server says the bedtime
-                // window is active (heartbeat-cached; the toy has no clock)
-                // AND the parent opted in (index-cached) AND a verified track
-                // is on the card, a press plays calm music instead of a
-                // story. A press during music stops it quietly (no Q&A, no
-                // resume bookkeeping — it's music, not a narrative). Never
-                // touches a paused story's resume offset.
-                transition_to(ST_PLAYING);
-                audio_speaker_begin();
-                Serial.printf("[music] playing %s\n", music_path);
-                Serial.flush();
-                audio_play_story_file(music_path, 0, story_barge_in_poll, nullptr);
-                Serial.println("[music] done");
-                Serial.flush();
-                transition_to(ST_IDLE);
+            } else if (voice_in_bedtime_window()) {
+                // Inside the bedtime window a hold is just a press — never
+                // the menu. A cheerful greeting at 21:30 is what
+                // handle_welcome_flow's own bedtime guard exists to prevent,
+                // and a hold that did nothing at all would read as a broken
+                // toy. Behaviour here is byte-identical to before this change.
+                char music_path[CS_MAX_PATH_LEN];
+                if (s_story_offset == 0
+                    && story_select_music_enabled()
+                    && music_select_next(music_path, sizeof(music_path))) {
+                    // Slice E — bedtime music: while the server says the bedtime
+                    // window is active (heartbeat-cached; the toy has no clock)
+                    // AND the parent opted in (index-cached) AND a verified track
+                    // is on the card, a press plays calm music instead of a
+                    // story. A press during music stops it quietly (no Q&A, no
+                    // resume bookkeeping — it's music, not a narrative). Never
+                    // touches a paused story's resume offset.
+                    transition_to(ST_PLAYING);
+                    audio_speaker_begin();
+                    Serial.printf("[music] playing %s\n", music_path);
+                    Serial.flush();
+                    audio_play_story_file(music_path, 0, story_barge_in_poll, nullptr);
+                    Serial.println("[music] done");
+                    Serial.flush();
+                    transition_to(ST_IDLE);
+                } else {
+                    handle_story_session();
+                }
             } else {
-                // Continuous story: a press starts the story (or resumes
-                // it from the last barge-in offset). During playback a
-                // press cuts the audio instantly; holding + speaking asks
-                // a question (answered, then the story auto-resumes), a
-                // quick tap just pauses. All handled in handle_story_session.
-                handle_story_session();
+                // Classify hold vs quick press. Local timer on purpose:
+                // button_poll() has four callers and three of them run during
+                // playback where a duration is meaningless, so widening its
+                // signature would put hold state on the barge-in hot path for
+                // one consumer's benefit.
+                const uint32_t press_started = millis();
+                bool released_early = false;
+                while (millis() - press_started < AREG_MENU_HOLD_MS) {
+                    if (button_poll() == 'R') { released_early = true; break; }
+                    delay(AREG_BUTTON_POLL_MS);
+                    esp_task_wdt_reset();
+                }
+                if (!released_early) {
+                    Serial.println("[button] hold — opening the menu");
+                    Serial.flush();
+                    handle_welcome_flow(/*child_present=*/true);
+                    // MANDATORY. handle_welcome_flow was written to be called
+                    // only from setup(), which restores the state itself.
+                    // SEVEN of its exits return with s_state still ST_PLAYING
+                    // (five in handle_welcome_flow itself, one in
+                    // welcome_offer_story, one in handle_online_chat_session
+                    // — the count read "six" here and was one short), and
+                    // loop() only accepts input while s_state == ST_IDLE —
+                    // without this line the toy takes one hold and then
+                    // ignores the button until a power cycle, which is the
+                    // exact failure this whole change exists to remove.
+                    transition_to(ST_IDLE);
+                } else {
+                    // Continuous story: a press starts the story (or resumes
+                    // it from the last barge-in offset). During playback a
+                    // press cuts the audio instantly; holding + speaking asks
+                    // a question (answered, then the story auto-resumes), a
+                    // quick tap just pauses. All handled in handle_story_session.
+                    handle_story_session();
+                }
             }
         }
     }

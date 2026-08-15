@@ -877,3 +877,121 @@ void story_heard_clear() {
     memset(&set, 0, sizeof(set));
     heard_save(&set);
 }
+
+// ---- per-story reflection-question cursor ---------------------------
+//
+// Lives here rather than in the .ino because this file already owns
+// every per-story fact the toy persists — the rotation cursor, the heard
+// set, the series latch — and already carries the fixed-blob NVS idiom
+// this copies. The .ino stays a flow file with no NVS code in it.
+
+namespace {
+
+// One slot per story, so this table and the heard set can never fall out
+// of step. Guarded rather than hardcoded so a build flag can shrink it;
+// config.h carries the same guarded default as the public record. The
+// override that reaches EVERY translation unit is the build flag —
+// config.h is not included here, deliberately (it would also expose this
+// file's AREG_VARIANT_ENDINGS_ENABLED default to config.h, which is a
+// separate decision and not this slice's to make).
+#ifndef AREG_QUESTION_CURSOR_SLOTS
+#define AREG_QUESTION_CURSOR_SLOTS CS_MAX_STORIES
+#endif
+
+constexpr const char *kQuestionPrefsNamespace = "aregqidx";
+constexpr const char *kQuestionPrefsKey       = "cursors";
+
+// Parallel arrays rather than a struct-per-entry: it keeps the blob's
+// layout obvious and the whole thing is one stack local, never .bss.
+struct QuestionCursorSet {
+    char    ids[AREG_QUESTION_CURSOR_SLOTS][CS_MAX_STORY_ID_LEN + 1];
+    uint8_t last_asked[AREG_QUESTION_CURSOR_SLOTS];
+    int     count;
+};
+
+void question_cursor_load(QuestionCursorSet *set) {
+    memset(set, 0, sizeof(*set));
+    Preferences prefs;
+    if (!prefs.begin(kQuestionPrefsNamespace, /*readOnly=*/true)) {
+        return;   // never provisioned — an empty set, not an error
+    }
+    const size_t read = prefs.getBytes(kQuestionPrefsKey, set, sizeof(*set));
+    prefs.end();
+    // Same rule the heard set applies: a short or oversized read means a
+    // downgrade, corruption or a hand-written key. Treat it as empty
+    // rather than trusting it — the worst outcome is a child being asked
+    // question 0 again, which is not worth a single risky byte.
+    if (read != sizeof(*set) || set->count < 0
+        || set->count > AREG_QUESTION_CURSOR_SLOTS) {
+        memset(set, 0, sizeof(*set));
+    }
+}
+
+/// Position of `story_id` in the set, or -1.
+int question_cursor_find(const QuestionCursorSet *set, const char *story_id) {
+    for (int i = 0; i < set->count; i++) {
+        if (cs_story_ids_equal(set->ids[i], story_id)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+}  // namespace
+
+int story_question_cursor_next(const char *story_id) {
+    if (!cs_is_valid_story_id(story_id)) {
+        return 0;
+    }
+    QuestionCursorSet set;
+    question_cursor_load(&set);
+    const int at = question_cursor_find(&set, story_id);
+    if (at < 0) {
+        return 0;   // first listen — question 0, the one most stories have
+    }
+    // A stored index outside the range (a downgrade from a build with more
+    // kinds, or a corrupt byte) is clamped by the modulo rather than
+    // trusted, so it can never index cs_question_clip_kind out of bounds.
+    return (set.last_asked[at] + 1) % CS_QUESTION_KINDS;
+}
+
+void story_question_cursor_commit(const char *story_id, int index) {
+    if (!cs_is_valid_story_id(story_id)
+        || index < 0 || index >= CS_QUESTION_KINDS) {
+        return;
+    }
+    QuestionCursorSet set;
+    question_cursor_load(&set);
+
+    const int at = question_cursor_find(&set, story_id);
+    if (at >= 0) {
+        if (set.last_asked[at] == (uint8_t)index) {
+            return;   // already there — do not re-write flash
+        }
+        set.last_asked[at] = (uint8_t)index;
+    } else {
+        if (set.count >= AREG_QUESTION_CURSOR_SLOTS) {
+            // Drop the OLDEST, exactly as the heard set does. Refusing to
+            // record would be worse: the evicted story simply starts its
+            // rotation again, while a refusal would freeze every story
+            // added after the table filled on question 0 forever.
+            for (int i = 1; i < AREG_QUESTION_CURSOR_SLOTS; i++) {
+                memcpy(set.ids[i - 1], set.ids[i], sizeof(set.ids[0]));
+                set.last_asked[i - 1] = set.last_asked[i];
+            }
+            set.count = AREG_QUESTION_CURSOR_SLOTS - 1;
+        }
+        cs_copy_bounded(set.ids[set.count], sizeof(set.ids[0]), story_id);
+        set.last_asked[set.count] = (uint8_t)index;
+        set.count++;
+    }
+
+    Preferences prefs;
+    if (!prefs.begin(kQuestionPrefsNamespace, /*readOnly=*/false)) {
+        Serial.println("[post] NVS unavailable — question cursor not persisted");
+        Serial.flush();
+        return;   // never blocks the flow; the child still got their question
+    }
+    prefs.putBytes(kQuestionPrefsKey, &set, sizeof(set));
+    prefs.end();
+}

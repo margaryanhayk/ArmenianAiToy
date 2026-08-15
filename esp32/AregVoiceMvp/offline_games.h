@@ -70,6 +70,21 @@
 // need a new input gesture or LED vocabulary.
 void offline_games_tick();
 
+// Runs the build-time-picked game once and returns. Deliberately does NOT
+// touch the one-game-per-boot latch offline_games_tick owns, so a caller
+// that wants a game (the "what next" menu, a bench harness) can ask for
+// one without the arm delay and without consuming the boot's tick.
+void offline_games_run_picked();
+
+// True exactly once after a game session has ended, then false again.
+//
+// A latch rather than a return value: each game has many quiet exits (a
+// missing clip, no press inside the answer window, the SD card gone), and
+// hooking every one of them would be a dozen edits that a future game
+// would have to remember to repeat. One flag set where a game RETURNS
+// catches all of them by construction.
+bool offline_games_consume_finished();
+
 // Plain entry points. Each runs one complete session and returns; each
 // self-gates on the answer buttons and the SD card, so calling one on a
 // build that has neither is a logged no-op.

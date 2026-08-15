@@ -1,0 +1,21 @@
+﻿nt-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+[alive] ms=27254 heap=123724 psram=7861268 wifi=3 ip=192.168.1.3 rssi=-44
+[alive] ms=32256 heap=123724 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-44
+[alive] ms=37258 heap=123724 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-44
+[alive] ms=42260 heap=123672 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-45
+[alive] ms=47262 heap=123724 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-42
+[alive] ms=52264 heap=123724 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-43
+[alive] ms=57266 heap=123724 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-45
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=62662 heap=123676 psram=7860872 wifi=3 ip=192.168.1.3 rssi=-45
+[alive] ms=67664 heap=123724 psram=7861012 wifi=3 ip=192.168.1.3 rssi=-44
+[alive] ms=72666 heap=123724 psram=7861012 wifi=3 ip=192.168.1.3 rssi=-44
+[alive] ms=77668 heap=123724 psram=7861012 wifi=3 ip=192.168.1.3 rssi=-45
+[alive] ms=82670 heap=123724 psram=7861012 wifi=3 ip=192.168.1.3 rssi=-45
+[alive] ms=87672 heap=123724 psram=7861012 wifi=3 ip=192.168.1.3 rssi=-43
+[alive] ms=92674 heap=123724 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-43
+[alive] ms=97676 heap=123724 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-45
+[alive] ms=102678 heap=123672 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-46
+[alive] ms=107680 heap=123724 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-45
+[alive] ms=112682 heap=123724 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-44
+[alive] ms=117684 heap=123724 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-44

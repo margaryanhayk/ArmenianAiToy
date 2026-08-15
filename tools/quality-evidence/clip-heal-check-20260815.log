@@ -1,0 +1,135 @@
+﻿ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x8 (SPI_FAST_FLASH_BOOT)
+Saved PC:0x4037a9ae
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x116c
+load:0x403c8700,len:0xc2c
+load:0x403cb700,len:0x3108
+entry 0x403c88b8
+
+[boot] AregVoiceMvp starting
+[boot] backend = https://armenianaitoy-production.up.railway.app
+[net] TLS: verifying (ISRG Root X1 pinned)
+[boot] reset_reason=11/UNKNOWN
+[boot] diag_boot_counter=0 (cold)
+[boot] previous_step=(none)
+[boot] backend=https://armenianaitoy-production.up.railway.app/api/chat/audio
+[boot] pins button=0 led=48
+[boot] mic_i2s bck=4 ws=5 sd=6
+[boot] amp_i2s bck=15 lrc=16 din=7
+E (224) task_wdt: esp_task_wdt_init(517): TWDT already initialized
+[boot] task watchdog enabled (30s)
+[boot] sd_spi cs=10 sck=12 mosi=11 miso=13
+[sd] mounted; type=3 size=7680MB
+[boot] SD mounted; offline narration /stories/anban-huri/narration.mp3 = absent
+[content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=42 music=0
+[wifi] using compile-time fallback creds (ssid=<home-ssid-redacted>)
+[wifi] connecting to <home-ssid-redacted> ...
+[wifi] event=connected
+[wifi] event=got_ip
+[wifi] ip=192.168.1.11
+[boot] ready ??? press button to speak
+[state] 0 -> 0
+[ota] running fw=1.3.3 partition=app0 img_state=undefined ota_state=idle (pending_ver=- cmd=- boots=0)
+[device] using provisioned identity (id=248729da-08d8-4144-afc0-e6af8a3fe471)
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[welcome] greeting greet-17
+[state] 0 -> 3
+[story] SD open: /voice/greet-17-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] ask ask-sgrc
+[state] 3 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=21673 heap=123492 psram=7861540 wifi=3 ip=192.168.1.11 rssi=-72
+[ota] boot poll (fw=1.3.3 build=games-bench board=areg-s3-n8 partition=app0)
+[content-sync] bench fw built Aug 15 2026 20:04:04
+[content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+[games] armed (pick=1), starting in 5s
+[alive] ms=26681 heap=123492 psram=7861276 wifi=3 ip=192.168.1.11 rssi=-71
+[games] armed (pick=1), starting in 0s
+[story] SD open: /games/mind-reader/intro.mp3 @ 0
+[story] SD end interrupted=false
+[story] SD open: /games/mind-reader/q-root.mp3 @ 0
+[story] SD end interrupted=false
+[games] mind-reader: no answer ??? asking once more
+[story] SD open: /games/mind-reader/q-root.mp3 @ 0
+[story] SD end interrupted=false
+[story] SD open: /games/mind-reader/q-0.mp3 @ 0
+[story] SD end interrupted=false
+[story] SD open: /games/mind-reader/q-01.mp3 @ 0
+[story] SD end interrupted=false
+[story] SD open: /games/mind-reader/q-011.mp3 @ 0
+[story] SD end interrupted=false
+[games] mind-reader: guessing g-0110
+[story] SD open: /games/mind-reader/g-0110.mp3 @ 0
+[story] SD end interrupted=false
+[games] mind-reader: guessed wrong ??? child wins
+[story] SD open: /games/mind-reader/lose.mp3 @ 0
+[story] SD end interrupted=false
+[alive] ms=91322 heap=123492 psram=7861316 wifi=3 ip=192.168.1.11 rssi=-67
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=96326 heap=123492 psram=7861020 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=101328 heap=123300 psram=7861020 wifi=3 ip=192.168.1.11 rssi=-74
+[alive] ms=106330 heap=123492 psram=7861020 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=111332 heap=123440 psram=7861020 wifi=3 ip=192.168.1.11 rssi=-76
+[alive] ms=116334 heap=123492 psram=7861020 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=121336 heap=123440 psram=7861092 wifi=3 ip=192.168.1.11 rssi=-76
+[alive] ms=126338 heap=123492 psram=7861348 wifi=3 ip=192.168.1.11 rssi=-81
+[alive] ms=131340 heap=123492 psram=7861348 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=136342 heap=123492 psram=7861348 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=141344 heap=123492 psram=7861348 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=146346 heap=123492 psram=7861604 wifi=3 ip=192.168.1.11 rssi=-73
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=154037 heap=123232 psram=7861176 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=159039 heap=123492 psram=7861316 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=164041 heap=123440 psram=7861316 wifi=3 ip=192.168.1.11 rssi=-74
+[alive] ms=169043 heap=123492 psram=7861316 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=174045 heap=123492 psram=7861316 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=179047 heap=123492 psram=7861316 wifi=3 ip=192.168.1.11 rssi=-74
+[content-sync] starting
+[content-sync] heap before=123492
+[content-sync] manifest bytes=-1 heap parse 79048->79260 psram=7806860
+[content-sync] manifest status=200 stories=10 introEnabled=1 music=0 musicEnabled=0 voice=42 games=104 modes=1111 pauses=1 variants=1
+[content-sync] index v7 loaded entries=10 music=0 voice=42
+[content-sync] item anban-huri v9 "?????????? ????????????" 5560991 bytes
+[content-sync] anban-huri already current (index)
+[content-sync] item hedgehog-apple v3 "???????????? ???? ????????????" 613817 bytes
+[content-sync] hedgehog-apple already current (index)
+[content-sync] item khosogh-dzuk v10 "?????????? ??????????" 8138336 bytes
+[content-sync] khosogh-dzuk already current (index)
+[content-sync] item little-cloud v3 "???????????? ????????????" 514133 bytes
+[content-sync] little-cloud already current (index)
+[content-sync] item pochat-aghves v9 "?????????? ????????????" 5460680 bytes
+[content-sync] pochat-aghves already current (index)
+[content-sync] item princess-and-pea v6 "?????????????????????????? ?? ????????????????????????" 1611903 bytes
+[content-sync] princess-and-pea already current (index)
+[content-sync] item sutasan v6 "??????????????????" 1969258 bytes
+[content-sync] sutasan already current (index)
+[content-sync] item sutlik-orskan v9 "?????????????? ??????????????" 3356047 bytes
+[content-sync] sutlik-orskan already current (index)
+[content-sync] item three-piglets v6 "???????? ????????????????????" 2078973 bytes
+[content-sync] three-piglets already current (index)
+[content-sync] item ulik v12 "????????????" 2631933 bytes
+[content-sync] ulik already current (index)
+[content-sync] voice summary offered=42 already=42 downloaded=0 failed=0 voice_active=42
+[content-sync] games phase B: 0 to download, heap=79308
+[content-sync] games summary offered=104 invalid=0 already=104 downloaded=0 failed=0 truncated=0 carried=0 games_active=104
+[content-sync] index written
+[content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=42 music=0
+[content-sync] summary manifest_items=10 accepted_items=10 invalid_items=0 duplicate_items=0 disabled_items=0 truncated_items=0 already_current=10 downloaded=0 failed=0 carried_forward=0 active_index_items=10 index_written=1
+[content-sync] heap after=79308
+[content-sync] PASS
+[content-sync] status=ok error= streak=0 next in 21600s
+[alive] ms=186399 heap=123444 psram=7860952 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=191400 heap=123492 psram=7861092 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=196402 heap=123440 psram=7861092 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=201404 heap=123492 psram=7861092 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=206406 heap=123492 psram=7861092 wifi=3 ip=192.168.1.11 rssi=-67
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=213945 heap=123444 psram=7860664 wifi=3 ip=192.168.1.11 rssi=-78
