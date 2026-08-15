@@ -1,0 +1,176 @@
+﻿
+[games] armed (pick=1), starting in 8s
+[wifi] event=disconnected reason=201
+[wifi] down (status=1); reconnect attempt (backoff=4000 ms)
+[alive] ms=26217 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[games] armed (pick=1), starting in 3s
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[sd] SD.begin failed (no card / wiring / format?)
+[games] mind-reader: SD not available ??? skipping
+[alive] ms=31222 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] down (status=1); reconnect attempt (backoff=8000 ms)
+[wifi] event=disconnected reason=201
+[alive] ms=36227 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=41229 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=46230 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] down (status=1); reconnect attempt (backoff=16000 ms)
+[alive] ms=51235 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=56236 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=61238 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=66240 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=71242 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=76244 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[wifi] down (status=1); reconnect attempt (backoff=32000 ms)
+[alive] ms=81250 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=86252 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=91254 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=96256 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=101258 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=106260 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=111261 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=116263 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=121265 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=126266 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=131268 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=136270 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[wifi] down (status=1); reconnect attempt (backoff=60000 ms)
+[alive] ms=141275 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=146277 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=151279 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=156281 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=161283 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=166285 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=171287 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[alive] ms=176290 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[alive] ms=181293 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[alive] ms=186296 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[alive] ms=191299 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[alive] ms=196301 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[wifi] down (status=1); reconnect attempt (backoff=60000 ms)
+[alive] ms=201307 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[wifi] event=disconnected reason=201
+[alive] ms=206309 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[wifi] event=disconnected reason=201
+[alive] ms=211312 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[wifi] event=disconnected reason=201
+[alive] ms=216315 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[wifi] event=disconnected reason=201
+[alive] ms=221317 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[wifi] event=disconnected reason=201
+[alive] ms=226320 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[wifi] event=disconnected reason=201
+[alive] ms=231323 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[alive] ms=236326 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[alive] ms=241329 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[alive] ms=246332 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[alive] ms=251335 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[alive] ms=256338 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[wifi] down (status=1); reconnect attempt (backoff=60000 ms)
+[alive] ms=261344 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0
+[wifi] event=disconnected reason=201
+[content-sync] waiting wifi
+[wifi] event=disconnected reason=201
+[alive] ms=266346 heap=127224 psram=7892696 wifi=1 ip=0.0.0.0 rssi=0

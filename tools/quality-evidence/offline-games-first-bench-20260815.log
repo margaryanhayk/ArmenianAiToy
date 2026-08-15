@@ -1,0 +1,25 @@
+﻿92.168.1.3 rssi=-51
+[games] armed (pick=1), starting in 13s
+[alive] ms=21682 heap=123828 psram=7891052 wifi=3 ip=192.168.1.3 rssi=-51
+[games] armed (pick=1), starting in 8s
+[alive] ms=26684 heap=123776 psram=7891052 wifi=3 ip=192.168.1.3 rssi=-52
+[games] armed (pick=1), starting in 3s
+[sd] mounted; type=3 size=7680MB
+[games] clip missing: /games/mind-reader/intro.mp3
+[story] SD open: /games/mind-reader/q-root.mp3 @ 0
+[story] SD end interrupted=false
+[games] mind-reader: no answer ??? asking once more
+[story] SD open: /games/mind-reader/q-root.mp3 @ 0
+[story] SD end interrupted=false
+[games] mind-reader: still no answer ??? closing quietly
+[games] mind-reader: ended at depth 0
+[alive] ms=52536 heap=123464 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-50
+[alive] ms=57538 heap=123464 psram=7861308 wifi=3 ip=192.168.1.3 rssi=-50
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=62660 heap=123416 psram=7860880 wifi=3 ip=192.168.1.3 rssi=-49
+[alive] ms=67662 heap=123464 psram=7861020 wifi=3 ip=192.168.1.3 rssi=-49
+[alive] ms=72664 heap=123412 psram=7861020 wifi=3 ip=192.168.1.3 rssi=-48
+[alive] ms=77666 heap=123464 psram=7861020 wifi=3 ip=192.168.1.3 rssi=-49
+[alive] ms=82668 heap=123464 psram=7861020 wifi=3 ip=192.168.1.3 rssi=-51
+[alive] ms=87670 heap=123464 psram=7861020 wifi=3 ip=192.168.1.3 rssi=-47
+[alive] ms=92672 heap=123464 psram=7861052 wifi=3 ip=192.168.1.3 rssi=-45

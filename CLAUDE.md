@@ -2678,18 +2678,52 @@ here the question really is binary. Negated phrases («չեմ ուզում») ar
 and removed FIRST, so the «ուզում» inside a refusal can never read as consent
 (pinned by `DetectYesNo_NegationBeatsAffirmation`). A transcript carrying both
 a clear yes and a clear no is `Unknown` — the toy re-asks once, then just
-starts a story. The Armenian intra-word marks ՞ ՛ ՜ are stripped, mirroring
+starts a story. **CORRECTED 2026-08-15 — that re-ask-once behavior was
+previously written here as if it also covered SILENCE; it did not.** It is
+true only for the heard-but-ambiguous path (a transcript with both a yes and
+a no). On plain silence, `handle_welcome_flow()` returned immediately with no
+retry and no fallback story — the toy asked a question and went dead silent,
+which is the exact defect firmware 1.3.3 exists to fix (see § "Firmware half"
+above and § "Firmware 1.3.3 — hold-to-menu" below). 1.3.3 fixes this only for
+the hold-triggered menu (`child_present=true`): silence there now falls
+through to a story instead of closing. Boot-time silence
+(`child_present=false`) still deliberately closes quietly — unchanged, and
+correct, since nothing at power-on proves a child is in the room. The
+Armenian intra-word marks ՞ ՛ ՜ are stripped, mirroring
 `ModeDetector.NormalizeForMatch` (duplicated, not exposed — that file sits on
 the chat gate's hot path and is HIGH risk).
 
-### Firmware half (compile-verified; NOT yet bench-verified)
+### Firmware half
 
-`handle_welcome_flow()` runs at the END of `setup()`, after the
-hold-to-reprovision gesture has had its chance. Shape copied from
-`handle_post_story_flow` — play a clip, open a listening window, record,
-upload, act — so there is **no new state enum, no new LED vocabulary, no state
-machine**. Full behaviour table and bench procedure in
+**CORRECTED 2026-08-15 (firmware 1.3.3) — the menu is no longer boot-only.**
+This subsection originally described `handle_welcome_flow()` running once, at
+the END of `setup()`, as the whole story. That was true only through firmware
+1.3.2. As of 1.3.3 (§ "Firmware 1.3.3 — hold-to-menu" below), **holding the
+button `AREG_MENU_HOLD_MS` (2000 ms) in IDLE re-opens the same menu at any
+time** — a quick press still starts/resumes a story, as before. The shape
+copied from `handle_post_story_flow` — play a clip, open a listening window,
+record, upload, act — so there is still **no new state enum, no new LED
+vocabulary, no state machine**. Full behaviour table and bench procedure in
 `esp32/AregVoiceMvp/README.md` § "Welcome flow".
+
+- **The IDLE call site must restore state, or the button dies.**
+  `handle_welcome_flow()` has six exits that return with `s_state ==
+  ST_PLAYING`, and `loop()` only accepts input while `s_state == ST_IDLE`.
+  `setup()`'s call site restored it directly; the new hold-triggered IDLE call
+  site does the same and ends with an explicit `transition_to(ST_IDLE)`.
+  Omitting that line is the exact defect 1.3.3 fixes at the boot call site's
+  sibling: the toy accepts one hold and then ignores the button until a power
+  cycle. Keep this in mind before touching either call site again.
+- **`child_present` is a real parameter now, not implicit.** Threaded through
+  `handle_welcome_flow()` and `welcome_offer_story()`: `false` at power-on (no
+  evidence anyone is in the room, so silence still closes quietly — unchanged
+  from before) vs. `true` after a button hold (a child is physically present,
+  so silence on that path falls through to the graceful default and a story
+  plays, rather than going dead). No default-argument trick — Arduino's
+  auto-prototype generator mishandles those.
+- **Bedtime is unchanged and still wins.** Inside the bedtime window a hold
+  behaves as an ordinary press (music if opted-in and a track resolves, else
+  the story session) — it never opens the menu.
 
 - **Index schema v3 → v4**: root `voice[]` + the four mode flags. A superset
   like every previous bump, so a v3 card parses as "no voice clips, every mode
@@ -4821,6 +4855,73 @@ for the firmware half that ships them.
   is expected to grow) and prints unparseable content raw rather than
   swallowing it, because a diagnostic that cannot be parsed is itself a
   diagnostic.
+
+### Firmware 1.3.3 — hold-to-menu (2026-08-15, cable-flashed only)
+
+**Root cause fixed:** `handle_welcome_flow()` — the "what shall we do?" menu,
+and the only door to Game/Riddle/Curiosity — was called once at the tail of
+`setup()` and never again, so a power cycle was the only way back to it.
+Separately, on child silence it returned with no retry and no fallback, so
+the toy asked a question and went dead silent (the false claim corrected in
+§ "The Armenian" above). Both are fixed in this release. Changes are all in
+`esp32/AregVoiceMvp/`:
+
+1. **Hold-to-menu.** Holding the button `AREG_MENU_HOLD_MS` (new constant,
+   2000 ms, in `config.h` + `config.h.example`) in IDLE opens the
+   welcome/mode menu; a quick press still starts/resumes a story. Hold
+   detection is a local timer in the IDLE `'P'` branch — `button_poll()`'s
+   signature is unchanged (it has 4 callers, 3 of which run during
+   playback).
+2. **The menu call site restores state — see the trap noted in § "Firmware
+   half" above.** Without the trailing `transition_to(ST_IDLE)`, one hold
+   would work and every button press after it would be ignored until a power
+   cycle — the same shape of bug the release fixes, reintroduced at a second
+   call site.
+3. **Bedtime unchanged.** Inside the bedtime window a hold behaves as an
+   ordinary press, never the menu.
+4. **`child_present` parameter** — see § "Firmware half" above for the
+   `false`-at-boot / `true`-after-hold split.
+5. **Content sync**: the operator "Sync now" request now jumps the boot arm
+   gate (`if (!s_requested_now && now < kBenchStartMs)`), `s_requested_now`
+   is cleared just before the run rather than before the Wi-Fi/SD gates (so
+   a request landing on a radio-down tick is no longer swallowed), and the
+   pre-arm waiting line prints ONCE per boot instead of every 5 s, from the
+   `kBenchStartMs` constant instead of a hardcoded `"180000"`.
+   **`kBenchStartMs` itself is UNCHANGED at 180000** — lowering it was
+   reviewed and rejected: `content_sync_tick()` runs before `button_poll()`
+   in the same IDLE branch and downloads synchronously, so an earlier arm
+   would move the button-dead window earlier and reproduce the very symptom
+   this release fixes.
+6. **Version**: `AREG_FW_VERSION` 1.3.2 → **1.3.3**, `AREG_FW_BUILD` →
+   `"hold-to-menu"`.
+7. `esp32/AregVoiceMvp/README.md` carries the button contract, the bench
+   demo, and corrections to the welcome-flow section.
+
+**Hardware evidence (real toy, COM7, 2026-08-15):**
+- Pre-flash boot log confirmed the defect live:
+  `[welcome] ask ask-sgrc` → `[welcome] listening (mode)` →
+  `[welcome] no answer — closing quietly` → `[state] 3 -> 0`, then silence.
+- Post-flash: `[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)`, pre-arm
+  waiting-line count **1** in 95 s (was ~19 before the fix), no panic, heap
+  123,724 B (unchanged from 1.3.2 — the change costs no runtime RAM).
+- Build: 1,328,736 B = 42.2% of the 3 MB app slot (1.3.2 was 1,328,688 B).
+- NVS was not in esptool's erase list, so device credentials, Wi-Fi, story
+  cursor and heard-set survived the flash.
+- Evidence log: `tools/quality-evidence/hold-to-menu-bench-20260815.log`.
+
+**Cable-flashed only — NOT staged for OTA.** See
+`docs/ota-release-runbook.md` § Field log for the reason (this build was
+compiled from a bench `config.h` carrying real device credentials and a real
+Wi-Fi password) and the required steps before it may ever become a release.
+`FirmwareUpdate:LatestVersion` in `appsettings.json` is deliberately left at
+`1.3.2` — the offer gate is strictly-older, so a toy already on 1.3.3 is
+never offered a "downgrade" to 1.3.2.
+
+**NOT verified — say so plainly:** nobody has yet pressed the button on
+1.3.3. Quick-press-still-plays-a-story, hold-opens-the-menu,
+held-button-not-eaten-as-the-answer, silence-after-a-hold-plays-a-story, and
+toy-still-responds-after-the-menu are all UNVERIFIED and await the owner's
+hands on the toy.
 
 ### Open items across Stages 1–5 (2026-08-14) — recorded honestly, not yet closed
 
