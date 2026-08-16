@@ -1835,32 +1835,44 @@ static void handle_story_session_once() {
             // against audio quality (longer → fewer AudioOutputI2S re-inits).
             //
             // HARDWARE ASSUMPTION: repeated AudioOutputI2S begin/stop within
-            // audio_play_thinking_earcon()'s internal helper is well-tolerated
-            // by the MAX98357A. If re-init clicks are audible, replace the
-            // per-pulse I2S construction with a long tone whose amplitude we
-            // fade down (requires exposing a "play N samples then stop" API
-            // or restructuring synth_write_tone to accept a done_fn callback).
+            // synth_play_pulse() is well-tolerated by the MAX98357A. If
+            // re-init clicks are audible, replace the per-pulse I2S
+            // construction with a long tone whose amplitude we fade down
+            // (requires exposing a "play N samples then stop" API or
+            // restructuring synth_write_tone to accept a done_fn callback).
+            //
+            // PULSE 1 IS THE EARCON AND STAYS EXACTLY AS IT WAS: it is the
+            // child's acoustic receipt for letting go of the button, so it
+            // keeps its own pitch, length and loudness. Pulses 2+ are the
+            // thinking bed proper — lower, shorter, quieter, and moving.
+            //
+            // FIXED 2026-08-16 (this is the TODO that used to sit here): the
+            // bed was a second call to the earcon, so the entire wait was one
+            // 440 Hz 600 ms beep repeated up to 70 times — the 4th identical
+            // beep by second 2, the 16th by second 10. The monotony was the
+            // boredom, more than the duration. The three AREG_THINKBED_ tone
+            // constants had been declared for exactly this from the start and
+            // were read by no sound path at all; only the pulse cap was live.
+            // synth_write_tone() was already fully parameterised, so the fix
+            // was to stop calling the earcon here — not to write a new synth.
             int bed_count = 0;
             while (!voice_async_upload_done() &&
                    bed_count < AREG_THINKBED_MAX_PULSES) {
-                // Reuse audio_play_thinking_earcon() with thinking-bed params.
-                // HARDWARE ASSUMPTION: the earcon function reads
-                // AREG_EARCON_FREQ_HZ / AREG_EARCON_DURATION_MS internally.
-                // For the thinking bed we want different freq/duration, so we
-                // call a single-pulse synth directly.
-                // TODO (on device): refactor synth_write_tone() to accept
-                // freq/duration/amplitude args so we can call it with
-                // AREG_THINKBED_FREQ_HZ / AREG_THINKBED_PULSE_MS /
-                // AREG_THINKBED_AMPLITUDE here without rebuilding AudioOutputI2S
-                // on every pulse. For now, reuse the earcon (same freq/duration)
-                // so we can verify the FreeRTOS + I2S coexistence first.
-                esp_task_wdt_reset();  // #047 — feed across the ~0.6s-per-pulse bed
-                // ABORTABLE (latency, 2026-08-10): the pulse now checks the
+                esp_task_wdt_reset();  // #047 — feed across the per-pulse bed
+                // ABORTABLE (latency, 2026-08-10): the pulse checks the
                 // upload's done flag every ~16 ms and fades out early instead
-                // of finishing its 600 ms. Before this, an answer that arrived
-                // 20 ms into a pulse still waited out the other 580 ms —
-                // 0-600 ms of dead time on every question, ~300 ms on average.
-                audio_play_thinking_earcon_abortable(voice_async_upload_done);
+                // of running its full length. Before this, an answer that
+                // arrived 20 ms into a pulse still waited out the other 580 ms
+                // — 0-600 ms of dead time on every question, ~300 ms on
+                // average. BOTH calls below keep it, and the bed's shorter
+                // pulse only adds more between-pulse chances to notice, so
+                // the worst-case wait after an answer lands cannot grow.
+                if (bed_count == 0) {
+                    audio_play_thinking_earcon_abortable(voice_async_upload_done);
+                } else {
+                    audio_play_thinking_bed_abortable((uint32_t)(bed_count - 1),
+                                                      voice_async_upload_done);
+                }
                 bed_count++;
             }
             Serial.printf("[qa] thinking-bed done after %d pulses; upload_done=%s\n",
@@ -1899,8 +1911,22 @@ static void handle_story_session_once() {
             if (turn.ok) {
                 transition_to(ST_PLAYING);
                 const uint32_t qa_latency_ms = millis() - qa_release_ms;
+                // THE KEY NAME CHANGES WITH THE PATH, and that is deliberate.
+                // On the streaming path turn.ok is published at the response
+                // HEADERS (voice_client.cpp), not after the body has landed,
+                // so this stopwatch stops at the first byte -- a different
+                // quantity from the buffered build's, and a much smaller
+                // number. Printing both under one name would let a definition
+                // change be read as a saving; the two are not comparable, and
+                // a log line has to say which one it is on its own.
+#ifdef AREG_QA_STREAM_PLAYBACK
+                Serial.printf("[latency] qa_release->%s=%u\n",
+                              turn.streaming ? "first_byte_ms" : "play_begin_ms",
+                              (unsigned)qa_latency_ms);
+#else
                 Serial.printf("[latency] qa_release->play_begin_ms=%u\n",
                               (unsigned)qa_latency_ms);
+#endif
                 Serial.flush();
 
                 // Play the answer.

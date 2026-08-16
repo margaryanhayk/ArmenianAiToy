@@ -391,25 +391,35 @@
 // See esp32/AregVoiceMvp/latency-firmware-notes.md
 // -------------------------------------------------------------
 
-// AREG_QA_STREAM_PLAYBACK â€” start playing the spoken answer on the FIRST
+// AREG_QA_STREAM_PLAYBACK -- start playing the spoken answer on the FIRST
 // bytes of the POST response instead of after the whole body has landed in
-// PSRAM. Worth ~0.5-1.5 s per question, and more if the backend ever
-// produces the answer progressively.
+// PSRAM. Worth ~0.5-1.5 s per question.
 //
-// OFF BY DEFAULT, and it must stay off until it has been bench-tested on
-// real hardware: it swaps a proven buffered decode for a live-socket one,
-// and it has NO buffered copy to fall back on â€” a bad stream is a question
-// the child gets no answer to.
+// Shown commented out here because config.h.example is the template. It is
+// ON in the working config.h since 2026-08-16; leave it off in any build you
+// have not benched, because it swaps a proven buffered decode for a
+// live-socket one and has NO buffered copy to fall back on -- a bad stream
+// is a question the child gets no answer to. On failure the toy plays the
+// canned failure clip rather than half an answer.
 //
-// IT ALSO NEEDS THE BACKEND. The endpoint today composes the whole MP3 and
-// sends it with a Content-Length; with the flag on that still works (the
-// device just decodes as the body arrives instead of after), but the real
-// win needs /api/chat/story-qa to WRITE AND FLUSH audio as it is produced,
-// which makes the response Transfer-Encoding: chunked. The firmware side of
-// that is done â€” the de-chunker is in audio_io.cpp â€” but the buffered path
-// still rejects a body with no Content-Length, so the two ends must be
-// flipped together. Details in latency-firmware-notes.md Â§ "What the
-// backend must do".
+// IT NEEDS NO BACKEND CHANGE. The endpoint composes the whole MP3 and sends
+// it with a Content-Length, which is exactly what this path wants: the
+// device decodes as the body arrives instead of after it lands, which is
+// where the saving comes from.
+//
+// AND THE BACKEND MUST NOT BE MADE CHUNKED (decision, 2026-08-16). An
+// earlier attempt to flush audio progressively was reverted for two reasons
+// that both still hold:
+//   - It breaks every field toy still running flag-off firmware. The
+//     buffered reader rejects a body with no Content-Length (voice_client.cpp,
+//     read_response_into), so a chunked response turns every question on
+//     those toys into the canned failure clip.
+//   - It buys close to nothing. The bridge and recap clips are cached for
+//     the process lifetime (StoryQaController), so the server is not slowly
+//     producing audio that could be played early.
+// The de-chunker in audio_io.cpp stays because it costs nothing to keep and
+// makes the device correct against either wire shape -- not because the
+// backend is expected to start using it.
 // #define AREG_QA_STREAM_PLAYBACK 1
 
 // AREG_DIAG_MARK_SERIAL â€” print + flush + delay(5) on every DIAG_MARK.

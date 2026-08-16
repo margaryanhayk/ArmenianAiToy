@@ -746,19 +746,28 @@ static void synth_write_tone(AudioOutputI2S &out,
 }
 #endif  // AREG_DISABLE_MP3_PLAYBACK
 
-// ---- S1: audio_play_thinking_earcon() -----------------------
-bool audio_play_thinking_earcon() {
-    return audio_play_thinking_earcon_abortable(nullptr);
-}
-
-bool audio_play_thinking_earcon_abortable(audio_abort_fn abort) {
-    Serial.println("[audio] earcon_begin");
+// ---- Shared: bring up I2S and write one synthesized pulse ----
+//
+// Both the earcon and the thinking bed are "make one tone now" with
+// different numbers, so the peripheral bring-up lives here once instead of
+// being copied per tone. Extracted 2026-08-16 when the bed stopped being a
+// second call to the earcon; nothing about the earcon's own sound, timing
+// or logging changed in the move.
+static bool synth_play_pulse(uint16_t freq_hz,
+                             uint32_t duration_ms,
+                             int16_t  amplitude,
+                             audio_abort_fn abort,
+                             const char *tag) {
+    Serial.printf("[audio] %s_begin\n", tag);
     Serial.flush();
 #ifdef AREG_DISABLE_MP3_PLAYBACK
+    (void)freq_hz;
+    (void)duration_ms;
+    (void)amplitude;
     (void)abort;
-    // Playback disabled for bench I2S isolation — treat as success
-    // (the important thing is we didn't add silence; earcon is optional).
-    Serial.println("[audio] earcon: playback disabled, skipping");
+    // Playback disabled for bench I2S isolation -- treat as success
+    // (the important thing is we didn't add silence; the tone is optional).
+    Serial.printf("[audio] %s: playback disabled, skipping\n", tag);
     Serial.flush();
     return true;
 #else
@@ -773,29 +782,100 @@ bool audio_play_thinking_earcon_abortable(audio_abort_fn abort) {
     // calling it explicitly here to match audio_play_mp3_buffer style.
     out.SetGain(volume_pot_gain());
     // The synth path MUST set the I2S sample rate. The MP3 path gets it from
-    // the decoder (mp3.begin → out.SetRate); without it here the channel runs
+    // the decoder (mp3.begin -> out.SetRate); without it here the channel runs
     // at ESP8266Audio's default 44.1 kHz, so the 16 kHz-generated tone is
-    // clocked ~2.75x too fast — mis-paced and inaudible — and synth_write_tone
+    // clocked ~2.75x too fast -- mis-paced and inaudible -- and synth_write_tone
     // returns almost instantly (which is why the thinking-bed loop spins,
     // spamming earcon_begin/earcon_end). Setting the rate fixes both.
     out.SetRate(AREG_SAMPLE_RATE_HZ);
     if (!out.begin()) {
-        Serial.println("[audio] earcon: out.begin() failed");
+        Serial.printf("[audio] %s: out.begin() failed\n", tag);
         Serial.flush();
         return false;
     }
 
-    synth_write_tone(out,
-                     AREG_EARCON_FREQ_HZ,
-                     AREG_EARCON_DURATION_MS,
-                     AREG_EARCON_AMPLITUDE,
-                     abort);
+    synth_write_tone(out, freq_hz, duration_ms, amplitude, abort);
 
     out.stop();
-    Serial.println("[audio] earcon_end");
+    Serial.printf("[audio] %s_end\n", tag);
     Serial.flush();
     return true;
 #endif
+}
+
+// ---- S1: audio_play_thinking_earcon() -----------------------
+bool audio_play_thinking_earcon() {
+    return audio_play_thinking_earcon_abortable(nullptr);
+}
+
+bool audio_play_thinking_earcon_abortable(audio_abort_fn abort) {
+    return synth_play_pulse(AREG_EARCON_FREQ_HZ,
+                            AREG_EARCON_DURATION_MS,
+                            AREG_EARCON_AMPLITUDE,
+                            abort,
+                            "earcon");
+}
+
+// ---- S3: audio_play_thinking_bed_abortable() ----------------
+//
+// The pitch figure the wait is built from. Pulse 1 of a wait is the earcon
+// and is deliberately NOT this: it is the child's acoustic receipt for
+// letting go of the button, so it keeps its own pitch, length and loudness.
+// Everything after it is this -- lower, shorter and quieter, on the
+// AREG_THINKBED_* constants that were declared for exactly this in config.h
+// and, until 2026-08-16, were never read by any sound path. Only
+// AREG_THINKBED_MAX_PULSES was ever live, so the "thinking bed" was in
+// truth the 440 Hz earcon repeated up to 70 times.
+//
+// WHY a contour and not one repeated note. The defect is monotony, not
+// pitch: a child waiting ten seconds heard the same beep sixteen times,
+// which is what made the wait feel like a stuck machine rather than a toy
+// that is working. A strict two-note alternation is still a clock, so the
+// pitch instead walks up and back down a six-step figure -- about three
+// seconds to come round, so by two seconds the child has heard movement,
+// and by ten no short loop has repeated often enough to be countable.
+//
+// WHY it stays this narrow. The top step is one whole tone above the base
+// (base * 9/8, since 3/24 = 1/8) and no further. Wider begins to sound like
+// a tune asking for attention; this has to sit behind a child's shoulder
+// while they wait, which is the same reason it runs at the thinking-bed's
+// quieter amplitude rather than the earcon's.
+//
+// WHY it never speeds up or climbs as the wait grows: an accelerating or
+// rising beep reads as an alarm. The figure at second ten is identical to
+// the figure at second two -- calm, and finite-feeling, per the tone
+// contract in CLAUDE.md. The wait is still bounded by
+// AREG_THINKBED_MAX_PULSES exactly as before.
+static const uint8_t kBedContourSteps[] = { 0, 1, 2, 3, 2, 1 };
+
+bool audio_play_thinking_bed_abortable(uint32_t pulse_index,
+                                       audio_abort_fn abort) {
+    const uint8_t step =
+        kBedContourSteps[pulse_index %
+                         (sizeof(kBedContourSteps) / sizeof(kBedContourSteps[0]))];
+    // Derived from the constant rather than tabulated, so retuning
+    // AREG_THINKBED_FREQ_HZ moves the whole figure and keeps its shape.
+    const uint16_t freq_hz =
+        (uint16_t)(AREG_THINKBED_FREQ_HZ +
+                   ((uint32_t)AREG_THINKBED_FREQ_HZ * step) / 24u);
+
+    // Once per wait, not per pulse: enough for a bench listener to confirm
+    // the contour is live without 70 lines of it scrolling past.
+    if (pulse_index == 0) {
+        Serial.printf("[audio] thinkbed contour base=%u Hz top=%u Hz %u ms amp=%u\n",
+                      (unsigned)AREG_THINKBED_FREQ_HZ,
+                      (unsigned)(AREG_THINKBED_FREQ_HZ +
+                                 ((uint32_t)AREG_THINKBED_FREQ_HZ * 3u) / 24u),
+                      (unsigned)AREG_THINKBED_PULSE_MS,
+                      (unsigned)AREG_THINKBED_AMPLITUDE);
+        Serial.flush();
+    }
+
+    return synth_play_pulse(freq_hz,
+                            AREG_THINKBED_PULSE_MS,
+                            AREG_THINKBED_AMPLITUDE,
+                            abort,
+                            "thinkbed");
 }
 
 // ---- S3: audio_play_qa_stream() -----------------------------
@@ -925,6 +1005,17 @@ public:
         return true;
     }
 
+    // True when bytes this source was still owed never arrived -- a stalled
+    // socket, or the server dropping the connection mid-answer.
+    //
+    // NOT the same as "the body had bytes left in it". The MP3 decoder stops
+    // at the audio's end, which need not be the body's end (ID3v1 trailer, a
+    // final partial frame) -- voice_qa_stream_finish() drops the connection
+    // for exactly that reason. So leftover bytes are normal and `_remaining`
+    // is useless as a completeness test; the only honest signal is a read
+    // that failed while the decoder was still asking for data.
+    bool truncated() const { return _truncated; }
+
     bool isOpen() override { return _body != nullptr; }
     bool close() override { _body = nullptr; return true; }
     uint32_t getSize() override { return 0; }   // unknown — streaming
@@ -957,7 +1048,15 @@ private:
             uint32_t want = len - done;
             if (want > _remaining) want = _remaining;
             const int got = wait_read(dst + done, want);
-            if (got <= 0) { _eof = true; break; }
+            if (got <= 0) {
+                // Owed bytes that never came. Record it: pull() collapses this
+                // into the same _eof a clean end produces, and without the
+                // distinction half an answer is indistinguishable from a whole
+                // one to the caller.
+                _truncated = true;
+                _eof       = true;
+                break;
+            }
             done       += (uint32_t)got;
             _pos       += (uint32_t)got;
             _remaining -= (uint32_t)got;
@@ -990,13 +1089,15 @@ private:
     bool next_chunk() {
         if (_saw_chunk) {                       // CRLF terminating the previous chunk
             uint8_t crlf[2];
-            if (wait_read(crlf, 2) != 2) return false;
+            if (wait_read(crlf, 2) != 2) { _truncated = true; return false; }
         }
         char line[24];
         size_t n = 0;
         for (;;) {
             uint8_t c;
-            if (wait_read(&c, 1) != 1) return false;
+            // Dying part-way through a chunk header is a truncated body; the
+            // zero-size chunk below is the clean end and must not be flagged.
+            if (wait_read(&c, 1) != 1) { _truncated = true; return false; }
             if (c == '\n') break;
             if (c != '\r' && n < sizeof(line) - 1) line[n++] = (char)c;
         }
@@ -1013,6 +1114,7 @@ private:
     uint32_t _remaining;
     uint32_t _pos       = 0;
     bool     _eof       = false;
+    bool     _truncated = false;
     bool     _saw_chunk = false;
     uint8_t  _head[3]   = {0, 0, 0};
     uint8_t  _head_len  = 0;
@@ -1054,9 +1156,21 @@ bool audio_play_qa_stream_response(Stream *body, int content_length) {
         }
     }
     out.stop();
-    Serial.println("[audio] qa_stream_end ok=true");
+
+    // Report what actually happened, not that we reached the end of the
+    // function. This used to be an unconditional `return true`, so a body
+    // that stalled half-way through the answer was reported to the caller as
+    // a good turn: the child heard a sentence and a half, and the toy neither
+    // played the failure clip nor logged anything wrong. A partial answer is
+    // a failed turn -- on this path there is no buffered copy, so the caller
+    // playing the canned failure clip is the only recovery available.
+    const bool ok = !source.truncated();
+    Serial.printf("[audio] qa_stream_end ok=%s bytes=%u%s\n",
+                  ok ? "true" : "false",
+                  (unsigned)source.getPos(),
+                  ok ? "" : " (body stopped mid-answer)");
     Serial.flush();
-    return true;
+    return ok;
 }
 
 #endif  // AREG_DISABLE_MP3_PLAYBACK
