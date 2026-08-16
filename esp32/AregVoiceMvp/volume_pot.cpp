@@ -8,6 +8,10 @@
 static float s_gain = AREG_VOLUME_FIXED_GAIN;
 static uint32_t s_last_mv = 0;
 static uint32_t s_last_read_ms = 0;
+// Serial is a blocking device once its TX buffer fills, and this code runs on
+// the decode hot path. See the note in volume_pot_tick().
+static uint32_t s_last_log_ms = 0;
+static constexpr uint32_t kLogEveryMs = 3000;
 
 // One sample set -> gain. Touches no state, so both begin() and tick() can
 // use it and differ only in what they do with the result.
@@ -92,9 +96,25 @@ bool volume_pot_tick() {
 
     s_gain = candidate;
     s_last_mv = mv;
-    // Gated by the deadband above, so a still knob prints nothing and this
-    // cannot flood the log during a four-minute story.
-    Serial.printf("[volume] gain %.2f (%u mV)\n", s_gain, (unsigned)mv);
+
+    // NO PRINT ON THE HOT PATH. 2026-08-16: the owner heard the story stutter
+    // -- "sdsdsdsd" -- and this line was the cause, not the ADC.
+    //
+    // volume_pot_tick() runs INSIDE the MP3 decode loop so the knob works
+    // mid-story. The deadband was supposed to make this print rare; against a
+    // pot that is partly measuring the amplifier's own rail it was not rare at
+    // all -- 530 prints in a single story, measured. Each one is a float
+    // printf over a 115200 baud line, and when the TX buffer fills Serial
+    // BLOCKS. Blocking the decoder is exactly how an MP3 stutters.
+    //
+    // The print was a bench aid for the night the knob was built. It is
+    // rate-limited to one line every 3 s now, which keeps it useful for
+    // diagnosis and cannot starve the decoder. The gain itself still updates
+    // on every real move -- the sound follows the knob, the log does not.
+    if ((now - s_last_log_ms) >= kLogEveryMs) {
+        s_last_log_ms = now;
+        Serial.printf("[volume] gain %.2f (%u mV)\n", s_gain, (unsigned)mv);
+    }
     return true;
 }
 
