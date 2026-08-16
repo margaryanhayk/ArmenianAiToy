@@ -1,0 +1,123 @@
+﻿[volume] gain 2.38 (2579 mV)
+[volume] gain 2.31 (2504 mV)
+[volume] gain 1.76 (1866 mV)
+[volume] gain 1.78 (1893 mV)
+[volume] gain 2.04 (2187 mV)
+[volume] gain 1.82 (1929 mV)
+[volume] gain 1.81 (1925 mV)
+[volume] gain 2.06 (2214 mV)
+[volume] gain 2.07 (2228 mV)
+[volume] gain 1.82 (1935 mV)
+[volume] gain 2.06 (2213 mV)
+[volume] gain 1.83 (1940 mV)
+[volume] gain 1.82 (1931 mV)
+[volume] gain 2.07 (2219 mV)
+[volume] gain 1.80 (1911 mV)
+[volume] gain 1.80 (1911 mV)
+[volume] gain 1.79 (1899 mV)
+[volume] gain 2.05 (2204 mV)
+[story] SD end interrupted=false
+[story-report] started princess-and-pea (sd) key=b30-1 queued=1
+[story-report] finished ??? event closed
+[state] 3 -> 3
+[post] summary/conclusion (/stories/princess-and-pea-v6-summary.mp3)
+[story] SD open: /stories/princess-and-pea-v6-summary.mp3 @ 0
+[volume] gain 1.79 (1895 mV)
+[story] SD end interrupted=false
+[state] 3 -> 3
+[post] question 0 (/stories/princess-and-pea-v6-question.mp3)
+[story] SD open: /stories/princess-and-pea-v6-question.mp3 @ 0
+[volume] gain 1.78 (1883 mV)
+[story] SD end interrupted=false
+[post] listening for answer 0 (press & hold to talk)
+[state] 3 -> 1
+[audio] record_begin
+[audio] i2s_new_channel err=0/ESP_OK
+[audio] i2s_channel_init_std_mode err=0/ESP_OK
+[audio] i2s_channel_enable err=0/ESP_OK
+[audio] record_progress samples=16128 bytes=32256 heap=97796 psram=7861184
+[audio] record_progress samples=32256 bytes=64512 heap=97796 psram=7861184
+[audio] record_progress samples=48384 bytes=96768 heap=97796 psram=7861184
+[audio] record_progress samples=64512 bytes=129024 heap=97796 psram=7861184
+[audio] record_end bytes=136192
+[state] 1 -> 2
+[audio] earcon_begin
+[audio] earcon_end
+[post] uploading answer 0 (last=1)
+[post] POST answer (136236 bytes) qIndex=0
+[voice] http 200, body=169318 bytes (psram), continue=0
+[post] ack 169318 bytes
+[state] 2 -> 3
+[audio] play_begin bytes=169318
+[volume] gain 1.76 (1865 mV)
+[volume] gain 1.71 (1810 mV)
+[volume] gain 2.06 (2213 mV)
+[audio] play_end ok=true
+[post] reply 0 played
+[story] finished ??? press to play again
+[state] 3 -> 0
+[alive] ms=1249712 heap=100892 psram=7861184 wifi=3 ip=192.168.1.11 rssi=-71
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[story-report] uploaded 1 event(s), 0 still queued
+[menu] activity ended ??? asking what next (chain=1)
+[welcome] greeting greet-16
+[state] 0 -> 3
+[story] SD open: /voice/greet-16-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] ask ask-sgrc
+[state] 3 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=1273346 heap=100844 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-75
+[alive] ms=1278353 heap=100892 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=1283354 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-77
+[alive] ms=1288356 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-79
+[alive] ms=1293358 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=1298362 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-81
+[alive] ms=1303369 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=1308370 heap=100844 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-74
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=1313371 heap=100844 psram=7860640 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=1318371 heap=100892 psram=7860640 wifi=3 ip=192.168.1.11 rssi=-74
+[alive] ms=1323376 heap=100892 psram=7860640 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=1328378 heap=100844 psram=7860640 wifi=3 ip=192.168.1.11 rssi=-75
+[alive] ms=1333383 heap=100892 psram=7860640 wifi=3 ip=192.168.1.11 rssi=-75
+[alive] ms=1338392 heap=100892 psram=7860640 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=1343400 heap=100892 psram=7860672 wifi=3 ip=192.168.1.11 rssi=-74
+[alive] ms=1348404 heap=100844 psram=7860672 wifi=3 ip=192.168.1.11 rssi=-77
+[alive] ms=1353404 heap=100892 psram=7860672 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=1358409 heap=100892 psram=7860672 wifi=3 ip=192.168.1.11 rssi=-75
+[alive] ms=1363419 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=1368426 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-73
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=1373432 heap=100892 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-80
+[alive] ms=1378437 heap=100892 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-85
+[alive] ms=1383440 heap=100892 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-84
+[alive] ms=1388449 heap=100892 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=1393453 heap=100844 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-74
+[alive] ms=1398459 heap=100892 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=1403467 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=1408470 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-79
+[alive] ms=1413470 heap=100844 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-78
+[alive] ms=1418471 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=1423478 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=1428486 heap=100844 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-77
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=1433486 heap=100892 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-75
+[alive] ms=1438493 heap=100892 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-77
+[alive] ms=1443499 heap=100892 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-77
+[alive] ms=1448499 heap=100892 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-87
+[alive] ms=1453506 heap=100892 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-81
+[alive] ms=1458511 heap=100892 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-79
+[alive] ms=1463511 heap=100844 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-79
+[alive] ms=1468517 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-89
+[alive] ms=1473522 heap=100844 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=1478532 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=1483540 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-75
+[alive] ms=1488542 heap=100892 psram=7860928 wifi=3 ip=192.168.1.11 rssi=-74
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=1493546 heap=100892 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-76
+[alive] ms=1498554 heap=100892 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-68

@@ -20,22 +20,22 @@
 
 #include <driver/i2s_std.h>
 #include <esp_err.h>
-#include <esp_task_wdt.h>   // #047 — feed the task watchdog from the long decode loops
+#include <esp_task_wdt.h>   // #047 â€” feed the task watchdog from the long decode loops
 #include <math.h>   // sinf() for S1 earcon tone synthesis (UNVERIFIED)
 
-// #047 — per-sample cap on synth_write_tone's I2S back-pressure wait. Defaulted
+// #047 â€” per-sample cap on synth_write_tone's I2S back-pressure wait. Defaulted
 // here so the build never depends on config.h carrying it; overridable there.
 #ifndef AREG_I2S_CONSUME_TIMEOUT_MS
 #define AREG_I2S_CONSUME_TIMEOUT_MS  1000
 #endif
-// AREG_DISABLE_MP3_PLAYBACK — bench rollback switch.
+// AREG_DISABLE_MP3_PLAYBACK â€” bench rollback switch.
 //
 // Capture has been migrated to the new i2s_std driver, so the
 // historical legacy-vs-new IDF conflict no longer applies and
 // ESP8266Audio's AudioOutputI2S can be linked alongside without
 // the boot-time abort. The macro is preserved as an instant
 // rollback to the speaker-disabled bench mode in case the new
-// playback path regresses on hardware — defining it strips
+// playback path regresses on hardware â€” defining it strips
 // every ESP8266Audio symbol from the binary and makes
 // audio_play_mp3_buffer a logged no-op that the state machine
 // treats as success. Capture + HTTP upload are unaffected by
@@ -43,7 +43,7 @@
 #ifndef AREG_DISABLE_MP3_PLAYBACK
 // ESP8266Audio exposes several AudioFileSource subclasses.
 // `AudioFileSourcePROGMEM` despite its AVR-era name works
-// identically against RAM and PSRAM on ESP32 — it uses
+// identically against RAM and PSRAM on ESP32 â€” it uses
 // `pgm_read_byte` which is a plain dereference outside the
 // AVR family. This is the canonical way to decode an in-
 // memory MP3 buffer on ESP32 with ESP8266Audio.
@@ -57,7 +57,7 @@
 #include <SD.h>
 #endif
 
-// Use I2S port 0 for both capture and playback — we tear down
+// Use I2S port 0 for both capture and playback â€” we tear down
 // and reconfigure between phases rather than running two ports
 // in parallel. Simpler, avoids pin-driver conflicts on S3.
 #define AREG_I2S_PORT           I2S_NUM_0
@@ -91,9 +91,9 @@ bool audio_mic_begin() {
         I2S_CHANNEL_DEFAULT_CONFIG(AREG_I2S_PORT, I2S_ROLE_MASTER);
     // Bring-up stability experiment: smaller RX DMA buffers reduce
     // DMA/interrupt pressure during i2s_channel_enable on ESP32-S3.
-    // (Was 4×1024 = 16 KB DMA residency; matched the legacy capture
+    // (Was 4Ã—1024 = 16 KB DMA residency; matched the legacy capture
     // shape. Lower values let the channel come up with much smaller
-    // contiguous DMA descriptors — if that survives, the original
+    // contiguous DMA descriptors â€” if that survives, the original
     // values were starving the I2S driver's allocation path or
     // tripping an interrupt-context issue at enable time.)
     chan_cfg.dma_desc_num  = 2;
@@ -116,7 +116,7 @@ bool audio_mic_begin() {
     // INMP441 outputs 24-bit data in a 32-bit slot. We read the
     // 32-bit slot and right-shift to 16-bit below. L/R is tied
     // to GND on the bench board, which places the mic on the
-    // LEFT slot — make that explicit instead of relying on the
+    // LEFT slot â€” make that explicit instead of relying on the
     // mono-default's chip-specific behaviour.
     i2s_std_config_t std_cfg = {
         .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(AREG_SAMPLE_RATE_HZ),
@@ -254,7 +254,7 @@ size_t audio_mic_capture(int16_t *out_buffer,
         }
         total_samples += samples_read;
 
-        // 1 Hz capture progress — surfaces stalls without spam.
+        // 1 Hz capture progress â€” surfaces stalls without spam.
         const uint32_t now = millis();
         if (now - last_progress_ms >= 1000) {
             last_progress_ms = now;
@@ -278,7 +278,7 @@ size_t audio_mic_capture(int16_t *out_buffer,
 // Speaker
 // -------------------------------------------------------------
 // AudioOutputI2S from ESP8266Audio configures the I2S peripheral
-// itself — we just hand it the pin numbers and sample rate. It
+// itself â€” we just hand it the pin numbers and sample rate. It
 // uses i2s_driver_install internally, which is why we
 // audio_mic_end() before calling audio_speaker_begin().
 
@@ -336,7 +336,7 @@ bool audio_play_mp3_buffer(const uint8_t *data, size_t length) {
     DIAG_MARK(4022, "play_mp3_loop_enter");
     uint32_t last_watchdog_tickle = millis();
     while (mp3.isRunning()) {
-        esp_task_wdt_reset();  // #047 — feed the WDT each decode iteration
+        esp_task_wdt_reset();  // #047 â€” feed the WDT each decode iteration
         if (!mp3.loop()) {
             mp3.stop();
             break;
@@ -346,14 +346,14 @@ bool audio_play_mp3_buffer(const uint8_t *data, size_t length) {
         if (millis() - last_watchdog_tickle > 50) {
             delay(1);
             last_watchdog_tickle = millis();
-            // A child turns the knob WHILE something is playing — which is
+            // A child turns the knob WHILE something is playing â€” which is
             // exactly when loop()'s IDLE branch cannot run, since we are
             // blocked in here for the whole clip. That is the only reason
             // this lives on the decode hot path. It rides the existing yield
             // throttle rather than adding a timer, and volume_pot_tick() is
             // itself rate-limited, so the ADC is read a few times a second
             // and SetGain only touches a member when the knob really moved.
-            if (volume_pot_tick()) out.SetGain(volume_pot_gain());
+            if (volume_pot_tick_playing()) out.SetGain(volume_pot_gain());
         }
     }
     DIAG_MARK(4030, "play_mp3_loop_exit");
@@ -391,7 +391,7 @@ bool audio_play_story_stream(const char *url,
 
     AudioFileSourceHTTPStream http(url);
     if (!http.isOpen()) {
-        // #063 — a non-200 GET (the concealment 404 of a rejected/expired
+        // #063 â€” a non-200 GET (the concealment 404 of a rejected/expired
         // token) lands here. Surface it as the REAL open-failure signal so the
         // caller's token-retry no longer guesses from wall-clock latency.
         if (out_open_failed != nullptr) {
@@ -408,7 +408,7 @@ bool audio_play_story_stream(const char *url,
 
     AudioGeneratorMP3 mp3;
     if (!mp3.begin(&http, &out)) {
-        // Stream opened (200) but the body would not start decoding — NOT an
+        // Stream opened (200) but the body would not start decoding â€” NOT an
         // open failure, so out_open_failed stays false (no token retry).
         Serial.println("[story] mp3.begin (stream) failed");
         Serial.flush();
@@ -418,7 +418,7 @@ bool audio_play_story_stream(const char *url,
     bool interrupted = false;
     uint32_t last_yield = millis();
     while (mp3.isRunning()) {
-        esp_task_wdt_reset();  // #047 — feed the WDT each decode iteration
+        esp_task_wdt_reset();  // #047 â€” feed the WDT each decode iteration
         // True barge-in: poll the button DURING decode and cut
         // instantly on a press.
         if (barge_in != nullptr && barge_in()) {
@@ -446,12 +446,12 @@ bool audio_play_story_stream(const char *url,
         if (millis() - last_yield > 50) {
             delay(1);
             last_yield = millis();
-            // A child turns the knob WHILE the story plays — precisely when
+            // A child turns the knob WHILE the story plays â€” precisely when
             // loop()'s IDLE branch cannot run, because we are blocked in here
             // for minutes. Hence the hot path. Placed after the barge-in check
             // above so button latency is untouched, and riding the existing
             // yield throttle rather than adding a second timer.
-            if (volume_pot_tick()) out.SetGain(volume_pot_gain());
+            if (volume_pot_tick_playing()) out.SetGain(volume_pot_gain());
         }
     }
     out.stop();
@@ -464,7 +464,7 @@ bool audio_play_story_stream(const char *url,
 
 // -------------------------------------------------------------
 // Offline story playback from the microSD content pack (Slice 2)
-// UNVERIFIED — not compiled/flashed. See HARDENING-INTEGRATION.md §6.
+// UNVERIFIED â€” not compiled/flashed. See HARDENING-INTEGRATION.md Â§6.
 // -------------------------------------------------------------
 
 static bool s_sd_ok = false;
@@ -479,7 +479,7 @@ bool audio_sd_begin() {
         return true;  // idempotent
     }
     // Dedicated SPI bus for the card. Pins from config.h; clear of the
-    // strapping / USB pins (see HARDENING-INTEGRATION.md §6.3).
+    // strapping / USB pins (see HARDENING-INTEGRATION.md Â§6.3).
     SPI.begin(AREG_PIN_SD_SCK, AREG_PIN_SD_MISO, AREG_PIN_SD_MOSI, AREG_PIN_SD_CS);
     // 16 MHz is well within any genuine card's spec and far above the
     // ~16 KB/s an MP3 needs; lower it if your wiring is long / noisy.
@@ -513,12 +513,12 @@ bool audio_sd_has_file(const char *path) {
 }
 
 #ifndef AREG_DISABLE_MP3_PLAYBACK
-// #064 — sanity-check that an SD file actually starts like MP3 before handing
+// #064 â€” sanity-check that an SD file actually starts like MP3 before handing
 // it to the decoder. A corrupt card or a wrong/renamed file would otherwise
 // feed arbitrary bytes to the MP3 generator. Accepts the two real MP3 starts
-// (ID3v2 tag or an MPEG frame sync — same check as the network path #048),
+// (ID3v2 tag or an MPEG frame sync â€” same check as the network path #048),
 // then rewinds the source to 0 for the decoder. This is an integrity/typo
-// guard, NOT tamper-proofing — a signed content manifest (operator signing
+// guard, NOT tamper-proofing â€” a signed content manifest (operator signing
 // key) is the deferred full fix for #064.
 static bool sd_file_looks_like_mp3(AudioFileSourceSD &file) {
     uint8_t hdr[3] = { 0, 0, 0 };
@@ -564,11 +564,11 @@ bool audio_play_story_file(const char *path,
         Serial.flush();
         return false;  // nothing to resume; caller treats as natural end
     }
-    // #064 — integrity precheck on a from-start play. A mid-stream resume
+    // #064 â€” integrity precheck on a from-start play. A mid-stream resume
     // (start_byte > 0) trusts the file already validated when it started; a
     // frame-sync sniff at an arbitrary resume offset wouldn't be meaningful.
     if (start_byte == 0 && !sd_file_looks_like_mp3(file)) {
-        Serial.printf("[story] SD file is not MP3 (corrupt/wrong file): %s — refusing to decode\n", path);
+        Serial.printf("[story] SD file is not MP3 (corrupt/wrong file): %s â€” refusing to decode\n", path);
         Serial.flush();
         return false;  // caller treats as natural end / falls back to Wi-Fi
     }
@@ -596,10 +596,10 @@ bool audio_play_story_file(const char *path,
     bool interrupted = false;
     uint32_t last_yield = millis();
     while (mp3.isRunning()) {
-        esp_task_wdt_reset();  // #047 — feed the WDT each decode iteration
+        esp_task_wdt_reset();  // #047 â€” feed the WDT each decode iteration
         // True barge-in: poll the button DURING decode and cut instantly.
         if (barge_in != nullptr && barge_in()) {
-            // getPos() on a file source is the ABSOLUTE file position — no
+            // getPos() on a file source is the ABSOLUTE file position â€” no
             // base_offset bookkeeping needed (unlike the HTTP stream).
             uint32_t abs_pos = (uint32_t)file.getPos();
             // Back up past the decoded-but-unplayed I2S-buffered tail so resume
@@ -627,12 +627,12 @@ bool audio_play_story_file(const char *path,
         if (millis() - last_yield > 50) {
             delay(1);
             last_yield = millis();
-            // The SD story is the long one — four minutes blocked in here,
+            // The SD story is the long one â€” four minutes blocked in here,
             // with loop()'s IDLE branch unable to run, which is exactly the
             // window in which a child reaches for the knob. Placed after the
             // barge-in check above so button latency is untouched, and riding
             // the existing yield throttle rather than adding a second timer.
-            if (volume_pot_tick()) out.SetGain(volume_pot_gain());
+            if (volume_pot_tick_playing()) out.SetGain(volume_pot_gain());
         }
     }
     out.stop();
@@ -644,8 +644,8 @@ bool audio_play_story_file(const char *path,
 }
 
 // -------------------------------------------------------------
-// Dead-air mitigation — S1 (earcon) + S3 (Q&A stream)
-// UNVERIFIED — not compiled/flashed. See HARDENING-INTEGRATION.md §2.
+// Dead-air mitigation â€” S1 (earcon) + S3 (Q&A stream)
+// UNVERIFIED â€” not compiled/flashed. See HARDENING-INTEGRATION.md Â§2.
 // -------------------------------------------------------------
 
 // ---- Shared helper: synthesize and write a soft sine tone ----
@@ -656,7 +656,7 @@ bool audio_play_story_file(const char *path,
 //
 // HARDWARE ASSUMPTION: AudioOutputI2S is already begin()-ed and configured
 // at AREG_SAMPLE_RATE_HZ. ConsumeSample() is the ESP8266Audio sample-push
-// API — it takes a pair of 16-bit values (left, right, packed as int16_t[2])
+// API â€” it takes a pair of 16-bit values (left, right, packed as int16_t[2])
 // and returns false when the I2S DMA buffer is full (back-pressure signal).
 // When it returns false we yield briefly with delay(1) and retry.
 //
@@ -701,8 +701,8 @@ static void synth_write_tone(AudioOutputI2S &out,
         if (abort_at != 0xFFFFFFFFu && i >= abort_at + kAbortFadeSamples) {
             return;  // faded out cleanly above
         }
-        // Map the 32-bit phase accumulator (0..0xFFFFFFFF) onto 0..2π and
-        // compute sinf(). The Xtensa LX7 has hardware FPU — this is fast.
+        // Map the 32-bit phase accumulator (0..0xFFFFFFFF) onto 0..2Ï€ and
+        // compute sinf(). The Xtensa LX7 has hardware FPU â€” this is fast.
         // HARDWARE ASSUMPTION: ESP32-S3 Xtensa LX7 FPU handles sinf in ~10 cycles.
         float angle = ((float)(phase) / (float)0xFFFFFFFFu) * (2.0f * 3.14159265f);
         int16_t raw = (int16_t)(sinf(angle) * (float)amplitude);
@@ -723,19 +723,19 @@ static void synth_write_tone(AudioOutputI2S &out,
         }
 
         // ConsumeSample expects AudioOutput::AudioType (int16_t[2] packed
-        // as a uint32_t on some versions, or two separate calls — the
+        // as a uint32_t on some versions, or two separate calls â€” the
         // public API is ConsumeSample(int16_t lr[2])). Use the two-element
         // array form which is consistent across ESP8266Audio versions.
-        // HARDWARE ASSUMPTION: mono signal — copy left to right.
+        // HARDWARE ASSUMPTION: mono signal â€” copy left to right.
         int16_t lr[2] = { raw, raw };
-        // Back-pressure: if DMA buffers are full, yield and retry — but BOUND
+        // Back-pressure: if DMA buffers are full, yield and retry â€” but BOUND
         // the wait (#047). A never-clearing I2S stall (dead amp / DMA wedged)
         // would otherwise hang here forever; on timeout we abort the tone, which
         // is optional (earcon / thinking-bed), so the caller continues cleanly.
         uint32_t consume_deadline = millis() + AREG_I2S_CONSUME_TIMEOUT_MS;
         while (!out.ConsumeSample(lr)) {
             if ((int32_t)(millis() - consume_deadline) >= 0) {  // rollover-safe
-                Serial.println("[audio] synth: I2S back-pressure timeout — aborting tone");
+                Serial.println("[audio] synth: I2S back-pressure timeout â€” aborting tone");
                 Serial.flush();
                 return;
             }
@@ -902,7 +902,7 @@ bool audio_play_qa_stream(const char *url) {
     // AudioFileSourceHTTPStream opens a TCP connection and begins the GET.
     // On a first-response latency of e.g. 300 ms the mp3.loop() decode
     // loop below will block briefly until the server sends the first MP3
-    // sync word — this is fine; the decoder handles streaming natively.
+    // sync word â€” this is fine; the decoder handles streaming natively.
     AudioFileSourceHTTPStream http(url);
     if (!http.isOpen()) {
         Serial.println("[audio] qa_stream: http open failed; caller may use buffered fallback");
@@ -923,7 +923,7 @@ bool audio_play_qa_stream(const char *url) {
 
     uint32_t last_yield = millis();
     while (mp3.isRunning()) {
-        esp_task_wdt_reset();  // #047 — feed the WDT each decode iteration
+        esp_task_wdt_reset();  // #047 â€” feed the WDT each decode iteration
         if (!mp3.loop()) {
             mp3.stop();
             break;
@@ -962,8 +962,8 @@ bool audio_play_qa_stream_response(Stream *, int) {
 // An AudioFileSource over an already-open HTTP response body.
 //
 // Two shapes of body, one class:
-//   identity — `_remaining` counts down from Content-Length.
-//   chunked  — `_remaining` is refilled from each hex chunk-size line and a
+//   identity â€” `_remaining` counts down from Content-Length.
+//   chunked  â€” `_remaining` is refilled from each hex chunk-size line and a
 //              zero-size chunk ends the body. HTTPClient does NOT de-chunk
 //              for us on getStreamPtr(); it only does that inside
 //              writeToStream(). Feeding raw chunk headers to the MP3 decoder
@@ -1018,7 +1018,7 @@ public:
 
     bool isOpen() override { return _body != nullptr; }
     bool close() override { _body = nullptr; return true; }
-    uint32_t getSize() override { return 0; }   // unknown — streaming
+    uint32_t getSize() override { return 0; }   // unknown â€” streaming
     uint32_t getPos() override { return _pos; }
     bool seek(int32_t, int) override { return false; }
 
@@ -1066,7 +1066,7 @@ private:
 
     // Blocking read with a stall bound + watchdog feeding. The decoder calls
     // this from inside mp3.loop(), which is exactly where the toy legitimately
-    // waits on the network — an unbounded wait here is a watchdog reboot.
+    // waits on the network â€” an unbounded wait here is a watchdog reboot.
     int wait_read(uint8_t *dst, uint32_t want) {
         const uint32_t deadline = millis() + (uint32_t)AREG_HTTP_READ_MS;
         while (_body->available() == 0) {
@@ -1084,7 +1084,7 @@ private:
     }
 
     // Reads "<hex>[;ext]\r\n" and arms _remaining. A zero-size chunk is the
-    // end of the body and returns false (trailers are ignored — the socket
+    // end of the body and returns false (trailers are ignored â€” the socket
     // is about to be closed or drained by HTTPClient::end()).
     bool next_chunk() {
         if (_saw_chunk) {                       // CRLF terminating the previous chunk
