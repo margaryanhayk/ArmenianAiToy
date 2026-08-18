@@ -181,6 +181,11 @@ static void button_begin() {
     pinMode(AREG_PIN_BUTTON, INPUT_PULLUP);
     s_raw_last = digitalRead(AREG_PIN_BUTTON);
     s_button_pressed = false;
+    // Resting level, printed once. With INPUT_PULLUP and nothing pressed this
+    // must read UP; a boot that reports DOWN means the pin is held low by the
+    // wiring, which on GPIO0 is also the download-mode gesture.
+    Serial.printf("[button] pin=%d resting=%s\n",
+                  (int)AREG_PIN_BUTTON, (s_raw_last == LOW) ? "DOWN" : "UP");
 }
 
 // Returns 'P' on a press edge, 'R' on a release edge, 0 otherwise.
@@ -189,6 +194,15 @@ static char button_poll() {
     if (raw != s_raw_last) {
         s_last_edge_ms = millis();
         s_raw_last = raw;
+        // The button is the toy's ONLY physical input, and when it appears
+        // dead there is no way to tell "the wire is off" from "the firmware
+        // ignored it" -- 2026-08-18 cost an evening and a multimeter to that
+        // ambiguity, and the real cause turned out to be neither. This prints
+        // the raw pin edge BEFORE debounce, so a press shows up even when the
+        // state machine is busy and drops it. It cannot flood: it fires only
+        // on a physical level change, and the 30 ms debounce below still
+        // decides what the toy acts on.
+        Serial.printf("[button] raw=%s\n", (raw == LOW) ? "DOWN" : "UP");
     }
     if ((millis() - s_last_edge_ms) < AREG_BUTTON_DEBOUNCE_MS) {
         return 0;

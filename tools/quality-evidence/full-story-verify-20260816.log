@@ -1,0 +1,92 @@
+﻿8 psram=7860860 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=3413839 heap=101456 psram=7860860 wifi=3 ip=192.168.1.11 rssi=-63
+[alive] ms=3418848 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-63
+[alive] ms=3423855 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-65
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=3428863 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-63
+[alive] ms=3433871 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-63
+[alive] ms=3438878 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=3443885 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-62
+[alive] ms=3448894 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-63
+[alive] ms=3453901 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-64
+[alive] ms=3458907 heap=101408 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-74
+[alive] ms=3463915 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=3468923 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=3473931 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-62
+[alive] ms=3478939 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=3483947 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-67
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=3488955 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-80
+[alive] ms=3493962 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=3498970 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=3503977 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=3508984 heap=101408 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=3513991 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=3518999 heap=101456 psram=7861116 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=3524007 heap=101456 psram=7861116 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=3529014 heap=101456 psram=7861116 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=3534023 heap=101456 psram=7861116 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=3539028 heap=101456 psram=7861116 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=3544037 heap=101456 psram=7861116 wifi=3 ip=192.168.1.11 rssi=-68
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=3549046 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=3554053 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=3559062 heap=101408 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=3564067 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=3569074 heap=101408 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=3574083 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=3579091 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=3584097 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-74
+[alive] ms=3589106 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=3594113 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=3599122 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-64
+[alive] ms=3604129 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-73
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=3609135 heap=101408 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=3614143 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=3619151 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=3624159 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=3629165 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=3634165 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=3639172 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=3644180 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=3649189 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=3654190 heap=101408 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-77
+[alive] ms=3659191 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=3664196 heap=101456 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-73
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=3669204 heap=101408 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=3674205 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=3679214 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=3684221 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=3689226 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=3694233 heap=101408 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=3699242 heap=101456 psram=7861116 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=3704249 heap=101456 psram=7861116 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=3709256 heap=101456 psram=7861116 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=3714265 heap=101456 psram=7861116 wifi=3 ip=192.168.1.11 rssi=-78
+[alive] ms=3719272 heap=101456 psram=7861116 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=3724280 heap=101456 psram=7861116 wifi=3 ip=192.168.1.11 rssi=-71
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=3729284 heap=101408 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=3734293 heap=101456 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-63
+[button] pressed
+[story] selected sutlik-orskan (10 eligible)
+[story] source = SD (cache)
+[state] 0 -> 3
+[story] intro clip (/stories/sutlik-orskan-v9-intro.mp3)
+[story] SD open: /stories/sutlik-orskan-v9-intro.mp3 @ 0
+[story] SD end interrupted=false
+[state] 3 -> 3
+[story] SD play from byte 0
+[story] SD open: /stories/sutlik-orskan-v9.mp3 @ 0
+[story] SD end interrupted=false
+[story-report] started sutlik-orskan (sd) key=b32-2 queued=1
+[story-report] finished ??? event closed
+[state] 3 -> 3
+[post] summary/conclusion (/stories/sutlik-orskan-v9-summary.mp3)
+[story] SD open: /stories/sutlik-orskan-v9-summary.mp3 @ 0
+[story] SD end interrupted=false
+[state] 3 -> 3
+[post] question 0 (/stories/sutlik-orskan-v9-question.mp3)
+[story] SD open: /stories/sutlik-orskan-v9-question.mp3 @ 0

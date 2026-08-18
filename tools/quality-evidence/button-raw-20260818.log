@@ -1,0 +1,27 @@
+[welcome] ask ask-sgrc
+[state] 3 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=23063 heap=101540 psram=7861416 wifi=3 ip=192.168.1.11 rssi=-69
+[ota] boot poll (fw=1.3.3 build=hold-to-menu board=areg-s3-n8 partition=app0)
+[content-sync] bench fw built Aug 18 2026 23:29:49
+[content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+[alive] ms=28065 heap=101540 psram=7861160 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=33074 heap=101540 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=38079 heap=101540 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=43087 heap=101540 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=48090 heap=101540 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=53096 heap=101540 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=58100 heap=101540 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-72
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=63110 heap=101540 psram=7860904 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=68117 heap=101540 psram=7860904 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=73120 heap=101540 psram=7860904 wifi=3 ip=192.168.1.11 rssi=-75
+[alive] ms=78122 heap=101488 psram=7860904 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=83128 heap=101540 psram=7860904 wifi=3 ip=192.168.1.11 rssi=-84
+[alive] ms=88137 heap=101540 psram=7860904 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=93146 heap=101540 psram=7860840 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=98147 heap=101540 psram=7860840 wifi=3 ip=192.168.1.11 rssi=-73
