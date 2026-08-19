@@ -568,7 +568,28 @@ bool audio_play_story_file(const char *path,
     // (start_byte > 0) trusts the file already validated when it started; a
     // frame-sync sniff at an arbitrary resume offset wouldn't be meaningful.
     if (start_byte == 0 && !sd_file_looks_like_mp3(file)) {
-        Serial.printf("[story] SD file is not MP3 (corrupt/wrong file): %s â€” refusing to decode\n", path);
+        Serial.printf("[story] SD file is not MP3 (corrupt/wrong file): %s -- refusing to decode\n", path);
+        // HEAL IT. Without this the toy is silent on that clip FOREVER: the
+        // content index still records the file as verified at the right size,
+        // so every future sync says "already current" and skips it, and the
+        // only symptom a parent sees is one greeting that never plays.
+        // Found 2026-08-19 on the owner's toy -- /voice/greet-38-v1.mp3 was
+        // damaged on the card while the server's copy was byte-perfect and
+        // its sha256 matched the manifest.
+        //
+        // Deleting is safe and is the smallest thing that works: the file is
+        // unplayable by definition (it passed neither the ID3 nor the frame
+        // sync test), and content sync's already-current test requires the
+        // file to EXIST at the recorded size, so removing it is exactly the
+        // signal that makes the next sync fetch it again. Nothing else needs
+        // to know -- no index rewrite, no new NVS state, no new manifest
+        // field.
+        file.close();          // release the handle before unlinking
+        if (SD.remove(path)) {
+            Serial.printf("[story] removed the bad file; it will re-download on the next sync\n");
+        } else {
+            Serial.printf("[story] could NOT remove the bad file: %s\n", path);
+        }
         Serial.flush();
         return false;  // caller treats as natural end / falls back to Wi-Fi
     }
