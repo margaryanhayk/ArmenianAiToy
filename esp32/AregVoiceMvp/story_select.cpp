@@ -10,6 +10,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <esp_heap_caps.h>
+#include <esp_task_wdt.h>
 #include <FS.h>
 #include <SD.h>
 #include <Preferences.h>
@@ -96,9 +97,18 @@ int load_raw_index(CsStory *out, int max_out) {
     if (!f) {
         return 0;
     }
+    // Feed the watchdog around the read. A HEALTHY card parses this in
+    // milliseconds; a DYING one (2026-08-19: flaky SPI, IncompleteInput,
+    // then no mount at all) makes every read a multi-second timeout, and
+    // the boot chain calls this several times back to back -- the sum
+    // starved the 30 s task watchdog and the toy REBOOTED instead of
+    // saying "no card" calmly. A panic reboot is the worst possible answer
+    // to a loose wire.
+    esp_task_wdt_reset();
     JsonDocument doc(&s_json_psram);
     const DeserializationError err = deserializeJson(doc, f);
     f.close();
+    esp_task_wdt_reset();   // see above -- the read may have taken seconds
     if (err != DeserializationError::Ok) {
         // Name the reason. "index parse failed" on its own sent this
         // hunting for a corrupt card when the card was fine.

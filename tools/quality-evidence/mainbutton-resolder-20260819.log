@@ -1,0 +1,131 @@
+[alive] ms=1652343 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=1657347 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-73 btn=UP
+[alive] ms=1662354 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[alive] ms=1667364 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-73 btn=UP
+[alive] ms=1672367 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-71 btn=UP
+[alive] ms=1677368 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-73 btn=UP
+[alive] ms=1682377 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[alive] ms=1687380 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[alive] ms=1692381 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[alive] ms=1697390 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP
+[button] raw=DOWN
+[button] pressed
+[button] raw=UP
+[story] no eligible cached stories ??? using fallback chain
+[story] source = Wi-Fi stream
+[state] 0 -> 3
+[story] play from beginning (token=0)
+[story] stream open: https://armenianaitoy-production.up.railway.app/api/story-audio/anban-huri
+[story] http stream open failed (non-200)
+[story-select] index parse failed: IncompleteInput (heap=101508 psram=7843516)
+[state] 3 -> 3
+[post] question 1 (/stories/anban-huri-v9-question1.mp3)
+[story] SD open: /stories/anban-huri-v9-question1.mp3 @ 0
+[story] SD end interrupted=false
+[post] listening for answer 1 (press & hold to talk)
+[button] raw=DOWN
+[state] 3 -> 1
+[audio] record_begin
+[audio] i2s_new_channel err=0/ESP_OK
+[audio] i2s_channel_init_std_mode err=0/ESP_OK
+[audio] i2s_channel_enable err=0/ESP_OK
+[audio] record_end bytes=6144
+[post] answer too short (192 ms); closing
+[menu] ask clip missing ??? not opening the menu
+[story] finished ??? press to play again
+[state] 1 -> 0
+[alive] ms=1713480 heap=101508 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-78 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[button] raw=UP
+[alive] ms=1718480 heap=101508 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-71 btn=UP
+[button] raw=DOWN
+[button] pressed
+[button] raw=UP
+[story-select] index parse failed: IncompleteInput (heap=101508 psram=7854716)
+[story] no eligible cached stories ??? using fallback chain
+[story] source = Wi-Fi stream
+[state] 0 -> 3
+[story] play from beginning (token=0)
+[story] stream open: https://armenianaitoy-production.up.railway.app/api/story-audio/anban-huri
+[story] http stream open failed (non-200)
+[story-select] index parse failed: IncompleteInput (heap=101508 psram=7854460)
+[story-select] index parse failed: IncompleteInput (heap=101508 psram=7854460)
+[story-select] index parse failed: IncompleteInput (heap=101460 psram=7854460)
+[story-select] index parse failed: IncompleteInput (heap=101508 psram=7843260)
+[menu] ask clip missing ??? not opening the menu
+[story] finished ??? press to play again
+[state] 3 -> 0
+[alive] ms=1731767 heap=101460 psram=7860680 wifi=3 ip=192.168.1.11 rssi=-73 btn=UP
+[alive] ms=1736768 heap=101508 psram=7860712 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[alive] ms=1741769 heap=101508 psram=7860712 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[alive] ms=1746776 heap=101508 psram=7860712 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=1751780 heap=101508 psram=7860712 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=1756787 heap=101508 psram=7860712 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[alive] ms=1761794 heap=101508 psram=7860712 wifi=3 ip=192.168.1.11 rssi=-71 btn=UP
+[alive] ms=1766799 heap=101508 psram=7860712 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[alive] ms=1771801 heap=101508 psram=7860712 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=1776805 heap=101508 psram=7860680 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=1781807 heap=101508 psram=7860680 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=1786809 heap=101508 psram=7860680 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[alive] ms=1791817 heap=101508 psram=7860680 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=1796818 heap=101508 psram=7860680 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[alive] ms=1801826 heap=101508 psram=7860680 wifi=3 ip=192.168.1.11 rssi=-71 btn=UP
+[alive] ms=1806832 heap=101460 psram=7860712 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[alive] ms=1811841 heap=101508 psram=7860712 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[alive] ms=1816842 heap=101508 psram=7860712 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[alive] ms=1821849 heap=101508 psram=7860712 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[alive] ms=1826852 heap=101508 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=1831855 heap=101508 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=1836859 heap=101508 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[alive] ms=1841864 heap=101508 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-70 btn=UP
+[alive] ms=1846864 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[alive] ms=1851866 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[alive] ms=1856874 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[alive] ms=1861875 heap=101460 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-71 btn=UP
+[alive] ms=1866876 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP
+[alive] ms=1871883 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-73 btn=UP
+[alive] ms=1876890 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-73 btn=UP
+[alive] ms=1881893 heap=101460 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-73 btn=UP
+[alive] ms=1886893 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-73 btn=UP
+[alive] ms=1891896 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=1896905 heap=101508 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[alive] ms=1901910 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[alive] ms=1906912 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-73 btn=UP
+[alive] ms=1911921 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP
+[alive] ms=1916923 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-73 btn=UP
+[alive] ms=1921931 heap=101460 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-71 btn=UP
+[alive] ms=1926935 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP
+[alive] ms=1931941 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-71 btn=UP
+[alive] ms=1936949 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP
+[alive] ms=1941949 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP
+[alive] ms=1946951 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-71 btn=UP
+[alive] ms=1951956 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=1956963 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[alive] ms=1961969 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[alive] ms=1966970 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[alive] ms=1971978 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[alive] ms=1976983 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[alive] ms=1981991 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-73 btn=UP
+[alive] ms=1987000 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP
+[alive] ms=1992001 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[alive] ms=1997011 heap=101460 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-73 btn=UP
+[alive] ms=2002016 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-75 btn=UP
+[alive] ms=2007023 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-76 btn=UP
+[alive] ms=2012027 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=2017031 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-73 btn=UP
+[alive] ms=2022033 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP
+[alive] ms=2027036 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-73 btn=UP
+[alive] ms=2032038 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP
+[alive] ms=2037038 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[alive] ms=2042044 heap=101508 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[alive] ms=2047046 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-74 btn=UP
+[alive] ms=2052047 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-71 btn=UP
+[alive] ms=2057056 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-71 btn=UP
+[alive] ms=2062061 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP
+[alive] ms=2067069 heap=101508 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP

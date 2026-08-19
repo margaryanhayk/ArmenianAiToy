@@ -60,8 +60,16 @@
 // AREG_PIN_BUTTON_YES / _NO pins logs once and does nothing.
 #pragma once
 
-#ifdef AREG_OFFLINE_GAMES_BENCH
+// PROMOTED TO PRODUCTION 2026-08-19 (owner decision, menu redesign):
+// the engine below compiles into EVERY build, because "game" in the toy's
+// menu now plays one of these for real instead of promising a game and
+// telling a story. Only offline_games_tick -- the bench-only 30-second
+// AUTO-START that once made the toy take itself over after every boot and
+// eat the main button for minutes (see button-dead-diagnosis-20260818.md)
+// -- stays behind the bench flag. A game must start because a child asked,
+// never because a timer fired.
 
+#ifdef AREG_OFFLINE_GAMES_BENCH
 // One game per boot, 30 s after boot, called from the IDLE branch of
 // loop() — the same shape as offline_quiz_tick / sd_playback_tick. Which
 // game runs is chosen at BUILD time by AREG_OFFLINE_GAMES_PICK (see
@@ -69,6 +77,7 @@
 // the TODO in the .cpp; deliberately NOT invented here, because it would
 // need a new input gesture or LED vocabulary.
 void offline_games_tick();
+#endif // AREG_OFFLINE_GAMES_BENCH
 
 // Runs the build-time-picked game once and returns. Deliberately does NOT
 // touch the one-game-per-boot latch offline_games_tick owns, so a caller
@@ -92,4 +101,14 @@ void offline_games_run_mindreader();
 void offline_games_run_buzzer();
 void offline_games_run_simon();
 
-#endif // AREG_OFFLINE_GAMES_BENCH
+// Menu entry point: runs the NEXT game in a per-boot rotation
+// (mind-reader -> buzzer -> simon -> ...), so a child who asks twice in an
+// evening gets two different games. RAM cursor only -- across a power
+// cycle starting from the first game again is the right behaviour, not a
+// bug (mirrors Simon's own always-start-at-2 rule).
+void offline_games_run_next();
+
+// True when the games can actually run HERE AND NOW: answer buttons
+// compiled in, SD up, and the first game's entry clip verified on the
+// card. The menu must never say yes to a game it cannot start.
+bool offline_games_available();

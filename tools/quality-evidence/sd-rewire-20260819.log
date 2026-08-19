@@ -1,0 +1,167 @@
+[alive] ms=15282 heap=101788 psram=7890936 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[alive] ms=20292 heap=101788 psram=7890936 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=25297 heap=101788 psram=7890936 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[alive] ms=30302 heap=101788 psram=7890936 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=35307 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=40309 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[alive] ms=45311 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[alive] ms=50313 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[alive] ms=55321 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=62630 heap=101732 psram=7890540 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[alive] ms=67634 heap=101788 psram=7890680 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=72640 heap=101788 psram=7890680 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[alive] ms=77646 heap=101788 psram=7890680 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[alive] ms=82647 heap=101788 psram=7890680 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=87649 heap=101740 psram=7890680 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[alive] ms=92656 heap=101788 psram=7890712 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=97661 heap=101788 psram=7890712 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=102669 heap=101788 psram=7890712 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=107671 heap=101788 psram=7890712 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[alive] ms=112671 heap=101788 psram=7890712 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[alive] ms=117676 heap=101788 psram=7890712 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=122682 heap=101732 psram=7890316 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[alive] ms=127684 heap=101788 psram=7890712 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[alive] ms=132689 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[alive] ms=137690 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=142691 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[alive] ms=147697 heap=101740 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[alive] ms=152700 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[alive] ms=157707 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[alive] ms=162710 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[alive] ms=167712 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[alive] ms=172715 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[alive] ms=177724 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[content-sync] sd init start cs=10 sck=12 mosi=11 miso=13
+[sd] SD.begin failed (no card / wiring / format?)
+[content-sync] sd init failed
+[content-sync] waiting sd
+[alive] ms=183604 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[content-sync] waiting sd
+[alive] ms=188611 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] waiting sd
+[alive] ms=193620 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[content-sync] waiting sd
+[alive] ms=198628 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] waiting sd
+[alive] ms=203634 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[content-sync] waiting sd
+[alive] ms=208641 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] sd init start cs=10 sck=12 mosi=11 miso=13
+[sd] SD.begin failed (no card / wiring / format?)
+[content-sync] sd init failed
+[content-sync] waiting sd
+[alive] ms=213649 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[content-sync] waiting sd
+[alive] ms=218649 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] waiting sd
+[alive] ms=223653 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] waiting sd
+[alive] ms=228661 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[content-sync] waiting sd
+[alive] ms=233665 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] waiting sd
+[alive] ms=238669 heap=101740 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[content-sync] sd init start cs=10 sck=12 mosi=11 miso=13
+[sd] SD.begin failed (no card / wiring / format?)
+[content-sync] sd init failed
+[content-sync] waiting sd
+[alive] ms=243676 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] waiting sd
+[alive] ms=248685 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] waiting sd
+[alive] ms=253695 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[content-sync] waiting sd
+[alive] ms=258700 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] waiting sd
+[alive] ms=263707 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] waiting sd
+[alive] ms=268713 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] sd init start cs=10 sck=12 mosi=11 miso=13
+[sd] SD.begin failed (no card / wiring / format?)
+[content-sync] sd init failed
+[content-sync] waiting sd
+[alive] ms=273721 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] waiting sd
+[alive] ms=278730 heap=101600 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] waiting sd
+[alive] ms=283736 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] waiting sd
+[alive] ms=288736 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] waiting sd
+[alive] ms=293741 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] waiting sd
+[alive] ms=298750 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[content-sync] sd init start cs=10 sck=12 mosi=11 miso=13
+[sd] SD.begin failed (no card / wiring / format?)
+[content-sync] sd init failed
+[content-sync] waiting sd
+[alive] ms=303756 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[content-sync] waiting sd
+[alive] ms=308764 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[content-sync] waiting sd
+[alive] ms=313768 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] waiting sd
+[alive] ms=318776 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[content-sync] waiting sd
+[alive] ms=323782 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[content-sync] waiting sd
+[alive] ms=328788 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] sd init start cs=10 sck=12 mosi=11 miso=13
+[sd] SD.begin failed (no card / wiring / format?)
+[content-sync] sd init failed
+[content-sync] waiting sd
+[alive] ms=333795 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[content-sync] waiting sd
+[alive] ms=338804 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] waiting sd
+[alive] ms=343812 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] waiting sd
+[alive] ms=348819 heap=101740 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] waiting sd
+[alive] ms=353819 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] waiting sd
+[alive] ms=358828 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-69 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[content-sync] sd init start cs=10 sck=12 mosi=11 miso=13
+[sd] SD.begin failed (no card / wiring / format?)
+[content-sync] sd init failed
+[content-sync] waiting sd
+[alive] ms=363836 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] waiting sd
+[alive] ms=368840 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] waiting sd
+[alive] ms=373842 heap=101740 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] waiting sd
+[alive] ms=378851 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] waiting sd
+[alive] ms=383860 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] waiting sd
+[alive] ms=388866 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] sd init start cs=10 sck=12 mosi=11 miso=13
+[sd] SD.begin failed (no card / wiring / format?)
+[content-sync] sd init failed
+[content-sync] waiting sd
+[alive] ms=393874 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] waiting sd
+[alive] ms=398880 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] waiting sd
+[alive] ms=403888 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[content-sync] waiting sd
+[alive] ms=408888 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-66 btn=UP
+[content-sync] waiting sd
+[alive] ms=413895 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-68 btn=UP
+[content-sync] waiting sd
+[alive] ms=418901 heap=101788 psram=7891000 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[content-sync] sd init start cs=10 sck=12 mosi=11 miso=13
+[sd] SD.begin failed (no card / wiring / format?)
+[content-sync] sd init failed
+[alive] ms=424713 heap=101788 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[content-sync] waiting sd
+[alive] ms=429719 heap=101740 psram=7890968 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[content-sync] waiting sd

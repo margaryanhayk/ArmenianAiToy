@@ -388,6 +388,13 @@
 #ifndef AREG_EARCON_FREQ_HZ
 #define AREG_EARCON_FREQ_HZ     440
 #endif
+
+// Choosing budget for the menu (owner decision 2026-08-19): suggest, wait,
+// suggest again, then close softly to idle. Applies to CHOOSING only -- a
+// story or game that already started is never cut by it.
+#ifndef AREG_MENU_TOTAL_MS
+#define AREG_MENU_TOTAL_MS 60000UL
+#endif
 #ifndef AREG_EARCON_DURATION_MS
 #define AREG_EARCON_DURATION_MS 600
 #endif
