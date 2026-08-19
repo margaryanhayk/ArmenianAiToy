@@ -2585,13 +2585,23 @@ void loop() {
         if (now - s_last_heartbeat_ms >= 5000) {
             s_last_heartbeat_ms = now;
             Serial.printf(
-                "[alive] ms=%u heap=%u psram=%u wifi=%d ip=%s rssi=%d\n",
+                "[alive] ms=%u heap=%u psram=%u wifi=%d ip=%s rssi=%d btn=%s\n",
                 (unsigned)now,
                 (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getFreePsram(),
                 (int)WiFi.status(),
                 WiFi.localIP().toString().c_str(),
-                (int)WiFi.RSSI());
+                (int)WiFi.RSSI(),
+                // Raw main-button level, read here and NOT through
+                // button_poll(). 2026-08-19: two different pins in a row
+                // reported zero edges, which is not credible as two dead
+                // pins -- so the next thing to rule out is whether the
+                // button code is reached at all. This print does not depend
+                // on the state machine, the debounce, or button_poll(); it
+                // only depends on the loop running, which the rest of this
+                // same line already proves. Hold the button across a tick
+                // and it must read DOWN.
+                (digitalRead(AREG_PIN_BUTTON) == LOW) ? "DOWN" : "UP");
             Serial.flush();
         }
 

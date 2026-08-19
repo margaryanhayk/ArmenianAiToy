@@ -150,7 +150,30 @@
 #define AREG_PIN_AMP_LRC        16
 #define AREG_PIN_AMP_DATA       7
 // Button to GND, internal pullup
-#define AREG_PIN_BUTTON         0      // BOOT button is fine for bench
+#define AREG_PIN_BUTTON         18     // MAIN button. Was GPIO0; see the note below.
+
+// WHY NOT GPIO0 ANY MORE (2026-08-19, and it cost three evenings)
+//
+// Two reasons, and the second is the one that forced the move today:
+//
+// 1. GPIO0 is a STRAPPING pin. A child holding the button through a power
+//    cycle puts the chip in download mode, which presents as a toy that
+//    boots to nothing. docs/hardware/schematic-spec.md already specifies
+//    GPIO18 for the production MAIN button for exactly this reason; the
+//    bench had simply never followed it.
+//
+// 2. On the owner's bench board GPIO0 stopped responding altogether. It
+//    rests HIGH on the chip's own pull-up and NOTHING external moves it --
+//    not the owner's wired button, and not the dev board's own BOOT button,
+//    which is hardwired to the same pin and bypasses all of his wiring.
+//    Measured: no short to 3V3, no short to GND, and zero level changes
+//    across five minutes of idle polling with the raw-edge print in
+//    button_poll() active. Evidence:
+//    tools/quality-evidence/button-dead-diagnosis-20260818.md
+//
+// GPIO18 is free in this pin map: mic 4/5/6, amp 15/16/7, SD 10/11/12/13,
+// LED 48, answer buttons 21/47, volume pot 8. Avoid 19/20 -- native USB.
+
 // CAUTION: GPIO0 is a boot-mode strapping pin ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â held low across a power
 // cycle it blocks boot. Fine for bench; move to a safe pin (21/47) at
 // the next hardware revision.

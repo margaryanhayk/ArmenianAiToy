@@ -98,3 +98,77 @@ RTS**. On the S3's native USB-CDC those lines are the reset / boot-mode
 gesture; pulsing them is what put this toy into `DOWNLOAD(USB/UART0)` mode
 on 2026-08-17 and cost an evening. Opening the port can still reset the chip
 on its own — that is CDC connection state, not the script.
+
+---
+
+## Continued 2026-08-19 — it is not the pin
+
+The GPIO0-is-dead hypothesis above was **wrong**, and the way it was
+disproved is worth keeping.
+
+**Measured, not assumed:** continuity GPIO0 ↔ 3V3 was **silent**. No short.
+So the pin was not being held high by the owner's soldered pull-up, and the
+leading hypothesis died.
+
+**Main button moved to GPIO18** (`config.h` + `config.h.example`), which
+`docs/hardware/schematic-spec.md` already names as the production pin — the
+bench had simply never followed its own spec. GPIO18 collides with nothing:
+mic 4/5/6, amp 15/16/7, SD 10/11/12/13, LED 48, answer buttons 21/47, volume
+pot 8. Rebuilt, flashed, five minutes of capture with the owner pressing:
+
+```
+button edges: 0
+```
+
+**Two different pins reporting zero edges is not credible as two dead pins.**
+So the next thing to rule out was whether the button code is reached at all —
+`button_poll()` lives in the IDLE branch and could in principle be starved by
+the state machine, which would look identical from outside.
+
+`[alive]` now carries the raw level, read with a bare `digitalRead` in the
+5-second diagnostic tick — outside `button_poll()`, outside the debounce,
+outside the state machine. It depends only on the loop running, which the
+rest of that same line already proves.
+
+```
+[alive] ... rssi=-78 btn=UP
+```
+
+Owner held the button 15 s (guaranteed to cross three ticks):
+
+```
+DOWN ticks: 0    UP ticks: 7
+```
+
+And with a plain jumper touched directly from pin 18 to GND, no button
+involved at all:
+
+```
+DOWN ticks: 0    UP ticks: 48
+```
+
+## Where this leaves it
+
+The pin **reads correctly at rest** (`UP`, on the internal pull-up), on both
+pins tried, and the firmware is confirmed to be reading it — so the read path
+is sound end to end. What has never once been observed is the level going
+LOW, by button or by wire.
+
+Every remaining explanation is on the bench, not in this repo:
+
+- the jumper/button is not landing on the header pins believed (a header
+  labelled differently, or a neighbouring row),
+- the GND used is not a GND,
+- a wire is open (broken core, cold joint) — invisible to the eye,
+- the button's two wires are on a leg pair that is internally joined (a
+  4-leg tactile has two such pairs; only the DIAGONAL pair switches). Note
+  this specific fault would read DOWN permanently, not UP, so it does not
+  fit — recorded because it was the first suspicion and it is ruled out by
+  the data.
+
+Not yet confirmed for any of the captures above: that the owner's action and
+the capture window actually overlapped. Several windows closed while he was
+mid-question, and one 300 s capture ended at 34 s when the port dropped
+(fixed — `watch-serial.ps1` now reconnects instead of exiting, since the S3
+re-enumerates USB on every reset). Only two windows are known to have
+contained a deliberate action, and both are among the zero-edge results.
