@@ -9,6 +9,7 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <esp_heap_caps.h>
 #include <FS.h>
 #include <SD.h>
 #include <Preferences.h>
@@ -19,6 +20,39 @@
 namespace {
 
 constexpr const char *kIndexPath = "/content_index.json";
+
+// PARSE THE INDEX OUT OF PSRAM, NOT INTERNAL HEAP.
+//
+// This is the same failure that took the toy down for a whole night on
+// 2026-08-14, in a different file: the index is 10 stories + 42 voice clips
+// + 104 game clips, each carrying a 64-character sha256, and a JsonDocument
+// for it does not fit in internal heap once anything else is running.
+// content_sync.cpp already parses through an allocator like this one; this
+// call site never got it, so the index parsed fine at boot and failed in
+// the middle of a story, when the audio buffers hold the heap:
+//
+//     [story-select] index parse failed
+//     [post] question 0 not on the card - asking 1 instead
+//
+// The toy then asked the WRONG reflection question, silently. A parse that
+// only fails under memory pressure fails at exactly the moment a child is
+// listening, and reports itself as missing content rather than as an
+// out-of-memory error, which is why it went unexplained for days.
+//
+// PSRAM is 7.8 MB and idle. TLS cannot use it; plain data can.
+struct PsramJsonAllocator : ArduinoJson::Allocator {
+    void *allocate(size_t n) override {
+        void *p = heap_caps_malloc(n, MALLOC_CAP_SPIRAM);
+        return p != nullptr ? p : malloc(n);   // never worse than before
+    }
+    void deallocate(void *p) override { heap_caps_free(p); }
+    void *reallocate(void *p, size_t n) override {
+        void *q = heap_caps_realloc(p, n, MALLOC_CAP_SPIRAM);
+        return q != nullptr ? q : realloc(p, n);
+    }
+};
+// File-scope so it outlives every document that borrows it.
+PsramJsonAllocator s_json_psram;
 
 // NVS namespace/key for the rotation cursor. Its own namespace so it can
 // never collide with device_creds / wifi_creds / ota_state.
@@ -62,11 +96,16 @@ int load_raw_index(CsStory *out, int max_out) {
     if (!f) {
         return 0;
     }
-    JsonDocument doc;
+    JsonDocument doc(&s_json_psram);
     const DeserializationError err = deserializeJson(doc, f);
     f.close();
     if (err != DeserializationError::Ok) {
-        Serial.println("[story-select] index parse failed");
+        // Name the reason. "index parse failed" on its own sent this
+        // hunting for a corrupt card when the card was fine.
+        Serial.printf("[story-select] index parse failed: %s (heap=%u psram=%u)\n",
+                      err.c_str(),
+                      (unsigned)ESP.getFreeHeap(),
+                      (unsigned)ESP.getFreePsram());
         Serial.flush();
         return 0;
     }

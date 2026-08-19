@@ -33,8 +33,11 @@
 #ifndef AREG_VOLUME_MIN_GAIN
 #define AREG_VOLUME_MIN_GAIN 0.15f
 #endif
+// See the long note beside this constant in config.h: SetGain is a sample
+// multiplier, so anything above 1.0 clips instead of amplifying. Loudness
+// beyond this belongs on the MAX98357A's GAIN pin, not here.
 #ifndef AREG_VOLUME_MAX_GAIN
-#define AREG_VOLUME_MAX_GAIN 3.0f
+#define AREG_VOLUME_MAX_GAIN 1.0f
 #endif
 #ifndef AREG_VOLUME_READ_MS
 #define AREG_VOLUME_READ_MS 200

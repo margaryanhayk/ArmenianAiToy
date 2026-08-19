@@ -209,7 +209,10 @@
 // above 0.6f because "too quiet" is what the knob exists to answer;
 // ESP8266Audio clamps at 4.0f.
 // #define AREG_VOLUME_MIN_GAIN 0.15f
-// #define AREG_VOLUME_MAX_GAIN 3.0f
+// #define AREG_VOLUME_MAX_GAIN 1.0f   // ceiling, do NOT raise: SetGain is a sample
+//                                     // multiplier, so >1.0 clips instead of
+//                                     // amplifying. Louder belongs on the amp's
+//                                     // GAIN pin. See config.h.
 // Sampling period. 200 ms is under the ~300 ms a hand takes to turn a knob,
 // so the change is heard as continuous, while staying rare enough to be free
 // inside the story decode loop.
