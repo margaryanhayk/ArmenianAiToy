@@ -1,0 +1,28 @@
+[welcome] ask ask-sgrc
+[state] 3 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=23161 heap=101520 psram=7861416 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[ota] boot poll (fw=1.3.3 build=hold-to-menu board=areg-s3-n8 partition=app0)
+[content-sync] bench fw built Aug 19 2026 21:38:57
+[content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+[alive] ms=28171 heap=101520 psram=7861160 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP
+[button] raw=DOWN
+[button] pressed
+[button] raw=UP
+[story] selected khosogh-dzuk (10 eligible)
+[story] source = SD (cache)
+[state] 0 -> 3
+[story] intro clip (/stories/khosogh-dzuk-v10-intro.mp3)
+[story] SD open: /stories/khosogh-dzuk-v10-intro.mp3 @ 0
+[story] SD end interrupted=false
+[state] 3 -> 3
+[story] SD play from byte 0
+[story] SD open: /stories/khosogh-dzuk-v10.mp3 @ 0
+[volume] gain 0.95 (3093 mV)
+[volume] gain 0.96 (3149 mV)
+[volume] gain 0.96 (3149 mV)
+[volume] gain 0.96 (3149 mV)

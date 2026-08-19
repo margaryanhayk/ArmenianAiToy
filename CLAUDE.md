@@ -4235,13 +4235,19 @@ directly on documentation elsewhere in this file:
   updated HARDWARE NOTE in Â§ Cloudâ†’SD content sync (firmware half). The
   brownout was the bench breakout module's own regulator, not a property
   of microSD; the production schematic runs SD off the single 3V3 rail.
-- **GPIO0 is a production blocker on the current bench wiring.** The
-  bench build's MAIN button lives on GPIO0 (an ESP32 strapping pin â€” a
-  child holding it through a power-cycle forces download mode, which
-  looks exactly like a dead toy). `docs/hardware/schematic-spec.md` moves
-  the production MAIN button to **GPIO18**, leaving GPIO0 as a
-  10 kÎ©-pulled factory test pad only. Not yet carried back into the bench
-  firmware pin map â€” still GPIO0 on the dev-kit bench today.
+- **GPIO0 was a production blocker on the bench wiring â€” CORRECTED
+  2026-08-19, this is now done.** The bench build's MAIN button used to
+  live on GPIO0 (an ESP32 strapping pin â€” a child holding it through a
+  power-cycle forces download mode, which looks exactly like a dead toy),
+  and this file used to say that move was "not yet carried back into the
+  bench firmware pin map." It has been: commit `f43d5ea` (2026-08-19)
+  moved `AREG_PIN_BUTTON` to **GPIO18** on the bench firmware itself,
+  matching `docs/hardware/schematic-spec.md`, which leaves GPIO0 as a
+  10 kÎ©-pulled factory test pad only. See Â§ "Firmware fixes (2026-08-18/19)
+  â€” the button, a self-healing clip, and a mis-heaped index" below for the
+  full diagnostic story and hardware verification. The move is on
+  hand-soldered wires on the owner's bench toy, not yet a permanent
+  fixture.
 - Full dossier (battery chemistry, speaker-sensitivity/rail-count
   coupling, EU/RED certification path, BOM deltas) is scoped as owner
   decisions + lab measurements, not yet closed â€” see
@@ -5111,6 +5117,122 @@ actively wrong, not just outdated.
   enrollment â€” see Â§ "Home-screen install" under Â§ Parent-Facing Read-Only
   Monitoring Surface for the same fact and why `parent.html`, not this app,
   is the phone surface for iOS today).
+
+## Firmware fixes (2026-08-18/19) â€” the button, a self-healing clip, and a mis-heaped index
+
+Four commits (`a8cb88c`, `f43d5ea`, `a1f0222`, `145f9a7`), all firmware +
+tooling + evidence logs. No backend/C# code touched by any of the four;
+test count unaffected.
+
+**The button was never dead â€” a bench build was eating it (`a8cb88c`).**
+The main button did nothing for two evenings, which cost a multimeter, a
+resoldered pull-up, and a night in DOWNLOAD mode chasing the wrong fault.
+The actual cause: the flashed image carried `-DAREG_OFFLINE_GAMES_BENCH`,
+and that build auto-starts an offline game 30 s after **every** boot; the
+game then owns the loop for minutes reading only the GREEN/RED pins (21/47),
+so the main button was never polled in that window. The toy looked dead,
+then talked on its own â€” exactly what was reported. `config.h` (gitignored)
+had `AREG_FW_BUILD "games-bench"` baked in; it is back to `"hold-to-menu"`
+locally. Added so this can never take two evenings again: `button_poll()`
+now prints the raw pin edge before debounce, and `button_begin()` prints the
+resting level once at boot â€” both deliberately **outside** the debounce and
+state machine, because a starved state machine and a disconnected wire look
+identical from outside otherwise. `tools/firmware/watch-serial.ps1` added: a
+serial monitor that never touches DTR/RTS (on the S3's native USB-CDC those
+lines ARE the reset/boot-mode gesture â€” pulsing them is what put the toy
+into DOWNLOAD(USB/UART0) mode on 2026-08-17) and that reconnects instead of
+exiting when the port drops on re-enumeration.
+
+**The main button moved off GPIO0, and the pin was made readable
+(`f43d5ea`).** `AREG_PIN_BUTTON` GPIO0 â†’ **GPIO18**, matching what
+`docs/hardware/schematic-spec.md` had already specified: GPIO0 is a
+strapping pin, so a child holding the button through a power cycle drops
+the chip into download mode and the toy looks dead â€” this bench had already
+lived that failure once (see the previous fix). GPIO18 collides with
+nothing in the pin map (mic 4/5/6, amp 15/16/7, SD 10/11/12/13, LED 48,
+answer buttons 21/47, volume pot 8; 19/20 avoided as native USB). **The move
+did not fix the dead button** â€” the more useful half of this commit is the
+diagnostic: the `[alive]` 5-second line now carries the raw button level,
+read with a bare `digitalRead` outside `button_poll()`/debounce/state
+machine, because two evenings had been spent unable to tell "the wire is
+off" from "the firmware dropped it." It paid for itself immediately: with
+the button held 15 s the line read `DOWN 0 / UP 7`, and a bare jumper from
+the pin straight to GND (no button in the circuit) read `DOWN 0 / UP 48` â€”
+the pin never once measured LOW, on either pin tried, which moved every
+remaining explanation onto the bench wiring and off this repo. Full chain,
+including the "GPIO0 shorted to 3V3" hypothesis that a continuity check
+disproved, is in
+`tools/quality-evidence/button-dead-diagnosis-20260818.md`.
+`watch-serial.ps1` now reconnects instead of exiting when the port drops
+(a 300 s capture had previously ended at 34 s and thrown away the button
+presses it was started to record).
+
+**A damaged cached clip had been healing itself into permanent silence
+(`a1f0222`).** `/voice/greet-38-v1.mp3` played no sound on the owner's toy.
+The #064 MP3 sniff correctly refused to decode it â€” the file was corrupt on
+the SD card while the server's copy was byte-perfect (valid ID3, sha256
+matching the manifest). What was missing was worse than the corruption: the
+content index still recorded the file as verified at the right size, and
+sync's already-current test is exactly "index matches AND file exists at
+the recorded size" â€” both true â€” so **every future sync skipped it and the
+greeting stayed silent forever**, with nothing reporting it (one greeting
+out of 39 that never plays is not the kind of thing anyone would attribute
+to a bad SD block). Fix: the sniff now closes the handle and `SD.remove()`s
+the file it just rejected â€” exactly the signal that makes the next sync
+re-download it. No index rewrite, no new NVS state, no second code path.
+Heals any cached audio, not just voice clips â€” stories, game clips and
+music all reach the decoder through the same `audio_play_story_file()`.
+Found during the same bench session that verified the GPIO18 button end to
+end: press â†’ intro clip â†’ story â†’ summary â†’ reflection question â†’ listen
+â†’ story play uploaded to the dashboard.
+
+**The volume knob was distorting, and the index parsed on the wrong heap
+(`145f9a7`).** Two unrelated faults presenting as one complaint â€” "it says
+two words and then aaaaaaa":
+- **Volume.** `AudioOutputI2S::SetGain` multiplies each sample rather than
+  controlling an amplifier; above 1.0 the loud parts of the waveform clip
+  flat, which is why quiet words survived and the first loud syllable
+  collapsed into a solid tone. The knob shipped mapped to 0.15..3.0, and the
+  knob's top stop measured **2.87** on the toy â€” nearly 5Ã— the 0.6 the six
+  call sites used to hardcode, and the "bzzzzzzz" reported at maximum knob
+  earlier the same evening was this same clipping. Roughly two thirds of
+  the knob's travel had been distortion. `AREG_VOLUME_MAX_GAIN` capped
+  **3.0 â†’ 1.0**, with a comment noting that raising it again is not a
+  louder toy but a broken one â€” real loudness belongs on the MAX98357A's
+  GAIN pin (`docs/hardware/schematic-spec.md`), not on this constant.
+- **Index parse.** `story_select.cpp`'s `load_raw_index()` built its
+  `JsonDocument` on internal heap. The index is 10 stories + 42 voice clips
+  + 104 game clips, each carrying a 64-char sha256 â€” it parses fine at boot
+  and fails once audio buffers hold the heap mid-story, producing
+  `[story-select] index parse failed` then "question 0 not on the card â€”
+  asking 1 instead": the toy silently asked the **wrong** reflection
+  question and reported missing content when it was actually out of
+  memory. This is the same failure class as the 2026-08-14 overnight crash
+  loop (Â§ "The toy says what content it has" above), and the fix had
+  already been written down and implemented one file away
+  (`content_sync.cpp`'s PSRAM allocator) â€” `story_select.cpp` simply never
+  got it. It now uses the same allocator with a malloc fallback, and the
+  failure log names the ArduinoJson reason plus free heap and PSRAM.
+
+**Verified on the owner's real toy**: the button works on GPIO18; a full
+story played with zero index parse failures; the owner confirmed by ear
+that the voice no longer breaks up.
+
+**NOT verified â€” say so plainly:**
+- Nobody has listened to the 70 per-story clips shipped in the previous
+  batch (Â§ Owner batch 2026-08-15/16) â€” the standing human-listen-test gate
+  is still open for that render; this batch did not close it.
+- The self-heal path in `a1f0222` has not yet been observed firing on
+  hardware â€” `greet-38` is 1 of 39 greetings in the rotation and has not
+  come up again since the fix.
+- The GPIO18 button is currently on hand-soldered wires on the bench toy,
+  not a permanent fixture.
+
+Evidence: `tools/quality-evidence/button-dead-diagnosis-20260818.md` (the
+full diagnostic chain, including the GPIO0-shorted-to-3V3 hypothesis a
+continuity check disproved), plus the raw serial captures
+(`button-raw*-20260818.log`, `button-alive-level-20260819.log`,
+`button-jumper*-20260819.log`, `sd-stutter-20260819.log`).
 
 ## Key Design Decisions
 
