@@ -1,0 +1,228 @@
+[boot] SD mounted; offline narration /stories/anban-huri/narratiESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x2b (SPI_FAST_FLASH_BOOT)
+Saved PC:0x4037f0d6
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x116c
+load:0x403c8700,len:0xc2c
+load:0x403cb700,len:0x3108
+entry 0x403c88b8
+
+[boot] AregVoiceMvp starting
+[boot] backend = https://armenianaitoy-production.up.railway.app
+[net] TLS: verifying (ISRG Root X1 pinned)
+[wifi] credentials already in NVS ??? burn skipped
+[boot] reset_reason=11/UNKNOWN
+[boot] diag_boot_counter=0 (cold)
+[boot] previous_step=(none)
+[boot] backend=https://armenianaitoy-production.up.railway.app/api/chat/audio
+[boot] pins button=18 led=48
+[boot] mic_i2s bck=4 ws=5 sd=6
+[boot] amp_i2s bck=15 lrc=16 din=7
+E (228) task_wdt: esp_task_wdt_init(517): TWDT already initialized
+[boot] task watchdog enabled (30s)
+[button] pin=18 resting=UP
+[volume] gain 0.96 (3149 mV)
+[boot] sd_spi cs=10 sck=12 mosi=11 miso=13
+[sd] mounted; type=3 size=7680MB
+[boot] SD mounted; offline narration /stories/anban-huri/narration.mp3 = absent
+[content-report] index parse failed: IncompleteInput
+[wifi] using provisioned creds (ssid=OVIO_0242850)
+[wifi] connecting to OVIO_0242850 ...
+[wifi] event=connected
+[wifi] event=got_ip
+[wifi] ip=192.168.1.10
+[boot] ready ??? press button to speak
+[state] 0 -> 0
+[ota] running fw=1.3.3 partition=app0 img_state=undefined ota_state=idle (pending_ver=- cmd=- boots=0)
+[device] using provisioned identity (id=248729da-08d8-4144-afc0-e6af8a3fe471)
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[welcome] clip ask-any not on card ??? skipping
+[welcome] no ask clip ??? going straight to a story
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7855196)
+[welcome] no cached stories ??? falling through to the story session
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7843996)
+[story] no eligible cached stories ??? using fallback chain
+[story] source = Wi-Fi stream
+[state] 0 -> 3
+[story] play from beginning (token=0)
+[story] stream open: https://armenianaitoy-production.up.railway.app/api/story-audio/anban-huri
+[story] http stream open failed (non-200)
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7843740)
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7820316)
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7843772)
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7843772)
+[menu] ask clip missing ??? not opening the menu
+[story] finished ??? press to play again
+[state] 3 -> 0
+[state] 0 -> 0
+[alive] ms=24194 heap=101480 psram=7861192 wifi=3 ip=192.168.1.10 rssi=-71 btn=UP
+[ota] boot poll (fw=1.3.3 build=hold-to-menu board=areg-s3-n8 partition=app0)
+[content-sync] bench fw built Aug 19 2026 22:29:26
+[content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+[alive] ms=29196 heap=101480 psram=7860896 wifi=3 ip=192.168.1.10 rssi=-72 btn=UP
+[button] raw=DOWN
+[button] pressed
+[button] raw=UP
+[button] press -- opening the menu
+[welcome] clip ask-any not on card ??? skipping
+[welcome] no ask clip ??? going straight to a story
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7843476)
+[welcome] no cached stories ??? falling through to the story session
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7843476)
+[story] no eligible cached stories ??? using fallback chain
+[story] source = Wi-Fi stream
+[state] 0 -> 3
+[story] play from beginning (token=0)
+[story] stream open: https://armenianaitoy-production.up.railway.app/api/story-audio/anban-huri
+[story] http stream open failed (non-200)
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7854420)
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7854420)
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7854420)
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7854420)
+[menu] ask clip missing ??? not opening the menu
+[story] finished ??? press to play again
+[state] 3 -> 0
+[state] 0 -> 0
+[alive] ms=50331 heap=101480 psram=7860640 wifi=3 ip=192.168.1.10 rssi=-77 btn=DOWN
+[button] raw=DOWN
+[button] pressed
+[button] hold -- opening the menu
+[welcome] clip ask-any not on card ??? skipping
+[welcome] no ask clip ??? going straight to a story
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7843260)
+[welcome] no cached stories ??? falling through to the story session
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7843260)
+[story] no eligible cached stories ??? using fallback chain
+[story] source = Wi-Fi stream
+[state] 0 -> 3
+[story] play from beginning (token=0)
+[story] stream open: https://armenianaitoy-production.up.railway.app/api/story-audio/anban-huri
+[story] http stream open failed (non-200)
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7854164)
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7842964)
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7854164)
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7854164)
+[menu] ask clip missing ??? not opening the menu
+[story] finished ??? press to play again
+[state] 3 -> 0
+[state] 0 -> 0
+[alive] ms=69929 heap=101480 psram=7860384 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[button] raw=UP
+[button] raw=DOWN
+[button] pressed
+[button] hold -- opening the menu
+[welcome] clip ask-any not on card ??? skipping
+[welcome] no ask clip ??? going straight to a story
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7853908)
+[welcome] no cached stories ??? falling through to the story session
+[story-select] index parse failed: IncompleteInput (heap=101480 psram=7842708)
+[story] no eligible cached stories ??? using fallback chain
+[story] source = Wi-Fi stream
+[state] 0 -> 3
+[story] play from beginning (token=0)
+[story] stream open: https://armenianaitoy-production.up.railway.app/api/story-audio/anban-huri
+[story] http stream open failed (non-200)
+[state] 3 -> 3
+[post] summary/conclusion (/stories/anban-huri-v9-summary.mp3)
+[story] SD open: /stories/anban-huri-v9-summary.mp3 @ 0
+[story] SD end interrupted=false
+[state] 3 -> 3
+[post] question 2 (/stories/anban-huri-v9-question2.mp3)
+[story] SD open: /stories/anban-huri-v9-question2.mp3 @ 0
+[story] SD end interrupted=false
+[post] listening for answer 2 (press & hold to talk)
+[button] raw=UP
+[post] no answer in window; closing quietly
+[story] finished ??? press to play again
+[state] 3 -> 0
+[state] 0 -> 0
+[alive] ms=105797 heap=101436 psram=7859912 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[menu] activity ended ??? asking what next (chain=1)
+[welcome] ask ask-sgrc
+[state] 0 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=120984 heap=101436 psram=7859912 wifi=3 ip=192.168.1.10 rssi=-67 btn=UP
+[alive] ms=125993 heap=101436 psram=7860200 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=132607 heap=101384 psram=7859772 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[alive] ms=137610 heap=101436 psram=7859912 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[boot] SD mounted; offline narration /stories/anban-huri/narration.mp3 = absent
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x2b (SPI_FAST_FLASH_BOOT)
+Saved PC:0x4037f0d6
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x116c
+load:0x403c8700,len:0xc2c
+load:0x403cb700,len:0x3108
+entry 0x403c88b8
+
+[boot] AregVoiceMvp starting
+[boot] backend = https://armenianaitoy-production.up.railway.app
+[net] TLS: verifying (ISRG Root X1 pinned)
+[wifi] credentials already in NVS ??? burn skipped
+[boot] reset_reason=11/UNKNOWN
+[boot] diag_boot_counter=0 (cold)
+[boot] previous_step=(none)
+[boot] backend=https://armenianaitoy-production.up.railway.app/api/chat/audio
+[boot] pins button=18 led=48
+[boot] mic_i2s bck=4 ws=5 sd=6
+[boot] amp_i2s bck=15 lrc=16 din=7
+E (227) task_wdt: esp_task_wdt_init(517): TWDT already initialized
+[boot] task watchdog enabled (30s)
+[button] pin=18 resting=UP
+[volume] gain 0.96 (3149 mV)
+[boot] sd_spi cs=10 sck=12 mosi=11 miso=13
+[sd] mounted; type=3 size=7680MB
+[boot] SD mounted; offline narration /stories/anban-huri/narration.mp3 = absent
+[content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=42 music=0
+[wifi] using provisioned creds (ssid=OVIO_0242850)
+[wifi] connecting to OVIO_0242850 ...
+[wifi] event=connected
+[wifi] event=got_ip
+[wifi] ip=192.168.1.10
+[boot] ready ??? press button to speak
+[state] 0 -> 0
+[ota] running fw=1.3.3 partition=app0 img_state=undefined ota_state=idle (pending_ver=- cmd=- boots=0)
+[device] using provisioned identity (id=248729da-08d8-4144-afc0-e6af8a3fe471)
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[welcome] greeting greet-07
+[state] 0 -> 3
+[story] SD open: /voice/greet-07-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] ask ask-sgrc
+[state] 3 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[volume] gain 0.15 (0 mV)
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=23398 heap=101448 psram=7861440 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[ota] boot poll (fw=1.3.3 build=hold-to-menu board=areg-s3-n8 partition=app0)
+[content-sync] bench fw built Aug 19 2026 22:29:26
+[content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+[alive] ms=28407 heap=101448 psram=7861144 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[volume] gain 0.15 (0 mV)
+[alive] ms=33414 heap=101448 psram=7861144 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=38416 heap=101448 psram=7861144 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=43417 heap=101448 psram=7861144 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[alive] ms=48424 heap=101448 psram=7861144 wifi=3 ip=192.168.1.10 rssi=-67 btn=UP
+[alive] ms=53431 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-71 btn=UP
+[alive] ms=58437 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=63442 heap=101448 psram=7860888 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=68450 heap=101448 psram=7860888 wifi=3 ip=192.168.1.10 rssi=-72 btn=UP
+[alive] ms=73455 heap=101448 psram=7860888 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=78457 heap=101396 psram=7860888 wifi=3 ip=192.168.1.10 rssi=-71 btn=UP
+[alive] ms=83461 heap=101448 psram=7860888 wifi=3 ip=192.168.1.10 rssi=-72 btn=UP
+[alive] ms=88469 heap=101448 psram=7860888 wifi=3 ip=192.168.1.10 rssi=-71 btn=UP
+[alive] ms=93475 heap=101448 psram=7860928 wifi=3 ip=192.168.1.10 rssi=-71 btn=UP
