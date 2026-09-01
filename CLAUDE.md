@@ -96,7 +96,7 @@ one message is not a rule, which is why it is written here.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2755 tests)
+dotnet test                                     # Run all tests (2761 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 ```
 
@@ -2926,6 +2926,75 @@ vendor questions, and the paid test that gates the whole decision:
 `docs/voice-narrator-brief.md`. The earlier options analysis stays in
 `docs/voice-decision-brief.md`; its Gemini/Azure re-audition is now a fallback,
 not the decision.
+
+## Story Q&A — negotiated first-byte streaming (2026-09-01)
+
+`POST /api/chat/story-qa` used to synthesise the whole answer (3–5 s on
+ElevenLabs), compose answer + pause + bridge (+ recap) into one buffer and
+return it with a Content-Length. It now streams the answer audio on its
+first synthesized bytes — but **only when the toy asks**. Contract, all pinned
+by `StoryQaControllerStreamingTests`:
+
+- **Opt-in header `X-Areg-Accept-Stream: 1`** (the name the firmware notes
+  already reserved). Streaming happens only when that header is present AND
+  the configured TTS provider implements `IStreamingAudioSynthesisService`
+  (ElevenLabs; OpenAI does not) AND the answer is model-authored and PASSED
+  output moderation. Every other request — no header, buffered provider,
+  canned/fallback lines, output-blocked, stream-open failure — keeps the
+  buffered `File(...)` response **byte for byte**, Content-Length and all.
+  The fielded buffered firmware reader rejects any body without a
+  Content-Length (`fdc4b66` shipped a global chunked response and `96d6084`
+  reverted it after bring-up); a globally-streamed endpoint would silence
+  every toy's Q&A, so the shape is negotiated per request, never switched on.
+- **Moderate, then stream.** Input moderation stays serial before the model.
+  During output moderation the speculative act is now OPENING the provider
+  stream (the same overlap that existed with buffered TTS) — not one byte is
+  written to the toy until the classifier has passed. A blocked answer
+  disposes the unread stream and speaks the canned fallback, buffered,
+  exactly as before. Unmoderated speech cannot leave the server.
+- **Same body, chunked.** The streamed response is the answer audio followed
+  by `ComposeAnswerWithPause([], bridge, recap)` — with an empty answer that
+  helper yields exactly the pause + bridge (+ beat + recap) tail, so the
+  streamed bytes equal the buffered composition. The tail clips are process-
+  cached and, on a cold cache, render WHILE the answer streams. No
+  Content-Length ⇒ Kestrel frames it `Transfer-Encoding: chunked`.
+- **Kill switch `StoryQa:StreamAnswerAudio`** (default `true`). A de-framing
+  defect found on real hardware can be neutralised by config alone without
+  a firmware release.
+- **Firmware half (`esp32/AregVoiceMvp/`, compiled, NOT flashed, NOT
+  bench-run).** a flag-gated file-static `s_qa_accept_stream` in
+  `voice_client.cpp` makes `qa_post_with_retry()` send the header; only
+  the flag-on (`AREG_QA_STREAM_PLAYBACK`) async upload sets it, around its
+  own POST. The sync fallback in `voice_upload_question()` reads through
+  `read_response_into()` and clears it — sending the header from there
+  would reproduce the `fdc4b66` failure. A static rather than a parameter
+  so the flag-off production image's code and data are **byte-identical**
+  to a HEAD build (verified at the same path with pinned
+  `SOURCE_DATE_EPOCH`, since the toy embeds `__DATE__`/`__TIME__`: the
+  stripped objects hash the same, and the image differs only in its
+  32-byte `app_elf_sha256` header field — a hash of the ELF's debug line
+  tables, which any comment edit moves — plus the trailing digest that
+  covers it). Flag on: 1,628,576 B, +2,080 B. The request stays HTTP/1.1: the
+  streaming reader (`AudioFileSourceHttpBody`, `audio_io.cpp`) already
+  de-frames chunked bodies and treats a missing Content-Length AS chunked,
+  so `http.useHTTP10(true)` — which would make Kestrel send an un-framed
+  identity body — was considered and rejected. One hardening rode along:
+  the de-framer's inter-chunk CRLF is read one byte at a time, because
+  `wait_read()` returns what is available and the CR/LF can straddle TLS
+  records; a two-byte read that came back with one ended the body a chunk
+  early.
+- **Measured END TO END with every stage real (2026-09-02: real API,
+  registered bench toy, real Armenian question clip, `gpt-4o-mini-transcribe`,
+  GPT, both moderation calls, `eleven_v3`; 4 alternated pairs):** first byte
+  **5.73 s buffered → 2.71 s streamed** (mean), ~3.0 s off the wait. The TTS
+  stage alone went 2.8–4.1 s → 0.6–0.8 s; what remains before the first byte
+  is STT + moderation + GPT. A same-day ElevenLabs-only run (OpenAI stages
+  stubbed) read 4.84 s → 1.00 s. Bodies decode as clean MP3, no chunk framing
+  inside. Tables in `docs/latency-plan.md` Part 4.
+- **Remaining verification:** the on-toy bench (`latency-firmware-notes.md`
+  § "What a bench test must check", items 10–13) against this backend — a
+  chunk-header byte reaching the decoder is a burst of noise, a stalled
+  stream must play the canned failure clip without a watchdog reboot.
 
 ## Story Q&A text harness (`POST /api/story-qa-text`)
 
