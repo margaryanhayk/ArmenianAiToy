@@ -1,3 +1,9 @@
+// WOKWI SIMULATOR CONFIG -- generated from config.h.example 2026-09-01.
+// NO real secrets belong in this file, ever: it is meant to be shareable.
+// Wi-Fi = Wokwi-GUEST (the simulator's open AP). Device identity stays a
+// placeholder, so device-authed backend calls return 401 in the sim --
+// expected; boot, menu, SD and state-machine logic all run regardless.
+
 // -------------------------------------------------------------
 // AregVoiceMvp / config.h.example  ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â TEMPLATE
 //
@@ -26,7 +32,7 @@
 // NVS; these defines exist only as a bench escape hatch and as the
 // fallback the B.1 code checks when NVS is empty.
 #ifndef AREG_WIFI_SSID
-#define AREG_WIFI_SSID          ""
+#define AREG_WIFI_SSID          "Wokwi-GUEST"
 #endif
 #ifndef AREG_WIFI_PASSWORD
 #define AREG_WIFI_PASSWORD      ""
@@ -51,7 +57,7 @@
 // net_transport.cpp; define AREG_TLS_INSECURE to skip verification for
 // bench triage only (it prints a loud warning every boot).
 #ifndef AREG_BACKEND_BASE_URL
-#define AREG_BACKEND_BASE_URL   "http://YOUR_LAN_IP:5000"
+#define AREG_BACKEND_BASE_URL   "https://armenianaitoy-production.up.railway.app"
 #endif
 
 // Chat audio POST. NOTE: several modules derive their own endpoint at
@@ -184,8 +190,8 @@
 // for the one-button build ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â everything folds to no-ops.
 // Recommended pins (2026-08-05 pin audit): 21 and 47 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â free,
 // non-strapping, PSRAM-safe. Wire: pin ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ button ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ GND (internal pullup).
-// #define AREG_PIN_BUTTON_YES  21
-// #define AREG_PIN_BUTTON_NO   47
+#define AREG_PIN_BUTTON_YES  21
+#define AREG_PIN_BUTTON_NO   47
 
 // --- Hardware volume knob (10 kOhm linear pot) ---
 // Wiring: wiper -> the pin below, the two end legs to 3V3 and GND. Use an
@@ -197,7 +203,7 @@
 // exactly as it did before the knob existed. That opt-in is deliberate: an
 // ADC pin with nothing wired to it floats, and a floating read mapped to
 // gain is random volume that drifts on its own and looks like a fault.
-// #define AREG_PIN_VOLUME_POT 8
+#define AREG_PIN_VOLUME_POT 8
 
 // 0.6f is the value all six out.SetGain() sites in audio_io.cpp hardcoded
 // before the knob existed, so it stays the no-knob fallback. The old advice
@@ -511,7 +517,7 @@
 // PLATFORM-ARCHITECTURE.txt, Phase B.2 build spec). With the flag OFF (default),
 // none of the BLE code is compiled and the firmware is identical to B.1.
 //
-#define AREG_USE_BLE_PROVISIONING 1
+// #define AREG_USE_BLE_PROVISIONING 1  // OFF: Wokwi has no BLE
 //
 // CORE VERSION WARNING: Arduino-ESP32 3.3.7 and 3.3.8 crash on the
 // ESP32-S3 inside btdm_controller_init the moment BLE provisioning

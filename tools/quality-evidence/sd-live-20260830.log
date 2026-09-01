@@ -1,0 +1,10 @@
+
+[alive] ms=118305 heap=100932 psram=7860672 wifi=3 ip=192.168.1.10 rssi=-63 btn=UP
+[alive] ms=123308 heap=100932 psram=7860704 wifi=3 ip=192.168.1.10 rssi=-64 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=131048 heap=100884 psram=7860532 wifi=3 ip=192.168.1.10 rssi=-62 btn=UP
+[alive] ms=136056 heap=100932 psram=7860672 wifi=3 ip=192.168.1.10 rssi=-65 btn=UP
+[alive] ms=141066 heap=100932 psram=7860928 wifi=3 ip=192.168.1.10 rssi=-66 btn=UP
+[alive] ms=146073 heap=100880 psram=7860928 wifi=3 ip=192.168.1.10 rssi=-65 btn=UP
+[alive] ms=151079 heap=100932 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-67 btn=UP
+[alive] ms=156081 heap=100932 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-62 btn=UP

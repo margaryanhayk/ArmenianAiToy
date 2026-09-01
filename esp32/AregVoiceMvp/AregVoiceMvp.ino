@@ -2381,14 +2381,37 @@ void setup() {
     // compile-time SSID not a placeholder. Burn once, then drop the flag --
     // and never build an OTA image with it, for the reason c9e6593 records.
 #ifdef AREG_PROVISION_WIFI_ONCE
-    if (wifi_creds_present()) {
-        Serial.println("[wifi] credentials already in NVS — burn skipped");
-    } else if (strlen(AREG_WIFI_SSID) == 0
-               || strcmp(AREG_WIFI_SSID, "YOUR_WIFI_SSID") == 0) {
-        Serial.println("[wifi] refusing to burn a placeholder SSID");
-    } else {
-        wifi_creds_save(AREG_WIFI_SSID, AREG_WIFI_PASSWORD);
-        Serial.printf("[wifi] credentials burned to NVS (ssid=%s)\n", AREG_WIFI_SSID);
+    {
+        const bool placeholder = strlen(AREG_WIFI_SSID) == 0
+                                 || strcmp(AREG_WIFI_SSID, "YOUR_WIFI_SSID") == 0;
+        const bool present = wifi_creds_present();
+        bool differs = false;
+#ifdef AREG_PROVISION_WIFI_FORCE
+        // Force-rewrite path (2026-09-01, router changed again): with FORCE
+        // defined, creds already in NVS are OVERWRITTEN when they differ
+        // from the compile-time pair -- idempotent, so it writes flash at
+        // most once per credential change, not once per boot. Bench-only:
+        // never build an OTA image with FORCE on (c9e6593's reason -- an
+        // OTA image reaches every toy and would clobber creds a parent
+        // provisioned by phone).
+        if (present && !placeholder) {
+            static char cur_ssid[64];
+            static char cur_pass[64];
+            if (wifi_creds_load(cur_ssid, sizeof(cur_ssid), cur_pass, sizeof(cur_pass))) {
+                differs = strcmp(cur_ssid, AREG_WIFI_SSID) != 0
+                          || strcmp(cur_pass, AREG_WIFI_PASSWORD) != 0;
+            }
+        }
+#endif
+        if (placeholder) {
+            Serial.println("[wifi] refusing to burn a placeholder SSID");
+        } else if (present && !differs) {
+            Serial.println("[wifi] credentials already in NVS — burn skipped");
+        } else {
+            wifi_creds_save(AREG_WIFI_SSID, AREG_WIFI_PASSWORD);
+            Serial.printf("[wifi] credentials %s to NVS (ssid=%s)\n",
+                          (present ? "updated" : "burned"), AREG_WIFI_SSID);
+        }
     }
     Serial.flush();
 #endif
@@ -2825,6 +2848,17 @@ void loop() {
         // after boot, IDLE-only. Zero bytes of this in production.
         offline_quiz_tick();
 #endif
+
+        // One-shot SD read-integrity self-test, ~15 s after boot (after
+        // the boot flows settle, before content sync's 3-minute arm). See
+        // content_sync_read_selftest's header comment for why it exists.
+        {
+            static bool sd_selftest_done = false;
+            if (!sd_selftest_done && millis() > 15000UL && audio_sd_available()) {
+                sd_selftest_done = true;
+                content_sync_read_selftest();
+            }
+        }
 
 #ifdef AREG_OFFLINE_GAMES_BENCH
         // Bench-only AUTO-start (30 s after boot). The engine itself is

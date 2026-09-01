@@ -481,13 +481,25 @@ bool audio_sd_begin() {
     // Dedicated SPI bus for the card. Pins from config.h; clear of the
     // strapping / USB pins (see HARDENING-INTEGRATION.md Â§6.3).
     SPI.begin(AREG_PIN_SD_SCK, AREG_PIN_SD_MISO, AREG_PIN_SD_MOSI, AREG_PIN_SD_CS);
-    // 16 MHz is well within any genuine card's spec and far above the
-    // ~16 KB/s an MP3 needs; lower it if your wiring is long / noisy.
-    s_sd_ok = SD.begin(AREG_PIN_SD_CS, SPI, 16000000U);
+    // SD SPI clock. Default 4 MHz, NOT the card's ceiling: the 2026-08-30
+    // read-integrity self-test proved the bench wiring corrupts reads at
+    // 16 MHz (same file hashed twice -> two different hashes and two
+    // different byte counts), and corrupted MP3 bytes reach the decoder as
+    // a constant tone mixed into the real words -- in every mode, at any
+    // volume. Playback needs only ~24 KB/s and 4 MHz still delivers
+    // hundreds; raise via AREG_SD_SPI_HZ in config.h only on a board with
+    // real PCB traces, and only after [sd-selftest] passes at the higher
+    // clock. Same posture as AREG_VOLUME_MAX_GAIN: the default is the
+    // safe value, and raising it is a deliberate act, not a tweak.
+#ifndef AREG_SD_SPI_HZ
+#define AREG_SD_SPI_HZ 4000000U
+#endif
+    s_sd_ok = SD.begin(AREG_PIN_SD_CS, SPI, AREG_SD_SPI_HZ);
     if (s_sd_ok) {
-        Serial.printf("[sd] mounted; type=%d size=%lluMB\n",
+        Serial.printf("[sd] mounted; type=%d size=%lluMB spi=%luHz\n",
                       (int)SD.cardType(),
-                      (unsigned long long)(SD.cardSize() / (1024ULL * 1024ULL)));
+                      (unsigned long long)(SD.cardSize() / (1024ULL * 1024ULL)),
+                      (unsigned long)AREG_SD_SPI_HZ);
     } else {
         Serial.println("[sd] SD.begin failed (no card / wiring / format?)");
     }

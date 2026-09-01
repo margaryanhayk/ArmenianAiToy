@@ -76,6 +76,18 @@ void content_sync_tick();
 // console button can never interrupt a story or race a firmware update.
 void content_sync_request_now();
 
+// SD READ-INTEGRITY SELF-TEST (2026-08-30). Reads the same file TWICE and
+// hashes both passes. Two different hashes = the read path is returning
+// different bytes for the same sectors -- corruption in the wiring, the
+// card, or its power, with no software ambiguity left. Also reports read
+// speed. Written after a week in which the same clip played real words on
+// one boot and a constant tone on the next: a 52-second sprint through
+// ~75 seconds of audio proved the decoder was being fed garbage, and this
+// test is the instrument that separates "broken files" (false -- the
+// server copies verify) from "broken reads". Logs its verdict; returns
+// true when both hashes match.
+bool content_sync_read_selftest();
+
 // Last attempt's outcome, for the heartbeat. Bounded vocabulary:
 //   "never"   no attempt since boot
 //   "ok"      everything the manifest offered is now on the card
