@@ -492,6 +492,15 @@ allowlist entry, not a flag. sha256 b212721c…, 1,638,720 B (52.1%).
 the offer gate WILL offer it 1.3.4 — the apply is the operator's enqueue,
 per § 5, and doubles as the OTA-path regression test.
 
+**Applied the same day, cleanly.** Enqueued on the owner's word: offer
+1.3.3 -> 1.3.4 (sig ok, board ok, size ok), download 1,638,720 B,
+`sha256 ok`, flashed to `app1`, rebooted into pending-verify, checked in,
+acked `ok`, `image marked VALID (confirmed)`, then a normal content sync
+(everything already current) and steady heartbeats reporting
+`fw=1.3.4 build=2026-09-02-release`. First fully clean OTA since 1.3.2 and
+the first ever with BLE compiled in. Evidence:
+`tools/quality-evidence/ota-134-20260902.log`.
+
 
 **2026-08-07 — 1.1.0, first real OTA to the owner's toy: ROLLED BACK (by design).**
 Command polled 41 s after enqueue, then silence (correct: no ack before

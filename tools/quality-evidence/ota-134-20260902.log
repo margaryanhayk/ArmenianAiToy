@@ -1,0 +1,251 @@
+[alive] ms=5779774 heap=96676 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=5784777 heap=96676 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=5789781 heap=96676 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=5794785 heap=96676 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=5799790 heap=96676 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=5804798 heap=96676 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=5809801 heap=96676 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=5814805 heap=96676 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=5819813 heap=96676 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-70 btn=UP
+[alive] ms=5824822 heap=96676 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[ota] 1 command(s) pending
+[ota] command id=454c35c3-9e26-4826-8f37-f20e7ded1fbb type=firmware_update expiresAt=2026-09-02T09:10:32.0616563Z
+[ota] manifest signature OK
+[ota] expiresAt=2026-09-02T08:16:34.2190620Z (device-side expiry skipped ??? no RTC; server-enforced)
+[ota] manifest: UPDATE 1.3.3 -> 1.3.4 (sig=ok board=ok size=1638720)
+[ota] downloading 10% (165456/1638720)
+[ota] downloading 20% (331344/1638720)
+[ota] downloading 30% (492672/1638720)
+[ota] downloading 40% (655520/1638720)
+[ota] downloading 50% (822064/1638720)
+[ota] downloading 60% (983808/1638720)
+[ota] downloading 70% (1147728/1638720)
+[ota] downloading 80% (1314064/1638720)
+[ota] downloading 90% (1476016/1638720)
+[ota] downloading 100% (1638720/1638720)
+[ota] sha256 ok
+[ota] APPLYING 1.3.4 -> reboot into pending-verify
+[wifi] event=disconnected reason=8
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0xc (RTC_SW_CPU_RST),boot:0x2b (SPI_FAST_FLASH_BOOT)
+Saved PC:0x40047a66
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x116c
+load:0x403c8700,len:0xc2c
+load:0x403cb700,len:0x3108
+entry 0x403c88b8
+
+[boot] AregVoiceMvp starting
+[boot] backend = https://armenianaitoy-production.up.railway.app
+[net] TLS: verifying (ISRG Root X1 pinned)
+[boot] reset_reason=3/SW
+[boot] diag_boot_counter=0 (cold)
+[boot] previous_step=(none)
+[boot] backend=https://armenianaitoy-production.up.railway.app/api/chat/audio
+[boot] pins button=18 led=48
+[boot] mic_i2s bck=4 ws=5 sd=6
+[boot] amp_i2s bck=15 lrc=16 din=7
+E (261) task_wdt: esp_task_wdt_init(517): TWDT already initialized
+[boot] task watchdog enabled (30s)
+[button] pin=18 resting=UP
+[volume] gain 0.74 (2272 mV)
+[boot] sd_spi cs=10 sck=12 mosi=11 miso=13
+[sd] mounted; type=3 size=7680MB spi=4000000Hz
+[boot] SD mounted; offline narration /stories/anban-huri/narration.mp3 = absent
+[content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=42 music=0
+[wifi] using provisioned creds (ssid=OVIO_0114707)
+[wifi] connecting to OVIO_0114707 ...
+[wifi] event=connected
+[wifi] event=got_ip
+[wifi] ip=192.168.1.24
+[boot] ready ??? press button to speak
+[state] 0 -> 0
+[ota] running fw=1.3.4 partition=app1 img_state=valid ota_state=rebooting (pending_ver=1.3.4 cmd=454c35c3-9e26-4826-8f37-f20e7ded1fbb boots=1)
+[device] using provisioned identity (id=248729da-08d8-4144-afc0-e6af8a3fe471)
+[heartbeat] status=200 (fw=1.3.4 bedtime=0 paused=0)
+[ota] ack 454c35c3-9e26-4826-8f37-f20e7ded1fbb result=ok status=200
+[ota] image marked VALID (confirmed)
+[heartbeat] status=200 (fw=1.3.4 bedtime=0 paused=0)
+[welcome] greeting greet-15
+[state] 0 -> 3
+[story] SD open: /voice/greet-15-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] ask ask-sgrc
+[state] 3 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=29082 heap=97152 psram=7861144 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[ota] boot poll (fw=1.3.4 build=2026-09-02-release board=areg-s3-n8 partition=app1)
+[content-sync] bench fw built Sep  2 2026 11:37:29
+[content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+[sd-selftest] /stories/khosogh-dzuk-v10.mp3 pass1=2097152 B 431 KB/s pass2=2097152 B 431 KB/s
+[sd-selftest] PASS -- both reads identical (51f02da5a636...)
+[alive] ms=42910 heap=96752 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=47912 heap=96752 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=52912 heap=96752 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-70 btn=UP
+[alive] ms=57918 heap=96752 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[heartbeat] status=200 (fw=1.3.4 bedtime=0 paused=0)
+[alive] ms=62921 heap=96704 psram=7860492 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=67929 heap=96752 psram=7860632 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=72929 heap=96752 psram=7860632 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=77931 heap=96752 psram=7860632 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=82933 heap=96752 psram=7860632 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=87938 heap=96700 psram=7860632 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=92946 heap=96752 psram=7860672 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=97948 heap=96752 psram=7860672 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=102950 heap=96752 psram=7860672 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=107951 heap=96752 psram=7860672 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=112958 heap=96752 psram=7860672 wifi=3 ip=192.168.1.24 rssi=-70 btn=UP
+[alive] ms=117963 heap=96752 psram=7860672 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[heartbeat] status=200 (fw=1.3.4 bedtime=0 paused=0)
+[alive] ms=122963 heap=96700 psram=7860268 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=127963 heap=96752 psram=7860672 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=132967 heap=96752 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=137974 heap=96752 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=142981 heap=96752 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=147989 heap=96752 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=152997 heap=96752 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=158003 heap=96752 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-70 btn=UP
+[alive] ms=163012 heap=96752 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=168018 heap=96700 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=173019 heap=96752 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=178024 heap=96752 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[content-sync] starting
+[content-sync] heap before=96752
+[content-sync] manifest bytes=-1 heap parse 52112->52584 psram=7788832
+[content-sync] manifest status=200 stories=10 introEnabled=1 music=0 musicEnabled=0 voice=42 games=104 modes=1111 pauses=1 variants=1
+[content-sync] index v7 loaded entries=10 music=0 voice=42
+[content-sync] item anban-huri v9 "?????????? ????????????" 5560991 bytes
+[content-sync] anban-huri already current (index)
+[content-sync] anban-huri:intro already current
+[content-sync] anban-huri:question already current
+[content-sync] anban-huri:question1 already current
+[content-sync] anban-huri:question2 already current
+[content-sync] anban-huri:summary already current
+[content-sync] anban-huri:offer already current
+[content-sync] anban-huri:reoffer already current
+[content-sync] item hedgehog-apple v3 "???????????? ???? ????????????" 613817 bytes
+[content-sync] hedgehog-apple already current (index)
+[content-sync] hedgehog-apple:intro already current
+[content-sync] hedgehog-apple:question already current
+[content-sync] hedgehog-apple:question1 already current
+[content-sync] hedgehog-apple:question2 already current
+[content-sync] hedgehog-apple:summary already current
+[content-sync] hedgehog-apple:offer already current
+[content-sync] hedgehog-apple:reoffer already current
+[content-sync] item khosogh-dzuk v10 "?????????? ??????????" 8138336 bytes
+[content-sync] khosogh-dzuk already current (index)
+[content-sync] khosogh-dzuk:intro already current
+[content-sync] khosogh-dzuk:question already current
+[content-sync] khosogh-dzuk:question1 already current
+[content-sync] khosogh-dzuk:question2 already current
+[content-sync] khosogh-dzuk:summary already current
+[content-sync] khosogh-dzuk:offer already current
+[content-sync] khosogh-dzuk:reoffer already current
+[content-sync] item little-cloud v3 "???????????? ????????????" 514133 bytes
+[content-sync] little-cloud already current (index)
+[content-sync] little-cloud:intro already current
+[content-sync] little-cloud:question already current
+[content-sync] little-cloud:question1 already current
+[content-sync] little-cloud:question2 already current
+[content-sync] little-cloud:summary already current
+[content-sync] little-cloud:offer already current
+[content-sync] little-cloud:reoffer already current
+[content-sync] item pochat-aghves v9 "?????????? ????????????" 5460680 bytes
+[content-sync] pochat-aghves already current (index)
+[content-sync] pochat-aghves:intro already current
+[content-sync] pochat-aghves:question already current
+[content-sync] pochat-aghves:question1 already current
+[content-sync] pochat-aghves:question2 already current
+[content-sync] pochat-aghves:summary already current
+[content-sync] pochat-aghves:offer already current
+[content-sync] pochat-aghves:reoffer already current
+[content-sync] item princess-and-pea v6 "?????????????????????????? ?? ????????????????????????" 1611903 bytes
+[content-sync] princess-and-pea already current (index)
+[content-sync] princess-and-pea:intro already current
+[content-sync] princess-and-pea:question already current
+[content-sync] princess-and-pea:question1 already current
+[content-sync] princess-and-pea:question2 already current
+[content-sync] princess-and-pea:summary already current
+[content-sync] princess-and-pea:offer already current
+[content-sync] princess-and-pea:reoffer already current
+[content-sync] item sutasan v6 "??????????????????" 1969258 bytes
+[content-sync] sutasan already current (index)
+[content-sync] sutasan:intro already current
+[content-sync] sutasan:question already current
+[content-sync] sutasan:question1 already current
+[content-sync] sutasan:question2 already current
+[content-sync] sutasan:summary already current
+[content-sync] sutasan:offer already current
+[content-sync] sutasan:reoffer already current
+[content-sync] item sutlik-orskan v9 "?????????????? ??????????????" 3356047 bytes
+[content-sync] sutlik-orskan already current (index)
+[content-sync] sutlik-orskan:intro already current
+[content-sync] sutlik-orskan:question already current
+[content-sync] sutlik-orskan:question1 already current
+[content-sync] sutlik-orskan:question2 already current
+[content-sync] sutlik-orskan:summary already current
+[content-sync] sutlik-orskan:offer already current
+[content-sync] sutlik-orskan:reoffer already current
+[content-sync] item three-piglets v6 "???????? ????????????????????" 2078973 bytes
+[content-sync] three-piglets already current (index)
+[content-sync] three-piglets:intro already current
+[content-sync] three-piglets:question already current
+[content-sync] three-piglets:question1 already current
+[content-sync] three-piglets:question2 already current
+[content-sync] three-piglets:summary already current
+[content-sync] three-piglets:offer already current
+[content-sync] three-piglets:reoffer already current
+[content-sync] item ulik v12 "????????????" 2631933 bytes
+[content-sync] ulik already current (index)
+[content-sync] ulik:intro already current
+[content-sync] ulik:question already current
+[content-sync] ulik:question1 already current
+[content-sync] ulik:question2 already current
+[content-sync] ulik:summary already current
+[content-sync] ulik:offer already current
+[content-sync] ulik:reoffer already current
+[content-sync] voice summary offered=42 already=42 downloaded=0 failed=0 voice_active=42
+[content-sync] games phase B: 0 to download, heap=52584
+[content-sync] games summary offered=104 invalid=0 already=104 downloaded=0 failed=0 truncated=0 carried=0 games_active=104
+[content-sync] index written
+[content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=42 music=0
+[content-sync] summary manifest_items=10 accepted_items=10 invalid_items=0 duplicate_items=0 disabled_items=0 truncated_items=0 already_current=10 downloaded=0 failed=0 carried_forward=0 active_index_items=10 index_written=1
+[content-sync] heap after=52584
+[content-sync] PASS
+[content-sync] status=ok error= streak=0 next in 21600s
+[alive] ms=195253 heap=96704 psram=7861044 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[heartbeat] status=200 (fw=1.3.4 bedtime=0 paused=0)
+[alive] ms=200262 heap=96752 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=205263 heap=96752 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=210270 heap=96752 psram=7860960 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=215277 heap=96752 psram=7860960 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=220286 heap=96752 psram=7860960 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=225292 heap=96752 psram=7860960 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=230299 heap=96752 psram=7860960 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=235299 heap=96752 psram=7860960 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=240302 heap=96752 psram=7860960 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=245307 heap=96752 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=250312 heap=96752 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-70 btn=UP
+[heartbeat] status=200 (fw=1.3.4 bedtime=0 paused=0)
+[alive] ms=257856 heap=96704 psram=7860788 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=262860 heap=96752 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-70 btn=UP
+[alive] ms=267860 heap=96700 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-70 btn=UP
+[alive] ms=272866 heap=96752 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=277866 heap=96752 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-73 btn=UP
+[alive] ms=282868 heap=96752 psram=7860928 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=287876 heap=96752 psram=7860960 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[alive] ms=292877 heap=96752 psram=7860960 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=297886 heap=96752 psram=7860960 wifi=3 ip=192.168.1.24 rssi=-70 btn=UP
+[alive] ms=302887 heap=96752 psram=7860960 wifi=3 ip=192.168.1.24 rssi=-77 btn=UP
+[alive] ms=307888 heap=96752 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=312888 heap=96752 psram=7861216 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
+[heartbeat] status=200 (fw=1.3.4 bedtime=0 paused=0)
+[alive] ms=318166 heap=96704 psram=7861044 wifi=3 ip=192.168.1.24 rssi=-71 btn=UP
+[alive] ms=323170 heap=96752 psram=7861184 wifi=3 ip=192.168.1.24 rssi=-72 btn=UP
