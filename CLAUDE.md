@@ -5234,6 +5234,67 @@ continuity check disproved), plus the raw serial captures
 (`button-raw*-20260818.log`, `button-alive-level-20260819.log`,
 `button-jumper*-20260819.log`, `sd-stutter-20260819.log`).
 
+## The SD bus was lying, and the story stream was dead on arrival (2026-08-30..09-02)
+
+One bench arc, three unrelated faults found stacked on each other; evidence in
+`tools/quality-evidence/` (`sd-selftest-*`, `card-heal-20260902.log`,
+`sd-bus-fix-listen-test-20260902.md`).
+
+- **SD read corruption = the "aaaa" tone.** The owner heard a constant tone
+  inside real words, every mode, any volume. A new read self-test
+  (`content_sync_read_selftest`, compiled UNCONDITIONALLY into every build —
+  deliberate, unlike every flag-gated sibling — one shot ~15 s after boot,
+  capped 2 MB/pass) hashed the same file twice at the shipped 16 MHz SPI clock
+  and got two different hashes AND two different sizes. Corrupt bytes into the
+  decoder ARE the tone. Fix: `AREG_SD_SPI_HZ` default **4 MHz** (config-
+  overridable; playback needs ~24 KB/s, so 4 MHz is still >10x headroom) —
+  self-test PASS on the same card and wires. Raising the clock again requires
+  a PASS at the higher speed on real hardware first.
+- **GPIO0 struck again.** The toy went completely silent — not our firmware:
+  a hello-world was silent too, while esptool `--before no-reset` connected
+  instantly ("Staying in bootloader"), proving the chip was PARKED in the ROM
+  bootloader. A stray wire on GPIO0. Removed; cold power-on boots normally.
+  The rule is now absolute: **nothing ever connects to GPIO0** (button is
+  GPIO18 since `f43d5ea`).
+- **The Wi-Fi router changed (again)** — the second time a router change
+  orphaned the toy. `AREG_PROVISION_WIFI_FORCE` added: with the flag, the
+  boot burn OVERWRITES NVS creds when they differ from the compile-time pair
+  (idempotent; bench-only; never in an OTA image, c9e6593's reason). Used
+  once for OVIO_0114707 (2.4 GHz — the S3 cannot join 5 GHz SSIDs), then
+  dropped from the local config.h. Also relearned: the toy's real identity
+  lives in NVS; the config.h device creds were stale and 401'd when borrowed.
+- **`/api/story-audio/*` had been dead in production since it shipped.** The
+  stream gate is FAIL-CLOSED with no `StoryAudio:SigningKey` and
+  `AllowUnauthenticated=false` (both shipped defaults) — while the token
+  endpoint simultaneously returned `{token:null, enforced:false}` ("stream
+  without a token"). The two endpoints contradict on shipped defaults, so
+  every Wi-Fi-stream fallback 404'd ("Unknown story.") for every toy, ever.
+  Fixed by SETTING the key on Railway (2026-09-01), then proven end to end
+  with a throwaway registered device: token minted -> HTTP 200 audio/mpeg,
+  3.5 MB, now server-cached. Firmware needed no change (it already fetches
+  and attaches the token). The throwaway devices were revoked after use.
+- **Card heal.** An operator sync-now re-verified the whole card at the
+  clean bus: one damaged voice clip (`say-again`) re-downloaded; the
+  `sutlik-orskan` "present but not usable" verdict turned out to be a
+  corrupted READ of a healthy file — the bus fix healed it for free.
+- **Heard by the owner, 2026-09-02**: one full story + after-story flow,
+  clean. The "aaaa" case is closed by ear. The full 70-clip listen gate
+  remains open — one story's clip set was heard, not all ten.
+- **A Wokwi virtual board** now exists (`esp32/AregVoiceMvp/wokwi/`): the
+  whole bench wiring simulated in the browser, sim-safe config (Wokwi-GUEST,
+  placeholder identity, BLE off), image verified free of bench secrets. It
+  tests logic (buttons, menu, SD flows, state machine) — it cannot see the
+  fault classes this very arc was made of (analog corruption, brownouts,
+  strapping pins), which is why it complements the bench and never replaces
+  it.
+- **Latency work forked to a parallel session**: `docs/latency-plan.md`
+  Part 4 (2026 research: streaming budgets, ElevenLabs Scribe v2 Realtime +
+  Eleven v3 Conversational as the only realtime candidates that may speak
+  Armenian) is the spec; negotiated first-byte streaming on
+  `POST /api/chat/story-qa` (opt-in `X-Areg-Accept-Stream: 1`, kill switch
+  `StoryQa:StreamAnswerAudio`, moderate-then-stream) is being implemented on
+  its own branch as Part 5.
+
 ## Key Design Decisions
 
 - Devices auth via `X-Device-Id`/`X-Api-Key` headers. Parents use JWT.
