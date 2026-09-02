@@ -479,6 +479,20 @@ wrong-key requests to the image endpoint return 401.
 
 ## 11. Field log
 
+### 2026-09-02 — 1.3.4 staged (first BLE-enabled gated release)
+
+Cut from the merged main (PR #28). Placeholder config build, gate PASS
+on the second run: the first run FAILED on one GUID-shaped string, which
+proved to be the Espressif WiFiProv BLE service UUID
+(258EAFA5-E914-47DA-95CA-C5AB0DC85B11) — expected forever now that BLE
+provisioning is on by default. The gate learned it as an EXACT-VALUE
+allowlist entry, not a flag. sha256 b212721c…, 1,638,720 B (52.1%).
+`areg-current.bin` swapped, `LatestVersion` 1.3.2 → 1.3.4. The bench toy
+(cable-flashed with the same tree as 1.3.3-plus-fixes) reports 1.3.3, so
+the offer gate WILL offer it 1.3.4 — the apply is the operator's enqueue,
+per § 5, and doubles as the OTA-path regression test.
+
+
 **2026-08-07 — 1.1.0, first real OTA to the owner's toy: ROLLED BACK (by design).**
 Command polled 41 s after enqueue, then silence (correct: no ack before
 reboot), then the OLD image acked `failed / rollback_no_checkin`,
