@@ -172,6 +172,30 @@ bool audio_play_thinking_earcon();
 typedef bool (*audio_abort_fn)();
 bool audio_play_thinking_earcon_abortable(audio_abort_fn abort);
 
+// S3 — one pulse of the thinking bed, the sound of the wait AFTER the
+// opening earcon. Lower, shorter and quieter than the earcon, on the
+// AREG_THINKBED_* constants in config.h.
+//
+// WHY (2026-08-16): the bed was a second call to the earcon, so a child
+// waiting for an answer heard one identical 440 Hz 600 ms beep up to 70
+// times — the 4th by second 2, the 16th by second 10. That monotony, more
+// than the wait itself, is what made the toy sound stuck. The three
+// AREG_THINKBED_ tone constants had been declared for this from the start
+// and were never read by any sound path; only the pulse COUNT was live.
+//
+// `pulse_index` is 0 for the first BED pulse (i.e. the second pulse of the
+// wait overall) and counts up from there. It selects the pitch from a slow
+// rise-and-fall figure — see the contour comment in audio_io.cpp for why it
+// moves at all, why it stays inside one whole tone, and why it deliberately
+// never accelerates. Callers pass a plain counter; the wrap is handled here.
+//
+// `abort` behaves exactly as it does for the earcon: polled roughly every
+// 16 ms of audio, fading out over ~8 ms. The shorter pulse means the loop
+// also gets BETWEEN-pulse chances to notice more often, so this cannot
+// lengthen the worst-case wait after an answer lands.
+bool audio_play_thinking_bed_abortable(uint32_t pulse_index,
+                                       audio_abort_fn abort);
+
 // S3 — Stream a Q&A answer incrementally from a URL.
 //
 // Opens `url` as an HTTP stream and decodes the MP3 response chunk-by-

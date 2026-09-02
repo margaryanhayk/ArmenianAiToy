@@ -1,0 +1,622 @@
+﻿ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x2b (SPI_FAST_FLASH_BOOT)
+Saved PC:0x4037a9ce
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x116c
+load:0x403c8700,len:0xc2c
+load:0x403cb700,len:0x3108
+entry 0x403c88b8
+
+[boot] AregVoiceMvp starting
+[boot] backend = https://armenianaitoy-production.up.railway.app
+[net] TLS: verifying (ISRG Root X1 pinned)
+[boot] reset_reason=11/UNKNOWN
+[boot] diag_boot_counter=0 (cold)
+[boot] previous_step=(none)
+[boot] backend=https://armenianaitoy-production.up.railway.app/api/chat/audio
+[boot] pins button=0 led=48
+[boot] mic_i2s bck=4 ws=5 sd=6
+[boot] amp_i2s bck=15 lrc=16 din=7
+E (224) task_wdt: esp_task_wdt_init(517): TWDT already initialized
+[boot] task watchdog enabled (30s)
+[volume] gain 0.15 (0 mV)
+[boot] sd_spi cs=10 sck=12 mosi=11 miso=13
+[sd] mounted; type=3 size=7680MB
+[boot] SD mounted; offline narration /stories/anban-huri/narration.mp3 = absent
+[content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=42 music=0
+[wifi] using compile-time fallback creds (ssid=<home-ssid-redacted>)
+[wifi] connecting to <home-ssid-redacted> ...
+[wifi] event=connected
+[wifi] event=got_ip
+[wifi] ip=192.168.1.11
+[boot] ready ??? press button to speak
+[state] 0 -> 0
+[ota] running fw=1.3.3 partition=app0 img_state=undefined ota_state=idle (pending_ver=- cmd=- boots=0)
+[device] using provisioned identity (id=248729da-08d8-4144-afc0-e6af8a3fe471)
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[welcome] greeting greet-32
+[state] 0 -> 3
+[story] SD open: /voice/greet-32-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] ask ask-sgrc
+[state] 3 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=22390 heap=122372 psram=7861416 wifi=3 ip=192.168.1.11 rssi=-67
+[ota] boot poll (fw=1.3.3 build=games-bench board=areg-s3-n8 partition=app0)
+[content-sync] bench fw built Aug 15 2026 23:46:47
+[content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+[games] armed (pick=1), starting in 5s
+[alive] ms=27393 heap=122372 psram=7861152 wifi=3 ip=192.168.1.11 rssi=-73
+[games] armed (pick=1), starting in 0s
+[story] SD open: /games/mind-reader/intro.mp3 @ 0
+[story] SD end interrupted=false
+[story] SD open: /games/mind-reader/q-root.mp3 @ 0
+[story] SD end interrupted=false
+[games] mind-reader: no answer ??? asking once more
+[story] SD open: /games/mind-reader/q-root.mp3 @ 0
+[story] SD end interrupted=false
+[games] mind-reader: still no answer ??? closing quietly
+[games] mind-reader: ended at depth 0
+[menu] activity ended ??? asking what next (chain=1)
+[welcome] greeting greet-33
+[state] 0 -> 3
+[story] SD open: /voice/greet-33-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] ask ask-sgrc
+[state] 3 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=88338 heap=122372 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-68
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=93342 heap=122372 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=98349 heap=122372 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=103356 heap=122372 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=108363 heap=122372 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=113370 heap=122372 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=118377 heap=122372 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=123384 heap=122372 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=128391 heap=122372 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=133398 heap=122372 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=138404 heap=122372 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=143411 heap=122372 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-70
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=150967 heap=122316 psram=7861052 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=155974 heap=122372 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=160981 heap=122372 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=165988 heap=122324 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=170995 heap=122372 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=176002 heap=122372 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-70
+[content-sync] starting
+[content-sync] heap before=122372
+[content-sync] manifest bytes=-1 heap parse 78148->78196 psram=7788592
+[content-sync] manifest status=200 stories=10 introEnabled=1 music=0 musicEnabled=0 voice=42 games=104 modes=1111 pauses=1 variants=1
+[content-sync] index v7 loaded entries=10 music=0 voice=42
+[content-sync] item anban-huri v9 "?????????? ????????????" 5560991 bytes
+[content-sync] anban-huri already current (index)
+[content-sync] anban-huri:intro download 12% (12288/100354)
+[content-sync] anban-huri:intro download 20% (20510/100354)
+[content-sync] anban-huri:intro download 32% (32798/100354)
+[content-sync] anban-huri:intro download 40% (40990/100354)
+[content-sync] anban-huri:intro download 53% (53278/100354)
+[content-sync] anban-huri:intro download 63% (63486/100354)
+[content-sync] anban-huri:intro download 71% (71678/100354)
+[content-sync] anban-huri:intro download 82% (82576/100354)
+[content-sync] anban-huri:intro download 90% (90768/100354)
+[content-sync] anban-huri:intro download 100% (100354/100354)
+[content-sync] anban-huri:intro sha256 ok
+[content-sync] moved /tmp/anban-huri-v9-intro.mp3.part -> /stories/anban-huri-v9-intro.mp3
+[content-sync] anban-huri:question download 15% (8192/53960)
+[content-sync] anban-huri:question download 22% (12288/53960)
+[content-sync] anban-huri:question download 30% (16415/53960)
+[content-sync] anban-huri:question download 43% (23695/53960)
+[content-sync] anban-huri:question download 51% (27791/53960)
+[content-sync] anban-huri:question download 66% (35983/53960)
+[content-sync] anban-huri:question download 74% (40079/53960)
+[content-sync] anban-huri:question download 81% (44175/53960)
+[content-sync] anban-huri:question download 93% (50239/53960)
+[content-sync] anban-huri:question download 100% (53960/53960)
+[content-sync] anban-huri:question sha256 ok
+[content-sync] moved /tmp/anban-huri-v9-question.mp3.part -> /stories/anban-huri-v9-question.mp3
+[content-sync] anban-huri:question1 download 16% (8192/50199)
+[content-sync] anban-huri:question1 download 24% (12288/50199)
+[content-sync] anban-huri:question1 download 32% (16415/50199)
+[content-sync] anban-huri:question1 download 40% (20511/50199)
+[content-sync] anban-huri:question1 download 57% (28703/50199)
+[content-sync] anban-huri:question1 download 65% (32799/50199)
+[content-sync] anban-huri:question1 download 73% (36895/50199)
+[content-sync] anban-huri:question1 download 83% (41695/50199)
+[content-sync] anban-huri:question1 download 91% (45791/50199)
+[content-sync] anban-huri:question1 download 100% (50199/50199)
+[content-sync] anban-huri:question1 sha256 ok
+[content-sync] moved /tmp/anban-huri-v9-question1.mp3.part -> /stories/anban-huri-v9-question1.mp3
+[content-sync] anban-huri:question2 download 16% (8192/48318)
+[content-sync] anban-huri:question2 download 25% (12288/48318)
+[content-sync] anban-huri:question2 download 33% (16415/48318)
+[content-sync] anban-huri:question2 download 42% (20511/48318)
+[content-sync] anban-huri:question2 download 50% (24607/48318)
+[content-sync] anban-huri:question2 download 67% (32799/48318)
+[content-sync] anban-huri:question2 download 76% (36895/48318)
+[content-sync] anban-huri:question2 download 86% (41695/48318)
+[content-sync] anban-huri:question2 download 94% (45791/48318)
+[content-sync] anban-huri:question2 download 100% (48318/48318)
+[content-sync] anban-huri:question2 sha256 ok
+[content-sync] moved /tmp/anban-huri-v9-question2.mp3.part -> /stories/anban-huri-v9-question2.mp3
+[content-sync] anban-huri:summary download 11% (20510/186244)
+[content-sync] anban-huri:summary download 20% (37598/186244)
+[content-sync] anban-huri:summary download 31% (57822/186244)
+[content-sync] anban-huri:summary download 40% (75166/186244)
+[content-sync] anban-huri:summary download 50% (93648/186244)
+[content-sync] anban-huri:summary download 61% (115440/186244)
+[content-sync] anban-huri:summary download 70% (130608/186244)
+[content-sync] anban-huri:summary download 81% (151088/186244)
+[content-sync] anban-huri:summary download 90% (168288/186244)
+[content-sync] anban-huri:summary download 100% (186244/186244)
+[content-sync] anban-huri:summary sha256 ok
+[content-sync] moved /tmp/anban-huri-v9-summary.mp3.part -> /stories/anban-huri-v9-summary.mp3
+[content-sync] anban-huri:offer download 12% (8192/65872)
+[content-sync] anban-huri:offer download 24% (16415/65872)
+[content-sync] anban-huri:offer download 31% (20511/65872)
+[content-sync] anban-huri:offer download 43% (28703/65872)
+[content-sync] anban-huri:offer download 50% (33120/65872)
+[content-sync] anban-huri:offer download 61% (40704/65872)
+[content-sync] anban-huri:offer download 74% (48896/65872)
+[content-sync] anban-huri:offer download 80% (52992/65872)
+[content-sync] anban-huri:offer download 92% (61184/65872)
+[content-sync] anban-huri:offer download 100% (65872/65872)
+[content-sync] anban-huri:offer sha256 ok
+[content-sync] moved /tmp/anban-huri-v9-offer.mp3.part -> /stories/anban-huri-v9-offer.mp3
+[content-sync] anban-huri:reoffer download 13% (12288/92204)
+[content-sync] anban-huri:reoffer download 22% (20511/92204)
+[content-sync] anban-huri:reoffer download 31% (28703/92204)
+[content-sync] anban-huri:reoffer download 41% (38207/92204)
+[content-sync] anban-huri:reoffer download 50% (46399/92204)
+[content-sync] anban-huri:reoffer download 63% (58687/92204)
+[content-sync] anban-huri:reoffer download 72% (66879/92204)
+[content-sync] anban-huri:reoffer download 81% (75071/92204)
+[content-sync] anban-huri:reoffer download 93% (86239/92204)
+[content-sync] anban-huri:reoffer download 100% (92204/92204)
+[content-sync] anban-huri:reoffer sha256 ok
+[content-sync] moved /tmp/anban-huri-v9-reoffer.mp3.part -> /stories/anban-huri-v9-reoffer.mp3
+[content-sync] item hedgehog-apple v3 "???????????? ???? ????????????" 613817 bytes
+[content-sync] hedgehog-apple already current (index)
+[content-sync] hedgehog-apple:intro download 15% (8192/52080)
+[content-sync] hedgehog-apple:intro download 23% (12288/52080)
+[content-sync] hedgehog-apple:intro download 31% (16415/52080)
+[content-sync] hedgehog-apple:intro download 47% (24607/52080)
+[content-sync] hedgehog-apple:intro download 55% (29055/52080)
+[content-sync] hedgehog-apple:intro download 63% (33151/52080)
+[content-sync] hedgehog-apple:intro download 71% (37247/52080)
+[content-sync] hedgehog-apple:intro download 80% (41695/52080)
+[content-sync] hedgehog-apple:intro download 95% (49887/52080)
+[content-sync] hedgehog-apple:intro download 100% (52080/52080)
+[content-sync] hedgehog-apple:intro sha256 ok
+[content-sync] moved /tmp/hedgehog-apple-v3-intro.mp3.part -> /stories/hedgehog-apple-v3-intro.mp3
+[content-sync] hedgehog-apple:question download 14% (8192/57722)
+[content-sync] hedgehog-apple:question download 21% (12288/57722)
+[content-sync] hedgehog-apple:question download 30% (17375/57722)
+[content-sync] hedgehog-apple:question download 44% (25567/57722)
+[content-sync] hedgehog-apple:question download 51% (29663/57722)
+[content-sync] hedgehog-apple:question download 65% (37599/57722)
+[content-sync] hedgehog-apple:question download 72% (41695/57722)
+[content-sync] hedgehog-apple:question download 86% (49887/57722)
+[content-sync] hedgehog-apple:question download 93% (53983/57722)
+[content-sync] hedgehog-apple:question download 100% (57722/57722)
+[content-sync] hedgehog-apple:question sha256 ok
+[content-sync] moved /tmp/hedgehog-apple-v3-question.mp3.part -> /stories/hedgehog-apple-v3-question.mp3
+[content-sync] hedgehog-apple:question1 download 15% (8192/52080)
+[content-sync] hedgehog-apple:question1 download 23% (12288/52080)
+[content-sync] hedgehog-apple:question1 download 31% (16415/52080)
+[content-sync] hedgehog-apple:question1 download 47% (24607/52080)
+[content-sync] hedgehog-apple:question1 download 55% (28703/52080)
+[content-sync] hedgehog-apple:question1 download 62% (32799/52080)
+[content-sync] hedgehog-apple:question1 download 75% (39167/52080)
+[content-sync] hedgehog-apple:question1 download 81% (42655/52080)
+[content-sync] hedgehog-apple:question1 download 97% (50847/52080)
+[content-sync] hedgehog-apple:question1 download 100% (52080/52080)
+[content-sync] hedgehog-apple:question1 sha256 ok
+[content-sync] moved /tmp/hedgehog-apple-v3-question1.mp3.part -> /stories/hedgehog-apple-v3-question1.mp3
+[content-sync] hedgehog-apple:question2 download 14% (8192/55841)
+[content-sync] hedgehog-apple:question2 download 22% (12288/55841)
+[content-sync] hedgehog-apple:question2 download 36% (20511/55841)
+[content-sync] hedgehog-apple:question2 download 44% (24607/55841)
+[content-sync] hedgehog-apple:question2 download 51% (28703/55841)
+[content-sync] hedgehog-apple:question2 download 66% (36895/55841)
+[content-sync] hedgehog-apple:question2 download 74% (41695/55841)
+[content-sync] hedgehog-apple:question2 download 82% (45791/55841)
+[content-sync] hedgehog-apple:question2 download 96% (53983/55841)
+[content-sync] hedgehog-apple:question2 download 100% (55841/55841)
+[content-sync] hedgehog-apple:question2 sha256 ok
+[content-sync] moved /tmp/hedgehog-apple-v3-question2.mp3.part -> /stories/hedgehog-apple-v3-question2.mp3
+[content-sync] hedgehog-apple:summary download 10% (12318/122924)
+[content-sync] hedgehog-apple:summary download 20% (24606/122924)
+[content-sync] hedgehog-apple:summary download 31% (38862/122924)
+[content-sync] hedgehog-apple:summary download 41% (51150/122924)
+[content-sync] hedgehog-apple:summary download 51% (63486/122924)
+[content-sync] hedgehog-apple:summary download 60% (74688/122924)
+[content-sync] hedgehog-apple:summary download 72% (89200/122924)
+[content-sync] hedgehog-apple:summary download 80% (98704/122924)
+[content-sync] hedgehog-apple:summary download 90% (110992/122924)
+[content-sync] hedgehog-apple:summary download 100% (122924/122924)
+[content-sync] hedgehog-apple:summary sha256 ok
+[content-sync] moved /tmp/hedgehog-apple-v3-summary.mp3.part -> /stories/hedgehog-apple-v3-summary.mp3
+[content-sync] hedgehog-apple:offer download 11% (8192/71515)
+[content-sync] hedgehog-apple:offer download 22% (16415/71515)
+[content-sync] hedgehog-apple:offer download 34% (24607/71515)
+[content-sync] hedgehog-apple:offer download 40% (28703/71515)
+[content-sync] hedgehog-apple:offer download 51% (36895/71515)
+[content-sync] hedgehog-apple:offer download 63% (45087/71515)
+[content-sync] hedgehog-apple:offer download 74% (53279/71515)
+[content-sync] hedgehog-apple:offer download 80% (57375/71515)
+[content-sync] hedgehog-apple:offer download 92% (66015/71515)
+[content-sync] hedgehog-apple:offer download 100% (71515/71515)
+[content-sync] hedgehog-apple:offer sha256 ok
+[content-sync] moved /tmp/hedgehog-apple-v3-offer.mp3.part -> /stories/hedgehog-apple-v3-offer.mp3
+[content-sync] hedgehog-apple:reoffer download 13% (12288/88442)
+[content-sync] hedgehog-apple:reoffer download 23% (20511/88442)
+[content-sync] hedgehog-apple:reoffer download 32% (28703/88442)
+[content-sync] hedgehog-apple:reoffer download 41% (36895/88442)
+[content-sync] hedgehog-apple:reoffer download 51% (45791/88442)
+[content-sync] hedgehog-apple:reoffer download 62% (55599/88442)
+[content-sync] hedgehog-apple:reoffer download 72% (63791/88442)
+[content-sync] hedgehog-apple:reoffer download 83% (73599/88442)
+[content-sync] hedgehog-apple:reoffer download 90% (79615/88442)
+[content-sync] hedgehog-apple:reoffer download 100% (88442/88442)
+[content-sync] hedgehog-apple:reoffer sha256 ok
+[content-sync] moved /tmp/hedgehog-apple-v3-reoffer.mp3.part -> /stories/hedgehog-apple-v3-reoffer.mp3
+[content-sync] item khosogh-dzuk v10 "?????????? ??????????" 8138336 bytes
+[content-sync] khosogh-dzuk already current (index)
+[content-sync] khosogh-dzuk:intro download 13% (12288/92204)
+[content-sync] khosogh-dzuk:intro download 22% (20511/92204)
+[content-sync] khosogh-dzuk:intro download 30% (27791/92204)
+[content-sync] khosogh-dzuk:intro download 40% (37599/92204)
+[content-sync] khosogh-dzuk:intro download 54% (49887/92204)
+[content-sync] khosogh-dzuk:intro download 62% (58079/92204)
+[content-sync] khosogh-dzuk:intro download 72% (66975/92204)
+[content-sync] khosogh-dzuk:intro download 81% (75167/92204)
+[content-sync] khosogh-dzuk:intro download 90% (83359/92204)
+[content-sync] khosogh-dzuk:intro download 100% (92204/92204)
+[content-sync] khosogh-dzuk:intro sha256 ok
+[content-sync] moved /tmp/khosogh-dzuk-v10-intro.mp3.part -> /stories/khosogh-dzuk-v10-intro.mp3
+[content-sync] khosogh-dzuk:question download 15% (8192/52080)
+[content-sync] khosogh-dzuk:question download 23% (12288/52080)
+[content-sync] khosogh-dzuk:question download 31% (16415/52080)
+[content-sync] khosogh-dzuk:question download 47% (24607/52080)
+[content-sync] khosogh-dzuk:question download 55% (28703/52080)
+[content-sync] khosogh-dzuk:question download 62% (32799/52080)
+[content-sync] khosogh-dzuk:question download 70% (36895/52080)
+[content-sync] khosogh-dzuk:question download 87% (45487/52080)
+[content-sync] khosogh-dzuk:question download 95% (49583/52080)
+[content-sync] khosogh-dzuk:question download 100% (52080/52080)
+[content-sync] khosogh-dzuk:question sha256 ok
+[content-sync] moved /tmp/khosogh-dzuk-v10-question.mp3.part -> /stories/khosogh-dzuk-v10-question.mp3
+[content-sync] khosogh-dzuk:question1 download 13% (8192/59603)
+[content-sync] khosogh-dzuk:question1 download 20% (12288/59603)
+[content-sync] khosogh-dzuk:question1 download 34% (20511/59603)
+[content-sync] khosogh-dzuk:question1 download 41% (24607/59603)
+[content-sync] khosogh-dzuk:question1 download 55% (32799/59603)
+[content-sync] khosogh-dzuk:question1 download 65% (39167/59603)
+[content-sync] khosogh-dzuk:question1 download 74% (44223/59603)
+[content-sync] khosogh-dzuk:question1 download 81% (48319/59603)
+[content-sync] khosogh-dzuk:question1 download 91% (54335/59603)
+[content-sync] khosogh-dzuk:question1 download 100% (59603/59603)
+[content-sync] khosogh-dzuk:question1 sha256 ok
+[content-sync] moved /tmp/khosogh-dzuk-v10-question1.mp3.part -> /stories/khosogh-dzuk-v10-question1.mp3
+[content-sync] khosogh-dzuk:question2 download 13% (8192/61484)
+[content-sync] khosogh-dzuk:question2 download 22% (13887/61484)
+[content-sync] khosogh-dzuk:question2 download 35% (22079/61484)
+[content-sync] khosogh-dzuk:question2 download 40% (24959/61484)
+[content-sync] khosogh-dzuk:question2 download 53% (33151/61484)
+[content-sync] khosogh-dzuk:question2 download 60% (37247/61484)
+[content-sync] khosogh-dzuk:question2 download 76% (47055/61484)
+[content-sync] khosogh-dzuk:question2 download 83% (51151/61484)
+[content-sync] khosogh-dzuk:question2 download 96% (59343/61484)
+[content-sync] khosogh-dzuk:question2 download 100% (61484/61484)
+[content-sync] khosogh-dzuk:question2 sha256 ok
+[content-sync] moved /tmp/khosogh-dzuk-v10-question2.mp3.part -> /stories/khosogh-dzuk-v10-question2.mp3
+[content-sync] khosogh-dzuk:summary download 10% (12288/119162)
+[content-sync] khosogh-dzuk:summary download 20% (24606/119162)
+[content-sync] khosogh-dzuk:summary download 32% (39166/119162)
+[content-sync] khosogh-dzuk:summary download 40% (47710/119162)
+[content-sync] khosogh-dzuk:summary download 50% (59998/119162)
+[content-sync] khosogh-dzuk:summary download 61% (73598/119162)
+[content-sync] khosogh-dzuk:summary download 70% (83710/119162)
+[content-sync] khosogh-dzuk:summary download 80% (95998/119162)
+[content-sync] khosogh-dzuk:summary download 90% (108286/119162)
+[content-sync] khosogh-dzuk:summary download 100% (119162/119162)
+[content-sync] khosogh-dzuk:summary sha256 ok
+[content-sync] moved /tmp/khosogh-dzuk-v10-summary.mp3.part -> /stories/khosogh-dzuk-v10-summary.mp3
+[content-sync] khosogh-dzuk:offer download 13% (8192/59603)
+[content-sync] khosogh-dzuk:offer download 20% (12288/59603)
+[content-sync] khosogh-dzuk:offer download 34% (20480/59603)
+[content-sync] khosogh-dzuk:offer download 41% (24576/59603)
+[content-sync] khosogh-dzuk:offer download 50% (30015/59603)
+[content-sync] khosogh-dzuk:offer download 64% (38207/59603)
+[content-sync] khosogh-dzuk:offer download 74% (44223/59603)
+[content-sync] khosogh-dzuk:offer download 81% (48319/59603)
+[content-sync] khosogh-dzuk:offer download 90% (54031/59603)
+[content-sync] khosogh-dzuk:offer download 100% (59603/59603)
+[content-sync] khosogh-dzuk:offer sha256 ok
+[content-sync] moved /tmp/khosogh-dzuk-v10-offer.mp3.part -> /stories/khosogh-dzuk-v10-offer.mp3
+[content-sync] khosogh-dzuk:reoffer download 12% (12288/98473)
+[content-sync] khosogh-dzuk:reoffer download 20% (20511/98473)
+[content-sync] khosogh-dzuk:reoffer download 33% (33151/98473)
+[content-sync] khosogh-dzuk:reoffer download 43% (43263/98473)
+[content-sync] khosogh-dzuk:reoffer download 52% (51807/98473)
+[content-sync] khosogh-dzuk:reoffer download 60% (59999/98473)
+[content-sync] khosogh-dzuk:reoffer download 71% (70767/98473)
+[content-sync] khosogh-dzuk:reoffer download 80% (78959/98473)
+[content-sync] khosogh-dzuk:reoffer download 93% (92336/98473)
+[content-sync] khosogh-dzuk:reoffer download 100% (98473/98473)
+[content-sync] khosogh-dzuk:reoffer sha256 ok
+[content-sync] moved /tmp/khosogh-dzuk-v10-reoffer.mp3.part -> /stories/khosogh-dzuk-v10-reoffer.mp3
+[content-sync] item little-cloud v3 "???????????? ????????????" 514133 bytes
+[content-sync] little-cloud already current (index)
+[content-sync] little-cloud:intro download 15% (8192/52080)
+[content-sync] little-cloud:intro download 23% (12288/52080)
+[content-sync] little-cloud:intro download 31% (16415/52080)
+[content-sync] little-cloud:intro download 47% (24607/52080)
+[content-sync] little-cloud:intro download 55% (29055/52080)
+[content-sync] little-cloud:intro download 63% (33151/52080)
+[content-sync] little-cloud:intro download 75% (39167/52080)
+[content-sync] little-cloud:intro download 81% (42655/52080)
+[content-sync] little-cloud:intro download 97% (50847/52080)
+[content-sync] little-cloud:intro download 100% (52080/52080)
+[content-sync] little-cloud:intro sha256 ok
+[content-sync] moved /tmp/little-cloud-v3-intro.mp3.part -> /stories/little-cloud-v3-intro.mp3
+[content-sync] little-cloud:question download 19% (8192/42675)
+[content-sync] little-cloud:question download 28% (12288/42675)
+[content-sync] little-cloud:question download 38% (16415/42675)
+[content-sync] little-cloud:question download 48% (20511/42675)
+[content-sync] little-cloud:question download 57% (24607/42675)
+[content-sync] little-cloud:question download 67% (28703/42675)
+[content-sync] little-cloud:question download 76% (32799/42675)
+[content-sync] little-cloud:question download 86% (36895/42675)
+[content-sync] little-cloud:question download 97% (41695/42675)
+[content-sync] little-cloud:question download 100% (42675/42675)
+[content-sync] little-cloud:question sha256 ok
+[content-sync] moved /tmp/little-cloud-v3-question.mp3.part -> /stories/little-cloud-v3-question.mp3
+[content-sync] little-cloud:question1 download 15% (8192/52080)
+[content-sync] little-cloud:question1 download 23% (12288/52080)
+[content-sync] little-cloud:question1 download 31% (16415/52080)
+[content-sync] little-cloud:question1 download 47% (24607/52080)
+[content-sync] little-cloud:question1 download 55% (28703/52080)
+[content-sync] little-cloud:question1 download 62% (32799/52080)
+[content-sync] little-cloud:question1 download 70% (36895/52080)
+[content-sync] little-cloud:question1 download 81% (42655/52080)
+[content-sync] little-cloud:question1 download 94% (48975/52080)
+[content-sync] little-cloud:question1 download 100% (52080/52080)
+[content-sync] little-cloud:question1 sha256 ok
+[content-sync] moved /tmp/little-cloud-v3-question1.mp3.part -> /stories/little-cloud-v3-question1.mp3
+[content-sync] little-cloud:question2 download 10% (4096/40795)
+[content-sync] little-cloud:question2 download 20% (8192/40795)
+[content-sync] little-cloud:question2 download 30% (12288/40795)
+[content-sync] little-cloud:question2 download 40% (16415/40795)
+[content-sync] little-cloud:question2 download 50% (20511/40795)
+[content-sync] little-cloud:question2 download 68% (27791/40795)
+[content-sync] little-cloud:question2 download 78% (31887/40795)
+[content-sync] little-cloud:question2 download 89% (36639/40795)
+[content-sync] little-cloud:question2 download 99% (40735/40795)
+[content-sync] little-cloud:question2 download 100% (40795/40795)
+[content-sync] little-cloud:question2 sha256 ok
+[content-sync] moved /tmp/little-cloud-v3-question2.mp3.part -> /stories/little-cloud-v3-question2.mp3
+[content-sync] little-cloud:summary download 10% (8192/75276)
+[content-sync] little-cloud:summary download 21% (16384/75276)
+[content-sync] little-cloud:summary download 31% (23999/75276)
+[content-sync] little-cloud:summary download 42% (32191/75276)
+[content-sync] little-cloud:summary download 53% (40383/75276)
+[content-sync] little-cloud:summary download 60% (45791/75276)
+[content-sync] little-cloud:summary download 71% (53983/75276)
+[content-sync] little-cloud:summary download 82% (62223/75276)
+[content-sync] little-cloud:summary download 93% (70415/75276)
+[content-sync] little-cloud:summary download 100% (75276/75276)
+[content-sync] little-cloud:summary sha256 ok
+[content-sync] moved /tmp/little-cloud-v3-summary.mp3.part -> /stories/little-cloud-v3-summary.mp3
+[content-sync] little-cloud:offer download 12% (8192/65872)
+[content-sync] little-cloud:offer download 24% (16415/65872)
+[content-sync] little-cloud:offer download 31% (20511/65872)
+[content-sync] little-cloud:offer download 43% (28703/65872)
+[content-sync] little-cloud:offer download 56% (36895/65872)
+[content-sync] little-cloud:offer download 62% (40991/65872)
+[content-sync] little-cloud:offer download 74% (49183/65872)
+[content-sync] little-cloud:offer download 80% (53279/65872)
+[content-sync] little-cloud:offer download 90% (59391/65872)
+[content-sync] little-cloud:offer download 100% (65872/65872)
+[content-sync] little-cloud:offer sha256 ok
+[content-sync] moved /tmp/little-cloud-v3-offer.mp3.part -> /stories/little-cloud-v3-offer.mp3
+[content-sync] little-cloud:reoffer download 14% (12288/84680)
+[content-sync] little-cloud:reoffer download 24% (20480/84680)
+[content-sync] little-cloud:reoffer download 33% (28703/84680)
+[content-sync] little-cloud:reoffer download 43% (36895/84680)
+[content-sync] little-cloud:reoffer download 53% (45087/84680)
+[content-sync] little-cloud:reoffer download 62% (53279/84680)
+[content-sync] little-cloud:reoffer download 73% (62527/84680)
+[content-sync] little-cloud:reoffer download 83% (70719/84680)
+[content-sync] little-cloud:reoffer download 93% (78911/84680)
+[content-sync] little-cloud:reoffer download 100% (84680/84680)
+[content-sync] little-cloud:reoffer sha256 ok
+[content-sync] moved /tmp/little-cloud-v3-reoffer.mp3.part -> /stories/little-cloud-v3-reoffer.mp3
+[content-sync] item pochat-aghves v9 "?????????? ????????????" 5460680 bytes
+[content-sync] pochat-aghves already current (index)
+[content-sync] pochat-aghves:intro download 11% (12622/105996)
+[content-sync] pochat-aghves:intro download 23% (24910/105996)
+[content-sync] pochat-aghves:intro download 33% (35678/105996)
+[content-sync] pochat-aghves:intro download 43% (45790/105996)
+[content-sync] pochat-aghves:intro download 50% (53982/105996)
+[content-sync] pochat-aghves:intro download 61% (64750/105996)
+[content-sync] pochat-aghves:intro download 71% (76126/105996)
+[content-sync] pochat-aghves:intro download 80% (85630/105996)
+[content-sync] pochat-aghves:intro download 90% (95742/105996)
+[content-sync] pochat-aghves:intro download 100% (105996/105996)
+[content-sync] pochat-aghves:intro sha256 ok
+[content-sync] moved /tmp/pochat-aghves-v9-intro.mp3.part -> /stories/pochat-aghves-v9-intro.mp3
+[content-sync] pochat-aghves:question download 16% (8192/48318)
+[content-sync] pochat-aghves:question download 25% (12288/48318)
+[content-sync] pochat-aghves:question download 33% (16415/48318)
+[content-sync] pochat-aghves:question download 42% (20511/48318)
+[content-sync] pochat-aghves:question download 50% (24607/48318)
+[content-sync] pochat-aghves:question download 67% (32799/48318)
+[content-sync] pochat-aghves:question download 76% (36895/48318)
+[content-sync] pochat-aghves:question download 84% (40991/48318)
+[content-sync] pochat-aghves:question download 90% (43919/48318)
+[content-sync] pochat-aghves:question download 100% (48318/48318)
+[content-sync] pochat-aghves:question sha256 ok
+[content-sync] moved /tmp/pochat-aghves-v9-question.mp3.part -> /stories/pochat-aghves-v9-question.mp3
+[content-sync] pochat-aghves:question1 download 14% (8192/57722)
+[content-sync] pochat-aghves:question1 download 21% (12288/57722)
+[content-sync] pochat-aghves:question1 download 35% (20511/57722)
+[content-sync] pochat-aghves:question1 download 42% (24607/57722)
+[content-sync] pochat-aghves:question1 download 56% (32799/57722)
+[content-sync] pochat-aghves:question1 download 63% (36895/57722)
+[content-sync] pochat-aghves:question1 download 71% (40991/57722)
+[content-sync] pochat-aghves:question1 download 85% (49183/57722)
+[content-sync] pochat-aghves:question1 download 92% (53279/57722)
+[content-sync] pochat-aghves:question1 download 100% (57722/57722)
+[content-sync] pochat-aghves:question1 sha256 ok
+[content-sync] moved /tmp/pochat-aghves-v9-question1.mp3.part -> /stories/pochat-aghves-v9-question1.mp3
+[content-sync] pochat-aghves:question2 download 13% (8192/61484)
+[content-sync] pochat-aghves:question2 download 20% (12319/61484)
+[content-sync] pochat-aghves:question2 download 33% (20511/61484)
+[content-sync] pochat-aghves:question2 download 40% (24607/61484)
+[content-sync] pochat-aghves:question2 download 51% (31583/61484)
+[content-sync] pochat-aghves:question2 download 64% (39775/61484)
+[content-sync] pochat-aghves:question2 download 71% (43871/61484)
+[content-sync] pochat-aghves:question2 download 83% (51455/61484)
+[content-sync] pochat-aghves:question2 download 90% (55551/61484)
+[content-sync] pochat-aghves:question2 download 100% (61484/61484)
+[content-sync] pochat-aghves:question2 sha256 ok
+[content-sync] moved /tmp/pochat-aghves-v9-question2.mp3.part -> /stories/pochat-aghves-v9-question2.mp3
+[content-sync] pochat-aghves:summary download 10% (12318/122924)
+[content-sync] pochat-aghves:summary download 20% (24606/122924)
+[content-sync] pochat-aghves:summary download 30% (36894/122924)
+[content-sync] pochat-aghves:summary download 40% (49886/122924)
+[content-sync] pochat-aghves:summary download 51% (63182/122924)
+[content-sync] pochat-aghves:summary download 63% (77694/122924)
+[content-sync] pochat-aghves:summary download 71% (87502/122924)
+[content-sync] pochat-aghves:summary download 80% (98574/122924)
+[content-sync] pochat-aghves:summary download 90% (110862/122924)
+[content-sync] pochat-aghves:summary download 100% (122924/122924)
+[content-sync] pochat-aghves:summary sha256 ok
+[content-sync] moved /tmp/pochat-aghves-v9-summary.mp3.part -> /stories/pochat-aghves-v9-summary.mp3
+[content-sync] pochat-aghves:offer download 10% (8192/75276)
+[content-sync] pochat-aghves:offer download 20% (15151/75276)
+[content-sync] pochat-aghves:offer download 33% (25263/75276)
+[content-sync] pochat-aghves:offer download 43% (32543/75276)
+[content-sync] pochat-aghves:offer download 55% (41695/75276)
+[content-sync] pochat-aghves:offer download 60% (45791/75276)
+[content-sync] pochat-aghves:offer download 74% (55903/75276)
+[content-sync] pochat-aghves:offer download 85% (64095/75276)
+[content-sync] pochat-aghves:offer download 90% (68239/75276)
+[content-sync] pochat-aghves:offer download 100% (75276/75276)
+[content-sync] pochat-aghves:offer sha256 ok
+[content-sync] moved /tmp/pochat-aghves-v9-offer.mp3.part -> /stories/pochat-aghves-v9-offer.mp3
+[content-sync] pochat-aghves:reoffer download 13% (12288/88442)
+[content-sync] pochat-aghves:reoffer download 23% (20511/88442)
+[content-sync] pochat-aghves:reoffer download 32% (28703/88442)
+[content-sync] pochat-aghves:reoffer download 41% (36895/88442)
+[content-sync] pochat-aghves:reoffer download 50% (44223/88442)
+[content-sync] pochat-aghves:reoffer download 63% (56511/88442)
+[content-sync] pochat-aghves:reoffer download 73% (64703/88442)
+[content-sync] pochat-aghves:reoffer download 81% (72031/88442)
+[content-sync] pochat-aghves:reoffer download 90% (80223/88442)
+[content-sync] pochat-aghves:reoffer download 100% (88442/88442)
+[content-sync] pochat-aghves:reoffer sha256 ok
+[content-sync] moved /tmp/pochat-aghves-v9-reoffer.mp3.part -> /stories/pochat-aghves-v9-reoffer.mp3
+[content-sync] item princess-and-pea v6 "?????????????????????????? ?? ????????????????????????" 1611903 bytes
+[content-sync] princess-and-pea already current (index)
+[content-sync] princess-and-pea:intro download 11% (16414/138597)
+[content-sync] princess-and-pea:intro download 20% (29054/138597)
+[content-sync] princess-and-pea:intro download 32% (45486/138597)
+[content-sync] princess-and-pea:intro download 40% (56558/138597)
+[content-sync] princess-and-pea:intro download 51% (72030/138597)
+[content-sync] princess-and-pea:intro download 61% (85278/138597)
+[content-sync] princess-and-pea:intro download 70% (97918/138597)
+[content-sync] princess-and-pea:intro download 82% (114046/138597)
+[content-sync] princess-and-pea:intro download 91% (126334/138597)
+[content-sync] princess-and-pea:intro download 100% (138597/138597)
+[content-sync] princess-and-pea:intro sha256 ok
+[content-sync] moved /tmp/princess-and-pea-v6-intro.mp3.part -> /stories/princess-and-pea-v6-intro.mp3
+[content-sync] princess-and-pea:question download 16% (8192/50199)
+[content-sync] princess-and-pea:question download 24% (12288/50199)
+[content-sync] princess-and-pea:question download 32% (16415/50199)
+[content-sync] princess-and-pea:question download 40% (20511/50199)
+[content-sync] princess-and-pea:question download 57% (29055/50199)
+[content-sync] princess-and-pea:question download 66% (33151/50199)
+[content-sync] princess-and-pea:question download 74% (37247/50199)
+[content-sync] princess-and-pea:question download 85% (42959/50199)
+[content-sync] princess-and-pea:question download 93% (47055/50199)
+[content-sync] princess-and-pea:question download 100% (50199/50199)
+[content-sync] princess-and-pea:question sha256 ok
+[content-sync] moved /tmp/princess-and-pea-v6-question.mp3.part -> /stories/princess-and-pea-v6-question.mp3
+[content-sync] princess-and-pea:question1 download 10% (8192/80919)
+[content-sync] princess-and-pea:question1 download 23% (19247/80919)
+[content-sync] princess-and-pea:question1 download 30% (24959/80919)
+[content-sync] princess-and-pea:question1 download 43% (35375/80919)
+[content-sync] princess-and-pea:question1 download 53% (43567/80919)
+[content-sync] princess-and-pea:question1 download 60% (48975/80919)
+[content-sync] princess-and-pea:question1 download 70% (57167/80919)
+[content-sync] princess-and-pea:question1 download 84% (68239/80919)
+[content-sync] princess-and-pea:question1 download 94% (76431/80919)
+[content-sync] princess-and-pea:question1 download 100% (80919/80919)
+[content-sync] princess-and-pea:question1 sha256 ok
+[content-sync] moved /tmp/princess-and-pea-v6-question1.mp3.part -> /stories/princess-and-pea-v6-question1.mp3
+[content-sync] princess-and-pea:question2 download 10% (8192/79038)
+[content-sync] princess-and-pea:question2 download 20% (16415/79038)
+[content-sync] princess-and-pea:question2 download 31% (24607/79038)
+[content-sync] princess-and-pea:question2 download 41% (33151/79038)
+[content-sync] princess-and-pea:question2 download 53% (42303/79038)
+[content-sync] princess-and-pea:question2 download 61% (48975/79038)
+[content-sync] princess-and-pea:question2 download 72% (57167/79038)
+[content-sync] princess-and-pea:question2 download 82% (65359/79038)
+[content-sync] princess-and-pea:question2 download 94% (74863/79038)
+[content-sync] princess-and-pea:question2 download 100% (79038/79038)
+[content-sync] princess-and-pea:question2 sha256 ok
+[content-sync] moved /tmp/princess-and-pea-v6-question2.mp3.part -> /stories/princess-and-pea-v6-question2.mp3
+[content-sync] princess-and-pea:summary download 14% (12288/84680)
+[content-sync] princess-and-pea:summary download 24% (20511/84680)
+[content-sync] princess-and-pea:summary download 33% (28703/84680)
+[content-sync] princess-and-pea:summary download 43% (36895/84680)
+[content-sync] princess-and-pea:summary download 54% (45791/84680)
+[content-sync] princess-and-pea:summary download 62% (52767/84680)
+[content-sync] princess-and-pea:summary download 71% (60959/84680)
+[content-sync] princess-and-pea:summary download 81% (69151/84680)
+[content-sync] princess-and-pea:summary download 90% (76783/84680)
+[content-sync] princess-and-pea:summary download 100% (84680/84680)
+[content-sync] princess-and-pea:summary sha256 ok
+[content-sync] moved /tmp/princess-and-pea-v6-summary.mp3.part -> /stories/princess-and-pea-v6-summary.mp3
+[content-sync] princess-and-pea:offer download 13% (12288/94084)
+[content-sync] princess-and-pea:offer download 21% (20480/94084)
+[content-sync] princess-and-pea:offer download 30% (28672/94084)
+[content-sync] princess-and-pea:offer download 43% (41039/94084)
+[content-sync] princess-and-pea:offer download 53% (49887/94084)
+[content-sync] princess-and-pea:offer download 61% (58079/94084)
+[content-sync] princess-and-pea:offer download 70% (66271/94084)
+[content-sync] princess-and-pea:offer download 83% (78655/94084)
+[content-sync] princess-and-pea:offer download 94% (88463/94084)
+[content-sync] princess-and-pea:offer download 100% (94084/94084)
+[content-sync] princess-and-pea:offer sha256 ok
+[content-sync] moved /tmp/princess-and-pea-v6-offer.mp3.part -> /stories/princess-and-pea-v6-offer.mp3
+[content-sync] princess-and-pea:reoffer download 10% (12288/119162)
+[content-sync] princess-and-pea:reoffer download 20% (24606/119162)
+[content-sync] princess-and-pea:reoffer download 31% (37246/119162)
+[content-sync] princess-and-pea:reoffer download 42% (50846/119162)
+[content-sync] princess-and-pea:reoffer download 53% (63182/119162)
+[content-sync] princess-and-pea:reoffer download 63% (75470/119162)
+[content-sync] princess-and-pea:reoffer download 70% (83710/119162)
+[content-sync] princess-and-pea:reoffer download 80% (95998/119162)
+[content-sync] princess-and-pea:reoffer download 90% (108286/119162)
+[content-sync] princess-and-pea:reoffer download 100% (119162/119162)
+[content-sync] princess-and-pea:reoffer sha256 ok
+[content-sync] moved /tmp/princess-and-pea-v6-reoffer.mp3.part -> /stories/princess-and-pea-v6-reoffer.mp3
+[content-sync] item sutasan v6 "??????????????????" 1969258 bytes
+[content-sync] sutasan already current (index)
+[content-sync] sutasan:intro download 10% (9791/96592)
+[content-sync] sutasan:intro download 22% (22079/96592)

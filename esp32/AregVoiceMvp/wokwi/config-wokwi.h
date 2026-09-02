@@ -1,0 +1,602 @@
+// WOKWI SIMULATOR CONFIG -- generated from config.h.example 2026-09-01.
+// NO real secrets belong in this file, ever: it is meant to be shareable.
+// Wi-Fi = Wokwi-GUEST (the simulator's open AP). Device identity stays a
+// placeholder, so device-authed backend calls return 401 in the sim --
+// expected; boot, menu, SD and state-machine logic all run regardless.
+
+// -------------------------------------------------------------
+// AregVoiceMvp / config.h.example  ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â TEMPLATE
+//
+// Copy this file to `config.h` and fill in the five secret values
+// before the first flash. `config.h` is gitignored and MUST NOT be
+// committed (it holds Wi-Fi + device credentials). Keep all non-secret
+// defaults (pins / audio / timing / LED) in sync with this template.
+//
+//   cp config.h.example config.h    # then edit the secrets below
+//
+// Secrets to fill in:
+//   - WIFI_SSID / WIFI_PASSWORD  ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â your dev Wi-Fi
+//   - BACKEND_BASE_URL           ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â your dev laptop's LAN address + port.
+//                                  ONE place; every backend URL derives
+//                                  from it. Do not edit the others.
+//   - DEVICE_ID / DEVICE_API_KEY ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â returned from POST /api/devices/register
+// -------------------------------------------------------------
+#pragma once
+
+#include <Arduino.h>
+
+// --- Wi-Fi credentials ---------------------------------------
+// PRODUCT RULE: LEAVE THESE EMPTY. A shipped toy must not carry any
+// developer's home network. The parent provisions Wi-Fi from their phone
+// over BLE (AREG_USE_BLE_PROVISIONING below) and the toy stores it in
+// NVS; these defines exist only as a bench escape hatch and as the
+// fallback the B.1 code checks when NVS is empty.
+#ifndef AREG_WIFI_SSID
+#define AREG_WIFI_SSID          "Wokwi-GUEST"
+#endif
+#ifndef AREG_WIFI_PASSWORD
+#define AREG_WIFI_PASSWORD      ""
+#endif
+
+// --- Backend base URL (SINGLE SOURCE OF TRUTH ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â edit host here) ---
+// Every backend URL below is built from this by string-literal
+// concatenation, so changing your dev laptop's LAN address is a ONE-LINE
+// edit. Set host + port only ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â NO trailing slash, NO path.
+//
+// This exists because the host used to be repeated in four separate
+// defines. When DHCP moved the dev laptop's address, three of them were
+// updated and the rest silently kept pointing at the old IP, so backend
+// calls failed with no obvious cause. Keep it that way: never paste a
+// literal host into a URL define below.
+//
+// http:// and https:// are BOTH supported ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â net_transport.cpp picks the
+// transport from the scheme, so a bench LAN server and the live cloud
+// differ by this one line. For the cloud use the full https origin, e.g.
+//   "https://armenianaitoy-production.up.railway.app"
+// TLS verifies against the pinned ISRG Root X1 (Let's Encrypt) in
+// net_transport.cpp; define AREG_TLS_INSECURE to skip verification for
+// bench triage only (it prints a loud warning every boot).
+#ifndef AREG_BACKEND_BASE_URL
+#define AREG_BACKEND_BASE_URL   "https://armenianaitoy-production.up.railway.app"
+#endif
+
+// Chat audio POST. NOTE: several modules derive their own endpoint at
+// runtime by string-replacing the "/api/chat/audio" suffix of this value
+// (heartbeat, story-audio-token, OTA command poll/ack, firmware manifest,
+// content manifest/file). That suffix is therefore load-bearing ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â keep it
+// exactly as-is unless you also update those call sites.
+#ifndef AREG_BACKEND_URL
+#define AREG_BACKEND_URL        AREG_BACKEND_BASE_URL "/api/chat/audio"
+#endif
+
+// Continuous story narration (pre-rendered, streamed). The device
+// streams this MP3 and decodes it on the fly; resume appends
+// "?from=<byteOffset>".
+#ifndef AREG_STORY_AUDIO_URL
+#define AREG_STORY_AUDIO_URL    AREG_BACKEND_BASE_URL "/api/story-audio/anban-huri"
+#endif
+
+// Library story id (matches the path in AREG_STORY_AUDIO_URL); sent to
+// the Q&A endpoint so the backend answers from the right story.
+#ifndef AREG_STORY_ID
+#define AREG_STORY_ID           "anban-huri"
+#endif
+
+// In-story Q&A. On barge-in the device records the question and POSTs
+// the WAV here as "?storyId=<id>&offset=<byteOffset>"; the response is
+// the spoken answer MP3. Device-auth headers ARE sent on this POST.
+#ifndef AREG_STORY_QA_URL
+#define AREG_STORY_QA_URL       AREG_BACKEND_BASE_URL "/api/chat/story-qa"
+#endif
+
+// Post-story reflection answer (Slice 3). After the story + conclusion +
+// reflection question, the child's spoken answer is POSTed here as
+// "?storyId=<id>&questionIndex=<n>"; the response is the spoken warm
+// acknowledgement MP3. Device-auth headers ARE sent. Sub-route of story-qa.
+#ifndef AREG_STORY_REFLECTION_URL
+#define AREG_STORY_REFLECTION_URL AREG_BACKEND_BASE_URL "/api/chat/story-qa/reflection-answer"
+#endif
+
+// Resume-offset correction. getPos() reports bytes the decoder has
+// CONSUMED, which runs ahead of what the speaker has actually played
+// (decoded audio still buffered in the I2S DMA when barge-in cuts it).
+// We resume from (getPos - this) so playback lands at ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â or slightly
+// before ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the audible pause point. ~24 KB ÃƒÂ¢Ã¢â‚¬Â°Ã‹â€  ~1 s at the narration
+// bitrate. Tune if resume skips (raise) or repeats too much (lower).
+#ifndef AREG_STORY_RESUME_FUDGE_BYTES
+#define AREG_STORY_RESUME_FUDGE_BYTES 8192
+#endif
+
+// --- Shout-it-out story pauses -------------------------------
+// Mid-story, Areg stops, invites the child to shout something, waits a
+// beat, and continues. Defaults live in story_pause.h; every value below
+// is optional and shown at its shipped setting. The FEATURE switch is not
+// here ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â it is the parent's own toggle, delivered on the content manifest
+// and cached in the SD index. There is deliberately no build-time way to
+// force pauses on for a device whose parent turned them off.
+//
+// Nothing is recorded during a pause: the mic stays off, no audio is
+// uploaded, no clip claims to have heard anything.
+//
+// #define AREG_STORY_PAUSE_HEAD_MS   45000UL  // never pause before this
+// #define AREG_STORY_PAUSE_TAIL_MS   30000UL  // never pause this close to the end
+// #define AREG_STORY_PAUSE_MIN_GAP_MS 45000UL // minimum spacing between two
+// #define AREG_STORY_PAUSE_BEAT_MS    3000UL  // the silent beat to shout into
+// #define AREG_STORY_PAUSE_MAX_PER_STORY 2    // hard ceiling per story
+//
+// Assumed narration byte rate, used only until a real one is measured
+// during the story. 24000 B/s = 192 kbps, the level Ship-StoryAudio.ps1
+// normalises the whole library to. Raise it only if the library's bitrate
+// rises ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â over-stating it moves pauses earlier (safe), under-stating it
+// moves them toward the ending (not safe).
+// #define AREG_STORY_PAUSE_BYTES_PER_SEC 24000UL
+//
+// Where the clips live and how many pairs exist. Changing these means the
+// content-sync config changed too; they are not free-form.
+// #define AREG_STORY_PAUSE_GAME_KEY "story-pauses"
+// #define AREG_STORY_PAUSE_VARIANTS 4
+
+// --- Device credentials (SECRET ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â fill in) -------------------
+// Get these once via POST /api/devices/register against the backend.
+// See README.md "First-run provisioning" for the curl invocation.
+#ifndef AREG_DEVICE_ID
+#define AREG_DEVICE_ID          "YOUR_DEVICE_GUID"
+#endif
+#ifndef AREG_DEVICE_API_KEY
+#define AREG_DEVICE_API_KEY     "YOUR_DEVICE_API_KEY"
+#endif
+
+// --- Pin map (ESP32-S3-DevKitC-1 defaults) -------------------
+// INMP441 I2S mic (RX)
+#define AREG_PIN_MIC_BCK        4      // SCK
+#define AREG_PIN_MIC_WS         5      // WS / L-R
+#define AREG_PIN_MIC_DATA       6      // SD
+// MAX98357A I2S amp (TX)
+#define AREG_PIN_AMP_BCK        15
+#define AREG_PIN_AMP_LRC        16
+#define AREG_PIN_AMP_DATA       7
+// Button to GND, internal pullup
+#define AREG_PIN_BUTTON         18     // MAIN button. Was GPIO0; see the note below.
+
+// WHY NOT GPIO0 ANY MORE (2026-08-19, and it cost three evenings)
+//
+// Two reasons, and the second is the one that forced the move today:
+//
+// 1. GPIO0 is a STRAPPING pin. A child holding the button through a power
+//    cycle puts the chip in download mode, which presents as a toy that
+//    boots to nothing. docs/hardware/schematic-spec.md already specifies
+//    GPIO18 for the production MAIN button for exactly this reason; the
+//    bench had simply never followed it.
+//
+// 2. On the owner's bench board GPIO0 stopped responding altogether. It
+//    rests HIGH on the chip's own pull-up and NOTHING external moves it --
+//    not the owner's wired button, and not the dev board's own BOOT button,
+//    which is hardwired to the same pin and bypasses all of his wiring.
+//    Measured: no short to 3V3, no short to GND, and zero level changes
+//    across five minutes of idle polling with the raw-edge print in
+//    button_poll() active. Evidence:
+//    tools/quality-evidence/button-dead-diagnosis-20260818.md
+//
+// GPIO18 is free in this pin map: mic 4/5/6, amp 15/16/7, SD 10/11/12/13,
+// LED 48, answer buttons 21/47, volume pot 8. Avoid 19/20 -- native USB.
+
+// CAUTION: GPIO0 is a boot-mode strapping pin ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â held low across a power
+// cycle it blocks boot. Fine for bench; move to a safe pin (21/47) at
+// the next hardware revision.
+
+// --- Optional YES / NO answer buttons (3-button revision) ---
+// GREEN = yes/true, RED = no/false. Uncomment BOTH to compile the
+// answer-button support in (answer_buttons.{h,cpp}); leave commented
+// for the one-button build ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â everything folds to no-ops.
+// Recommended pins (2026-08-05 pin audit): 21 and 47 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â free,
+// non-strapping, PSRAM-safe. Wire: pin ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ button ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ GND (internal pullup).
+#define AREG_PIN_BUTTON_YES  21
+#define AREG_PIN_BUTTON_NO   47
+
+// --- Hardware volume knob (10 kOhm linear pot) ---
+// Wiring: wiper -> the pin below, the two end legs to 3V3 and GND. Use an
+// ADC1 pin (GPIO1-10 on the S3) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ADC2 is unusable while Wi-Fi holds the
+// radio. GPIO8 = ADC1_CH7 is free on WROOM-1-N8R8: not strapping, no clash
+// with mic 4/5/6, amp 15/16/7, SD 10/11/12/13, LED 48, buttons 0/21/47.
+// Uncomment to compile volume_pot.{h,cpp} in; left commented, the module
+// folds to no-ops returning AREG_VOLUME_FIXED_GAIN and the build behaves
+// exactly as it did before the knob existed. That opt-in is deliberate: an
+// ADC pin with nothing wired to it floats, and a floating read mapped to
+// gain is random volume that drifts on its own and looks like a fault.
+#define AREG_PIN_VOLUME_POT 8
+
+// 0.6f is the value all six out.SetGain() sites in audio_io.cpp hardcoded
+// before the knob existed, so it stays the no-knob fallback. The old advice
+// of raising that SetGain call when the speaker is too quiet is obsolete on
+// a build with the knob ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â editing source is not something a parent can do.
+// #define AREG_VOLUME_FIXED_GAIN 0.6f
+// Knob travel maps linearly onto MIN..MAX. MIN is deliberately not 0.0f ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â a
+// knob at its stop should be quiet, not broken-sounding-silent. MAX is well
+// above 0.6f because "too quiet" is what the knob exists to answer;
+// ESP8266Audio clamps at 4.0f.
+// #define AREG_VOLUME_MIN_GAIN 0.15f
+// #define AREG_VOLUME_MAX_GAIN 1.0f   // ceiling, do NOT raise: SetGain is a sample
+//                                     // multiplier, so >1.0 clips instead of
+//                                     // amplifying. Louder belongs on the amp's
+//                                     // GAIN pin. See config.h.
+// Sampling period. 200 ms is under the ~300 ms a hand takes to turn a knob,
+// so the change is heard as continuous, while staying rare enough to be free
+// inside the story decode loop.
+// #define AREG_VOLUME_READ_MS 200
+// Gain must move by more than this before it is republished; without it the
+// residual ADC noise re-sets the gain every read and the sound breathes.
+// #define AREG_VOLUME_DEADBAND_GAIN 0.22f
+
+// Offline quiz (bench flag -DAREG_OFFLINE_QUIZ_BENCH) answer window:
+// how long the toy waits for a GREEN/RED press after a question. The
+// offline games (-DAREG_OFFLINE_GAMES_BENCH) deliberately share this same
+// knob ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â one "how long does a child get to press" number product-wide.
+// #define AREG_QUIZ_ANSWER_WINDOW_MS 10000UL
+
+// Offline games (bench flag -DAREG_OFFLINE_GAMES_BENCH). Clips live at
+// <dir>/<game-key>/<clip-id>.mp3; the game key is the top-level key in
+// backend/content/offline-games/game-clips.json. The per-game subdir is
+// required, not cosmetic ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â four games there each define an `intro` clip.
+// #define AREG_GAMES_CLIP_DIR       "/games"
+// #define AREG_GAMES_DIR_MINDREADER "mind-reader"
+// #define AREG_GAMES_DIR_BUZZER     "who-first"
+// #define AREG_GAMES_DIR_SIMON      "button-simon"
+//
+// Which game a bench build runs: 1 = mind-reader, 2 = buzzer, 3 = Simon.
+// Runtime selection UX is a bench-day decision (see the README) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â until
+// then the game is a build-time pick, like any other bench harness.
+// #define AREG_OFFLINE_GAMES_PICK 1
+//
+// Button Simon ramp ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â WITHIN-SESSION ONLY, nothing is persisted, so every
+// session starts at the floor again (explicit product rule).
+// #define AREG_SIMON_START_LEN    2
+// #define AREG_SIMON_MAX_LEN      6
+// #define AREG_SIMON_TONE_GAP_MS  250UL
+//
+// Two-player buzzer: rounds before the closing clips.
+// #define AREG_BUZZER_ROUNDS 5
+
+// Onboard WS2812 RGB LED on S3-DevKitC-1
+#define AREG_PIN_LED            48
+
+// --- microSD (SPI mode) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â offline content pack ---------------
+// SPI is the pragmatic choice for a toy (4 pins; throughput is a non-issue
+// for MP3). 3.3 V native (no level shifter). AVOID strapping pins
+// (GPIO0/3/45/46) and the USB pins (GPIO19/20); the set below is clear of
+// those on the DevKitC-1. Adjust to your wiring ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the avoid-list is the only
+// hard rule. See HARDENING-INTEGRATION.md Ãƒâ€šÃ‚Â§6.3.
+#define AREG_PIN_SD_CS    10
+#define AREG_PIN_SD_SCK   12
+#define AREG_PIN_SD_MOSI  11
+#define AREG_PIN_SD_MISO  13
+
+// SD SPI clock (Hz). Default 4000000 (4 MHz) -- set in audio_io.cpp, not
+// here. The 2026-08-30 read-integrity self-test proved the hand-wired
+// bench corrupts reads at 16 MHz (same file, two passes, two different
+// hashes), which the MP3 decoder plays as a constant tone over the words.
+// Raise this only on a board with real PCB traces, and only after
+// [sd-selftest] passes at the higher clock.
+// #define AREG_SD_SPI_HZ 16000000U
+
+// On-SD narration path for the configured story (content-pack layout from
+// tools/ContentPackBuilder: /stories/<id>/narration.mp3). When this file is
+// on the card, the device plays it OFFLINE; otherwise it falls back to the
+// Wi-Fi story stream.
+#define AREG_SD_STORY_NARRATION "/stories/" AREG_STORY_ID "/narration.mp3"
+
+// On-SD post-story clips (content-pack layout, Slice 1). The conclusion +
+// reflection question play OFFLINE after the story ends; the question's ANSWER
+// needs the cloud. /clips/offline_close.mp3 is OPTIONAL ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â played offline in
+// place of the (cloud) answer if present.
+#define AREG_SD_STORY_CONCLUSION "/stories/" AREG_STORY_ID "/conclusion.mp3"
+#define AREG_SD_STORY_QUESTION0  "/stories/" AREG_STORY_ID "/question-0.mp3"
+#define AREG_SD_OFFLINE_CLOSE    "/clips/offline_close.mp3"
+
+// How long (ms) after the reflection question to wait for the child to press &
+// hold to answer. No press in this window ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ quiet close (never force an answer).
+#define AREG_REFLECTION_LISTEN_MS 8000
+
+// The toy asks exactly ONE reflection question per story, and rotates which
+// one, so a re-listen is not the same question again. That needs a cursor per
+// story, kept in NVS (namespace `aregqidx`) Ã¢â‚¬â€ this is how many stories it
+// remembers, one slot each, dropping the oldest when full (a dropped story
+// simply starts its rotation over).
+//
+// Defined as CS_MAX_STORIES rather than a number so it can never drift out of
+// step with the heard set, which is bounded the same way. story_select.cpp
+// carries the identical guarded default, so the override that reaches EVERY
+// translation unit is a build flag (-DAREG_QUESTION_CURSOR_SLOTS=N); editing
+// it here alone changes only the units that include config.h.
+#ifndef AREG_QUESTION_CURSOR_SLOTS
+#define AREG_QUESTION_CURSOR_SLOTS CS_MAX_STORIES
+#endif
+
+// --- Welcome flow (power-on greeting + spoken menu) ----------
+// The toy greets the child at power-on, asks what they want to do (only
+// the modes the parent left enabled), and offers a story by name. Every
+// line it speaks is a pre-rendered clip synced to /voice on the SD card,
+// so it works offline; only HEARING the child needs the network.
+#define AREG_WELCOME_LISTEN_MS   8000   // listening window, ms
+#define AREG_WELCOME_MAX_TRIES   2      // mis-hears before it just starts a story
+#define AREG_WELCOME_MAX_OFFERS  2      // stories offered by name before it plays one
+// Hold the button this long in IDLE to open the "what shall we do?" menu.
+// Anything shorter is an ordinary story press. Before this existed the menu
+// ran only at the tail of setup(), so a power cycle was the only way back to it.
+#define AREG_MENU_HOLD_MS        2000   // hold, ms, that opens the menu
+
+// --- Audio parameters ----------------------------------------
+#define AREG_SAMPLE_RATE_HZ     16000  // Whisper-friendly, bandwidth-friendly
+#define AREG_SAMPLE_BITS        16     // linear PCM
+
+// --- Hands-free library-story autoplay -----------------------
+// After playing a library segment whose response carried
+// X-Areg-Continue: 1, the device auto-fetches the next segment with
+// no button press, looping until the backend returns 204 / no
+// continue header. This cap is a safety stop so a backend bug can
+// never spin the loop forever (the longest curated story is well
+// under this).
+#define AREG_MAX_AUTOPLAY_SEGMENTS 30
+
+// --- Capture + playback limits -------------------------------
+#define AREG_MAX_RECORD_MS      15000  // 15 s hard cap on button-hold
+#define AREG_MIN_RECORD_MS      250    // below this, treat as misfire
+#define AREG_RECORD_BUFFER_BYTES (AREG_SAMPLE_RATE_HZ * 2 * (AREG_MAX_RECORD_MS / 1000))
+// 16 kHz * 2 bytes/sample * 15 s = 480 000 bytes. Lives in PSRAM.
+#define AREG_PLAYBACK_BUFFER_BYTES (512 * 1024)  // 512 KB PSRAM headroom for MP3 response
+
+// --- Timing --------------------------------------------------
+#define AREG_BUTTON_POLL_MS     10
+#define AREG_BUTTON_DEBOUNCE_MS 30
+#define AREG_HTTP_CONNECT_MS    5000
+#define AREG_HTTP_READ_MS       30000
+
+// --- Wi-Fi reconnect backoff (#045) --------------------------
+// Optional. voice_client.cpp provides these same defaults via #ifndef, so
+// they only need to be set here to TUNE the background reconnect. MIN is the
+// first retry delay after a drop; the backoff doubles each failed attempt up
+// to MAX, then holds, so a long outage doesn't hammer the radio.
+#define AREG_WIFI_RECONNECT_MIN_MS  3000
+#define AREG_WIFI_RECONNECT_MAX_MS  60000
+
+// --- Hang protection: watchdog + bounded waits (#047) --------
+// Optional. Code provides these same defaults via #ifndef.
+// AREG_WDT_TIMEOUT_S: task-watchdog timeout. Deliberately LARGER than any
+//   legitimate single blocking operation (<=30 s HTTP read, <=15 s record), so
+//   only a genuine stall (a loop that stops iterating, hence stops feeding)
+//   trips it -> clean reset instead of a silent freeze. The minutes-long story
+//   decode loops feed it each iteration.
+// AREG_I2S_CONSUME_TIMEOUT_MS: per-sample cap on synth_write_tone's I2S
+//   back-pressure wait; on expiry the (optional) tone is aborted, not hung.
+// AREG_ASYNC_UPLOAD_TIMEOUT_MS: cap on the async-Q&A completion wait; on expiry
+//   the device does a controlled reboot (a stuck cross-core upload task cannot
+//   be safely cancelled, so reboot is the clean recovery).
+#define AREG_WDT_TIMEOUT_S            60
+#define AREG_I2S_CONSUME_TIMEOUT_MS   1000
+#define AREG_ASYNC_UPLOAD_TIMEOUT_MS  45000
+
+// --- LED colors (GRB order for NeoPixel) ---------------------
+#define AREG_LED_IDLE_R         8
+#define AREG_LED_IDLE_G         16
+#define AREG_LED_IDLE_B         64
+#define AREG_LED_REC_R          180
+#define AREG_LED_REC_G          0
+#define AREG_LED_REC_B          0
+#define AREG_LED_UPLOAD_R       180
+#define AREG_LED_UPLOAD_G       120
+#define AREG_LED_UPLOAD_B       0
+#define AREG_LED_PLAY_R         0
+#define AREG_LED_PLAY_G         160
+#define AREG_LED_PLAY_B         40
+#define AREG_LED_ERROR_R        200
+#define AREG_LED_ERROR_G        60
+#define AREG_LED_ERROR_B        0
+
+// --- Serial --------------------------------------------------
+#define AREG_SERIAL_BAUD        115200
+
+// --- Dead-air mitigation (S1 earcon + S3 streamed Q&A) -------
+// UNVERIFIED ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â not compiled/flashed. All values are best-guess
+// for a 16 kHz / MAX98357A setup; tune on the bench.
+
+// S1: Thinking-earcon synthesized tone (soft "thinking" chime to I2S).
+#ifndef AREG_EARCON_FREQ_HZ
+#define AREG_EARCON_FREQ_HZ     440
+#endif
+
+// Choosing budget for the menu (owner decision 2026-08-19): suggest, wait,
+// suggest again, then close softly to idle. Applies to CHOOSING only -- a
+// story or game that already started is never cut by it.
+#ifndef AREG_MENU_TOTAL_MS
+#define AREG_MENU_TOTAL_MS 60000UL
+#endif
+#ifndef AREG_EARCON_DURATION_MS
+#define AREG_EARCON_DURATION_MS 600
+#endif
+// Amplitude of the synthesized sine (0..32767). 8000 is audible over a
+// MAX98357A at default gain on a small speaker; drop it if it startles.
+#ifndef AREG_EARCON_AMPLITUDE
+#define AREG_EARCON_AMPLITUDE   8000
+#endif
+
+// S3: Thinking-bed tone played while the network fetch is in flight.
+#ifndef AREG_THINKBED_FREQ_HZ
+#define AREG_THINKBED_FREQ_HZ   280
+#endif
+#ifndef AREG_THINKBED_PULSE_MS
+#define AREG_THINKBED_PULSE_MS  500
+#endif
+#ifndef AREG_THINKBED_AMPLITUDE
+#define AREG_THINKBED_AMPLITUDE 5000
+#endif
+// Max thinking-bed pulses before hard-stopping (ÃƒÂ¢Ã¢â‚¬Â°Ã‹â€  read timeout / pulse ms).
+#ifndef AREG_THINKBED_MAX_PULSES
+#define AREG_THINKBED_MAX_PULSES 70
+#endif
+
+// -------------------------------------------------------------
+// In-story Q&A latency switches (2026-08-10)
+// See esp32/AregVoiceMvp/latency-firmware-notes.md
+// -------------------------------------------------------------
+
+// AREG_QA_STREAM_PLAYBACK -- start playing the spoken answer on the FIRST
+// bytes of the POST response instead of after the whole body has landed in
+// PSRAM. Worth ~0.5-1.5 s per question.
+//
+// Shown commented out here because config.h.example is the template. It is
+// ON in the working config.h since 2026-08-16; leave it off in any build you
+// have not benched, because it swaps a proven buffered decode for a
+// live-socket one and has NO buffered copy to fall back on -- a bad stream
+// is a question the child gets no answer to. On failure the toy plays the
+// canned failure clip rather than half an answer.
+//
+// IT NEEDS NO BACKEND CHANGE. The endpoint composes the whole MP3 and sends
+// it with a Content-Length, which is exactly what this path wants: the
+// device decodes as the body arrives instead of after it lands, which is
+// where the saving comes from.
+//
+// AND THE BACKEND MUST NOT BE MADE CHUNKED (decision, 2026-08-16). An
+// earlier attempt to flush audio progressively was reverted for two reasons
+// that both still hold:
+//   - It breaks every field toy still running flag-off firmware. The
+//     buffered reader rejects a body with no Content-Length (voice_client.cpp,
+//     read_response_into), so a chunked response turns every question on
+//     those toys into the canned failure clip.
+//   - It buys close to nothing. The bridge and recap clips are cached for
+//     the process lifetime (StoryQaController), so the server is not slowly
+//     producing audio that could be played early.
+// The de-chunker in audio_io.cpp stays because it costs nothing to keep and
+// makes the device correct against either wire shape -- not because the
+// backend is expected to start using it.
+// #define AREG_QA_STREAM_PLAYBACK 1
+
+// AREG_DIAG_MARK_SERIAL ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â print + flush + delay(5) on every DIAG_MARK.
+// OFF by default since 2026-08-10: it cost ~130 ms per Q&A turn (~26 marks)
+// for a live trace nobody was watching. The crash breadcrumb itself is
+// unaffected ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â it lives in RTC memory and still prints on the next boot.
+// Turn this on when you are watching a hang happen in real time.
+// #define AREG_DIAG_MARK_SERIAL 1
+
+// -------------------------------------------------------------
+// Phase B.2 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â BLE Wi-Fi provisioning (OPT-IN; bench default = OFF)
+// -------------------------------------------------------------
+// Uncomment AREG_USE_BLE_PROVISIONING to build the provisioning variant.
+//
+// WHY THIS MATTERS, learned the hard way on 2026-08-15: with the flag OFF, a
+// toy's Wi-Fi lives ONLY in the compile-time credentials below. The owner's
+// router was replaced, the toy went permanently deaf (wifi reason=201), and
+// the only cure was a cable, a PC and a code edit. A family that moves house
+// would have a dead toy. The rescue was already written and simply not
+// compiled: AregVoiceMvp.ino's B.3 fallback reopens provisioning by itself
+// after AREG_PROV_FALLBACK_AFTER_MS with no gesture at all.
+//
+// ORDERING TRAP Ã¢â‚¬â€ read before switching it on. With this flag ON and the
+// aregwifi NVS namespace EMPTY, setup() opens provisioning and never calls
+// voice_wifi_begin(), so the credentials below are not consulted and a
+// working toy drops off the network. Flash it the first time together with
+// AREG_PROVISION_WIFI_ONCE (below), which copies them into NVS at boot.
+//
+// CORRECTED 2026-08-16: the note that used to sit here demanding
+// PartitionScheme=huge_app is wrong for this sketch. It was true of the
+// `default` table's 1.25 MB slots; this project ships its own 8 MB dual-OTA
+// partitions.csv with 3 MB slots. Measured with the flag on: 1,631,423 bytes,
+// 51.9% of the slot. Use PartitionScheme=custom Ã¢â‚¬â€ huge_app cannot do OTA.
+
+// One-shot: copy AREG_WIFI_SSID / AREG_WIFI_PASSWORD into NVS at boot, so the
+// toy is genuinely provisioned before the BLE branch decides what to do.
+// Guarded three ways (flag defined, NVS empty, SSID not a placeholder) and it
+// never overwrites a toy a parent already provisioned. Burn once, confirm the
+// serial line, then comment it out. NEVER build an OTA image with it Ã¢â‚¬â€ an OTA
+// image reaches every toy, and that is one household's password. See c9e6593.
+// #define AREG_PROVISION_WIFI_ONCE 1
+// FORCE variant: also OVERWRITE creds already in NVS when they differ from
+// the pair above (router changed). Idempotent -- writes at most once per
+// credential change. Bench-only; NEVER in an OTA image (c9e6593).
+// #define AREG_PROVISION_WIFI_FORCE 1
+// IMPORTANT: the BLE stack does NOT fit the `default` partition ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â compile and
+// flash the flag-on build with PartitionScheme=huge_app (see
+// PLATFORM-ARCHITECTURE.txt, Phase B.2 build spec). With the flag OFF (default),
+// none of the BLE code is compiled and the firmware is identical to B.1.
+//
+// #define AREG_USE_BLE_PROVISIONING 1  // OFF: Wokwi has no BLE
+//
+// CORE VERSION WARNING: Arduino-ESP32 3.3.7 and 3.3.8 crash on the
+// ESP32-S3 inside btdm_controller_init the moment BLE provisioning
+// starts (LoadProhibited boot loop; upstream regression, arduino-esp32
+// issues #12436 / #12357). Build this with core 3.3.6:
+//     arduino-cli core install esp32:esp32@3.3.6
+//
+// BLE service name the toy advertises during provisioning (what the parent
+// sees in the phone app). Keep it short.
+#ifndef AREG_PROV_SERVICE_NAME
+#define AREG_PROV_SERVICE_NAME "Areg-Setup"
+#endif
+// Proof-of-possession string. PRODUCTION: set this to the toy's printed
+// pairing code (QR / box label) so provisioning requires physical possession.
+// The shared default below is for the bench only.
+#ifndef AREG_PROV_POP
+#define AREG_PROV_POP "areg-pair"
+#endif
+// Hold the button this long (ms) at power-on to forget the saved network and
+// re-enter provisioning (moved toy / new router).
+#ifndef AREG_PROV_RESET_HOLD_MS
+#define AREG_PROV_RESET_HOLD_MS 5000
+#endif
+// B.3 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â a provisioned toy that can't rejoin Wi-Fi for this long (ms) auto-opens
+// BLE provisioning (moved toy / new router; no button gesture needed). 5 min.
+#ifndef AREG_PROV_FALLBACK_AFTER_MS
+#define AREG_PROV_FALLBACK_AFTER_MS 300000UL
+#endif
+// Phase A.1 (toy side) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â interval (ms) between idle presence heartbeats to
+// POST /api/devices/heartbeat. Keeps the parent app's online dot fresh. 60s.
+#ifndef AREG_HEARTBEAT_INTERVAL_MS
+#define AREG_HEARTBEAT_INTERVAL_MS 60000UL
+#endif
+
+// --- OTA foundation (Proof 2) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â firmware identity ---------------
+// Reported on every heartbeat and compared by the backend's firmware-
+// manifest offer gate. Defaults live in ota_foundation.h; override here
+// (or via build flags) per release. AREG_FW_VERSION is plain
+// MAJOR.MINOR.PATCH ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â bump on every release build. AREG_BOARD_MODEL must
+// match the backend's FirmwareUpdate:BoardModel for a board-gated release
+// to be offered.
+#ifndef AREG_FW_VERSION
+// Cloud->SD content sync. LOAD-BEARING despite the "BENCH" in its name: a
+// build without it downloads NOTHING, silently, forever -- no story, game clip
+// or voice clip ever reaches the card. It used to live only on the compile
+// command line, hand-typed per release, which is one forgotten flag away from
+// shipping a toy that quietly stops receiving content. Defined here so it
+// cannot be forgotten; the compile line may still pass it harmlessly.
+#ifndef AREG_CONTENT_SYNC_BENCH
+#define AREG_CONTENT_SYNC_BENCH
+#endif
+
+#define AREG_FW_VERSION   "1.0.0"
+#endif
+#ifndef AREG_FW_BUILD
+#define AREG_FW_BUILD     "dev"
+#endif
+#ifndef AREG_BOARD_MODEL
+#define AREG_BOARD_MODEL  "areg-s3-n8"
+#endif
+
+// --- OTA apply (real update) -------------------------------------
+// Shared HMAC key for MANIFEST signature verification ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â must equal the
+// backend's FirmwareUpdate:SigningKey. Empty = verification SKIPPED with a
+// loud serial warning (Stage-A bench only; release builds MUST set it).
+#ifndef AREG_MANIFEST_HMAC_KEY
+#define AREG_MANIFEST_HMAC_KEY ""
+#endif
+// How long the NEW image may retry its backend check-in (the final ack)
+// before it self-invalidates and the bootloader rolls back to the old image.
+// Measured from BOOT, so it must exceed the WORST-CASE time from power-on to
+// the first successful backend call (Wi-Fi join + all of setup() + whatever
+// the loop does first) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â not the typical time. 300000 (5 min) was too tight:
+// 1.1.0 rolled back in the field on 2026-08-07 with `rollback_no_checkin`
+// despite a working radio, flash and bootloader.
+#ifndef AREG_OTA_CHECKIN_DEADLINE_MS
+#define AREG_OTA_CHECKIN_DEADLINE_MS 900000UL
+#endif
+// Retry cadence for that post-reboot check-in ack.
+#ifndef AREG_OTA_ACK_RETRY_MS
+#define AREG_OTA_ACK_RETRY_MS 10000UL
+#endif

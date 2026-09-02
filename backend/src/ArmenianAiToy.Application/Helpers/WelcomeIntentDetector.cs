@@ -24,6 +24,71 @@ public static class VoiceIntents
 }
 
 /// <summary>
+/// WHY a voice-intent turn resolved the way it did — a metric tag only, and
+/// deliberately NOT a response field.
+///
+/// <para>
+/// Ten distinct paths through <c>POST /api/devices/voice-intent</c> return
+/// <see cref="VoiceIntents.Unknown"/>, and from the toy they are byte-identical:
+/// HTTP 200 <c>{"intent":"unknown"}</c>. That is correct for the child (the
+/// firmware's "I didn't understand" handling is the graceful default for all of
+/// them) and was useless for an operator: an owner whose «Արի խաղանք» came back
+/// unknown had no way to tell a tripped cost cap from a parent-disabled mode
+/// from a genuine classifier miss, because most of those paths wrote nothing at
+/// all. This tag separates them on the metric while the wire stays closed.
+/// </para>
+///
+/// <para>
+/// The value space is CLOSED and small — eleven compile-time constants, no
+/// free-form strings, no per-device or per-transcript values — so it is safe
+/// under the no-high-cardinality invariant in CLAUDE.md § Metrics, exactly as
+/// the <c>outcome</c> tag on <c>aat_story_qa_turn_total</c> is. Do NOT add the
+/// transcript, a confidence score, a device id, or a moderation category here.
+/// </para>
+/// </summary>
+public static class VoiceIntentReasons
+{
+    /// <summary>A parent has the toy paused.</summary>
+    public const string GatedPaused = "gated_paused";
+
+    /// <summary>Inside the device's bedtime window.</summary>
+    public const string GatedBedtime = "gated_bedtime";
+
+    /// <summary>This device is over its own daily OpenAI cost cap.</summary>
+    public const string CostCap = "cost_cap";
+
+    /// <summary>The fleet-wide daily ceiling (kill-switch) is over.</summary>
+    public const string CostCapGlobal = "cost_cap_global";
+
+    /// <summary>Speech-to-text threw.</summary>
+    public const string SttFailed = "stt_failed";
+
+    /// <summary>Speech-to-text returned nothing usable.</summary>
+    public const string SttEmpty = "stt_empty";
+
+    /// <summary>Input moderation blocked the transcript.</summary>
+    public const string ModerationBlocked = "moderation_blocked";
+
+    /// <summary>A yes/no offer whose answer was neither.</summary>
+    public const string YesNoUnclear = "yesno_unclear";
+
+    /// <summary>The keyword classifier matched no mode.</summary>
+    public const string NoMatch = "no_match";
+
+    /// <summary>A mode was matched, but a parent has it switched off.</summary>
+    public const string ModeDisabled = "mode_disabled";
+
+    /// <summary>A real intent was resolved and returned.</summary>
+    public const string Matched = "matched";
+
+    public static readonly IReadOnlyList<string> All =
+    [
+        GatedPaused, GatedBedtime, CostCap, CostCapGlobal, SttFailed, SttEmpty,
+        ModerationBlocked, YesNoUnclear, NoMatch, ModeDisabled, Matched,
+    ];
+}
+
+/// <summary>
 /// What the toy just asked, so the transcription can be biased toward the
 /// answers that are actually possible. A one-word reply from a five-year-old
 /// is where an STT prompt earns its keep.

@@ -1,0 +1,63 @@
+﻿ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x2b (SPI_FAST_FLASH_BOOT)
+Saved PC:0x4037f0d6
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x116c
+load:0x403c8700,len:0xc2c
+load:0x403cb700,len:0x3108
+entry 0x403c88b8
+
+[boot] AregVoiceMvp starting
+[boot] backend = https://armenianaitoy-production.up.railway.app
+[net] TLS: verifying (ISRG Root X1 pinned)
+[wifi] credentials already in NVS ??? burn skipped
+[boot] reset_reason=11/UNKNOWN
+[boot] diag_boot_counter=0 (cold)
+[boot] previous_step=(none)
+[boot] backend=https://armenianaitoy-production.up.railway.app/api/chat/audio
+[boot] pins button=0 led=48
+[boot] mic_i2s bck=4 ws=5 sd=6
+[boot] amp_i2s bck=15 lrc=16 din=7
+E (225) task_wdt: esp_task_wdt_init(517): TWDT already initialized
+[boot] task watchdog enabled (30s)
+[volume] gain 0.15 (0 mV)
+[boot] sd_spi cs=10 sck=12 mosi=11 miso=13
+[sd] mounted; type=3 size=7680MB
+[boot] SD mounted; offline narration /stories/anban-huri/narration.mp3 = absent
+[content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=42 music=0
+[wifi] using provisioned creds (ssid=<home-ssid-redacted>)
+[wifi] connecting to <home-ssid-redacted> ...
+[wifi] event=connected
+[wifi] event=got_ip
+[wifi] ip=192.168.1.11
+[boot] ready ??? press button to speak
+[state] 0 -> 0
+[ota] running fw=1.3.3 partition=app0 img_state=undefined ota_state=idle (pending_ver=- cmd=- boots=0)
+[device] using provisioned identity (id=248729da-08d8-4144-afc0-e6af8a3fe471)
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[welcome] greeting greet-37
+[state] 0 -> 3
+[story] SD open: /voice/greet-37-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] ask ask-sgrc
+[state] 3 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=22641 heap=101512 psram=7861448 wifi=3 ip=192.168.1.11 rssi=-70
+[ota] boot poll (fw=1.3.3 build=games-bench board=areg-s3-n8 partition=app0)
+[content-sync] bench fw built Aug 16 2026 02:26:16
+[content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+[games] armed (pick=1), starting in 4s
+[alive] ms=27645 heap=101512 psram=7861152 wifi=3 ip=192.168.1.11 rssi=-70
+[story] SD open: /games/mind-reader/intro.mp3 @ 0
+[story] SD end interrupted=false
+[story] SD open: /games/mind-reader/q-root.mp3 @ 0
+[story] SD end interrupted=false
+[games] mind-reader: no answer ??? asking once more
+[story] SD open: /games/mind-reader/q-root.mp3 @ 0
+[story] SD end interrupted=false

@@ -1,0 +1,23 @@
+[content-sync] games phase B: 0 to download, heap=57360
+[content-sync] games summary offered=104 invalid=0 already=104 downloaded=0 failed=0 truncated=0 carried=0 games_active=104
+[content-sync] index written
+[content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=42 music=0
+[content-sync] summary manifest_items=10 accepted_items=10 invalid_items=0 duplicate_items=0 disabled_items=0 truncated_items=0 already_current=10 downloaded=0 failed=0 carried_forward=0 active_index_items=10 index_written=1
+[content-sync] heap after=57312
+[content-sync] PASS
+[content-sync] status=ok error= streak=0 next in 21600s
+[alive] ms=189585 heap=101492 psram=7861052 wifi=3 ip=192.168.1.11 rssi=-78 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=194593 heap=101540 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-81 btn=UP
+[alive] ms=199594 heap=101540 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-83 btn=UP
+[alive] ms=204595 heap=101540 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-83 btn=UP
+[alive] ms=209599 heap=101540 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-79 btn=UP
+[alive] ms=214603 heap=101540 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-78 btn=UP
+[alive] ms=219610 heap=101540 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-78 btn=UP
+[alive] ms=224617 heap=101540 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-77 btn=UP
+[alive] ms=229625 heap=101540 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-75 btn=UP
+[alive] ms=234633 heap=101540 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-79 btn=UP
+[alive] ms=239635 heap=101540 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-76 btn=UP
+[alive] ms=244636 heap=101540 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-78 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=252212 heap=101492 psram=7860796 wifi=3 ip=192.168.1.11 rssi=-78 btn=UP

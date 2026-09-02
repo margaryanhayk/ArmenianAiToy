@@ -1,0 +1,215 @@
+SD open: /stories/ulik-v12-intro.mp3 @ 0
+[story] SD end interrupted=false
+[state] 3 -> 3
+[story] SD play from byte 0
+[story] SD open: /stories/ulik-v12.mp3 @ 0
+[story] SD end interrupted=false
+[story-report] started ulik (sd) key=b41-1 queued=1
+[story-report] finished ??? event closed
+[state] 3 -> 3
+[post] summary/conclusion (/stories/ulik-v12-summary.mp3)
+[story] SD open: /stories/ulik-v12-summary.mp3 @ 0
+[story] SD end interrupted=false
+[story-select] index parse failed
+[post] question 0 not on the card ??? asking 1 instead
+[state] 3 -> 3
+[post] question 1 (/stories/ulik-v12-question1.mp3)
+[story] SD open: /stories/ulik-v12-question1.mp3 @ 0
+[story] SD end interrupted=false
+[post] listening for answer 1 (press & hold to talk)
+[post] no answer in window; closing quietly
+[story] finished ??? press to play again
+[state] 3 -> 0
+[state] 0 -> 0
+[alive] ms=611862 heap=101528 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-70 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[story-report] uploaded 1 event(s), 0 still queued
+[menu] activity ended ??? asking what next (chain=1)
+[welcome] greeting greet-38
+[state] 0 -> 3
+[story] SD open: /voice/greet-38-v1.mp3 @ 0
+[story] SD file is not MP3 (corrupt/wrong file): /voice/greet-38-v1.mp3 ???????? refusing to decode
+[welcome] ask ask-sgrc
+[state] 3 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=632815 heap=101528 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-71 btn=UP
+[alive] ms=637822 heap=101528 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-67 btn=UP
+[alive] ms=642827 heap=101528 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-71 btn=UP
+[alive] ms=647834 heap=101528 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72 btn=UP
+[button] raw=DOWN
+[button] raw=UP
+[button] raw=DOWN
+[button] pressed
+[button] raw=UP
+[story] selected anban-huri (10 eligible)
+[story] source = SD (cache)
+[state] 0 -> 3
+[story] intro clip (/stories/anban-huri-v9-intro.mp3)
+[story] SD open: /stories/anban-huri-v9-intro.mp3 @ 0
+[story] SD end interrupted=false
+[state] 3 -> 3
+[story] SD play from byte 0
+[story] SD open: /stories/anban-huri-v9.mp3 @ 0
+[button] raw=DOWN
+[story] SD barge-in: abs=1581 resume_from=0
+[story] SD end interrupted=true
+[story-report] started anban-huri (sd) key=b41-2 queued=1
+[state] 3 -> 1
+[audio] record_begin
+[audio] i2s_new_channel err=0/ESP_OK
+[audio] i2s_channel_init_std_mode err=0/ESP_OK
+[audio] i2s_channel_enable err=0/ESP_OK
+[audio] record_progress samples=16128 bytes=32256 heap=98432 psram=7861224
+[audio] record_progress samples=32256 bytes=64512 heap=98432 psram=7861224
+[audio] record_progress samples=48384 bytes=96768 heap=98432 psram=7861224
+[audio] record_progress samples=64512 bytes=129024 heap=98432 psram=7861224
+[audio] record_progress samples=80640 bytes=161280 heap=98432 psram=7861224
+[audio] record_progress samples=96768 bytes=193536 heap=98432 psram=7861224
+[audio] record_progress samples=112896 bytes=225792 heap=98376 psram=7861224
+[audio] record_progress samples=129024 bytes=258048 heap=98432 psram=7861224
+[audio] record_progress samples=145152 bytes=290304 heap=98432 psram=7861224
+[audio] record_progress samples=161280 bytes=322560 heap=98432 psram=7861224
+[audio] record_progress samples=177408 bytes=354816 heap=98376 psram=7861224
+[audio] record_progress samples=193536 bytes=387072 heap=98432 psram=7861224
+[audio] record_progress samples=209664 bytes=419328 heap=98432 psram=7861224
+[audio] record_progress samples=225792 bytes=451584 heap=98432 psram=7861224
+[audio] record_end bytes=479744
+[state] 1 -> 2
+[audio] earcon_begin
+[qa-async] POST (479788 bytes) offset=0
+[audio] earcon_end
+[audio] thinkbed contour base=280 Hz top=315 Hz 500 ms amp=5000
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[audio] thinkbed_end
+[audio] thinkbed_begin
+[qa-async] headers in, streaming body (content_length=173190)
+[audio] thinkbed_end
+[qa] thinking-bed done after 57 pulses; upload_done=true
+[state] 2 -> 3
+[latency] qa_release->first_byte_ms=29518
+[audio] qa_stream_begin (live POST body, len=173190, identity)
+[audio] qa_stream_end ok=true bytes=173193
+[qa] answer played (streamed POST response)
+[state] 3 -> 3
+[story] SD play from byte 0
+[story] SD open: /stories/anban-huri-v9.mp3 @ 0
+[button] raw=UP
+[volume] gain 2.17 (2335 mV)
+[story] SD end interrupted=false
+[story-report] finished ??? event closed
+[state] 3 -> 3
+[post] summary/conclusion (/stories/anban-huri-v9-summary.mp3)
+[story] SD open: /stories/anban-huri-v9-summary.mp3 @ 0
+[volume] gain 0.35 (237 mV)

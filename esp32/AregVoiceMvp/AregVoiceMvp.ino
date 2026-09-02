@@ -181,6 +181,11 @@ static void button_begin() {
     pinMode(AREG_PIN_BUTTON, INPUT_PULLUP);
     s_raw_last = digitalRead(AREG_PIN_BUTTON);
     s_button_pressed = false;
+    // Resting level, printed once. With INPUT_PULLUP and nothing pressed this
+    // must read UP; a boot that reports DOWN means the pin is held low by the
+    // wiring, which on GPIO0 is also the download-mode gesture.
+    Serial.printf("[button] pin=%d resting=%s\n",
+                  (int)AREG_PIN_BUTTON, (s_raw_last == LOW) ? "DOWN" : "UP");
 }
 
 // Returns 'P' on a press edge, 'R' on a release edge, 0 otherwise.
@@ -189,6 +194,15 @@ static char button_poll() {
     if (raw != s_raw_last) {
         s_last_edge_ms = millis();
         s_raw_last = raw;
+        // The button is the toy's ONLY physical input, and when it appears
+        // dead there is no way to tell "the wire is off" from "the firmware
+        // ignored it" -- 2026-08-18 cost an evening and a multimeter to that
+        // ambiguity, and the real cause turned out to be neither. This prints
+        // the raw pin edge BEFORE debounce, so a press shows up even when the
+        // state machine is busy and drops it. It cannot flood: it fires only
+        // on a physical level change, and the 30 ms debounce below still
+        // decides what the toy acts on.
+        Serial.printf("[button] raw=%s\n", (raw == LOW) ? "DOWN" : "UP");
     }
     if ((millis() - s_last_edge_ms) < AREG_BUTTON_DEBOUNCE_MS) {
         return 0;
@@ -249,6 +263,21 @@ static bool s_story_preselected = false;
 // recursion through the largest stack frame in the sketch — story ends,
 // menu, story, ends, menu, until the stack is gone.
 static bool s_ask_next_pending = false;
+
+// Menu time budget (owner decision 2026-08-19): CHOOSING is capped at
+// AREG_MENU_TOTAL_MS -- suggest, wait, suggest again, then a soft close
+// to idle. A story or game that already STARTED is never cut by this.
+#ifndef AREG_MENU_TOTAL_MS
+#define AREG_MENU_TOTAL_MS 60000UL
+#endif
+static uint32_t s_menu_started_ms = 0;
+static bool menu_time_left() {
+    return (millis() - s_menu_started_ms) < AREG_MENU_TOTAL_MS;
+}
+// The power-on flow greets; every later menu skips the hello and goes
+// straight to the ask. Charm once, speed after -- before 2026-08-19 every
+// menu re-greeted, which read as the toy stalling.
+static bool s_greeted_this_boot = false;
 // Consecutive menus the toy opened by itself, with no press in between.
 // Bounded so a child who walks away is not offered a story forever: two
 // auto-menus, then the toy goes quiet until someone touches it again.
@@ -880,6 +909,7 @@ static bool welcome_listen(const char *expect, char *out_intent, size_t out_len,
     Serial.printf("[welcome] listening (%s)\n", expect);
     Serial.flush();
     led_for_state(ST_RECORDING);          // the "your turn" cue
+    const bool yesno = (strcmp(expect, "yesno") == 0);
     bool got_press = false;
     const uint32_t listen_started = millis();
     while (millis() - listen_started < AREG_WELCOME_LISTEN_MS) {
@@ -887,8 +917,37 @@ static bool welcome_listen(const char *expect, char *out_intent, size_t out_len,
             got_press = true;
             break;
         }
+#if AREG_HAS_ANSWER_BUTTONS
+        // The buttons are the answer path that works with no cloud and no
+        // clear speech (owner decision 2026-08-19: the menu must work both
+        // online and offline, and a shy child must still be able to
+        // choose). GREEN takes the default -- yes to an offer, a story for
+        // the open question; RED asks for the next suggestion.
+        const char ab = answer_buttons_poll();
+        if (ab == 'Y') {
+            cs_copy_bounded(out_intent, out_len, yesno ? "yes" : "story");
+            Serial.printf("[welcome] GREEN -> %s\n", out_intent);
+            Serial.flush();
+            return true;
+        }
+        if (ab == 'N') {
+            cs_copy_bounded(out_intent, out_len, yesno ? "no" : "suggest");
+            Serial.printf("[welcome] RED -> %s\n", out_intent);
+            Serial.flush();
+            return true;
+        }
+#endif
         delay(AREG_BUTTON_POLL_MS);
         esp_task_wdt_reset();
+    }
+    if (got_press && !voice_wifi_is_connected()) {
+        // Offline the mic cannot be understood (STT lives in the cloud),
+        // but the press itself IS an answer: the child wants the default.
+        // Never record something nobody can transcribe.
+        cs_copy_bounded(out_intent, out_len, yesno ? "yes" : "story");
+        Serial.printf("[welcome] offline press -> %s\n", out_intent);
+        Serial.flush();
+        return true;
     }
     if (!got_press) {
         Serial.println("[welcome] no answer — closing quietly");
@@ -1047,6 +1106,11 @@ static void handle_online_chat_session(uint8_t *payload, size_t payload_len) {
 // has no such evidence. Not a default argument on purpose: the Arduino
 // auto-prototype generator mishandles them (see welcome_listen above).
 static void welcome_offer_story(bool child_present) {
+    // On a dying SD card every read below becomes a multi-second timeout,
+    // and this flow stacks several. Feed the watchdog on entry so the sum
+    // cannot reach the 30 s panic (seen 2026-08-19: WDT reboot instead of
+    // a calm "no card").
+    esp_task_wdt_reset();
     // Filtered IN PLACE in the shared table: the offer pool is a subset
     // of the eligible list, so a second CsStory[CS_MAX_STORIES] would be
     // ~10 KB of .bss for nothing.
@@ -1078,6 +1142,15 @@ static void welcome_offer_story(bool child_present) {
 
     char chosen[CS_MAX_STORY_ID_LEN + 1] = "";
     for (int attempt = 0; attempt < AREG_WELCOME_MAX_OFFERS && pool_count > 0; attempt++) {
+        if (!menu_time_left()) {
+            // The choosing budget is spent (owner decision 2026-08-19):
+            // close softly to idle rather than talk at an empty room.
+            // Goodbye clip pending render -- quiet until it exists.
+            Serial.println("[menu] time budget spent -- closing to idle");
+            Serial.flush();
+            led_for_state(ST_IDLE);
+            return;
+        }
         if (!story_select_pick(pool, pool_count, chosen, sizeof(chosen))) {
             break;
         }
@@ -1094,9 +1167,10 @@ static void welcome_offer_story(bool child_present) {
         audio_speaker_begin();
         audio_play_story_file(clip, 0, nullptr, nullptr);
 
-        if (!voice_wifi_is_connected()) {
-            break;   // cannot hear a yes — just play what we offered
-        }
+        // (2026-08-19) An offline break used to live here -- "cannot
+        // hear a yes, just play what we offered". The GREEN/RED buttons
+        // hear a yes offline now, so the offer is a real question
+        // everywhere.
 
         char intent[16];
         if (!welcome_listen("yesno", intent, sizeof(intent), nullptr, nullptr)) {
@@ -1129,8 +1203,18 @@ static void welcome_offer_story(bool child_present) {
     }
 
     if (chosen[0] == '\0') {
-        // Every offer was refused, or nothing resolved. Play the rotation's
-        // pick rather than leaving the child with nothing.
+        // Every offer was refused, or nothing resolved. Stories first,
+        // then a game (owner structure 2026-08-19): a child who said no
+        // to every tale is asking for something DIFFERENT, and the game
+        // announces itself with its own intro clip. Budget still applies.
+        if (menu_time_left() && offline_games_available()) {
+            Serial.println("[menu] stories refused -- offering a game");
+            Serial.flush();
+            offline_games_run_next();
+            return;
+        }
+        // No games on the card: the graceful default, one short line and
+        // the rotation's pick, rather than leaving the child with nothing.
         welcome_say(CS_VOICE_ID_JUST_STORY);
         handle_story_session();
         return;
@@ -1147,6 +1231,11 @@ static void welcome_offer_story(bool child_present) {
 // rather than "nobody is there". False at power-on. Not a default argument
 // on purpose: the Arduino auto-prototype generator mishandles them.
 static void handle_welcome_flow(bool child_present) {
+    // On a dying SD card every read below becomes a multi-second timeout,
+    // and this flow stacks several. Feed the watchdog on entry so the sum
+    // cannot reach the 30 s panic (seen 2026-08-19: WDT reboot instead of
+    // a calm "no card").
+    esp_task_wdt_reset();
     // ---- preconditions: return SILENTLY, no sound, no LED change ----
     // A paused toy is fully silent, and the greeting is the first thing
     // that would break that promise. The pause flag is seeded from NVS in
@@ -1169,14 +1258,20 @@ static void handle_welcome_flow(bool child_present) {
         return;   // every line lives on the card; there is nothing to say
     }
 
-    // ---- 1. greeting ----
-    char greeting[CS_MAX_PATH_LEN];
-    if (voice_clip_next_greeting(greeting, sizeof(greeting))) {
-        transition_to(ST_PLAYING);
-        audio_speaker_begin();
-        // Barge-in allowed: an impatient child pressing during the hello
-        // should move things along, not be ignored.
-        audio_play_story_file(greeting, 0, story_barge_in_poll, nullptr);
+    // The choosing clock starts here; see AREG_MENU_TOTAL_MS above.
+    s_menu_started_ms = millis();
+
+    // ---- 1. greeting (first menu of the boot only) ----
+    if (!s_greeted_this_boot) {
+        s_greeted_this_boot = true;   // even if no clip resolves: greet ONCE
+        char greeting[CS_MAX_PATH_LEN];
+        if (voice_clip_next_greeting(greeting, sizeof(greeting))) {
+            transition_to(ST_PLAYING);
+            audio_speaker_begin();
+            // Barge-in allowed: an impatient child pressing during the
+            // hello should move things along, not be ignored.
+            audio_play_story_file(greeting, 0, story_barge_in_poll, nullptr);
+        }
     }
 
     // Story disabled at the device AND nothing else to offer → the
@@ -1193,28 +1288,22 @@ static void handle_welcome_flow(bool child_present) {
         return;
     }
 
-    // ---- 2. offline short-circuit ----
-    // Hearing the child needs the cloud and there is no offline path to
-    // it. Owner decision was voice-only, so the answer is not a second
-    // menu — it is one short line and a story.
-    if (!voice_wifi_is_connected()) {
-        Serial.println("[welcome] offline — going straight to a story");
-        Serial.flush();
-        if (story_ok) {
-            welcome_say(CS_VOICE_ID_JUST_STORY);
-            welcome_offer_story(child_present);
-        } else {
-            led_for_state(ST_IDLE);
-        }
-        return;
-    }
+    // ---- 2. connectivity shapes the OFFER, not the menu ----
+    // (2026-08-19) This used to short-circuit offline to "one line and a
+    // story", because answers were voice-only and hearing needs the
+    // cloud. The GREEN/RED buttons answer offline now, so the menu runs
+    // everywhere; what connectivity changes is HONESTY -- riddle and
+    // curiosity live server-side, so the ask clip must not name them when
+    // the cloud is unreachable. Never offer what cannot be honored.
+    const bool online = voice_wifi_is_connected();
 
     // ---- 3. ask, using the clip that names exactly the enabled modes ----
     char ask_id[16];
     char ask_path[CS_MAX_PATH_LEN];
     bool asked = false;
     if (cs_build_ask_voice_id(ask_id, sizeof(ask_id),
-                              story_ok, game_ok, riddle_ok, curiosity_ok)
+                              story_ok, game_ok,
+                              riddle_ok && online, curiosity_ok && online)
         && voice_clip_resolve_path(ask_id, ask_path, sizeof(ask_path))) {
         Serial.printf("[welcome] ask %s\n", ask_id);
         Serial.flush();
@@ -1236,6 +1325,7 @@ static void handle_welcome_flow(bool child_present) {
 
     // ---- 4. listen, with exactly one retry ----
     for (int attempt = 1; attempt <= AREG_WELCOME_MAX_TRIES; attempt++) {
+        if (!menu_time_left()) break;   // budget outranks the retry count
         char intent[16];
         uint8_t *heard = nullptr;
         size_t heard_len = 0;
@@ -1260,6 +1350,12 @@ static void handle_welcome_flow(bool child_present) {
             if (story_ok) { welcome_offer_story(child_present); return; }
             break;
         }
+        // RED on the open question: "show me the choices" -- go straight
+        // to the named suggestions, no extra line in between.
+        if (strcmp(intent, "suggest") == 0) {
+            if (heard != nullptr) heap_caps_free(heard);
+            break;
+        }
         // Calm is always available (MODES.md), and a bedtime cue must not
         // open a menu — it should settle things down, which here means a
         // story rather than a game.
@@ -1273,13 +1369,34 @@ static void handle_welcome_flow(bool child_present) {
         // Curiosity window all live server-side). The voice-intent call
         // above already confirmed the parent left this mode enabled —
         // and the backend re-checks per turn anyway.
-        if (strcmp(intent, "game") == 0 || strcmp(intent, "riddle") == 0
-            || strcmp(intent, "curiosity") == 0) {
+        if (strcmp(intent, "game") == 0) {
+            // Owner decision 2026-08-19: "game" plays one of the REAL
+            // offline games (mind-reader / buzzer / Simon, rotating) --
+            // deterministic, free, honest, identical online and offline.
+            // The online chat Game remains only as the fallback for a
+            // card that has no game clips yet.
+            if (offline_games_available()) {
+                if (heard != nullptr) heap_caps_free(heard);
+                offline_games_run_next();
+                return;
+            }
             if (heard != nullptr) {
                 handle_online_chat_session(heard, heard_len);
                 return;
             }
-            break;   // alloc edge — fall to the graceful default story
+            break;   // alloc edge -- fall to the graceful default
+        }
+        // riddle / curiosity -> the ONLINE chat session. The child's own
+        // recorded words open it (the backend's ModeDetector routes the
+        // transcript; both engines live server-side). The voice-intent
+        // call already confirmed the parent left the mode enabled -- and
+        // the backend re-checks per turn anyway.
+        if (strcmp(intent, "riddle") == 0 || strcmp(intent, "curiosity") == 0) {
+            if (heard != nullptr) {
+                handle_online_chat_session(heard, heard_len);
+                return;
+            }
+            break;   // alloc edge -- fall to the graceful default
         }
 
         if (heard != nullptr) heap_caps_free(heard);
@@ -1291,9 +1408,10 @@ static void handle_welcome_flow(bool child_present) {
         break;
     }
 
-    // Fell out: mis-heard twice, or asked for something we cannot yet do.
-    // One short line, then a story — the graceful default.
-    welcome_say(CS_VOICE_ID_JUST_STORY);
+    // Fell out: mis-heard twice, silence with a child present, RED on
+    // the open question, or something we cannot do. Straight to the named
+    // suggestions -- a "let me just tell you a story" line right before
+    // "want to hear X?" would contradict the question it introduces.
     if (story_ok) {
         welcome_offer_story(child_present);
     } else {
@@ -1835,32 +1953,44 @@ static void handle_story_session_once() {
             // against audio quality (longer → fewer AudioOutputI2S re-inits).
             //
             // HARDWARE ASSUMPTION: repeated AudioOutputI2S begin/stop within
-            // audio_play_thinking_earcon()'s internal helper is well-tolerated
-            // by the MAX98357A. If re-init clicks are audible, replace the
-            // per-pulse I2S construction with a long tone whose amplitude we
-            // fade down (requires exposing a "play N samples then stop" API
-            // or restructuring synth_write_tone to accept a done_fn callback).
+            // synth_play_pulse() is well-tolerated by the MAX98357A. If
+            // re-init clicks are audible, replace the per-pulse I2S
+            // construction with a long tone whose amplitude we fade down
+            // (requires exposing a "play N samples then stop" API or
+            // restructuring synth_write_tone to accept a done_fn callback).
+            //
+            // PULSE 1 IS THE EARCON AND STAYS EXACTLY AS IT WAS: it is the
+            // child's acoustic receipt for letting go of the button, so it
+            // keeps its own pitch, length and loudness. Pulses 2+ are the
+            // thinking bed proper — lower, shorter, quieter, and moving.
+            //
+            // FIXED 2026-08-16 (this is the TODO that used to sit here): the
+            // bed was a second call to the earcon, so the entire wait was one
+            // 440 Hz 600 ms beep repeated up to 70 times — the 4th identical
+            // beep by second 2, the 16th by second 10. The monotony was the
+            // boredom, more than the duration. The three AREG_THINKBED_ tone
+            // constants had been declared for exactly this from the start and
+            // were read by no sound path at all; only the pulse cap was live.
+            // synth_write_tone() was already fully parameterised, so the fix
+            // was to stop calling the earcon here — not to write a new synth.
             int bed_count = 0;
             while (!voice_async_upload_done() &&
                    bed_count < AREG_THINKBED_MAX_PULSES) {
-                // Reuse audio_play_thinking_earcon() with thinking-bed params.
-                // HARDWARE ASSUMPTION: the earcon function reads
-                // AREG_EARCON_FREQ_HZ / AREG_EARCON_DURATION_MS internally.
-                // For the thinking bed we want different freq/duration, so we
-                // call a single-pulse synth directly.
-                // TODO (on device): refactor synth_write_tone() to accept
-                // freq/duration/amplitude args so we can call it with
-                // AREG_THINKBED_FREQ_HZ / AREG_THINKBED_PULSE_MS /
-                // AREG_THINKBED_AMPLITUDE here without rebuilding AudioOutputI2S
-                // on every pulse. For now, reuse the earcon (same freq/duration)
-                // so we can verify the FreeRTOS + I2S coexistence first.
-                esp_task_wdt_reset();  // #047 — feed across the ~0.6s-per-pulse bed
-                // ABORTABLE (latency, 2026-08-10): the pulse now checks the
+                esp_task_wdt_reset();  // #047 — feed across the per-pulse bed
+                // ABORTABLE (latency, 2026-08-10): the pulse checks the
                 // upload's done flag every ~16 ms and fades out early instead
-                // of finishing its 600 ms. Before this, an answer that arrived
-                // 20 ms into a pulse still waited out the other 580 ms —
-                // 0-600 ms of dead time on every question, ~300 ms on average.
-                audio_play_thinking_earcon_abortable(voice_async_upload_done);
+                // of running its full length. Before this, an answer that
+                // arrived 20 ms into a pulse still waited out the other 580 ms
+                // — 0-600 ms of dead time on every question, ~300 ms on
+                // average. BOTH calls below keep it, and the bed's shorter
+                // pulse only adds more between-pulse chances to notice, so
+                // the worst-case wait after an answer lands cannot grow.
+                if (bed_count == 0) {
+                    audio_play_thinking_earcon_abortable(voice_async_upload_done);
+                } else {
+                    audio_play_thinking_bed_abortable((uint32_t)(bed_count - 1),
+                                                      voice_async_upload_done);
+                }
                 bed_count++;
             }
             Serial.printf("[qa] thinking-bed done after %d pulses; upload_done=%s\n",
@@ -1899,8 +2029,22 @@ static void handle_story_session_once() {
             if (turn.ok) {
                 transition_to(ST_PLAYING);
                 const uint32_t qa_latency_ms = millis() - qa_release_ms;
+                // THE KEY NAME CHANGES WITH THE PATH, and that is deliberate.
+                // On the streaming path turn.ok is published at the response
+                // HEADERS (voice_client.cpp), not after the body has landed,
+                // so this stopwatch stops at the first byte -- a different
+                // quantity from the buffered build's, and a much smaller
+                // number. Printing both under one name would let a definition
+                // change be read as a saving; the two are not comparable, and
+                // a log line has to say which one it is on its own.
+#ifdef AREG_QA_STREAM_PLAYBACK
+                Serial.printf("[latency] qa_release->%s=%u\n",
+                              turn.streaming ? "first_byte_ms" : "play_begin_ms",
+                              (unsigned)qa_latency_ms);
+#else
                 Serial.printf("[latency] qa_release->play_begin_ms=%u\n",
                               (unsigned)qa_latency_ms);
+#endif
                 Serial.flush();
 
                 // Play the answer.
@@ -2220,6 +2364,58 @@ void setup() {
     Serial.flush();
 #endif
 
+    // Same one-shot burn, for Wi-Fi. Added 2026-08-16 as the ORDERING FIX that
+    // makes BLE provisioning safe to switch on.
+    //
+    // With AREG_USE_BLE_PROVISIONING on, setup() branches on
+    // voice_wifi_is_provisioned() and, when NVS is empty, opens provisioning
+    // and NEVER calls voice_wifi_begin() -- the config.h fallback is not
+    // consulted at all. The owner's toy has real Wi-Fi ONLY in config.h and an
+    // empty aregwifi namespace, so enabling the flag alone would have taken a
+    // working toy off the network and left it waiting for a phone app that has
+    // no Android build yet. This burn runs first, so the toy is genuinely
+    // provisioned before that branch is reached.
+    //
+    // Guarded the same three ways as the identity burn: flag defined, NVS
+    // empty (never overwrites a toy a parent has already provisioned), and the
+    // compile-time SSID not a placeholder. Burn once, then drop the flag --
+    // and never build an OTA image with it, for the reason c9e6593 records.
+#ifdef AREG_PROVISION_WIFI_ONCE
+    {
+        const bool placeholder = strlen(AREG_WIFI_SSID) == 0
+                                 || strcmp(AREG_WIFI_SSID, "YOUR_WIFI_SSID") == 0;
+        const bool present = wifi_creds_present();
+        bool differs = false;
+#ifdef AREG_PROVISION_WIFI_FORCE
+        // Force-rewrite path (2026-09-01, router changed again): with FORCE
+        // defined, creds already in NVS are OVERWRITTEN when they differ
+        // from the compile-time pair -- idempotent, so it writes flash at
+        // most once per credential change, not once per boot. Bench-only:
+        // never build an OTA image with FORCE on (c9e6593's reason -- an
+        // OTA image reaches every toy and would clobber creds a parent
+        // provisioned by phone).
+        if (present && !placeholder) {
+            static char cur_ssid[64];
+            static char cur_pass[64];
+            if (wifi_creds_load(cur_ssid, sizeof(cur_ssid), cur_pass, sizeof(cur_pass))) {
+                differs = strcmp(cur_ssid, AREG_WIFI_SSID) != 0
+                          || strcmp(cur_pass, AREG_WIFI_PASSWORD) != 0;
+            }
+        }
+#endif
+        if (placeholder) {
+            Serial.println("[wifi] refusing to burn a placeholder SSID");
+        } else if (present && !differs) {
+            Serial.println("[wifi] credentials already in NVS — burn skipped");
+        } else {
+            wifi_creds_save(AREG_WIFI_SSID, AREG_WIFI_PASSWORD);
+            Serial.printf("[wifi] credentials %s to NVS (ssid=%s)\n",
+                          (present ? "updated" : "burned"), AREG_WIFI_SSID);
+        }
+    }
+    Serial.flush();
+#endif
+
     // Diag: reset reason. Distinguishes power-on / EN / panic /
     // brownout / watchdog so a "monitor came back" after a hang
     // can be classified without guessing.
@@ -2516,13 +2712,23 @@ void loop() {
         if (now - s_last_heartbeat_ms >= 5000) {
             s_last_heartbeat_ms = now;
             Serial.printf(
-                "[alive] ms=%u heap=%u psram=%u wifi=%d ip=%s rssi=%d\n",
+                "[alive] ms=%u heap=%u psram=%u wifi=%d ip=%s rssi=%d btn=%s\n",
                 (unsigned)now,
                 (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getFreePsram(),
                 (int)WiFi.status(),
                 WiFi.localIP().toString().c_str(),
-                (int)WiFi.RSSI());
+                (int)WiFi.RSSI(),
+                // Raw main-button level, read here and NOT through
+                // button_poll(). 2026-08-19: two different pins in a row
+                // reported zero edges, which is not credible as two dead
+                // pins -- so the next thing to rule out is whether the
+                // button code is reached at all. This print does not depend
+                // on the state machine, the debounce, or button_poll(); it
+                // only depends on the loop running, which the rest of this
+                // same line already proves. Hold the button across a tick
+                // and it must read DOWN.
+                (digitalRead(AREG_PIN_BUTTON) == LOW) ? "DOWN" : "UP");
             Serial.flush();
         }
 
@@ -2643,13 +2849,26 @@ void loop() {
         offline_quiz_tick();
 #endif
 
+        // One-shot SD read-integrity self-test, ~15 s after boot (after
+        // the boot flows settle, before content sync's 3-minute arm). See
+        // content_sync_read_selftest's header comment for why it exists.
+        {
+            static bool sd_selftest_done = false;
+            if (!sd_selftest_done && millis() > 15000UL && audio_sd_available()) {
+                sd_selftest_done = true;
+                content_sync_read_selftest();
+            }
+        }
+
 #ifdef AREG_OFFLINE_GAMES_BENCH
-        // Offline games (bench builds only): mind-reader / two-player
-        // buzzer / button Simon, all from /games clips on SD with the
-        // GREEN/RED buttons. One game per boot, 30 s after boot, IDLE-only;
-        // which one is a build-time pick (AREG_OFFLINE_GAMES_PICK). Zero
-        // bytes of this in production.
+        // Bench-only AUTO-start (30 s after boot). The engine itself is
+        // production since 2026-08-19 -- games start from the menu when a
+        // child asks -- but a game that starts because a TIMER fired is
+        // the defect that made the button look dead for two evenings
+        // (button-dead-diagnosis-20260818.md), so the tick stays behind
+        // the bench flag forever.
         offline_games_tick();
+#endif
         // A finished game asks what to do next, exactly as a finished
         // story does. Same deferred flag, for the same reason: the menu
         // can start a story, and starting one from inside a game's own
@@ -2657,7 +2876,6 @@ void loop() {
         if (offline_games_consume_finished() && ask_next_is_allowed()) {
             s_ask_next_pending = true;
         }
-#endif
 
         // An activity ended and the toy owes the child a question. Consumed
         // HERE, at the top level, and nowhere else — see s_ask_next_pending.
@@ -2741,27 +2959,33 @@ void loop() {
                     esp_task_wdt_reset();
                 }
                 if (!released_early) {
-                    Serial.println("[button] hold — opening the menu");
+                    Serial.println("[button] hold -- opening the menu");
                     Serial.flush();
                     handle_welcome_flow(/*child_present=*/true);
-                    // MANDATORY. handle_welcome_flow was written to be called
-                    // only from setup(), which restores the state itself.
-                    // SEVEN of its exits return with s_state still ST_PLAYING
-                    // (five in handle_welcome_flow itself, one in
-                    // welcome_offer_story, one in handle_online_chat_session
-                    // — the count read "six" here and was one short), and
-                    // loop() only accepts input while s_state == ST_IDLE —
-                    // without this line the toy takes one hold and then
-                    // ignores the button until a power cycle, which is the
-                    // exact failure this whole change exists to remove.
+                    // MANDATORY -- see the press branch below for why.
                     transition_to(ST_IDLE);
-                } else {
-                    // Continuous story: a press starts the story (or resumes
-                    // it from the last barge-in offset). During playback a
-                    // press cuts the audio instantly; holding + speaking asks
-                    // a question (answered, then the story auto-resumes), a
-                    // quick tap just pauses. All handled in handle_story_session.
+                } else if (s_story_offset > 0) {
+                    // THE one exception to press-equals-menu (owner
+                    // decision 2026-08-19): a story paused half-way
+                    // resumes from its saved byte. Asking "what shall we
+                    // do?" there would throw away the child's place.
                     handle_story_session();
+                } else {
+                    // Press = menu (owner decision 2026-08-19). One rule
+                    // a four-year-old can learn: press, and Areg asks.
+                    // The menu greets only on its first opening of the
+                    // boot, suggests a story by name, takes GREEN/RED or
+                    // voice as answers, and closes to idle when the
+                    // 60-second choosing budget is spent.
+                    Serial.println("[button] press -- opening the menu");
+                    Serial.flush();
+                    handle_welcome_flow(/*child_present=*/true);
+                    // MANDATORY. SEVEN of handle_welcome_flow's exits
+                    // return with s_state still ST_PLAYING, and loop()
+                    // only accepts input while s_state == ST_IDLE --
+                    // without this line the toy takes one press and then
+                    // ignores the button until a power cycle.
+                    transition_to(ST_IDLE);
                 }
             }
         }

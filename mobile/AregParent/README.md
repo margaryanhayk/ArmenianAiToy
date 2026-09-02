@@ -62,6 +62,10 @@ npx eas-cli build --profile preview --platform android
 # iPhone — needs an Apple Developer account ($99/yr, Apple's rule). No Mac needed:
 npx eas-cli build --profile development --platform ios
 #   → EAS walks you through Apple credentials + registering your device.
+#   BLOCKED as of 2026-08-04: Apple declined this project's Developer
+#   Program enrolment (case 20000124688383, no reason given). Without an
+#   approved account there is no signing identity for EAS to use, so this
+#   command cannot succeed today — see "TestFlight on your own iPhone" below.
 ```
 
 Profiles (`eas.json`):
@@ -78,10 +82,25 @@ The backend URL is baked in at build time from `eas.json` →
 | development / preview | `http://192.168.1.4:5000` (bench LAN — phone must be on the same Wi-Fi, and the address is DHCP so re-check it) |
 | production | `https://armenianaitoy-production.up.railway.app` (live) |
 
-## TestFlight on your own iPhone (the Day-6 path)
+## TestFlight on your own iPhone — BLOCKED (Apple declined enrolment, 2026-08-04)
 
-Everything below is already prepared; this is the whole sequence once the
-Apple Developer Program enrolment is approved.
+**Corrected 2026-08-16 — this section previously read "Everything below is
+already prepared; this is the whole sequence once the Apple Developer
+Program enrolment is approved," written before Apple's decision. That
+framing is now misleading: Apple declined the enrolment on 2026-08-04 (case
+20000124688383, no reason given), and nothing since has changed that. The
+steps below remain accurate as *the sequence to run if and when an approved
+account exists* — they are not a live path today.**
+
+**Consequence for this app, not just for TestFlight**: without an iOS build,
+the Bluetooth Wi-Fi setup screen (`ProvisioningScreen.tsx`, see below)
+cannot reach an iPhone at all — Expo Go/web only show the graceful fallback,
+and a *dev* build needs the same Apple signing identity `production` does.
+BLE Wi-Fi setup on this app is therefore **Android-only** until Apple
+reverses course. This is exactly why `wwwroot/parent.html` — not this app —
+is the phone surface documented as the "add-to-home-screen" fallback for
+iOS in CLAUDE.md § "Parent-Facing Read-Only Monitoring Surface"; that
+dashboard has no native-module dependency and works on any phone's browser.
 
 ```bash
 cd mobile/AregParent
@@ -120,6 +139,9 @@ The "Connect to Wi-Fi" screen (Settings → 📶) drives BLE provisioning via
 `@orbital-systems/react-native-esp-idf-provisioning`. That's a **native module**,
 so it does NOT run in Expo Go or the web preview — it needs an **Expo dev build**.
 The code is written (`ProvisioningScreen.tsx`) but **UNVERIFIED on a device**.
+**Android-only in practice** — an iOS dev build needs the same Apple signing
+identity that TestFlight does, and Apple has declined this project's
+Developer Program enrolment (see "TestFlight on your own iPhone" above).
 
 - In Expo Go / web it shows a graceful fallback ("use the ESP BLE Provisioning
   app, PoP `areg-pair`"); only a dev build activates the real flow. The toy/
@@ -137,9 +159,13 @@ npx expo run:android
 npx expo start --dev-client
 ```
 
-iOS needs a Mac or EAS (`eas build --profile development -p ios`). After it
-launches: put the toy in setup mode (hold its button ~5s at power-on), then
-Settings → 📶 Connect to Wi-Fi → Search → pick your network → password → Send.
+iOS needs a Mac or EAS (`eas build --profile development -p ios`) — **and,
+as of 2026-08-04, an approved Apple Developer Program account that this
+project does not have** (Apple declined the enrolment; see "TestFlight on
+your own iPhone" above), so this path is not currently runnable on iOS.
+After the Android dev build launches: put the toy in setup mode (hold its
+button ~5s at power-on), then Settings → 📶 Connect to Wi-Fi → Search → pick
+your network → password → Send.
 
 ## Still TODO (next slices)
 
@@ -152,6 +178,9 @@ Settings → 📶 Connect to Wi-Fi → Search → pick your network → password
 
 ## Notes
 
-- iOS builds without a Mac: use **EAS Build** (`eas build -p ios`) — cloud build.
+- iOS builds without a Mac: use **EAS Build** (`eas build -p ios`) — cloud
+  build. Still needs an approved Apple Developer Program account, which this
+  project does not currently have (Apple declined enrolment 2026-08-04); see
+  "TestFlight on your own iPhone" above.
 - Endpoints ride plain HTTP today; flip `Security:RequireHttps` on the backend
   and use the HTTPS URL here once TLS (a domain + certificate) is in place.

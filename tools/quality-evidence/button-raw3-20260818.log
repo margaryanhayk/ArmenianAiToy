@@ -1,0 +1,33 @@
+=192.168.1.11 rssi=-83
+[alive] ms=272153 heap=101540 psram=7860828 wifi=3 ip=192.168.1.11 rssi=-83
+[alive] ms=277161 heap=101540 psram=7860828 wifi=3 ip=192.168.1.11 rssi=-84
+[alive] ms=282170 heap=101540 psram=7860860 wifi=3 ip=192.168.1.11 rssi=-84
+[alive] ms=287178 heap=101540 psram=7860860 wifi=3 ip=192.168.1.11 rssi=-84
+[alive] ms=292183 heap=101540 psram=7860860 wifi=3 ip=192.168.1.11 rssi=-83
+[alive] ms=297190 heap=101540 psram=7860860 wifi=3 ip=192.168.1.11 rssi=-84
+[alive] ms=302199 heap=101540 psram=7860860 wifi=3 ip=192.168.1.11 rssi=-83
+[alive] ms=307202 heap=101488 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-83
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=312254 heap=101492 psram=7860692 wifi=3 ip=192.168.1.11 rssi=-84
+[alive] ms=317263 heap=101540 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-84
+[alive] ms=322271 heap=101540 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-84
+[alive] ms=327280 heap=101540 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-84
+[alive] ms=332285 heap=101540 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-83
+[alive] ms=337293 heap=101540 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-85
+[alive] ms=342295 heap=101540 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-83
+[alive] ms=347304 heap=101540 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-85
+[alive] ms=352304 heap=101540 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-83
+[alive] ms=357311 heap=101540 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-84
+[alive] ms=362319 heap=101540 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-83
+[alive] ms=367329 heap=101540 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-83
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=372334 heap=101488 psram=7860700 wifi=3 ip=192.168.1.11 rssi=-83
+[alive] ms=377339 heap=101488 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-85
+[alive] ms=382345 heap=101540 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-85
+[alive] ms=387352 heap=101540 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-83
+[alive] ms=392359 heap=101488 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-83
+[alive] ms=397361 heap=101540 psram=7861096 wifi=3 ip=192.168.1.11 rssi=-84
+[alive] ms=402368 heap=101540 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-85
+[alive] ms=407372 heap=101540 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-82
+[alive] ms=412379 heap=101540 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-85
+[alive] ms=417383 heap=101540 psram=7861128 wifi=3 ip=192.168.1.11 rssi=-85

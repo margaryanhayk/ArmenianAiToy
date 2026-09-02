@@ -1,0 +1,6 @@
+[wokwi]
+version = 1
+# Built by tools/firmware/build-wokwi described in wokwi/README.md --
+# the image uses wokwi/config-wokwi.h (no secrets), NOT the bench config.h.
+firmware = "../build_wokwi/AregVoiceMvp.ino.merged.bin"
+elf = "../build_wokwi/AregVoiceMvp.ino.elf"

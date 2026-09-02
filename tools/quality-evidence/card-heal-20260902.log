@@ -1,0 +1,209 @@
+653 heap=96680 psram=7861224 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=182662 heap=96680 psram=7860936 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=187663 heap=96488 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=192671 heap=96680 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=197679 heap=96680 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=202679 heap=96680 psram=7861224 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[ota] 1 command(s) pending
+[ota] command id=74093ae3-b3ab-4bb3-bbfc-f5be46b0bb3c type=refresh_story_manifest expiresAt=2026-09-01T22:43:12.0378071Z
+[content-sync] sync requested by command
+[ota] ack 74093ae3-b3ab-4bb3-bbfc-f5be46b0bb3c result=ok status=200
+[content-sync] starting
+[content-sync] heap before=96632
+[content-sync] manifest bytes=-1 heap parse 52444->52504 psram=7788336
+[content-sync] manifest status=200 stories=10 introEnabled=1 music=0 musicEnabled=0 voice=42 games=104 modes=1111 pauses=1 variants=1
+[content-sync] index v7 loaded entries=10 music=0 voice=42
+[content-sync] item anban-huri v9 "?????????? ????????????" 5560991 bytes
+[content-sync] anban-huri already current (index)
+[content-sync] anban-huri:intro already current
+[content-sync] anban-huri:question already current
+[content-sync] anban-huri:question1 already current
+[content-sync] anban-huri:question2 already current
+[content-sync] anban-huri:summary already current
+[content-sync] anban-huri:offer download 12% (8192/65872)
+[content-sync] anban-huri:offer download 24% (16415/65872)
+[content-sync] anban-huri:offer download 32% (21471/65872)
+[content-sync] anban-huri:offer download 45% (29663/65872)
+[content-sync] anban-huri:offer download 55% (36864/65872)
+[content-sync] anban-huri:offer download 62% (40960/65872)
+[content-sync] anban-huri:offer download 74% (49152/65872)
+[content-sync] anban-huri:offer download 80% (53248/65872)
+[content-sync] anban-huri:offer download 94% (62144/65872)
+[content-sync] anban-huri:offer download 100% (65872/65872)
+[content-sync] anban-huri:offer sha256 ok
+[content-sync] moved /tmp/anban-huri-v9-offer.mp3.part -> /stories/anban-huri-v9-offer.mp3
+[content-sync] anban-huri:reoffer already current
+[content-sync] item hedgehog-apple v3 "???????????? ???? ????????????" 613817 bytes
+[content-sync] hedgehog-apple already current (index)
+[content-sync] hedgehog-apple:intro already current
+[content-sync] hedgehog-apple:question already current
+[content-sync] hedgehog-apple:question1 already current
+[content-sync] hedgehog-apple:question2 already current
+[content-sync] hedgehog-apple:summary already current
+[content-sync] hedgehog-apple:offer already current
+[content-sync] hedgehog-apple:reoffer already current
+[content-sync] item khosogh-dzuk v10 "?????????? ??????????" 8138336 bytes
+[content-sync] khosogh-dzuk already current (index)
+[content-sync] khosogh-dzuk:intro already current
+[content-sync] khosogh-dzuk:question already current
+[content-sync] khosogh-dzuk:question1 already current
+[content-sync] khosogh-dzuk:question2 already current
+[content-sync] khosogh-dzuk:summary already current
+[content-sync] khosogh-dzuk:offer already current
+[content-sync] khosogh-dzuk:reoffer already current
+[content-sync] item little-cloud v3 "???????????? ????????????" 514133 bytes
+[content-sync] little-cloud already current (index)
+[content-sync] little-cloud:intro already current
+[content-sync] little-cloud:question already current
+[content-sync] little-cloud:question1 already current
+[content-sync] little-cloud:question2 already current
+[content-sync] little-cloud:summary already current
+[content-sync] little-cloud:offer already current
+[content-sync] little-cloud:reoffer already current
+[content-sync] item pochat-aghves v9 "?????????? ????????????" 5460680 bytes
+[content-sync] pochat-aghves already current (index)
+[content-sync] pochat-aghves:intro already current
+[content-sync] pochat-aghves:question already current
+[content-sync] pochat-aghves:question1 already current
+[content-sync] pochat-aghves:question2 already current
+[content-sync] pochat-aghves:summary already current
+[content-sync] pochat-aghves:offer already current
+[content-sync] pochat-aghves:reoffer already current
+[content-sync] item princess-and-pea v6 "?????????????????????????? ?? ????????????????????????" 1611903 bytes
+[content-sync] princess-and-pea already current (index)
+[content-sync] princess-and-pea:intro already current
+[content-sync] princess-and-pea:question already current
+[content-sync] princess-and-pea:question1 already current
+[content-sync] princess-and-pea:question2 already current
+[content-sync] princess-and-pea:summary already current
+[content-sync] princess-and-pea:offer already current
+[content-sync] princess-and-pea:reoffer already current
+[content-sync] item sutasan v6 "??????????????????" 1969258 bytes
+[content-sync] sutasan already current (index)
+[content-sync] sutasan:intro download 12% (12288/96592)
+[content-sync] sutasan:intro download 21% (20511/96592)
+[content-sync] sutasan:intro download 30% (29359/96592)
+[content-sync] sutasan:intro download 40% (39167/96592)
+[content-sync] sutasan:intro download 52% (50543/96592)
+[content-sync] sutasan:intro download 60% (58735/96592)
+[content-sync] sutasan:intro download 73% (71023/96592)
+[content-sync] sutasan:intro download 82% (79215/96592)
+[content-sync] sutasan:intro download 90% (87407/96592)
+[content-sync] sutasan:intro download 100% (96592/96592)
+[content-sync] sutasan:intro sha256 ok
+[content-sync] moved /tmp/sutasan-v6-intro.mp3.part -> /stories/sutasan-v6-intro.mp3
+[content-sync] sutasan:question already current
+[content-sync] sutasan:question1 already current
+[content-sync] sutasan:question2 already current
+[content-sync] sutasan:summary already current
+[content-sync] sutasan:offer already current
+[content-sync] sutasan:reoffer download 10% (8192/75276)
+[content-sync] sutasan:reoffer download 23% (17679/75276)
+[content-sync] sutasan:reoffer download 35% (26527/75276)
+[content-sync] sutasan:reoffer download 40% (30623/75276)
+[content-sync] sutasan:reoffer download 50% (37824/75276)
+[content-sync] sutasan:reoffer download 61% (46016/75276)
+[content-sync] sutasan:reoffer download 72% (54560/75276)
+[content-sync] sutasan:reoffer download 84% (63712/75276)
+[content-sync] sutasan:reoffer download 90% (68464/75276)
+[content-sync] sutasan:reoffer download 100% (75276/75276)
+[content-sync] sutasan:reoffer sha256 ok
+[content-sync] moved /tmp/sutasan-v6-reoffer.mp3.part -> /stories/sutasan-v6-reoffer.mp3
+[content-sync] item sutlik-orskan v9 "?????????????? ??????????????" 3356047 bytes
+[content-sync] sutlik-orskan already current (index)
+[content-sync] sutlik-orskan:intro already current
+[content-sync] sutlik-orskan:question already current
+[content-sync] sutlik-orskan:question1 already current
+[content-sync] sutlik-orskan:question2 already current
+[content-sync] sutlik-orskan:summary already current
+[content-sync] sutlik-orskan:offer already current
+[content-sync] sutlik-orskan:reoffer already current
+[content-sync] item three-piglets v6 "???????? ????????????????????" 2078973 bytes
+[content-sync] three-piglets already current (index)
+[content-sync] three-piglets:intro already current
+[content-sync] three-piglets:question already current
+[content-sync] three-piglets:question1 already current
+[content-sync] three-piglets:question2 already current
+[content-sync] three-piglets:summary already current
+[content-sync] three-piglets:offer already current
+[content-sync] three-piglets:reoffer already current
+[content-sync] item ulik v12 "????????????" 2631933 bytes
+[content-sync] ulik already current (index)
+[content-sync] ulik:intro already current
+[content-sync] ulik:question already current
+[content-sync] ulik:question1 already current
+[content-sync] ulik:question2 already current
+[content-sync] ulik:summary already current
+[content-sync] ulik:offer already current
+[content-sync] ulik:reoffer already current
+[content-sync] v:say-again download 18% (8192/43511)
+[content-sync] v:say-again download 28% (12288/43511)
+[content-sync] v:say-again download 37% (16384/43511)
+[content-sync] v:say-again download 47% (20511/43511)
+[content-sync] v:say-again download 56% (24607/43511)
+[content-sync] v:say-again download 65% (28703/43511)
+[content-sync] v:say-again download 75% (32799/43511)
+[content-sync] v:say-again download 84% (36895/43511)
+[content-sync] v:say-again download 94% (40991/43511)
+[content-sync] v:say-again download 100% (43511/43511)
+[content-sync] v:say-again sha256 ok
+[content-sync] moved /tmp/v-say-again-v1.mp3.part -> /voice/say-again-v1.mp3
+[content-sync] voice summary offered=42 already=41 downloaded=1 failed=0 voice_active=42
+[content-sync] games phase B: 0 to download, heap=51888
+[content-sync] games summary offered=104 invalid=0 already=104 downloaded=0 failed=0 truncated=0 carried=0 games_active=104
+[content-sync] index written
+[content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=42 music=0
+[content-sync] summary manifest_items=10 accepted_items=10 invalid_items=0 duplicate_items=0 disabled_items=0 truncated_items=0 already_current=10 downloaded=0 failed=0 carried_forward=0 active_index_items=10 index_written=1
+[content-sync] heap after=51888
+[content-sync] PASS
+[content-sync] status=ok error= streak=0 next in 21600s
+[alive] ms=238368 heap=96032 psram=7860304 wifi=3 ip=192.168.1.24 rssi=-65 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=243376 heap=96092 psram=7860424 wifi=3 ip=192.168.1.24 rssi=-66 btn=UP
+[alive] ms=248381 heap=96092 psram=7860424 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=253389 heap=96040 psram=7860424 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=258394 heap=96092 psram=7860424 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=263394 heap=96092 psram=7860424 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=268397 heap=96092 psram=7860424 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=273406 heap=96040 psram=7860456 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=278408 heap=96092 psram=7860456 wifi=3 ip=192.168.1.24 rssi=-66 btn=UP
+[alive] ms=283413 heap=96092 psram=7860456 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=288418 heap=96092 psram=7860456 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=293426 heap=96092 psram=7860456 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=298434 heap=96092 psram=7860456 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=303443 heap=96092 psram=7860424 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=308445 heap=96092 psram=7860424 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=313450 heap=96040 psram=7860424 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=318453 heap=96092 psram=7860424 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=323453 heap=96092 psram=7860424 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=328460 heap=96092 psram=7860424 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=333469 heap=96092 psram=7860712 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=338473 heap=96092 psram=7860968 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=343480 heap=96092 psram=7860968 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=348480 heap=96092 psram=7860968 wifi=3 ip=192.168.1.24 rssi=-66 btn=UP
+[alive] ms=353484 heap=96040 psram=7860968 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=358492 heap=96092 psram=7861224 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=363493 heap=96092 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=368497 heap=96092 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=373505 heap=96092 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=378506 heap=96092 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-66 btn=UP
+[alive] ms=383512 heap=96092 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=388517 heap=96092 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-66 btn=UP
+[alive] ms=393524 heap=96040 psram=7861224 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=398525 heap=96092 psram=7861224 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=403529 heap=96092 psram=7861224 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=408529 heap=96092 psram=7861224 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=413538 heap=96092 psram=7861224 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=418544 heap=96092 psram=7861224 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=423550 heap=96092 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=428557 heap=96092 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=433562 heap=96092 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=438562 heap=96092 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=443570 heap=96092 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-67 btn=UP
+[alive] ms=448574 heap=96092 psram=7861192 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP
+[alive] ms=453583 heap=96092 psram=7861224 wifi=3 ip=192.168.1.24 rssi=-66 btn=UP
+[alive] ms=458585 heap=96092 psram=7861224 wifi=3 ip=192.168.1.24 rssi=-68 btn=UP

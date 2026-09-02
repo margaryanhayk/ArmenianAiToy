@@ -1,0 +1,286 @@
+[welcome] ask ask-sgrc
+[state] 3 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=26022 heap=101352 psram=7861440 wifi=3 ip=192.168.1.10 rssi=-61 btn=UP
+[ota] boot poll (fw=1.3.3 build=hold-to-menu board=areg-s3-n8 partition=app0)
+[content-sync] bench fw built Aug 30 2026 16:07:28
+[content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+[sd-selftest] /stories/khosogh-dzuk-v10.mp3 pass1=8138336 B 1308 KB/s pass2=8138336 B 1310 KB/s
+[sd-selftest] PASS -- both reads identical (6da54b89b894...)
+[alive] ms=42277 heap=100900 psram=7861152 wifi=3 ip=192.168.1.10 rssi=-66 btn=UP
+[alive] ms=47278 heap=100900 psram=7861152 wifi=3 ip=192.168.1.10 rssi=-62 btn=UP
+[alive] ms=52282 heap=100900 psram=7861152 wifi=3 ip=192.168.1.10 rssi=-61 btn=UP
+[alive] ms=57287 heap=100900 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-63 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=63002 heap=100852 psram=7860756 wifi=3 ip=192.168.1.10 rssi=-67 btn=UP
+[button] raw=DOWN
+[button] pressed
+[button] raw=UP
+[button] press -- opening the menu
+[welcome] ask ask-sgrc
+[state] 0 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] RED -> suggest
+[welcome] offering from 10 already-heard stories
+[state] 3 -> 3
+[story] SD open: /stories/sutasan-v6-reoffer.mp3 @ 0
+[story] SD file is not MP3 (corrupt/wrong file): /stories/sutasan-v6-reoffer.mp3 -- refusing to decode
+[story] removed the bad file; it will re-download on the next sync
+[welcome] listening (yesno)
+[welcome] no answer ??? closing quietly
+[welcome] playing chosen story sutasan
+[story] source = SD (cache)
+[state] 3 -> 3
+[story] intro clip (/stories/sutasan-v6-intro.mp3)
+[story] SD open: /stories/sutasan-v6-intro.mp3 @ 0
+[story] SD file is not MP3 (corrupt/wrong file): /stories/sutasan-v6-intro.mp3 -- refusing to decode
+[story] removed the bad file; it will re-download on the next sync
+[state] 3 -> 3
+[story] SD play from byte 0
+[story] SD open: /stories/sutasan-v6.mp3 @ 0
+[story] SD end interrupted=false
+[story-report] started sutasan (sd) key=b49-1 queued=1
+[story-report] finished ??? event closed
+[state] 3 -> 3
+[post] summary/conclusion (/stories/sutasan-v6-summary.mp3)
+[story] SD open: /stories/sutasan-v6-summary.mp3 @ 0
+[story] SD end interrupted=false
+[state] 3 -> 3
+[post] question 1 (/stories/sutasan-v6-question1.mp3)
+[story] SD open: /stories/sutasan-v6-question1.mp3 @ 0
+[story] SD end interrupted=false
+[post] listening for answer 1 (press & hold to talk)
+[post] no answer in window; closing quietly
+[story] finished ??? press to play again
+[state] 3 -> 0
+[state] 0 -> 0
+[alive] ms=115011 heap=100888 psram=7860928 wifi=3 ip=192.168.1.10 rssi=-65 btn=UP
+[story-report] uploaded 1 event(s), 0 still queued
+[menu] activity ended ??? asking what next (chain=1)
+[welcome] ask ask-sgrc
+[state] 0 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[button] raw=DOWN
+[state] 3 -> 1
+[audio] record_begin
+[audio] i2s_new_channel err=0/ESP_OK
+[audio] i2s_channel_init_std_mode err=0/ESP_OK
+[audio] i2s_channel_enable err=0/ESP_OK
+[audio] record_end bytes=14848
+[state] 1 -> 2
+[audio] earcon_begin
+[audio] earcon_end
+[welcome] intent=unknown
+[state] 2 -> 3
+[story] SD open: /voice/say-again-v1.mp3 @ 0
+[story] SD file is not MP3 (corrupt/wrong file): /voice/say-again-v1.mp3 -- refusing to decode
+[story] removed the bad file; it will re-download on the next sync
+[welcome] listening (mode)
+[button] raw=UP
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=150969 heap=100888 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-59 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=155972 heap=100888 psram=7860928 wifi=3 ip=192.168.1.10 rssi=-62 btn=UP
+[alive] ms=160977 heap=100888 psram=7860928 wifi=3 ip=192.168.1.10 rssi=-58 btn=UP
+[alive] ms=165980 heap=100888 psram=7860928 wifi=3 ip=192.168.1.10 rssi=-61 btn=UP
+[alive] ms=170988 heap=100888 psram=7860928 wifi=3 ip=192.168.1.10 rssi=-61 btn=UP
+[alive] ms=175994 heap=100888 psram=7860928 wifi=3 ip=192.168.1.10 rssi=-60 btn=UP
+[content-sync] starting
+[content-sync] heap before=100888
+[content-sync] manifest bytes=-1 heap parse 56656->56708 psram=7788604
+[content-sync] manifest status=200 stories=10 introEnabled=1 music=0 musicEnabled=0 voice=42 games=104 modes=1111 pauses=1 variants=1
+[content-sync] index parse FAILED ??? previous contents UNKNOWN (cached MP3s untouched)
+[content-sync] item anban-huri v9 "?????????? ????????????" 5560991 bytes
+[content-sync] anban-huri already cached PASS (hashed)
+[content-sync] anban-huri:intro download 12% (12288/100354)
+[content-sync] anban-huri:intro download 20% (20510/100354)
+[content-sync] anban-huri:intro download 31% (31278/100354)
+[content-sync] anban-huri:intro download 41% (41694/100354)
+[content-sync] anban-huri:intro download 52% (52766/100354)
+[content-sync] anban-huri:intro download 60% (60958/100354)
+[content-sync] anban-huri:intro download 72% (73246/100354)
+[content-sync] anban-huri:intro download 81% (81438/100354)
+[content-sync] anban-huri:intro download 93% (93726/100354)
+[content-sync] anban-huri:intro download 100% (100354/100354)
+[content-sync] anban-huri:intro sha256 ok
+[content-sync] moved /tmp/anban-huri-v9-intro.mp3.part -> /stories/anban-huri-v9-intro.mp3
+[content-sync] anban-huri:question download 15% (8192/53960)
+[content-sync] anban-huri:question download 22% (12288/53960)
+[content-sync] anban-huri:question download 30% (16415/53960)
+[content-sync] anban-huri:question download 45% (24607/53960)
+[content-sync] anban-huri:question download 53% (29055/53960)
+[content-sync] anban-huri:question download 61% (33151/53960)
+[content-sync] anban-huri:question download 76% (41343/53960)
+[content-sync] anban-huri:question download 84% (45439/53960)
+[content-sync] anban-huri:question download 91% (49535/53960)
+[content-sync] anban-huri:question download 100% (53960/53960)
+[content-sync] anban-huri:question sha256 ok
+[content-sync] moved /tmp/anban-huri-v9-question.mp3.part -> /stories/anban-huri-v9-question.mp3
+[content-sync] anban-huri:question1 download 16% (8192/50199)
+[content-sync] anban-huri:question1 download 24% (12288/50199)
+[content-sync] anban-huri:question1 download 32% (16415/50199)
+[content-sync] anban-huri:question1 download 40% (20511/50199)
+[content-sync] anban-huri:question1 download 57% (28703/50199)
+[content-sync] anban-huri:question1 download 65% (32799/50199)
+[content-sync] anban-huri:question1 download 78% (39167/50199)
+[content-sync] anban-huri:question1 download 86% (43263/50199)
+[content-sync] anban-huri:question1 download 94% (47359/50199)
+[content-sync] anban-huri:question1 download 100% (50199/50199)
+[content-sync] anban-huri:question1 sha256 ok
+[content-sync] moved /tmp/anban-huri-v9-question1.mp3.part -> /stories/anban-huri-v9-question1.mp3
+[content-sync] anban-huri:question2 download 16% (8192/48318)
+[content-sync] anban-huri:question2 download 25% (12288/48318)
+[content-sync] anban-huri:question2 download 33% (16415/48318)
+[content-sync] anban-huri:question2 download 42% (20511/48318)
+[content-sync] anban-huri:question2 download 50% (24607/48318)
+[content-sync] anban-huri:question2 download 60% (29055/48318)
+[content-sync] anban-huri:question2 download 75% (36560/48318)
+[content-sync] anban-huri:question2 download 84% (40656/48318)
+[content-sync] anban-huri:question2 download 92% (44752/48318)
+[content-sync] anban-huri:question2 download 100% (48318/48318)
+[content-sync] anban-huri:question2 sha256 ok
+[content-sync] moved /tmp/anban-huri-v9-question2.mp3.part -> /stories/anban-huri-v9-question2.mp3
+[content-sync] anban-huri:summary download 11% (20510/186244)
+[content-sync] anban-huri:summary download 20% (38862/186244)
+[content-sync] anban-huri:summary download 31% (59342/186244)
+[content-sync] anban-huri:summary download 40% (74558/186244)
+[content-sync] anban-huri:summary download 50% (93822/186244)
+[content-sync] anban-huri:summary download 61% (114654/186244)
+[content-sync] anban-huri:summary download 70% (131038/186244)
+[content-sync] anban-huri:summary download 81% (151358/186244)
+[content-sync] anban-huri:summary download 90% (167742/186244)
+[content-sync] anban-huri:summary download 100% (186244/186244)
+[content-sync] anban-huri:summary sha256 ok
+[content-sync] moved /tmp/anban-huri-v9-summary.mp3.part -> /stories/anban-huri-v9-summary.mp3
+[content-sync] anban-huri:offer download 12% (8192/65872)
+[content-sync] anban-huri:offer download 24% (16384/65872)
+[content-sync] anban-huri:offer download 31% (20511/65872)
+[content-sync] anban-huri:offer download 43% (28703/65872)
+[content-sync] anban-huri:offer download 55% (36639/65872)
+[content-sync] anban-huri:offer download 60% (40127/65872)
+[content-sync] anban-huri:offer download 73% (48319/65872)
+[content-sync] anban-huri:offer download 85% (56511/65872)
+[content-sync] anban-huri:offer download 92% (60607/65872)
+[content-sync] anban-huri:offer download 100% (65872/65872)
+[content-sync] anban-huri:offer sha256 ok
+[content-sync] story anban-huri:offer FAILED (rename_failed)
+[content-sync] story anban-huri:reoffer FAILED (sd_write_failed)
+[content-sync] item hedgehog-apple v3 "???????????? ???? ????????????" 613817 bytes
+[content-sync] hedgehog-apple already cached PASS (hashed)
+[content-sync] hedgehog-apple:intro connect failed (-7) ??? resetting TLS, retrying
+[content-sync] story hedgehog-apple:intro FAILED (sd_write_failed)
+[content-sync] hedgehog-apple:question connect failed (-7) ??? resetting TLS, retrying
+[content-sync] hedgehog-apple:question download 14% (8192/57722)
+[content-sync] hedgehog-apple:question download 21% (12288/57722)
+[boot] SD mounted; offline narration /stories/anban-huri/narratiESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x2b (SPI_FAST_FLASH_BOOT)
+Saved PC:0x420efa0f
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x116c
+load:0x403c8700,len:0xc2c
+load:0x403cb700,len:0x3108
+entry 0x403c88b8
+
+[boot] AregVoiceMvp starting
+[boot] backend = https://armenianaitoy-production.up.railway.app
+[net] TLS: verifying (ISRG Root X1 pinned)
+[wifi] credentials already in NVS ??? burn skipped
+[boot] reset_reason=11/UNKNOWN
+[boot] diag_boot_counter=0 (cold)
+[boot] previous_step=(none)
+[boot] backend=https://armenianaitoy-production.up.railway.app/api/chat/audio
+[boot] pins button=18 led=48
+[boot] mic_i2s bck=4 ws=5 sd=6
+[boot] amp_i2s bck=15 lrc=16 din=7
+E (226) task_wdt: esp_task_wdt_init(517): TWDT already initialized
+[boot] task watchdog enabled (30s)
+[button] pin=18 resting=UP
+[volume] gain 0.86 (2770 mV)
+[boot] sd_spi cs=10 sck=12 mosi=11 miso=13
+[sd] mounted; type=3 size=7680MB
+[boot] SD mounted; offline narration /stories/anban-huri/narration.mp3 = absent
+[content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=42 music=0
+[wifi] using provisioned creds (ssid=OVIO_0242850)
+[wifi] connecting to OVIO_0242850 ...
+[wifi] event=connected
+[wifi] event=got_ip
+[wifi] ip=192.168.1.10
+[boot] ready ??? press button to speak
+[state] 0 -> 0
+[ota] running fw=1.3.3 partition=app0 img_state=undefined ota_state=idle (pending_ver=- cmd=- boots=0)
+[device] using provisioned identity (id=248729da-08d8-4144-afc0-e6af8a3fe471)
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[welcome] greeting greet-10
+[state] 0 -> 3
+[story] SD open: /voice/greet-10-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] ask ask-sgrc
+[state] 3 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[button] raw=DOWN
+[state] 3 -> 1
+[audio] record_begin
+[audio] i2s_new_channel err=0/ESP_OK
+[audio] i2s_channel_init_std_mode err=0/ESP_OK
+[audio] i2s_channel_enable err=0/ESP_OK
+[audio] record_end bytes=5632
+[welcome] answer too short (176 ms)
+[state] 1 -> 0
+[alive] ms=19785 heap=101304 psram=7861408 wifi=3 ip=192.168.1.10 rssi=-59 btn=UP
+[ota] boot poll (fw=1.3.3 build=hold-to-menu board=areg-s3-n8 partition=app0)
+[content-sync] resuming with fail streak=1 ??? first attempt deferred to ms>=480000
+[content-sync] bench fw built Aug 30 2026 16:07:28
+[content-sync] enabled; waiting for WiFi+SD; will start at ms>=180000
+[sd-selftest] /stories/khosogh-dzuk-v10.mp3 pass1=8138336 B 1309 KB/s pass2=2682880 B 1003 KB/s
+[sd-selftest] FAIL -- SAME FILE READ TWICE GAVE DIFFERENT BYTES.
+[sd-selftest] The SD read path is corrupting data (wiring, card, or its power).
+[sd-selftest] pass1=6da54b89b894a3db89774245aa90781ead61b505125670cf6e3f51a08b1bf773
+[sd-selftest] pass2=8b5b3a477f5a7a6458f3d6b5ce410d290af2c965a181136b3b08d2b468c396d2
+[alive] ms=31959 heap=100900 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-64 btn=DOWN
+[button] raw=UP
+[alive] ms=36963 heap=100900 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-61 btn=UP
+[button] raw=DOWN
+[button] pressed
+[button] raw=UP
+[button] press -- opening the menu
+[welcome] ask ask-sgrc
+[state] 0 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] RED -> suggest
+[welcome] offering from 9 already-heard stories
+[welcome] no reoffer clip for sutlik-orskan ??? playing it
+[story-select] sutlik-orskan present but not usable
+[welcome] chosen story sutlik-orskan did not resolve ??? normal selection
+[story-select] sutlik-orskan present but not usable
+[story] selected sutlik-orskan but it did not resolve ??? using fallback chain
+[story] source = Wi-Fi stream
+[state] 3 -> 3
+[story] play from beginning (token=0)
+[story] stream open: https://armenianaitoy-production.up.railway.app/api/story-audio/anban-huri
+[story] http stream open failed (non-200)
+[story] finished ??? press to play again
+[state] 3 -> 0
+[state] 0 -> 0
+[alive] ms=63275 heap=100900 psram=7860888 wifi=3 ip=192.168.1.10 rssi=-64 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[menu] activity ended ??? asking what next (chain=1)
+[welcome] ask ask-sgrc
+[state] 0 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)

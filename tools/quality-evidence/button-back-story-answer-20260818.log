@@ -1,0 +1,228 @@
+﻿.mp3 @ 0
+[story] SD end interrupted=false
+[games] mind-reader: no verdict ??? asking once more
+[story] SD open: /games/mind-reader/g-1000.mp3 @ 0
+[story] SD end interrupted=false
+[games] mind-reader: guessed wrong ??? child wins
+[story] SD open: /games/mind-reader/lose.mp3 @ 0
+[story] SD end interrupted=false
+[menu] ask clip missing ??? not opening the menu
+[alive] ms=104196 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-75
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=109196 heap=101468 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-77
+[alive] ms=114204 heap=101468 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-80
+[alive] ms=119210 heap=101468 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-76
+[alive] ms=124213 heap=101468 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-76
+[alive] ms=129214 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-78
+[alive] ms=134217 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-81
+[alive] ms=139219 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=144226 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-75
+[alive] ms=149226 heap=101468 psram=7861480 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=154233 heap=101468 psram=7861480 wifi=3 ip=192.168.1.11 rssi=-74
+[alive] ms=159242 heap=101468 psram=7861480 wifi=3 ip=192.168.1.11 rssi=-72
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=167231 heap=101416 psram=7861052 wifi=3 ip=192.168.1.11 rssi=-75
+[alive] ms=172237 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-75
+[alive] ms=177243 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-69
+[content-sync] starting
+[content-sync] heap before=101468
+[content-sync] manifest bytes=-1 heap parse 57236->57284 psram=7788592
+[content-sync] manifest status=200 stories=10 introEnabled=1 music=0 musicEnabled=0 voice=42 games=104 modes=1111 pauses=1 variants=1
+[content-sync] index v7 loaded entries=10 music=0 voice=42
+[content-sync] item anban-huri v9 "?????????? ????????????" 5560991 bytes
+[content-sync] anban-huri already current (index)
+[content-sync] anban-huri:intro already current
+[content-sync] anban-huri:question already current
+[content-sync] anban-huri:question1 already current
+[content-sync] anban-huri:question2 already current
+[content-sync] anban-huri:summary already current
+[content-sync] anban-huri:offer already current
+[content-sync] anban-huri:reoffer already current
+[content-sync] item hedgehog-apple v3 "???????????? ???? ????????????" 613817 bytes
+[content-sync] hedgehog-apple already current (index)
+[content-sync] hedgehog-apple:intro already current
+[content-sync] hedgehog-apple:question already current
+[content-sync] hedgehog-apple:question1 already current
+[content-sync] hedgehog-apple:question2 already current
+[content-sync] hedgehog-apple:summary already current
+[content-sync] hedgehog-apple:offer already current
+[content-sync] hedgehog-apple:reoffer already current
+[content-sync] item khosogh-dzuk v10 "?????????? ??????????" 8138336 bytes
+[content-sync] khosogh-dzuk already current (index)
+[content-sync] khosogh-dzuk:intro already current
+[content-sync] khosogh-dzuk:question already current
+[content-sync] khosogh-dzuk:question1 already current
+[content-sync] khosogh-dzuk:question2 already current
+[content-sync] khosogh-dzuk:summary already current
+[content-sync] khosogh-dzuk:offer already current
+[content-sync] khosogh-dzuk:reoffer already current
+[content-sync] item little-cloud v3 "???????????? ????????????" 514133 bytes
+[content-sync] little-cloud already current (index)
+[content-sync] little-cloud:intro already current
+[content-sync] little-cloud:question already current
+[content-sync] little-cloud:question1 already current
+[content-sync] little-cloud:question2 already current
+[content-sync] little-cloud:summary already current
+[content-sync] little-cloud:offer already current
+[content-sync] little-cloud:reoffer already current
+[content-sync] item pochat-aghves v9 "?????????? ????????????" 5460680 bytes
+[content-sync] pochat-aghves already current (index)
+[content-sync] pochat-aghves:intro already current
+[content-sync] pochat-aghves:question already current
+[content-sync] pochat-aghves:question1 already current
+[content-sync] pochat-aghves:question2 already current
+[content-sync] pochat-aghves:summary already current
+[content-sync] pochat-aghves:offer already current
+[content-sync] pochat-aghves:reoffer already current
+[content-sync] item princess-and-pea v6 "?????????????????????????? ?? ????????????????????????" 1611903 bytes
+[content-sync] princess-and-pea already current (index)
+[content-sync] princess-and-pea:intro already current
+[content-sync] princess-and-pea:question already current
+[content-sync] princess-and-pea:question1 already current
+[content-sync] princess-and-pea:question2 already current
+[content-sync] princess-and-pea:summary already current
+[content-sync] princess-and-pea:offer already current
+[content-sync] princess-and-pea:reoffer already current
+[content-sync] item sutasan v6 "??????????????????" 1969258 bytes
+[content-sync] sutasan already current (index)
+[content-sync] sutasan:intro already current
+[content-sync] sutasan:question already current
+[content-sync] sutasan:question1 already current
+[content-sync] sutasan:question2 already current
+[content-sync] sutasan:summary already current
+[content-sync] sutasan:offer already current
+[content-sync] sutasan:reoffer already current
+[content-sync] item sutlik-orskan v9 "?????????????? ??????????????" 3356047 bytes
+[content-sync] sutlik-orskan already current (index)
+[content-sync] sutlik-orskan:intro already current
+[content-sync] sutlik-orskan:question already current
+[content-sync] sutlik-orskan:question1 already current
+[content-sync] sutlik-orskan:question2 already current
+[content-sync] sutlik-orskan:summary already current
+[content-sync] sutlik-orskan:offer already current
+[content-sync] sutlik-orskan:reoffer already current
+[content-sync] item three-piglets v6 "???????? ????????????????????" 2078973 bytes
+[content-sync] three-piglets already current (index)
+[content-sync] three-piglets:intro already current
+[content-sync] three-piglets:question already current
+[content-sync] three-piglets:question1 already current
+[content-sync] three-piglets:question2 already current
+[content-sync] three-piglets:summary already current
+[content-sync] three-piglets:offer already current
+[content-sync] three-piglets:reoffer already current
+[content-sync] item ulik v12 "????????????" 2631933 bytes
+[content-sync] ulik already current (index)
+[content-sync] ulik:intro already current
+[content-sync] ulik:question already current
+[content-sync] ulik:question1 already current
+[content-sync] ulik:question2 already current
+[content-sync] ulik:summary already current
+[content-sync] ulik:offer already current
+[content-sync] ulik:reoffer already current
+[content-sync] voice summary offered=42 already=42 downloaded=0 failed=0 voice_active=42
+[content-sync] games phase B: 0 to download, heap=57284
+[content-sync] games summary offered=104 invalid=0 already=104 downloaded=0 failed=0 truncated=0 carried=0 games_active=104
+[content-sync] index written
+[content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=42 music=0
+[content-sync] summary manifest_items=10 accepted_items=10 invalid_items=0 duplicate_items=0 disabled_items=0 truncated_items=0 already_current=10 downloaded=0 failed=0 carried_forward=0 active_index_items=10 index_written=1
+[content-sync] heap after=57284
+[content-sync] PASS
+[content-sync] status=ok error= streak=0 next in 21600s
+[alive] ms=189610 heap=101420 psram=7860796 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=194610 heap=101468 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=199616 heap=101468 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=204617 heap=101468 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=209624 heap=101468 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=214632 heap=101468 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=219639 heap=101468 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-65
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=226819 heap=101420 psram=7860540 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=231825 heap=101468 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=236831 heap=101420 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=241840 heap=101468 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=246848 heap=101468 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=251851 heap=101468 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=256853 heap=101468 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=261862 heap=101468 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=266869 heap=101468 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-64
+[alive] ms=271876 heap=101468 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-64
+[alive] ms=276883 heap=101468 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=281890 heap=101420 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-65
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=286899 heap=101468 psram=7860540 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=291905 heap=101468 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-64
+[alive] ms=296911 heap=101468 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=301911 heap=101468 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-64
+[alive] ms=306916 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=311916 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=316923 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=321931 heap=101420 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=326938 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=331946 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-64
+[alive] ms=336951 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-64
+[alive] ms=341952 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-64
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=347151 heap=101420 psram=7860796 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=352153 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=357157 heap=101420 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=362166 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=367172 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=372173 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=377178 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=382186 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=387193 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=392202 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=397208 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=402215 heap=101420 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=410028 heap=101420 psram=7861052 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=415029 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=420033 heap=101420 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=425033 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=430040 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=435047 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=440056 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=445064 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=450070 heap=101420 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=455078 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=460087 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-73
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=468810 heap=101420 psram=7861052 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=473819 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-78
+[alive] ms=478826 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-78
+[alive] ms=483828 heap=101420 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-78
+[alive] ms=488831 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=493834 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=498835 heap=101420 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-79
+[alive] ms=503841 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72
+[volume] gain 0.15 (2 mV)
+[alive] ms=508850 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-79
+[alive] ms=513860 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=518867 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=523871 heap=101420 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-69
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[volume] gain 0.15 (0 mV)
+[alive] ms=528880 heap=101468 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-70
+[volume] gain 0.15 (0 mV)
+[alive] ms=533886 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=538886 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=543889 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=548891 heap=101420 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=553898 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-76
+[alive] ms=558904 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=563912 heap=101420 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=568921 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=573929 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72
+[alive] ms=578935 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=583942 heap=101468 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-72
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=588942 heap=101468 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=593950 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-71
+[volume] gain 2.87 (3149 mV)
+[volume] gain 0.15 (0 mV)
+[alive] ms=598955 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-66
+[volume] gain 2.87 (3149 mV)
+[alive] ms=603965 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-74
+[alive] ms=608965 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-69
+[volume] gain 0.15 (0 mV)
+[alive] ms=613970 heap=101468 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-68
