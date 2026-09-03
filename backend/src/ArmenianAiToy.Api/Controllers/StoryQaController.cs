@@ -1125,16 +1125,30 @@ public class StoryQaController : ControllerBase
         }
     }
 
-    /// <summary>Per-(story, question) cache of the authored reflection
-    /// CONCLUSION lines' TTS — fixed reviewed text, so each costs at most
-    /// one TTS call per process lifetime.</summary>
+    /// <summary>Per-(story, question, TEXT) cache of the authored reflection
+    /// CONCLUSION lines' TTS — each costs at most one TTS call per process
+    /// lifetime.
+    /// <para>
+    /// The text is part of the key, not just the (story, question) identity.
+    /// It used to be keyed on identity alone, on the reasoning that the text
+    /// was "fixed reviewed text" — which held until 2026-09-03, when the
+    /// owner's listen test found sutasan's conclusion stating the story's
+    /// wager backwards and it had to be rewritten. An identity-only key
+    /// serves the OLD audio for the rest of the process lifetime after such
+    /// an edit, so the toy would keep speaking the wrong line while the JSON
+    /// on disk read correctly — the worst shape of bug this repo knows, where
+    /// the fix looks applied and is not.
+    /// </para></summary>
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]>
         _reflectionConclusionAudio = new();
 
     private async Task<byte[]> GetReflectionConclusionAudioAsync(
         string storyId, int questionIndex, string conclusionText, CancellationToken ct)
     {
-        var key = storyId + "|" + questionIndex;
+        // The whole text, not a hash of it: these are one-sentence lines and a
+        // handful per story, so the memory is nothing, and it removes both
+        // collision risk and the per-process randomisation of string hashing.
+        var key = storyId + "|" + questionIndex + "|" + conclusionText;
         if (_reflectionConclusionAudio.TryGetValue(key, out var cached))
         {
             return cached;

@@ -289,9 +289,21 @@ foreach (var story in stories)
     // a story with no verified author gets the title-only intro — never
     // a guessed attribution. Summary prefers the B1 `lesson` text and
     // falls back to the reflectionText the stories always had.
-    var intro = story.Author is null
-        ? $"Հեքիաթ՝ «{story.Title}»։"
-        : $"Հեքիաթ՝ «{story.Title}»։ Հեղինակ՝ {story.Author}։";
+    // Three shapes, not two. A story with an author names them; a story
+    // nobody wrote names its ORIGIN instead of stopping after the title —
+    // the owner's 2026-09-03 listen test heard that silence on «Ուլիկը» and
+    // «Երեք խոզուկները» as unfinished, and he is right that a child is owed
+    // the same "where is this from" the other eight stories get. The origin
+    // leads the sentence rather than trailing it, because «Հեքիաթ՝ «X»։
+    // Ժողովրդական հեքիաթ։» says «հեքիաթ» twice in two short breaths.
+    // An in-project original still gets the title alone: it is neither
+    // authored-by-a-name nor folk, and claiming either would be false.
+    var intro = (story.Author, story.Origin) switch
+    {
+        (not null, _) => $"Հեքիաթ՝ «{story.Title}»։ Հեղինակ՝ {story.Author}։",
+        (null, not null) => $"{story.Origin}՝ «{story.Title}»։",
+        _ => $"Հեքիաթ՝ «{story.Title}»։",
+    };
     jobs.Add(($"{story.Id}--intro.mp3", $"{story.Id} intro", [intro]));
     // ALL the reflection questions, not just the first. Every story has
     // carried three since 2026-08-03 and this loop only ever rendered index 0,

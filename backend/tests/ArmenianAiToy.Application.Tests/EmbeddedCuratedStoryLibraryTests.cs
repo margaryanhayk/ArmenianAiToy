@@ -119,6 +119,51 @@ public class EmbeddedCuratedStoryLibraryTests
         Assert.Equal(2, story.Segments.Count);
     }
 
+    // ── origin: provenance for a story nobody wrote ──────────────────
+    // Added 2026-09-03 after the owner's listen test heard the two folk
+    // tales' intros stop after the title, with nothing where the other
+    // eight stories name an author.
+
+    [Fact]
+    public void Parser_AcceptsOrigin_WhenThereIsNoAuthor()
+    {
+        var json = ValidJson.Replace(
+            "\"title\": \"Փորձնական վերնագիր\",",
+            "\"title\": \"Փորձնական վերնագիր\", \"origin\": \"Ժողովրդական հեքիաթ\",");
+
+        var story = StoryFileParser.Parse(json, "test");
+
+        Assert.Equal("Ժողովրդական հեքիաթ", story.Origin);
+        Assert.Null(story.Author);
+    }
+
+    [Fact]
+    public void Parser_RejectsBlankOrigin()
+    {
+        var json = ValidJson.Replace(
+            "\"title\": \"Փորձնական վերնագիր\",",
+            "\"title\": \"Փորձնական վերնագիր\", \"origin\": \"   \",");
+
+        var ex = Assert.Throws<InvalidDataException>(() => StoryFileParser.Parse(json, "test"));
+        Assert.Contains("origin is present but blank", ex.Message);
+    }
+
+    // KEYSTONE. A story is authored or it is not. Both fields set would mean
+    // a named author had also been called folk -- one of the two is then a
+    // false statement, and the intro composer would be picking which to
+    // speak to a child.
+    [Fact]
+    public void Parser_RejectsAuthorAndOriginTogether()
+    {
+        var json = ValidJson.Replace(
+            "\"title\": \"Փորձնական վերնագիր\",",
+            "\"title\": \"Փորձնական վերնագիր\", \"author\": \"Հովհաննես Թումանյան\", "
+                + "\"origin\": \"Ժողովրդական հեքիաթ\",");
+
+        var ex = Assert.Throws<InvalidDataException>(() => StoryFileParser.Parse(json, "test"));
+        Assert.Contains("mutually exclusive", ex.Message);
+    }
+
     [Fact]
     public void Parser_RejectsUnknownJsonField()
     {

@@ -78,10 +78,15 @@ def expected_text(kind, s):
     questions = s.get('reflectionQuestions') or []
     title = s.get('title', '')
     if kind == 'intro':
-        text = INTRO_STORY + ' ' + LQ + title + RQ + STOP
+        # Three branches, same as ElevenLabsRender/Program.cs: authored,
+        # folk (origin leads the sentence), or an in-project original that
+        # gets the title alone.
         if s.get('author'):
-            text += ' ' + INTRO_AUTHOR + ' ' + s['author'] + STOP
-        return text
+            return (INTRO_STORY + ' ' + LQ + title + RQ + STOP + ' '
+                    + INTRO_AUTHOR + ' ' + s['author'] + STOP)
+        if s.get('origin'):
+            return s['origin'] + '՝ ' + LQ + title + RQ + STOP
+        return INTRO_STORY + ' ' + LQ + title + RQ + STOP
     if kind == 'summary':
         return s.get('lesson') or s.get('reflectionText') or ''
     if kind == 'question':
@@ -95,6 +100,19 @@ def expected_text(kind, s):
     if kind == 'reoffer':
         return REOFFER_T.replace('{Title}', title)
     return ''
+
+
+def _intro_note(kind, story):
+    """Why an intro says what it says -- so an absent author reads as the
+    decision it is rather than as something missing. The owner flagged
+    exactly this silence on the two folk tales."""
+    if kind != 'intro' or story.get('author'):
+        return ''
+    if story.get('origin'):
+        return ('Nobody wrote this one, so the intro names its origin instead'
+                ' of an author. Re-recorded 2026-09-03.')
+    return ('An original written for this project: no author is named and none'
+            ' is invented -- an attribution spoken to a child is never guessed.')
 
 
 def collect():
@@ -116,10 +134,7 @@ def collect():
                 'label': label,
                 'role': role,
                 'text': expected_text(kind, story),
-                'note': ('This story has no verified author, so the intro names'
-                         ' none by design -- an attribution spoken to a child is'
-                         ' never guessed.')
-                        if kind == 'intro' and not story.get('author') else '',
+                'note': _intro_note(kind, story),
                 'src': 'data:audio/mpeg;base64,' + b64,
             })
             total += 1
@@ -469,10 +484,11 @@ def main():
         '  <h1>The clips a child hears</h1>\n'
         '  <p class="sub">' + str(total) + ' clips across ' + str(len(stories)) +
         ' stories. Tap play, compare against the words underneath, mark it.</p>\n'
-        '  <p class="sub" style="color:var(--flag)">Corrected 2026-09-03: the reference'
-        ' text under <b>intro</b>, <b>offer</b> and <b>re-offer</b> was mine and was'
-        ' wrong — it now comes from the same files the renderer used. Your marks'
-        ' are kept; those three rows per story are worth a second look.</p>\n'
+        '  <p class="sub" style="color:var(--flag)">Re-recorded 2026-09-03 after'
+        ' your review — 4 clips changed: <b>ulik</b> and <b>three-piglets</b>'
+        ' intro (they now say where the tale comes from), <b>princess-and-pea</b>'
+        ' Q3 and <b>sutasan</b> Q2 (wording fixed). Those four are worth a'
+        ' listen; everything else is unchanged.</p>\n'
         '  <div class="bar"><i></i></div>\n'
         '  <div class="stats">\n'
         '    <span><b id="nHeard">0</b> of <b id="nTotal">0</b> heard</span>\n'

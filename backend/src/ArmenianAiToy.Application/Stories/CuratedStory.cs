@@ -47,6 +47,13 @@ public sealed record CuratedStory(
     /// worse than none.</summary>
     public string? Author { get; init; }
 
+    /// <summary>Optional provenance for a story nobody wrote (Armenian,
+    /// e.g. «Ժողովրդական հեքիաթ»). The spoken intro uses it in place of the
+    /// author line, so a folk tale says where it comes from instead of
+    /// stopping after the title. Mutually exclusive with <see cref="Author"/>;
+    /// never set on an in-project original.</summary>
+    public string? Origin { get; init; }
+
     /// <summary>Optional parent-facing purpose (Armenian, one sentence).
     /// Library card only; not spoken.</summary>
     public string? Goal { get; init; }

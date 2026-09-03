@@ -37,6 +37,17 @@ internal sealed class StoryFileDto
     /// than none.</summary>
     public string? Author { get; init; }
 
+    /// <summary>Optional provenance for a story that has no author because
+    /// nobody wrote it (Armenian, e.g. «Ժողովրդական հեքիաթ»,
+    /// «Անգլիական ժողովրդական հեքիաթ»). Feeds the spoken intro, which
+    /// otherwise says the title and stops — the owner's 2026-09-03 listen
+    /// test caught that silence on the two folk tales and heard it as
+    /// unfinished. Only ever set where the file's own review notes support
+    /// it, and NEVER on an in-project original, where a folk-tale claim
+    /// would be false. Mutually exclusive with <see cref="Author"/>: a story
+    /// has one or the other, never both.</summary>
+    public string? Origin { get; init; }
+
     /// <summary>Optional parent-facing purpose of the story (Armenian,
     /// one sentence). Shown on the library card; not spoken.</summary>
     public string? Goal { get; init; }
@@ -177,6 +188,17 @@ internal static class StoryFileParser
         {
             throw Fail(sourceName, "author is present but blank (omit the field instead)");
         }
+        if (dto.Origin is not null && string.IsNullOrWhiteSpace(dto.Origin))
+        {
+            throw Fail(sourceName, "origin is present but blank (omit the field instead)");
+        }
+        // A story is authored or it is not. Carrying both would leave the
+        // intro composer choosing between two truths, and would mean a named
+        // author had also been called folk -- one of the two is then wrong.
+        if (dto.Author is not null && dto.Origin is not null)
+        {
+            throw Fail(sourceName, "author and origin are mutually exclusive (a story has one or the other)");
+        }
         if (dto.Goal is not null && string.IsNullOrWhiteSpace(dto.Goal))
         {
             throw Fail(sourceName, "goal is present but blank (omit the field instead)");
@@ -287,6 +309,7 @@ internal static class StoryFileParser
             dto.BedtimeSafe)
         {
             Author = dto.Author,
+            Origin = dto.Origin,
             Goal = dto.Goal,
             Lesson = dto.Lesson,
             Translations = dto.Translations?.ToDictionary(
