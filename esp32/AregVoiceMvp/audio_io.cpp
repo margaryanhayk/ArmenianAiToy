@@ -1121,8 +1121,13 @@ private:
     // is about to be closed or drained by HTTPClient::end()).
     bool next_chunk() {
         if (_saw_chunk) {                       // CRLF terminating the previous chunk
-            uint8_t crlf[2];
-            if (wait_read(crlf, 2) != 2) { _truncated = true; return false; }
+            // One byte at a time: wait_read() returns what is available,
+            // and the CR and LF can arrive in different TLS records. A
+            // two-byte read that came back with one would have ended the
+            // body a chunk early and cut the answer mid-word.
+            uint8_t c;
+            if (wait_read(&c, 1) != 1) { _truncated = true; return false; }
+            if (wait_read(&c, 1) != 1) { _truncated = true; return false; }
         }
         char line[24];
         size_t n = 0;

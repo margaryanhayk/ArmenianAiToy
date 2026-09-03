@@ -167,9 +167,19 @@ content_length)`, which decodes **that** body:
 
 ## What the backend must do for item 5
 
-**The firmware side is done and needs nothing further.** With the flag on, the
-device already accepts either wire shape. But the *saving* depends on the
-server, and the two ends must be flipped together:
+**DONE on both ends (2026-09-01).** The backend now streams `/api/chat/story-qa`
+chunked — answer audio on its first synthesized bytes, then pause + bridge
+(+ recap) in the same body — but ONLY when the request carries
+`X-Areg-Accept-Stream: 1`. The flag-on async upload sends that header
+(`s_qa_accept_stream`, set around its POST in `upload_question_task()`); the
+sync fallback path and every flag-off build do not, so they keep receiving the Content-Length body
+they require. Nothing else about the contract changed: the shape is negotiated
+per request exactly as the "Preferred" order below describes, and the
+paragraphs that follow are kept as the record of why. Not yet bench-run on the
+toy against the streaming backend (items 10–13 below are the checks).
+
+With the flag on, the device already accepts either wire shape. But the
+*saving* depends on the server, and the two ends must be flipped together:
 
 1. **As things stand today (endpoint unchanged):** `/api/chat/story-qa` composes
    the whole MP3, then sends it with a `Content-Length`. With the flag on, the
@@ -278,7 +288,7 @@ stack of the call that is decoding.
 - **Making heartbeat / OTA poll / content sync share one connection.** Would
   extend item 4's win to the first question of a session, but it touches the OTA
   machinery, which was out of scope.
-- **The `X-Areg-Accept-Stream` request header.** One line, but it only means
-  something once the backend has agreed to honour it.
+- ~~**The `X-Areg-Accept-Stream` request header.**~~ Done 2026-09-01, together
+  with the backend half that honours it.
 - **Bumping `AREG_FW_VERSION` or building a release image.** The owner owns the
   OTA release.

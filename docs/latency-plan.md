@@ -287,3 +287,96 @@ territory; we do not chase it at the cost of the safety ordering.
 Safety invariant unchanged: input moderation stays serial before the model;
 output moderation keeps gating what is returned (speculative TTS discarded on
 block). Streaming changes WHERE bytes wait, never what is allowed to speak.
+
+---
+
+## Part 5 — negotiated first-byte streaming on `story-qa` (2026-09-01, implemented)
+
+Step 1 of the Part 4 ranked plan (lever 2 of Part 2), done on both ends without a fleet-wide flag day. The
+firmware notes (`esp32/AregVoiceMvp/latency-firmware-notes.md` § "What the
+backend must do for item 5") had already named the contract; this is it.
+
+**Backend.** `POST /api/chat/story-qa` streams the answer audio on its first
+synthesized bytes — then pause + bridge (+ recap) in the same body, chunked —
+**only** when the request carries `X-Areg-Accept-Stream: 1`, the TTS provider
+implements `IStreamingAudioSynthesisService` (ElevenLabs), the answer is
+model-authored, and output moderation passed. Every other request keeps the
+buffered Content-Length body byte for byte (§1.4 is why). During output
+moderation the speculative act is opening the provider stream; not one byte is
+written before the classifier passes, and a blocked answer disposes the unread
+stream and speaks the canned fallback exactly as before (§1.5 still holds).
+Kill switch: `StoryQa:StreamAnswerAudio` (default true).
+
+**Firmware.** The flag-on (`AREG_QA_STREAM_PLAYBACK`) async upload sends the
+header; the sync fallback path and every flag-off build do not, because they
+read through `read_response_into()` (§1.4). The request stays HTTP/1.1 — the
+streaming reader already de-frames chunked bodies and treats a missing
+Content-Length *as* chunked, so the `useHTTP10(true)` that Part 4's row 1 suggested would have broken it (Kestrel answers HTTP/1.0 with an unframed body closed by the server) and was rejected.
+Compiled at the canonical FQBN, flag off (byte-identical) and flag on; **not
+flashed, not bench-run** — the toy was busy with hardware work.
+
+**Measured END TO END, every stage real (2026-09-02, after the environment's
+network policy was opened to `api.openai.com`).** The real API (`dotnet run`,
+Development, `AI:TtsProvider=elevenlabs`), a registered + claimed bench toy,
+a real Armenian question clip («Ո՞վ է փոքրիկ ամպիկը։», 29 KB MP3 rendered by
+ElevenLabs) posted as the child's recording, `gpt-4o-mini-transcribe` STT,
+GPT answer, both moderation calls, `eleven_v3` TTS. Six warm-ups, then four
+alternated pairs, `curl --no-buffer`, LittleCloud segment 0, every turn
+`answered` (QLen 18, ALen ~40):
+
+| Pair | buffered first byte | streamed first byte | streamed last byte | TTS stage (buffered → stream-open) |
+|---|---:|---:|---:|---|
+| 1 | 6.57 s | **2.81 s** | 4.09 s | 3377 → 633 ms |
+| 2 | 4.55 s | **2.35 s** | 3.34 s | 2804 → 786 ms |
+| 3 | 5.61 s | **2.47 s** | 4.77 s | 4081 → 681 ms |
+| 4 | 6.20 s | **3.21 s** | 4.95 s | 4058 → 728 ms |
+| mean | **5.73 s** | **2.71 s** | 4.29 s | |
+
+**~3.0 s off the child's wait for the first spoken byte, end to end.** The
+2.7 s that remain before the first byte are STT (0.5–1.1 s) + input
+moderation (0.1–0.3 s) + GPT (0.6–2.3 s) + output moderation (0.1–0.2 s) +
+the stream opening (~0.7 s) — none of which this slice touches. Buffered
+`X-Qa-Tts-Ms` (2.8–4.1 s) against streamed (0.6–0.8 s) is the mechanism
+itself, isolated. All eight bodies are clean MP3 with no chunk framing
+inside. `Content-Length` without the header, `Transfer-Encoding: chunked`
+with it.
+
+**Earlier the same day — LIVE ElevenLabs, OpenAI stages stubbed** (kept: it
+isolates the TTS half from STT/GPT variance). Real Kestrel, the
+production `ElevenLabsTtsSynthesisService` adapter, `eleven_v3`,
+`areg-storyteller`, a two-sentence Armenian answer (~85 chars), all five
+bridges pre-warmed, buffered and streamed requests alternated. STT / GPT /
+moderation stubbed (the org proxy blocks `api.openai.com`; those stages are
+identical on both paths and cancel out of the difference).
+
+| Pair | buffered first byte (= last byte) | streamed first byte | streamed last byte |
+|---|---:|---:|---:|
+| 1 | 5.07 s | **0.89 s** | 4.52 s |
+| 2 | 5.33 s | **1.50 s** | 5.37 s |
+| 3 | 4.37 s | **0.78 s** | 4.31 s |
+| 4 | 4.59 s | **0.82 s** | 4.69 s |
+| mean | **4.84 s** | **1.00 s** | 4.72 s |
+
+**~3.8 s off the child's wait for the first spoken byte**, at the top of the
+2–4 s Part 2 estimated. Total wall clock is unchanged (the audio still has
+to be synthesized); only the silence before it starts is gone. All eight
+bodies decode as clean MP3 with no chunk framing inside them (388 ± 20
+frame syncs, zero CRLF-hex hits), i.e. Kestrel's chunked encoding is
+correct on the wire and a de-framing client sees pure audio.
+
+**Earlier, stub-TTS run (kept as the server-overhead control).** Stub answer TTS: first byte at 1.0 s, last at 3.0 s, for
+both the buffered and the streaming call, so the two paths differ only in when
+bytes leave the server. STT / moderation / GPT immediate; bridge pre-cached.
+
+| Request | Framing | `curl --no-buffer` time-to-first-byte | total | body |
+|---|---|---:|---:|---|
+| no header | `Content-Length: 82400` | **3.00 s** (×3: 3.034 / 3.005 / 3.002) | 3.00 s | 82 400 B |
+| `X-Areg-Accept-Stream: 1` | `Transfer-Encoding: chunked` | **1.17 s** (×3: 1.173 / 1.173 / 1.171) | 3.01 s | 82 400 B, `cmp` identical |
+| header + buffered provider | `Content-Length: 82400` | 3.00 s | 3.00 s | buffered |
+
+The streamed first byte lands at 1.17 s because the stub releases its first
+4 KB chunk at 1000 + 2000 × 4096/48000 ≈ 1170 ms — the server adds nothing.
+Both live runs above confirm it against the real providers. **What is not yet
+measured:** the toy. Items 10–13 of the firmware notes' bench list are the remaining
+verification — a chunk-header byte reaching the decoder is a burst of noise,
+and a stalled stream must end in the canned failure clip, not a watchdog reboot.

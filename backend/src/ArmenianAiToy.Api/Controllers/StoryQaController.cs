@@ -407,12 +407,35 @@ public class StoryQaController : ControllerBase
         // wall-clock wait. Safety invariant is intact: if moderation BLOCKS,
         // the speculative audio is discarded and the canned fallback is spoken
         // instead, so unmoderated content is never returned to the child.
+        //
+        // NEGOTIATED FIRST-BYTE STREAMING. When the toy sent
+        // `X-Areg-Accept-Stream: 1`, the operator has not switched it off, and
+        // the provider can stream, the speculative act is OPENING the provider
+        // stream rather than buffering it — but not one byte is written to the
+        // toy until output moderation has passed. A blocked answer disposes the
+        // unread stream and takes the buffered fallback exactly as before, so
+        // unmoderated speech can never leave the server. Every other path
+        // (no header, buffered provider, canned lines, failures) keeps today's
+        // Content-Length response byte for byte — the buffered firmware reader
+        // rejects a body without one (fdc4b66 → 96d6084).
+        var streamRequested = StreamAnswerAudioEnabled()
+            && string.Equals(Request.Headers[AcceptStreamHeader], "1", StringComparison.Ordinal)
+            && _synthesis is IStreamingAudioSynthesisService;
         Task<AudioSynthesisResult>? speculativeTts = null;
+        Task<AudioSynthesisStreamResult>? speculativeStream = null;
         if (answerIsModelAuthored)
         {
             try
             {
-                speculativeTts = _synthesis.SynthesizeArmenianAsync(answerText.TrimEnd(), cancellationToken);
+                if (streamRequested)
+                {
+                    speculativeStream = ((IStreamingAudioSynthesisService)_synthesis)
+                        .SynthesizeArmenianStreamAsync(answerText.TrimEnd(), cancellationToken);
+                }
+                else
+                {
+                    speculativeTts = _synthesis.SynthesizeArmenianAsync(answerText.TrimEnd(), cancellationToken);
+                }
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
@@ -422,6 +445,7 @@ public class StoryQaController : ControllerBase
                 // synthesize (and sanitize any failure) normally.
                 _logger.LogWarning(ex, "Story-QA: speculative answer-TTS kickoff failed; retried in TTS step");
                 speculativeTts = null;
+                speculativeStream = null;
             }
             stage.Restart();
             var outputModeration = await _moderation.CheckContentAsync(answerText);
@@ -435,6 +459,23 @@ public class StoryQaController : ControllerBase
                 // (observe its exception so a faulted discard can't go unhandled).
                 _ = speculativeTts?.ContinueWith(t => { _ = t.Exception; }, TaskScheduler.Default);
                 speculativeTts = null;
+                // The unread provider stream is closed, never forwarded —
+                // synchronously when it is already open (the common case, so
+                // the upstream socket is released before the fallback renders),
+                // otherwise as soon as it opens.
+                if (speculativeStream is { IsCompletedSuccessfully: true })
+                {
+                    speculativeStream.Result.Dispose();
+                }
+                else
+                {
+                    _ = speculativeStream?.ContinueWith(t =>
+                    {
+                        if (t.IsCompletedSuccessfully) t.Result.Dispose();
+                        _ = t.Exception;
+                    }, TaskScheduler.Default);
+                }
+                speculativeStream = null;
                 answerText = StoryAnswerFilter.SafeFallback;
                 assistantFlag = SafetyFlag.Flagged;
                 turnOutcome = "answer_blocked";
@@ -466,16 +507,41 @@ public class StoryQaController : ControllerBase
         // then the (cached) return-to-story bridge — so the child has a
         // beat to take in the answer before the narration resumes, instead
         // of the answer and "let's go back" snapping together.
-        AudioSynthesisResult answerTts;
+        AudioSynthesisResult? answerTts = null;
+        AudioSynthesisStreamResult? answerStream = null;
         try
         {
             stage.Restart();
-            // Use the speculative synthesis started during output moderation
-            // when the answer passed; otherwise synthesize the final (fallback
-            // or canned) text now.
-            answerTts = speculativeTts is not null
-                ? await speculativeTts
-                : await _synthesis.SynthesizeArmenianAsync(answerText.TrimEnd(), cancellationToken);
+            if (speculativeStream is not null)
+            {
+                // Streaming path: the provider stream opened during output
+                // moderation. Awaiting it is time-to-stream-OPEN, so on this
+                // path `tts=` in the timing line measures first-byte
+                // readiness, not last-byte — the whole point of the path.
+                try
+                {
+                    answerStream = await speculativeStream;
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    // Opening the stream failed: render the same (already
+                    // moderated) text buffered instead. The toy then gets the
+                    // Content-Length shape, which its streaming reader also
+                    // accepts, rather than a 502.
+                    _logger.LogWarning(ex,
+                        "Story-QA: answer-TTS stream open failed for {StoryId}; falling back to buffered", storyId);
+                }
+            }
+            if (answerStream is null)
+            {
+                // Use the speculative synthesis started during output moderation
+                // when the answer passed; otherwise synthesize the final (fallback
+                // or canned) text now.
+                answerTts = speculativeTts is not null
+                    ? await speculativeTts
+                    : await _synthesis.SynthesizeArmenianAsync(answerText.TrimEnd(), cancellationToken);
+            }
             ttsMs = stage.ElapsedMilliseconds;
         }
         catch (OperationCanceledException) { throw; }
@@ -512,17 +578,114 @@ public class StoryQaController : ControllerBase
         }
 
         // The answer is fully GENERATED, VALIDATED (moderation +
-        // StoryAnswerFilter/repair/fallback above), persisted, and SYNTHESIZED.
-        // Compose answer + calm pause + return-to-story bridge (+ recap) into
-        // ONE buffered MP3 and return it with a Content-Length.
+        // StoryAnswerFilter/repair/fallback above), persisted, and either
+        // SYNTHESIZED (buffered) or OPENED as a provider stream (negotiated).
         //
-        // NOTE: a streamed/chunked response was REVERTED here. The firmware
-        // sizes its receive buffer from HTTPClient.getSize() (Content-Length);
-        // a chunked body reports -1, so the device dropped the answer and
-        // played nothing. The device buffers the whole body before decoding
-        // anyway, so streaming bought no on-device latency — only this bug.
+        // Default shape: answer + calm pause + return-to-story bridge (+ recap)
+        // composed into ONE buffered MP3 with a Content-Length. The firmware's
+        // buffered reader sizes its receive buffer from HTTPClient.getSize();
+        // a chunked body reports -1 and was rejected outright when streaming
+        // was once switched on globally (fdc4b66, reverted 96d6084). So the
+        // chunked shape below is sent ONLY to a toy that asked for it.
         RecordTurn(turnOutcome);
 
+        if (answerStream is not null)
+        {
+            return await StreamAnswerAsync(answerStream, storyId, segmentIndex, answerText, cancellationToken);
+        }
+
+        var (bridgeAudio, recapAudio) = await GetTailClipsAsync(storyId, segmentIndex, answerText, cancellationToken);
+        if (bridgeAudio is null)
+        {
+            // Bridge render failed: still give the child the answer (with a
+            // Content-Length) rather than nothing.
+            return File(answerTts!.Content, answerTts.MimeType);
+        }
+
+        var spoken = ComposeAnswerWithPause(answerTts!.Content, bridgeAudio, recapAudio);
+        return File(spoken, answerTts.MimeType);
+    }
+
+    /// <summary>Request header a streaming-capable toy sends to opt in to a
+    /// chunked, first-byte answer. Absent ⇒ the buffered Content-Length
+    /// response, byte-identical to before streaming existed.</summary>
+    internal const string AcceptStreamHeader = "X-Areg-Accept-Stream";
+
+    /// <summary>Server-side kill switch for the negotiated streaming path —
+    /// <c>StoryQa:StreamAnswerAudio</c>, default <c>true</c>. Exists so a
+    /// de-framing defect found on real hardware can be neutralised by config
+    /// alone, without waiting for a firmware release.</summary>
+    private bool StreamAnswerAudioEnabled() =>
+        !bool.TryParse(_config["StoryQa:StreamAnswerAudio"], out var enabled) || enabled;
+
+    /// <summary>
+    /// Negotiated streaming body: the moderated answer is copied from the
+    /// provider stream to the response as it arrives (first audio byte reaches
+    /// the toy while synthesis is still running), then the SAME tail the
+    /// buffered path composes — pause + bridge (+ recap) — follows in the same
+    /// body. No Content-Length is set, so Kestrel frames it chunked; the
+    /// flag-on firmware de-frames that itself. Headers/timing were already
+    /// recorded by the caller. A failure mid-flight cannot change the status
+    /// line: the body ends short, the toy's decoder reports it, and the child
+    /// hears the canned failure clip — the same UX as a dropped download.
+    /// </summary>
+    private async Task<IActionResult> StreamAnswerAsync(
+        AudioSynthesisStreamResult stream,
+        string storyId,
+        int segmentIndex,
+        string answerText,
+        CancellationToken cancellationToken)
+    {
+        using (stream)
+        {
+            // Bridge/recap are process-cached; on a cold cache they render
+            // WHILE the answer streams instead of before it.
+            var tailTask = GetTailClipsAsync(storyId, segmentIndex, answerText, cancellationToken);
+
+            Response.ContentType = stream.MimeType;
+            Response.StatusCode = 200;
+
+            var buffer = new byte[8192];
+            try
+            {
+                int read;
+                while ((read = await stream.AudioStream.ReadAsync(
+                    buffer.AsMemory(0, buffer.Length), cancellationToken)) > 0)
+                {
+                    await Response.Body.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                    // Flush per chunk: the saving IS the first byte leaving
+                    // early, so nothing may sit in a server-side buffer.
+                    await Response.Body.FlushAsync(cancellationToken);
+                }
+
+                var (bridge, recap) = await tailTask;
+                if (bridge is not null)
+                {
+                    // Empty answer ⇒ exactly pause + bridge (+ beat + recap):
+                    // the streamed body equals the buffered composition.
+                    var tail = ComposeAnswerWithPause([], bridge, recap);
+                    await Response.Body.WriteAsync(tail, cancellationToken);
+                }
+                await Response.Body.FlushAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Story-QA: answer stream aborted mid-flight for {StoryId}", storyId);
+                _ = tailTask.ContinueWith(t => { _ = t.Exception; }, TaskScheduler.Default);
+            }
+            return new EmptyResult();
+        }
+    }
+
+    /// <summary>The clips spoken after the answer: the rotated return-to-story
+    /// bridge and, when the answer is long enough, the segment recap. Both
+    /// process-cached. A bridge failure returns a null bridge (caller speaks
+    /// the answer alone); a recap failure just drops the recap. Shared by the
+    /// buffered and streaming paths so the two can never drift.</summary>
+    private async Task<(byte[]? Bridge, byte[]? Recap)> GetTailClipsAsync(
+        string storyId, int segmentIndex, string answerText, CancellationToken cancellationToken)
+    {
         byte[] bridgeAudio;
         try
         {
@@ -532,10 +695,8 @@ public class StoryQaController : ControllerBase
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
-            // Bridge render failed: still give the child the answer (with a
-            // Content-Length) rather than nothing.
             _logger.LogWarning(ex, "Story-QA: bridge TTS failure for {StoryId}; returning answer only", storyId);
-            return File(answerTts.Content, answerTts.MimeType);
+            return (null, null);
         }
 
         byte[]? recapAudio = null;
@@ -556,9 +717,7 @@ public class StoryQaController : ControllerBase
                 }
             }
         }
-
-        var spoken = ComposeAnswerWithPause(answerTts.Content, bridgeAudio, recapAudio);
-        return File(spoken, answerTts.MimeType);
+        return (bridgeAudio, recapAudio);
     }
 
     /// <summary>

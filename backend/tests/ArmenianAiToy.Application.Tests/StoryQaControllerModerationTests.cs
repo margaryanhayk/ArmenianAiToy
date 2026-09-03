@@ -135,7 +135,8 @@ public class StoryQaControllerModerationTests
     /// <summary>Materializes the buffered audio response body to bytes and
     /// confirms it is a 200 audio/mpeg <see cref="FileContentResult"/> (the
     /// story-qa response is buffered with a Content-Length so the firmware can
-    /// read it; a streamed/chunked variant was reverted).</summary>
+    /// read it; the chunked shape is sent only to a toy that opts in with
+    /// <c>X-Areg-Accept-Stream: 1</c> — see StoryQaControllerStreamingTests).</summary>
     private static Task<byte[]> ReadBodyAsync(IActionResult result)
     {
         switch (result)
@@ -553,7 +554,7 @@ public class StoryQaControllerModerationTests
 
     /// <summary>The happy path returns a BUFFERED <see cref="FileContentResult"/>
     /// (audio/mpeg, with a Content-Length so the firmware can size its receive
-    /// buffer — a streamed/chunked variant was reverted). The body is the
+    /// buffer — streaming is negotiated per request, never the default). The body is the
     /// canonical <c>ComposeAnswerWithPause(answer, bridge, recap)</c>: the
     /// VALIDATED answer first, then the pause, then the return bridge — so it
     /// starts with the answer and is strictly longer. LittleCloud has no

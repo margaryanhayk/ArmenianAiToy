@@ -844,6 +844,19 @@ static HTTPClient &qa_http() {
 // which is the failure this reuse introduces; anything later (connection lost
 // mid-headers, read timeout) may already have been processed and is reported
 // to the caller unchanged.
+#ifdef AREG_QA_STREAM_PLAYBACK
+// When true, the next POST carries `X-Areg-Accept-Stream: 1`: the backend may
+// then answer chunked (no Content-Length) and start the audio on the first
+// synthesized bytes. Set ONLY by the flag-on async upload task, and only
+// around its own POST — every caller that reads through
+// read_response_into() (the sync fallback in voice_upload_question(), and
+// every flag-off build) rejects a body with no Content-Length, which is what
+// reverted fdc4b66, so the header must never be sent on their behalf. A
+// file-static rather than a parameter so the flag-off image is byte-identical.
+// Read per attempt inside the retry loop because begin() clears headers.
+static bool s_qa_accept_stream = false;
+#endif
+
 static int qa_post_with_retry(HTTPClient &http, const char *url,
                               const uint8_t *payload, size_t length) {
     int status = HTTPC_ERROR_NOT_CONNECTED;
@@ -858,6 +871,9 @@ static int qa_post_with_retry(HTTPClient &http, const char *url,
         http.setTimeout(AREG_HTTP_READ_MS);
         http.addHeader("Content-Type", "audio/wav");
         add_device_auth_headers(http);
+#ifdef AREG_QA_STREAM_PLAYBACK
+        if (s_qa_accept_stream) http.addHeader("X-Areg-Accept-Stream", "1");
+#endif
 
         status = http.POST((uint8_t *)payload, length);
         if (status == 200) return status;
@@ -899,6 +915,9 @@ VoiceTurnResult voice_upload_question(const uint8_t *payload, size_t length,
     Serial.printf("[qa] POST question (%u bytes) offset=%u\n",
                   (unsigned)length, (unsigned)offset);
     Serial.flush();
+#ifdef AREG_QA_STREAM_PLAYBACK
+    s_qa_accept_stream = false;   // this path reads through read_response_into()
+#endif
     const int status = qa_post_with_retry(http, url, payload, length);
     result.http_status = status;
     if (status != 200) {
@@ -1093,7 +1112,15 @@ static void upload_question_task(void * /*pvParams*/) {
     // This is safe because the task runs AFTER the caller has already finished
     // playing the previous answer (the story playback was cut before record_question).
     voice_release_last_response();
+#ifdef AREG_QA_STREAM_PLAYBACK
+    // Flag-on: the body is decoded live off the socket (chunked or sized),
+    // so ask the backend to start the audio on its first synthesized bytes.
+    s_qa_accept_stream = true;
+#endif
     const int status = qa_post_with_retry(http, url, s_async_payload, s_async_length);
+#ifdef AREG_QA_STREAM_PLAYBACK
+    s_qa_accept_stream = false;
+#endif
     result.http_status = status;
     if (status != 200) {
         Serial.printf("[qa-async] POST non-200: %d\n", status);

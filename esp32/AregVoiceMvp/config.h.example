@@ -443,24 +443,27 @@
 // is a question the child gets no answer to. On failure the toy plays the
 // canned failure clip rather than half an answer.
 //
-// IT NEEDS NO BACKEND CHANGE. The endpoint composes the whole MP3 and sends
-// it with a Content-Length, which is exactly what this path wants: the
-// device decodes as the body arrives instead of after it lands, which is
-// where the saving comes from.
+// THE BACKEND HALF EXISTS (2026-09-01), NEGOTIATED PER REQUEST. With this
+// flag on, the async upload sends `X-Areg-Accept-Stream: 1` and
+// /api/chat/story-qa answers chunked, streaming the answer audio on its
+// first synthesized bytes; the de-chunker in audio_io.cpp handles that
+// shape. Without the flag no header is sent and the backend keeps sending
+// the Content-Length body the buffered reader requires, so a flag-off toy
+// is never handed a chunked response.
 //
-// AND THE BACKEND MUST NOT BE MADE CHUNKED (decision, 2026-08-16). An
-// earlier attempt to flush audio progressively was reverted for two reasons
-// that both still hold:
-//   - It breaks every field toy still running flag-off firmware. The
-//     buffered reader rejects a body with no Content-Length (voice_client.cpp,
-//     read_response_into), so a chunked response turns every question on
-//     those toys into the canned failure clip.
-//   - It buys close to nothing. The bridge and recap clips are cached for
-//     the process lifetime (StoryQaController), so the server is not slowly
-//     producing audio that could be played early.
-// The de-chunker in audio_io.cpp stays because it costs nothing to keep and
-// makes the device correct against either wire shape -- not because the
-// backend is expected to start using it.
+// This is what the 2026-08-16 decision ("the backend must not be made
+// chunked") was protecting, and it still holds for an UNNEGOTIATED chunked
+// endpoint:
+//   - Globally chunked breaks every field toy on flag-off firmware
+//     (voice_client.cpp read_response_into rejects a body with no
+//     Content-Length). A per-request opt-in cannot: a toy that does not
+//     ask is never handed a chunked body.
+//   - The bridge and recap clips are process-cached, so the only audio the
+//     server was slowly producing was the ANSWER itself -- 3-5 s of
+//     ElevenLabs synthesis that used to be finished before the first byte
+//     left. Measured end to end with every stage real: first byte
+//     5.7 s -> 2.7 s (docs/latency-plan.md Part 5).
+// Details in latency-firmware-notes.md, "What the backend must do".
 // #define AREG_QA_STREAM_PLAYBACK 1
 
 // AREG_DIAG_MARK_SERIAL ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â print + flush + delay(5) on every DIAG_MARK.
