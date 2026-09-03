@@ -12,7 +12,10 @@
     "stability": 0.55,
     "similarity_boost": 0.8,
     "style": 0.2
-   }
+   },
+   "voiceId": "NxAsEwnikgCJa5tyBwEf",
+   "voiceName": "areg-storyteller",
+   "modelId": "eleven_v3_conversational"
   },
   "mother": {
    "role": "Այծը, Ուլիկի մայրը",
@@ -23,28 +26,38 @@
     "stability": 0.6,
     "similarity_boost": 0.85,
     "style": 0.3
-   }
+   },
+   "voiceId": "bpss31fpiTyvjz5XZUT0",
+   "voiceName": "katrin-v3",
+   "modelId": "eleven_v3_conversational"
   },
   "wolf": {
    "role": "Գայլը",
-   "pitch": 0.88,
+   "pitch": 1.0,
    "note": "Says the mother's words EXACTLY — only the voice differs, and that IS the scene. Not frightening: the kid is unimpressed, not terrified, and sends him away.",
    "directionForHumanNarrator": "deep thick growling wolf, badly pretending to be sweet",
    "voiceSettings": {
-    "stability": 0.3,
+    "stability": 0.65,
     "similarity_boost": 0.8,
-    "style": 0.55
-   }
+    "style": 0.15,
+    "speed": 1.1
+   },
+   "voiceId": "N2lVS1w4EtoT3dr4eOWO",
+   "voiceName": "PROVISIONAL — Callum (ElevenLabs library). The owner heard Callum on 2026-09-03 and rejected the delivery ('bad, change the voice'); seven other candidates are with him. Replace voiceId before this story is re-rendered for shipping.",
+   "modelId": "eleven_v3_conversational"
   },
   "ulik": {
    "role": "Ուլիկը",
-   "pitch": 1.06,
+   "pitch": 1.1,
    "directionForHumanNarrator": "small young goat, bright, a little wary, then excited telling his mother",
    "voiceSettings": {
     "stability": 0.4,
     "similarity_boost": 0.8,
     "style": 0.45
-   }
+   },
+   "voiceId": "PgFHHZMKb19tJbjBe6aY",
+   "voiceName": "vardan-v2",
+   "modelId": "eleven_v3_conversational"
   }
  },
  "segments": [
@@ -139,5 +152,6 @@
    ]
   }
  ],
- "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing)."
+ "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing).",
+ "_cast": "Owner decision 2026-09-03: a real cast per story. Narrator is always Areg. Katrin and Vardan take a part in every story. Library voices only for villains and animals (they speak Armenian with an accent). Every speaker may carry voiceId/modelId; absent means the narrator's voice in eleven_v3, so older maps render unchanged."
 }

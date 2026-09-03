@@ -85,8 +85,10 @@ def duration(path):
                           "-of","csv=p=0",path], capture_output=True, text=True).stdout.strip()
     return float(out) if out else 0.0
 
-def tts(text, path, token, voice, settings):
-    body = {"text": text, "model_id": "eleven_v3"}
+DEFAULT_MODEL = "eleven_v3"
+
+def tts(text, path, token, voice, settings, model=DEFAULT_MODEL):
+    body = {"text": text, "model_id": model}
     if settings:
         body["voice_settings"] = settings
     r = subprocess.run(
@@ -111,9 +113,17 @@ def render_segment(smap, seg, outdir, token, voice, sid):
         # later had to INFER where a speaker changed instead of measuring it.
         raw = os.path.join(outdir, f"{sid}-{seg['index']:02d}-{i:02d}-{who}.mp3")
 
+        # A CAST, not one voice (owner decision 2026-09-03): a speaker may name
+        # its own ElevenLabs voice and model. Without them it is the narrator's
+        # voice in the default model, so every speaker map written before this
+        # renders exactly as it did. The narrator stays Areg by rule; clones
+        # for anyone a child should love; library voices only for villains
+        # and animals, because a library voice speaks Armenian with an accent.
+        spk_voice = spk.get("voiceId") or voice
+        spk_model = spk.get("modelId") or DEFAULT_MODEL
         # Render, and re-ask if the model returns it with the tail cut off.
         for attempt in range(TAIL_RETRIES + 1):
-            tts(text, raw, token, voice, spk.get("voiceSettings"))
+            tts(text, raw, token, spk_voice, spk.get("voiceSettings"), spk_model)
             ratio = tail_ratio(raw)
             expect = len(text) / CHARS_PER_SECOND
             short = duration(raw) < expect * TAIL_MIN_LENGTH_RATIO
@@ -153,7 +163,8 @@ def render_segment(smap, seg, outdir, token, voice, sid):
         parts.append((who, wav, pause_after(text), len(text), duration(wav)))
         print(f"    {i:02d} {who:14} {len(text):>4}ch {got:>5.1f}s "
               f"tail {tail_ratio(raw):.0%}"
-              f"{'  pitch '+str(pitch) if pitch!=1.0 else ''}", flush=True)
+              f"{'  pitch '+str(pitch) if pitch!=1.0 else ''}"
+              f"{'  voice '+spk_voice[:8]+'… '+spk_model if spk.get('voiceId') else ''}", flush=True)
     if problems:
         raise SystemExit("SPAN LENGTH CHECK FAILED\n" + "\n".join(problems))
     return parts
