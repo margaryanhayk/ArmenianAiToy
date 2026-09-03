@@ -71,3 +71,7 @@ tools/voice-audition/_chunks/
 # Scratch output from tools/ElevenLabsRender — the installed copies under
 # story-audio/ are the shipped ones; these are the pre-levelling renders.
 tools/.render-out/
+
+# Generated listen-test page (7 MB of embedded audio; rebuild with
+# tools/story-audio/build_clip_listen_page.py)
+tools/story-audio/clip-listen-test.html
