@@ -35,17 +35,33 @@ KINDS = [
     ('question2', 'Question 3', 'Third reflection question'),
 ]
 
-# Armenian literals as escapes so this source file stays ASCII and can be
-# opened by any editor/codepage without mojibake.
-HEQIAT = 'Հեքիաթը՝'          # story:
-HEGHINAK = 'Հեղինակը՝'  # author:
-UZUM = ('Ուզու՞մ ես '
-        'լսել')                                   # do you want to hear
-HEQIATN = 'հեքիաթը'                # the story
-MENQ = ('Մենք արդեն '
-        'լսել ենք')                # we already heard
-LQ, RQ = '«', '»'
-STOP = '։'
+# The reference text MUST come from the same sources the renderer used, never
+# from a hand-written reconstruction. The first version of this file rebuilt
+# the intro/offer/reoffer strings by hand and got all three subtly wrong
+# («Հեքիաթը՝» for «Հեքիաթ՝», a different offer sentence entirely), which sent
+# the owner chasing two clips that were in fact correct. A review instrument
+# that shows the wrong reference is worse than no instrument.
+#   intro         -> tools/ElevenLabsRender/Program.cs (composed there)
+#   offer/reoffer -> backend/content/voice-clips/voice-clips.json
+#                    _perStoryTemplates, {Title}-substituted
+#   the rest      -> the story's own JSON fields
+TEMPLATES = os.path.join(ROOT, 'backend/content/voice-clips/voice-clips.json')
+
+
+def load_templates():
+    with open(TEMPLATES, encoding='utf-8') as fh:
+        blob = json.load(fh)
+    t = blob.get('_perStoryTemplates') or {}
+    return t.get('offer') or '', t.get('reoffer') or ''
+
+
+OFFER_T, REOFFER_T = load_templates()
+
+# Exactly as ElevenLabsRender/Program.cs composes it -- classifier without the
+# definite article, title already carrying its own.
+INTRO_STORY = 'Հեքիաթ՝'      # Հեքիաթ՝
+INTRO_AUTHOR = 'Հեղինակ՝'  # Հեղինակ՝
+LQ, RQ, STOP = '«', '»', '։'
 
 
 def load_story(sid):
@@ -62,9 +78,9 @@ def expected_text(kind, s):
     questions = s.get('reflectionQuestions') or []
     title = s.get('title', '')
     if kind == 'intro':
-        text = HEQIAT + ' ' + LQ + title + RQ + STOP
+        text = INTRO_STORY + ' ' + LQ + title + RQ + STOP
         if s.get('author'):
-            text += ' ' + HEGHINAK + ' ' + s['author'] + STOP
+            text += ' ' + INTRO_AUTHOR + ' ' + s['author'] + STOP
         return text
     if kind == 'summary':
         return s.get('lesson') or s.get('reflectionText') or ''
@@ -75,9 +91,9 @@ def expected_text(kind, s):
     if kind == 'question2':
         return questions[2] if len(questions) > 2 else ''
     if kind == 'offer':
-        return UZUM + ' ' + LQ + title + RQ + ' ' + HEQIATN + STOP
+        return OFFER_T.replace('{Title}', title)
     if kind == 'reoffer':
-        return MENQ + ' ' + LQ + title + RQ + '…'
+        return REOFFER_T.replace('{Title}', title)
     return ''
 
 
@@ -100,6 +116,10 @@ def collect():
                 'label': label,
                 'role': role,
                 'text': expected_text(kind, story),
+                'note': ('This story has no verified author, so the intro names'
+                         ' none by design -- an attribution spoken to a child is'
+                         ' never guessed.')
+                        if kind == 'intro' and not story.get('author') else '',
                 'src': 'data:audio/mpeg;base64,' + b64,
             })
             total += 1
@@ -205,6 +225,7 @@ h1{
   background:color-mix(in srgb,var(--gold) 7%,transparent);
   font-family:Sylfaen,"Noto Serif Armenian",Georgia,serif;font-size:.95rem
 }
+.why{margin:.4rem 0 0;font-size:.76rem;color:var(--faint);font-style:italic}
 .acts{display:flex;gap:.4rem;margin-top:.55rem}
 .tog{
   flex:1;padding:.4rem;border-radius:6px;border:1px solid var(--edge);
@@ -353,6 +374,12 @@ function render() {
         p.textContent = c.text;
         row.appendChild(p);
       }
+      if (c.note) {
+        const n = document.createElement('p');
+        n.className = 'why';
+        n.textContent = c.note;
+        row.appendChild(n);
+      }
 
       const acts = document.createElement('div');
       acts.className = 'acts';
@@ -441,8 +468,11 @@ def main():
         '<header class="top"><div class="wrap">\n'
         '  <h1>The clips a child hears</h1>\n'
         '  <p class="sub">' + str(total) + ' clips across ' + str(len(stories)) +
-        ' stories, rendered 2026-08-16 and never listened to. Tap play, compare'
-        ' against the words underneath, mark it.</p>\n'
+        ' stories. Tap play, compare against the words underneath, mark it.</p>\n'
+        '  <p class="sub" style="color:var(--flag)">Corrected 2026-09-03: the reference'
+        ' text under <b>intro</b>, <b>offer</b> and <b>re-offer</b> was mine and was'
+        ' wrong — it now comes from the same files the renderer used. Your marks'
+        ' are kept; those three rows per story are worth a second look.</p>\n'
         '  <div class="bar"><i></i></div>\n'
         '  <div class="stats">\n'
         '    <span><b id="nHeard">0</b> of <b id="nTotal">0</b> heard</span>\n'
