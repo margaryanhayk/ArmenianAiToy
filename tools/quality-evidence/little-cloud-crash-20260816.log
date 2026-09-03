@@ -1,0 +1,164 @@
+﻿[games] mind-reader: still no answer ??? closing quietly
+[games] mind-reader: ended at depth 0
+[menu] activity ended ??? asking what next (chain=1)
+[welcome] greeting greet-12
+[state] 0 -> 3
+[story] SD open: /voice/greet-12-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] ask ask-sgrc
+[state] 3 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=88849 heap=101472 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-83
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=93850 heap=101472 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=98858 heap=101472 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=103858 heap=101472 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=108863 heap=101472 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=113870 heap=101472 psram=7860896 wifi=3 ip=192.168.1.11 rssi=-81
+[alive] ms=118870 heap=101420 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=123876 heap=101472 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=128876 heap=101472 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=133881 heap=101472 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=138881 heap=101472 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-80
+[alive] ms=143885 heap=101472 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-69
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=152282 heap=101424 psram=7861052 wifi=3 ip=192.168.1.11 rssi=-84
+[alive] ms=157289 heap=101472 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=162290 heap=101420 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-71
+[alive] ms=167299 heap=101472 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-73
+[alive] ms=172306 heap=101472 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=177310 heap=101472 psram=7861192 wifi=3 ip=192.168.1.11 rssi=-73
+[content-sync] starting
+[content-sync] heap before=101420
+[content-sync] manifest bytes=-1 heap parse 57240->57288 psram=7788588
+[content-sync] manifest status=200 stories=10 introEnabled=1 music=0 musicEnabled=0 voice=42 games=104 modes=1111 pauses=1 variants=1
+[content-sync] index v7 loaded entries=10 music=0 voice=42
+[content-sync] item anban-huri v9 "?????????? ????????????" 5560991 bytes
+[content-sync] anban-huri already current (index)
+[content-sync] anban-huri:intro already current
+[content-sync] anban-huri:question already current
+[content-sync] anban-huri:question1 already current
+[content-sync] anban-huri:question2 already current
+[content-sync] anban-huri:summary already current
+[content-sync] anban-huri:offer already current
+[content-sync] anban-huri:reoffer already current
+[content-sync] item hedgehog-apple v3 "???????????? ???? ????????????" 613817 bytes
+[content-sync] hedgehog-apple already current (index)
+[content-sync] hedgehog-apple:intro already current
+[content-sync] hedgehog-apple:question already current
+[content-sync] hedgehog-apple:question1 already current
+[content-sync] hedgehog-apple:question2 already current
+[content-sync] hedgehog-apple:summary already current
+[content-sync] hedgehog-apple:offer already current
+[content-sync] hedgehog-apple:reoffer already current
+[content-sync] item khosogh-dzuk v10 "?????????? ??????????" 8138336 bytes
+[content-sync] khosogh-dzuk already current (index)
+[content-sync] khosogh-dzuk:intro already current
+[content-sync] khosogh-dzuk:question already current
+[content-sync] khosogh-dzuk:question1 already current
+[content-sync] khosogh-dzuk:question2 already current
+[content-sync] khosogh-dzuk:summary already current
+[content-sync] khosogh-dzuk:offer already current
+[content-sync] khosogh-dzuk:reoffer already current
+[content-sync] item little-cloud v3 "???????????? ????????????" 514133 bytes
+[content-sync] little-cloud already current (index)
+[content-sync] little-cloud:intro already current
+[content-sync] little-cloud:question already current
+[content-sync] little-cloud:question1 already current
+[content-sync] little-cloud:question2 already current
+[content-sync] little-cloud:summary already current
+[content-sync] little-cloud:offer already current
+[content-sync] little-cloud:reoffer already current
+[content-sync] item pochat-aghves v9 "?????????? ????????????" 5460680 bytes
+[content-sync] pochat-aghves already current (index)
+[content-sync] pochat-aghves:intro already current
+[content-sync] pochat-aghves:question already current
+[content-sync] pochat-aghves:question1 already current
+[content-sync] pochat-aghves:question2 already current
+[content-sync] pochat-aghves:summary already current
+[content-sync] pochat-aghves:offer already current
+[content-sync] pochat-aghves:reoffer already current
+[content-sync] item princess-and-pea v6 "?????????????????????????? ?? ????????????????????????" 1611903 bytes
+[content-sync] princess-and-pea already current (index)
+[content-sync] princess-and-pea:intro already current
+[content-sync] princess-and-pea:question already current
+[content-sync] princess-and-pea:question1 already current
+[content-sync] princess-and-pea:question2 already current
+[content-sync] princess-and-pea:summary already current
+[content-sync] princess-and-pea:offer already current
+[content-sync] princess-and-pea:reoffer already current
+[content-sync] item sutasan v6 "??????????????????" 1969258 bytes
+[content-sync] sutasan already current (index)
+[content-sync] sutasan:intro already current
+[content-sync] sutasan:question already current
+[content-sync] sutasan:question1 already current
+[content-sync] sutasan:question2 already current
+[content-sync] sutasan:summary already current
+[content-sync] sutasan:offer already current
+[content-sync] sutasan:reoffer already current
+[content-sync] item sutlik-orskan v9 "?????????????? ??????????????" 3356047 bytes
+[content-sync] sutlik-orskan already current (index)
+[content-sync] sutlik-orskan:intro already current
+[content-sync] sutlik-orskan:question already current
+[content-sync] sutlik-orskan:question1 already current
+[content-sync] sutlik-orskan:question2 already current
+[content-sync] sutlik-orskan:summary already current
+[content-sync] sutlik-orskan:offer already current
+[content-sync] sutlik-orskan:reoffer already current
+[content-sync] item three-piglets v6 "???????? ????????????????????" 2078973 bytes
+[content-sync] three-piglets already current (index)
+[content-sync] three-piglets:intro already current
+[content-sync] three-piglets:question already current
+[content-sync] three-piglets:question1 already current
+[content-sync] three-piglets:question2 already current
+[content-sync] three-piglets:summary already current
+[content-sync] three-piglets:offer already current
+[content-sync] three-piglets:reoffer already current
+[content-sync] item ulik v12 "????????????" 2631933 bytes
+[content-sync] ulik already current (index)
+[content-sync] ulik:intro already current
+[content-sync] ulik:question already current
+[content-sync] ulik:question1 already current
+[content-sync] ulik:question2 already current
+[content-sync] ulik:summary already current
+[content-sync] ulik:offer already current
+[content-sync] ulik:reoffer already current
+[content-sync] voice summary offered=42 already=42 downloaded=0 failed=0 voice_active=42
+[content-sync] games phase B: 0 to download, heap=57288
+[content-sync] games summary offered=104 invalid=0 already=104 downloaded=0 failed=0 truncated=0 carried=0 games_active=104
+[content-sync] index written
+[content-report] schema=7 stories=[anban-huri:9,hedgehog-apple:3,khosogh-dzuk:10,little-cloud:3,pochat-aghves:9,princess-and-pea:6,sutasan:6,sutlik-orskan:9,three-piglets:6,ulik:12] games=104 voice=42 music=0
+[content-sync] summary manifest_items=10 accepted_items=10 invalid_items=0 duplicate_items=0 disabled_items=0 truncated_items=0 already_current=10 downloaded=0 failed=0 carried_forward=0 active_index_items=10 index_written=1
+[content-sync] heap after=57288
+[content-sync] PASS
+[content-sync] status=ok error= streak=0 next in 21600s
+[alive] ms=189506 heap=101424 psram=7860796 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=194513 heap=101472 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=199518 heap=101472 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=204521 heap=101472 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-65
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=211372 heap=101424 psram=7860572 wifi=3 ip=192.168.1.11 rssi=-70
+[alive] ms=216381 heap=101472 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=221385 heap=101472 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=226395 heap=101420 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=231402 heap=101472 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=236408 heap=101472 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=241408 heap=101472 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-68
+[alive] ms=246414 heap=101472 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=251416 heap=101420 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=256419 heap=101472 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=261428 heap=101472 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-69
+[alive] ms=266434 heap=101420 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-67
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=271809 heap=101424 psram=7860540 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=276817 heap=101472 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=281817 heap=101472 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=286822 heap=101472 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=291831 heap=101420 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-66
+[alive] ms=296837 heap=101472 psram=7860936 wifi=3 ip=192.168.1.11 rssi=-67
+[alive] ms=301845 heap=101472 psram=7860968 wifi=3 ip=192.168.1.11 rssi=-65
+[alive] ms=306854 heap=101472 psram=7861224 wifi=3 ip=192.168.1.11 rssi=-65

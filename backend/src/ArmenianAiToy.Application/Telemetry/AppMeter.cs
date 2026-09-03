@@ -274,6 +274,16 @@ public static class AppMeter
     /// whether voice-only selection actually works for small children — the
     /// one number worth watching after the first families.
     /// </para>
+    /// <para>
+    /// A second tag, <c>reason</c>, says WHICH of the ten paths produced that
+    /// intent — its value space is exactly
+    /// <see cref="Helpers.VoiceIntentReasons.All"/> (11 values), also a closed
+    /// compile-time enumeration and so also safe under the same invariant.
+    /// Without it every <c>unknown</c> collapses into one bucket and a tripped
+    /// cost cap is indistinguishable from a classifier miss; the response body
+    /// cannot carry the difference (see
+    /// <see cref="Helpers.VoiceIntentReasons"/>), so the metric must.
+    /// </para>
     /// </summary>
     public static readonly Counter<long> VoiceIntentTurn =
         Instance.CreateCounter<long>(

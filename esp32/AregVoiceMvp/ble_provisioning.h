@@ -8,11 +8,18 @@
 // network across reboots and can be re-onboarded for a new router without
 // re-flashing.
 //
-// GATED behind AREG_USE_BLE_PROVISIONING. The default (bench) build does NOT
-// define it, so none of this is compiled and the firmware is byte-identical
-// to B.1. The BLE stack does not fit the `default` partition — the flag-on
-// build MUST be compiled/flashed with PartitionScheme=huge_app. See
-// PLATFORM-ARCHITECTURE.txt (Phase B.2 build spec) and config.h.example.
+// GATED behind AREG_USE_BLE_PROVISIONING, which is ON as of 2026-08-16 — see
+// the note in config.h. With the flag off none of this is compiled and the
+// firmware is byte-identical to B.1.
+//
+// CORRECTED 2026-08-16. This header used to say the BLE stack "does not fit
+// the `default` partition" and that the flag-on build MUST use
+// PartitionScheme=huge_app. That was true against the 1.25 MB slots of the
+// `default` table and has been stale since this sketch got its own 8 MB
+// dual-OTA partitions.csv with 3 MB slots. Measured, flag on, on the shipping
+// FQBN: 1,631,423 bytes — 51.9% of the slot. huge_app is not needed and would
+// be wrong anyway, because it is OTA-incapable and this toy updates over the
+// air. Keep PartitionScheme=custom.
 // -------------------------------------------------------------
 #pragma once
 

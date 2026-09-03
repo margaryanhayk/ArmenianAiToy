@@ -4,8 +4,6 @@
 // honesty rules. Entire file compiles out unless AREG_OFFLINE_GAMES_BENCH
 // is defined.
 // -------------------------------------------------------------
-#ifdef AREG_OFFLINE_GAMES_BENCH
-
 #include "offline_games.h"
 
 #include <Arduino.h>
@@ -63,8 +61,10 @@
 
 namespace {
 
+#ifdef AREG_OFFLINE_GAMES_BENCH
 constexpr uint32_t kStartMs       = 30000UL;  // 30 s arm delay (monitor attach)
 constexpr uint32_t kStatusEveryMs = 5000UL;
+#endif
 constexpr int      kMaxQuizQuestions = 60;    // q01..q60 scanned; gaps are fine
 
 // One shared path scratch buffer for the whole module (RAM discipline —
@@ -72,8 +72,10 @@ constexpr int      kMaxQuizQuestions = 60;    // q01..q60 scanned; gaps are fine
 // "/games/mind-reader/q-root.mp3" is 29 bytes.
 char s_path[64];
 
+#ifdef AREG_OFFLINE_GAMES_BENCH
 bool s_done = false;
 uint32_t s_last_status_ms = 0;
+#endif
 
 // Set where a game RETURNS, consumed by loop(). Separate from s_done: that
 // one is the boot latch ("a game has already run"), this one is the edge
@@ -438,6 +440,7 @@ void offline_games_run_picked() {
 #endif
 }
 
+#ifdef AREG_OFFLINE_GAMES_BENCH
 void offline_games_tick() {
     if (s_done) return;
     const uint32_t now = millis();
@@ -453,5 +456,32 @@ void offline_games_tick() {
     s_done = true;   // one game per boot, whatever the outcome
     offline_games_run_picked();
 }
-
 #endif // AREG_OFFLINE_GAMES_BENCH
+
+// ---- menu entry points (production) ---------------------------------
+
+// Per-boot rotation cursor. RAM on purpose; see the header: across a
+// power cycle starting from the first game again is the right behaviour.
+static int s_next_game = 0;
+
+void offline_games_run_next() {
+    const int pick = s_next_game % 3;
+    s_next_game++;
+    if (pick == 1)      offline_games_run_buzzer();
+    else if (pick == 2) offline_games_run_simon();
+    else                offline_games_run_mindreader();
+}
+
+bool offline_games_available() {
+#if !AREG_HAS_ANSWER_BUTTONS
+    return false;   // a game with no yes/no buttons cannot be played
+#else
+    if (!audio_sd_available()) return false;
+    // One representative clip per game; if the sync delivered these it
+    // delivered the set (same namespace, per-clip sha gate already ran).
+    return audio_sd_has_file(AREG_GAMES_CLIP_DIR "/" AREG_GAMES_DIR_MINDREADER "/intro.mp3")
+        || audio_sd_has_file(AREG_GAMES_CLIP_DIR "/" AREG_GAMES_DIR_BUZZER "/intro.mp3")
+        || audio_sd_has_file(AREG_GAMES_CLIP_DIR "/" AREG_GAMES_DIR_SIMON "/intro.mp3");
+#endif
+}
+

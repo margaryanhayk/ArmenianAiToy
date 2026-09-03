@@ -479,6 +479,20 @@ wrong-key requests to the image endpoint return 401.
 
 ## 11. Field log
 
+### 2026-09-02 — 1.3.4 staged (first BLE-enabled gated release)
+
+Cut from the merged main (PR #28). Placeholder config build, gate PASS
+on the second run: the first run FAILED on one GUID-shaped string, which
+proved to be the Espressif WiFiProv BLE service UUID
+(258EAFA5-E914-47DA-95CA-C5AB0DC85B11) — expected forever now that BLE
+provisioning is on by default. The gate learned it as an EXACT-VALUE
+allowlist entry, not a flag. sha256 b212721c…, 1,638,720 B (52.1%).
+`areg-current.bin` swapped, `LatestVersion` 1.3.2 → 1.3.4. The bench toy
+(cable-flashed with the same tree as 1.3.3-plus-fixes) reports 1.3.3, so
+the offer gate WILL offer it 1.3.4 — the apply is the operator's enqueue,
+per § 5, and doubles as the OTA-path regression test.
+
+
 **2026-08-07 — 1.1.0, first real OTA to the owner's toy: ROLLED BACK (by design).**
 Command polled 41 s after enqueue, then silence (correct: no ack before
 reboot), then the OLD image acked `failed / rollback_no_checkin`,
@@ -600,6 +614,122 @@ reconsidered once a second board exists.
 content sync had not completed at the time of writing. Free heap read 123,300
 against 210,020 on the 1.2.0 rollout at the same 5 s uptime; the content report
 accounts for 672 B of that and the rest is unexplained.
+
+---
+
+### 1.2.2 — 2026-08-14 — the OOM crash the 1.2.1 content sync caused, fixed the same morning
+
+Applied over the air, from 1.2.1, cleanly:
+
+```
+[ota] manifest: UPDATE 1.2.1 -> 1.2.2 (sig=ok board=ok size=1326496)
+[ota] downloading 100% (1326496/1326496)
+[ota] sha256 ok
+[ota] running fw=1.2.2 partition=app0 img_state=valid ota_state=rebooting
+[heartbeat] status=200 (fw=1.2.2 bedtime=0 paused=0)
+[ota] ack ... result=ok status=200
+[ota] image marked VALID (confirmed)
+```
+
+The 1.2.1 toy above was not merely `stale` overnight — it was **panicking
+every ~184 s** parsing the 156-item content manifest (10 stories + 42 voice +
+104 game clips, each with a 64-char sha256) into INTERNAL heap beside a live
+TLS session; with ~123 KB free it did not fit
+(`ESP_ERR_NO_MEM` → `abort()` → `reset_reason=4/PANIC` → rearm 180 s later →
+panic again). Full transcript and root-cause analysis:
+`tools/quality-evidence/content-sync-oom-crash-20260814.{md,log}`.
+
+**Fix**: every `JsonDocument` in `content_sync.cpp` now allocates from PSRAM
+(7.8 MB idle; TLS cannot use PSRAM, plain data can) instead of internal heap
+— the same fix `sync_games` already used for its own allocation, now applied
+one frame up the stack. +139 B of flash.
+
+**Verified** (`tools/quality-evidence/content-sync-fix-verified-20260814.log`):
+`heap parse 79312->79312` — internal heap **unchanged** across the manifest
+parse — then `[content-sync] PASS`, and the backend reports `up_to_date`,
+`missingStoryIds []`, all ten stories at their re-rendered versions, 104 game
+clips, 43 voice clips. Zero panics observed after the fix.
+
+**Still open after this release** (recorded honestly, not yet closed): a
+crash loop is invisible anywhere else in the product — the toy heartbeats
+normally for the first 180 s of every cycle, so `lastSeenAt` stays fresh and
+the console shows the device merely `stale`, never "panicking." And the
+content index is still written once, at the very end of a sync pass, so a
+crash mid-sync discards the record of downloads that already succeeded and
+the toy re-downloads the whole library on the next attempt — the real fix
+(per-namespace index writes) is not done.
+
+---
+
+### 1.3.0 — 2026-08-14 — scheduled retry with a crash-safe backoff, unconditional diagnostics, "sync now" (`059df03`)
+
+Ships Stage 1 (device-side), Stage 2, and Stage 5 (device-side) in one
+release rather than three separate OTA rollouts — each release is a chance
+to brick a toy, and the owner's 1.1.0 field lesson is to minimize how many
+times that risk is taken. Full change list: CLAUDE.md
+§ "Stage 2 & Stage 5 (firmware)".
+
+Headline changes: the one-shot "already tried this boot" sync latch is gone,
+replaced by a real schedule (~6 h after a clean pass; 5/15/60/240 min backoff
+after a failure); the failure streak is persisted to NVS **before** the risky
+work and cleared after, so a mid-sync panic still leaves evidence of what
+happened; the four Stage-1 heartbeat diagnostic fields
+(`contentSyncStatus`/`contentSyncError`/`resetReason`/`bootCount`) are now
+sent unconditionally, not gated on the SD card being readable; the new
+`refresh_story_manifest` command type ("sync this toy now") only moves the
+retry schedule forward and answers with the previous attempt's outcome; and
+the toy stops polling `GET /api/devices/commands` on every heartbeat,
+checking the new `hasCommands` flag first (defaults `true` against an older
+backend, so this can only reduce traffic, never miss a command). Also fixes
+an allocation-failure bug in `sync_games` that silently dropped every
+already-cached game clip from a rewritten index, and now counts an index
+WRITE failure as a sync failure (previously the exact failure mode of the
+1.2.1/1.2.2 overnight crash loop reported itself as healthy).
+
+**BENCH-VERIFIED ON THE REAL TOY, 2026-08-14** (applied OTA from 1.2.2):
+manifest `signature OK`, confirmed, then `[content-sync] PASS` and
+`status=ok streak=0 next in 21600s` (the 6-hour reschedule, proving the
+one-shot latch is gone). Zero watchdog resets, zero panics, and **zero**
+command polls observed after boot (`hasCommands` working as intended).
+
++2,192 bytes of flash. No backend/C# code in this firmware release.
+
+---
+
+### 1.3.1 — 2026-08-14 — debug build, applied to settle a reporting question
+
+A temporary debug build (`79516d5`, build tag `hb-body-debug`) that prints
+the raw heartbeat JSON body to serial. Applied OTA from 1.3.0:
+
+```
+[ota] manifest: UPDATE 1.3.0 -> 1.3.1 (sig=ok board=ok size=1328736)
+[ota] running fw=1.3.1 partition=app0 img_state=valid ota_state=rebooting
+[heartbeat] status=200 (fw=1.3.1 bedtime=0 paused=0)
+```
+
+Existed to resolve an apparent contradiction: the toy's own log read
+`status=ok` for a sync while the backend had stored
+`contentSyncStatus="never"`. The printed body proved there was **no defect**
+— the toy had just rebooted for the OTA and had not yet reached its
+180-second sync arm, so `never` was the truthful answer for that specific
+boot, and `contentSyncedAt` still held its pre-reboot value because the
+partial-report rule correctly leaves absent fields untouched. Two fields
+from two different moments, read as one snapshot — the mistake was in
+reading the evidence, not in the firmware.
+
+Once the sync ran on this same boot, the body correctly carried
+`"contentSyncStatus":"ok"` plus `contentSyncedSecondsAgo`, and the backend
+stored `ok` / `SW` / `bootCount 0` / `up_to_date`. Evidence:
+`tools/quality-evidence/sync-reporting-verified-20260814.log`.
+
+---
+
+### 1.3.2 — 2026-08-14 — the clean image (debug print removed)
+
+Removes the raw-body debug print added in 1.3.1. Applied OTA from 1.3.1.
+Sketch size is **byte-identical to 1.3.0** — the proof the debug-only change
+is fully gone and nothing else moved. This is the version the 1.3.3
+hold-to-menu diffs and RAM/flash comparisons below are measured against.
 
 ---
 

@@ -1,0 +1,128 @@
+67 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=1043374 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=1048376 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-72 btn=UP
+[alive] ms=1053385 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-79 btn=UP
+[alive] ms=1058395 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-67 btn=UP
+[alive] ms=1063397 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=1068399 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[alive] ms=1073405 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-67 btn=UP
+[alive] ms=1078405 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-67 btn=UP
+[button] raw=DOWN
+[button] pressed
+[button] raw=UP
+[button] press -- opening the menu
+[welcome] ask ask-sgrc
+[state] 0 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] GREEN -> story
+[welcome] offering from 10 already-heard stories
+[state] 3 -> 3
+[story] SD open: /stories/little-cloud-v3-reoffer.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (yesno)
+[welcome] no answer ??? closing quietly
+[welcome] playing chosen story little-cloud
+[story] source = SD (cache)
+[state] 3 -> 3
+[story] intro clip (/stories/little-cloud-v3-intro.mp3)
+[story] SD open: /stories/little-cloud-v3-intro.mp3 @ 0
+[story] SD end interrupted=false
+[state] 3 -> 3
+[story] SD play from byte 0
+[story] SD open: /stories/little-cloud-v3.mp3 @ 0
+[story] SD end interrupted=false
+[story-report] started little-cloud (sd) key=b47-1 queued=1
+[story-report] finished ??? event closed
+[state] 3 -> 3
+[post] summary/conclusion (/stories/little-cloud-v3-summary.mp3)
+[story] SD open: /stories/little-cloud-v3-summary.mp3 @ 0
+[story] SD end interrupted=false
+[state] 3 -> 3
+[post] question 1 (/stories/little-cloud-v3-question1.mp3)
+[story] SD open: /stories/little-cloud-v3-question1.mp3 @ 0
+[story] SD end interrupted=false
+[post] listening for answer 1 (press & hold to talk)
+[post] no answer in window; closing quietly
+[story] finished ??? press to play again
+[state] 3 -> 0
+[state] 0 -> 0
+[alive] ms=1130437 heap=101448 psram=7861472 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[story-report] uploaded 1 event(s), 0 still queued
+[menu] activity ended ??? asking what next (chain=1)
+[welcome] ask ask-sgrc
+[state] 0 -> 3
+[story] SD open: /voice/ask-sgrc-v1.mp3 @ 0
+[story] SD end interrupted=false
+[welcome] listening (mode)
+[welcome] no answer ??? closing quietly
+[state] 3 -> 0
+[alive] ms=1149845 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=1154852 heap=101448 psram=7861440 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=1159859 heap=101448 psram=7861440 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[alive] ms=1164861 heap=101448 psram=7861472 wifi=3 ip=192.168.1.10 rssi=-75 btn=UP
+[alive] ms=1169863 heap=101448 psram=7861472 wifi=3 ip=192.168.1.10 rssi=-76 btn=UP
+[alive] ms=1174869 heap=101396 psram=7861472 wifi=3 ip=192.168.1.10 rssi=-76 btn=UP
+[alive] ms=1179873 heap=101448 psram=7861472 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=1184876 heap=101448 psram=7861472 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=1189877 heap=101448 psram=7861472 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=1194883 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=1199891 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=1204899 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=1209899 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=1214902 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-76 btn=UP
+[alive] ms=1219906 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-78 btn=UP
+[alive] ms=1224915 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-78 btn=UP
+[alive] ms=1229915 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-78 btn=UP
+[alive] ms=1234920 heap=101396 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-78 btn=UP
+[alive] ms=1239924 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-79 btn=UP
+[alive] ms=1244928 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-77 btn=UP
+[alive] ms=1249936 heap=101396 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=1254939 heap=101396 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=1259946 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=1264948 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-78 btn=UP
+[alive] ms=1269948 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-76 btn=UP
+[alive] ms=1274957 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-75 btn=UP
+[alive] ms=1279966 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=1284967 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=1289975 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=1294979 heap=101396 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-72 btn=UP
+[alive] ms=1299982 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=1304989 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=1309994 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-83 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=1314998 heap=101396 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-72 btn=UP
+[alive] ms=1320007 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=1325008 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=1330016 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-72 btn=UP
+[alive] ms=1335021 heap=101396 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-66 btn=UP
+[alive] ms=1340022 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=1345029 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-71 btn=UP
+[alive] ms=1350038 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=1355043 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-71 btn=UP
+[alive] ms=1360048 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[alive] ms=1365053 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[alive] ms=1370059 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-67 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=1375060 heap=101396 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-67 btn=UP
+[alive] ms=1380063 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-67 btn=UP
+[alive] ms=1385063 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[alive] ms=1390066 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[alive] ms=1395067 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[alive] ms=1400069 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[alive] ms=1405074 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[alive] ms=1410079 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=1415083 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=1420088 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[alive] ms=1425088 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=1430092 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=1435096 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[alive] ms=1440101 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-71 btn=UP
+[alive] ms=1445104 heap=101396 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=1450112 heap=101396 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=1455117 heap=101396 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-71 btn=UP

@@ -1707,6 +1707,96 @@ void content_sync_tick() {
     Serial.flush();
 }
 
+// Capped variant of sha256_of_file for the read self-test only: hashes at
+// most cap_bytes so two passes stay a bounded pause, not a dead minute.
+static bool sha256_of_file_capped(const char *path, size_t cap_bytes,
+                                  char *out_hex /* 65 */, size_t *out_size) {
+    File f = SD.open(path, FILE_READ);
+    if (!f) return false;
+    mbedtls_sha256_context sha;
+    mbedtls_sha256_init(&sha);
+    mbedtls_sha256_starts(&sha, 0);
+    static uint8_t buf[4096];
+    size_t total = 0;
+    while (total < cap_bytes) {
+        esp_task_wdt_reset();
+        size_t want = sizeof(buf);
+        if (cap_bytes - total < want) want = cap_bytes - total;
+        const int n = f.read(buf, want);
+        if (n <= 0) break;
+        mbedtls_sha256_update(&sha, buf, (size_t)n);
+        total += (size_t)n;
+    }
+    f.close();
+    uint8_t digest[32];
+    mbedtls_sha256_finish(&sha, digest);
+    mbedtls_sha256_free(&sha);
+    to_hex_lower(digest, sizeof(digest), out_hex);
+    if (out_size != nullptr) *out_size = total;
+    return true;
+}
+
+bool content_sync_read_selftest() {
+    if (!audio_sd_available()) {
+        Serial.println("[sd-selftest] SD not mounted -- cannot test");
+        return false;
+    }
+    // The index is present on every synced card and small enough that two
+    // full passes cost well under a second even on a struggling card.
+    // Prefer a big story file when one exists: corruption shows up per
+    // megabyte, and the index alone might read clean while stories don't.
+    const char *path = "/content_index.json";
+    File probe = SD.open("/stories");
+    if (probe) {
+        static char big[CS_MAX_PATH_LEN];
+        size_t big_size = 0;
+        File e = probe.openNextFile();
+        while (e) {
+            if (!e.isDirectory() && (size_t)e.size() > big_size) {
+                big_size = (size_t)e.size();
+                snprintf(big, sizeof(big), "/stories/%s", e.name());
+            }
+            e = probe.openNextFile();
+        }
+        probe.close();
+        if (big_size > 0) path = big;
+    }
+    char h1[65], h2[65];
+    size_t n1 = 0, n2 = 0;
+    const uint32_t t0 = millis();
+    // Cap each pass at 2 MB: the point is read STABILITY, not a full-file
+    // hash, and the 2026-08-30 16 MHz failure diverged inside the first
+    // 2.7 MB. Uncapped, two passes over an 8 MB story at 4 MHz block the
+    // loop (and the button) for ~45 seconds after every boot.
+    const bool ok1 = sha256_of_file_capped(path, 2097152U, h1, &n1);
+    const uint32_t t1 = millis();
+    const bool ok2 = sha256_of_file_capped(path, 2097152U, h2, &n2);
+    const uint32_t t2 = millis();
+    if (!ok1 || !ok2) {
+        Serial.printf("[sd-selftest] open failed on %s\n", path);
+        return false;
+    }
+    const uint32_t kbps1 = (t1 > t0) ? (uint32_t)(n1 / (t1 - t0)) : 0;
+    const uint32_t kbps2 = (t2 > t1) ? (uint32_t)(n2 / (t2 - t1)) : 0;
+    const bool same = (strcmp(h1, h2) == 0) && (n1 == n2);
+    Serial.printf("[sd-selftest] %s pass1=%u B %u KB/s pass2=%u B %u KB/s\n",
+                  path, (unsigned)n1, (unsigned)kbps1,
+                  (unsigned)n2, (unsigned)kbps2);
+    if (same) {
+        Serial.printf("[sd-selftest] PASS -- both reads identical (%.*s...)\n",
+                      12, h1);
+    } else {
+        // The unambiguous verdict. Do not soften this line: it is the one
+        // piece of evidence that ends the software-vs-hardware argument.
+        Serial.println("[sd-selftest] FAIL -- SAME FILE READ TWICE GAVE DIFFERENT BYTES.");
+        Serial.println("[sd-selftest] The SD read path is corrupting data (wiring, card, or its power).");
+        Serial.printf("[sd-selftest] pass1=%s\n", h1);
+        Serial.printf("[sd-selftest] pass2=%s\n", h2);
+    }
+    Serial.flush();
+    return same;
+}
+
 void content_sync_request_now() {
     // Only moves the schedule. Every guard in the tick still applies, so an
     // operator pressing "Sync this toy now" cannot interrupt a story, race an

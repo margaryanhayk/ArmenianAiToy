@@ -238,11 +238,61 @@ non-MP3 pass-through.
 
 Full suite: **2522 passed, 0 failed** (2509 before).
 
+
 ---
 
-## Part 4 — negotiated first-byte streaming on `story-qa` (2026-09-01, implemented)
+## Part 4 — 2026-09-01 research update: what the industry does, and our path
 
-Lever 2 from Part 2, done on both ends without a fleet-wide flag day. The
+Since Part 2 was written, levers 1/3/4/9 LANDED (fast models in prod `327720b`,
+POST-before-earcon + TLS reuse + DIAG gating in fw 1.2.0 `64a6957`, streaming
+playback ON `f7b529b`). But the AI provider flips changed the board: chat is
+Gemini, TTS is the ElevenLabs clone — and `/api/chat/story-qa` still synthesises
+the WHOLE answer buffered (3–5 s) before the first byte leaves; the e4f0d6f
+streaming pass-through was wired only on `/api/chat/audio`.
+
+**Industry reality (sourced, 2026):** production voice agents run ~680–950 ms
+voice-to-voice. The budget: streaming STT with server endpointing 150–300 ms,
+LLM first token 150–500 ms, TTS first byte 100–300 ms, transport 50–150 ms —
+everything streams, nothing store-and-forwards. Perceived-latency research: an
+instant earcon + a spoken filler buys 2–4 s of tolerated wait.
+
+**The Armenian constraint, re-checked:** Gemini Live and the fast TTS vendors
+(Cartesia, Inworld, Deepgram) still have no hy. But two 2026 releases at OUR
+existing vendor potentially close both gaps:
+- **ElevenLabs Scribe v2 Realtime** — 150 ms streaming STT, "90+ languages";
+  hy CONFIRMED in batch Scribe v2 (5–10 % WER), realtime list unenumerated.
+- **Eleven v3 Conversational** — ~280 ms realtime TTS in the v3 family (the
+  only family that speaks Armenian; the clone's family). Listed with hy.
+Both need an afternoon of empirical testing with an API key before believing.
+Azure hy-AM neural voices remain the proven-realtime TTS fallback (owner rated
+them mediocre in the 2026-08-05 listen test — a quality compromise).
+
+**Ranked plan from here:**
+
+| # | Step | Cuts | Size |
+|---|---|---:|---|
+| 0 | Measure the CURRENT number on the toy (`[latency]` print + X-Qa headers) | — | tonight |
+| 1 | **Stream story-qa TTS pass-through** — mirror e4f0d6f on `StoryQaController`, negotiated per request (firmware `useHTTP10(true)` on the QA POST avoids the HTTPClient chunked-framing trap; the AREG_QA_STREAM_PLAYBACK reader already tolerates a missing Content-Length) | **2–4 s** | backend, days |
+| 2 | Gemini PAID tier (free tier = 5 req/min; throttling is latency too) | variable | config |
+| 3 | **Empirical hy test: Scribe v2 Realtime + Eleven v3 Conversational** — one afternoon, decides whether both realtime gaps close at ElevenLabs | gate for #4 | test |
+| 4 | **Stream the mic upload while the child speaks** (Willow shape: chunked upload/websocket during recording, server-side endpointing; STT result ~ready at button release) | **2–4 s** (upload + STT leave the critical path) | firmware+backend slice |
+| 5 | Filler clip in the clone's voice between upload-end and first answer byte (the 2026-06 failure was decode-concurrent-with-UPLOAD starvation; with #4 the upload is over before the filler starts — but re-verify on the bench) | perceived | firmware |
+| 6 | Host near providers | 0.4–1 s | ops decision |
+
+**End state:** release → first audio ≈ 1.5–2.5 s real (the realistic floor for
+an Armenian pipeline that keeps dual moderation serial), perceived ≈ instant
+with the earcon + filler. The 800 ms industry median is English-only-stack
+territory; we do not chase it at the cost of the safety ordering.
+
+Safety invariant unchanged: input moderation stays serial before the model;
+output moderation keeps gating what is returned (speculative TTS discarded on
+block). Streaming changes WHERE bytes wait, never what is allowed to speak.
+
+---
+
+## Part 5 — negotiated first-byte streaming on `story-qa` (2026-09-01, implemented)
+
+Step 1 of the Part 4 ranked plan (lever 2 of Part 2), done on both ends without a fleet-wide flag day. The
 firmware notes (`esp32/AregVoiceMvp/latency-firmware-notes.md` § "What the
 backend must do for item 5") had already named the contract; this is it.
 
@@ -261,7 +311,7 @@ Kill switch: `StoryQa:StreamAnswerAudio` (default true).
 header; the sync fallback path and every flag-off build do not, because they
 read through `read_response_into()` (§1.4). The request stays HTTP/1.1 — the
 streaming reader already de-frames chunked bodies and treats a missing
-Content-Length *as* chunked, so `useHTTP10(true)` would have broken it.
+Content-Length *as* chunked, so the `useHTTP10(true)` that Part 4's row 1 suggested would have broken it (Kestrel answers HTTP/1.0 with an unframed body closed by the server) and was rejected.
 Compiled at the canonical FQBN, flag off (byte-identical) and flag on; **not
 flashed, not bench-run** — the toy was busy with hardware work.
 

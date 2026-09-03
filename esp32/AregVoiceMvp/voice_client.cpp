@@ -21,7 +21,52 @@
 #include "ota_state.h"      // OTA apply — lastOtaStatus for the heartbeat report
 #include "content_sync_rules.h"  // cs_copy_bounded — bounded intent-token copy
 
+#include <esp_task_wdt.h>   // bounded blocking POSTs unsubscribe the loop task
 #include <Preferences.h>    // welcome flow — persisted last-known pause/bedtime
+
+// -------------------------------------------------------------
+// WdtPause — unsubscribe THIS task from the watchdog for the length of a
+// bounded blocking network call, and re-subscribe however the scope exits.
+//
+// CRASH FIX 2026-08-16, caught on the toy the first time a child ever
+// answered a reflection question:
+//
+//   [post] POST answer (134700 bytes) qIndex=0
+//   E task_wdt: Task watchdog got triggered ... loopTask (CPU 1)
+//   Aborting. Rebooting...   reset_reason=6/TASK_WDT
+//
+// HTTPClient::POST blocks its task with no hook to feed the watchdog, and
+// AREG_HTTP_READ_MS (30000) is the SAME value as AREG_WDT_TIMEOUT_S. So any
+// backend turn that takes its full read budget guarantees a reset — and 134 KB
+// of a child's answer, plus STT, moderation, the model and TTS, gets there
+// easily on a weak link. The in-story Q&A path escaped this years ago by
+// moving to its own core-0 task, which is not watchdog-subscribed; every other
+// AI-waiting call still runs right here on loopTask.
+//
+// This is not a dodge around the watchdog. The watchdog exists to catch a
+// HANG; these are bounded waits with their own two timeouts (connect 5 s,
+// read 30 s). What it must never do is leak — a missed re-add would leave the
+// toy permanently unwatched, which is worse than the bug being fixed. Hence a
+// destructor rather than paired calls: every early return re-arms it.
+// -------------------------------------------------------------
+namespace {
+struct WdtPause {
+    const bool was_on;
+    WdtPause() : was_on(esp_task_wdt_status(NULL) == ESP_OK) {
+        if (was_on) {
+            esp_task_wdt_delete(NULL);
+        }
+    }
+    ~WdtPause() {
+        if (was_on) {
+            esp_task_wdt_add(NULL);
+            esp_task_wdt_reset();
+        }
+    }
+    WdtPause(const WdtPause &) = delete;
+    WdtPause &operator=(const WdtPause &) = delete;
+};
+}  // namespace
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -725,18 +770,24 @@ VoiceTurnResult voice_upload_turn(const uint8_t *payload, size_t length) {
     static const char *kCollectHeaders[] = {"X-Areg-Continue"};
     http.collectHeaders(kCollectHeaders, 1);
 
+    // Same bounded AI wait as the reflection answer, same watchdog hazard —
+    // this one runs on loopTask via handle_online_chat_session(). See WdtPause.
     DIAG_MARK(5010, "http_post_before");
-    const int status = http.POST((uint8_t *)payload, length);
-    DIAG_MARK(5011, "http_post_after");
-    result.http_status = status;
-    if (status != 200) {
-        Serial.printf("[voice] http POST non-200: %d\n", status);
-        http.end();
-        return result;
-    }
+    bool read_ok = false;
+    {
+        WdtPause wdt;
+        const int status = http.POST((uint8_t *)payload, length);
+        DIAG_MARK(5011, "http_post_after");
+        result.http_status = status;
+        if (status != 200) {
+            Serial.printf("[voice] http POST non-200: %d\n", status);
+            http.end();
+            return result;
+        }
 
-    DIAG_MARK(5020, "http_read_body_before");
-    const bool read_ok = read_response_into(http, result);
+        DIAG_MARK(5020, "http_read_body_before");
+        read_ok = read_response_into(http, result);
+    }
     DIAG_MARK(5021, "http_read_body_after_ok");
     http.end();
     DIAG_MARK(5030, "http_end_after");
@@ -928,15 +979,20 @@ VoiceTurnResult voice_upload_reflection_answer(const uint8_t *payload, size_t le
     Serial.printf("[post] POST answer (%u bytes) qIndex=%d\n",
                   (unsigned)length, question_index);
     Serial.flush();
-    const int status = http.POST((uint8_t *)payload, length);
-    result.http_status = status;
-    if (status != 200) {
-        Serial.printf("[post] http POST non-200: %d\n", status);
-        http.end();
-        return result;
-    }
 
-    const bool read_ok = read_response_into(http, result);
+    // This is the call that rebooted the toy on 2026-08-16 — see WdtPause.
+    bool read_ok = false;
+    {
+        WdtPause wdt;
+        const int status = http.POST((uint8_t *)payload, length);
+        result.http_status = status;
+        if (status != 200) {
+            Serial.printf("[post] http POST non-200: %d\n", status);
+            http.end();
+            return result;
+        }
+        read_ok = read_response_into(http, result);
+    }
     http.end();
     if (!read_ok) {
         voice_release_last_response();
@@ -1224,22 +1280,27 @@ VoiceTurnResult voice_continue_turn() {
     http.collectHeaders(kCollectHeaders, 1);
 
     // Empty body — the backend skips STT and advances the active
-    // library story.
-    const int status = http.POST((uint8_t *)"", 0);
-    result.http_status = status;
-    if (status == 204) {
-        // No more story to play — clean end of autoplay.
-        Serial.println("[voice] continue: 204 (story complete)");
-        http.end();
-        return result;  // ok=false, continue_more=false
-    }
-    if (status != 200) {
-        Serial.printf("[voice] continue: non-200 %d\n", status);
-        http.end();
-        return result;
-    }
+    // library story. Still waits on the model and TTS, still on loopTask,
+    // so it carries the same watchdog hazard as the other two. See WdtPause.
+    bool read_ok = false;
+    {
+        WdtPause wdt;
+        const int status = http.POST((uint8_t *)"", 0);
+        result.http_status = status;
+        if (status == 204) {
+            // No more story to play — clean end of autoplay.
+            Serial.println("[voice] continue: 204 (story complete)");
+            http.end();
+            return result;  // ok=false, continue_more=false
+        }
+        if (status != 200) {
+            Serial.printf("[voice] continue: non-200 %d\n", status);
+            http.end();
+            return result;
+        }
 
-    const bool read_ok = read_response_into(http, result);
+        read_ok = read_response_into(http, result);
+    }
     http.end();
     if (!read_ok) {
         voice_release_last_response();

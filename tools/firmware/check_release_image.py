@@ -99,7 +99,19 @@ def main() -> int:
             f"placeholder and rebuild. Treat the key as COMPROMISED and revoke "
             f"it — the value is not printed here, look in your own config.h.")
 
-    guids = [s for s in strings if GUID_RE.match(s)]
+    # Well-known LIBRARY constants that are GUID-shaped by nature. These are
+    # identical in every firmware in the world that uses the library, carry no
+    # secret, and would otherwise fail every BLE-enabled release forever.
+    # Keep this list EXACT-VALUE only -- never a pattern, never a flag an
+    # operator could wave a real device id through. First entry added for
+    # release 1.3.4 (2026-09-02), the first gated release with BLE
+    # provisioning compiled in.
+    KNOWN_LIBRARY_GUIDS = {
+        # Espressif WiFiProv BLE provisioning service UUID (esp_prov).
+        "258eafa5-e914-47da-95ca-c5ab0dc85b11",
+    }
+    guids = [s for s in strings
+             if GUID_RE.match(s) and s.lower() not in KNOWN_LIBRARY_GUIDS]
     if guids:
         failures.append(
             f"{len(guids)} GUID-shaped string(s) compiled in. If any is the "

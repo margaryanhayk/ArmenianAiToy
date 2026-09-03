@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "author": "Areg bench",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-s3-devkitc-1",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {
+        "flashSize": "8"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnMain",
+      "top": -80,
+      "left": 260,
+      "attrs": {
+        "color": "yellow",
+        "label": "MAIN (18)"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnGreen",
+      "top": -10,
+      "left": 260,
+      "attrs": {
+        "color": "green",
+        "label": "YES (21)"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnRed",
+      "top": 60,
+      "left": 260,
+      "attrs": {
+        "color": "red",
+        "label": "NO (47)"
+      }
+    },
+    {
+      "type": "wokwi-microsd-card",
+      "id": "sd",
+      "top": -120,
+      "left": -180,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot",
+      "top": 140,
+      "left": 260,
+      "attrs": {
+        "label": "VOLUME (8)"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "btnMain:1.l",
+      "esp:18",
+      "gold",
+      []
+    ],
+    [
+      "btnMain:2.l",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "btnGreen:1.l",
+      "esp:21",
+      "green",
+      []
+    ],
+    [
+      "btnGreen:2.l",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "btnRed:1.l",
+      "esp:47",
+      "red",
+      []
+    ],
+    [
+      "btnRed:2.l",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "sd:CS",
+      "esp:10",
+      "orange",
+      []
+    ],
+    [
+      "sd:SCK",
+      "esp:12",
+      "blue",
+      []
+    ],
+    [
+      "sd:DI",
+      "esp:11",
+      "purple",
+      []
+    ],
+    [
+      "sd:DO",
+      "esp:13",
+      "cyan",
+      []
+    ],
+    [
+      "sd:VCC",
+      "esp:3V3.1",
+      "red",
+      []
+    ],
+    [
+      "sd:GND",
+      "esp:GND.2",
+      "black",
+      []
+    ],
+    [
+      "pot:SIG",
+      "esp:8",
+      "gold",
+      []
+    ],
+    [
+      "pot:VCC",
+      "esp:3V3.1",
+      "red",
+      []
+    ],
+    [
+      "pot:GND",
+      "esp:GND.2",
+      "black",
+      []
+    ]
+  ]
+}

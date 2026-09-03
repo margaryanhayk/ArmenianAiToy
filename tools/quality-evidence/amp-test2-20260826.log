@@ -1,0 +1,65 @@
+[alive] ms=4275571 heap=101396 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-65 btn=UP
+[alive] ms=4280574 heap=101400 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-76 btn=UP
+[alive] ms=4285582 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=4290589 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-71 btn=UP
+[alive] ms=4295592 heap=101396 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=4300598 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-72 btn=UP
+[alive] ms=4305603 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-67 btn=UP
+[alive] ms=4310606 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=4315607 heap=101400 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=4320607 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=4325614 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=4330616 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-72 btn=UP
+[alive] ms=4335620 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=4340628 heap=101396 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=4345633 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=4350638 heap=101396 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-72 btn=UP
+[alive] ms=4355647 heap=101396 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-72 btn=UP
+[alive] ms=4360654 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=4365662 heap=101396 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=4373298 heap=101400 psram=7860788 wifi=3 ip=192.168.1.10 rssi=-72 btn=UP
+[alive] ms=4378301 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=4383306 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-74 btn=UP
+[alive] ms=4388308 heap=101396 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-73 btn=UP
+[alive] ms=4393309 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-72 btn=UP
+[alive] ms=4398312 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=4403313 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=4408317 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-72 btn=UP
+[alive] ms=4413321 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=4418322 heap=101396 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-71 btn=UP
+[alive] ms=4423324 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=4428331 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-67 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=4433332 heap=101400 psram=7860788 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[alive] ms=4438339 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[alive] ms=4443344 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-64 btn=UP
+[alive] ms=4448344 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[alive] ms=4453347 heap=101396 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=4458351 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-67 btn=UP
+[alive] ms=4463353 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=4468356 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[alive] ms=4473362 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[alive] ms=4478363 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=4483369 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=4488375 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=4493378 heap=101448 psram=7860788 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=4498384 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=4503390 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=4508395 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[alive] ms=4513395 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=4518404 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-71 btn=UP
+[alive] ms=4523405 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-66 btn=UP
+[alive] ms=4528407 heap=101396 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=4533407 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[alive] ms=4538408 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[alive] ms=4543417 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[alive] ms=4548421 heap=101448 psram=7861216 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[heartbeat] status=200 (fw=1.3.3 bedtime=0 paused=0)
+[alive] ms=4553422 heap=101396 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-67 btn=UP
+[alive] ms=4558429 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
+[alive] ms=4563429 heap=101396 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-70 btn=UP
+[alive] ms=4568430 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-69 btn=UP
+[alive] ms=4573438 heap=101448 psram=7861184 wifi=3 ip=192.168.1.10 rssi=-68 btn=UP
