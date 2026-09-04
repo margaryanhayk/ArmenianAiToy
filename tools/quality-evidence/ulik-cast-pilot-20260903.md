@@ -141,3 +141,21 @@ glitch, and it would have caught «shshsh» before the owner did. Not yet
 built into render_story.py.
 
 v5: 2:29, with the owner.
+
+## 2026-09-04, round 4 — a stray «hmm», and air after the door
+
+Owner on v5: a «hmm» after «Ուլիկն իսկույն վեր է թռչում, դուռը բաց անում» that
+is not in the story; and after the door opens for the mother («Ուլիկը
+դուռը բաց է անում, կաթ է խմում…») the story must wait before going on.
+
+- render_story.py now transcribes every span (Scribe v2) and refuses a take
+  that contains a word the story does not, or reads too far from the text
+  (WER > 0.35); it re-asks up to the same retry budget as the chopped-tail
+  check. This is the machine check the round-3 note asked for — «shshsh» and
+  «hmm» both show up as extra words. A key without speech_to_text skips it
+  with a note instead of failing the render.
+- Segment 1 re-rendered through that check; the first take was clean.
+- Both door-open cues: tail 0.9 s (was 0.5), leadIn 0.3. Hole is now 2.32 s
+  for 1.12 s of sound.
+
+v6: 2:30, with the owner.

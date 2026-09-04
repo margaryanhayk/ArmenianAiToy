@@ -384,7 +384,7 @@
           "landOn": "դուռը բաց անում",
           "insert": true,
           "leadIn": 0.3,
-          "tail": 0.5,
+          "tail": 0.9,
           "note": "Ulik opens the door for his mother (owner request 2026-09-04). Inserted: latch, creak, then the milk."
         },
         {
@@ -431,7 +431,7 @@
           "landOn": "դուռը բաց է անում",
           "insert": true,
           "leadIn": 0.3,
-          "tail": 0.5,
+          "tail": 0.9,
           "note": "The same door opens for the same mother, after the RIGHT voice. Second line cue in segment 4 — needs the mixer to key line anchors per cue, not per segment."
         }
       ]

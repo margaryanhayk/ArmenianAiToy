@@ -100,6 +100,48 @@ def tts(text, path, token, voice, settings, model=DEFAULT_MODEL):
     if not os.path.exists(path) or os.path.getsize(path) < 1000:
         raise SystemExit(f"render failed for {text[:40]!r}: {r.stderr.decode()[:200]}")
 
+STT_MODEL = "scribe_v2"
+STT_MAX_EXTRA_WORDS = 0        # any word the story does not have is a fault
+STT_MAX_WER = 0.35             # above this the take is garbage, not an accent
+
+def _norm_words(t):
+    t = re.sub(r"[՞՛՜]", "", t.lower())
+    return re.sub(r"[^\w\s]", " ", t).split()
+
+def _wer(ref, hyp):
+    r, h = _norm_words(ref), _norm_words(hyp)
+    d = list(range(len(h) + 1))
+    for i in range(1, len(r) + 1):
+        prev, d[0] = d[0], i
+        for j in range(1, len(h) + 1):
+            cur = d[j]
+            d[j] = min(d[j] + 1, d[j - 1] + 1, prev + (r[i - 1] != h[j - 1]))
+            prev = cur
+    return d[len(h)] / max(1, len(r))
+
+def spoken_matches(path, text, token):
+    """Transcribe the span and refuse a take that says something the story
+    does not. The owner caught «Արածում է shshsh իրիկունը» and a stray «hmm»
+    after «դուռը բաց անում» by ear (2026-09-04); both transcribe as extra
+    words. Returns (ok, reason). A key without speech_to_text permission
+    skips the check with a warning rather than failing the render."""
+    r = subprocess.run(
+        ["curl","-sS","--max-time","120","-X","POST","-H",f"xi-api-key: {token}",
+         "-F",f"model_id={STT_MODEL}","-F","language_code=hy","-F",f"file=@{path}",
+         "https://api.elevenlabs.io/v1/speech-to-text"], capture_output=True)
+    try:
+        j = json.loads(r.stdout.decode("utf-8", "replace"))
+    except ValueError:
+        return True, "stt unreadable — skipped"
+    if "text" not in j:
+        return True, f"stt skipped ({str(j)[:80]})"
+    hyp = j["text"]
+    extra = len(_norm_words(hyp)) - len(_norm_words(text))
+    w = _wer(text, hyp)
+    if extra > STT_MAX_EXTRA_WORDS or w > STT_MAX_WER:
+        return False, f"heard {hyp[:90]!r} (+{extra} words, wer {w:.2f})"
+    return True, f"wer {w:.2f}"
+
 def render_segment(smap, seg, outdir, token, voice, sid):
     parts, problems = [], []
     for i, span in enumerate(seg["spans"]):
@@ -127,6 +169,13 @@ def render_segment(smap, seg, outdir, token, voice, sid):
             ratio = tail_ratio(raw)
             expect = len(text) / CHARS_PER_SECOND
             short = duration(raw) < expect * TAIL_MIN_LENGTH_RATIO
+            said_ok, why = spoken_matches(raw, text, token)
+            if not said_ok:
+                if attempt == TAIL_RETRIES:
+                    raise SystemExit(f"NOT THE STORY: span {i} ({who}) {text[:40]!r} — {why}, "
+                                     f"after {TAIL_RETRIES} retries")
+                print(f"    {i:02d} {who:14} {why} — re-asking", flush=True)
+                continue
             if ratio <= TAIL_MAX_RATIO or not short:
                 break
             if attempt == TAIL_RETRIES:
