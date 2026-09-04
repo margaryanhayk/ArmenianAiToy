@@ -47,15 +47,15 @@
   },
   "ulik": {
    "role": "Ուլիկը",
-   "pitch": 1.1,
+   "pitch": 1.0,
    "directionForHumanNarrator": "small young goat, bright, a little wary, then excited telling his mother",
    "voiceSettings": {
     "stability": 0.4,
     "similarity_boost": 0.8,
     "style": 0.45
    },
-   "voiceId": "PgFHHZMKb19tJbjBe6aY",
-   "voiceName": "vardan-v2",
+   "voiceId": "GazesXOqRnIUqi60EsmM",
+   "voiceName": "vardan-test (owner's pick 2026-09-04 from ten candidates; unshifted — the 10% lift on vardan-v2 was what sounded unlovely)",
    "modelId": "eleven_v3_conversational"
   }
  },

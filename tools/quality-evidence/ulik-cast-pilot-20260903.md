@@ -159,3 +159,20 @@ is not in the story; and after the door opens for the mother («Ուլիկը
   for 1.12 s of sound.
 
 v6: 2:30, with the owner.
+
+## 2026-09-04, round 5 — Ulik recast
+
+Owner on v6: Ulik's voice "not pleasant, something not lovely". Ten
+candidates rendered on his main line — Vardan plain and +6 %, vardan-test,
+Katrin v3 plain and +6 %, katrin-rec1, katrin-v2, and three designed voices
+(ElevenLabs refused a description containing "child"; "young goat
+character" passed). Owner picked **vardan-test**, unshifted. The 10 % lift on
+vardan-v2 is the likely culprit: pitch-shifting a clone is what sounded off.
+
+The transcript guard earned its keep on the first run: vardan-test's first
+two takes of «Էդ ո՞վ ես դու…» came back truncated (WER 0.45, then 0.74 —
+the second stopped after nine words) and were re-asked automatically; the
+third passed. The mother's segment-4 line was re-asked once for an extra
+word. None of this reached the owner.
+
+v7: 2:30, with the owner.
