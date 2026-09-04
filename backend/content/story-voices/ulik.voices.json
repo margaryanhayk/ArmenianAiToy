@@ -15,7 +15,8 @@
    },
    "voiceId": "NxAsEwnikgCJa5tyBwEf",
    "voiceName": "areg-storyteller",
-   "modelId": "eleven_v3_conversational"
+   "modelId": "eleven_v3",
+   "note": "Narration stays on eleven_v3, the model the approved library was rendered with. eleven_v3_conversational is tuned for dialogue and, on the opening of Ուլիկը, let sentence endings fall away 'as if out of breath' (owner, 2026-09-04). Characters keep the conversational model."
   },
   "mother": {
    "role": "Այծը, Ուլիկի մայրը",
@@ -138,7 +139,14 @@
    "spans": [
     {
      "speaker": "mother",
-     "text": "— Պա՛ պա՛, պա՛, պա՛, Սևուկ ջան, ի՜նչ լավ է եղել, որ բաց չես արել,"
+     "text": "— Պա՛ պա՛, պա՛, պա՛, Սևուկ ջան, ի՜նչ լավ է եղել, որ բաց չես արել,",
+     "voiceSettings": {
+      "stability": 0.65,
+      "similarity_boost": 0.85,
+      "style": 0.25,
+      "speed": 0.9
+     },
+     "note": "Slower and steadier than her song: «Պա՛ պա՛, պա՛, պա՛» came out unnaturally fast (owner, 2026-09-04)."
     },
     {
      "speaker": "narrator",
@@ -146,7 +154,14 @@
     },
     {
      "speaker": "mother",
-     "text": "— Էդ գայլն է եղել, եկել է, որ քեզ ուտի։ Մյուս անգամ էլ որ գա, բաց չանես, ասա՝ գնա՛, թե չէ՝ իմ մայրը քեզ կսպանի իր սուր պոզերով։"
+     "text": "— Էդ գայլն է եղել, եկել է, որ քեզ ուտի։ Մյուս անգամ էլ որ գա, բաց չանես, ասա՝ գնա՛, թե չէ՝ իմ մայրը քեզ կսպանի իր սուր պոզերով։",
+     "voiceSettings": {
+      "stability": 0.65,
+      "similarity_boost": 0.85,
+      "style": 0.25,
+      "speed": 0.9
+     },
+     "note": "Slower and steadier than her song: «Պա՛ պա՛, պա՛, պա՛» came out unnaturally fast (owner, 2026-09-04)."
     }
    ]
   }

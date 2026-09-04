@@ -142,12 +142,84 @@ def spoken_matches(path, text, token):
         return False, f"heard {hyp[:90]!r} (+{extra} words, wer {w:.2f})"
     return True, f"wer {w:.2f}"
 
-def render_segment(smap, seg, outdir, token, voice, sid):
+# RENDER_ONLY="narrator,5:0,5:2" re-renders only those speakers / seg:span
+# pairs and keeps every other span's WAV as it is. The owner tunes one
+# character at a time, and an approved take must not change because a
+# different character was re-asked (2026-09-04).
+def _render_only():
+    raw = os.environ.get("RENDER_ONLY", "").strip()
+    if not raw:
+        return None
+    names, pairs = set(), set()
+    for tok in raw.split(","):
+        tok = tok.strip()
+        if not tok: continue
+        if ":" in tok:
+            a, b = tok.split(":", 1); pairs.add((int(a), int(b)))
+        else:
+            names.add(tok)
+    return names, pairs
+
+def _selected(sel, who, si, pi):
+    return sel is None or who in sel[0] or (si, pi) in sel[1]
+
+F0_MIN_HZ, F0_MAX_HZ = 70.0, 500.0
+F0_RATIO_BAND = (0.75, 1.30)    # a take outside this against the speaker's own reference is a different voice
+F0_MIN_CHARS = 40               # a short exclamation legitimately sits higher or lower; too few voiced frames to judge
+
+def median_f0(path):
+    """Median fundamental of the voiced frames, by autocorrelation. Crude, but
+    the fault it guards against is not subtle: the mother's last line came
+    back «like a little child talking» (owner, 2026-09-04) — a shift no
+    settings asked for. Returns None when numpy is missing."""
+    try:
+        import numpy as np, struct
+    except ImportError:
+        return None
+    raw = subprocess.run(["ffmpeg","-v","error","-i",path,"-f","s16le","-ac","1","-ar","16000","-"],
+                         capture_output=True).stdout
+    x = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    sr, win, hop = 16000, 640, 320
+    lo, hi = int(sr / F0_MAX_HZ), int(sr / F0_MIN_HZ)
+    f0s = []
+    thr = 0.05 * (np.abs(x).max() or 1.0)
+    for i in range(0, len(x) - win, hop):
+        fr = x[i:i + win]
+        if np.abs(fr).mean() < thr: continue
+        fr = fr - fr.mean()
+        ac = np.correlate(fr, fr, "full")[win - 1:]
+        if ac[0] <= 0: continue
+        seg = ac[lo:hi]
+        k = int(np.argmax(seg)) + lo
+        if ac[k] / ac[0] > 0.5:
+            f0s.append(sr / k)
+    return float(np.median(f0s)) if len(f0s) >= 20 else None
+
+def pitch_matches(path, ref_path):
+    a, b = median_f0(path), median_f0(ref_path)
+    if a is None or b is None:
+        return True, "pitch check skipped"
+    r = a / b
+    ok = F0_RATIO_BAND[0] <= r <= F0_RATIO_BAND[1]
+    return ok, f"f0 {a:.0f} Hz vs reference {b:.0f} Hz (x{r:.2f})"
+
+def render_segment(smap, seg, outdir, token, voice, sid, sel=None, refs=None):
     parts, problems = [], []
+    refs = refs if refs is not None else {}
     for i, span in enumerate(seg["spans"]):
         who = span["speaker"]
         spk = smap["speakers"][who]
         text = guard(span["text"].strip())
+        kept = os.path.join(outdir, f"{sid}-{seg['index']:02d}-{i:02d}-{who}.wav")
+        if not _selected(sel, who, seg["index"], i) and os.path.exists(kept):
+            parts.append((who, kept, pause_after(text), len(text), duration(kept)))
+            refs.setdefault(who, kept)
+            print(f"    {i:02d} {who:14} kept", flush=True)
+            continue
+        # A span may carry its own voiceSettings on top of the speaker's —
+        # «Պա՛ պա՛, պա՛, պա՛» wants to be slower than the same mother's song.
+        settings = dict(spk.get("voiceSettings") or {})
+        settings.update(span.get("voiceSettings") or {})
         # The story id is in the NAME. Without it, rendering ten stories into
         # one directory silently overwrites every span of the first nine — the
         # finished audio survived (each story is stitched before the next
@@ -165,11 +237,13 @@ def render_segment(smap, seg, outdir, token, voice, sid):
         spk_model = spk.get("modelId") or DEFAULT_MODEL
         # Render, and re-ask if the model returns it with the tail cut off.
         for attempt in range(TAIL_RETRIES + 1):
-            tts(text, raw, token, spk_voice, spk.get("voiceSettings"), spk_model)
+            tts(text, raw, token, spk_voice, settings or None, spk_model)
             ratio = tail_ratio(raw)
             expect = len(text) / CHARS_PER_SECOND
             short = duration(raw) < expect * TAIL_MIN_LENGTH_RATIO
             said_ok, why = spoken_matches(raw, text, token)
+            if said_ok and who in refs and len(text) >= F0_MIN_CHARS:
+                said_ok, why = pitch_matches(raw, refs[who])
             if not said_ok:
                 if attempt == TAIL_RETRIES:
                     raise SystemExit(f"NOT THE STORY: span {i} ({who}) {text[:40]!r} — {why}, "
@@ -210,6 +284,7 @@ def render_segment(smap, seg, outdir, token, voice, sid):
                         "-ac","1","-ar","44100",wav], capture_output=True)
         os.remove(stage)
         parts.append((who, wav, pause_after(text), len(text), duration(wav)))
+        refs.setdefault(who, wav)
         print(f"    {i:02d} {who:14} {len(text):>4}ch {got:>5.1f}s "
               f"tail {tail_ratio(raw):.0%}"
               f"{'  pitch '+str(pitch) if pitch!=1.0 else ''}"
@@ -332,18 +407,20 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     smap = json.load(open(f"backend/content/story-voices/{sid}.voices.json", encoding="utf-8"))
     seg_files, span_map = [], {}
+    sel, refs = _render_only(), {}
     for seg in smap["segments"]:
         if only is not None and seg["index"] != only:
             continue
         f = os.path.join(outdir, f"{sid}-seg{seg['index']}.mp3")
         # Resume. 211 paid requests where one chopped span at number 200 throws
         # away the other 199 is the wrong shape: a finished segment is money
-        # already spent, so it is never re-requested.
-        if os.path.exists(f) and os.path.getsize(f) > 1000:
+        # already spent, so it is never re-requested. With RENDER_ONLY the
+        # segment is re-stitched from kept WAVs plus the re-rendered ones.
+        if sel is None and os.path.exists(f) and os.path.getsize(f) > 1000:
             print(f"  segment {seg['index']} already rendered — keeping")
             seg_files.append(f); continue
         print(f"  segment {seg['index']} ({len(seg['spans'])} spans)")
-        parts = render_segment(smap, seg, outdir, token, voice, sid)
+        parts = render_segment(smap, seg, outdir, token, voice, sid, sel, refs)
         print("  ->", stitch(parts, outdir, f"{sid}-seg{seg['index']}.mp3"))
         seg_files.append(f)
         span_map[seg["index"]] = span_timings(parts)

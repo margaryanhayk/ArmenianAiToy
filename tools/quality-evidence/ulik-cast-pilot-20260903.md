@@ -194,3 +194,35 @@ last knock (the mother's) should go.
   door-open inserts stay.
 
 v8: 2:23, with the owner.
+
+## 2026-09-04, round 7 — the narrator's breath, the mother's speed, the mother's pitch
+
+Owner on v8: the opening narration does not finish its sentences ("as if
+out of breath", startlingly deep at one point); the mother's «Պա՛ պա՛, պա՛,
+պա՛, Սևուկ ջան» is unnaturally fast; her last line comes out "like a little
+child talking".
+
+- **Narrator back to `eleven_v3`.** The conversational model was applied to
+  everyone in the pilot because the owner preferred it for the two clones;
+  for NARRATION it drops sentence endings. The approved library was rendered
+  with eleven_v3 and that stays the narrator's model. Characters keep the
+  conversational model. All narrator spans re-rendered; every character take
+  the owner had accepted is untouched.
+- **`RENDER_ONLY="narrator,5:0,5:2"`** — the renderer can now re-render only
+  named speakers and seg:span pairs, keeping every other span's WAV and
+  re-stitching. Before this, fixing one character's line meant re-rolling
+  its whole segment, which is how the mother's refrain went bad in round 5.
+- **Span-level `voiceSettings`** override the speaker's: the two segment-5
+  mother lines carry speed 0.9, stability 0.65, style 0.25.
+- **Pitch guard.** A take's median f0 (autocorrelation, numpy) is compared
+  with the same speaker's first rendered take; outside ×0.75–1.30 it is
+  re-asked. It fired correctly on the mother's «Պա՛ պա՛» (×1.19 on the first
+  band, re-asked) and wrongly on two short narrator asides («— ասավ վախեցած
+  մայրը։», 27 chars, ×0.76) — a short parenthetical is legitimately lower,
+  and too short to measure — so the guard now skips spans under 40 chars
+  and the band is 0.75–1.30. The first run aborted on that false positive
+  and the mix that followed silently reused the OLD segment 5; caught before
+  sending, re-run with `RENDER_ONLY="5:1,5:2"`.
+
+v9: 2:15 (eleven_v3 narrates faster than the conversational model), with
+the owner.
