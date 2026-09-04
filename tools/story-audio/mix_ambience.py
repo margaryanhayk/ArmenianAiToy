@@ -524,8 +524,17 @@ def load_aligned_words(story_id: str, audio_dir: Path) -> list[dict]:
     for d in (audio_dir, REPO / "backend/src/ArmenianAiToy.Api/story-audio"):
         p = d / f"{story_id}.words.json"
         if p.exists():
-            return json.loads(p.read_text(encoding="utf-8")).get("words", [])
+            doc = json.loads(p.read_text(encoding="utf-8"))
+            # A per-span alignment (tools/story-voices/align_spans.py) is
+            # already in this timeline; drift correction would only add the
+            # first-word lead of each segment back in as an error.
+            global _WORDS_EXACT
+            _WORDS_EXACT = bool(doc.get("exact"))
+            return doc.get("words", [])
     return []
+
+
+_WORDS_EXACT = False
 
 
 def find_aligned_phrase_end(words: list[dict], phrase: str,
@@ -651,7 +660,7 @@ def resolve_line_positions(story_id: str, cues: list[dict], durations: list[floa
         if story_json.exists() else []
     aligned_seg_start: dict[int, float] = {}
     if words and texts:
-        anchors = drift_anchors(words, texts, starts)
+        anchors = [] if _WORDS_EXACT else drift_anchors(words, texts, starts)
         if len(anchors) >= 2:
             d0 = anchors[0][0] - anchors[0][1]
             dn = anchors[-1][0] - anchors[-1][1]
@@ -702,7 +711,10 @@ def resolve_line_positions(story_id: str, cues: list[dict], durations: list[floa
             # previous cue's position is not enough on its own: «դուռը զարկում»
             # occurs in segment 0 too — the mother's first knock — and the
             # wolf's cue resolved to it, 20.5s before its own segment.
-            floor = max(seen, aligned_seg_start.get(i, 0.0) - 0.05)
+            # An exact per-span map IS in file time, so the file-time segment
+            # start is the right floor for it; there is no drift to allow for.
+            seg_floor = starts[i] if _WORDS_EXACT else aligned_seg_start.get(i, 0.0)
+            floor = max(seen, seg_floor - 0.05)
             spoken_raw = find_aligned_phrase_end(words, line, floor)
             spoken = (correct_drift(spoken_raw, anchors)
                       if spoken_raw is not None else None)
@@ -816,7 +828,13 @@ def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Pat
         install_marker: Path | None = None) -> int:
     cues, held = partition_held(load_cues(story_id))
     refuse_if_already_mixed(narration, force)
-    audio_dir = narration.parent if narration is not None else Path(".")
+    # In segments mode the alignment belongs beside the segments. Path(".")
+    # here meant the repo root, where no fresh render ever puts a words.json,
+    # so the fallback silently read the SHIPPED story's word map and anchored
+    # a new render's cues against audio that no longer existed (found on the
+    # 2026-09-03 cast pilot: both knocks 0.5-0.7 s late, "drift" of -29.6 s).
+    audio_dir = (narration.parent if narration is not None
+                 else segments_dir if segments_dir is not None else Path("."))
     if narration is not None:
         segs = [narration]
         durations = segments_from_shipped(narration, map_path)

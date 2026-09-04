@@ -60,3 +60,31 @@ a span. Not fixed in this pilot — the owner listens first.
 
 Roughly 1,600 characters per full render, three full renders plus ~20
 wolf auditions ≈ 7,000 characters. One forced alignment per render.
+
+## 2026-09-04 — the knocks were late, and it was the mixer, not the aligner
+
+The owner heard both knocks land wrong. Measured against a per-span forced
+alignment (one voice, a few seconds each — exact): «դուռը զարկում» ends at
+3.08 s into segment 2, the knock was cut in at 3.81 s; «դուռը ծեծում» ends at
+2.44 s into segment 4, the knock at 2.97 s. Both late, both by about half a
+second, the second one inside the mother's first word.
+
+Cause: in `--segments-dir` mode `mix_ambience.py` looked for the word map in
+`Path(".")` — the repo root — found nothing, and fell back to the SHIPPED
+story's `story-audio/ulik.words.json`, the alignment of a different
+recording. The "-29.6 s drift" in the first pilot's log was that: two
+unrelated timelines being reconciled. The soft spot recorded above was
+misdiagnosed as aligner drift.
+
+Fixes, both in this commit:
+- `mix_ambience.py` reads the word map from the segments directory in
+  segments mode, and when a map declares `"exact": true` it applies no drift
+  correction and floors each phrase search at the file-time segment start.
+- `tools/story-voices/align_spans.py` — one forced alignment per span, shifted
+  by the renderer's own span map into the mixer's timeline, written as an
+  exact map. Whole-story alignment of a multi-voice render is not trusted for
+  cue placement any more.
+
+Re-mixed: knocks at 3.16 s and 2.60 s into their segments (inside the pause
+after the word, before the next one). Mixer self-test passes. `ulik-pilot-v2`
+went to the owner.
