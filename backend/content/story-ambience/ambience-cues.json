@@ -407,22 +407,6 @@
           "segment": 4,
           "at": "line",
           "kind": "oneshot",
-          "sound": "door-knock-soft",
-          "seconds": 2.5,
-          "level": -18,
-          "holdUnder": false,
-          "cueLine": "Գալիս է մայրը, դուռը ծեծում․",
-          "note": "The mother's knock: light and quick, unmistakably not the wolf's. See the segment-2 note.",
-          "avoid": "no howl, no growl, no animal",
-          "insert": true,
-          "landOn": "դուռը ծեծում",
-          "leadIn": 0.5,
-          "tail": 0.6
-        },
-        {
-          "segment": 4,
-          "at": "line",
-          "kind": "oneshot",
           "sound": "door-open",
           "seconds": 2.5,
           "level": -19,
@@ -434,6 +418,9 @@
           "tail": 0.9,
           "note": "The same door opens for the same mother, after the RIGHT voice. Second line cue in segment 4 — needs the mixer to key line anchors per cue, not per segment."
         }
+      ],
+      "_notes": [
+        "2026-09-04: the mother's knock (door-knock-soft, segment 4) was REMOVED at the owner's request after hearing v7 — the wolf's knock is the only knock in the story now. The sound stays in sounds/ulik/ for other stories."
       ]
     },
     {

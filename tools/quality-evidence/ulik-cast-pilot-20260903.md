@@ -176,3 +176,21 @@ third passed. The mother's segment-4 line was re-asked once for an extra
 word. None of this reached the owner.
 
 v7: 2:30, with the owner.
+
+## 2026-09-04, round 6 — the refrain, and one knock only
+
+Owner on v7: the mother's second «Սևուկ ուլիկ, Սիրուն բալիկ» was "very
+split" — chopped where it should be sung, «Սևուուուկ… Սիրուուուն…»; and the
+last knock (the mother's) should go.
+
+- The mother's two songs are byte-identical in the story text, so her
+  segment-4 span now reuses the segment-0 take the owner had already
+  accepted. Segment 4 was re-stitched with the renderer's own stitch and
+  span-timing functions (nothing hand-timed). Rule worth making automatic:
+  a speaker's identical refrain gets ONE take, rendered once — a refrain
+  is supposed to sound the same, and one take cannot be choppy twice.
+- `door-knock-soft` removed from Ուլիկը's cues (kept in sounds/ for other
+  stories). The wolf's heavy knock is the only knock left; the two
+  door-open inserts stay.
+
+v8: 2:23, with the owner.
