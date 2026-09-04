@@ -120,6 +120,30 @@
       "description": "A few people in a large room, no words distinguishable.",
       "licence": "generated - no licence fee. Output ownership comes from the ElevenLabs plan's terms, not from the audio being synthetic; the CC0 Wikimedia candidates in sound-candidates.md remain the fallback if a real recording is ever preferred.",
       "prompt": "A few people talking quietly in a large stone room, heard from the far side. No word is distinguishable, no laughter stands out."
+    },
+    {
+      "id": "door-knock-heavy",
+      "description": "Three slow heavy fist-knocks on a thick cottage door — the wolf.",
+      "prompt": "Three slow, heavy knocks of a large fist on a thick wooden cottage door, from inside the room, dry, close. No voice, no growl, no animal, no music, no reverb tail.",
+      "durationSeconds": 3.0,
+      "licence": "generated - no licence fee. Output ownership comes from the ElevenLabs plan's terms, not from the audio being synthetic; the CC0 Wikimedia candidates in sound-candidates.md remain the fallback if a real recording is ever preferred.",
+      "promptInfluence": 0.6
+    },
+    {
+      "id": "door-knock-soft",
+      "description": "Four quick light friendly taps — the mother.",
+      "prompt": "Four quick, light, friendly taps of small knuckles on a wooden cottage door, from inside the room, gentle. No voice, no animal, no music.",
+      "durationSeconds": 2.5,
+      "licence": "generated - no licence fee. Output ownership comes from the ElevenLabs plan's terms, not from the audio being synthetic; the CC0 Wikimedia candidates in sound-candidates.md remain the fallback if a real recording is ever preferred.",
+      "promptInfluence": 0.6
+    },
+    {
+      "id": "door-open",
+      "description": "Iron latch lifts, wooden door swings open with a short creak.",
+      "prompt": "An old wooden cottage door with an iron latch: the latch lifts, the door swings open with a short soft creak of hinges. From inside a quiet room. No voice, no footsteps, no music.",
+      "durationSeconds": 2.5,
+      "licence": "generated - no licence fee. Output ownership comes from the ElevenLabs plan's terms, not from the audio being synthetic; the CC0 Wikimedia candidates in sound-candidates.md remain the fallback if a real recording is ever preferred.",
+      "promptInfluence": 0.6
     }
   ],
   "stories": [
@@ -349,32 +373,66 @@
           "note": "The same forest, later in the day - the day cue from segment 0 hands over to this one. Calm, never eerie: the light changes, the mood does not. Anchored to the START of the segment, not its end, because the end of segment 1 IS the start of segment 2, where the wolf knocks - the two landed on the same instant and arrived as one muddled event. This way the evening settles, the bed thins out under the narration, and the knock lands into it."
         },
         {
+          "segment": 1,
+          "at": "line",
+          "kind": "oneshot",
+          "sound": "door-open",
+          "seconds": 2.5,
+          "level": -19,
+          "holdUnder": false,
+          "cueLine": "Ուլիկն իսկույն վեր է թռչում, դուռը բաց անում։",
+          "landOn": "դուռը բաց անում",
+          "insert": true,
+          "leadIn": 0.3,
+          "tail": 0.5,
+          "note": "Ulik opens the door for his mother (owner request 2026-09-04). Inserted: latch, creak, then the milk."
+        },
+        {
           "segment": 2,
           "at": "line",
           "kind": "oneshot",
-          "sound": "door-knock",
-          "seconds": 2,
+          "sound": "door-knock-heavy",
+          "seconds": 3,
           "level": -18,
           "holdUnder": false,
           "cueLine": "Մի իրիկուն այծից առաջ գալիս է, դուռը զարկում ու իր հաստ ձայնով կանչում․",
-          "note": "The wolf at the door. No howl anywhere in this story - the menace is the voice, and that is the point the child is meant to notice.",
+          "note": "OWNER CHANGE 2026-09-04: the two knocks are no longer the same sound. The wolf knocks heavy and slow, the mother light and quick — and the story stops for it: pause, knock, pause, continue (leadIn/tail override the mixer's defaults). The earlier 'same knock, only the voice differs' idea is retired by the owner's ear.",
           "avoid": "no howl, no growl, no animal",
           "insert": true,
-          "landOn": "դուռը զարկում"
+          "landOn": "դուռը զարկում",
+          "leadIn": 0.6,
+          "tail": 0.7
         },
         {
           "segment": 4,
           "at": "line",
           "kind": "oneshot",
-          "sound": "door-knock",
-          "seconds": 2,
+          "sound": "door-knock-soft",
+          "seconds": 2.5,
           "level": -18,
           "holdUnder": false,
           "cueLine": "Գալիս է մայրը, դուռը ծեծում․",
-          "note": "The SAME knock, at the same level, as the wolf's. That is deliberate: the door sounds identical and only the voice differs, which is exactly what the kid had to work out.",
+          "note": "The mother's knock: light and quick, unmistakably not the wolf's. See the segment-2 note.",
           "avoid": "no howl, no growl, no animal",
           "insert": true,
-          "landOn": "դուռը ծեծում"
+          "landOn": "դուռը ծեծում",
+          "leadIn": 0.5,
+          "tail": 0.6
+        },
+        {
+          "segment": 4,
+          "at": "line",
+          "kind": "oneshot",
+          "sound": "door-open",
+          "seconds": 2.5,
+          "level": -19,
+          "holdUnder": false,
+          "cueLine": "Ուլիկը դուռը բաց է անում, կաթ է խմում ու մորը պատմում․",
+          "landOn": "դուռը բաց է անում",
+          "insert": true,
+          "leadIn": 0.3,
+          "tail": 0.5,
+          "note": "The same door opens for the same mother, after the RIGHT voice. Second line cue in segment 4 — needs the mixer to key line anchors per cue, not per segment."
         }
       ]
     },

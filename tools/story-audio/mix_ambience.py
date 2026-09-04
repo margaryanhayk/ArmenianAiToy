@@ -216,7 +216,7 @@ def snap_to_pause(estimate: float, silences: list[tuple[float, float]],
 
 
 def resolve_cue_time(cue: dict, starts: list[float], durations: list[float],
-                     lines: dict | None = None) -> float:
+                     lines: dict | None = None, cue_index: int | None = None) -> float:
     """Absolute seconds for a cue anchored to a segment index and start/end/line.
 
     `lines` maps segment index -> seconds into that segment for an `at: "line"`
@@ -232,6 +232,11 @@ def resolve_cue_time(cue: dict, starts: list[float], durations: list[float],
         # second before it.
         return starts[i] + durations[i]
     if at == "line":
+        # A segment may carry more than one line cue (Ուլիկը, segment 4: the
+        # mother's knock, then the door opening for her), so positions are
+        # keyed per cue first and per segment as the older fallback.
+        if lines is not None and cue_index is not None and ("cue", cue_index) in lines:
+            return starts[i] + lines[("cue", cue_index)]
         if lines is None or i not in lines:
             raise SystemExit(
                 f"segment {i} / {cue.get('sound')}: at=\"line\" but no line "
@@ -252,7 +257,7 @@ def build_chains(cues: list[dict], starts: list[float], durations: list[float],
     """
     chains = []
     for ci, cue in enumerate(cues):
-        at = resolve_cue_time(cue, starts, durations, lines)
+        at = resolve_cue_time(cue, starts, durations, lines, ci)
         seconds = float(cue["seconds"])
         level = float(cue["level"])
         src = sound_index[cue["sound"]]
@@ -674,11 +679,11 @@ def resolve_line_positions(story_id: str, cues: list[dict], durations: list[floa
     # in «Ուլիկը» by three characters — so each search starts after the last
     # one ended, or every cue but the first lands on the first singing.
     seen = 0.0
-    for cue in cues:
+    for ci, cue in enumerate(cues):
         if cue.get("at") != "line":
             continue
         i = cue["segment"]
-        if i in out:
+        if ("cue", ci) in out:
             continue
         # `landOn` is the phrase the SOUND lands on; `cueLine` is the line the
         # cue belongs to. They are usually different and the difference is
@@ -739,7 +744,9 @@ def resolve_line_positions(story_id: str, cues: list[dict], durations: list[floa
                         f"drift — the cueLine is matching an earlier "
                         f"occurrence. Make it longer or more specific.")
                 out[i] = at
+                out[("cue", ci)] = out[i]
                 src[i] = "aligned"
+                src[("cue", ci)] = src[i]
                 near = snap_to_pause(spoken, silences, SNAP_WINDOW_S)
                 notes.append(
                     f"seg {i}: line anchor {at:.2f}s (ALIGNED word ends "
@@ -776,6 +783,7 @@ def resolve_line_positions(story_id: str, cues: list[dict], durations: list[floa
             # The END of the span the line finishes, not the start of the next.
             start, dur = measured[i][k - 1]
             out[i] = start + dur
+            out[("cue", ci)] = out[i]
             notes.append(f"seg {i}: line anchor {out[i]:.2f}s (measured span map)")
             continue
 
@@ -786,10 +794,12 @@ def resolve_line_positions(story_id: str, cues: list[dict], durations: list[floa
         snapped = snap_to_pause(est + starts[i], silences)
         if snapped is None:
             out[i] = est
+            out[("cue", ci)] = out[i]
             notes.append(f"seg {i}: line anchor {est:.2f}s (estimate; no pause "
                          f"within {SNAP_WINDOW_S}s)")
         else:
             out[i] = snapped - starts[i]
+            out[("cue", ci)] = out[i]
             notes.append(f"seg {i}: line anchor {out[i]:.2f}s "
                          f"(estimate {est:.2f}s, snapped {out[i] - est:+.2f}s "
                          f"to a pause)")
@@ -888,7 +898,7 @@ def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Pat
         # after «գցում գետը։»: the narrator runs straight into the next line,
         # and demanding a silence would have refused to place the story's
         # single most important sound.
-        if line_source.get(cue["segment"]) == "aligned":
+        if line_source.get(("cue", ci), line_source.get(cue["segment"])) == "aligned":
             # Cut exactly where the alignment says the word ends, and do NOT
             # snap. Snapping made two instruments argue: on «Երեք խոզուկները»
             # silencedetect found a gap 0.56s BEFORE «ուժով։» finished and the
@@ -914,7 +924,10 @@ def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Pat
             line_notes.append(f"seg {cue['segment']}: cutting at {cut:.2f}s "
                               f"unchecked — no pause data (is ffmpeg present?)")
         body = sound_content_length(chain["src"]) or float(cue["seconds"])
-        gap = INSERT_LEAD_S + body + INSERT_TAIL_S
+        # "pause, knock, pause, continue" — a cue may ask for more air than
+        # the defaults on either side of its sound (owner, 2026-09-04).
+        gap = (float(cue.get("leadIn", INSERT_LEAD_S)) + body
+               + float(cue.get("tail", INSERT_TAIL_S)))
         insertions.append((cut, gap))
         inserted_at[idx] = cut
         line_notes.append(f"seg {cue['segment']}: cut at {cut:.2f}s, "
@@ -928,8 +941,9 @@ def run(story_id: str, segments_dir: Path | None, sounds_dir: Path, out_dir: Pat
         # the silence it opened.
         for idx, cut in inserted_at.items():
             before = sum(g for c, g in insertions if c < cut)
+            lead = float(cues[chains[idx]["cue"]].get("leadIn", INSERT_LEAD_S))
             chains[idx] = {**chains[idx],
-                           "start": cut + before + INSERT_LEAD_S,
+                           "start": cut + before + lead,
                            "duration": sound_content_length(chains[idx]["src"])
                                        or chains[idx]["duration"]}
         total = shift_for(total, insertions)

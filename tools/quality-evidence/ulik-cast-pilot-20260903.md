@@ -88,3 +88,27 @@ Fixes, both in this commit:
 Re-mixed: knocks at 3.16 s and 2.60 s into their segments (inside the pause
 after the word, before the next one). Mixer self-test passes. `ulik-pilot-v2`
 went to the owner.
+
+## 2026-09-04, round 2 — pause, knock, pause; two knocks; a door that opens
+
+Owner on v2/v3: the wolf's knock still wrong ("we can pause, knock, pause,
+and continue"), the two knocks should differ and run a little longer, keep
+the behind-the-door voices (v3), add a door-open sound. Done as v4:
+
+- Three sounds generated (ElevenLabs sound-generation, prompts in
+  `sounds/ulik/prompts.json`): `door-knock-heavy` (the wolf, 2.1 s of
+  strikes), `door-knock-soft` (the mother), `door-open` (latch + creak).
+  The August decision that both knocks are the same sound is retired by the
+  owner's ear; the cue sheet says so at the wolf's cue.
+- Mixer: a cue may set `leadIn` / `tail` around its inserted sound (wolf:
+  0.6 / 0.7 s, mother: 0.5 / 0.6 s), and a segment may carry more than one
+  line cue — segment 4 now has the mother's knock AND the door opening for
+  her. Line positions are keyed per cue with the per-segment key kept as
+  the fallback the self-test exercises.
+- Behind-the-door voices are applied to the per-segment WAVs on span-local
+  times before mixing, so the inserts cannot shift them.
+
+Placements, all from the exact per-span map: door-open at 2.98 s into seg 1
+(«դուռը բաց անում»), heavy knock at 3.16 s into seg 2, soft knock at 2.60 s
+into seg 4, door-open at 18.71 s into seg 4 («դուռը բաց է անում»). 2:30.
+Self-test passes. Not shipped; v4 is with the owner.

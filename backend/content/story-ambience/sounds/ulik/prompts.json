@@ -16,5 +16,23 @@
     "durationSeconds": 10.0,
     "promptInfluence": 0.45,
     "cuesUsingIt": 1
+  },
+  "door-knock-heavy": {
+    "prompt": "Three slow, heavy knocks of a large fist on a thick wooden cottage door, from inside the room, dry, close. No voice, no growl, no animal, no music, no reverb tail.",
+    "durationSeconds": 3.0,
+    "promptInfluence": 0.6,
+    "generated": "2026-09-04, ElevenLabs sound-generation, for the cast pilot (owner: two different knocks, a little longer, and a door opening)"
+  },
+  "door-knock-soft": {
+    "prompt": "Four quick, light, friendly taps of small knuckles on a wooden cottage door, from inside the room, gentle. No voice, no animal, no music.",
+    "durationSeconds": 2.5,
+    "promptInfluence": 0.6,
+    "generated": "2026-09-04, ElevenLabs sound-generation, for the cast pilot (owner: two different knocks, a little longer, and a door opening)"
+  },
+  "door-open": {
+    "prompt": "An old wooden cottage door with an iron latch: the latch lifts, the door swings open with a short soft creak of hinges. From inside a quiet room. No voice, no footsteps, no music.",
+    "durationSeconds": 2.5,
+    "promptInfluence": 0.6,
+    "generated": "2026-09-04, ElevenLabs sound-generation, for the cast pilot (owner: two different knocks, a little longer, and a door opening)"
   }
 }
