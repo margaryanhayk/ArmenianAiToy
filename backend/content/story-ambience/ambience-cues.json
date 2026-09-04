@@ -396,10 +396,10 @@
           "level": -18,
           "holdUnder": false,
           "cueLine": "Մի իրիկուն այծից առաջ գալիս է, դուռը զարկում ու իր հաստ ձայնով կանչում․",
-          "note": "OWNER CHANGE 2026-09-04: the two knocks are no longer the same sound. The wolf knocks heavy and slow, the mother light and quick — and the story stops for it: pause, knock, pause, continue (leadIn/tail override the mixer's defaults). The earlier 'same knock, only the voice differs' idea is retired by the owner's ear.",
+          "note": "OWNER CHANGE 2026-09-04: the two knocks are no longer the same sound. The wolf knocks heavy and slow, the mother light and quick — and the story stops for it: pause, knock, pause, continue (leadIn/tail override the mixer's defaults). The earlier 'same knock, only the voice differs' idea is retired by the owner's ear. 2026-09-04: moved from «դուռը զարկում» to the END of the narrator's sentence — cutting after «զարկում» clipped the tiny «ու» that follows it (owner heard it). At the sentence end the cut falls in the speaker pause before the wolf sings, where there is no word to clip: '…calls in his thick voice:' — knock — the wolf's song.",
           "avoid": "no howl, no growl, no animal",
           "insert": true,
-          "landOn": "դուռը զարկում",
+          "landOn": "ձայնով կանչում",
           "leadIn": 0.6,
           "tail": 0.7
         },

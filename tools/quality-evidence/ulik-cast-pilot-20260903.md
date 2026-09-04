@@ -112,3 +112,32 @@ Placements, all from the exact per-span map: door-open at 2.98 s into seg 1
 («դուռը բաց անում»), heavy knock at 3.16 s into seg 2, soft knock at 2.60 s
 into seg 4, door-open at 18.71 s into seg 4 («դուռը բաց է անում»). 2:30.
 Self-test passes. Not shipped; v4 is with the owner.
+
+## 2026-09-04, round 3 — no muffling, knock after the sentence, one bad «և»
+
+Owner on v4: (1) drop the behind-the-door effect; (2) the wolf's knock was
+cut badly — the cut after «զարկում» clipped the tiny «ու» that follows;
+(3) a voice bug in the opening: «Արածում է և իրիկունը…» came out as
+«Արածում է shshsh…».
+
+- (1) v5 mixes from the unfiltered segments. The effect stays available as
+  a technique (it is a one-line ffmpeg pass on a span) but is not used.
+- (2) The wolf's cue now lands on «ձայնով կանչում», the END of the
+  narrator's sentence: the cut falls in the 0.40 s speaker pause before the
+  wolf sings, where no word can be clipped. Placed at 5.22 s into segment 2
+  (the narrator span is 5.20 s). Rule for the cue sheet from this: prefer a
+  landOn that ends a span; a mid-line landOn is only safe when the next
+  word is not a one-letter one.
+- (3) Confirmed by transcription (Scribe v2): the shipped take read
+  «արածում է չնաչորսը և իրիկունը» — a spoken artefact where the text has
+  «է և». Segment 0 was re-rendered once (both spans; the renderer's unit is
+  the segment) and the new take transcribes clean, «արածում է և իրիկունը».
+  The span map for segment 0 was rebuilt from the new WAV lengths with the
+  renderer's own 0.40 s speaker pause, then align_spans re-run.
+
+A rule worth keeping: transcribe every span after rendering and diff it
+against the text — that is a cheap machine check for exactly this class of
+glitch, and it would have caught «shshsh» before the owner did. Not yet
+built into render_story.py.
+
+v5: 2:29, with the owner.
