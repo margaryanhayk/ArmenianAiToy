@@ -226,3 +226,23 @@ child talking".
 
 v9: 2:15 (eleven_v3 narrates faster than the conversational model), with
 the owner.
+
+## 2026-09-06, round 8 — two text edits, the door in the right pause, «Պա՛ պա՛» slower still
+
+Owner on v9: «կաաա» before the door sound (the cut at «անում» split «կաթ»);
+«Պա՛ պա՛» still too fast; remove «— ասավ վախեցած մայրը։»; «գեղեցիկ ուլ» →
+«գեղեցիկ ուլիկ».
+
+- **Two edits to the story TEXT**, made in `ulik.story.json` and the speaker
+  map together; `check_speaker_map.py` passes (the map still reconstructs
+  the story byte for byte) and the 51 story-library tests pass. The comma
+  before the removed attribution became a full stop. The shipped narration
+  on the toy does not carry these edits until the cast render ships.
+- **`landAfterSpan`** in the mixer: a cue may land at the measured end of a
+  span. The segment-4 door now opens in the renderer's 0.40 s speaker pause
+  between the mother's song and «Ուլիկը դուռը բաց է անում…» — the only
+  anchor there that cannot split a word.
+- «Պա՛ պա՛…» at speed 0.8, stability 0.75, style 0.15 (span-level).
+- Re-rendered with `RENDER_ONLY="0:0,5:0"`; every other take kept.
+
+v10: 2:13, with the owner.

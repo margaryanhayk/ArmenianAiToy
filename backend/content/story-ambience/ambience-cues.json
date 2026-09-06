@@ -412,11 +412,11 @@
           "level": -19,
           "holdUnder": false,
           "cueLine": "Ուլիկը դուռը բաց է անում, կաթ է խմում ու մորը պատմում․",
-          "landOn": "դուռը բաց է անում",
           "insert": true,
           "leadIn": 0.3,
           "tail": 0.9,
-          "note": "The same door opens for the same mother, after the RIGHT voice. Second line cue in segment 4 — needs the mixer to key line anchors per cue, not per segment."
+          "note": "The door opens in the speaker pause after the mother's song, before the narrator says Ulik opened it. Anchored on «դուռը բաց է անում» it cut «կաթ» in half (owner heard «կաաա», 2026-09-06).",
+          "landAfterSpan": 1
         }
       ],
       "_notes": [

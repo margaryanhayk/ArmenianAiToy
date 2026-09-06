@@ -694,6 +694,24 @@ def resolve_line_positions(story_id: str, cues: list[dict], durations: list[floa
         # it lands on the word that means knocked.
         line = (cue.get("landOn") or cue.get("cueLine", "")).strip()
 
+        # `landAfterSpan: k` — land at the END of span k of this segment, from
+        # the renderer's measured span map. For a sound that belongs between
+        # two speakers (the door opening after the mother's song, before the
+        # narrator says Ulik opened it) this is the only anchor that cannot
+        # split a word: the cut falls in the speaker pause the renderer put
+        # there. On 2026-09-06 a word-end anchor cut «կաթ» in half.
+        if "landAfterSpan" in cue:
+            k = int(cue["landAfterSpan"])
+            if i not in measured or not (0 <= k < len(measured[i])):
+                raise SystemExit(f"segment {i} / {cue.get('sound')}: landAfterSpan={k} "
+                                 f"but no measured span map for that segment.")
+            start, dur = measured[i][k]
+            out[i] = start + dur
+            out[("cue", ci)] = out[i]
+            src[i] = "measured"; src[("cue", ci)] = "measured"
+            notes.append(f"seg {i}: line anchor {out[i]:.2f}s (end of span {k}, measured)")
+            continue
+
         if words and line:
             # Search from this segment's own start, never earlier. A story
             # repeats itself — «Խոսող ձուկը» says «դուռը զարկեց» in more than

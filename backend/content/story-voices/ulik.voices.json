@@ -66,7 +66,7 @@
    "spans": [
     {
      "speaker": "narrator",
-     "text": "Խոր անտառում մի այծ է լինում։ Ունենում է մի գեղեցիկ ուլ։ Ուլին ամեն օր թողնում է տանը, ինքը գնում է արոտ անելու։ Արածում է և իրիկունը կուրծքը լիքը տուն է գալիս։ Տուն է գալիս, դուռը զարկում ու մկըկում, կանչում․ "
+     "text": "Խոր անտառում մի այծ է լինում։ Ունենում է մի գեղեցիկ ուլիկ։ Ուլին ամեն օր թողնում է տանը, ինքը գնում է արոտ անելու։ Արածում է և իրիկունը կուրծքը լիքը տուն է գալիս։ Տուն է գալիս, դուռը զարկում ու մկըկում, կանչում․ "
     },
     {
      "speaker": "mother",
@@ -139,18 +139,14 @@
    "spans": [
     {
      "speaker": "mother",
-     "text": "— Պա՛ պա՛, պա՛, պա՛, Սևուկ ջան, ի՜նչ լավ է եղել, որ բաց չես արել,",
+     "text": "— Պա՛ պա՛, պա՛, պա՛, Սևուկ ջան, ի՜նչ լավ է եղել, որ բաց չես արել։ ",
      "voiceSettings": {
-      "stability": 0.65,
+      "stability": 0.75,
       "similarity_boost": 0.85,
-      "style": 0.25,
-      "speed": 0.9
+      "style": 0.15,
+      "speed": 0.8
      },
-     "note": "Slower and steadier than her song: «Պա՛ պա՛, պա՛, պա՛» came out unnaturally fast (owner, 2026-09-04)."
-    },
-    {
-     "speaker": "narrator",
-     "text": "— ասավ վախեցած մայրը։ "
+     "note": "Slow and steady: «Պա՛ պա՛, պա՛, պա՛» was still too fast at speed 0.9 (owner, 2026-09-06). The attribution «— ասավ վախեցած մայրը։» that followed was cut by the owner the same day; the comma became a full stop."
     },
     {
      "speaker": "mother",
@@ -167,5 +163,8 @@
   }
  ],
  "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing).",
- "_cast": "Owner decision 2026-09-03: a real cast per story. Narrator is always Areg. Katrin and Vardan take a part in every story. Library voices only for villains and animals (they speak Armenian with an accent). Every speaker may carry voiceId/modelId; absent means the narrator's voice in eleven_v3, so older maps render unchanged."
+ "_cast": "Owner decision 2026-09-03: a real cast per story. Narrator is always Areg. Katrin and Vardan take a part in every story. Library voices only for villains and animals (they speak Armenian with an accent). Every speaker may carry voiceId/modelId; absent means the narrator's voice in eleven_v3, so older maps render unchanged.",
+ "_textEdits": [
+  "2026-09-06 (owner): «գեղեցիկ ուլ» -> «գեղեցիկ ուլիկ» in segment 0; «— ասավ վախեցած մայրը։» removed from segment 5 (comma before it became a full stop). Story file and speaker map edited together; the shipped narration audio does not carry these edits until the cast render ships."
+ ]
 }
