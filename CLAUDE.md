@@ -2985,9 +2985,11 @@ it is ok"). It is a LISTENING COPY in scratch; the shipped
   with a −43 dBFS floor and a clone reproduces its room. Fix now: per-speaker
   `"denoise": true` in the voices map (`anlmdn` before loudnorm, −10..−13 dB
   floor, speech untouched), and `render_story.py` prints floor/SNR on every
-  take with `NOISY` under 36 dB. Fix for good: re-clone Vardan from a clean
-  sample (needs `voices_write` on the key; owner action). Evidence:
-  `tools/quality-evidence/ulik-cast-noise-20260907.md`.
+  take with `NOISY` under 36 dB. **The denoiser was then REJECTED on listen
+  ("it went more bad") — never denoise a voice, re-clone it.** The fix that
+  held: `vardan-v2` (8 clean samples, −60 dBFS) was already on the account
+  and renders 13 dB cleaner, at Areg's level; Ուլիկ now uses it unshifted
+  (v14). Evidence: `tools/quality-evidence/ulik-cast-noise-20260907.md`.
 - **Not done:** shipping v10 (Ship-StoryAudio levelling, sha/size, `Version`
   bump, `segments_to_bytes`, ambience marker, listen test on the toy), the
   other nine casts, and a re-render of the `summary` / question clips in the

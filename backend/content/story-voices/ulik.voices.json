@@ -55,10 +55,10 @@
         "similarity_boost": 0.8,
         "style": 0.45
       },
-      "voiceId": "GazesXOqRnIUqi60EsmM",
-      "voiceName": "vardan-test (owner's pick 2026-09-04 from ten candidates; unshifted — the 10% lift on vardan-v2 was what sounded unlovely)",
+      "voiceId": "PgFHHZMKb19tJbjBe6aY",
+      "voiceName": "vardan-v2 (unshifted; switched from vardan-test 2026-09-07 — see noiseNote)",
       "modelId": "eleven_v3_conversational",
-      "noiseNote": "vardan-test is a clone of ONE 8 s sample with a -43 dBFS floor (SNR 28 dB); every take carries that room (-44..-47 dBFS, SNR 31-34 dB against Areg's 40-44), on every model and stability — measured 2026-09-07. denoise=true (anlmdn) was tried and REJECTED by the owner on listen the same day: it lowered the floor 10 dB and audibly damaged the speech ('it went more bad'). Do not re-enable it on this voice. The fix is a re-clone from a clean sample (ElevenLabs 'remove background noise' on add, or a longer quiet recording)."
+      "noiseNote": "Switched to vardan-v2 on 2026-09-07 for NOISE: vardan-test was cloned from one 8 s sample with a -43 dBFS floor and every take carried that room (-44..-47 dBFS, SNR 31-34 dB); vardan-v2 is cloned from 8 clean samples (-60 dBFS) and renders the same line at -57 dBFS, SNR 48 — Areg's level. The owner had rejected vardan-v2 only WITH the +10% pitch lift (2026-09-04, 'not lovely'); this is the unshifted voice. anlmdn denoising of vardan-test was tried and rejected on listen the same day ('it went more bad') — never denoise a voice, re-clone it."
     }
   },
   "segments": [

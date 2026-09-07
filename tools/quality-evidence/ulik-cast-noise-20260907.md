@@ -99,3 +99,27 @@ Then point `ulik.voices.json` at the new voice id and drop `denoise`.
 
 Not committed: the voice samples themselves (a person's recording is not
 repo content) and the scratch A/B renders.
+
+## 6. Same day, second listen: the denoiser was REJECTED, the clean clone was already on the account
+
+The owner heard v13 and said *"it went more bad"*: `anlmdn` took 10 dB off
+the floor and audibly damaged the speech with it. Lesson written into the
+voices map: never denoise a voice, re-clone it. `denoise` is off for Ուլիկ.
+
+Then the same line rendered with every voice on the account, 192 kbps:
+
+| voice | clone source | line floor | SNR |
+|---|---|---:|---:|
+| vardan-test | 1 sample, −44 dBFS | −44.1 | 34.5 |
+| **vardan-v2** | **8 samples, −60 / −59 dBFS** | **−57.0** | **48.3** |
+| areg-storyteller | 2 samples, −61 / −60 | −53.2 | 43.9 |
+| katrin-v3 | 7 samples, −58 / −53 | −54.1 | 44.6 |
+| katrin-rec1 | 1 sample, −59 | −58.3 | 47.7 |
+
+`vardan-v2` — the voice the owner had rejected on 2026-09-04, but only with
+the +10% pitch lift — is 13 dB cleaner than vardan-test, at Areg's level.
+Ուլիկ's two lines were re-rendered with it unshifted (`RENDER_ONLY=ulik`,
+every other take kept; floors −59 / −58 dBFS, SNR 47 / 45; the transcript
+guard re-asked one take that added two words), spans re-aligned, ambience
+re-mixed, levelled: `ulik-pilot-v14-vardan-v2-with-summary.mp3`, handed to
+the owner. The voices map now points Ուլիկ at vardan-v2, pitch 1.0.
