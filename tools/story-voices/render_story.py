@@ -34,6 +34,19 @@ TAIL_MIN_LENGTH_RATIO = 0.70   # got/expected below this, with a loud tail, is a
 TAIL_RETRIES = 2               # rendering is non-deterministic; ask again
 FADE_IN = 0.008
 FADE_OUT = 0.030               # longer out: gives a loud ending a natural decay
+
+# Noise floor of a take, measured as the RMS of its quietest 10% of 50 ms
+# windows (dBFS) against the RMS of its loudest 25% — the between-word floor
+# against the speech level. Printed on every take since 2026-09-07, when the
+# owner heard "noise in some parts" and the cause turned out to be one CLONE:
+# vardan-test was made from a single 8 s sample with a -43 dBFS floor
+# (SNR 28 dB), and a clone reproduces its source's room on every model and
+# every stability setting — Areg's samples sit at -60. Nothing in this
+# pipeline added it (our processing moved the floor by ±2 dB); it was in the
+# take as ElevenLabs returned it. A number on the line is what makes the next
+# noisy voice visible on its FIRST render instead of on the owner's phone.
+SNR_WARN_DB = 36.0             # Areg/Katrin takes read 40-44; vardan-test read 31-34
+DENOISE_AF = "anlmdn=s=3:p=0.002:r=0.006"   # per-speaker "denoise": true — measured -10..-13 dB floor, speech level unchanged
                                # instead of a wall, which is what a splice hears
 
 # The story's own punctuation is the timing sheet. A full stop earns more air
@@ -85,8 +98,10 @@ def duration(path):
                           "-of","csv=p=0",path], capture_output=True, text=True).stdout.strip()
     return float(out) if out else 0.0
 
-def tts(text, path, token, voice, settings):
-    body = {"text": text, "model_id": "eleven_v3"}
+DEFAULT_MODEL = "eleven_v3"
+
+def tts(text, path, token, voice, settings, model=DEFAULT_MODEL):
+    body = {"text": text, "model_id": model}
     if settings:
         body["voice_settings"] = settings
     r = subprocess.run(
@@ -98,12 +113,146 @@ def tts(text, path, token, voice, settings):
     if not os.path.exists(path) or os.path.getsize(path) < 1000:
         raise SystemExit(f"render failed for {text[:40]!r}: {r.stderr.decode()[:200]}")
 
-def render_segment(smap, seg, outdir, token, voice, sid):
+STT_MODEL = "scribe_v2"
+STT_MAX_EXTRA_WORDS = 0        # any word the story does not have is a fault
+STT_MAX_WER = 0.35             # above this the take is garbage, not an accent
+
+def _norm_words(t):
+    t = re.sub(r"[՞՛՜]", "", t.lower())
+    return re.sub(r"[^\w\s]", " ", t).split()
+
+def _wer(ref, hyp):
+    r, h = _norm_words(ref), _norm_words(hyp)
+    d = list(range(len(h) + 1))
+    for i in range(1, len(r) + 1):
+        prev, d[0] = d[0], i
+        for j in range(1, len(h) + 1):
+            cur = d[j]
+            d[j] = min(d[j] + 1, d[j - 1] + 1, prev + (r[i - 1] != h[j - 1]))
+            prev = cur
+    return d[len(h)] / max(1, len(r))
+
+def spoken_matches(path, text, token):
+    """Transcribe the span and refuse a take that says something the story
+    does not. The owner caught «Արածում է shshsh իրիկունը» and a stray «hmm»
+    after «դուռը բաց անում» by ear (2026-09-04); both transcribe as extra
+    words. Returns (ok, reason). A key without speech_to_text permission
+    skips the check with a warning rather than failing the render."""
+    r = subprocess.run(
+        ["curl","-sS","--max-time","120","-X","POST","-H",f"xi-api-key: {token}",
+         "-F",f"model_id={STT_MODEL}","-F","language_code=hy","-F",f"file=@{path}",
+         "https://api.elevenlabs.io/v1/speech-to-text"], capture_output=True)
+    try:
+        j = json.loads(r.stdout.decode("utf-8", "replace"))
+    except ValueError:
+        return True, "stt unreadable — skipped"
+    if "text" not in j:
+        return True, f"stt skipped ({str(j)[:80]})"
+    hyp = j["text"]
+    extra = len(_norm_words(hyp)) - len(_norm_words(text))
+    w = _wer(text, hyp)
+    if extra > STT_MAX_EXTRA_WORDS or w > STT_MAX_WER:
+        return False, f"heard {hyp[:90]!r} (+{extra} words, wer {w:.2f})"
+    return True, f"wer {w:.2f}"
+
+# RENDER_ONLY="narrator,5:0,5:2" re-renders only those speakers / seg:span
+# pairs and keeps every other span's WAV as it is. The owner tunes one
+# character at a time, and an approved take must not change because a
+# different character was re-asked (2026-09-04).
+def _render_only():
+    raw = os.environ.get("RENDER_ONLY", "").strip()
+    if not raw:
+        return None
+    names, pairs = set(), set()
+    for tok in raw.split(","):
+        tok = tok.strip()
+        if not tok: continue
+        if ":" in tok:
+            a, b = tok.split(":", 1); pairs.add((int(a), int(b)))
+        else:
+            names.add(tok)
+    return names, pairs
+
+def _selected(sel, who, si, pi):
+    return sel is None or who in sel[0] or (si, pi) in sel[1]
+
+F0_MIN_HZ, F0_MAX_HZ = 70.0, 500.0
+F0_RATIO_BAND = (0.75, 1.30)    # a take outside this against the speaker's own reference is a different voice
+F0_MIN_CHARS = 40               # a short exclamation legitimately sits higher or lower; too few voiced frames to judge
+
+def median_f0(path):
+    """Median fundamental of the voiced frames, by autocorrelation. Crude, but
+    the fault it guards against is not subtle: the mother's last line came
+    back «like a little child talking» (owner, 2026-09-04) — a shift no
+    settings asked for. Returns None when numpy is missing."""
+    try:
+        import numpy as np, struct
+    except ImportError:
+        return None
+    raw = subprocess.run(["ffmpeg","-v","error","-i",path,"-f","s16le","-ac","1","-ar","16000","-"],
+                         capture_output=True).stdout
+    x = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    sr, win, hop = 16000, 640, 320
+    lo, hi = int(sr / F0_MAX_HZ), int(sr / F0_MIN_HZ)
+    f0s = []
+    thr = 0.05 * (np.abs(x).max() or 1.0)
+    for i in range(0, len(x) - win, hop):
+        fr = x[i:i + win]
+        if np.abs(fr).mean() < thr: continue
+        fr = fr - fr.mean()
+        ac = np.correlate(fr, fr, "full")[win - 1:]
+        if ac[0] <= 0: continue
+        seg = ac[lo:hi]
+        k = int(np.argmax(seg)) + lo
+        if ac[k] / ac[0] > 0.5:
+            f0s.append(sr / k)
+    return float(np.median(f0s)) if len(f0s) >= 20 else None
+
+def pitch_matches(path, ref_path):
+    a, b = median_f0(path), median_f0(ref_path)
+    if a is None or b is None:
+        return True, "pitch check skipped"
+    r = a / b
+    ok = F0_RATIO_BAND[0] <= r <= F0_RATIO_BAND[1]
+    return ok, f"f0 {a:.0f} Hz vs reference {b:.0f} Hz (x{r:.2f})"
+
+def snr_db(path):
+    """(floor dBFS, speech dBFS, SNR dB) — see SNR_WARN_DB. None without numpy,
+    like median_f0: the readout is advisory, never a reason a render cannot run."""
+    try:
+        import numpy as np
+    except ImportError:
+        return None
+    raw = subprocess.run(["ffmpeg","-v","error","-i",path,"-f","s16le","-ac","1","-ar","44100","-"],
+                         capture_output=True).stdout
+    x = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    w = 2205; n = len(x) // w
+    if n < 4:
+        return None
+    fr = x[:n*w].reshape(n, w)
+    db = 20*np.log10(np.sqrt((fr**2).mean(1)) + 1e-9)
+    o = np.argsort(db)
+    floor = 20*np.log10(np.sqrt((fr[o[:max(2, n//10)]]**2).mean()) + 1e-9)
+    speech = 20*np.log10(np.sqrt((fr[o[-max(2, n//4):]]**2).mean()) + 1e-9)
+    return floor, speech, speech - floor
+
+def render_segment(smap, seg, outdir, token, voice, sid, sel=None, refs=None):
     parts, problems = [], []
+    refs = refs if refs is not None else {}
     for i, span in enumerate(seg["spans"]):
         who = span["speaker"]
         spk = smap["speakers"][who]
         text = guard(span["text"].strip())
+        kept = os.path.join(outdir, f"{sid}-{seg['index']:02d}-{i:02d}-{who}.wav")
+        if not _selected(sel, who, seg["index"], i) and os.path.exists(kept):
+            parts.append((who, kept, pause_after(text), len(text), duration(kept)))
+            refs.setdefault(who, kept)
+            print(f"    {i:02d} {who:14} kept", flush=True)
+            continue
+        # A span may carry its own voiceSettings on top of the speaker's —
+        # «Պա՛ պա՛, պա՛, պա՛» wants to be slower than the same mother's song.
+        settings = dict(spk.get("voiceSettings") or {})
+        settings.update(span.get("voiceSettings") or {})
         # The story id is in the NAME. Without it, rendering ten stories into
         # one directory silently overwrites every span of the first nine — the
         # finished audio survived (each story is stitched before the next
@@ -111,12 +260,29 @@ def render_segment(smap, seg, outdir, token, voice, sid):
         # later had to INFER where a speaker changed instead of measuring it.
         raw = os.path.join(outdir, f"{sid}-{seg['index']:02d}-{i:02d}-{who}.mp3")
 
+        # A CAST, not one voice (owner decision 2026-09-03): a speaker may name
+        # its own ElevenLabs voice and model. Without them it is the narrator's
+        # voice in the default model, so every speaker map written before this
+        # renders exactly as it did. The narrator stays Areg by rule; clones
+        # for anyone a child should love; library voices only for villains
+        # and animals, because a library voice speaks Armenian with an accent.
+        spk_voice = spk.get("voiceId") or voice
+        spk_model = spk.get("modelId") or DEFAULT_MODEL
         # Render, and re-ask if the model returns it with the tail cut off.
         for attempt in range(TAIL_RETRIES + 1):
-            tts(text, raw, token, voice, spk.get("voiceSettings"))
+            tts(text, raw, token, spk_voice, settings or None, spk_model)
             ratio = tail_ratio(raw)
             expect = len(text) / CHARS_PER_SECOND
             short = duration(raw) < expect * TAIL_MIN_LENGTH_RATIO
+            said_ok, why = spoken_matches(raw, text, token)
+            if said_ok and who in refs and len(text) >= F0_MIN_CHARS:
+                said_ok, why = pitch_matches(raw, refs[who])
+            if not said_ok:
+                if attempt == TAIL_RETRIES:
+                    raise SystemExit(f"NOT THE STORY: span {i} ({who}) {text[:40]!r} — {why}, "
+                                     f"after {TAIL_RETRIES} retries")
+                print(f"    {i:02d} {who:14} {why} — re-asking", flush=True)
+                continue
             if ratio <= TAIL_MAX_RATIO or not short:
                 break
             if attempt == TAIL_RETRIES:
@@ -136,6 +302,11 @@ def render_segment(smap, seg, outdir, token, voice, sid):
         af = ("loudnorm=I=-17:TP=-1.5" if abs(pitch - 1.0) < 0.005 else
               f"asetrate=44100*{pitch},aresample=44100,atempo=1/{pitch},"
               f"loudnorm=I=-17:TP=-1.5")
+        # Denoise BEFORE loudnorm, so the level is measured on the voice and
+        # not on the room it was cloned from. Opt-in per speaker: on a clean
+        # clone it would only smear consonants for nothing.
+        if spk.get("denoise"):
+            af = DENOISE_AF + "," + af
         stage = raw[:-4] + ".stage.wav"
         subprocess.run(["ffmpeg","-v","error","-y","-i",raw,"-af",af,
                         "-ac","1","-ar","44100",stage], capture_output=True)
@@ -151,9 +322,15 @@ def render_segment(smap, seg, outdir, token, voice, sid):
                         "-ac","1","-ar","44100",wav], capture_output=True)
         os.remove(stage)
         parts.append((who, wav, pause_after(text), len(text), duration(wav)))
+        refs.setdefault(who, wav)
+        snr = snr_db(wav)
+        noisy = snr is not None and snr[2] < SNR_WARN_DB
         print(f"    {i:02d} {who:14} {len(text):>4}ch {got:>5.1f}s "
               f"tail {tail_ratio(raw):.0%}"
-              f"{'  pitch '+str(pitch) if pitch!=1.0 else ''}", flush=True)
+              f"{'  floor %.0f dBFS SNR %.0f dB' % (snr[0], snr[2]) if snr else ''}"
+              f"{'  NOISY' if noisy else ''}"
+              f"{'  pitch '+str(pitch) if pitch!=1.0 else ''}"
+              f"{'  voice '+spk_voice[:8]+'… '+spk_model if spk.get('voiceId') else ''}", flush=True)
     if problems:
         raise SystemExit("SPAN LENGTH CHECK FAILED\n" + "\n".join(problems))
     return parts
@@ -272,18 +449,20 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     smap = json.load(open(f"backend/content/story-voices/{sid}.voices.json", encoding="utf-8"))
     seg_files, span_map = [], {}
+    sel, refs = _render_only(), {}
     for seg in smap["segments"]:
         if only is not None and seg["index"] != only:
             continue
         f = os.path.join(outdir, f"{sid}-seg{seg['index']}.mp3")
         # Resume. 211 paid requests where one chopped span at number 200 throws
         # away the other 199 is the wrong shape: a finished segment is money
-        # already spent, so it is never re-requested.
-        if os.path.exists(f) and os.path.getsize(f) > 1000:
+        # already spent, so it is never re-requested. With RENDER_ONLY the
+        # segment is re-stitched from kept WAVs plus the re-rendered ones.
+        if sel is None and os.path.exists(f) and os.path.getsize(f) > 1000:
             print(f"  segment {seg['index']} already rendered — keeping")
             seg_files.append(f); continue
         print(f"  segment {seg['index']} ({len(seg['spans'])} spans)")
-        parts = render_segment(smap, seg, outdir, token, voice, sid)
+        parts = render_segment(smap, seg, outdir, token, voice, sid, sel, refs)
         print("  ->", stitch(parts, outdir, f"{sid}-seg{seg['index']}.mp3"))
         seg_files.append(f)
         span_map[seg["index"]] = span_timings(parts)

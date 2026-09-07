@@ -95,6 +95,9 @@ bool s_intro_enabled = true;
 // the index alongside the intro flag so the last-known values apply offline.
 bool s_pauses_enabled   = true;
 bool s_variants_enabled = true;
+// The after-story question toggle (owner request 2026-09-07), cached into
+// the index root as `questionsEnabled` like the two above.
+bool s_questions_enabled = true;
 
 // Slice E — bedtime music: manifest/prev/active tables + the parent's
 // opt-in flag, all cached into the index like the intro toggle.
@@ -425,6 +428,7 @@ bool write_index() {
     cs_index_add_modes(idx, s_mode_story, s_mode_game,
                        s_mode_riddle, s_mode_curiosity);
     cs_index_add_story_flags(idx, s_pauses_enabled, s_variants_enabled);
+    cs_index_add_questions_flag(idx, s_questions_enabled);
 
     // Shrink alarm. This is an ALARM, NOT A BLOCK: a namespace legitimately
     // shrinks when a file is genuinely deleted or its size changed on the
@@ -1337,6 +1341,7 @@ void content_sync_run() {
     // pre-toggle backend) means the shipped default (both ON).
     s_pauses_enabled   = doc["storyPausesEnabled"]    | true;
     s_variants_enabled = doc["variantEndingsEnabled"] | true;
+    s_questions_enabled = doc["storyQuestionsEnabled"] | true;
     // Slice E — bedtime-music opt-in + track list (absent → off/none).
     s_music_enabled = doc["bedtimeMusicEnabled"] | false;
     s_music_manifest_count = cs_manifest_parse_music(
@@ -1357,14 +1362,15 @@ void content_sync_run() {
         game_clips.isNull() ? 0U : (unsigned)game_clips.size();
     Serial.printf("[content-sync] manifest status=200 stories=%u introEnabled=%d "
                   "music=%d musicEnabled=%d voice=%d games=%u modes=%d%d%d%d "
-                  "pauses=%d variants=%d\n",
+                  "pauses=%d variants=%d questions=%d\n",
                   stories.isNull() ? 0U : (unsigned)stories.size(),
                   s_intro_enabled ? 1 : 0,
                   s_music_manifest_count, s_music_enabled ? 1 : 0,
                   s_voice_manifest_count, game_offered,
                   s_mode_story ? 1 : 0, s_mode_game ? 1 : 0,
                   s_mode_riddle ? 1 : 0, s_mode_curiosity ? 1 : 0,
-                  s_pauses_enabled ? 1 : 0, s_variants_enabled ? 1 : 0);
+                  s_pauses_enabled ? 1 : 0, s_variants_enabled ? 1 : 0,
+                  s_questions_enabled ? 1 : 0);
     Serial.flush();
     if ((stories.isNull() || stories.size() == 0)
         && s_music_manifest_count == 0

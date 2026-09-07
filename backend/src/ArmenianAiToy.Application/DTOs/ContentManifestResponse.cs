@@ -24,6 +24,12 @@ public sealed record ContentManifestResponse(
     /// absent field means the shipped default (ON).</summary>
     public bool? StoryPausesEnabled { get; init; }
 
+    /// <summary>The device's parent-set after-story-question flag, stamped
+    /// beside <see cref="StoryPausesEnabled"/> and cached in the toy's SD
+    /// index so it applies offline. Absent → ON, the shipped default. Gates
+    /// only the question the toy asks after a story, never the summary.</summary>
+    public bool? StoryQuestionsEnabled { get; init; }
+
     /// <summary>The device's parent-set variant-endings flag, stamped
     /// alongside <see cref="StoryPausesEnabled"/>. Absent → ON, the shipped
     /// default; a library with no alternate files behaves identically either

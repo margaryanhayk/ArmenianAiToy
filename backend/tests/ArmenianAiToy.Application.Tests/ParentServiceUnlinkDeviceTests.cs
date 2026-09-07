@@ -180,6 +180,7 @@ public class ParentServiceUnlinkDeviceTests
         Assert.Null(device.BedtimeEnd);
         Assert.True(device.StoryEnabled);
         Assert.True(device.StoryIntroEnabled);
+        Assert.True(device.StoryQuestionsEnabled);
         Assert.False(device.BedtimeMusicEnabled);
 
         // Parent itself is unrelated to the unlink — still there.

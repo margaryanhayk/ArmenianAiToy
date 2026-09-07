@@ -65,6 +65,11 @@ public interface IParentService
     /// idempotent, audit only on a real flip.</summary>
     Task<bool> SetDeviceStoryPausesAsync(Guid parentId, Guid deviceId, bool enabled);
 
+    /// <summary>After-story question toggle. Exact mirror of
+    /// <see cref="SetDeviceStoryIntroAsync"/> — ownership, silent false,
+    /// idempotent, audit only on a real flip.</summary>
+    Task<bool> SetDeviceStoryQuestionsAsync(Guid parentId, Guid deviceId, bool enabled);
+
     /// <summary>Variant-endings toggle. Exact mirror of
     /// <see cref="SetDeviceStoryIntroAsync"/> — ownership, silent false,
     /// idempotent, audit only on a real flip.</summary>

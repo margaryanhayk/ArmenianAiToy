@@ -1708,6 +1708,13 @@
       story_intro_label: { en: 'Spoken story intro (title + author)', ru: 'Озвученное вступление (название + автор)', hy: 'Հեքիաթից առաջ ասել վերնագիրն ու հեղինակին' },
       story_pauses_label: { en: 'Short pauses during a story', ru: 'Короткие паузы в сказке', hy: 'Կարճ դադարներ հեքիաթի ընթացքում' },
       story_pauses_note: { en: 'The toy stops for a moment so your child can think and answer.', ru: 'Игрушка ненадолго останавливается, чтобы ребёнок мог подумать и ответить.', hy: 'Խաղալիքը մի պահ լռում է, որ երեխան հասցնի մտածել ու պատասխանել։' },
+      story_questions_label: { en: 'A question after the story', ru: 'Вопрос после сказки', hy: 'Հարց հեքիաթից հետո' },
+      // Describes the thing, never names the field: «խրատ» / «вывод» /
+      // "lesson" is the story.json key in a scolding register this product
+      // does not use (ux review 2026-09-07). The LAST sentence is temporary:
+      // OFF reaches the toy only with the next firmware release — drop it in
+      // all three languages the day that release has been bench-run.
+      story_questions_note: { en: 'The toy always ends with what the story teaches. With this on, it also asks one question and waits for an answer. Turning it off reaches your toy with its next update.', ru: 'Игрушка всегда говорит, чему учит сказка. Когда включено, она ещё задаёт один вопрос и ждёт ответа. Выключение заработает после следующего обновления.', hy: 'Խաղալիքը միշտ ասում է, թե ինչ է սովորեցնում հեքիաթը։ Երբ միացված է, տալիս է նաև մեկ հարց ու սպասում պատասխանին։ Անջատումը կգործի հաջորդ թարմացումից հետո։' },
       variant_endings_label: { en: 'A different ending when a story repeats', ru: 'Другая концовка, если сказка повторяется', hy: 'Այլ ավարտ, երբ հեքիաթը կրկին են լսում' },
       variant_endings_note: { en: 'Only some stories have a second ending — the rest end the usual way. Both endings are written and checked in advance.', ru: 'Второй вариант есть не у всех сказок — остальные закончатся как обычно. Обе концовки написаны и проверены заранее.', hy: 'Ոչ բոլոր հեքիաթներն ունեն երկրորդ ավարտ, իսկ մնացածն ավարտվում են սովորականի պես։ Երկու ավարտն էլ նախապես գրված ու ստուգված են։' },
       bedtime_music_label: { en: 'Music at bedtime hours', ru: 'Музыка в часы сна', hy: 'Երաժշտություն քնի ժամերին' },
@@ -2184,6 +2191,7 @@
       ev_revocation_changed: { en: 'Toy access changed', ru: 'Доступ игрушки изменён', hy: 'Խաղալիքի մուտքը փոխվեց' },
       ev_story_intro_set: { en: 'Spoken story intro changed', ru: 'Озвученное вступление изменено', hy: 'Հեքիաթի վերնագրի հայտարարումը փոխվեց' },
       ev_story_pauses_set: { en: 'Pauses during stories changed', ru: 'Паузы в сказках изменены', hy: 'Հեքիաթի դադարները փոխվեցին' },
+      ev_story_questions_set: { en: 'Question after the story changed', ru: 'Вопрос после сказки изменён', hy: 'Հեքիաթից հետո հարցը փոխվեց' },
       ev_variant_endings_set: { en: 'Different endings changed', ru: 'Другие концовки изменены', hy: 'Այլ ավարտները փոխվեցին' },
       ev_bedtime_music_set: { en: 'Bedtime music changed', ru: 'Музыка для сна изменена', hy: 'Քնի ժամի երաժշտությունը փոխվեց' },
       ev_story_requested: { en: 'Story requested', ru: 'Заказана сказка', hy: 'Հեքիաթ պատվիրվեց' },
@@ -2349,6 +2357,7 @@
       ParentDeviceRevocationChanged: 'ev_revocation_changed',
       ParentDeviceStoryIntroSet: 'ev_story_intro_set',
       ParentDeviceStoryPausesSet: 'ev_story_pauses_set',
+      ParentDeviceStoryQuestionsSet: 'ev_story_questions_set',
       ParentDeviceVariantEndingsSet: 'ev_variant_endings_set',
       ParentBedtimeMusicSet: 'ev_bedtime_music_set',
       ParentStoryRequestSubmitted: 'ev_story_requested'
@@ -4321,6 +4330,17 @@
             // 2026-08-10: "the story is cut"). Flip this the day that goes
             // to 1 and has been bench-run.
             { noteKey: 'story_pauses_note', notOnToyYet: true }));
+          // The after-story question (owner request 2026-09-07: "question
+          // clips must be optional"). The toy DOES ask it today — the 70
+          // per-story clips shipped 2026-08-16 — so unlike the two switches
+          // around it this one is not "not on your toy yet". What the toy
+          // cannot honour until its next firmware update is OFF; the note
+          // says what the switch does, and the standing "coming in an
+          // update" copy would be a lie about a behaviour that runs. Same
+          // `!== false` rule: absent from an older backend reads as on.
+          gHow.appendChild(flagToggle('story_questions_label',
+            d.storyQuestionsEnabled !== false, 'story-questions',
+            { noteKey: 'story_questions_note' }));
           // Variant endings is the one switch here whose effect is invisible
           // by design: with the toggle on, a story that has no second ending
           // simply ends the way it always did. Without a standing note the
@@ -6247,6 +6267,7 @@
           return m.is_revoked ? t('m_access_off') : t('m_access_on');
         case 'ParentDeviceStoryIntroSet':
         case 'ParentDeviceStoryPausesSet':
+        case 'ParentDeviceStoryQuestionsSet':
         case 'ParentDeviceVariantEndingsSet':
         case 'ParentBedtimeMusicSet':
           return m.enabled ? t('m_turned_on') : t('m_turned_off');

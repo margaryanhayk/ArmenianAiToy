@@ -849,6 +849,7 @@ void test_variant_index_round_trip() {
     JsonDocument built;
     cs_index_build(built, active, 3, "anban-huri");
     cs_index_add_story_flags(built, /*pauses=*/false, /*variants=*/true);
+    cs_index_add_questions_flag(built, /*questions=*/false);
     check((built["schemaVersion"] | 0) == CS_INDEX_SCHEMA_VERSION,
           "index_v6_schema_version");
     // An ordinary story writes NO altOf key, so a variant-free library still
@@ -874,6 +875,8 @@ void test_variant_index_round_trip() {
     // other.
     check(!cs_index_pauses_enabled(reread), "index_v6_pauses_flag_round_trip");
     check(cs_index_variants_enabled(reread), "index_v6_variants_flag_round_trip");
+    // Third root flag (after-story question), same independence rule.
+    check(!cs_index_questions_enabled(reread), "index_questions_flag_round_trip");
 }
 
 // KEYSTONE: a card written by the PREVIOUS firmware must keep working.
@@ -903,6 +906,7 @@ void test_index_v5_forward_compatible() {
     // Absent root flags default ON, matching the shipped server-side default.
     check(cs_index_pauses_enabled(reread), "v5_index_pauses_defaults_on");
     check(cs_index_variants_enabled(reread), "v5_index_variants_defaults_on");
+    check(cs_index_questions_enabled(reread), "old_index_questions_defaults_on");
     // And the v5 fields it DOES carry are untouched by the bump.
     check(cs_index_intro_enabled(reread), "v5_index_intro_flag_still_read");
     check(cs_index_mode_enabled(reread, "storyEnabled"), "v5_index_modes_still_default_on");

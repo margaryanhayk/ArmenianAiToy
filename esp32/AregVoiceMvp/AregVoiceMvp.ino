@@ -583,6 +583,22 @@ static void handle_post_story_flow() {
         audio_play_story_file(summary_clip, 0, nullptr, nullptr);
     }
 
+    // 1b. Parent toggle (owner request 2026-09-07: "question clips must be
+    //     optional"). Read from the SD index root (`questionsEnabled`,
+    //     cached from the manifest by content_sync), so it applies offline.
+    //     Placed AFTER the summary on purpose: OFF means "lesson, then
+    //     quiet" — the lesson is the conclusion the owner asked to keep,
+    //     the question is the part a parent may not want. Nothing below
+    //     runs: no question clip, no listening window, no cursor move (the
+    //     cursor commits only on a clip that actually played, so the next
+    //     listen with the toggle back on asks the question this one owed).
+    if (!story_questions_enabled()) {
+        Serial.println("[post] after-story question is off (parent toggle) — closing");
+        Serial.flush();
+        led_for_state(ST_IDLE);
+        return;
+    }
+
     // 2. The reflection question — exactly ONE (owner request 2026-08-15).
     //    This used to loop rounds 0..2, asking every rendered question back
     //    to back; that is two questions more than a four-year-old will
