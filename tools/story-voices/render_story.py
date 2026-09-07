@@ -124,6 +124,7 @@ STT_MODEL = "scribe_v2"
 STT_MAX_EXTRA_WORDS = 0        # any word the story does not have is a fault
 STT_MAX_WER = 0.35             # above this the take is garbage, not an accent
 STT_MAX_CHAR_ERR = 0.25        # letters-only fallback when the transcriber ran words together
+STT_MAX_NAME_ERR = 0.50        # same word count, no added letters: a name it cannot spell
 
 def _norm_words(t):
     t = re.sub(r"[՞՛՜]", "", t.lower())
@@ -163,7 +164,7 @@ def _wer(ref, hyp):
             prev = cur
     return d[len(h)] / max(1, len(r))
 
-def spoken_matches(path, text, token):
+def spoken_matches(path, text, token, _second=0):
     """Transcribe the span and refuse a take that says something the story
     does not. The owner caught «Արածում է shshsh իրիկունը» and a stray «hmm»
     after «դուռը բաց անում» by ear (2026-09-04); both transcribe as extra
@@ -180,6 +181,13 @@ def spoken_matches(path, text, token):
     if "text" not in j:
         return True, f"stt skipped ({str(j)[:80]})"
     hyp = j["text"]
+    # Scribe sometimes returns only the first few words of a long take — on
+    # «Սուտլիկ որսկանը» a 21 s, 262-character span came back as four words
+    # five times out of nine, with nothing wrong in the audio. That is the
+    # transcriber giving up, not the story going wrong: ask it once more
+    # before blaming the take.
+    if len(_norm_words(hyp)) < 0.6 * len(_norm_words(text)) and _second < 2:
+        return spoken_matches(path, text, token, _second=_second + 1)
     extra = len(_norm_words(hyp)) - len(_norm_words(text))
     w = _wer(text, hyp)
     if extra > STT_MAX_EXTRA_WORDS or w > STT_MAX_WER:
@@ -190,10 +198,22 @@ def spoken_matches(path, text, token):
         # two strings differ by a few respelled letters. Only for a hypothesis
         # no longer than the line, which is what keeps this door shut to a
         # genuinely added word — «shshsh» and «hmm» add their letters.
+        # The slack is two letters, or 4% of a long line: a 262-character
+        # boast came back four letters long because the transcriber heard
+        # «Մատին էր» as «մատմատիներ» — its own stutter, not the take's —
+        # while «shshsh» on a 40-character line is six letters over two.
+        # A line of the same word count whose letters are up to half
+        # different is a NAME the transcriber cannot spell («- Չատի՞,
+        # Մատի՞․․․» came back «Խաթի, մաթի» three times running); a whole
+        # different sentence of exactly that shape is not a failure TTS has.
         rc, hc = "".join(_norm_words(text)), "".join(_norm_words(hyp))
-        if len(hc) <= len(rc) + 1 and rc and _lev(rc, hc) / len(rc) <= STT_MAX_CHAR_ERR:
-            return True, f"wer {w:.2f} (letters {_lev(rc, hc) / len(rc):.2f}, word boundaries differ)"
-        return False, f"heard {hyp[:90]!r} (+{extra} words, wer {w:.2f})"
+        slack = max(2, int(0.04 * len(rc)))
+        err = _lev(rc, hc) / max(1, len(rc))
+        if len(hc) <= len(rc) + slack and rc and \
+                (err <= STT_MAX_CHAR_ERR or (extra == 0 and err <= STT_MAX_NAME_ERR)):
+            return True, f"wer {w:.2f} (letters {err:.2f}, spelling/boundaries differ)"
+        return False, (f"heard {hyp[:90]!r} (+{extra} words, wer {w:.2f}, "
+                       f"letters {len(hc)}/{len(rc)} err {err:.2f})")
     return True, f"wer {w:.2f}"
 
 # RENDER_ONLY="narrator,5:0,5:2" re-renders only those speakers / seg:span
@@ -310,6 +330,7 @@ def render_segment(smap, seg, outdir, token, voice, sid, sel=None, refs=None):
         spk_voice = spk.get("voiceId") or voice
         spk_model = spk.get("modelId") or DEFAULT_MODEL
         # Render, and re-ask if the model returns it with the tail cut off.
+        tried_f0 = []
         for attempt in range(TAIL_RETRIES + 1):
             tts(text, raw, token, spk_voice, settings or None, spk_model)
             ratio = tail_ratio(raw)
@@ -318,6 +339,20 @@ def render_segment(smap, seg, outdir, token, voice, sid, sel=None, refs=None):
             said_ok, why = spoken_matches(raw, text, token)
             if said_ok and who in refs and len(text) >= F0_MIN_CHARS:
                 said_ok, why = pitch_matches(raw, refs[who])
+                f0 = median_f0(raw)
+                if f0:
+                    tried_f0.append(f0)
+                # The reference is the speaker's FIRST take, and on «Խոսող
+                # ձուկը» that take was the outlier three times over (a man's
+                # first line at 179 Hz, every later one at ~130): the guard
+                # then refused every normal take of his. When the retries
+                # agree with EACH OTHER and not with the reference, the
+                # reference is what was wrong — take this one and re-base.
+                if not said_ok and attempt == TAIL_RETRIES and len(tried_f0) >= 2 \
+                        and max(tried_f0) / min(tried_f0) <= 1.15:
+                    print(f"    {i:02d} {who:14} {why} — but {len(tried_f0)} takes agree "
+                          f"with each other, so the first take was the outlier; re-basing", flush=True)
+                    said_ok, refs[who] = True, raw
             if not said_ok:
                 if attempt == TAIL_RETRIES:
                     raise SystemExit(f"NOT THE STORY: span {i} ({who}) {text[:40]!r} — {why}, "
@@ -365,7 +400,10 @@ def render_segment(smap, seg, outdir, token, voice, sid, sel=None, refs=None):
         parts.append((who, wav, pause_after(text), len(text), duration(wav)))
         refs.setdefault(who, wav)
         snr = snr_db(wav)
-        noisy = snr is not None and snr[2] < SNR_WARN_DB
+        # A take under ~2.5 s has too few between-word windows for the floor
+        # to mean anything — «— ասում է թագավորը։» read NOISY at 31-35 dB on
+        # a clone whose long takes read 40-46. The number still prints.
+        noisy = snr is not None and snr[2] < SNR_WARN_DB and duration(wav) >= 2.5
         print(f"    {i:02d} {who:14} {len(text):>4}ch {got:>5.1f}s "
               f"tail {tail_ratio(raw):.0%}"
               f"{'  floor %.0f dBFS SNR %.0f dB' % (snr[0], snr[2]) if snr else ''}"

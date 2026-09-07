@@ -1,7 +1,7 @@
 {
  "storyId": "pochat-aghves",
  "title": "Պոչատ աղվեսը",
- "_status": "DRAFT — attribution pending the owner's review. This file changes no story text.",
+ "_status": "v1 CAST PILOT 2026-09-07 — listening copies in scratch; the shipped narration is untouched until the owner says ship. This file changes no story text.",
  "_rule": "Only DIRECT speech gets a character. Reported speech («Նա ասաց, որ…») stays narrator, because it is the narrator speaking about them, not them speaking.",
  "_why": "A cumulative chain: the fox repeats a growing request to eight in turn. Each answerer gets its own colour so the child can hear WHO refuses, since the fox's words barely change. The repetition is the pleasure — the fox must not sound bored of it.",
  "speakers": {
@@ -13,37 +13,53 @@
     "stability": 0.55,
     "similarity_boost": 0.8,
     "style": 0.2
-   }
+   },
+   "voiceId": "NxAsEwnikgCJa5tyBwEf",
+   "voiceName": "areg-storyteller",
+   "modelId": "eleven_v3",
+   "note": "Narration stays on eleven_v3, the model the approved library was rendered with (the Ուլիկը pilot showed eleven_v3_conversational lets sentence endings fall away). Characters use the conversational model."
   },
   "fox": {
    "role": "Պոչատ աղվեսը",
-   "pitch": 1.05,
+   "pitch": 1.0,
    "directionForHumanNarrator": "anxious and pleading, saying the same long request over and over, a little more desperate each time",
    "voiceSettings": {
     "stability": 0.5,
     "similarity_boost": 0.8,
     "style": 0.3
-   }
+   },
+   "voiceId": "PgFHHZMKb19tJbjBe6aY",
+   "voiceName": "vardan-v2",
+   "modelId": "eleven_v3_conversational",
+   "castNote": "v1 cast 2026-09-07: Vardan unshifted (the map proposed 1.05; the owner rejected a lift on Vardan)"
   },
   "old_woman": {
    "role": "Պառավը",
-   "pitch": 0.98,
+   "pitch": 0.92,
    "directionForHumanNarrator": "an old village woman, brisk, unimpressed",
    "voiceSettings": {
     "stability": 0.5,
     "similarity_boost": 0.8,
     "style": 0.3
-   }
+   },
+   "voiceId": "bpss31fpiTyvjz5XZUT0",
+   "voiceName": "katrin-v3",
+   "modelId": "eleven_v3_conversational",
+   "castNote": "v1 cast 2026-09-07: Katrin shifted down, same decision as the mother-in-law in «Անբան Հուռին»"
   },
   "cow": {
    "role": "Կովը",
-   "pitch": 0.9,
+   "pitch": 0.88,
    "directionForHumanNarrator": "slow, placid, low",
    "voiceSettings": {
     "stability": 0.5,
     "similarity_boost": 0.8,
     "style": 0.3
-   }
+   },
+   "voiceId": "NxAsEwnikgCJa5tyBwEf",
+   "voiceName": "areg-storyteller",
+   "modelId": "eleven_v3_conversational",
+   "castNote": "v1 cast 2026-09-07: Areg conversational, shifted down for the placid cow"
   },
   "field": {
    "role": "Արտը",
@@ -53,7 +69,11 @@
     "stability": 0.5,
     "similarity_boost": 0.8,
     "style": 0.3
-   }
+   },
+   "voiceId": "NxAsEwnikgCJa5tyBwEf",
+   "voiceName": "areg-storyteller",
+   "modelId": "eleven_v3_conversational",
+   "castNote": "v1 cast 2026-09-07: Areg conversational, slightly down"
   },
   "spring": {
    "role": "Աղբյուրը",
@@ -63,17 +83,25 @@
     "stability": 0.5,
     "similarity_boost": 0.8,
     "style": 0.3
-   }
+   },
+   "voiceId": "bpss31fpiTyvjz5XZUT0",
+   "voiceName": "katrin-v3",
+   "modelId": "eleven_v3_conversational",
+   "castNote": "v1 cast 2026-09-07: Katrin lifted, as the map proposed"
   },
   "girl": {
    "role": "Աղջիկը",
-   "pitch": 1.08,
+   "pitch": 1.0,
    "directionForHumanNarrator": "a young village girl, matter-of-fact",
    "voiceSettings": {
     "stability": 0.5,
     "similarity_boost": 0.8,
     "style": 0.3
-   }
+   },
+   "voiceId": "bpss31fpiTyvjz5XZUT0",
+   "voiceName": "katrin-v3",
+   "modelId": "eleven_v3_conversational",
+   "castNote": "v1 cast 2026-09-07: Katrin unshifted"
   },
   "pedlar": {
    "role": "Չարչին",
@@ -83,7 +111,11 @@
     "stability": 0.5,
     "similarity_boost": 0.8,
     "style": 0.3
-   }
+   },
+   "voiceId": "NxAsEwnikgCJa5tyBwEf",
+   "voiceName": "areg-storyteller",
+   "modelId": "eleven_v3_conversational",
+   "castNote": "v1 cast 2026-09-07: Areg conversational unshifted"
   },
   "hen": {
    "role": "Հավը",
@@ -93,7 +125,11 @@
     "stability": 0.5,
     "similarity_boost": 0.8,
     "style": 0.3
-   }
+   },
+   "voiceId": "bpss31fpiTyvjz5XZUT0",
+   "voiceName": "katrin-v3",
+   "modelId": "eleven_v3_conversational",
+   "castNote": "v1 cast 2026-09-07: Katrin lifted, as the map proposed"
   }
  },
  "segments": [
@@ -248,5 +284,6 @@
    ]
   }
  ],
- "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing)."
+ "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing).",
+ "_cast": "Owner decision 2026-09-03: a real cast per story. Narrator is always Areg. Katrin and Vardan take a part in every story. Library voices only for villains and animals (they speak Armenian with an accent). Every speaker may carry voiceId/modelId; absent means the narrator's voice in eleven_v3, so older maps render unchanged."
 }
