@@ -58,8 +58,7 @@
       "voiceId": "GazesXOqRnIUqi60EsmM",
       "voiceName": "vardan-test (owner's pick 2026-09-04 from ten candidates; unshifted — the 10% lift on vardan-v2 was what sounded unlovely)",
       "modelId": "eleven_v3_conversational",
-      "denoise": true,
-      "noiseNote": "vardan-test is a clone of ONE 8 s sample with a -43 dBFS floor (SNR 28 dB); every take carries that room (-44..-47 dBFS, SNR 31-34 dB against Areg's 40-44), on every model and stability — measured 2026-09-07. denoise=true runs anlmdn before loudnorm (-10..-13 dB floor, speech untouched). The real fix is a re-clone from a clean sample: ElevenLabs 'remove background noise' on add, or the pre-denoised sample kept in the evidence folder."
+      "noiseNote": "vardan-test is a clone of ONE 8 s sample with a -43 dBFS floor (SNR 28 dB); every take carries that room (-44..-47 dBFS, SNR 31-34 dB against Areg's 40-44), on every model and stability — measured 2026-09-07. denoise=true (anlmdn) was tried and REJECTED by the owner on listen the same day: it lowered the floor 10 dB and audibly damaged the speech ('it went more bad'). Do not re-enable it on this voice. The fix is a re-clone from a clean sample (ElevenLabs 'remove background noise' on add, or a longer quiet recording)."
     }
   },
   "segments": [
