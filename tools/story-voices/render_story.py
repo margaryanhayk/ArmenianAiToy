@@ -100,7 +100,7 @@ def duration(path):
 
 DEFAULT_MODEL = "eleven_v3"
 
-def tts(text, path, token, voice, settings, model=DEFAULT_MODEL):
+def tts(text, path, token, voice, settings, model=DEFAULT_MODEL, attempt=0):
     body = {"text": text, "model_id": model}
     if settings:
         body["voice_settings"] = settings
@@ -111,15 +111,46 @@ def tts(text, path, token, voice, settings, model=DEFAULT_MODEL):
          f"https://api.elevenlabs.io/v1/text-to-speech/{voice}?output_format=mp3_44100_128"],
         input=json.dumps(body, ensure_ascii=False).encode(), capture_output=True)
     if not os.path.exists(path) or os.path.getsize(path) < 1000:
-        raise SystemExit(f"render failed for {text[:40]!r}: {r.stderr.decode()[:200]}")
+        # An EMPTY file with nothing on stderr is the connection dropping,
+        # not the API refusing: seen once on «Անբան Հուռին» after 200 good
+        # requests. One more try before failing the whole render for it.
+        if attempt == 0 and os.path.exists(path) and os.path.getsize(path) == 0:
+            print(f"    empty response for {text[:30]!r} — asking once more", flush=True)
+            return tts(text, path, token, voice, settings, model, attempt=1)
+        body_head = open(path, "rb").read(300).decode("utf-8", "replace") if os.path.exists(path) else ""
+        raise SystemExit(f"render failed for {text[:40]!r}: {r.stderr.decode()[:200]} {body_head}")
 
 STT_MODEL = "scribe_v2"
 STT_MAX_EXTRA_WORDS = 0        # any word the story does not have is a fault
 STT_MAX_WER = 0.35             # above this the take is garbage, not an accent
+STT_MAX_CHAR_ERR = 0.25        # letters-only fallback when the transcriber ran words together
 
 def _norm_words(t):
     t = re.sub(r"[՞՛՜]", "", t.lower())
     return re.sub(r"[^\w\s]", " ", t).split()
+
+# A word the transcriber SPELLS differently is not a word the story does not
+# have. On «Անբան Հուռին» (2026-09-07) Scribe heard the dialect line «— ձեն է
+# տալի Անբան Հուռին,» as «Ձեն է տալիս համբան հուրին» — every word one letter
+# off (ռ→ր, an added ս, a nasal shift), WER 0.60 on a five-word span, and the
+# render was refused three times for a take that said the line. The guard's
+# job is the extra «shshsh» and the stray «hmm», which are ADDED words and are
+# still counted exactly; a substitution only counts when the two words are
+# genuinely different, not respelled.
+WORD_CLOSE = 0.34              # edits / longer word, at or under this is the same word
+
+def _lev(a, b):
+    d = list(range(len(b) + 1))
+    for i in range(1, len(a) + 1):
+        prev, d[0] = d[0], i
+        for j in range(1, len(b) + 1):
+            cur = d[j]
+            d[j] = min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] != b[j - 1]))
+            prev = cur
+    return d[len(b)]
+
+def _same_word(a, b):
+    return a == b or _lev(a, b) / max(len(a), len(b), 1) <= WORD_CLOSE
 
 def _wer(ref, hyp):
     r, h = _norm_words(ref), _norm_words(hyp)
@@ -128,7 +159,7 @@ def _wer(ref, hyp):
         prev, d[0] = d[0], i
         for j in range(1, len(h) + 1):
             cur = d[j]
-            d[j] = min(d[j] + 1, d[j - 1] + 1, prev + (r[i - 1] != h[j - 1]))
+            d[j] = min(d[j] + 1, d[j - 1] + 1, prev + (not _same_word(r[i - 1], h[j - 1])))
             prev = cur
     return d[len(h)] / max(1, len(r))
 
@@ -152,6 +183,16 @@ def spoken_matches(path, text, token):
     extra = len(_norm_words(hyp)) - len(_norm_words(text))
     w = _wer(text, hyp)
     if extra > STT_MAX_EXTRA_WORDS or w > STT_MAX_WER:
+        # The transcriber also RUNS short fast words together — «ձեն է տալի»
+        # came back as «Զենետալի», one word for three — and SPLITS long ones:
+        # «մորքուրի» came back as «մոր քուրի», which the word count reads as
+        # an added word. Letters are the tie-break: with the spaces removed the
+        # two strings differ by a few respelled letters. Only for a hypothesis
+        # no longer than the line, which is what keeps this door shut to a
+        # genuinely added word — «shshsh» and «hmm» add their letters.
+        rc, hc = "".join(_norm_words(text)), "".join(_norm_words(hyp))
+        if len(hc) <= len(rc) + 1 and rc and _lev(rc, hc) / len(rc) <= STT_MAX_CHAR_ERR:
+            return True, f"wer {w:.2f} (letters {_lev(rc, hc) / len(rc):.2f}, word boundaries differ)"
         return False, f"heard {hyp[:90]!r} (+{extra} words, wer {w:.2f})"
     return True, f"wer {w:.2f}"
 
@@ -439,6 +480,17 @@ def assemble(sid, seg_files, outdir):
     print(f"  -> {out}  {duration(out):.1f}s, {len(starts)} segments -> {mp}")
     return out
 
+def kept_parts(seg, outdir, sid):
+    """Rebuild stitch()'s input for a segment that is already on disk."""
+    parts = []
+    for pi, sp in enumerate(seg["spans"]):
+        wav = os.path.join(outdir, f"{sid}-{seg['index']:02d}-{pi:02d}-{sp['speaker']}.wav")
+        if not os.path.exists(wav):
+            return None
+        text = sp["text"].strip()
+        parts.append((sp["speaker"], wav, pause_after(text), len(text), duration(wav)))
+    return parts
+
 def main():
     if len(sys.argv) < 3:
         print("usage: render_story.py <storyId> <outdir> [segmentIndex]"); return 2
@@ -459,7 +511,17 @@ def main():
         # already spent, so it is never re-requested. With RENDER_ONLY the
         # segment is re-stitched from kept WAVs plus the re-rendered ones.
         if sel is None and os.path.exists(f) and os.path.getsize(f) > 1000:
-            print(f"  segment {seg['index']} already rendered — keeping")
+            # A kept segment is still TIMED, from the WAVs it was stitched
+            # from — the same (speaker, wav, pause, chars, duration) tuples
+            # stitch() consumed, so the map describes exactly the audio in
+            # the kept file. Before this, a run resumed after one refused span
+            # finished with no span map at all and had to be paid for twice.
+            kept = kept_parts(seg, outdir, sid)
+            if kept is None:
+                print(f"  segment {seg['index']} already rendered — keeping (its WAVs are gone: no span map)")
+            else:
+                print(f"  segment {seg['index']} already rendered — keeping, timed from its WAVs")
+                span_map[seg["index"]] = span_timings(kept)
             seg_files.append(f); continue
         print(f"  segment {seg['index']} ({len(seg['spans'])} spans)")
         parts = render_segment(smap, seg, outdir, token, voice, sid, sel, refs)
