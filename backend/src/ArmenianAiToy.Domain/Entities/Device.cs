@@ -271,6 +271,18 @@ public class Device
     public bool VariantEndingsEnabled { get; set; } = true;
 
     /// <summary>
+    /// Parent toggle for the AFTER-STORY QUESTION — the one reflection
+    /// question the toy asks when a story ends («Ի՞նչ սովորեցինք…»), waits
+    /// for an answer, and reacts to. ON by default (owner request
+    /// 2026-09-07: "question clips must be optional"). OFF means the story
+    /// ends after the spoken summary/lesson and the toy goes quiet — the
+    /// summary itself is NOT gated by this flag. Same manifest + SD-index
+    /// delivery as <see cref="StoryPausesEnabled"/>, so it applies offline.
+    /// Shapes the story experience; never gates chat.
+    /// </summary>
+    public bool StoryQuestionsEnabled { get; set; } = true;
+
+    /// <summary>
     /// Timestamp of the most recent dormant-device warning email
     /// dispatched to this device's verified linked parents by the
     /// scheduled <c>WarnDormantDevicesAsync</c> pass. Null for

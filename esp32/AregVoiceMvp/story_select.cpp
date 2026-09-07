@@ -683,6 +683,14 @@ bool story_variant_endings_enabled() {
     return cs_index_variants_enabled(doc);
 }
 
+bool story_questions_enabled() {
+    JsonDocument doc;
+    if (!load_index_doc(doc)) {
+        return true;   // no card / no index — shipped default is ON
+    }
+    return cs_index_questions_enabled(doc);
+}
+
 bool voice_clip_resolve_path(const char *voice_id, char *out, size_t out_len) {
     if (out == NULL || out_len == 0) {
         return false;

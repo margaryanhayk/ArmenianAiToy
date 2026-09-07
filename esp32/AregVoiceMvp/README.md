@@ -657,6 +657,36 @@ across the CsStory tables — MEASURED, not estimated, per the rule the
 `CS_MAX_STORIES` and `CS_MAX_CLIPS` bumps set. 227 KB free still leaves far
 more than the ~40–50 KB a TLS handshake wants during audio.
 
+### After-story question toggle (owner request 2026-09-07)
+
+A parent switch, `PUT /api/parents/devices/{id}/story-questions` (default
+ON), rides the content manifest as `storyQuestionsEnabled` and is cached
+in the index root as `questionsEnabled`, so it applies offline exactly the
+way `introEnabled` / `pausesEnabled` do. Read by `story_questions_enabled()`
+(`story_select.cpp`) from `handle_post_story_flow()`.
+
+- **It gates only the QUESTION.** The after-story flow is summary → question
+  → listen → reaction. The check sits between the first two steps: with the
+  switch off the toy speaks the story's lesson (the `summary` clip) and goes
+  quiet — no question clip, no listening window, no upload. The owner asked
+  for the conclusion to stay and the question to be optional, in those words.
+- **No index schema bump.** `cs_index_add_questions_flag` / 
+  `cs_index_questions_enabled` are separate calls beside
+  `cs_index_add_story_flags`, and an absent key reads as ON — which is what
+  every card written before this flag did, so nothing migrates and no card is
+  wiped. Pinned by `index_questions_flag_round_trip` and
+  `old_index_questions_defaults_on` in `content_sync_test.cpp`.
+- **The question cursor does not move** on a skipped question: it commits
+  only on a clip that actually played, so the next listen with the switch
+  back on asks the question this one owed.
+- **Compile-verified only** (production build, canonical FQBN: 1,630,630 B,
+  194,544 B static RAM), not flashed, not bench-run — the OFF path has
+  never been heard on a toy. The `-DAREG_CONTENT_SYNC_TEST_BENCH` build does
+  NOT link on this tree: `.dram0.bss` overflows `dram0_0_seg` by 11,736 B —
+  identical at HEAD before this change (measured 2026-09-07), so the two new
+  bench checks are written but have not run. Until the next firmware release reaches the toy,
+  the dashboard switch saves the preference and the toy keeps asking.
+
 ### Shout-it-out story pauses
 
 `story_pause.{h,cpp}` — compiled into every build. Mid-story the narration

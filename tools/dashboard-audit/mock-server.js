@@ -31,14 +31,14 @@ const devices = [
     isPaused: false, isRevoked: false, bedtimeStart: '20:30:00', bedtimeEnd: '07:00:00',
     storyEnabled: true, gameEnabled: true, riddleEnabled: true, curiosityEnabled: true,
     isDormant: false, isOnline: true, storyHealth: 'ok', faultCode: '',
-    storyIntroEnabled: true, storyPausesEnabled: true, variantEndingsEnabled: true,
+    storyIntroEnabled: true, storyPausesEnabled: true, storyQuestionsEnabled: true, variantEndingsEnabled: true,
     bedtimeMusicEnabled: false },
   { deviceId: DEV2, deviceName: 'Տատիկի մոտ', lastSeenAt: ago(60 * 32), linkedAt: ago(60 * 24 * 9),
     lastConversationAt: ago(60 * 33), children: [],
     isPaused: true, isRevoked: false, bedtimeStart: null, bedtimeEnd: null,
     storyEnabled: true, gameEnabled: false, riddleEnabled: true, curiosityEnabled: true,
     isDormant: false, isOnline: false, storyHealth: 'offline', faultCode: 'E-101',
-    storyIntroEnabled: true, storyPausesEnabled: false, variantEndingsEnabled: true,
+    storyIntroEnabled: true, storyPausesEnabled: false, storyQuestionsEnabled: false, variantEndingsEnabled: true,
     bedtimeMusicEnabled: true },
 ];
 
@@ -277,6 +277,7 @@ http.createServer((req, res) => {
           else if (what === 'revoke') { dev.isRevoked = !!payload.revoked; }
           else if (typeof payload.enabled === 'boolean') {
             const flag = { 'story-intro': 'storyIntroEnabled', 'story-pauses': 'storyPausesEnabled',
+                           'story-questions': 'storyQuestionsEnabled',
                            'variant-endings': 'variantEndingsEnabled',
                            'bedtime-music': 'bedtimeMusicEnabled' }[what];
             if (flag) dev[flag] = payload.enabled;

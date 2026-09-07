@@ -658,4 +658,28 @@ public class ParentServiceGetLinkedDeviceDetailsTests
             new List<ArmenianAiToy.Application.DTOs.LinkedDeviceChildDto>(),
             false, false, null, null, true, true, true, true, false, true,
             DeviceStoryHealth.Unknown, string.Empty);
+
+    /// <summary>The dashboard renders the after-story-question switch from
+    /// this projection, so the column must read back — a flag that saves
+    /// but never reads would show "On" forever after a parent turned it off.
+    /// Its siblings (intro / pauses / variants) stay at their defaults.</summary>
+    [Fact]
+    public async Task GetLinkedDeviceDetailsAsync_ProjectsStoryQuestionsFlag()
+    {
+        var (service, db) = CreateService();
+        var parentId = Guid.NewGuid();
+        var device = NewDevice("toy", DateTime.UtcNow);
+        device.StoryQuestionsEnabled = false;
+        db.Add(new Parent { Id = parentId, Email = "p@x.test", PasswordHash = "h" });
+        db.Add(device);
+        db.Add(new ParentDevice { ParentId = parentId, DeviceId = device.Id });
+        await db.SaveChangesAsync();
+
+        var dto = Assert.Single(await service.GetLinkedDeviceDetailsAsync(parentId));
+
+        Assert.Equal(device.Id, dto.DeviceId);
+        Assert.False(dto.StoryQuestionsEnabled);
+        Assert.True(dto.StoryPausesEnabled);
+        Assert.True(dto.StoryIntroEnabled);
+    }
 }

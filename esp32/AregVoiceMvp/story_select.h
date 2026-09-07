@@ -314,6 +314,13 @@ bool story_pauses_enabled();
 /// story_select_resolve_playback_path on every new story session.
 bool story_variant_endings_enabled();
 
+/// The parent's AFTER-STORY QUESTION toggle as cached on the card (index
+/// root `questionsEnabled`). Absent index / older card → true, the shipped
+/// default. LIVE: read by handle_post_story_flow after the summary clip;
+/// false means the story ends with the lesson and the toy goes quiet. The
+/// summary itself is never gated by it.
+bool story_questions_enabled();
+
 /// Slice E — the parent's bedtime-music opt-in as cached on the card
 /// (index root `musicEnabled`). Absent → false (music is opt-in).
 bool story_select_music_enabled();

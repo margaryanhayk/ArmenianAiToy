@@ -305,6 +305,9 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                     b.Property<bool>("StoryPausesEnabled")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("StoryQuestionsEnabled")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("TimeZone")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

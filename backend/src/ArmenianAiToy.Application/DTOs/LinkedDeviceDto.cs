@@ -64,6 +64,9 @@ public record LinkedDeviceDto(
     /// discipline as <see cref="StoryIntroEnabled"/>.</summary>
     public bool StoryPausesEnabled { get; init; } = true;
 
+    /// <summary>After-story question toggle (default ON).</summary>
+    public bool StoryQuestionsEnabled { get; init; } = true;
+
     /// <summary>Variant-endings toggle (default ON).</summary>
     public bool VariantEndingsEnabled { get; init; } = true;
 

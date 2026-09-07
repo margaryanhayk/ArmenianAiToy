@@ -587,6 +587,16 @@ bool cs_index_variants_enabled(JsonDocument &doc) {
     return doc["variantsEnabled"] | true;
 }
 
+void cs_index_add_questions_flag(JsonDocument &doc, bool questions) {
+    doc["questionsEnabled"] = questions;
+}
+
+bool cs_index_questions_enabled(JsonDocument &doc) {
+    // Absent → true: a card written before this flag existed keeps asking
+    // the after-story question, which is what every toy did before it.
+    return doc["questionsEnabled"] | true;
+}
+
 // ---- offline-game clips (index schema v7) ---------------------------
 
 bool cs_manifest_read_game(JsonObjectConst item, CsGame *out) {

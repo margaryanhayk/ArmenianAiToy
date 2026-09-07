@@ -125,6 +125,19 @@ void cs_index_add_story_flags(JsonDocument &doc, bool pauses, bool variants);
 /// the shipped default.
 bool cs_index_pauses_enabled(JsonDocument &doc);
 
+/// Appends the parent AFTER-STORY QUESTION flag (root `questionsEnabled`)
+/// to an index document already built by cs_index_build. A separate call
+/// rather than a third parameter on cs_index_add_story_flags, so that
+/// function's callers and tests stay untouched. Added 2026-09-07 without a
+/// schema bump: absent → true (every card written before it), which is
+/// exactly the pre-toggle behaviour, so nothing needs migrating.
+void cs_index_add_questions_flag(JsonDocument &doc, bool questions);
+
+/// Reads the root `questionsEnabled` flag. Absent → true, the shipped
+/// default. Gates ONLY the reflection question the toy asks after a story;
+/// the spoken summary/lesson is never gated.
+bool cs_index_questions_enabled(JsonDocument &doc);
+
 /// Reads the root `variantsEnabled` flag. Absent (every pre-v6 card) →
 /// true, the shipped default. Harmless on a card with no alternate
 /// endings cached: nothing resolves, so the base narration plays.

@@ -569,6 +569,7 @@ public class DeviceController : ControllerBase
             // same "missing device row falls back to the shipped default (ON)"
             // rule as the intro flag above.
             StoryPausesEnabled = device?.StoryPausesEnabled ?? true,
+            StoryQuestionsEnabled = device?.StoryQuestionsEnabled ?? true,
             VariantEndingsEnabled = device?.VariantEndingsEnabled ?? true,
             // Slice E — bedtime-music opt-in rides the same manifest.
             BedtimeMusicEnabled = device?.BedtimeMusicEnabled ?? false,

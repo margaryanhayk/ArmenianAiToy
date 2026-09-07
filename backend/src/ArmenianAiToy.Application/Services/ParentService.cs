@@ -795,6 +795,7 @@ public class ParentService : IParentService
             device.CuriosityEnabled = true;
             device.StoryIntroEnabled = true;
             device.StoryPausesEnabled = true;
+            device.StoryQuestionsEnabled = true;
             device.VariantEndingsEnabled = true;
             device.BedtimeMusicEnabled = false;
         }
@@ -1622,6 +1623,38 @@ public class ParentService : IParentService
     }
 
     /// <summary>
+    /// Toggle the after-story question on a linked device — whether the toy
+    /// asks its one reflection question when a story ends. Same shape as
+    /// <see cref="SetDeviceStoryPausesAsync"/>. The spoken summary is not
+    /// gated here: OFF means "summary, then quiet".
+    /// </summary>
+    public async Task<bool> SetDeviceStoryQuestionsAsync(Guid parentId, Guid deviceId, bool enabled)
+    {
+        var linked = await _db.Set<ParentDevice>()
+            .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == deviceId);
+        if (!linked)
+            return false;
+
+        var device = await _db.Set<Device>().FirstOrDefaultAsync(d => d.Id == deviceId);
+        if (device == null)
+            return false;
+
+        if (device.StoryQuestionsEnabled == enabled)
+        {
+            return true;
+        }
+
+        device.StoryQuestionsEnabled = enabled;
+        TrackAndAddAudit(
+            AuditEvent.ParentDeviceStoryQuestionsSet(parentId, deviceId, enabled));
+        await _db.SaveChangesAsync();
+        _logger.LogInformation(
+            "Parent {ParentId} set device {DeviceId} storyQuestionsEnabled={Enabled}",
+            parentId, deviceId, enabled);
+        return true;
+    }
+
+    /// <summary>
     /// Toggle variant endings on a linked device — whether a re-listened
     /// story may end differently. Same shape as
     /// <see cref="SetDeviceStoryPausesAsync"/>.
@@ -1937,6 +1970,7 @@ public class ParentService : IParentService
             StoriesAvailable = AdvertisedFor(l.Device.Id).Count,
             StoryIntroEnabled = l.Device.StoryIntroEnabled,
             StoryPausesEnabled = l.Device.StoryPausesEnabled,
+            StoryQuestionsEnabled = l.Device.StoryQuestionsEnabled,
             VariantEndingsEnabled = l.Device.VariantEndingsEnabled,
             BedtimeMusicEnabled = l.Device.BedtimeMusicEnabled,
         }).ToList();

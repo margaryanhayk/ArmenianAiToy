@@ -96,7 +96,7 @@ one message is not a rule, which is why it is written here.
 ```bash
 # Backend (from backend/ directory)
 dotnet build                                    # Build all projects
-dotnet test                                     # Run all tests (2768 tests)
+dotnet test                                     # Run all tests (2779 tests)
 dotnet run --project src/ArmenianAiToy.Api      # Run API on http://0.0.0.0:5000
 ```
 
@@ -2935,6 +2935,87 @@ vendor questions, and the paid test that gates the whole decision:
 `docs/voice-narrator-brief.md`. The earlier options analysis stays in
 `docs/voice-decision-brief.md`; its Gemini/Azure re-audition is now a fallback,
 not the decision.
+
+## Story cast — one voice per character (owner direction 2026-09-03, pilot approved 2026-09-06)
+
+The owner's direction after the Ուլիկը listen: "for each part we can use
+different voices" — the narrator stays Areg, Katrin and Vardan take a part in
+every story, the wolf is a designed voice, and the sound effects stay. The
+Ուլիկը pilot went v1→v10 by the owner's ear and v10 was accepted ("Good, now
+it is ok"). It is a LISTENING COPY in scratch; the shipped
+`story-audio/ulik.mp3` is untouched until the owner says ship.
+
+- **Cast lives in `backend/content/story-voices/<id>.voices.json`** — each
+  speaker carries `voiceId` / `modelId` / `voiceSettings`, and a span may
+  override `voiceSettings` for one line. Narrator: `areg-storyteller` on
+  `eleven_v3` (the conversational model let sentence endings fall away "as if
+  out of breath"); characters on `eleven_v3_conversational`. Wolf: an
+  ElevenLabs Voice Design voice (every library voice was rejected for its
+  accent; "child" in a design prompt is refused, so the kid is "a young goat
+  character"). `check_speaker_map.py` still pins that the spans join back to
+  the story text byte for byte.
+- **`tools/story-voices/render_story.py`** renders one request per span with
+  three guards, each bought with a defect the owner heard: a transcript guard
+  (Scribe v2 batch STT, WER ≤ 0.35, zero extra words — «shshsh», «hmm» and a
+  read-aloud stage direction all failed it), a pitch guard (median f0 within
+  0.75–1.30 of the speaker's first take, skipped under 40 chars — a mother
+  whose voice "changed to a little child" failed it), and the tail-chop
+  guard. `RENDER_ONLY="narrator,5:0"` re-renders selected spans and keeps
+  every accepted take — the owner's rule: fixing one line must never re-roll
+  a line he already approved. Identical text reuses one take (refrains).
+- **`tools/story-voices/align_spans.py`** — forced alignment PER SPAN into
+  the mixer's timeline (`"exact": true`); the whole-story alignment drifted
+  −29.6 s over 2:20 on a multi-voice render and put both knocks late.
+- **`tools/story-audio/mix_ambience.py`** grew `--segments-dir` (per-segment
+  WAVs), exact-map mode (no drift correction, file-time phrase floor), per-cue
+  `leadIn` / `tail`, `landAfterSpan` (cut at a span boundary — cutting inside
+  «ու»/«կաթ» was audible), and `--marker` so a scratch mix never touches the
+  repo's `story-audio/*.ambience.json`. Ուլիկը's cues: forest beds, a
+  `door-open` and one heavy `door-knock-heavy`, all `insert: true`; the
+  mother's knock and the final knock were removed on the owner's ear.
+- **Two owner text edits (2026-09-06)** in `ulik.story.json` + voices map:
+  «ուլ» → «ուլիկ» in the opening, and the mother's «— ասաց վախեցած մայրը»
+  attribution dropped so her two lines run together. `check_speaker_map.py`
+  PASS, story tests green.
+- **Not done:** shipping v10 (Ship-StoryAudio levelling, sha/size, `Version`
+  bump, `segments_to_bytes`, ambience marker, listen test on the toy), the
+  other nine casts, and a re-render of the `summary` / question clips in the
+  cast narrator's settings — the shipped clips carry the voice's saved
+  settings, the cast narrator uses stability .55 / style .2; whether the
+  seam is audible is a listening question. The ElevenLabs keys pasted in chat
+  are burned; the replacement belongs in the environment as
+  `ELEVENLABS_API_KEY`, and until it is there no render can run from here.
+
+## After-story question toggle (owner request 2026-09-07)
+
+"Question clips must be optional (enabled from the parent dashboard or
+not)." Fourth story-shaping switch, an exact copy of the `StoryPausesEnabled`
+pattern, shipped as one slice per the same-commit dashboard rule.
+
+- **Backend.** `Device.StoryQuestionsEnabled` (default ON; hand-written
+  migration `AddDeviceStoryQuestionsEnabled` with an explicit
+  `defaultValue: true` — the scaffolder trap noted on `AddStoryFeatureToggles`),
+  `PUT /api/parents/devices/{id}/story-questions` `{ enabled }` (parent-JWT,
+  ownership-checked, silent 404, 400 on a missing flag, idempotent), audit
+  `ParentDeviceStoryQuestionsSet` on real flips only, `storyQuestionsEnabled`
+  on the content manifest (absent → ON) and on `LinkedDeviceDto`, reset to ON
+  by the unlink factory reset. Pinned by `StoryQuestionsToggleTests` +
+  `ParentServiceGetLinkedDeviceDetailsTests.GetLinkedDeviceDetailsAsync_ProjectsStoryQuestionsFlag`.
+- **It gates the QUESTION, never the summary.** OFF = the story ends with its
+  spoken lesson (the `summary` clip) and the toy goes quiet: no question clip,
+  no listening window, no upload, no cursor move. The owner asked for the
+  conclusion to stay and the question to be optional.
+- **Dashboard.** `parent.html` "A question after the story" switch beside the
+  intro/pauses switches, with a note saying what it does. Deliberately NOT
+  greyed as "not on your toy yet": the toy DOES ask the question today; what it
+  cannot honour until its next firmware release is OFF. Activity-feed label on
+  web and mobile; `tools/dashboard-audit/mock-server.js` carries the flag.
+- **Firmware** (`esp32/AregVoiceMvp/`, compile-verified, NOT flashed, NOT
+  bench-run): manifest field → `s_questions_enabled` → index root
+  `questionsEnabled` (`cs_index_add_questions_flag` / `cs_index_questions_enabled`,
+  no schema bump — absent reads ON) → `story_questions_enabled()` →
+  `handle_post_story_flow()` returns after the summary when off. Bench tests
+  `index_questions_flag_round_trip` / `old_index_questions_defaults_on`.
 
 ## Story Q&A — negotiated first-byte streaming (2026-09-01)
 

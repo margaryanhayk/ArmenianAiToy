@@ -76,6 +76,12 @@ public enum AuditEventType
     /// flag actually flips.</summary>
     ParentDeviceStoryPausesSet,
 
+    /// <summary>A parent toggled the after-story question (the one
+    /// reflection question the toy asks when a story ends) on a linked
+    /// device. Metadata carries the post-change state (enabled: bool).
+    /// Written only when the flag actually flips.</summary>
+    ParentDeviceStoryQuestionsSet,
+
     /// <summary>A parent toggled variant endings — the alternate ending a
     /// re-listened story may get — on a linked device. Metadata carries the
     /// post-change state (enabled: bool). Written only when the flag actually

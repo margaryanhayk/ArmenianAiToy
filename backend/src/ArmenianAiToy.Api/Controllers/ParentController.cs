@@ -684,6 +684,36 @@ public class ParentController : ControllerBase
     }
 
     /// <summary>
+    /// Toggle the after-story question on a linked device — whether the toy
+    /// asks its one reflection question when a story ends and waits for the
+    /// child's answer. ON by default. OFF means the story still ends with the
+    /// spoken summary, and the toy then goes quiet. Exact mirror of the
+    /// story-pauses toggle: parent-JWT, ownership-checked, silent 404,
+    /// idempotent (audit only on a real flip), 400 on a missing body/flag.
+    /// The toy picks the new value up on its next content-manifest fetch and
+    /// caches it so the toggle applies offline too.
+    /// </summary>
+    [HttpPut("devices/{deviceId}/story-questions")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> SetDeviceStoryQuestions(
+        Guid deviceId, [FromBody] DeviceStoryIntroRequest request)
+    {
+        if (request?.Enabled is null)
+            return BadRequest(new { error = "enabled (true/false) is required." });
+
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ok = await _parentService.SetDeviceStoryQuestionsAsync(
+            parentId, deviceId, request.Enabled.Value);
+        if (!ok)
+            return NotFound(new { error = "Device not found or not linked to this account." });
+        return Ok(new { storyQuestionsEnabled = request.Enabled.Value });
+    }
+
+    /// <summary>
     /// Toggle variant endings on a linked device: whether a story the child
     /// has already heard may end differently on a re-listen. ON by default.
     /// Same shape as the story-pauses toggle. A device whose library ships no

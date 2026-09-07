@@ -318,6 +318,23 @@ public class AuditEvent
         })
     };
 
+    /// <summary>A parent toggled the after-story question on a linked
+    /// device. Same envelope as <see cref="ParentDeviceStoryIntroSet"/>:
+    /// post-change flag only, written only on a real flip.</summary>
+    public static AuditEvent ParentDeviceStoryQuestionsSet(
+        Guid parentId, Guid deviceId, bool enabled) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.ParentDeviceStoryQuestionsSet,
+        ActorParentId = parentId,
+        TargetDeviceId = deviceId,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            enabled = enabled
+        })
+    };
+
     /// <summary>A parent toggled variant endings on a linked device. Same
     /// envelope as <see cref="ParentDeviceStoryIntroSet"/>: post-change flag
     /// only, written only on a real flip.</summary>
