@@ -1,170 +1,172 @@
 {
- "storyId": "ulik",
- "title": "Ուլիկը",
- "_status": "DRAFT — attribution pending the owner's review. This file changes no story text.",
- "_why": "The tale turns on the wolf saying the mother's exact words in a different voice. The text says so three times («իր հաստ ձայնով», «Քո ձայնը կոշտ է ու կոպիտ», «Էնպե՜ս հաստ ձայն ունե՜ր») and the 2026-08-11 narration says them all identically.",
- "speakers": {
-  "narrator": {
-   "role": "The storyteller",
-   "pitch": 1.0,
-   "directionForHumanNarrator": null,
-   "voiceSettings": {
-    "stability": 0.55,
-    "similarity_boost": 0.8,
-    "style": 0.2
-   },
-   "voiceId": "NxAsEwnikgCJa5tyBwEf",
-   "voiceName": "areg-storyteller",
-   "modelId": "eleven_v3",
-   "note": "Narration stays on eleven_v3, the model the approved library was rendered with. eleven_v3_conversational is tuned for dialogue and, on the opening of Ուլիկը, let sentence endings fall away 'as if out of breath' (owner, 2026-09-04). Characters keep the conversational model."
-  },
-  "mother": {
-   "role": "Այծը, Ուլիկի մայրը",
-   "pitch": 1.0,
-   "note": "Her call is the one the kid trusts, and the wolf's copy is measured against it. It must be unmistakably kind.",
-   "directionForHumanNarrator": "warm gentle mother goat, sweet and light, calling to her child",
-   "voiceSettings": {
-    "stability": 0.6,
-    "similarity_boost": 0.85,
-    "style": 0.3
-   },
-   "voiceId": "bpss31fpiTyvjz5XZUT0",
-   "voiceName": "katrin-v3",
-   "modelId": "eleven_v3_conversational"
-  },
-  "wolf": {
-   "role": "Գայլը",
-   "pitch": 1.0,
-   "note": "Says the mother's words EXACTLY — only the voice differs, and that IS the scene. Not frightening: the kid is unimpressed, not terrified, and sends him away.",
-   "directionForHumanNarrator": "deep thick growling wolf, badly pretending to be sweet",
-   "voiceSettings": {
-    "stability": 0.5,
-    "similarity_boost": 0.8,
-    "style": 0.3
-   },
-   "voiceId": "5WzpQqbTMzWBCHk0Mol1",
-   "voiceName": "areg-wolf (designed with ElevenLabs Voice Design on 2026-09-03 — preview 0 of three; the owner picked it after rejecting every library voice for its accent)",
-   "modelId": "eleven_v3_conversational"
-  },
-  "ulik": {
-   "role": "Ուլիկը",
-   "pitch": 1.0,
-   "directionForHumanNarrator": "small young goat, bright, a little wary, then excited telling his mother",
-   "voiceSettings": {
-    "stability": 0.4,
-    "similarity_boost": 0.8,
-    "style": 0.45
-   },
-   "voiceId": "GazesXOqRnIUqi60EsmM",
-   "voiceName": "vardan-test (owner's pick 2026-09-04 from ten candidates; unshifted — the 10% lift on vardan-v2 was what sounded unlovely)",
-   "modelId": "eleven_v3_conversational"
-  }
- },
- "segments": [
-  {
-   "index": 0,
-   "spans": [
-    {
-     "speaker": "narrator",
-     "text": "Խոր անտառում մի այծ է լինում։ Ունենում է մի գեղեցիկ ուլիկ։ Ուլին ամեն օր թողնում է տանը, ինքը գնում է արոտ անելու։ Արածում է և իրիկունը կուրծքը լիքը տուն է գալիս։ Տուն է գալիս, դուռը զարկում ու մկըկում, կանչում․ "
+  "storyId": "ulik",
+  "title": "Ուլիկը",
+  "_status": "DRAFT — attribution pending the owner's review. This file changes no story text.",
+  "_why": "The tale turns on the wolf saying the mother's exact words in a different voice. The text says so three times («իր հաստ ձայնով», «Քո ձայնը կոշտ է ու կոպիտ», «Էնպե՜ս հաստ ձայն ունե՜ր») and the 2026-08-11 narration says them all identically.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with. eleven_v3_conversational is tuned for dialogue and, on the opening of Ուլիկը, let sentence endings fall away 'as if out of breath' (owner, 2026-09-04). Characters keep the conversational model."
     },
-    {
-     "speaker": "mother",
-     "text": "Սևուկ ուլիկ, Սիրուն բալիկ, Ման եմ եկել սարեսար, Կաթն եմ բերել քեզ համար, Դըռնակը բա՛ց, ներս գամ ես, Անուշ-անուշ կաթ տամ քեզ․ Սևուկ ուլիկ, Սիրուն բալիկ։"
+    "mother": {
+      "role": "Այծը, Ուլիկի մայրը",
+      "pitch": 1.0,
+      "note": "Her call is the one the kid trusts, and the wolf's copy is measured against it. It must be unmistakably kind.",
+      "directionForHumanNarrator": "warm gentle mother goat, sweet and light, calling to her child",
+      "voiceSettings": {
+        "stability": 0.6,
+        "similarity_boost": 0.85,
+        "style": 0.3
+      },
+      "voiceId": "bpss31fpiTyvjz5XZUT0",
+      "voiceName": "katrin-v3",
+      "modelId": "eleven_v3_conversational"
+    },
+    "wolf": {
+      "role": "Գայլը",
+      "pitch": 1.0,
+      "note": "Says the mother's words EXACTLY — only the voice differs, and that IS the scene. Not frightening: the kid is unimpressed, not terrified, and sends him away.",
+      "directionForHumanNarrator": "deep thick growling wolf, badly pretending to be sweet",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "5WzpQqbTMzWBCHk0Mol1",
+      "voiceName": "areg-wolf (designed with ElevenLabs Voice Design on 2026-09-03 — preview 0 of three; the owner picked it after rejecting every library voice for its accent)",
+      "modelId": "eleven_v3_conversational"
+    },
+    "ulik": {
+      "role": "Ուլիկը",
+      "pitch": 1.0,
+      "directionForHumanNarrator": "small young goat, bright, a little wary, then excited telling his mother",
+      "voiceSettings": {
+        "stability": 0.4,
+        "similarity_boost": 0.8,
+        "style": 0.45
+      },
+      "voiceId": "GazesXOqRnIUqi60EsmM",
+      "voiceName": "vardan-test (owner's pick 2026-09-04 from ten candidates; unshifted — the 10% lift on vardan-v2 was what sounded unlovely)",
+      "modelId": "eleven_v3_conversational",
+      "denoise": true,
+      "noiseNote": "vardan-test is a clone of ONE 8 s sample with a -43 dBFS floor (SNR 28 dB); every take carries that room (-44..-47 dBFS, SNR 31-34 dB against Areg's 40-44), on every model and stability — measured 2026-09-07. denoise=true runs anlmdn before loudnorm (-10..-13 dB floor, speech untouched). The real fix is a re-clone from a clean sample: ElevenLabs 'remove background noise' on add, or the pre-denoised sample kept in the evidence folder."
     }
-   ]
   },
-  {
-   "index": 1,
-   "spans": [
+  "segments": [
     {
-     "speaker": "narrator",
-     "text": "Ուլիկն իսկույն վեր է թռչում, դուռը բաց անում։ Մայրը կաթ է տալիս նրան ու կրկին գնում արոտ։ Էս բոլորը թաքուն տեսնում է գայլը։"
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Խոր անտառում մի այծ է լինում։ Ունենում է մի գեղեցիկ ուլիկ։ Ուլին ամեն օր թողնում է տանը, ինքը գնում է արոտ անելու։ Արածում է և իրիկունը կուրծքը լիքը տուն է գալիս։ Տուն է գալիս, դուռը զարկում ու մկըկում, կանչում․ "
+        },
+        {
+          "speaker": "mother",
+          "text": "Սևուկ ուլիկ, Սիրուն բալիկ, Ման եմ եկել սարեսար, Կաթն եմ բերել քեզ համար, Դըռնակը բա՛ց, ներս գամ ես, Անուշ-անուշ կաթ տամ քեզ․ Սևուկ ուլիկ, Սիրուն բալիկ։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Ուլիկն իսկույն վեր է թռչում, դուռը բաց անում։ Մայրը կաթ է տալիս նրան ու կրկին գնում արոտ։ Էս բոլորը թաքուն տեսնում է գայլը։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Մի իրիկուն այծից առաջ գալիս է, դուռը զարկում ու իր հաստ ձայնով կանչում․ "
+        },
+        {
+          "speaker": "wolf",
+          "text": "Սևուկ ուլիկ, Սիրուն բալիկ, Ման եմ եկել սարեսար, Կաթն եմ բերել քեզ համար, Դըռնակը բա՛ց, ներս գամ ես, Անուշ-անուշ կաթ տամ քեզ․ Սևուկ ուլիկ, Սիրուն բալիկ։"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Ուլիկը լսում է, լսում ու պատասխանում․ "
+        },
+        {
+          "speaker": "ulik",
+          "text": "— Էդ ո՞վ ես դու, չեմ ճանաչում։ Իմ մայրը էդպես չի կանչում։ Նա քաղցր ու բարակ ձայն ունի։ Քո ձայնը կոշտ է ու կոպիտ։ Դուռը բաց չե՛մ անի․․․ Գնա՛․․․ Չեմ ուզում քեզ․․․։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ու գայլը հեռանում է, գնում։"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Գալիս է մայրը, դուռը ծեծում․ "
+        },
+        {
+          "speaker": "mother",
+          "text": "Սևուկ ուլիկ, Սիրուն բալիկ, Ման եմ եկել սարեսար, Կաթն եմ բերել քեզ համար, Դըռնակը բա՛ց, ներս գամ ես, Անուշ-անուշ կաթ տամ քեզ․ Սևուկ ուլիկ, Սիրուն բալիկ։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ուլիկը դուռը բաց է անում, կաթ է խմում ու մորը պատմում․ "
+        },
+        {
+          "speaker": "ulik",
+          "text": "— Գիտե՞ս, մայրիկ, ի՛նչ եղավ։ Մի քիչ առաջ մինը եկավ, դուռը զարկեց ու կանչում էր․ Սևուկ ուլիկ, Սիրուն բալիկ։ Ասում էր՝ դուռը բա՛ց արա։ Էնպե՜ս հաստ ձայն ունե՜ր։ Էնպե՜ս վախեցա՜, էնպե՜ս վախեցա՜․․․ Դուռը բաց չարի, ասի՝ չեմ ուզում, գնա՛․․․"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "spans": [
+        {
+          "speaker": "mother",
+          "text": "— Պա՛ պա՛, պա՛, պա՛, Սևուկ ջան, ի՜նչ լավ է եղել, որ բաց չես արել։ ",
+          "voiceSettings": {
+            "stability": 0.75,
+            "similarity_boost": 0.85,
+            "style": 0.15,
+            "speed": 0.8
+          },
+          "note": "Slow and steady: «Պա՛ պա՛, պա՛, պա՛» was still too fast at speed 0.9 (owner, 2026-09-06). The attribution «— ասավ վախեցած մայրը։» that followed was cut by the owner the same day; the comma became a full stop."
+        },
+        {
+          "speaker": "mother",
+          "text": "— Էդ գայլն է եղել, եկել է, որ քեզ ուտի։ Մյուս անգամ էլ որ գա, բաց չանես, ասա՝ գնա՛, թե չէ՝ իմ մայրը քեզ կսպանի իր սուր պոզերով։",
+          "voiceSettings": {
+            "stability": 0.65,
+            "similarity_boost": 0.85,
+            "style": 0.25,
+            "speed": 0.9
+          },
+          "note": "Slower and steadier than her song: «Պա՛ պա՛, պա՛, պա՛» came out unnaturally fast (owner, 2026-09-04)."
+        }
+      ]
     }
-   ]
-  },
-  {
-   "index": 2,
-   "spans": [
-    {
-     "speaker": "narrator",
-     "text": "Մի իրիկուն այծից առաջ գալիս է, դուռը զարկում ու իր հաստ ձայնով կանչում․ "
-    },
-    {
-     "speaker": "wolf",
-     "text": "Սևուկ ուլիկ, Սիրուն բալիկ, Ման եմ եկել սարեսար, Կաթն եմ բերել քեզ համար, Դըռնակը բա՛ց, ներս գամ ես, Անուշ-անուշ կաթ տամ քեզ․ Սևուկ ուլիկ, Սիրուն բալիկ։"
-    }
-   ]
-  },
-  {
-   "index": 3,
-   "spans": [
-    {
-     "speaker": "narrator",
-     "text": "Ուլիկը լսում է, լսում ու պատասխանում․ "
-    },
-    {
-     "speaker": "ulik",
-     "text": "— Էդ ո՞վ ես դու, չեմ ճանաչում։ Իմ մայրը էդպես չի կանչում։ Նա քաղցր ու բարակ ձայն ունի։ Քո ձայնը կոշտ է ու կոպիտ։ Դուռը բաց չե՛մ անի․․․ Գնա՛․․․ Չեմ ուզում քեզ․․․։ "
-    },
-    {
-     "speaker": "narrator",
-     "text": "Ու գայլը հեռանում է, գնում։"
-    }
-   ]
-  },
-  {
-   "index": 4,
-   "spans": [
-    {
-     "speaker": "narrator",
-     "text": "Գալիս է մայրը, դուռը ծեծում․ "
-    },
-    {
-     "speaker": "mother",
-     "text": "Սևուկ ուլիկ, Սիրուն բալիկ, Ման եմ եկել սարեսար, Կաթն եմ բերել քեզ համար, Դըռնակը բա՛ց, ներս գամ ես, Անուշ-անուշ կաթ տամ քեզ․ Սևուկ ուլիկ, Սիրուն բալիկ։ "
-    },
-    {
-     "speaker": "narrator",
-     "text": "Ուլիկը դուռը բաց է անում, կաթ է խմում ու մորը պատմում․ "
-    },
-    {
-     "speaker": "ulik",
-     "text": "— Գիտե՞ս, մայրիկ, ի՛նչ եղավ։ Մի քիչ առաջ մինը եկավ, դուռը զարկեց ու կանչում էր․ Սևուկ ուլիկ, Սիրուն բալիկ։ Ասում էր՝ դուռը բա՛ց արա։ Էնպե՜ս հաստ ձայն ունե՜ր։ Էնպե՜ս վախեցա՜, էնպե՜ս վախեցա՜․․․ Դուռը բաց չարի, ասի՝ չեմ ուզում, գնա՛․․․"
-    }
-   ]
-  },
-  {
-   "index": 5,
-   "spans": [
-    {
-     "speaker": "mother",
-     "text": "— Պա՛ պա՛, պա՛, պա՛, Սևուկ ջան, ի՜նչ լավ է եղել, որ բաց չես արել։ ",
-     "voiceSettings": {
-      "stability": 0.75,
-      "similarity_boost": 0.85,
-      "style": 0.15,
-      "speed": 0.8
-     },
-     "note": "Slow and steady: «Պա՛ պա՛, պա՛, պա՛» was still too fast at speed 0.9 (owner, 2026-09-06). The attribution «— ասավ վախեցած մայրը։» that followed was cut by the owner the same day; the comma became a full stop."
-    },
-    {
-     "speaker": "mother",
-     "text": "— Էդ գայլն է եղել, եկել է, որ քեզ ուտի։ Մյուս անգամ էլ որ գա, բաց չանես, ասա՝ գնա՛, թե չէ՝ իմ մայրը քեզ կսպանի իր սուր պոզերով։",
-     "voiceSettings": {
-      "stability": 0.65,
-      "similarity_boost": 0.85,
-      "style": 0.25,
-      "speed": 0.9
-     },
-     "note": "Slower and steadier than her song: «Պա՛ պա՛, պա՛, պա՛» came out unnaturally fast (owner, 2026-09-04)."
-    }
-   ]
-  }
- ],
- "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing).",
- "_cast": "Owner decision 2026-09-03: a real cast per story. Narrator is always Areg. Katrin and Vardan take a part in every story. Library voices only for villains and animals (they speak Armenian with an accent). Every speaker may carry voiceId/modelId; absent means the narrator's voice in eleven_v3, so older maps render unchanged.",
- "_textEdits": [
-  "2026-09-06 (owner): «գեղեցիկ ուլ» -> «գեղեցիկ ուլիկ» in segment 0; «— ասավ վախեցած մայրը։» removed from segment 5 (comma before it became a full stop). Story file and speaker map edited together; the shipped narration audio does not carry these edits until the cast render ships."
- ]
+  ],
+  "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing).",
+  "_cast": "Owner decision 2026-09-03: a real cast per story. Narrator is always Areg. Katrin and Vardan take a part in every story. Library voices only for villains and animals (they speak Armenian with an accent). Every speaker may carry voiceId/modelId; absent means the narrator's voice in eleven_v3, so older maps render unchanged.",
+  "_textEdits": [
+    "2026-09-06 (owner): «գեղեցիկ ուլ» -> «գեղեցիկ ուլիկ» in segment 0; «— ասավ վախեցած մայրը։» removed from segment 5 (comma before it became a full stop). Story file and speaker map edited together; the shipped narration audio does not carry these edits until the cast render ships."
+  ]
 }

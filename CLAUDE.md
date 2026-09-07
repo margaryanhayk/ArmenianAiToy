@@ -2977,6 +2977,17 @@ it is ok"). It is a LISTENING COPY in scratch; the shipped
   «ուլ» → «ուլիկ» in the opening, and the mother's «— ասաց վախեցած մայրը»
   attribution dropped so her two lines run together. `check_speaker_map.py`
   PASS, story tests green.
+- **"Noise in some parts of the voices" (owner, 2026-09-07) — it was the
+  Vardan CLONE, not the pipeline.** Measured: our loudnorm/fades move a
+  take's floor by ±2 dB; the Ուլիկ takes come back from ElevenLabs at
+  −44..−47 dBFS (SNR 31–34 dB) against Areg's −52..−57 (40–45), on every
+  model and stability, because `vardan-test` was cloned from ONE 8 s sample
+  with a −43 dBFS floor and a clone reproduces its room. Fix now: per-speaker
+  `"denoise": true` in the voices map (`anlmdn` before loudnorm, −10..−13 dB
+  floor, speech untouched), and `render_story.py` prints floor/SNR on every
+  take with `NOISY` under 36 dB. Fix for good: re-clone Vardan from a clean
+  sample (needs `voices_write` on the key; owner action). Evidence:
+  `tools/quality-evidence/ulik-cast-noise-20260907.md`.
 - **Not done:** shipping v10 (Ship-StoryAudio levelling, sha/size, `Version`
   bump, `segments_to_bytes`, ambience marker, listen test on the toy), the
   other nine casts, and a re-render of the `summary` / question clips in the

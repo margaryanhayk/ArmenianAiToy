@@ -34,6 +34,19 @@ TAIL_MIN_LENGTH_RATIO = 0.70   # got/expected below this, with a loud tail, is a
 TAIL_RETRIES = 2               # rendering is non-deterministic; ask again
 FADE_IN = 0.008
 FADE_OUT = 0.030               # longer out: gives a loud ending a natural decay
+
+# Noise floor of a take, measured as the RMS of its quietest 10% of 50 ms
+# windows (dBFS) against the RMS of its loudest 25% — the between-word floor
+# against the speech level. Printed on every take since 2026-09-07, when the
+# owner heard "noise in some parts" and the cause turned out to be one CLONE:
+# vardan-test was made from a single 8 s sample with a -43 dBFS floor
+# (SNR 28 dB), and a clone reproduces its source's room on every model and
+# every stability setting — Areg's samples sit at -60. Nothing in this
+# pipeline added it (our processing moved the floor by ±2 dB); it was in the
+# take as ElevenLabs returned it. A number on the line is what makes the next
+# noisy voice visible on its FIRST render instead of on the owner's phone.
+SNR_WARN_DB = 36.0             # Areg/Katrin takes read 40-44; vardan-test read 31-34
+DENOISE_AF = "anlmdn=s=3:p=0.002:r=0.006"   # per-speaker "denoise": true — measured -10..-13 dB floor, speech level unchanged
                                # instead of a wall, which is what a splice hears
 
 # The story's own punctuation is the timing sheet. A full stop earns more air
@@ -203,6 +216,26 @@ def pitch_matches(path, ref_path):
     ok = F0_RATIO_BAND[0] <= r <= F0_RATIO_BAND[1]
     return ok, f"f0 {a:.0f} Hz vs reference {b:.0f} Hz (x{r:.2f})"
 
+def snr_db(path):
+    """(floor dBFS, speech dBFS, SNR dB) — see SNR_WARN_DB. None without numpy,
+    like median_f0: the readout is advisory, never a reason a render cannot run."""
+    try:
+        import numpy as np
+    except ImportError:
+        return None
+    raw = subprocess.run(["ffmpeg","-v","error","-i",path,"-f","s16le","-ac","1","-ar","44100","-"],
+                         capture_output=True).stdout
+    x = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    w = 2205; n = len(x) // w
+    if n < 4:
+        return None
+    fr = x[:n*w].reshape(n, w)
+    db = 20*np.log10(np.sqrt((fr**2).mean(1)) + 1e-9)
+    o = np.argsort(db)
+    floor = 20*np.log10(np.sqrt((fr[o[:max(2, n//10)]]**2).mean()) + 1e-9)
+    speech = 20*np.log10(np.sqrt((fr[o[-max(2, n//4):]]**2).mean()) + 1e-9)
+    return floor, speech, speech - floor
+
 def render_segment(smap, seg, outdir, token, voice, sid, sel=None, refs=None):
     parts, problems = [], []
     refs = refs if refs is not None else {}
@@ -269,6 +302,11 @@ def render_segment(smap, seg, outdir, token, voice, sid, sel=None, refs=None):
         af = ("loudnorm=I=-17:TP=-1.5" if abs(pitch - 1.0) < 0.005 else
               f"asetrate=44100*{pitch},aresample=44100,atempo=1/{pitch},"
               f"loudnorm=I=-17:TP=-1.5")
+        # Denoise BEFORE loudnorm, so the level is measured on the voice and
+        # not on the room it was cloned from. Opt-in per speaker: on a clean
+        # clone it would only smear consonants for nothing.
+        if spk.get("denoise"):
+            af = DENOISE_AF + "," + af
         stage = raw[:-4] + ".stage.wav"
         subprocess.run(["ffmpeg","-v","error","-y","-i",raw,"-af",af,
                         "-ac","1","-ar","44100",stage], capture_output=True)
@@ -285,8 +323,12 @@ def render_segment(smap, seg, outdir, token, voice, sid, sel=None, refs=None):
         os.remove(stage)
         parts.append((who, wav, pause_after(text), len(text), duration(wav)))
         refs.setdefault(who, wav)
+        snr = snr_db(wav)
+        noisy = snr is not None and snr[2] < SNR_WARN_DB
         print(f"    {i:02d} {who:14} {len(text):>4}ch {got:>5.1f}s "
               f"tail {tail_ratio(raw):.0%}"
+              f"{'  floor %.0f dBFS SNR %.0f dB' % (snr[0], snr[2]) if snr else ''}"
+              f"{'  NOISY' if noisy else ''}"
               f"{'  pitch '+str(pitch) if pitch!=1.0 else ''}"
               f"{'  voice '+spk_voice[:8]+'… '+spk_model if spk.get('voiceId') else ''}", flush=True)
     if problems:
