@@ -2990,14 +2990,16 @@ it is ok"). It is a LISTENING COPY in scratch; the shipped
   held: `vardan-v2` (8 clean samples, −60 dBFS) was already on the account
   and renders 13 dB cleaner, at Areg's level; Ուլիկ now uses it unshifted
   (v14). Evidence: `tools/quality-evidence/ulik-cast-noise-20260907.md`.
-- **Not done:** shipping v10 (Ship-StoryAudio levelling, sha/size, `Version`
-  bump, `segments_to_bytes`, ambience marker, listen test on the toy), the
-  other nine casts, and a re-render of the `summary` / question clips in the
-  cast narrator's settings — the shipped clips carry the voice's saved
-  settings, the cast narrator uses stability .55 / style .2; whether the
-  seam is audible is a listening question. The ElevenLabs keys pasted in chat
-  are burned; the replacement belongs in the environment as
-  `ELEVENLABS_API_KEY`, and until it is there no render can run from here.
+- **SHIPPED 2026-09-07 (owner: "Ship").** v14 — the cast render with
+  vardan-v2 — installed as `story-audio/ulik.mp3` at `Version` 13 with the
+  four re-rendered summary/question clips, byte map, and ambience marker;
+  gates and 2779 tests green; approval pinned to sha256 in
+  `tools/quality-evidence/ulik-cast-ship-20260907.md`. The stale
+  `ulik.words.json` (alignment of the previous narration) was removed. Ship
+  ran here by hand, step for step, because this host has no PowerShell.
+  **Not done:** the listen test on the TOY (heard on a phone only), the
+  other nine casts. The ElevenLabs keys pasted in chat are burned; the
+  replacement belongs in the environment as `ELEVENLABS_API_KEY`.
 
 ## After-story question toggle (owner request 2026-09-07)
 
