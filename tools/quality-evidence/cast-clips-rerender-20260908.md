@@ -50,3 +50,7 @@ no story `Version` moved, so toys fetch ~4 MB of clips, not the narration again.
 
 Gates: `dotnet test` 2779/2779. Unchanged: intro / offer / reoffer clips (the 2026-08-16
 render). Not done: the listen test on the toy; the owner has the 36-clip preview file.
+
+## Owner verdict (2026-09-08)
+
+"Good" on the 36-clip preview. Approval is pinned to the sha256 table above (the installed bytes are the preview's bytes).
