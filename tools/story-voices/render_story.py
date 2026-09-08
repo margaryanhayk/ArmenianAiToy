@@ -125,6 +125,7 @@ STT_MAX_EXTRA_WORDS = 0        # any word the story does not have is a fault
 STT_MAX_WER = 0.35             # above this the take is garbage, not an accent
 STT_MAX_CHAR_ERR = 0.25        # letters-only fallback when the transcriber ran words together
 STT_MAX_NAME_ERR = 0.50        # same word count, no added letters: a name it cannot spell
+STT_NAME_MAX_WORDS = 3         # ...and only on a line that short
 
 def _norm_words(t):
     t = re.sub(r"[՞՛՜]", "", t.lower())
@@ -209,8 +210,14 @@ def spoken_matches(path, text, token, _second=0):
         rc, hc = "".join(_norm_words(text)), "".join(_norm_words(hyp))
         slack = max(2, int(0.04 * len(rc)))
         err = _lev(rc, hc) / max(1, len(rc))
+        # The name allowance is for SHORT calls only: on a 26-character
+        # greeting it let through a take the transcriber heard twice as
+        # «ի՞նչ կա թիորը» for «հեքիաթի օր է» (equal word count, letters 0.32)
+        # — and the re-render transcribed exactly, so the first take was
+        # genuinely off. Three words is «- Չատի՞, Մատի՞․․․» with room to spare.
+        short_call = len(_norm_words(text)) <= STT_NAME_MAX_WORDS
         if len(hc) <= len(rc) + slack and rc and \
-                (err <= STT_MAX_CHAR_ERR or (extra == 0 and err <= STT_MAX_NAME_ERR)):
+                (err <= STT_MAX_CHAR_ERR or (extra == 0 and short_call and err <= STT_MAX_NAME_ERR)):
             return True, f"wer {w:.2f} (letters {err:.2f}, spelling/boundaries differ)"
         return False, (f"heard {hyp[:90]!r} (+{extra} words, wer {w:.2f}, "
                        f"letters {len(hc)}/{len(rc)} err {err:.2f})")
