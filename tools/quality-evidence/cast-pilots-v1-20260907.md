@@ -43,3 +43,23 @@ Vardan is never lifted (rejected 2026-09-04). Every take floor −43..−66 dBFS
 - The owner has heard none of these. Nothing ships until he has.
 - «Փոքրիկ ամպիկը» and «Ոզնիկն ու խնձորը» have no ambience cues yet.
 - The OpenAI-TTS stream caches are untouched.
+
+## Owner verdict (2026-09-08)
+
+"For now these are good (there are minor bugs, but at this point I don't want to change)."
+Approval is pinned to the bytes he heard (the -with-summary copies) and to the narration
+files that would ship (the same audio without the appended summary clip).
+
+| story | heard (with summary) sha256 | ships (narration) sha256 | bytes |
+|---|---|---|---|
+| anban-huri | `c21c98d88a76aed4…` | `c5680e7b10bbc92938d07ff031217d1368ba36b24ad8347754b5e557ba81c555` | 6023044 |
+| princess-and-pea | `66d378adbfd1c92f…` | `28d0ab9161483480616451774fccebf53c8728f9461b5bae0b3840cb9ff74b3f` | 1638862 |
+| little-cloud | `463a2c9eaec654a4…` | `03e27b572b5c6fa80ed0b1cab8e966d0bba4a345121f78c5da02a9d209d317ce` | 525418 |
+| sutlik-orskan | `0d81b57c20412289…` | `d7482812c24cea9eebfbcea3eafc627734198d770d85d07b9957c6b1a287e4cb` | 3695221 |
+| sutasan | `56c4e6682b3fa13b…` | `a7af8a603fc75bf6fda254694c5bdda4d378c22c405364dba670bb26d1f6947a` | 2166117 |
+| pochat-aghves | `74c13bedd2b54ef4…` | `75f61439210cb7e18f8a5b76f93d228b5be614de4f957087a9770a16e8701711` | 6360964 |
+| khosogh-dzuk | `58e70dc79858f301…` | `e95e1291de4584641ea57330cb5fca7cdbba1cc0c27f289e620dc539f3422146` | 9347701 |
+| three-piglets | `3dcced61da05effc…` | `a0043a770622fea31d7a7216e8ee898c138fadd894364cd2ef910220d201418a` | 2038849 |
+| hedgehog-apple | `979ae53bc6350fcd…` | `424b9a0c70978aae50d926decc98d6eb7cee31f59d2ada174bc26f02725d2823` | 596889 |
+
+Not shipped: the owner has not said "Ship". The minor bugs he heard are not recorded — he chose not to change anything at this point.
