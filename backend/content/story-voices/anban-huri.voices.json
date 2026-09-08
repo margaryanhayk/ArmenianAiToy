@@ -1,7 +1,7 @@
 {
  "storyId": "anban-huri",
  "title": "Անբան Հուռին",
- "_status": "DRAFT — attribution pending the owner's review. This file changes no story text.",
+ "_status": "v1 CAST PILOT 2026-09-07 — listening copies in scratch; the shipped narration is untouched until the owner says ship. This file changes no story text.",
  "_rule": "Only DIRECT speech gets a character. Reported speech («Նա ասաց, որ…») stays narrator, because it is the narrator speaking about them, not them speaking.",
  "_why": "The frogs are the joke and the mother-in-law is the plot. Her beetle speech must be sincere, or the ending stops working.",
  "speakers": {
@@ -13,29 +13,40 @@
     "stability": 0.55,
     "similarity_boost": 0.8,
     "style": 0.2
-   }
+   },
+   "voiceId": "NxAsEwnikgCJa5tyBwEf",
+   "voiceName": "areg-storyteller",
+   "modelId": "eleven_v3",
+   "note": "Narration stays on eleven_v3, the model the approved library was rendered with (the Ուլիկը pilot showed eleven_v3_conversational lets sentence endings fall away). Characters use the conversational model."
   },
   "huri": {
    "role": "Անբան Հուռին",
-   "pitch": 1.04,
+   "pitch": 1.0,
    "note": "Never sly. She genuinely believes the frogs are spinning her cotton — the whole comedy rests on her sincerity.",
    "directionForHumanNarrator": "lazy, unbothered, pleased with herself; the verse chewed out slowly like she is chewing mastic",
    "voiceSettings": {
     "stability": 0.5,
     "similarity_boost": 0.8,
     "style": 0.3
-   }
+   },
+   "voiceId": "bpss31fpiTyvjz5XZUT0",
+   "voiceName": "katrin-v3",
+   "modelId": "eleven_v3_conversational",
+   "castNote": "v1 cast 2026-09-07: Katrin, unshifted (the map proposed 1.04; the owner rejected a +10% lift on Vardan, so no lift is tried first)."
   },
   "frogs": {
    "role": "Փեփելն ու Կեկելը — the frogs",
    "pitch": 0.9,
-   "note": "The narrator voices these himself and they are the story's best joke. The ambience cue sheet forbids a REAL frog sound over them for exactly this reason.",
+   "note": "The frogs are the story's best joke. v1 cast: Vardan pitched down to 0.9 for a croak, low stability so the two-note call stays flat. The ambience cue sheet still forbids a REAL frog sound over them.",
    "directionForHumanNarrator": "croaking, two-note, flat and repetitive — a frog, not a character with feelings",
    "voiceSettings": {
     "stability": 0.25,
     "similarity_boost": 0.7,
     "style": 0.6
-   }
+   },
+   "voiceId": "PgFHHZMKb19tJbjBe6aY",
+   "voiceName": "vardan-v2",
+   "modelId": "eleven_v3_conversational"
   },
   "husband": {
    "role": "Վաճառական մարդը",
@@ -45,18 +56,26 @@
     "stability": 0.5,
     "similarity_boost": 0.8,
     "style": 0.3
-   }
+   },
+   "voiceId": "NxAsEwnikgCJa5tyBwEf",
+   "voiceName": "areg-storyteller (as a character)",
+   "modelId": "eleven_v3_conversational",
+   "castNote": "v1 cast 2026-09-07: no adult male in the family cast besides Areg, and the owner keeps library voices for villains and animals only (accent). Areg on the conversational model, shifted 0.96 so he is not the narrator's own voice."
   },
   "mother_in_law": {
    "role": "Զոքանչը",
-   "pitch": 1.0,
+   "pitch": 0.92,
    "note": "Her lie must be delivered with complete sincerity — she is saving her daughter, not being funny.",
    "directionForHumanNarrator": "a sly old woman, honeyed and utterly straight-faced while inventing the beetle",
    "voiceSettings": {
     "stability": 0.5,
     "similarity_boost": 0.85,
     "style": 0.4
-   }
+   },
+   "voiceId": "bpss31fpiTyvjz5XZUT0",
+   "voiceName": "katrin-v3 (shifted down)",
+   "modelId": "eleven_v3_conversational",
+   "castNote": "v1 cast 2026-09-07: the weakest casting decision in this story — the only female clone is Katrin, so the old woman is Katrin at 0.92. Alternative for the owner's ear: Areg at 1.08 (the storyteller doing an old woman, which is what the single-voice render did)."
   }
  },
  "segments": [
@@ -230,5 +249,6 @@
    ]
   }
  ],
- "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing)."
+ "_renderRule": "Only the story's own words are ever sent to TTS. directionForHumanNarrator is documentation for a person, never model input — eleven_v3 spoke it aloud on short spans when it was passed as text. Expression comes from voiceSettings (API fields) and pitch (post-processing).",
+ "_cast": "Owner decision 2026-09-03: a real cast per story. Narrator is always Areg. Katrin and Vardan take a part in every story. Library voices only for villains and animals (they speak Armenian with an accent). Every speaker may carry voiceId/modelId; absent means the narrator's voice in eleven_v3, so older maps render unchanged."
 }

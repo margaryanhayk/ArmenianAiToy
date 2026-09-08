@@ -5,7 +5,7 @@
     "thunder-distant"
   ],
   "cues": 2,
-  "mixedFrom": "sutasan.mp3",
+  "mixedFrom": "/tmp/claude-0/-home-user-ArmenianAiToy/8be63dd7-ddad-50c5-bceb-62a176b2409e/scratchpad/pilot/sutasan/segments",
   "heldCues": [],
   "note": "Do not mix this file again \u2014 see refuse_if_already_mixed in tools/story-audio/mix_ambience.py. The narration-only master is in git history."
 }

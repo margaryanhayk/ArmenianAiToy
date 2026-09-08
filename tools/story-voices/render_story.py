@@ -100,7 +100,7 @@ def duration(path):
 
 DEFAULT_MODEL = "eleven_v3"
 
-def tts(text, path, token, voice, settings, model=DEFAULT_MODEL):
+def tts(text, path, token, voice, settings, model=DEFAULT_MODEL, attempt=0):
     body = {"text": text, "model_id": model}
     if settings:
         body["voice_settings"] = settings
@@ -111,15 +111,47 @@ def tts(text, path, token, voice, settings, model=DEFAULT_MODEL):
          f"https://api.elevenlabs.io/v1/text-to-speech/{voice}?output_format=mp3_44100_128"],
         input=json.dumps(body, ensure_ascii=False).encode(), capture_output=True)
     if not os.path.exists(path) or os.path.getsize(path) < 1000:
-        raise SystemExit(f"render failed for {text[:40]!r}: {r.stderr.decode()[:200]}")
+        # An EMPTY file with nothing on stderr is the connection dropping,
+        # not the API refusing: seen once on «Անբան Հուռին» after 200 good
+        # requests. One more try before failing the whole render for it.
+        if attempt == 0 and os.path.exists(path) and os.path.getsize(path) == 0:
+            print(f"    empty response for {text[:30]!r} — asking once more", flush=True)
+            return tts(text, path, token, voice, settings, model, attempt=1)
+        body_head = open(path, "rb").read(300).decode("utf-8", "replace") if os.path.exists(path) else ""
+        raise SystemExit(f"render failed for {text[:40]!r}: {r.stderr.decode()[:200]} {body_head}")
 
 STT_MODEL = "scribe_v2"
 STT_MAX_EXTRA_WORDS = 0        # any word the story does not have is a fault
 STT_MAX_WER = 0.35             # above this the take is garbage, not an accent
+STT_MAX_CHAR_ERR = 0.25        # letters-only fallback when the transcriber ran words together
+STT_MAX_NAME_ERR = 0.50        # same word count, no added letters: a name it cannot spell
 
 def _norm_words(t):
     t = re.sub(r"[՞՛՜]", "", t.lower())
     return re.sub(r"[^\w\s]", " ", t).split()
+
+# A word the transcriber SPELLS differently is not a word the story does not
+# have. On «Անբան Հուռին» (2026-09-07) Scribe heard the dialect line «— ձեն է
+# տալի Անբան Հուռին,» as «Ձեն է տալիս համբան հուրին» — every word one letter
+# off (ռ→ր, an added ս, a nasal shift), WER 0.60 on a five-word span, and the
+# render was refused three times for a take that said the line. The guard's
+# job is the extra «shshsh» and the stray «hmm», which are ADDED words and are
+# still counted exactly; a substitution only counts when the two words are
+# genuinely different, not respelled.
+WORD_CLOSE = 0.34              # edits / longer word, at or under this is the same word
+
+def _lev(a, b):
+    d = list(range(len(b) + 1))
+    for i in range(1, len(a) + 1):
+        prev, d[0] = d[0], i
+        for j in range(1, len(b) + 1):
+            cur = d[j]
+            d[j] = min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] != b[j - 1]))
+            prev = cur
+    return d[len(b)]
+
+def _same_word(a, b):
+    return a == b or _lev(a, b) / max(len(a), len(b), 1) <= WORD_CLOSE
 
 def _wer(ref, hyp):
     r, h = _norm_words(ref), _norm_words(hyp)
@@ -128,11 +160,11 @@ def _wer(ref, hyp):
         prev, d[0] = d[0], i
         for j in range(1, len(h) + 1):
             cur = d[j]
-            d[j] = min(d[j] + 1, d[j - 1] + 1, prev + (r[i - 1] != h[j - 1]))
+            d[j] = min(d[j] + 1, d[j - 1] + 1, prev + (not _same_word(r[i - 1], h[j - 1])))
             prev = cur
     return d[len(h)] / max(1, len(r))
 
-def spoken_matches(path, text, token):
+def spoken_matches(path, text, token, _second=0):
     """Transcribe the span and refuse a take that says something the story
     does not. The owner caught «Արածում է shshsh իրիկունը» and a stray «hmm»
     after «դուռը բաց անում» by ear (2026-09-04); both transcribe as extra
@@ -149,10 +181,39 @@ def spoken_matches(path, text, token):
     if "text" not in j:
         return True, f"stt skipped ({str(j)[:80]})"
     hyp = j["text"]
+    # Scribe sometimes returns only the first few words of a long take — on
+    # «Սուտլիկ որսկանը» a 21 s, 262-character span came back as four words
+    # five times out of nine, with nothing wrong in the audio. That is the
+    # transcriber giving up, not the story going wrong: ask it once more
+    # before blaming the take.
+    if len(_norm_words(hyp)) < 0.6 * len(_norm_words(text)) and _second < 2:
+        return spoken_matches(path, text, token, _second=_second + 1)
     extra = len(_norm_words(hyp)) - len(_norm_words(text))
     w = _wer(text, hyp)
     if extra > STT_MAX_EXTRA_WORDS or w > STT_MAX_WER:
-        return False, f"heard {hyp[:90]!r} (+{extra} words, wer {w:.2f})"
+        # The transcriber also RUNS short fast words together — «ձեն է տալի»
+        # came back as «Զենետալի», one word for three — and SPLITS long ones:
+        # «մորքուրի» came back as «մոր քուրի», which the word count reads as
+        # an added word. Letters are the tie-break: with the spaces removed the
+        # two strings differ by a few respelled letters. Only for a hypothesis
+        # no longer than the line, which is what keeps this door shut to a
+        # genuinely added word — «shshsh» and «hmm» add their letters.
+        # The slack is two letters, or 4% of a long line: a 262-character
+        # boast came back four letters long because the transcriber heard
+        # «Մատին էր» as «մատմատիներ» — its own stutter, not the take's —
+        # while «shshsh» on a 40-character line is six letters over two.
+        # A line of the same word count whose letters are up to half
+        # different is a NAME the transcriber cannot spell («- Չատի՞,
+        # Մատի՞․․․» came back «Խաթի, մաթի» three times running); a whole
+        # different sentence of exactly that shape is not a failure TTS has.
+        rc, hc = "".join(_norm_words(text)), "".join(_norm_words(hyp))
+        slack = max(2, int(0.04 * len(rc)))
+        err = _lev(rc, hc) / max(1, len(rc))
+        if len(hc) <= len(rc) + slack and rc and \
+                (err <= STT_MAX_CHAR_ERR or (extra == 0 and err <= STT_MAX_NAME_ERR)):
+            return True, f"wer {w:.2f} (letters {err:.2f}, spelling/boundaries differ)"
+        return False, (f"heard {hyp[:90]!r} (+{extra} words, wer {w:.2f}, "
+                       f"letters {len(hc)}/{len(rc)} err {err:.2f})")
     return True, f"wer {w:.2f}"
 
 # RENDER_ONLY="narrator,5:0,5:2" re-renders only those speakers / seg:span
@@ -269,6 +330,7 @@ def render_segment(smap, seg, outdir, token, voice, sid, sel=None, refs=None):
         spk_voice = spk.get("voiceId") or voice
         spk_model = spk.get("modelId") or DEFAULT_MODEL
         # Render, and re-ask if the model returns it with the tail cut off.
+        tried_f0 = []
         for attempt in range(TAIL_RETRIES + 1):
             tts(text, raw, token, spk_voice, settings or None, spk_model)
             ratio = tail_ratio(raw)
@@ -277,6 +339,20 @@ def render_segment(smap, seg, outdir, token, voice, sid, sel=None, refs=None):
             said_ok, why = spoken_matches(raw, text, token)
             if said_ok and who in refs and len(text) >= F0_MIN_CHARS:
                 said_ok, why = pitch_matches(raw, refs[who])
+                f0 = median_f0(raw)
+                if f0:
+                    tried_f0.append(f0)
+                # The reference is the speaker's FIRST take, and on «Խոսող
+                # ձուկը» that take was the outlier three times over (a man's
+                # first line at 179 Hz, every later one at ~130): the guard
+                # then refused every normal take of his. When the retries
+                # agree with EACH OTHER and not with the reference, the
+                # reference is what was wrong — take this one and re-base.
+                if not said_ok and attempt == TAIL_RETRIES and len(tried_f0) >= 2 \
+                        and max(tried_f0) / min(tried_f0) <= 1.15:
+                    print(f"    {i:02d} {who:14} {why} — but {len(tried_f0)} takes agree "
+                          f"with each other, so the first take was the outlier; re-basing", flush=True)
+                    said_ok, refs[who] = True, raw
             if not said_ok:
                 if attempt == TAIL_RETRIES:
                     raise SystemExit(f"NOT THE STORY: span {i} ({who}) {text[:40]!r} — {why}, "
@@ -324,7 +400,10 @@ def render_segment(smap, seg, outdir, token, voice, sid, sel=None, refs=None):
         parts.append((who, wav, pause_after(text), len(text), duration(wav)))
         refs.setdefault(who, wav)
         snr = snr_db(wav)
-        noisy = snr is not None and snr[2] < SNR_WARN_DB
+        # A take under ~2.5 s has too few between-word windows for the floor
+        # to mean anything — «— ասում է թագավորը։» read NOISY at 31-35 dB on
+        # a clone whose long takes read 40-46. The number still prints.
+        noisy = snr is not None and snr[2] < SNR_WARN_DB and duration(wav) >= 2.5
         print(f"    {i:02d} {who:14} {len(text):>4}ch {got:>5.1f}s "
               f"tail {tail_ratio(raw):.0%}"
               f"{'  floor %.0f dBFS SNR %.0f dB' % (snr[0], snr[2]) if snr else ''}"
@@ -439,6 +518,17 @@ def assemble(sid, seg_files, outdir):
     print(f"  -> {out}  {duration(out):.1f}s, {len(starts)} segments -> {mp}")
     return out
 
+def kept_parts(seg, outdir, sid):
+    """Rebuild stitch()'s input for a segment that is already on disk."""
+    parts = []
+    for pi, sp in enumerate(seg["spans"]):
+        wav = os.path.join(outdir, f"{sid}-{seg['index']:02d}-{pi:02d}-{sp['speaker']}.wav")
+        if not os.path.exists(wav):
+            return None
+        text = sp["text"].strip()
+        parts.append((sp["speaker"], wav, pause_after(text), len(text), duration(wav)))
+    return parts
+
 def main():
     if len(sys.argv) < 3:
         print("usage: render_story.py <storyId> <outdir> [segmentIndex]"); return 2
@@ -459,7 +549,17 @@ def main():
         # already spent, so it is never re-requested. With RENDER_ONLY the
         # segment is re-stitched from kept WAVs plus the re-rendered ones.
         if sel is None and os.path.exists(f) and os.path.getsize(f) > 1000:
-            print(f"  segment {seg['index']} already rendered — keeping")
+            # A kept segment is still TIMED, from the WAVs it was stitched
+            # from — the same (speaker, wav, pause, chars, duration) tuples
+            # stitch() consumed, so the map describes exactly the audio in
+            # the kept file. Before this, a run resumed after one refused span
+            # finished with no span map at all and had to be paid for twice.
+            kept = kept_parts(seg, outdir, sid)
+            if kept is None:
+                print(f"  segment {seg['index']} already rendered — keeping (its WAVs are gone: no span map)")
+            else:
+                print(f"  segment {seg['index']} already rendered — keeping, timed from its WAVs")
+                span_map[seg["index"]] = span_timings(kept)
             seg_files.append(f); continue
         print(f"  segment {seg['index']} ({len(seg['spans'])} spans)")
         parts = render_segment(smap, seg, outdir, token, voice, sid, sel, refs)
