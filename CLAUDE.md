@@ -3001,6 +3001,25 @@ it is ok"). It is a LISTENING COPY in scratch; the shipped
   other nine casts. The ElevenLabs keys pasted in chat are burned; the
   replacement belongs in the environment as `ELEVENLABS_API_KEY`.
 
+- **THE WHOLE LIBRARY SHIPPED WITH THE CAST, 2026-09-08 (owner: "For now these
+  are good… I don't want to change", then "Ship").** The other nine stories
+  were rendered as v1 pilots in one sequence on 2026-09-07 (cast per role
+  recorded as `castNote` in each `*.voices.json`: Katrin for every girl and,
+  at 0.92, every old woman; Vardan for every boy/animal hero, never lifted;
+  Areg on the dialogue model, shifted, for grown men; `areg-wolf` for the
+  monster in «Խոսող ձուկը»; the two stories with no direct speech as Areg
+  alone), sent one by one, approved as a set and installed by hand: every
+  `Version` bumped, byte maps and mixer markers beside each file, stale
+  `.words.json` alignments removed, gates green (`check_story_audio.py`
+  10/10, −16.6..−16.8 LUFS, 2779 tests). Approval pinned to sha256 in
+  `tools/quality-evidence/cast-library-ship-20260908.md`. `render_story.py`
+  grew on that batch: the transcript guard treats a respelled word as the
+  same word and has a letters-only tie-break (an added word still adds
+  letters), a truncated transcription is re-asked, the pitch guard re-bases
+  when the retries agree against a first-take reference, a resumed run keeps
+  its span map. **Not done:** the listen test on the toy for any of the ten;
+  the owner's "minor bugs" are unrecorded by his choice.
+
 ## After-story question toggle (owner request 2026-09-07)
 
 "Question clips must be optional (enabled from the parent dashboard or
