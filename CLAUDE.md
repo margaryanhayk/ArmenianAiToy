@@ -3025,9 +3025,11 @@ it is ok"). It is a LISTENING COPY in scratch; the shipped
   stories now match «Ուլիկը»'s — `areg-storyteller` on `eleven_v3`,
   .55/.8/.2 — so the voice that ends a story is the voice that asks about it.
   Transcript-guarded, levelled on a padded copy, re-hashed by
-  `apply_story_clips.py`; no `Version` moved. `intro`/`offer`/`reoffer` are
-  still the 2026-08-16 render. Evidence:
-  `tools/quality-evidence/cast-clips-rerender-20260908.md`.
+  `apply_story_clips.py`; no `Version` moved. Same day, the 30
+  `intro`/`offer`/`reoffer` clips (all ten stories) followed, so **every one of
+  the 70 per-story clips is now the cast narrator**. Evidence:
+  `tools/quality-evidence/cast-clips-rerender-20260908.md` and
+  `cast-clips-rerender2-20260908.md`.
 
 ## After-story question toggle (owner request 2026-09-07)
 
