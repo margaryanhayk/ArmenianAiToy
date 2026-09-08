@@ -3020,6 +3020,15 @@ it is ok"). It is a LISTENING COPY in scratch; the shipped
   its span map. **Not done:** the listen test on the toy for any of the ten;
   the owner's "minor bugs" are unrecorded by his choice.
 
+- **Summary + question clips re-rendered in the cast narrator (2026-09-08).**
+  The 36 `summary`/`question`/`question1`/`question2` clips of the nine
+  stories now match «Ուլիկը»'s — `areg-storyteller` on `eleven_v3`,
+  .55/.8/.2 — so the voice that ends a story is the voice that asks about it.
+  Transcript-guarded, levelled on a padded copy, re-hashed by
+  `apply_story_clips.py`; no `Version` moved. `intro`/`offer`/`reoffer` are
+  still the 2026-08-16 render. Evidence:
+  `tools/quality-evidence/cast-clips-rerender-20260908.md`.
+
 ## After-story question toggle (owner request 2026-09-07)
 
 "Question clips must be optional (enabled from the parent dashboard or
