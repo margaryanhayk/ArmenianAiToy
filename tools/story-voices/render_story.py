@@ -338,7 +338,14 @@ def render_segment(smap, seg, outdir, token, voice, sid, sel=None, refs=None):
         spk_model = spk.get("modelId") or DEFAULT_MODEL
         # Render, and re-ask if the model returns it with the tail cut off.
         tried_f0 = []
+        # REUSE_RAW=1: re-process the takes already on disk (a new tempo or
+        # pitch) without paying for and re-rolling them. The raw take passed
+        # its guards when it was rendered; only the post-processing changes.
+        reuse = bool(os.environ.get("REUSE_RAW")) and os.path.exists(raw) and os.path.getsize(raw) > 1000
         for attempt in range(TAIL_RETRIES + 1):
+            if reuse:
+                print(f"    {i:02d} {who:14} reusing the raw take on disk", flush=True)
+                break
             tts(text, raw, token, spk_voice, settings or None, spk_model)
             ratio = tail_ratio(raw)
             expect = len(text) / CHARS_PER_SECOND
@@ -385,6 +392,15 @@ def render_segment(smap, seg, outdir, token, voice, sid, sel=None, refs=None):
         af = ("loudnorm=I=-17:TP=-1.5" if abs(pitch - 1.0) < 0.005 else
               f"asetrate=44100*{pitch},aresample=44100,atempo=1/{pitch},"
               f"loudnorm=I=-17:TP=-1.5")
+        # Per-speaker "tempo": pace without pitch. The API's voice_settings.speed
+        # is honoured only loosely by eleven_v3 (a designed narrator asked for
+        # 1.2 came back at the same 11.5 chars/s as at 1.0, 2026-09-08), so a
+        # measured atempo after the render is the reliable knob. Kept within
+        # 0.8..1.35 — beyond that the seams start to sound processed.
+        tempo = float(spk.get("tempo", 1.0))
+        if abs(tempo - 1.0) >= 0.005:
+            tempo = max(0.8, min(1.35, tempo))
+            af = f"atempo={tempo}," + af
         # Denoise BEFORE loudnorm, so the level is measured on the voice and
         # not on the room it was cloned from. Opt-in per speaker: on a clean
         # clone it would only smear consonants for nothing.
