@@ -3027,9 +3027,11 @@ it is ok"). It is a LISTENING COPY in scratch; the shipped
   Transcript-guarded, levelled on a padded copy, re-hashed by
   `apply_story_clips.py`; no `Version` moved. Same day, the 30
   `intro`/`offer`/`reoffer` clips (all ten stories) followed, so **every one of
-  the 70 per-story clips is now the cast narrator**. Evidence:
-  `tools/quality-evidence/cast-clips-rerender-20260908.md` and
-  `cast-clips-rerender2-20260908.md`.
+  the 70 per-story clips is now the cast narrator**, and the 42 welcome-flow
+  voice clips (`ContentSync:Voice`, every `Version` bumped by
+  `apply_voice_clips.py`) followed the same day. Evidence:
+  `tools/quality-evidence/cast-clips-rerender-20260908.md`,
+  `cast-clips-rerender2-20260908.md`, `cast-voice-clips-rerender-20260908.md`.
 
 ## After-story question toggle (owner request 2026-09-07)
 
