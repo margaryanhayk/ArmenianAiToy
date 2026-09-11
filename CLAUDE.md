@@ -212,8 +212,9 @@ check `AREG_FW_BUILD` before diagnosing hardware.
   or ElevenLabs via the provider seam; the narrator decision (owner's own
   recording → Professional Voice Clone, 1 slot free) is pending his recording.
 - **Text drafts with no audio yet**: `backend/content/variant-endings/`,
-  `backend/content/serial-hero/` (Tsivik), bedtime music (`ContentSync:Music`
-  empty).
+  `backend/content/serial-hero/` (Tsivik). Bedtime music: 4 tracks defined
+  and reviewed in `backend/content/bedtime-music/tracks.json`, `ContentSync:
+  Music` still placeholder-only — see "State of the toy" below.
 
 ## State of the toy (2026-09-11)
 
@@ -230,7 +231,9 @@ wired 2026-09-11, never bench-flashed — see the subsection below);
 mid-story shout pauses (never bench-run); variant endings and the Tsivik
 serial (drafts + speaker maps + placeholder ContentSync rows prepared
 2026-09-11 — see the subsection below — still no rendered audio, no
-promoted episodes, no listen test); bedtime music (no tracks); hold-to-menu (unverified by hand, not
+promoted episodes, no listen test); bedtime music (4 tracks defined,
+reviewed and pipeline-verified 2026-09-11 — see the subsection below —
+still no rendered audio, no listen test); hold-to-menu (unverified by hand, not
 staged for OTA); streaming Q&A firmware flag off; mobile app has a
 documented, partially-exercised local Android build recipe but still no
 verified APK or on-device run (see the subsection below); listen tests of
@@ -253,7 +256,8 @@ Still to implement: a `sound-detective` firmware game (backend content
 ready — 21 clips already in `ContentSync:Games` — no engine written); two
 Simon tone clips (`tone-green` / `tone-red`, not yet rendered); render
 variant endings + serial (inputs prepared, see below — the render itself
-is still open); music tracks; narrator PVC; rev-A PCB routing + speaker
+is still open); render bedtime music (inputs prepared, see below — the
+render itself is still open); narrator PVC; rev-A PCB routing + speaker
 test + order.
 
 ### Online Game/Riddle/Curiosity/Calm voice contract (2026-09-11)
@@ -630,6 +634,32 @@ will fail at promotion, needs an owner call before then. NOT done: any
 render, any promotion, any listen test, ambience for two episodes and all
 10 alts, the `serialnext`/series-refrain clip tooling gap (documented,
 not built).
+
+### Bedtime music — render inputs prepared (2026-09-11)
+
+`ContentSync:Music` shipped empty since the feature's plumbing (parent
+opt-in toggle, firmware playback, Music dashboard view) was built; the
+blocker was rights-cleared tracks. Solved the way ambience was solved:
+GENERATED audio, no licence chain. `tools/story-ambience/generate_music.py`
+(sibling of `generate_sounds.py`) calls the ElevenLabs Music API — **not
+verified against live docs this session** (network egress to
+`elevenlabs.io` was blocked; see the script's own docstring and
+`docs/bedtime-music-render-runbook.md` step 0, which must be done before
+the first real render). Four tracks defined in
+`backend/content/bedtime-music/tracks.json`, titles reviewed by
+armenian-story-master, post-processed in one ffmpeg pass (fade in 3s, fade
+out 8s, loudnorm to **-23 LUFS** — quieter than the -16.4 LUFS narration
+target because bedtime music plays alone with no voice over it; justified
+in the script), 192 kbps mono MP3, one ID3 tag. `tools/story-audio/
+check_music_audio.py` gates duration (3–5 min) and single-ID3-tag. Four
+placeholder `ContentSync:Music` rows shipped (`SizeBytes: 0`), pinned by a
+new `ContentSyncAudioRootTests` test (shipped rows point at real files,
+placeholders exempt) and a new `ContentSyncMusicTests` test (shipped
+placeholder rows drop from the manifest). The fade/loudnorm/encode pipeline
+was run for real against synthetic audio (not a paid render) — see
+`tools/quality-evidence/bedtime-music-prep-20260911.md`. `dotnet build`/
+`dotnet test` green (2931 tests). NOT done: any paid render, any listen
+test, any real track.
 
 ## Working in this repo (agents)
 
