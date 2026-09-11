@@ -295,9 +295,15 @@ the bench fallback (`AREG_PROV_POP`, unchanged, still `"areg-pair"`) —
 host-tested (`host_tests/device_creds_rules_test.cpp`). The one-shot
 `AREG_PROVISION_IDENTITY_ONCE` burn burns the PoP too when the bench-only
 `AREG_BLE_POP` macro is defined; `check_release_image.py` now refuses an
-OTA image containing a real-looking PoP (8 chars, the mint alphabet),
-proven against both a synthetic bad image and a clean one
-(`tools/firmware/test_check_release_image.py`).
+OTA image containing a real-looking PoP (8 chars, the mint alphabet).
+Proven twice: the synthetic byte-blob suite
+(`tools/firmware/test_check_release_image.py`), and a REAL arduino-cli
+build — which first caught the gate false-failing on an ordinary clean
+image (four coincidental 8-char library-string collisions, fixed via an
+exact-value allowlist, same idiom as the existing `KNOWN_LIBRARY_GUIDS`)
+and then, once a real (non-placeholder) device id/key made the burn branch
+reachable at compile time, correctly flagged the actual compiled-in PoP
+string and nothing else.
 
 Production path is `tools/factory/provision_toy.py`: registers a device,
 builds an NVS partition image (id/key/pop) with Espressif's own
