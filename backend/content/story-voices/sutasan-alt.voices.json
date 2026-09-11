@@ -1,0 +1,228 @@
+{
+  "storyId": "sutasan-alt",
+  "altOf": "sutasan",
+  "title": "Սուտասանը — այլընտրանքային ավարտ",
+  "_status": "DRAFT — ending TEXT approved by the owner 2026-08-13 (variant-endings.json blanket approval, \"I approve all\"); NOT rendered, NOT listen-tested. The base narration segments below are COPIED VERBATIM from sutasan.voices.json (byte-identical spans — same speakers, same text, same settings) so the render can reuse the already-approved takes where a take-cache allows it; only the final segment (the graft) is new.",
+  "_why": "AltOf contract (ContentSyncStoryOptions.AltOf, story_select.cpp): the alt ships as a FULL standalone narration file — the base story's segments 0..3 unchanged, plus one new final segment holding the alternate ending, grafted immediately after the base story's existing final line (afterLine, verified byte-exact against the shipped story text). Not embedded as a curated story: the device always tracks the BASE story id for rotation, the heard-set and reflection dialogue — see docs/variant-endings-serial-render-runbook.md.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with (the Ուլիկը pilot showed eleven_v3_conversational lets sentence endings fall away). Characters use the conversational model."
+    },
+    "king": {
+      "role": "Թագավորը",
+      "pitch": 0.95,
+      "note": "He out-lies the first two happily. His last two lines are the joke: he must sound cornered, changing his story.",
+      "directionForHumanNarrator": "a king, confident and amused, enjoying the game until he is caught",
+      "voiceSettings": {
+        "stability": 0.45,
+        "similarity_boost": 0.8,
+        "style": 0.4
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Areg on the conversational model, shifted down for the king"
+    },
+    "shepherd": {
+      "role": "Հովիվը",
+      "pitch": 0.95,
+      "directionForHumanNarrator": "a shepherd, plain and bold, telling a whopper with a straight face",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "PgFHHZMKb19tJbjBe6aY",
+      "voiceName": "vardan-v2",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Vardan shifted down a little so the shepherd is not the peasant"
+    },
+    "tailor": {
+      "role": "Դերձակը",
+      "pitch": 1.02,
+      "directionForHumanNarrator": "a tailor, apologetic and quick, as if the excuse were ordinary",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Areg on the conversational model, lifted a touch for the quick tailor"
+    },
+    "peasant": {
+      "role": "Աղքատ գյուղացին",
+      "pitch": 1.0,
+      "note": "He must NOT sound clever or mocking. The trap only works because he sounds like he means it.",
+      "directionForHumanNarrator": "a poor villager, calm, patient, completely serious — the quietest voice wins",
+      "voiceSettings": {
+        "stability": 0.65,
+        "similarity_boost": 0.85,
+        "style": 0.2
+      },
+      "voiceId": "PgFHHZMKb19tJbjBe6aY",
+      "voiceName": "vardan-v2",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Vardan unshifted — the quiet hero"
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Լինում է, չի լինում՝ մի թագավոր։ Էս թագավորը իր երկրում հայտնում է․ "
+        },
+        {
+          "speaker": "king",
+          "text": "— Ով էնպես սուտ ասի, որ ես ասեմ՝ սուտ է, իմ թագավորության կեսը կտամ նրան։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Գալիս է մի հովիվ։ Ասում է․ "
+        },
+        {
+          "speaker": "shepherd",
+          "text": "— Թագավորն ապրած կենա, իմ հերը մի դագանակ ուներ, որ էստեղից մեկնում էր, երկնքում աստղերը խառնում։ "
+        },
+        {
+          "speaker": "king",
+          "text": "— Կպատահի՛,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— պատասխանում է թագավորը։ "
+        },
+        {
+          "speaker": "king",
+          "text": "— Իմ պապն էլ մի չիբուխ ուներ, մի ծերը բերանին էր դնում, մյուս ծերը մեկնում, արեգակիցը վառում։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ստախոսը գլուխը քորելով դուրս է գնում։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Գալիս է մի դերձակ։ Ասում է․ "
+        },
+        {
+          "speaker": "tailor",
+          "text": "— Ներողությո՛ւն, թագավո՛ր, ես վաղ պիտի գայի, ուշացա։ Երեկ շատ անձրև եկավ, կայծակները տրաքեցին, երկինքը պատռվեց, գնացել էի կարկատելու։ "
+        },
+        {
+          "speaker": "king",
+          "text": "— Հա՛, լավ ես արել,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասում է թագավորը,"
+        },
+        {
+          "speaker": "king",
+          "text": "— բայց լավ չէիր կարկատել, էս առավոտ էլ մի քիչ անձրև թափվեց։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Սա էլ է դուրս գնում։"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Ներս է մտնում մի աղքատ գյուղացի, կոտը կռնատակին։ "
+        },
+        {
+          "speaker": "king",
+          "text": "— Դո՞ւ ինչ ես ուզում, ա՛յ մարդ,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— հարցնում է թագավորը։ "
+        },
+        {
+          "speaker": "peasant",
+          "text": "— Ինձ մի կոտ ոսկի ես պարտ, եկել եմ տանեմ։ "
+        },
+        {
+          "speaker": "king",
+          "text": "— Մի կոտ ոսկի՞"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— զարմանում է թագավորը։ "
+        },
+        {
+          "speaker": "king",
+          "text": "— Սո՛ւտ ես ասում, ես քեզ ոսկի չեմ պարտ։ "
+        },
+        {
+          "speaker": "peasant",
+          "text": "— Թե որ սուտ եմ ասում, թագավորությանդ կեսը տուր։ "
+        },
+        {
+          "speaker": "king",
+          "text": "— Չէ՛, չէ՛, ճշմարիտ ես ասում,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— խոսքը փոխում է թագավորը։ "
+        },
+        {
+          "speaker": "peasant",
+          "text": "— Ճշմարիտ եմ ասում՝ մի կոտ ոսկին տուր։"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Թագավորը նայում է գյուղացուն, նայում է դատարկ կոտին ու հանկարծ սկսում է ծիծաղել։ "
+        },
+        {
+          "speaker": "king",
+          "text": "— Ա՛յ խելոք մարդ,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասում է,"
+        },
+        {
+          "speaker": "king",
+          "text": "— քո սուտը այնպիսի սուտ էր, որ ես ո՛չ «սուտ է» կարող էի ասել, ո՛չ՝ «ճշմարիտ է»։ Դու հաղթեցիր ոչ սրով, ոչ զորքով, այլ քո խելքով։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Հրամայում է կոտը լցնել ոսկով։ Գյուղացին կոտը շալակին՝ ուրախ-ուրախ գնում է տուն՝ ճամփին երգելով։ Իսկ թագավորը այդ օրվանից իր դուռը բաց է պահում ամեն խելոք մարդու առաջ, որ խելոք խոսք լսի։ Որովհետև սուրը կտրում է, զորքը հոգնում է, իսկ խելքը միշտ ճամփա է բացում։"
+        }
+      ]
+    }
+  ]
+}

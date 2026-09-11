@@ -557,10 +557,80 @@
           "note": "Morning after a sleepless night. Quiet - the story ends on a joke, not on weather."
         }
       ]
+    },
+    {
+      "storyId": "tsivik-one",
+      "title": "Ծիվիկի մեծ ճանապարհը — Մեծ երազանքը",
+      "cues": [
+        {
+          "segment": 0,
+          "at": "start",
+          "kind": "scene",
+          "sound": "village-morning",
+          "seconds": 4,
+          "level": -24,
+          "holdUnder": false,
+          "cueLine": "Մի գյուղում, հին տան կտուրի տակ, ապրում էր մի փոքրիկ ծիծեռնակ։",
+          "note": "Places the nest under the village roof and gets out. DRAFT — episode audio not yet rendered; unreviewed."
+        }
+      ]
+    },
+    {
+      "storyId": "tsivik-two",
+      "title": "Ծիվիկի մեծ ճանապարհը — Գետը և քամին",
+      "cues": [
+        {
+          "segment": 0,
+          "at": "start",
+          "kind": "scene",
+          "sound": "river-shallow",
+          "seconds": 5,
+          "level": -20,
+          "holdUnder": true,
+          "cueLine": "Առավոտյան Ծիվիկը թռավ այգիների վրայով ու հասավ մեծ գետին։",
+          "note": "The river is where this whole episode turns; held low under the crossing. DRAFT — episode audio not yet rendered; unreviewed."
+        }
+      ]
+    },
+    {
+      "storyId": "tsivik-three",
+      "title": "Ծիվիկի մեծ ճանապարհը — Ոսկե արտի երգը",
+      "cues": [
+        {
+          "segment": 0,
+          "at": "start",
+          "kind": "scene",
+          "sound": "open-country-wind",
+          "seconds": 4,
+          "level": -24,
+          "holdUnder": false,
+          "cueLine": "Առավոտյան Ծիվիկը թռավ ոսկեգույն արտի վրայով։",
+          "note": "The wheat field, brief and low — the narration carries the scene. DRAFT — episode audio not yet rendered; unreviewed."
+        }
+      ]
+    },
+    {
+      "storyId": "tsivik-four",
+      "title": "Ծիվիկի մեծ ճանապարհը — Ամպերի սարը",
+      "cues": [
+        {
+          "segment": 0,
+          "at": "start",
+          "kind": "scene",
+          "sound": "wind-gust",
+          "seconds": 4,
+          "level": -22,
+          "holdUnder": false,
+          "cueLine": "Առավոտյան Ծիվիկը սկսեց բարձրանալ սարը։",
+          "note": "The cold climb begins. DRAFT — episode audio not yet rendered; unreviewed."
+        }
+      ]
     }
   ],
   "_notCovered": {
     "hedgehog-apple": "No narration audio shipped. Draft cues in the pass that first renders it.",
-    "little-cloud": "No narration audio shipped. Draft cues in the pass that first renders it."
+    "little-cloud": "No narration audio shipped. Draft cues in the pass that first renders it.",
+    "tsivik-five": "Draft episode, no narration audio yet. A lake/sea ambience sound is not yet designed — deferred to the render pass (see docs/variant-endings-serial-render-runbook.md).",
+    "tsivik-six": "Draft episode, no narration audio yet. The sea-arrival moment deserves its own designed sound (not a reuse of an existing id) — deferred to the render pass, owner's ear needed on the prompt."
   }
 }

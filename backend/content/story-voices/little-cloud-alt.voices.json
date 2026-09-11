@@ -1,0 +1,83 @@
+{
+  "storyId": "little-cloud-alt",
+  "altOf": "little-cloud",
+  "title": "Փոքրիկ ամպիկը — այլընտրանքային ավարտ",
+  "_status": "DRAFT — ending TEXT approved by the owner 2026-08-13 (variant-endings.json blanket approval, \"I approve all\"); NOT rendered, NOT listen-tested. The base narration segments below are COPIED VERBATIM from little-cloud.voices.json (byte-identical spans — same speakers, same text, same settings) so the render can reuse the already-approved takes where a take-cache allows it; only the final segment (the graft) is new.",
+  "_why": "AltOf contract (ContentSyncStoryOptions.AltOf, story_select.cpp): the alt ships as a FULL standalone narration file — the base story's segments 0..2 unchanged, plus one new final segment holding the alternate ending, grafted immediately after the base story's existing final line (afterLine, verified byte-exact against the shipped story text). Not embedded as a curated story: the device always tracks the BASE story id for rotation, the heard-set and reflection dialogue — see docs/variant-endings-serial-render-runbook.md.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with (the Ուլիկը pilot showed eleven_v3_conversational lets sentence endings fall away). Characters use the conversational model."
+    },
+    "flower": {
+      "role": "Ծաղիկը",
+      "pitch": 1.08,
+      "directionForHumanNarrator": "a small flower, delighted and grateful, light and high",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "bpss31fpiTyvjz5XZUT0",
+      "voiceName": "katrin-v3",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Katrin, lifted as the map proposed — a small delighted flower"
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Երկնքում ապրում էր մի փոքրիկ ամպիկ։ Նա շատ էր սիրում թռչել քամու հետ։ Մի օր ամպիկը տեսավ մի փոքրիկ ծաղիկ։ Ծաղիկը ծարավ էր։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Ամպիկը մոտեցավ ծաղկին։ Նա մի քիչ անձրև մաղեց։ Ծաղիկն ուրախացավ ու բացեց իր թերթիկները։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Ծաղիկն ասաց՝ "
+        },
+        {
+          "speaker": "flower",
+          "text": "շնորհակալ եմ, ամպի՛կ ջան։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ամպիկը ժպտաց ու թռավ երկինք։ Նրանք դարձան լավ ընկերներ։"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Այդ օրվանից փոքրիկ ամպիկը և ծաղիկը լավ ընկերներ էին։ Մի առավոտ ամպիկը նորից իջավ մարգագետնի վրա։ Ծաղկի կողքին հիմա մի փոքրիկ ծառիկ էր աճում։ Ծառիկը նույնպես ծարավ էր։ Ամպիկը կանչեց մյուս ամպիկներին։ Նրանք միասին եկան ու մի տաք, փափուկ անձրև մաղեցին ամբողջ մարգագետնի վրա՝ թըփ-թըփ, թըփ-թըփ։ Ծաղիկները բացեցին իրենց թերթիկները։ Ծառիկը ուրախ շարժեց իր տերևները։ Ամպիկը նայեց ներքև՝ կանաչ, գույնզգույն մարգագետնին, ու զգաց, որ իր սիրտը տաքացել է։ Երբ օգնում ես մեկին, սիրտդ ուզում է օգնել բոլորին։ Իսկ դա ամենաուրախ բանն է աշխարհում։"
+        }
+      ]
+    }
+  ]
+}

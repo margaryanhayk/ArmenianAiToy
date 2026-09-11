@@ -1,0 +1,324 @@
+{
+  "storyId": "pochat-aghves-alt",
+  "altOf": "pochat-aghves",
+  "title": "Պոչատ աղվեսը — այլընտրանքային ավարտ",
+  "_status": "DRAFT — ending TEXT approved by the owner 2026-08-13 (variant-endings.json blanket approval, \"I approve all\"); NOT rendered, NOT listen-tested. The base narration segments below are COPIED VERBATIM from pochat-aghves.voices.json (byte-identical spans — same speakers, same text, same settings) so the render can reuse the already-approved takes where a take-cache allows it; only the final segment (the graft) is new.",
+  "_why": "AltOf contract (ContentSyncStoryOptions.AltOf, story_select.cpp): the alt ships as a FULL standalone narration file — the base story's segments 0..5 unchanged, plus one new final segment holding the alternate ending, grafted immediately after the base story's existing final line (afterLine, verified byte-exact against the shipped story text). Not embedded as a curated story: the device always tracks the BASE story id for rotation, the heard-set and reflection dialogue — see docs/variant-endings-serial-render-runbook.md.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with (the Ուլիկը pilot showed eleven_v3_conversational lets sentence endings fall away). Characters use the conversational model."
+    },
+    "fox": {
+      "role": "Պոչատ աղվեսը",
+      "pitch": 1.0,
+      "directionForHumanNarrator": "anxious and pleading, saying the same long request over and over, a little more desperate each time",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "PgFHHZMKb19tJbjBe6aY",
+      "voiceName": "vardan-v2",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Vardan unshifted (the map proposed 1.05; the owner rejected a lift on Vardan)"
+    },
+    "old_woman": {
+      "role": "Պառավը",
+      "pitch": 0.92,
+      "directionForHumanNarrator": "an old village woman, brisk, unimpressed",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "bpss31fpiTyvjz5XZUT0",
+      "voiceName": "katrin-v3",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Katrin shifted down, same decision as the mother-in-law in «Անբան Հուռին»"
+    },
+    "cow": {
+      "role": "Կովը",
+      "pitch": 0.88,
+      "directionForHumanNarrator": "slow, placid, low",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Areg conversational, shifted down for the placid cow"
+    },
+    "field": {
+      "role": "Արտը",
+      "pitch": 0.95,
+      "directionForHumanNarrator": "the field itself — wide, unhurried, almost a whisper",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Areg conversational, slightly down"
+    },
+    "spring": {
+      "role": "Աղբյուրը",
+      "pitch": 1.1,
+      "directionForHumanNarrator": "the spring — light, bubbling, quick",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "bpss31fpiTyvjz5XZUT0",
+      "voiceName": "katrin-v3",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Katrin lifted, as the map proposed"
+    },
+    "girl": {
+      "role": "Աղջիկը",
+      "pitch": 1.0,
+      "directionForHumanNarrator": "a young village girl, matter-of-fact",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "bpss31fpiTyvjz5XZUT0",
+      "voiceName": "katrin-v3",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Katrin unshifted"
+    },
+    "pedlar": {
+      "role": "Չարչին",
+      "pitch": 1.0,
+      "directionForHumanNarrator": "a pedlar, sing-song, used to bargaining",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Areg conversational unshifted"
+    },
+    "hen": {
+      "role": "Հավը",
+      "pitch": 1.12,
+      "directionForHumanNarrator": "clipped, fussy, a hen's short syllables",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "bpss31fpiTyvjz5XZUT0",
+      "voiceName": "katrin-v3",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Katrin lifted, as the map proposed"
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Լինում է, չի լինում՝ մի պառավ․ էս պառավն իր էծը կթում է, կաթը վեր դնում, գնում է ցախ ու փետ բերի, որ կրակ անի, կաթն եփի։ Մի աղվես գալիս է, գլուխը կոխում կաթնի ամանը, ուտում։ Պառավը վրա է հասնում, ցաքատով տալիս է, աղվեսի պոչը կտրում։ Պոչատ աղվեսը փախչում է, գնում է մի քարի վրա կանգնում ու էսպես խնդրում․ "
+        },
+        {
+          "speaker": "fox",
+          "text": "- Տատիկ, տատիկ, պոչս տուր, կցեմ, կցմցեմ, գնամ ընկերներիս հասնեմ, որ ինձ չասեն՝ պոչատ աղվես, ո՞րտեղ էիր։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Պառավն ասում է․ "
+        },
+        {
+          "speaker": "old_woman",
+          "text": "- Դե գնա իմ կաթը բե՛ր։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Աղվեսը գնում է կովի մոտ։ "
+        },
+        {
+          "speaker": "fox",
+          "text": "- Կովիկ, կովիկ, կա՛թ տուր ինձ, կաթը տանեմ պառավին տամ, պառավը պոչս տա, կցեմ, կցմցեմ, գնամ ընկերներիս հասնեմ, որ ինձ չասեն՝ պոչատ աղվես, ո՞րտեղ էիր։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Կովն ասում է․ "
+        },
+        {
+          "speaker": "cow",
+          "text": "- Դե գնա ինձ համար խո՛տ բեր։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Աղվեսը գնում է արտի մոտ։ "
+        },
+        {
+          "speaker": "fox",
+          "text": "- Արտիկ, արտիկ, խո՛տ տուր ինձ, խոտը տանեմ կովին տամ, կովը ինձ կաթ տա, կաթը տանեմ պառավին տամ, պառավը պոչս տա, կցեմ, կցմցեմ, գնամ ընկերներիս հասնեմ, որ ինձ չասեն՝ պոչատ աղվես, ո՞րտեղ էիր։ "
+        },
+        {
+          "speaker": "field",
+          "text": "- Դե գնա ինձ համար ջուր բեր։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Աղվեսը գնում է աղբյուրի մոտ։ "
+        },
+        {
+          "speaker": "fox",
+          "text": "- Աղբյուր, աղբյուր, ջո՛ւր տուր ինձ, ջուրը տանեմ արտին տամ, արտը ինձ խոտ տա․ խոտը տանեմ կովին տամ, կովը ինձ կաթ տա․ կաթը տանեմ պառավին տամ, պառավը պոչս տա, կցեմ, կցմցեմ, գնամ ընկերներիս հասնեմ, որ ինձ չասեն՝ պոչատ աղվես, ո՞րտեղ էիր։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Աղբյուրն ասում է․ "
+        },
+        {
+          "speaker": "spring",
+          "text": "- Դե գնա կուժ բեր։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Աղվեսը գնում է աղջկա մոտ։ "
+        },
+        {
+          "speaker": "fox",
+          "text": "- Աղջիկ, աղջիկ, կո՛ւժդ տուր, կուժը տանեմ աղբյուրին տամ, աղբյուրը ինձ ջուր տա․ ջուրը տանեմ արտին տամ, արտը ինձ խոտ տա․ խոտը տանեմ կովին տամ, կովը ինձ կաթ տա․ կաթը տանեմ պառավին տամ, պառավը պոչս տա, կցեմ, կցմցեմ, գնամ ընկերներիս հասնեմ, որ ինձ չասեն՝ պոչատ աղվես, ո՞րտեղ էիր։ "
+        },
+        {
+          "speaker": "girl",
+          "text": "- Դե գնա ուլո՛ւնք բեր ինձ համար։"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Աղվեսը գնում է չարչու մոտ։ "
+        },
+        {
+          "speaker": "fox",
+          "text": "- Չարչի, չարչի, ուլո՛ւնք տուր, ուլունքը տանեմ աղջկան տամ, աղջիկը ինձ կուժ տա․ կուժը տանեմ աղբյուրին տամ, աղբյուրը ինձ ջուր տա․ ջուրը տանեմ արտին տամ, արտը ինձ խոտ տա․ խոտը տանեմ կովին տամ, կովը ինձ կաթ տա․ կաթը տանեմ պառավին տամ, պառավը պոչս տա, կցեմ, կցմցեմ, գնամ ընկերներիս հասնեմ, որ ինձ չասեն՝ պոչատ աղվես, ո՞րտեղ էիր։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Չարչին ասում է․ "
+        },
+        {
+          "speaker": "pedlar",
+          "text": "- Դե գնա ինձ համար ձո՛ւ բեր։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Աղվեսը գնում է հավի մոտ։ "
+        },
+        {
+          "speaker": "fox",
+          "text": "- Հավիկ-հավիկ, ձու-ձու տուր, ձու-ձուն տանեմ չարչուն տամ, չարչին ինձ ուլունք տա․ ուլունքը տանեմ աղջկան տամ, աղջիկը ինձ կուժ տա․ կուժը տանեմ աղբյուրին տամ, աղբյուրը ինձ ջուր տա․ ջուրը տանեմ արտին տամ, արտը ինձ խոտ տա․ խոտը տանեմ կովին տամ, կովը ինձ կաթ տա․ կաթը տանեմ պառավին տամ, պառավը պոչս տա, կցեմ, կցմցեմ, գնամ ընկերներիս հասնեմ, որ ինձ չասեն՝ պոչատ աղվես, ո՞րտեղ էիր։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Հավն ասում է․ "
+        },
+        {
+          "speaker": "hen",
+          "text": "- Դե գնա ինձ համար կո՛ւտ բեր։"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Աղվեսը գնում է կալվորի մոտ։ "
+        },
+        {
+          "speaker": "fox",
+          "text": "- Կալվոր, կալվոր, կո՛ւտ տուր ինձ, կուտը տանեմ հավին տամ, հավը ինձ ձու տա․ ձուն տանեմ չարչուն տամ, չարչին ինձ ուլունք տա․ ուլունքը տանեմ աղջկան տամ, աղջիկը ինձ կուժ տա․ կուժը տանեմ աղբյուրին տամ, աղբյուրը ինձ ջուր տա․ ջուրը տանեմ արտին տամ, արտը ինձ խոտ տա․ խոտը տանեմ կովին տամ, կովը ինձ կաթ տա․ կաթը տանեմ պառավին տամ, պառավը պոչս տա․ կցեմ, կցմցեմ, գնամ ընկերներիս հասնեմ, որ ինձ չասեն՝ պոչատ աղվես, ո՞րտեղ էիր։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Կալվորի մեղքը գալիս է, մի բուռն կուտ է տալի։"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Աղվեսը կուտը տանում է հավին, հավը ձու է տալի․ ձուն տանում է չարչուն, չարչին ուլունք է տալի․ ուլունքը տանում է աղջկան, աղջիկը կուժ է տալի․ կուժը տանում է աղբյուրին, աղբյուրը ջուր է տալի․ ջուրը տանում է արտին, արտը խոտ է տալի․ խոտը տանում է կովին, կովը կաթ է տալի․ կաթը տանում է պառավին, պառավը պոչը տալիս է իրեն․ կցում է, կցմցում, վազում է գնում, իր ընկերներին հասնում։"
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Ընկերները շրջապատում են աղվեսին ու հարցնում․ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "- Ա՛յ աղվես, ո՞րտեղ էիր այսքան ժամանակ։ Աղվեսը պատմում է ամեն ինչ՝ կաթի մասին, պառավի, կովի, արտի, աղբյուրի, աղջկա, չարչու, հավի ու կալվորի մասին։ "
+        },
+        {
+          "speaker": "fox",
+          "text": "- Տեսե՛ք, ի՜նչ երկար ճամփա անցա մի կում կաթի պատճառով,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "- ասում է աղվեսը։"
+        },
+        {
+          "speaker": "fox",
+          "text": "- Եթե սկզբից հարցրած լինեի, պառավը գուցե ինքն էլ կաթ տար։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Մյուս օրը աղվեսը նորից է անցնում պառավի տան մոտով։ Կանգնում է դռան մոտ ու քաղցր ձայնով ասում․ "
+        },
+        {
+          "speaker": "fox",
+          "text": "- Տատի՛կ, կարելի՞ է մի կում կաթ խմեմ։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Պառավը ծիծաղում է ու մի աման կաթ դնում շեմին։ Այդ օրվանից աղվեսը միշտ նախ հարցնում է, նոր վերցնում։"
+        }
+      ]
+    }
+  ]
+}

@@ -427,7 +427,46 @@ public class ContentManifestServiceTests
             AudioPath = s.GetProperty("AudioPath").GetString() ?? "",
             Sha256 = s.GetProperty("Sha256").GetString() ?? "",
             SizeBytes = s.GetProperty("SizeBytes").GetInt64(),
+            AltOf = s.TryGetProperty("AltOf", out var altOf) ? altOf.GetString() ?? "" : "",
+            SeriesId = s.TryGetProperty("SeriesId", out var seriesId) ? seriesId.GetString() ?? "" : "",
+            SeriesTitle = s.TryGetProperty("SeriesTitle", out var seriesTitle) ? seriesTitle.GetString() ?? "" : "",
+            SeriesIndex = s.TryGetProperty("SeriesIndex", out var seriesIndex) ? seriesIndex.GetInt32() : null,
         }).ToList();
+    }
+
+    // Placeholder rows added 2026-09-11 (variant endings + the tsivik
+    // serial): SizeBytes 0 and no audio yet, so the test above already pins
+    // them dropped from the manifest. This is a narrower, config-only guard
+    // against the one mistake that test can't see — a typo in AltOf or a
+    // duplicate/missing SeriesIndex — which would only surface once real
+    // bytes ship and the row stops being dropped.
+    [Fact]
+    public void ShippedConfig_AltOfAndSeriesFields_AreInternallyConsistent()
+    {
+        var settings = FindRepoFile(Path.Combine(
+            "backend", "src", "ArmenianAiToy.Api", "appsettings.json"));
+        if (settings is null)
+        {
+            return;   // repo tree not deployed alongside the test binary
+        }
+
+        var configured = ReadShippedStories(settings);
+        var ids = configured.Select(s => s.StoryId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var story in configured.Where(s => !string.IsNullOrWhiteSpace(s.AltOf)))
+        {
+            Assert.NotEqual(story.StoryId, story.AltOf, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains(story.AltOf, ids);
+        }
+
+        var tsivikEpisodes = configured
+            .Where(s => string.Equals(s.SeriesId, "tsivik", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        Assert.Equal(6, tsivikEpisodes.Count);
+        Assert.Equal(
+            new[] { 1, 2, 3, 4, 5, 6 },
+            tsivikEpisodes.Select(s => s.SeriesIndex!.Value).OrderBy(i => i).ToArray());
+        Assert.All(tsivikEpisodes, s => Assert.False(string.IsNullOrWhiteSpace(s.SeriesTitle)));
     }
 
     private static string? FindRepoFile(string relative)

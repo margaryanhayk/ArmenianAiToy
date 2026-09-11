@@ -1,0 +1,125 @@
+{
+  "storyId": "tsivik-one",
+  "title": "Մեծ երազանքը",
+  "_status": "DRAFT — text approved by the owner 2026-08-13 (tsivik-series.json blanket approval); NOT rendered, NOT listen-tested. Cast assignment for stork/crow/putik/alik is a first pass by this slice, flagged CASTING OPEN FOR OWNER EAR in each speaker's note — unlike narrator/Ծիվիկ/Տատիկ, which reuse the exact standing-cast voice+settings already approved on Ուլիկը.",
+  "_why": "Mirrors the standing cast-per-role convention (CLAUDE.md § Story cast): narrator stays areg-storyteller on eleven_v3, every character on eleven_v3_conversational.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with — same reasoning as every other story's narrator entry."
+    },
+    "tatik": {
+      "role": "Տատիկը",
+      "pitch": 0.92,
+      "directionForHumanNarrator": "warm grandmother, gentle and a little slow, telling a beloved bedtime-adjacent story",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "bpss31fpiTyvjz5XZUT0",
+      "voiceName": "katrin-v3",
+      "modelId": "eleven_v3_conversational",
+      "note": "Same pitch (0.92) as the standing 'old woman' cast pattern (Պառավը in pochat-aghves, the queen in princess-and-pea)."
+    },
+    "tsivik": {
+      "role": "Ծիվիկը, մի փոքրիկ ծիծեռնակ",
+      "pitch": 1.0,
+      "directionForHumanNarrator": "small young swallow, bright, a little unsure at first, then excited and warm",
+      "voiceSettings": {
+        "stability": 0.4,
+        "similarity_boost": 0.8,
+        "style": 0.45
+      },
+      "voiceId": "PgFHHZMKb19tJbjBe6aY",
+      "voiceName": "vardan-v2",
+      "modelId": "eleven_v3_conversational",
+      "note": "Same voice and settings as Ուլիկը's title role — the standing 'young animal hero' cast, unshifted."
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Մի գյուղում, հին տան կտուրի տակ, ապրում էր մի փոքրիկ ծիծեռնակ։ Անունը Ծիվիկ էր։ Ծիվիկը դեռ շատ փոքր էր, և նրա թևիկները նոր էին ամրանում։ Ամեն երեկո տատիկը թոռնիկների համար պատմում էր հեռավոր ծովի մասին։ "
+        },
+        {
+          "speaker": "tatik",
+          "text": "— Ծովը մեծ է ու կապույտ,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասում էր տատիկը։"
+        },
+        {
+          "speaker": "tatik",
+          "text": "— Ծովը երգում է՝ շը-շը, շը-շը։ Իսկ ալիքների վրա արևը փայլում է հազար ոսկե կայծիկով։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ծիվիկը լսում էր ու փակում աչքերը։ Նա ամբողջ սրտով ուզում էր մի օր իր աչքերով տեսնել ծովը։ Մի առավոտ Ծիվիկը որոշեց փորձել իր թևիկները։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "tsivik",
+          "text": "— Այսօր կթռչեմ մինչև մեծ ընկուզենին,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց նա։ Ընկուզենին կանգնած էր այգու վերջում՝ բարձր ու կանաչ։ Ծիվիկը թափ առավ, թռավ… ու ընկավ փափուկ խոտերի մեջ։ Մի պահ նստեց տխուր։ Բայց հետո հիշեց ծովի երգը՝ շը-շը, շը-շը։ Վեր կացավ, թափ տվեց փետուրները ու նորից փորձեց։ Այս անգամ մի քիչ ավելի բարձր թռավ։ Երրորդ անգամ քամին եկավ օգնության, և Ծիվիկը հասավ ընկուզենու ամենավերին ճյուղին։ "
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Հասա՜,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ուրախացավ Ծիվիկը։ Ճյուղից երևում էր ամբողջ գյուղը՝ տները, այգիները, արահետները։ Իսկ շա՜տ հեռվում, բլուրների ետևում, փայլում էր մի բարակ կապույտ գիծ։ "
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Այնտե՞ղ է ծովը,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— մտածեց Ծիվիկը, և նրա սրտիկը արագ-արագ բաբախեց։ Երեկոյան նա ամեն ինչ պատմեց տատիկին։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "tsivik",
+          "text": "— Տատի՛կ, ես ուզում եմ թռչել մինչև ծովը։ Տատիկը չծիծաղեց։ Նա գորովով նայեց Ծիվիկին ու ասաց․ "
+        },
+        {
+          "speaker": "tatik",
+          "text": "— Ճանապարհը երկար է, բալի՛կս։ Բայց ամեն մեծ ճանապարհ սկսվում է մի փոքրիկ թռիչքից։ Դու այսօր արդեն թռար մինչև ընկուզենին։ Վաղը կթռչես մի քիչ ավելի հեռու։ Օր օրի թևիկներդ կամրանան, ու մի օր ծովը կբացվի քո առաջ։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ծիվիկը քնեց ուրախ սրտով։ Երազում նա տեսավ կապույտ ալիքներ ու ոսկե կայծիկներ։ Առավոտյան նա արդեն գիտեր, թե որտեղից պիտի սկսի։ Այգիներից այն կողմ հոսում էր մեծ գետը։ Բոլորը ասում էին, որ գետից այն կողմ դեռ ոչ մի փոքրիկ ծիծեռնակ չի թռել։ Բայց Ծիվիկը չվախեցավ։ Չէ՞ որ մեծ ճանապարհը արդեն սկսված էր։ Ծիվիկը որոշեց՝ վաղը կթռչի մինչև գետը՝ տեսնելու, թե ինչ կա այնտեղ։"
+        }
+      ]
+    }
+  ],
+  "_renderRule": "Render order for the sample-first listen test (per tsivik-series.json _renderNote): the refrain (series-refrain), episode one, the closing clip (series-closing) — verify «Ծիվի́կ» before batching the rest.",
+  "_cast": "Episode 1: narrator=areg-storyteller, tatik=katrin-v3, tsivik=vardan-v2"
+}

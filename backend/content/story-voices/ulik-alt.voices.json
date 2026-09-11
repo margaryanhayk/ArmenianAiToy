@@ -1,0 +1,208 @@
+{
+  "storyId": "ulik-alt",
+  "altOf": "ulik",
+  "title": "Ուլիկը — այլընտրանքային ավարտ",
+  "_status": "DRAFT — ending TEXT approved by the owner 2026-08-13 (variant-endings.json blanket approval, \"I approve all\"); NOT rendered, NOT listen-tested. The base narration segments below are COPIED VERBATIM from ulik.voices.json (byte-identical spans — same speakers, same text, same settings) so the render can reuse the already-approved takes where a take-cache allows it; only the final segment (the graft) is new.",
+  "_why": "AltOf contract (ContentSyncStoryOptions.AltOf, story_select.cpp): the alt ships as a FULL standalone narration file — the base story's segments 0..5 unchanged, plus one new final segment holding the alternate ending, grafted immediately after the base story's existing final line (afterLine, verified byte-exact against the shipped story text). Not embedded as a curated story: the device always tracks the BASE story id for rotation, the heard-set and reflection dialogue — see docs/variant-endings-serial-render-runbook.md.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with. eleven_v3_conversational is tuned for dialogue and, on the opening of Ուլիկը, let sentence endings fall away 'as if out of breath' (owner, 2026-09-04). Characters keep the conversational model."
+    },
+    "mother": {
+      "role": "Այծը, Ուլիկի մայրը",
+      "pitch": 1.0,
+      "note": "Her call is the one the kid trusts, and the wolf's copy is measured against it. It must be unmistakably kind.",
+      "directionForHumanNarrator": "warm gentle mother goat, sweet and light, calling to her child",
+      "voiceSettings": {
+        "stability": 0.6,
+        "similarity_boost": 0.85,
+        "style": 0.3
+      },
+      "voiceId": "bpss31fpiTyvjz5XZUT0",
+      "voiceName": "katrin-v3",
+      "modelId": "eleven_v3_conversational"
+    },
+    "wolf": {
+      "role": "Գայլը",
+      "pitch": 1.0,
+      "note": "Says the mother's words EXACTLY — only the voice differs, and that IS the scene. Not frightening: the kid is unimpressed, not terrified, and sends him away.",
+      "directionForHumanNarrator": "deep thick growling wolf, badly pretending to be sweet",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "5WzpQqbTMzWBCHk0Mol1",
+      "voiceName": "areg-wolf (designed with ElevenLabs Voice Design on 2026-09-03 — preview 0 of three; the owner picked it after rejecting every library voice for its accent)",
+      "modelId": "eleven_v3_conversational"
+    },
+    "ulik": {
+      "role": "Ուլիկը",
+      "pitch": 1.0,
+      "directionForHumanNarrator": "small young goat, bright, a little wary, then excited telling his mother",
+      "voiceSettings": {
+        "stability": 0.4,
+        "similarity_boost": 0.8,
+        "style": 0.45
+      },
+      "voiceId": "PgFHHZMKb19tJbjBe6aY",
+      "voiceName": "vardan-v2 (unshifted; switched from vardan-test 2026-09-07 — see noiseNote)",
+      "modelId": "eleven_v3_conversational",
+      "noiseNote": "Switched to vardan-v2 on 2026-09-07 for NOISE: vardan-test was cloned from one 8 s sample with a -43 dBFS floor and every take carried that room (-44..-47 dBFS, SNR 31-34 dB); vardan-v2 is cloned from 8 clean samples (-60 dBFS) and renders the same line at -57 dBFS, SNR 48 — Areg's level. The owner had rejected vardan-v2 only WITH the +10% pitch lift (2026-09-04, 'not lovely'); this is the unshifted voice. anlmdn denoising of vardan-test was tried and rejected on listen the same day ('it went more bad') — never denoise a voice, re-clone it."
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Խոր անտառում մի այծ է լինում։ Ունենում է մի գեղեցիկ ուլիկ։ Ուլին ամեն օր թողնում է տանը, ինքը գնում է արոտ անելու։ Արածում է և իրիկունը կուրծքը լիքը տուն է գալիս։ Տուն է գալիս, դուռը զարկում ու մկըկում, կանչում․ "
+        },
+        {
+          "speaker": "mother",
+          "text": "Սևուկ ուլիկ, Սիրուն բալիկ, Ման եմ եկել սարեսար, Կաթն եմ բերել քեզ համար, Դըռնակը բա՛ց, ներս գամ ես, Անուշ-անուշ կաթ տամ քեզ․ Սևուկ ուլիկ, Սիրուն բալիկ։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Ուլիկն իսկույն վեր է թռչում, դուռը բաց անում։ Մայրը կաթ է տալիս նրան ու կրկին գնում արոտ։ Էս բոլորը թաքուն տեսնում է գայլը։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Մի իրիկուն այծից առաջ գալիս է, դուռը զարկում ու իր հաստ ձայնով կանչում․ "
+        },
+        {
+          "speaker": "wolf",
+          "text": "Սևուկ ուլիկ, Սիրուն բալիկ, Ման եմ եկել սարեսար, Կաթն եմ բերել քեզ համար, Դըռնակը բա՛ց, ներս գամ ես, Անուշ-անուշ կաթ տամ քեզ․ Սևուկ ուլիկ, Սիրուն բալիկ։"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Ուլիկը լսում է, լսում ու պատասխանում․ "
+        },
+        {
+          "speaker": "ulik",
+          "text": "— Էդ ո՞վ ես դու, չեմ ճանաչում։ Իմ մայրը էդպես չի կանչում։ Նա քաղցր ու բարակ ձայն ունի։ Քո ձայնը կոշտ է ու կոպիտ։ Դուռը բաց չե՛մ անի․․․ Գնա՛․․․ Չեմ ուզում քեզ․․․։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ու գայլը հեռանում է, գնում։"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Գալիս է մայրը, դուռը ծեծում․ "
+        },
+        {
+          "speaker": "mother",
+          "text": "Սևուկ ուլիկ, Սիրուն բալիկ, Ման եմ եկել սարեսար, Կաթն եմ բերել քեզ համար, Դըռնակը բա՛ց, ներս գամ ես, Անուշ-անուշ կաթ տամ քեզ․ Սևուկ ուլիկ, Սիրուն բալիկ։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ուլիկը դուռը բաց է անում, կաթ է խմում ու մորը պատմում․ "
+        },
+        {
+          "speaker": "ulik",
+          "text": "— Գիտե՞ս, մայրիկ, ի՛նչ եղավ։ Մի քիչ առաջ մինը եկավ, դուռը զարկեց ու կանչում էր․ Սևուկ ուլիկ, Սիրուն բալիկ։ Ասում էր՝ դուռը բա՛ց արա։ Էնպե՜ս հաստ ձայն ունե՜ր։ Էնպե՜ս վախեցա՜, էնպե՜ս վախեցա՜․․․ Դուռը բաց չարի, ասի՝ չեմ ուզում, գնա՛․․․"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "spans": [
+        {
+          "speaker": "mother",
+          "text": "— Պա՛ պա՛, պա՛, պա՛, Սևուկ ջան, ի՜նչ լավ է եղել, որ բաց չես արել։ ",
+          "voiceSettings": {
+            "stability": 0.75,
+            "similarity_boost": 0.85,
+            "style": 0.15,
+            "speed": 0.8
+          },
+          "note": "Slow and steady: «Պա՛ պա՛, պա՛, պա՛» was still too fast at speed 0.9 (owner, 2026-09-06). The attribution «— ասավ վախեցած մայրը։» that followed was cut by the owner the same day; the comma became a full stop."
+        },
+        {
+          "speaker": "mother",
+          "text": "— Էդ գայլն է եղել, եկել է, որ քեզ ուտի։ Մյուս անգամ էլ որ գա, բաց չանես, ասա՝ գնա՛, թե չէ՝ իմ մայրը քեզ կսպանի իր սուր պոզերով։",
+          "voiceSettings": {
+            "stability": 0.65,
+            "similarity_boost": 0.85,
+            "style": 0.25,
+            "speed": 0.9
+          },
+          "note": "Slower and steadier than her song: «Պա՛ պա՛, պա՛, պա՛» came out unnaturally fast (owner, 2026-09-04)."
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Մի քանի օր հետո գայլը նորից է գալիս։ Այս անգամ նա բարակ, կամացուկ ձայնով է կանչում․ "
+        },
+        {
+          "speaker": "wolf",
+          "text": "Սևուկ ուլիկ, Սիրուն բալիկ, Ման եմ եկել սարեսար, Կաթն եմ բերել քեզ համար, Դըռնակը բա՛ց, ներս գամ ես, Անուշ-անուշ կաթ տամ քեզ․ Սևուկ ուլիկ, Սիրուն բալիկ։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ուլիկը լսում է ուշադիր, շա՜տ ուշադիր։ Ձայնը բարակ է, բայց քաղցր չէ։ "
+        },
+        {
+          "speaker": "ulik",
+          "text": "— Գնա՛,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասում է Ուլիկը,"
+        },
+        {
+          "speaker": "ulik",
+          "text": "— դու իմ մայրը չես։ Իմ մայրը քաղցր ձայն ունի։ Թե չգնաս՝ մայրս կգա իր սուր պոզերով։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Գայլը հասկանում է, որ Ուլիկին խաբել չի կարող, ու էլ երբեք չի գալիս։ Իրիկունը մայրը գրկում է Ուլիկին․ "
+        },
+        {
+          "speaker": "mother",
+          "text": "— Ապրե՛ս, բալի՛կս։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ուշադիր ականջը փոքրիկին միշտ պահում է անվտանգ։"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,183 @@
+{
+  "storyId": "tsivik-four",
+  "title": "Ամպերի սարը",
+  "_status": "DRAFT — text approved by the owner 2026-08-13 (tsivik-series.json blanket approval); NOT rendered, NOT listen-tested. Cast assignment for stork/crow/putik/alik is a first pass by this slice, flagged CASTING OPEN FOR OWNER EAR in each speaker's note — unlike narrator/Ծիվիկ/Տատիկ, which reuse the exact standing-cast voice+settings already approved on Ուլիկը.",
+  "_why": "Mirrors the standing cast-per-role convention (CLAUDE.md § Story cast): narrator stays areg-storyteller on eleven_v3, every character on eleven_v3_conversational.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with — same reasoning as every other story's narrator entry."
+    },
+    "crow": {
+      "role": "Ծեր ագռավը",
+      "pitch": 0.88,
+      "directionForHumanNarrator": "old, gravelly, kind underneath a gruff surface",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller (shifted)",
+      "modelId": "eleven_v3_conversational",
+      "note": "Lower pitch (0.88) than the stork — same voice, aged further, matching the 'cow'/'fisherman' pitch band in the standing cast. CASTING OPEN FOR OWNER EAR."
+    },
+    "tsivik": {
+      "role": "Ծիվիկը, մի փոքրիկ ծիծեռնակ",
+      "pitch": 1.0,
+      "directionForHumanNarrator": "small young swallow, bright, a little unsure at first, then excited and warm",
+      "voiceSettings": {
+        "stability": 0.4,
+        "similarity_boost": 0.8,
+        "style": 0.45
+      },
+      "voiceId": "PgFHHZMKb19tJbjBe6aY",
+      "voiceName": "vardan-v2",
+      "modelId": "eleven_v3_conversational",
+      "note": "Same voice and settings as Ուլիկը's title role — the standing 'young animal hero' cast, unshifted."
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Առավոտյան Ծիվիկը սկսեց բարձրանալ սարը։ Սկզբում հեշտ էր՝ լանջերին ծաղիկներ էին ու տաք արև։ Բայց որքան բարձր, այնքան ցուրտ էր դառնում։ Քամին սուլում էր՝ վու-վու, վու-վու։ Ամպերը այնքան մոտ էին, որ Ծիվիկը կարող էր թևիկով դիպչել նրանց։ Մի մեծ քարի տակ նա կանգ առավ հանգստանալու։ Թևիկները հոգնել էին, իսկ գագաթը դեռ հեռու էր։ "
+        },
+        {
+          "speaker": "crow",
+          "text": "— Կռա-կռա,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— լսվեց հանկարծ։ Քարի վրա նստած էր մի ծեր ագռավ՝ մոխրագույն փետուրներով ու իմաստուն աչքերով։ "
+        },
+        {
+          "speaker": "crow",
+          "text": "— Այս ցուրտ սարին ի՞նչ ես անում, փոքրիկ ծիծեռնակ։ "
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Ես ծովն եմ փնտրում,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց Ծիվիկը։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "tsivik",
+          "text": "— Ուզում եմ անցնել սարի վրայով, բայց քամին ցուրտ է, իսկ ես հոգնել եմ։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ծեր ագռավը երկար նայեց նրան։ "
+        },
+        {
+          "speaker": "crow",
+          "text": "— Ես այս սարի բոլոր քարերը գիտեմ,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց նա։"
+        },
+        {
+          "speaker": "crow",
+          "text": "— Գագաթով մի՛ գնա, այնտեղ քամին կատաղի է։ Ժայռերի արանքում մի նեղ կածան կա։ Այնտեղ քամին հանգիստ է, իսկ արևը՝ տաք։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ծիվիկը ուրախացավ։ Հետո հիշեց, որ թևիկի տակ մի ազնվամորի ունի՝ ճանապարհի համար պահած։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "tsivik",
+          "text": "— Վերցրո՛ւ,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց նա ագռավին։"
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Դու ինձ ճանապարհ ցույց տվեցիր, ես էլ քեզ քաղցր բան կհյուրասիրեմ։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ագռավը զարմացավ։ Շատ վաղուց ոչ ոք նրան նվեր չէր տվել։ Նա կերավ ազնվամորին ու փայլող աչքերով ասաց․ "
+        },
+        {
+          "speaker": "crow",
+          "text": "— Արի՛, միասին գնանք։ Ես քեզ կուղեկցեմ մինչև կածանի վերջը։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Նրանք միասին թռան նեղ կածանով՝ ժայռերի արանքով, տաք արևի տակ։ Ծեր ագռավը պատմում էր սարի պատմությունները, և ճանապարհը աննկատ անցավ։ Եվ ահա նրանք կանգնեցին սարի ուսին։"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "spans": [
+        {
+          "speaker": "crow",
+          "text": "— Նայի՛ր,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց ագռավը՝ թևով ցույց տալով հեռուն։ Ծիվիկը նայեց ու շունչը պահեց։ Հեռվում, բլուրների ետևում, արևի տակ փայլում էր մի արծաթե ժապավեն՝ լայն ու հանգիստ։ "
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Ծո՞վն է,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— կամաց հարցրեց Ծիվիկը։ "
+        },
+        {
+          "speaker": "crow",
+          "text": "— Չգիտեմ,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց ծեր ագռավը։"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "spans": [
+        {
+          "speaker": "crow",
+          "text": "— Ես այսքան հեռու երբեք չեմ թռել։ Բայց դու կթռչես, փոքրի՛կ։ Քո թևիկները փոքր են, բայց սիրտդ մեծ է։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ծիվիկը շնորհակալություն ասաց իր նոր ընկերոջը։ Այդ գիշեր նա քնեց սարի տաք քարերի արանքում՝ ամպերի փափուկ վերմակի տակ։ Իսկ սրտում մի հարց էր թպրտում՝ արծաթե ժապավենը իսկապե՞ս ծովն է։ Վաղը նա կիմանա։"
+        }
+      ]
+    }
+  ],
+  "_renderRule": "Render order for the sample-first listen test (per tsivik-series.json _renderNote): the refrain (series-refrain), episode one, the closing clip (series-closing) — verify «Ծիվի́կ» before batching the rest.",
+  "_cast": "Episode 4: crow=areg-storyteller (shifted), narrator=areg-storyteller, tsivik=vardan-v2"
+}

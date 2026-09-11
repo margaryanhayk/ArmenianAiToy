@@ -1,0 +1,277 @@
+{
+  "storyId": "anban-huri-alt",
+  "altOf": "anban-huri",
+  "title": "Անբան Հուռին — այլընտրանքային ավարտ",
+  "_status": "DRAFT — ending TEXT approved by the owner 2026-08-13 (variant-endings.json blanket approval, \"I approve all\"); NOT rendered, NOT listen-tested. The base narration segments below are COPIED VERBATIM from anban-huri.voices.json (byte-identical spans — same speakers, same text, same settings) so the render can reuse the already-approved takes where a take-cache allows it; only the final segment (the graft) is new.",
+  "_why": "AltOf contract (ContentSyncStoryOptions.AltOf, story_select.cpp): the alt ships as a FULL standalone narration file — the base story's segments 0..8 unchanged, plus one new final segment holding the alternate ending, grafted immediately after the base story's existing final line (afterLine, verified byte-exact against the shipped story text). Not embedded as a curated story: the device always tracks the BASE story id for rotation, the heard-set and reflection dialogue — see docs/variant-endings-serial-render-runbook.md.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with (the Ուլիկը pilot showed eleven_v3_conversational lets sentence endings fall away). Characters use the conversational model."
+    },
+    "huri": {
+      "role": "Անբան Հուռին",
+      "pitch": 1.0,
+      "note": "Never sly. She genuinely believes the frogs are spinning her cotton — the whole comedy rests on her sincerity.",
+      "directionForHumanNarrator": "lazy, unbothered, pleased with herself; the verse chewed out slowly like she is chewing mastic",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "bpss31fpiTyvjz5XZUT0",
+      "voiceName": "katrin-v3",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Katrin, unshifted (the map proposed 1.04; the owner rejected a +10% lift on Vardan, so no lift is tried first)."
+    },
+    "frogs": {
+      "role": "Փեփելն ու Կեկելը — the frogs",
+      "pitch": 0.9,
+      "note": "The frogs are the story's best joke. v1 cast: Vardan pitched down to 0.9 for a croak, low stability so the two-note call stays flat. The ambience cue sheet still forbids a REAL frog sound over them.",
+      "directionForHumanNarrator": "croaking, two-note, flat and repetitive — a frog, not a character with feelings",
+      "voiceSettings": {
+        "stability": 0.25,
+        "similarity_boost": 0.7,
+        "style": 0.6
+      },
+      "voiceId": "PgFHHZMKb19tJbjBe6aY",
+      "voiceName": "vardan-v2",
+      "modelId": "eleven_v3_conversational"
+    },
+    "husband": {
+      "role": "Վաճառական մարդը",
+      "pitch": 0.96,
+      "directionForHumanNarrator": "a young merchant, warm and hasty, easily delighted and easily frightened",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller (as a character)",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: no adult male in the family cast besides Areg, and the owner keeps library voices for villains and animals only (accent). Areg on the conversational model, shifted 0.96 so he is not the narrator's own voice."
+    },
+    "mother_in_law": {
+      "role": "Զոքանչը",
+      "pitch": 0.92,
+      "note": "Her lie must be delivered with complete sincerity — she is saving her daughter, not being funny.",
+      "directionForHumanNarrator": "a sly old woman, honeyed and utterly straight-faced while inventing the beetle",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.85,
+        "style": 0.4
+      },
+      "voiceId": "bpss31fpiTyvjz5XZUT0",
+      "voiceName": "katrin-v3 (shifted down)",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: the weakest casting decision in this story — the only female clone is Katrin, so the old woman is Katrin at 0.92. Alternative for the owner's ear: Areg at 1.08 (the storyteller doing an old woman, which is what the single-voice render did)."
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Լինում է, չի լինում՝ մի կին։ Էս կնիկը մի աղջիկ է ունենում, անունը՝ Հուռի։ Մի ծույլ, անշնորհք աղջիկ։ Օրը մինչև իրիկուն պարապ-սարապ նստած։\n"
+        },
+        {
+          "speaker": "huri",
+          "text": "Բանն ինչ կանեմ՝ կեղտոտ է,\n\nԲամբակը կորիզոտ է։\n\nՄաստակ պիտի, որ ծամեմ,\n\nԿըտերը տիտիկ անեմ,\n\nԱնցնողին մըտիկ անեմ․\n\nՈւտեմ, խմեմ,\n\nՄըթնի, քընեմ։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Հարևանները անունը դնում են Անբան Հուռի։ Ինչ մերն է՝ աղջկանը գովելով ման է գալի․ լիդրը գզող, լիդրը մանող, հա՛մ խճճող, հա՛մ խճուճը հանող, ձևող-կարող, հունցող-թխող, եփող-թափող, մի խոսքով՝ հուրի-հրեղեն, մատները՝ ոսկի։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Էս գովասանքը գնում, մի երիտասարդ վաճառականի ականջն է ընկնում։ Էս երիտասարդ վաճառականն ասում է՝ իմ ուզածն էլ հենց սա է, որ կա։ Գլխապատառ գալիս է Անբան Հուռուն ուզում է, հետը պսակվում, տանում իրենց տունը։ Մի քանի ժամանակից հետո մի տասը-քսան բեռը բամբակ է առնում, տալիս կնկանը, թե՝ ես գնում եմ հեռու տեղեր առուտուրի, դու էլ այս բամբակը գզի, մանի, գամ, տանեմ ծախեմ, հարստանանք։"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Անբան Հուռին է, իրեն համար մաստակ ծամելով ման է գալի։ Մի օր էլ գետի ափովն անց կենալիս լսում է, որ գորտերը կոկռում են։\n\n"
+        },
+        {
+          "speaker": "frogs",
+          "text": "- Փե՛փել․․․ Կե՛կել․․․ Փե՛փել․․․ Կե՛կել․․․\n\n"
+        },
+        {
+          "speaker": "huri",
+          "text": "- Վո՛ւյ, աղջի Փեփել, Կեկել,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ձեն է տալի Անբան Հուռին,"
+        },
+        {
+          "speaker": "huri",
+          "text": "- որ բամբակը բերեմ ձեզ տամ, կգզե՞ք․․․\n\n"
+        },
+        {
+          "speaker": "frogs",
+          "text": "- Բե՛ր, բե՛ր, բե՛ր․․․\n\n"
+        },
+        {
+          "speaker": "narrator",
+          "text": "Անբան Հուռին ուրախանում է։ Գնում է, բամբակը կրում, բերում, ածում գետը։\n\n"
+        },
+        {
+          "speaker": "huri",
+          "text": "- Դե գզեց ե՛ք, մանեցե′ք։ Մի քանի օրից հետո կգամ, մանածը կտանեմ, որ ծախենք։"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Գնում է, մի քանի օրից ետ է գալի։ Գորտերը էլի կռկոում են,\n\n"
+        },
+        {
+          "speaker": "frogs",
+          "text": "- Փե՛փել-Կեկել․․․ Փե՛փել-Կեկել․․․\n\n"
+        },
+        {
+          "speaker": "huri",
+          "text": "- Աղչի Փեփել, Կեկել, դե մանածը բերեք։\n\n"
+        },
+        {
+          "speaker": "narrator",
+          "text": "Գորտերը շարունակում են կռկռալ, իսկ մանածը չեն բերում։\n\nՀուռին մին էլ որ նայում է, աչքովն ընկնում գետի ափերին ու քարերին փաթաթված կանաչ մուռը։\n\n"
+        },
+        {
+          "speaker": "huri",
+          "text": "- Վո՛ւյ,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "- ասում է,- "
+        },
+        {
+          "speaker": "huri",
+          "text": "քոռանամ ես, տե՛ս, համ գզել ու մանել են, համ խալիչա են գործել իրենց համար։\n\n"
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ձեռը ճակատին է դնում, ձեն տալի․\n\n"
+        },
+        {
+          "speaker": "huri",
+          "text": "- Դե որ խալիչա եք գործել, մեր բամբակի փողը բերեք։\n\n"
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ձեն է տալի ու ոտը փոխում է, մտնում ջուրը։ Հանկարծ ոտը առնում է մի կոշտ բանի։ Հանում է, տեսնում՝ մի կտոր ոսկի։ Փեփելին ու Կեկելին շնորհակալություն է անում, ոսկու կտորը փեշը դնում, գալիս տուն։ Մարդն էլ առուտուրի տեղիցն է գալիս։ Գալիս է տեսնում՝ իրենց թարեքին մի մեծ ոսկու կտոր։"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "spans": [
+        {
+          "speaker": "husband",
+          "text": "- Ա՛յ կին, այս ի՞նչ ոսկի է։\n\n"
+        },
+        {
+          "speaker": "narrator",
+          "text": "Թե՝ բա չես ասիլ, բամբակը Փեփելի ու Կեկելի վրա ծախեցի, բամբակի փողն է։\nՄարդը ո՜նց է ուրախանում, այնպես էլ դուք ուրախանաք։ Զոքանչին հրավիրում է, ընծաներ է տալի, գովում է, շնորհակալություն է անում, որ այնպես խելոք, շնորհքով, աշխատասեր աղջիկ է մեծացրել։ Քեֆ է սարքում, նստում են քեֆի։"
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Զոքանչը խորամանկ կին է լինում։ Իմանում է, թե բանը ինչպես է պատահել, վախենում է՝ փեսեն էլի աղջկանը գործ հանձնի, ու գաղտնիքը բացվի։ Քեֆի լավ ժամանակը մի բզեզ է ներս մտնում ու բռռացնելով պտտվում սենյակում։ Էս զոքանչը վեր է կենում, գլուխ է տալի բզեզին։ Ասում է․\n\n"
+        },
+        {
+          "speaker": "mother_in_law",
+          "text": "- Բարով եկար, մորքուր ջան, ո՜նց ես, ո՛րտեղ ես, այսքան ժամանակ չես երևում․․․ Ախր քեզ ո՞վ էր ասում՝ այդքան բան անես, որ այդ օրն ընկնես․․․"
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Փեսեն մնում է զարմացած։ Ասում է․\n\n"
+        },
+        {
+          "speaker": "husband",
+          "text": "- Ա՛յ մեր, խելագարվեցի՞ր, քեզ ի՞նչ պատահեց, այդ բզեզին այդ ի՞նչ ես ասում, մորքո՞ւրս որն է․․․\n\n"
+        },
+        {
+          "speaker": "narrator",
+          "text": "Զոքանչը թե․\n\n"
+        },
+        {
+          "speaker": "mother_in_law",
+          "text": "- Ա՛յ որդի, քեզանից ինչ թաքցնեմ, դու էլ իմ որդին ես։ Չես ասիլ՝ այս բզեզն իմ մորքուրն է։ Խեղճը շատ աշխատասեր կին էր։ Ամբողջ օրն աշխատում էր, շատ աշխատելուց կուչ եկավ, պստիկացավ, այնքան պստիկացավ, որ դառավ բզեզ։ Մեր ցեղն այսպես է։ Շատ աշխատասեր ենք։ Բայց աշխատելուց պստիկանում, բզեզ ենք դառնում։"
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Էս որ փեսեն լսում է, վախից քիչ է մնում պռոշը ճաքի․ այն է լինում որ այն, արգելում է Հուռուն ձեռն էլ բանի չտա, որ մորքուրի նման բզեզ չդառնա։"
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Անց է կենում մի օր, անց է կենում երկու օր։ Հուռին նստած է պարապ-սարապ, բայց սիրտը ձանձրույթից նեղվում է։ Մի օր էլ, մարդը որ տանը չի լինում, Հուռին կամաց վեր է կենում, մի քիչ խմոր է հունցում, թխում մի տաք գաթա։ Տունը լցվում է անուշ հոտով։ Մարդը գալիս է, զգում է անուշ հոտը, զարմանում․ "
+        },
+        {
+          "speaker": "husband",
+          "text": "- Այս ի՞նչ համեղ բան է։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Հուռին ծիծաղում է․ "
+        },
+        {
+          "speaker": "huri",
+          "text": "- Մի քիչ աշխատեցի, տե՛ս՝ բզեզ էլ չդառա։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Այդ օրվանից Հուռին ամեն օր մի փոքր գործ է անում՝ մերթ թխում է, մերթ կարում։ Ու տեսնում է՝ գործ անելուց մարդ չի պստիկանում, այլ սիրտն է մեծանում ու տունը՝ լուսավորվում։"
+        }
+      ]
+    }
+  ]
+}

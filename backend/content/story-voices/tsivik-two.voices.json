@@ -1,0 +1,162 @@
+{
+  "storyId": "tsivik-two",
+  "title": "Գետը և քամին",
+  "_status": "DRAFT — text approved by the owner 2026-08-13 (tsivik-series.json blanket approval); NOT rendered, NOT listen-tested. Cast assignment for stork/crow/putik/alik is a first pass by this slice, flagged CASTING OPEN FOR OWNER EAR in each speaker's note — unlike narrator/Ծիվիկ/Տատիկ, which reuse the exact standing-cast voice+settings already approved on Ուլիկը.",
+  "_why": "Mirrors the standing cast-per-role convention (CLAUDE.md § Story cast): narrator stays areg-storyteller on eleven_v3, every character on eleven_v3_conversational.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with — same reasoning as every other story's narrator entry."
+    },
+    "stork": {
+      "role": "Արագիլը",
+      "pitch": 0.97,
+      "directionForHumanNarrator": "calm, wise, unhurried adult guide",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller (shifted)",
+      "modelId": "eleven_v3_conversational",
+      "note": "Areg on the dialogue model, shifted — same pattern as the standing 'grown man' cast (the tailor in sutasan, the fisherman in khosogh-dzuk). CASTING OPEN FOR OWNER EAR."
+    },
+    "tsivik": {
+      "role": "Ծիվիկը, մի փոքրիկ ծիծեռնակ",
+      "pitch": 1.0,
+      "directionForHumanNarrator": "small young swallow, bright, a little unsure at first, then excited and warm",
+      "voiceSettings": {
+        "stability": 0.4,
+        "similarity_boost": 0.8,
+        "style": 0.45
+      },
+      "voiceId": "PgFHHZMKb19tJbjBe6aY",
+      "voiceName": "vardan-v2",
+      "modelId": "eleven_v3_conversational",
+      "note": "Same voice and settings as Ուլիկը's title role — the standing 'young animal hero' cast, unshifted."
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Առավոտյան Ծիվիկը թռավ այգիների վրայով ու հասավ մեծ գետին։ Գետը լայն էր, շա՜տ լայն։ Ջուրը հոսում էր արագ, իսկ վերևում քամին սուլում էր՝ վու-վու, վու-վու։ Ծիվիկը նստեց ափի քարին ու նայեց մյուս ափին։ Այնքա՜ն հեռու էր։ "
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Իմ թևիկները փոքր են,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— տխրեց Ծիվիկը։"
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Քամին ինձ կտանի։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Հանկարծ երկնքում մի մեծ ստվեր սահեց։ Դա ծեր արագիլն էր՝ երկար կտուցով ու հանգիստ, լայն թևերով։ Արագիլը իջավ ափին՝ Ծիվիկի կողքին։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "stork",
+          "text": "— Բարև՛, փոքրիկ ճամփորդ,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց արագիլը։"
+        },
+        {
+          "speaker": "stork",
+          "text": "— Ինչո՞ւ ես տխուր։ "
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Ուզում եմ թռչել գետի վրայով,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց Ծիվիկը,"
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— բայց քամին շատ ուժեղ է։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Արագիլը ժպտաց իր երկար կտուցով։ "
+        },
+        {
+          "speaker": "stork",
+          "text": "— Ես քեզ մի գաղտնիք կասեմ։ Քամու հետ կռվել պետք չէ։ Քամու հետ պետք է ընկերանալ։ Բա՛ց արա թևիկներդ, թող քամին ինքը քեզ տանի։ Նայի՛ր ինձ։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Արագիլը թափ առավ, բացեց լայն թևերը ու առանց թափահարելու սահեց օդի մեջ՝ ինչպես նավակը ջրի վրա։ Ծիվիկը ուշադիր նայում էր։ Հետո ինքն էլ թափ առավ, բացեց իր փոքրիկ թևիկները… և քամին վերցրեց նրան։ Սկզբում մի քիչ վախեցավ։ Բայց քամին տաք էր ու փափուկ, ինչպես տատիկի թևիկը։ Ծիվիկը սահում էր օդի մեջ, իսկ ներքևում փայլում էր գետը՝ արծաթե ձկնիկներով լի։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "tsivik",
+          "text": "— Թռչո՜ւմ եմ,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ծիծաղեց Ծիվիկը։"
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Իսկապե՜ս թռչում եմ։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Քամին նրան տարավ գետի վրայով՝ մեղմ օրորելով։ Եվ ահա նրա ոտիկները դիպան մյուս ափի տաք ավազին։ Ծիվիկը շրջվեց ու նայեց։ Գետը հիմա իր ետևում էր՝ լայն ու փայլուն։ Իսկ արագիլը երկնքից գլխով արեց նրան։ "
+        },
+        {
+          "speaker": "stork",
+          "text": "— Ապրե՛ս, փոքրիկ ճամփորդ։ Հիշի՛ր՝ ուժեղը նա չէ, ով մեծ թևեր ունի։ Ուժեղը նա է, ով գիտի, թե երբ պետք է վստահել քամուն։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ծիվիկը շնորհակալություն ասաց ու նայեց առաջ։ Ափից այն կողմ, մինչև հորիզոն, փռված էր մի ոսկեգույն արտ։ Ցորենի հասկերը օրորվում էին քամուց ու կամացուկ շրշում էին, կարծես մի երգ էին երգում։"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "spans": [
+        {
+          "speaker": "tsivik",
+          "text": "— Ի՞նչ է շշնջում այս արտը,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— մտածեց Ծիվիկը։ Ծիվիկը որոշեց՝ վաղը կգնա լսելու ոսկե արտի երգը։"
+        }
+      ]
+    }
+  ],
+  "_renderRule": "Render order for the sample-first listen test (per tsivik-series.json _renderNote): the refrain (series-refrain), episode one, the closing clip (series-closing) — verify «Ծիվի́կ» before batching the rest.",
+  "_cast": "Episode 2: narrator=areg-storyteller, stork=areg-storyteller (shifted), tsivik=vardan-v2"
+}
