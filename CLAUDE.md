@@ -214,7 +214,7 @@ check `AREG_FW_BUILD` before diagnosing hardware.
   `backend/content/serial-hero/` (Tsivik), bedtime music (`ContentSync:Music`
   empty).
 
-## State of the toy (2026-09-10)
+## State of the toy (2026-09-11)
 
 Active and verified on hardware: SD stories with cast voices and ambience,
 browse/pause/resume, after-story flow, welcome flow, in-story Q&A, content
@@ -224,14 +224,17 @@ silence, the whole parent dashboard, operator console, backend safety.
 Built but not active or unverified: Game/Riddle/Curiosity/Calm by voice on
 the toy (backend done, firmware online chat loop written and compile-
 verified, never bench-flashed — see the subsection below); offline games
-(bench flag only); mid-story shout pauses (never bench-run); variant
-endings and serial (no audio); bedtime music (no tracks); hold-to-menu
-(unverified by hand, not staged for OTA); streaming Q&A firmware flag off;
-mobile app never built; listen tests of the cast library on the toy still
-open; every toy shares one BLE PoP.
+(compiled into every build since 2026-08-19, round-robin + play reporting
+wired 2026-09-11, never bench-flashed — see the subsection below);
+mid-story shout pauses (never bench-run); variant endings and serial (no
+audio); bedtime music (no tracks); hold-to-menu (unverified by hand, not
+staged for OTA); streaming Q&A firmware flag off; mobile app never built;
+listen tests of the cast library on the toy still open; every toy shares
+one BLE PoP.
 
-Still to implement: offline games into production; an offline-game
-fallback for online Game when Wi-Fi is down (seam left, not built); render
+Still to implement: a `sound-detective` firmware game (backend content
+ready — 21 clips already in `ContentSync:Games` — no engine written); two
+Simon tone clips (`tone-green` / `tone-red`, not yet rendered); render
 variant endings + serial; music tracks; per-toy PoP + factory station; card
 retirement / orphan sweeps / per-namespace index writes; durable child
 recordings (`Audio:BlobStoreRoot` unset on Railway — data lost on redeploy);
@@ -248,6 +251,29 @@ the turn cap (12). Always returns to `ST_IDLE` explicitly. Pure
 loop-termination logic is host-tested (`online_session_rules.h` /
 `host_tests/online_session_rules_test.cpp`). Nothing here has been heard
 on hardware — see `esp32/AregVoiceMvp/README.md`'s bench checklist.
+
+### Offline games — production contract (2026-09-11)
+
+`offline_games.{h,cpp}` (mind-reader, who-first/two-player buzzer,
+button-simon) compile into every build; only the bench 30-second
+auto-start stays behind `AREG_OFFLINE_GAMES_BENCH`. Welcome-menu "game"
+plays a real offline game whenever `offline_games_available()` says yes
+(owner precedence: offline first, the online Game loop above is the
+fallback for a card with no game clips). `offline_games_run_next()`
+round-robins the three, **skipping any game missing its `intro` clip**,
+cursor persisted in NVS (`"areggame"`, write-on-change, same idiom as
+`aregstory`). `online_session_offline_game_fallback()` is now live: a
+"game" session's first upload failure re-checks `offline_games_available()`
+(content sync can finish mid-race) and hands off to an offline round
+instead of the failure clip. Every finished session reports to the parent
+dashboard (`game_report.{h,cpp}` → `POST /api/devices/game-plays`, backend
+already shipped) with honesty-bounded fields only (`offline_games_rules.h`,
+host-tested): who-first's outcome is always null, mind-reader reports from
+its own side (won = its guess confirmed, lost = the child's win),
+button-simon reports won/stopped + the length reached. Nothing here has
+been heard on hardware; Simon still needs `tone-green`/`tone-red` clips —
+see `esp32/AregVoiceMvp/README.md`'s "Offline games" section and bench
+checklist.
 
 ## Working in this repo (agents)
 

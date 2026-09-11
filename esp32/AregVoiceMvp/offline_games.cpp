@@ -1,20 +1,25 @@
 // -------------------------------------------------------------
-// AregVoiceMvp / offline_games.cpp — three offline SD games (bench-only)
-// See offline_games.h for the scope statement, the SD layout and the
-// honesty rules. Entire file compiles out unless AREG_OFFLINE_GAMES_BENCH
-// is defined.
+// AregVoiceMvp / offline_games.cpp — three offline SD games (production
+// since 2026-08-19; see offline_games.h). Only offline_games_tick, the
+// bench-only 30-second auto-start, compiles out unless
+// AREG_OFFLINE_GAMES_BENCH is defined. See offline_games.h for the scope
+// statement, the SD layout and the honesty rules.
 // -------------------------------------------------------------
 #include "offline_games.h"
+#include "offline_games_rules.h"  // pure round-robin + outcome mapping, host-tested
 
 #include <Arduino.h>
 #include <FS.h>
 #include <SD.h>
+#include <Preferences.h>
 #include <esp_random.h>
 #include <esp_task_wdt.h>
+#include <string.h>
 
 #include "config.h"
 #include "audio_io.h"        // audio_sd_begin/available/has_file + audio_play_story_file
 #include "answer_buttons.h"  // GREEN/RED answer buttons
+#include "game_report.h"     // store-and-forward play reporting (parent dashboard)
 
 // ---- SD layout -------------------------------------------------------
 // Root for every offline-game clip. A #define so the layout can move
@@ -176,27 +181,36 @@ char ask_node(const char *path) {
     return 0;
 }
 
-void run_mindreader() {
-    if (!ready("mind-reader")) return;
+// Result of one session, for the play-report hook below. `verdict` is
+// 0 when nothing was ever measured (the child never got as far as a
+// confirm window) — offline_games_mindreader_outcome() maps that to "no
+// outcome claimed", never a guess.
+struct MindreaderResult {
+    int  depth   = 0;
+    char verdict = 0;
+};
+
+MindreaderResult run_mindreader_core() {
+    MindreaderResult r;
+    if (!ready("mind-reader")) return r;
 
     play_clip(AREG_GAMES_DIR_MINDREADER, "intro");
 
     char path[kTreeDepth + 1] = { 0 };   // the whole "tree state" — 5 bytes
-    int depth = 0;
-    while (depth < kTreeDepth) {
+    while (r.depth < kTreeDepth) {
         const char a = ask_node(path);
         if (a == 0) {
-            Serial.printf("[games] mind-reader: ended at depth %d\n", depth);
-            return;                       // quiet exit, no goodbye badgering
+            Serial.printf("[games] mind-reader: ended at depth %d\n", r.depth);
+            return r;                     // quiet exit, no goodbye badgering
         }
-        path[depth++] = (a == 'Y') ? '1' : '0';
-        path[depth] = '\0';
+        path[r.depth++] = (a == 'Y') ? '1' : '0';
+        path[r.depth] = '\0';
     }
 
     char guess_id[8];
     snprintf(guess_id, sizeof(guess_id), "g-%s", path);
     Serial.printf("[games] mind-reader: guessing %s\n", guess_id);
-    if (!play_clip(AREG_GAMES_DIR_MINDREADER, guess_id)) return;
+    if (!play_clip(AREG_GAMES_DIR_MINDREADER, guess_id)) return r;
 
     // Confirm window. GREEN = "you got it", RED = "you didn't". A timeout
     // is NOT scored either way: the toy re-asks the guess once (the guess
@@ -204,7 +218,7 @@ void run_mindreader() {
     char verdict = wait_for_answer();
     if (verdict == 0) {
         Serial.println("[games] mind-reader: no verdict — asking once more");
-        if (!play_clip(AREG_GAMES_DIR_MINDREADER, guess_id)) return;
+        if (!play_clip(AREG_GAMES_DIR_MINDREADER, guess_id)) return r;
         verdict = wait_for_answer();
     }
     if (verdict == 'Y') {
@@ -220,6 +234,19 @@ void run_mindreader() {
     // round, and honouring that invitation needs a selection gesture this
     // slice does not have. TODO(bench): wire replay once game selection
     // exists.
+    r.verdict = verdict;
+    return r;
+}
+
+void run_mindreader() {
+    const MindreaderResult r = run_mindreader_core();
+    // Report only when something was actually measured — the child never
+    // answering the very first question is not a "play", it's a game that
+    // never really started (see the header comment on quiet exits).
+    if (r.depth > 0 || r.verdict != 0) {
+        game_report_on_finished(AREG_GAMES_DIR_MINDREADER, r.depth,
+                                 offline_games_mindreader_outcome(r.verdict), -1);
+    }
 }
 
 // ---------------------------------------------------------------------
@@ -250,8 +277,8 @@ bool find_quiz_question_path(int n) {
     return false;
 }
 
-void run_buzzer() {
-    if (!ready("buzzer")) return;
+int run_buzzer_core() {
+    if (!ready("buzzer")) return 0;
 
     play_clip(AREG_GAMES_DIR_BUZZER, "intro");
 
@@ -281,7 +308,7 @@ void run_buzzer() {
             Serial.println("[games] buzzer: no press this round");
             if (++silent_rounds >= 2) {
                 Serial.println("[games] buzzer: closing quietly");
-                return;
+                return rounds_played;
             }
             continue;
         }
@@ -301,6 +328,17 @@ void run_buzzer() {
         play_clip(AREG_GAMES_DIR_BUZZER, "close");
     }
     Serial.printf("[games] buzzer: rounds played %d\n", rounds_played);
+    return rounds_played;
+}
+
+void run_buzzer() {
+    const int rounds_played = run_buzzer_core();
+    if (rounds_played > 0) {
+        // outcome is ALWAYS null — who-first is about speed, the toy
+        // addresses colours never children, and it never names a loser
+        // (see AllowedOutcomes' who-first rule in the backend DTO).
+        game_report_on_finished(AREG_GAMES_DIR_BUZZER, rounds_played, nullptr, -1);
+    }
 }
 
 // ---------------------------------------------------------------------
@@ -326,15 +364,20 @@ bool play_tone(char step) {
                      (step == 'Y') ? kToneGreen : kToneRed);
 }
 
-void run_simon() {
-    if (!ready("simon")) return;
+struct SimonResult {
+    int  reached = 0;      // longest sequence genuinely echoed
+    bool missed  = false;  // a wrong press ended the session (vs. the ceiling)
+};
+
+SimonResult run_simon_core() {
+    SimonResult r;
+    if (!ready("simon")) return r;
 
     play_clip(AREG_GAMES_DIR_SIMON, "intro");
 
     char seq[AREG_SIMON_MAX_LEN];        // the whole game state — 6 bytes
     int len = AREG_SIMON_START_LEN;
     if (len < 1) len = 1;
-    int reached = 0;                     // longest sequence genuinely echoed
     uint8_t level_up_variant = 0;        // rotates level-up-1/2/3
 
     // Fresh random sequence per session. esp_random() is the hardware RNG —
@@ -343,17 +386,16 @@ void run_simon() {
         seq[i] = (esp_random() & 1u) ? 'Y' : 'N';
     }
 
-    bool missed = false;
-    while (len <= AREG_SIMON_MAX_LEN && !missed) {
+    while (len <= AREG_SIMON_MAX_LEN && !r.missed) {
         for (int i = 0; i < len; i++) {
             if (!play_tone(seq[i])) {
                 Serial.println("[games] simon: tone clip missing — cannot play");
-                return;
+                return r;
             }
             delay(AREG_SIMON_TONE_GAP_MS);
             esp_task_wdt_reset();
         }
-        if (!play_clip(AREG_GAMES_DIR_SIMON, "your-turn")) return;
+        if (!play_clip(AREG_GAMES_DIR_SIMON, "your-turn")) return r;
 
         bool timed_out = false;
         for (int i = 0; i < len; i++) {
@@ -365,15 +407,15 @@ void run_simon() {
             }
             if (pressed != seq[i]) {
                 Serial.printf("[games] simon: wrong at step %d/%d\n", i + 1, len);
-                missed = true;
+                r.missed = true;
                 break;
             }
         }
-        if (timed_out) return;           // child walked away; no miss clip
-        if (missed) break;
+        if (timed_out) return r;         // child walked away; no miss clip
+        if (r.missed) break;
 
-        reached = len;
-        Serial.printf("[games] simon: echoed %d\n", reached);
+        r.reached = len;
+        Serial.printf("[games] simon: echoed %d\n", r.reached);
         if (len < AREG_SIMON_MAX_LEN) {
             // level-up-1/2/3 rotate so a long session never hears the same
             // congratulation twice running (the quiz's variant rule).
@@ -386,7 +428,7 @@ void run_simon() {
         len++;
     }
 
-    if (missed) {
+    if (r.missed) {
         // Warm, zero shame — and the SESSION ENDS here. The reached length
         // is the result; there is no shame in it and no score is stored.
         play_clip(AREG_GAMES_DIR_SIMON, "miss");
@@ -396,7 +438,21 @@ void run_simon() {
         play_clip(AREG_GAMES_DIR_SIMON, "best");
     }
     play_clip(AREG_GAMES_DIR_SIMON, "done");
-    Serial.printf("[games] simon: session result — longest echoed %d\n", reached);
+    Serial.printf("[games] simon: session result — longest echoed %d\n", r.reached);
+    return r;
+}
+
+void run_simon() {
+    const SimonResult r = run_simon_core();
+    // Report only when at least one full sequence was echoed OR a wrong
+    // press was actually registered — a child who never pressed anything
+    // (timed_out on the very first round) measured nothing to report.
+    if (r.reached > 0 || r.missed) {
+        const bool reached_ceiling_no_miss = !r.missed && r.reached >= AREG_SIMON_MAX_LEN;
+        game_report_on_finished(AREG_GAMES_DIR_SIMON, -1,
+                                 offline_games_simon_outcome(reached_ceiling_no_miss),
+                                 r.reached);
+    }
 }
 
 }  // namespace
@@ -460,13 +516,65 @@ void offline_games_tick() {
 
 // ---- menu entry points (production) ---------------------------------
 
-// Per-boot rotation cursor. RAM on purpose; see the header: across a
-// power cycle starting from the first game again is the right behaviour.
-static int s_next_game = 0;
+// index 0=mind-reader, 1=who-first, 2=button-simon — the fixed order
+// offline_games_rules.h's round-robin works over. static: file-local
+// helpers, not part of the header's public API.
+static const char *game_dir_for_index(int idx) {
+    if (idx == 1) return AREG_GAMES_DIR_BUZZER;
+    if (idx == 2) return AREG_GAMES_DIR_SIMON;
+    return AREG_GAMES_DIR_MINDREADER;
+}
+
+static int index_for_game_dir(const char *dir) {
+    if (dir == nullptr) return -1;
+    if (strcmp(dir, AREG_GAMES_DIR_MINDREADER) == 0) return 0;
+    if (strcmp(dir, AREG_GAMES_DIR_BUZZER) == 0)     return 1;
+    if (strcmp(dir, AREG_GAMES_DIR_SIMON) == 0)      return 2;
+    return -1;
+}
+
+// Verified on-card presence of game `idx`'s intro clip — the same
+// representative-clip check offline_games_available() used to inline.
+// One clip stands for the whole game's set (same namespace, per-clip sha
+// gate already ran during content sync).
+static bool game_intro_present(int idx) {
+    snprintf(s_path, sizeof(s_path), AREG_GAMES_CLIP_DIR "/%s/intro.mp3",
+              game_dir_for_index(idx));
+    return audio_sd_has_file(s_path);
+}
+
+// Round-robin cursor: own NVS namespace so it can never collide with
+// aregstory / aregmusic / aregheard, written only on the pick that
+// actually changes it — same idiom as story_select's "aregstory".
+constexpr const char *kCursorNamespace = "areggame";
+constexpr const char *kCursorKey       = "last";
 
 void offline_games_run_next() {
-    const int pick = s_next_game % 3;
-    s_next_game++;
+    const bool avail[3] = { game_intro_present(0), game_intro_present(1),
+                             game_intro_present(2) };
+
+    char last_dir[16] = "";
+    Preferences prefs;
+    if (prefs.begin(kCursorNamespace, /*readOnly=*/true)) {
+        prefs.getString(kCursorKey, last_dir, sizeof(last_dir));
+        prefs.end();
+    }
+    const int pick = offline_games_pick_next(avail, index_for_game_dir(last_dir));
+    if (pick < 0) {
+        Serial.println("[games] no game has its intro clip on the card — nothing to offer");
+        return;
+    }
+    const char *pick_dir = game_dir_for_index(pick);
+
+    if (strcmp(pick_dir, last_dir) != 0) {
+        if (prefs.begin(kCursorNamespace, /*readOnly=*/false)) {
+            prefs.putString(kCursorKey, pick_dir);
+            prefs.end();
+        } else {
+            Serial.println("[games] NVS unavailable — rotation not persisted this pick");
+        }
+    }
+
     if (pick == 1)      offline_games_run_buzzer();
     else if (pick == 2) offline_games_run_simon();
     else                offline_games_run_mindreader();
@@ -477,11 +585,7 @@ bool offline_games_available() {
     return false;   // a game with no yes/no buttons cannot be played
 #else
     if (!audio_sd_available()) return false;
-    // One representative clip per game; if the sync delivered these it
-    // delivered the set (same namespace, per-clip sha gate already ran).
-    return audio_sd_has_file(AREG_GAMES_CLIP_DIR "/" AREG_GAMES_DIR_MINDREADER "/intro.mp3")
-        || audio_sd_has_file(AREG_GAMES_CLIP_DIR "/" AREG_GAMES_DIR_BUZZER "/intro.mp3")
-        || audio_sd_has_file(AREG_GAMES_CLIP_DIR "/" AREG_GAMES_DIR_SIMON "/intro.mp3");
+    return game_intro_present(0) || game_intro_present(1) || game_intro_present(2);
 #endif
 }
 

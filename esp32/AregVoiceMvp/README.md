@@ -998,11 +998,17 @@ tracked for its own turn-taking (the `GameSessions` round going empty) —
 setting it changes no orchestration decision. Pinned by backend tests in
 `AudioChatControllerTests.cs` and `GameLoopIntegrationTests.cs`.
 
-**Offline-game fallback seam**: `online_session_offline_game_fallback()` is
-called (today: always returns `false`, a no-op) when a "game" session's
-very FIRST upload fails — the shape of "child asked for game, the cloud
-could not be reached". Not implemented in this pass; see CLAUDE.md /
-the PR for the follow-up.
+**Offline-game fallback**: `online_session_offline_game_fallback()` is
+called when a "game" session's very FIRST upload fails — the shape of
+"child asked for game, the cloud could not be reached". The welcome menu
+already prefers a REAL offline game whenever one is on the card (see
+"Offline games" below), so this online Game path is reached at all only
+when the earlier `offline_games_available()` check said no; the fallback
+re-checks it (content sync can finish delivering the game clips in the
+background between that check and this first upload) and, if a game just
+became playable, runs it instead of the canned failure clip. On an
+ordinary toy this is correctly a no-op almost always — see "Offline games"
+below for the full contract and the bench note on exercising this path.
 
 **Message.Mode / dashboard tabs**: verified, not changed. `AudioChatController`
 calls the exact same `IChatService.GetResponseAsync` the text endpoint uses,
@@ -1048,6 +1054,11 @@ was possible from this session; nothing here has ever been flashed):
       session` is a blocking call from `loop()`, exactly like a story
       session or the welcome flow; that is not new here) and that a long
       Game session does not leave a stray open TLS connection behind.
+- [ ] With offline game clips ON the card, say «խաղանք» → hears a REAL
+      offline game (mind-reader/who-first/button-simon), NOT this online
+      loop — confirms the owner's offline-first precedence still holds.
+      See "Offline games" below for its own bench checklist, including the
+      round-robin persistence and the fallback path.
 
 ## OTA — surviving the first boot of a new image
 
@@ -1155,7 +1166,7 @@ Note also that `docs/ota-release-runbook.md` § 9 still states the 5-minute
 figure; it was left alone deliberately (this slice is firmware-only) and
 needs a one-line correction.
 
-## Offline games (`offline_games.{h,cpp}`)
+## Offline games (`offline_games.{h,cpp}`) — PRODUCTION
 
 Three more fully-offline SD games beside the true/false quiz — no Wi-Fi, no
 STT, no model, **no mic** — built on the same primitives as
@@ -1163,10 +1174,16 @@ STT, no model, **no mic** — built on the same primitives as
 buttons, the same answer window, and the same loop discipline (clip → answer
 window → feedback → re-ask **once** → quiet exit; never badger).
 
-Gated behind **`-DAREG_OFFLINE_GAMES_BENCH`**, exactly like the quiz, so a
-production image compiles **zero bytes** of it and stays byte-identical.
-It also needs `AREG_PIN_BUTTON_YES` / `AREG_PIN_BUTTON_NO` in `config.h`;
-with the flag but no pins it logs once and does nothing.
+**Compiled into every build since 2026-08-19** (owner decision, menu
+redesign) — "game" in the welcome menu plays one of these for real. Only
+`offline_games_tick`, the bench-only **30-second AUTO-START** that once made
+the toy take itself over after every boot and ate the main button for two
+evenings (`button-dead-diagnosis-20260818.md`), stays behind
+**`-DAREG_OFFLINE_GAMES_BENCH`** — a game must start because a child asked,
+never because a timer fired. It also needs `AREG_PIN_BUTTON_YES` /
+`AREG_PIN_BUTTON_NO` in `config.h`; with no pins it logs once per call and
+does nothing (`offline_games_available()` says so up front, so the menu
+never offers what it cannot start).
 
 | game | id family | flow |
 |---|---|---|
@@ -1178,6 +1195,14 @@ with the flag but no pins it logs once and does nothing.
 — that file's `id` scheme is the contract this module resolves against.
 Nothing in the firmware invents an id, and a clip that is not on the card is
 a logged no-op, so a partly-rendered card degrades instead of crashing.
+
+`game-clips.json` / `ContentSync:Games` now ships **104 rendered clips**
+across FOUR game keys: the three below, plus `sound-detective` (21 clips) —
+content-ready but **not yet a firmware game**; this module only knows the
+three it implements, and `sound-detective` clips simply sit on the card
+unused until that engine exists. `story-pauses` (8 clips, mid-story shout
+pauses) ships in the same bank but is a different feature entirely (see
+CLAUDE.md) and this module never touches it.
 
 ### SD layout
 
@@ -1223,50 +1248,130 @@ without touching the code.
 ### Entry points and how a game starts
 
 ```c
-void offline_games_tick();              // one game per boot, 30 s after boot, IDLE-only
-void offline_games_run_mindreader();
-void offline_games_run_buzzer();
+void offline_games_run_mindreader();    // one direct session each — used by the
+void offline_games_run_buzzer();        // bench harness and by offline_games_run_next()
 void offline_games_run_simon();
+bool offline_games_available();         // true iff a game can actually run HERE AND NOW
+void offline_games_run_next();          // menu entry point — see below
 ```
 
-`offline_games_tick()` is called from the IDLE branch of `loop()`, the same
-shape as `offline_quiz_tick` / `sd_playback_tick`. Which game it runs is a
-**build-time** pick, `-DAREG_OFFLINE_GAMES_PICK=1|2|3` (1 = mind-reader,
-2 = buzzer, 3 = Simon; default 1).
+**The welcome menu is the real entry point** (owner decision 2026-08-19,
+"GAME MEANS A GAME"): when the child answers "game", `AregVoiceMvp.ino`
+calls `offline_games_available()` first and, if it says yes, plays a REAL
+offline game via `offline_games_run_next()` instead of opening the online
+chat Game loop — deterministic, free, and honest about what the toy is
+doing. The online chat Game (`handle_online_chat_session`, see below) is
+the fallback for a card with no offline game clips, or — mid-session, via
+`online_session_offline_game_fallback()` — for the narrow case where
+content sync finishes delivering the game clips between that check and the
+first online upload.
 
-Runtime game **selection UX is deliberately not invented here** — every
-option (a long-press cycle, a spoken menu clip, a third button) adds either
-an input gesture or an LED meaning the toy does not have today, and the rule
-for this slice was no new state machine and no new LED vocabulary. Until that
-decision is made at the bench, choosing a game is exactly like choosing which
-bench harness is compiled in.
+**Round-robin, persisted.** `offline_games_run_next()` rotates mind-reader →
+who-first → button-simon → …, **skipping any game whose `intro` clip is not
+on the card** (a game with no intro must never be offered — the exact
+"offered a game, heard nothing" shape the 2026-08-18 auto-start defect
+taught). The cursor is stored in its own NVS namespace (`"areggame"`, key
+`"last"`), written only on the pick that actually changes it — same idiom
+as `story_select`'s `"aregstory"` cursor — so two asks in one evening (or
+across a power cycle) get two different games. The pure selection rule
+(round-robin + availability) lives in `offline_games_rules.h` and is
+host-tested (`offline_games_rules_test.cpp`); everything SD/NVS/button
+around it is a thin wrapper.
+
+`offline_games_tick()` — the **bench-only** 30-second auto-start, kept ONLY
+behind `-DAREG_OFFLINE_GAMES_BENCH` — still exists for a bench harness that
+wants a game running without touching the menu. Which game it forces is a
+**build-time** pick, `-DAREG_OFFLINE_GAMES_PICK=1|2|3` (1 = mind-reader,
+2 = who-first, 3 = Simon; default 1), via `offline_games_run_picked()`.
+
+### Play reporting (`game_report.{h,cpp}`)
+
+The offline games make no network call of their own, so without this the
+parent dashboard would show nothing for an afternoon of play — the same gap
+`story_report.{h,cpp}` closes for SD story playback, and the same fix: each
+`run_*` wrapper in `offline_games.cpp` calls
+`game_report_on_finished(gameKey, rounds, outcome, score)` once a session
+actually measured something (see the honesty rules below — a game a child
+never engaged with reports nothing), which queues the event in its own NVS
+namespace (`"areggplays"`) and uploads it — store-and-forward, same
+idempotency-key shape as `story_report` — via `game_report_tick()` to
+**`POST /api/devices/game-plays`** (backend `GamePlayReportRequest` /
+`DeviceService.ReportGamePlaysAsync`, already shipped) whenever Wi-Fi is up.
+`game_report_tick()` runs from the same IDLE branch as `story_report_tick()`
+and is held during an OTA outcome-pending window for the same reason.
+
+Unlike a story, a game session never pauses and resumes across a boot — the
+whole session runs inside one `run_*` call — so there is no started/finished
+pair to track; a session enqueues **already closed**, once, when it ends.
+
+**Honesty, in the schema (`offline_games_rules.h`, host-tested):**
+
+| game | `rounds` | `outcome` |
+|---|---|---|
+| mind-reader | tree depth reached (0–4) | `"won"` = the toy's guess was confirmed, `"lost"` = it wasn't (the CHILD won), `null` if no verdict was ever measured |
+| who-first (buzzer) | rounds played | **always `null`** — the round is about speed, the toy addresses colours never children, and it never names a loser |
+| button-simon | *(not counted — see `score`)* | `"won"` = reached the ceiling with no miss, `"stopped"` = anything else genuinely scored |
+| button-simon | `score` = longest sequence echoed | — |
 
 ### Build
+
+```
+arduino-cli compile --fqbn "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc" ".\esp32\AregVoiceMvp"
+```
+
+is a normal **production** build now — no flag needed for the games engine
+itself. To force one via the bench 30-second auto-start:
 
 ```
 arduino-cli compile --fqbn "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc" --build-property "compiler.cpp.extra_flags=-DAREG_OFFLINE_GAMES_BENCH -DAREG_OFFLINE_GAMES_PICK=1" ".\esp32\AregVoiceMvp"
 ```
 
+#### Measured size cost (canonical FQBN, production build)
+
+Against the `claude/voice-modes` baseline (1,631,206 B flash / 194,544 B
+globals): **+3,032 B flash, +1,776 B globals** — the round-robin cursor
+logic, the honesty-mapping helpers, and `game_report.cpp`'s queue (a
+1,280-byte upload buffer + an 8-event `.bss` table, deliberately smaller
+than `story_report`'s 16 — a session plays far fewer games than stories).
+Compile-verified only (arduino-cli, esp32:esp32@3.3.8); `--warnings all`
+shows **zero new warnings** from any file this slice touched. The bench
+build (`-DAREG_OFFLINE_GAMES_BENCH`) also compiles clean.
+
 ### Open for bench day
 
-- **Nothing here has run on hardware.** Compile-verified only.
-- **The clips do not exist yet.** `game-clips.json` is still owner-review +
-  listen-test pending, and no MP3 has been rendered. Every game therefore
-  logs `clip missing` and exits quietly on today's card — correct
-  degradation, but it also means none of the three can be bench-tested
-  before the renders land.
-- **Simon needs two tone clips that the JSON does not yet list**
-  (`tone-green` / `tone-red`). There is no parameterised tone helper in
-  `audio_io` (`audio_play_thinking_earcon` is one fixed 440 Hz earcon and
-  `synth_write_tone` is file-static), so the two tones are short clips like
-  everything else. They are non-verbal — no Armenian text to review, just two
-  renders to add.
+- **Nothing here has run on hardware.** Compile-verified only, this slice
+  included.
+- **104 clips are configured and synced** (`ContentSync:Games`, real
+  sha256/size, not placeholders) across mind-reader (39), who-first (22),
+  button-simon (14) and `sound-detective` (21, not yet a firmware game —
+  see above). The three implemented games should therefore be listen-
+  testable at the bench once a card has synced, EXCEPT:
+- **Simon still needs two tone clips the JSON does not list**
+  (`tone-green` / `tone-red`). `button-simon`'s `intro` clip IS on the card,
+  so the round-robin WILL offer it — it plays the intro, then the first
+  tone-clip lookup fails and the session exits quietly (a logged no-op, per
+  the "never hang" rule — not a crash, not a badger), so nothing is falsely
+  reported either. There is no parameterised tone helper in `audio_io`
+  (`audio_play_thinking_earcon` is one fixed 440 Hz earcon and
+  `synth_write_tone` is file-static), so the two tones need to ship as short
+  clips like everything else. They are non-verbal — no Armenian text to
+  review, just two renders to add.
 - The mind-reader `replay` clip is **not** played: honouring the invitation
-  it makes needs the selection gesture above.
+  it makes needs a selection gesture this slice does not add.
 - Button-edge handling is inherited from the quiz verbatim: a press that
   happens *during* clip playback is not queued, because the answer buttons
   are only polled inside an answer window. Whether that feels wrong to a
   four-year-old is a listening question for the bench, not a code question.
+- **`online_session_offline_game_fallback`'s "content sync finished
+  mid-session" path is logically reachable but not bench-observed** — it
+  needs a real race between the welcome-flow check and the first online
+  upload to exercise, which is easiest to force by starting a session right
+  as a sync completes.
+- Verify at the bench: a full round-robin cycle (mind-reader → who-first →
+  button-simon → wraps) survives a power cycle at the right point (the NVS
+  cursor persisted); a card with only ONE game's intro clip never offers
+  the other two; `game-plays` rows appear in the parent dashboard's Games
+  tab after a session with Wi-Fi up.
 
 ## Known C1 limitations (deliberate, deferred)
 

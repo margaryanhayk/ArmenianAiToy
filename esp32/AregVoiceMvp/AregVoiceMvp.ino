@@ -38,7 +38,8 @@
 #include "answer_buttons.h"    // optional GREEN/RED answer buttons (no-op unless pins defined)
 #include "volume_pot.h"        // optional hardware volume knob (no-op unless pot pin defined)
 #include "offline_quiz.h"      // offline true/false quiz (AREG_OFFLINE_QUIZ_BENCH builds only)
-#include "offline_games.h"     // mind-reader / buzzer / Simon (AREG_OFFLINE_GAMES_BENCH builds only)
+#include "offline_games.h"     // mind-reader / who-first / button-simon (production; see the header)
+#include "game_report.h"       // offline game-play reporting (store-and-forward to backend)
 
 #include "story_select.h"      // which cached story to play (index v2 + no-repeat)
 #include "story_pause.h"       // shout-it-out pauses inside an SD story (parent-gated)
@@ -1026,7 +1027,10 @@ static bool welcome_listen(const char *expect, char *out_intent, size_t out_len,
 // server-side on every single turn regardless.
 //
 // Ends on, in the order checked:
-//   1. the upload failing (network/backend error) — canned failure clip;
+//   1. the upload failing (network/backend error) — canned failure clip,
+//      UNLESS this is a "game" session's very first turn and an offline
+//      game just became playable (online_session_offline_game_fallback);
+//      then the offline game's own ending replaces the failure clip;
 //   2. the backend's own X-Areg-Turn-End header — a Game round the child
 //      stopped, or ANY parent-gate canned clip (paused/bedtime/mode-off/
 //      cost-cap). No canned-failure clip: this ending is not an error,
@@ -1043,7 +1047,7 @@ static bool welcome_listen(const char *expect, char *out_intent, size_t out_len,
 //
 // Takes ownership of `payload` (PSRAM); frees it on every path.
 // `intent` is "game" | "riddle" | "curiosity" | "calm" — logging only,
-// plus the seam below for a later offline fallback.
+// plus online_session_offline_game_fallback() below for "game".
 
 #ifndef AREG_CHAT_LISTEN_MS
 #define AREG_CHAT_LISTEN_MS 12000UL       // child's window to answer, ms
@@ -1055,19 +1059,35 @@ static bool welcome_listen(const char *expect, char *out_intent, size_t out_len,
 #define AREG_CHAT_MAX_CONSECUTIVE_SILENCE 2
 #endif
 
-// Seam for a LATER offline-game fallback. Called only when the very
-// FIRST turn of a "game" online session fails to upload — the shape of
-// "child asked for game, the cloud could not be reached" — right before
-// the existing canned-failure clip plays. Today this is a deliberate
-// no-op: it always returns false, so behaviour is UNCHANGED (the caller
-// falls straight through to the failure clip and an honest transition to
-// IDLE). When an offline fallback is implemented, this is where it hands
-// off to something like offline_games_run_next() instead, and returns
-// true so the caller skips the failure clip. Not implemented here by
-// design — see the PR / CLAUDE.md note for this feature.
+// Offline-game fallback. Called only when the very FIRST turn of a
+// "game" online session fails to upload — the shape of "child asked for
+// game, the cloud could not be reached" — right before the existing
+// canned-failure clip plays.
+//
+// The welcome menu already prefers a REAL offline game over this online
+// session whenever one is available (owner decision 2026-08-19, "GAME
+// MEANS A GAME" — see the .ino's welcome-flow intent handling): this
+// branch is reached at all only when offline_games_available() said no
+// at that check, moments earlier. So on an ordinary toy this is correctly
+// a no-op — there is nothing to fall back TO, and the caller falls
+// through to the honest failure clip exactly as before.
+//
+// It re-checks rather than trusting that earlier "no", because content
+// sync can finish delivering the game clips in the background between
+// the welcome-flow check and this first upload attempt — a narrow but
+// real window, and the one case where this toy genuinely CAN answer
+// "game" for free instead of failing outright. Returns true only when it
+// actually started a game (the caller then skips the failure clip, since
+// the offline session already spoke); false leaves behaviour unchanged.
 static bool online_session_offline_game_fallback(const char *intent) {
-    (void)intent;
-    return false;
+    if (strcmp(intent, "game") != 0 || !offline_games_available()) {
+        return false;
+    }
+    Serial.println("[chat] game upload failed -- an offline game just became "
+                   "available; falling back to it instead of the failure clip");
+    Serial.flush();
+    offline_games_run_next();
+    return true;
 }
 
 static void handle_online_chat_session(uint8_t *payload, size_t payload_len,
@@ -1091,7 +1111,7 @@ static void handle_online_chat_session(uint8_t *payload, size_t payload_len,
                 transition_to(ST_ERROR);
                 if (turn_no == 1 && strcmp(intent, "game") == 0
                     && online_session_offline_game_fallback(intent)) {
-                    break;   // fallback handled it (not implemented today)
+                    break;   // fallback handled it — an offline game already played
                 }
                 play_canned_failure_clip();
             } else {
@@ -2878,10 +2898,11 @@ void loop() {
         // library — stories plus ~4.6 MB of game clips — inside a SINGLE
         // loop iteration. While it is in there, ota_foundation_tick() above
         // is not running, so neither the check-in retry nor the deadline
-        // test happens. story_report_tick() is smaller but is the same
-        // class of thing (a network upload before the verdict), so it is
-        // gated too. Both come back the moment the image is confirmed (or
-        // rolled back), which is one tick later in the normal case.
+        // test happens. story_report_tick() and game_report_tick() are
+        // smaller but are the same class of thing (a network upload
+        // before the verdict), so both are gated too. All three come back
+        // the moment the image is confirmed (or rolled back), which is
+        // one tick later in the normal case.
         const bool ota_pending = ota_outcome_pending();
         if (ota_pending) {
             static bool s_logged_hold = false;
@@ -2898,6 +2919,10 @@ void loop() {
             // cadence while anything is queued. IDLE-only, best-effort; events
             // are deleted only after a server 2xx.
             story_report_tick();
+
+            // Same store-and-forward shape, for the offline games — they
+            // make no network call of their own either.
+            game_report_tick();
 
 #ifdef AREG_CONTENT_SYNC_BENCH
             // Cloud→SD story sync (bench builds only): one attempt per boot,
