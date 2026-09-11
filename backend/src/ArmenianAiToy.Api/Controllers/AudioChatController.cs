@@ -63,6 +63,7 @@ public class AudioChatController : ControllerBase
     private readonly AppDbContext _db;
     private readonly OpenAICostMeter _costMeter;
     private readonly IOptions<OpenAIDailyCostCapOptions> _costCapOptions;
+    private readonly UsageTiersOptions _usageTiersOptions;
     private readonly IWebHostEnvironment _env;
     private readonly IConfiguration _config;
     private readonly ILogger<AudioChatController> _logger;
@@ -79,7 +80,8 @@ public class AudioChatController : ControllerBase
         IOptions<OpenAIDailyCostCapOptions> costCapOptions,
         IWebHostEnvironment env,
         IConfiguration config,
-        ILogger<AudioChatController> logger)
+        ILogger<AudioChatController> logger,
+        UsageTiersOptions? usageTiersOptions = null)
     {
         _chatService = chatService;
         _deviceService = deviceService;
@@ -90,6 +92,7 @@ public class AudioChatController : ControllerBase
         _db = db;
         _costMeter = costMeter;
         _costCapOptions = costCapOptions;
+        _usageTiersOptions = usageTiersOptions ?? new UsageTiersOptions();
         _env = env;
         _config = config;
         _logger = logger;
@@ -281,7 +284,9 @@ public class AudioChatController : ControllerBase
                 var sttCost = OpenAICostEstimator.EstimateWhisperCostUsd(audioBytes.LongLength);
                 var chatCost = OpenAICostEstimator.EstimateChatCostUsd(transcript, chatResult.Text);
                 var ttsCost = OpenAICostEstimator.EstimateTtsCostUsd(ttsText);
-                _costMeter.Record(deviceId, sttCost + chatCost + ttsCost, DateTime.UtcNow);
+                var turnCost = sttCost + chatCost + ttsCost;
+                _costMeter.Record(deviceId, turnCost, DateTime.UtcNow);
+                await _deviceService.RecordUsageQuestionAsync(deviceId, turnCost, DateTime.UtcNow);
             }
             catch (Exception ex)
             {
@@ -367,7 +372,9 @@ public class AudioChatController : ControllerBase
                 var sttCost = OpenAICostEstimator.EstimateWhisperCostUsd(childAudioBytes.LongLength);
                 var chatCost = OpenAICostEstimator.EstimateChatCostUsd(transcript, chatResult.Text);
                 var ttsCost = OpenAICostEstimator.EstimateTtsCostUsd(ttsText);
-                _costMeter.Record(deviceId, sttCost + chatCost + ttsCost, DateTime.UtcNow);
+                var turnCost = sttCost + chatCost + ttsCost;
+                _costMeter.Record(deviceId, turnCost, DateTime.UtcNow);
+                await _deviceService.RecordUsageQuestionAsync(deviceId, turnCost, DateTime.UtcNow);
             }
             catch (Exception ex)
             {
@@ -526,7 +533,22 @@ public class AudioChatController : ControllerBase
         }
 
         var costCapOpts = _costCapOptions.Value;
-        if (costCapOpts.Enabled)
+        var usageTiersOpts = _usageTiersOptions;
+        if (usageTiersOpts.Enabled)
+        {
+            // Usage:Tiers:Enabled REPLACES the flat dollar cap with the
+            // device's per-tier allowance — see ChatController for the
+            // same idiom and UsageTiersOptions for why the `else if` below
+            // stays byte-identical to today while the flag is off.
+            var allowance = await _deviceService.GetUsageAllowanceStatusAsync(deviceId, DateTime.UtcNow);
+            if (allowance.IsExhausted)
+            {
+                AppMeter.UsageAllowanceExhausted.Add(1,
+                    new KeyValuePair<string, object?>("tier", allowance.Tier));
+                return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
+            }
+        }
+        else if (costCapOpts.Enabled)
         {
             var nowUtc = DateTime.UtcNow;
             // #022 — fleet-wide ceiling (kill-switch), opt-in (skipped when

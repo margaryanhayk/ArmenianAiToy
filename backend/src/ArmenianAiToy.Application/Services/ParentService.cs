@@ -45,6 +45,7 @@ public class ParentService : IParentService
     private readonly IGoogleIdTokenValidator? _googleValidator;
     private readonly IAudioBlobStore _blobStore;
     private readonly LoginAttemptThrottle _loginThrottle;
+    private readonly UsageTiersOptions _usageTiersOptions;
 
     /// <summary>
     /// Standard constructor used by the DI container. Optional
@@ -84,11 +85,17 @@ public class ParentService : IParentService
         IGoogleIdTokenValidator? googleValidator = null,
         IAudioBlobStore? blobStore = null,
         LoginAttemptThrottle? loginThrottle = null,
-        IStoryRequestPhotoStore? storyRequestPhotos = null)
+        IStoryRequestPhotoStore? storyRequestPhotos = null,
+        UsageTiersOptions? usageTiersOptions = null)
     {
         _db = db;
         _config = config;
         _logger = logger;
+        // Falls back to resolving the same config this instance already
+        // received, so every existing test construction (no Usage:Tiers
+        // section => Enabled=false) compiles and behaves unchanged; real DI
+        // passes the shared singleton instead of re-parsing per instance.
+        _usageTiersOptions = usageTiersOptions ?? UsageTiersOptions.Resolve(config);
         _hashPassword = hashPassword ?? BCrypt.Net.BCrypt.HashPassword;
         _notifier = notifier ?? NullNotifier.Instance;
         _googleValidator = googleValidator;
@@ -1932,6 +1939,18 @@ public class ParentService : IParentService
         IReadOnlyCollection<(string StoryId, int Version)> AdvertisedFor(Guid id)
             => advertisedByDevice.TryGetValue(id, out var own) ? own : fleetAdvertised;
 
+        // Usage-tier metering foundation (2026-09-11): one batched query for
+        // TODAY's counts across every device in this response, same "one
+        // query then in-memory lookup" shape as advertisedByDevice above.
+        // Skipped entirely while the flag is off — no query, no field, byte-
+        // identical to before this feature (pinned by test).
+        var todayUtc = nowUtc.Date;
+        var questionsTodayByDevice = _usageTiersOptions.Enabled
+            ? await _db.Set<DeviceUsageDay>()
+                .Where(u => deviceIds.Contains(u.DeviceId) && u.DayUtc == todayUtc)
+                .ToDictionaryAsync(u => u.DeviceId, u => u.Questions)
+            : new Dictionary<Guid, int>();
+
         return links.Select(l =>
         {
             // Computed once and shared by StoryHealth/ContentHealth AND by
@@ -1981,6 +2000,14 @@ public class ParentService : IParentService
                 StoryQuestionsEnabled = l.Device.StoryQuestionsEnabled,
                 VariantEndingsEnabled = l.Device.VariantEndingsEnabled,
                 BedtimeMusicEnabled = l.Device.BedtimeMusicEnabled,
+                Usage = _usageTiersOptions.Enabled
+                    ? new UsageSummaryDto(
+                        Tier: string.IsNullOrWhiteSpace(l.Device.UsageTier)
+                            ? UsageTiersOptions.FreeTierName
+                            : l.Device.UsageTier,
+                        QuestionsToday: questionsTodayByDevice.TryGetValue(l.Device.Id, out var qToday) ? qToday : 0,
+                        AllowanceToday: UsageAllowance.Resolve(_usageTiersOptions, l.Device.UsageTier).QuestionsPerDay)
+                    : null,
             };
         }).ToList();
     }

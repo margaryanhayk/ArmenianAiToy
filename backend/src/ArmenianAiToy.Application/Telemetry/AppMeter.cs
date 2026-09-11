@@ -236,6 +236,23 @@ public static class AppMeter
             description: "Count of per-device daily OpenAI cost-cap trips, by kind.");
 
     /// <summary>
+    /// Usage-tier metering foundation (2026-09-11, ships behind
+    /// <c>Usage:Tiers:Enabled</c>=false). Count of gate trips where a
+    /// device's per-tier allowance (<c>UsageAllowance.IsExhausted</c>) —
+    /// not the flat dollar cap — was what stopped the turn. Only fires
+    /// while the flag is on; the flat-cap counter above keeps recording
+    /// every trip while it is off. Tag <c>tier</c> is the device's
+    /// <c>Device.UsageTier</c> string, bounded by the configured
+    /// <c>Usage:Tiers:Plans</c> set — an operator-controlled, small,
+    /// slow-changing vocabulary, safe under the no-high-cardinality
+    /// invariant (never a device/parent/child id).
+    /// </summary>
+    public static readonly Counter<long> UsageAllowanceExhausted =
+        Instance.CreateCounter<long>(
+            name: "aat_usage_allowance_exhausted_total",
+            description: "Count of chat/audio/story-qa turns stopped by an exhausted per-tier usage allowance, by tier.");
+
+    /// <summary>
     /// Count of in-story voice Q&amp;A turns handled by
     /// <c>StoryQaController.Ask</c> (one increment per turn that reaches
     /// transcription — input-validation rejections like unknown-story 404

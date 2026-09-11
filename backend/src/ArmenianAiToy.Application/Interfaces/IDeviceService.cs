@@ -61,4 +61,25 @@ public interface IDeviceService
     Task<bool> IsDeviceInBedtimeWindowAsync(Guid deviceId, DateTime nowUtc);
     Task<bool> IsDeviceModeEnabledAsync(Guid deviceId, DetectedMode mode);
     Task<bool> IsModeEnabledForRequestAsync(Guid deviceId, Guid? childId, DetectedMode mode);
+
+    /// <summary>
+    /// Usage-tier metering foundation (2026-09-11). Upsert today's
+    /// <c>DeviceUsageDay</c> row for <paramref name="deviceId"/>: +1
+    /// question, + <paramref name="costUsd"/>. Called from the SAME
+    /// best-effort try/catch the chat/audio/story-qa controllers already
+    /// wrap their <c>OpenAICostMeter.Record</c> call in — a failure here
+    /// must never break the turn. Written UNCONDITIONALLY wherever that
+    /// call site runs, independent of <c>Usage:Tiers:Enabled</c> (the flag
+    /// gates gating and the parent surface, not the counting).
+    /// </summary>
+    Task RecordUsageQuestionAsync(Guid deviceId, decimal costUsd, DateTime nowUtc);
+
+    /// <summary>
+    /// Resolve <paramref name="deviceId"/>'s current usage-tier standing:
+    /// tier name, questions used today/this month, and the plan's allowance
+    /// on each axis, via <see cref="Helpers.UsageAllowance"/>. Read by the
+    /// chat/audio/story-qa gate when <c>Usage:Tiers:Enabled</c> is true, and
+    /// by the parent-facing <c>LinkedDeviceDto.usage</c> field.
+    /// </summary>
+    Task<UsageAllowanceStatus> GetUsageAllowanceStatusAsync(Guid deviceId, DateTime nowUtc);
 }

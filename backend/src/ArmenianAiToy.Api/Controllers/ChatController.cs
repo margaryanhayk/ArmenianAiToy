@@ -23,6 +23,7 @@ public class ChatController : ControllerBase
     private readonly IDeviceService _deviceService;
     private readonly OpenAICostMeter _costMeter;
     private readonly IOptions<OpenAIDailyCostCapOptions> _costCapOptions;
+    private readonly UsageTiersOptions _usageTiersOptions;
     private readonly ILogger<ChatController> _logger;
 
     // Child-facing canned reply when a parent has paused the device. Kept
@@ -53,12 +54,14 @@ public class ChatController : ControllerBase
         IDeviceService deviceService,
         OpenAICostMeter costMeter,
         IOptions<OpenAIDailyCostCapOptions> costCapOptions,
-        ILogger<ChatController> logger)
+        ILogger<ChatController> logger,
+        UsageTiersOptions? usageTiersOptions = null)
     {
         _chatService = chatService;
         _deviceService = deviceService;
         _costMeter = costMeter;
         _costCapOptions = costCapOptions;
+        _usageTiersOptions = usageTiersOptions ?? new UsageTiersOptions();
         _logger = logger;
     }
 
@@ -111,13 +114,29 @@ public class ChatController : ControllerBase
                     ModeDisabledResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
         }
 
-        // P0 daily cost cap. Fires AFTER the soft-off gates above so the
-        // existing pause/bedtime/mode-disabled telemetry shape is
-        // unchanged. SafetyFlag stays Clean — a cost-cap trip is a
-        // parent-cost soft-off, not a safety event. Disabled config
-        // skips the gate entirely.
+        // P0 daily cost cap / usage-tier allowance. Fires AFTER the soft-off
+        // gates above so the existing pause/bedtime/mode-disabled telemetry
+        // shape is unchanged. SafetyFlag stays Clean — a cap/allowance trip
+        // is a parent-cost soft-off, not a safety event.
+        //
+        // Usage:Tiers:Enabled (default false) REPLACES the flat dollar cap
+        // with the device's per-tier allowance when true; the `else if`
+        // below is byte-identical to the original `if (costCapOpts.Enabled)`
+        // block while the flag is off — see UsageTiersOptions.
         var costCapOpts = _costCapOptions.Value;
-        if (costCapOpts.Enabled)
+        var usageTiersOpts = _usageTiersOptions;
+        if (usageTiersOpts.Enabled)
+        {
+            var allowance = await _deviceService.GetUsageAllowanceStatusAsync(deviceId, DateTime.UtcNow);
+            if (allowance.IsExhausted)
+            {
+                AppMeter.UsageAllowanceExhausted.Add(1,
+                    new KeyValuePair<string, object?>("tier", allowance.Tier));
+                return Ok(new ChatResponse(
+                    CostCapResponse, Guid.Empty, Guid.Empty, SafetyFlag.Clean));
+            }
+        }
+        else if (costCapOpts.Enabled)
         {
             var nowUtc = DateTime.UtcNow;
             // #022 — fleet-wide ceiling (kill-switch) checked first. Opt-in:
@@ -168,6 +187,10 @@ public class ChatController : ControllerBase
                     var estimate = OpenAICostEstimator.EstimateChatCostUsd(
                         request.Message, response.Response);
                     _costMeter.Record(deviceId, estimate, DateTime.UtcNow);
+                    // Usage-tier metering foundation: written unconditionally
+                    // here (independent of Usage:Tiers:Enabled) — see
+                    // IDeviceService.RecordUsageQuestionAsync.
+                    await _deviceService.RecordUsageQuestionAsync(deviceId, estimate, DateTime.UtcNow);
                 }
                 catch (Exception ex)
                 {

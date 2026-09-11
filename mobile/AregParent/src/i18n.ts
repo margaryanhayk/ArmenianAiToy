@@ -96,6 +96,16 @@ const D = {
     hy: 'Խնդրում ենք կապվել աջակցման ծառայության հետ և ասել այս կոդը՝',
   },
 
+  // Usage-tier metering foundation (2026-09-11, ships behind
+  // Usage:Tiers:Enabled=false) — mirrors parent.html's `usage_questions_today`
+  // verbatim, including the reversed Armenian placeholder order. Never a
+  // price, never the word "limit".
+  usage_questions_today: {
+    en: '{today} of {allowance} questions today',
+    ru: '{today} из {allowance} вопросов сегодня',
+    hy: 'Այսօր՝ {allowance}-ից {today} հարց',
+  },
+
   // ---------- errors ----------
   e_generic: {
     en: 'Something went wrong. Please try again.',

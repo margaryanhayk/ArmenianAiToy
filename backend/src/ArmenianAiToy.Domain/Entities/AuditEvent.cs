@@ -934,6 +934,33 @@ public class AuditEvent
     /// The item kind and key are catalogue identifiers, not child data.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Usage-tier metering foundation (2026-09-11): an operator set a
+    /// device's usage tier. Same <see cref="AuditEventType.InternalConsoleAction"/>
+    /// envelope as <see cref="InternalConsoleAction"/> (no migration, no new
+    /// parent-facing surface), with its own factory because the generic one
+    /// carries only a bool value and a tier is a name. Metadata is the
+    /// post-change tier only — written only when the tier actually changed
+    /// (idempotent no-ops write nothing, same contract as pause/revoke).
+    /// </summary>
+    public static AuditEvent InternalConsoleUsageTierSet(
+        string operatorName, Guid targetDeviceId, string tier, string reason) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.InternalConsoleAction,
+        ActorParentId = null,
+        TargetDeviceId = targetDeviceId,
+        TargetChildId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            @operator = operatorName,
+            action = "device_usage_tier",
+            tier = tier,
+            reason = reason
+        })
+    };
+
     public static AuditEvent InternalConsoleContentOverride(
         string operatorName, Guid targetDeviceId,
         string itemKind, string itemKey, bool allowed, string reason) => new()

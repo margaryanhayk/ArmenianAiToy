@@ -468,6 +468,17 @@ public static class DependencyInjection
             Microsoft.Extensions.Options.Options.Create(capOpts));
         services.AddSingleton<OpenAICostMeter>();
 
+        // Usage-tier metering foundation (2026-09-11): Usage:Tiers:Enabled
+        // defaults false, so this registration changes nothing until an
+        // operator opts in. Same manual-binding-via-Resolve idiom as
+        // ContentSyncOptions below (reachable by tests without DI), and
+        // registered as a plain singleton — not IOptions<T> — because
+        // DeviceService (Application layer) consumes it directly and
+        // Application does not reference Microsoft.Extensions.Options.
+        // Controllers (Api layer) that also need it take the same plain
+        // instance via constructor injection.
+        services.AddSingleton(UsageTiersOptions.Resolve(config));
+
         // OTA foundation (Proof 2): the CURRENT firmware release the manifest
         // endpoint offers. Same manual-binding style as the cost cap above.
         // Ships Enabled=false → the endpoint returns no-update until configured.

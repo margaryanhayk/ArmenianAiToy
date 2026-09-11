@@ -55,12 +55,14 @@ public class InternalController : ControllerBase
     private readonly IConfiguration _config;
     private readonly ILogger<InternalController> _logger;
     private readonly Application.Auth.OperatorSessionStore _sessions;
+    private readonly UsageTiersOptions _usageTiersOptions;
 
     public InternalController(
         AppDbContext db, ICuratedStoryLibrary library, OpenAICostMeter costMeter,
         LibraryStoryQuestionService questions, IModerationService moderation,
         IConfiguration config, ILogger<InternalController> logger,
-        Application.Auth.OperatorSessionStore? sessions = null)
+        Application.Auth.OperatorSessionStore? sessions = null,
+        UsageTiersOptions? usageTiersOptions = null)
     {
         _db = db;
         _library = library;
@@ -70,6 +72,7 @@ public class InternalController : ControllerBase
         _config = config;
         _logger = logger;
         _sessions = sessions ?? new Application.Auth.OperatorSessionStore();
+        _usageTiersOptions = usageTiersOptions ?? UsageTiersOptions.Resolve(config);
     }
 
     /// <summary>System-wide counts + today's activity + total in-process
@@ -210,6 +213,7 @@ public class InternalController : ControllerBase
                 ResetReason = d.ResetReason,
                 BootCount = d.BootCount,
                 BoardModel = d.BoardModel,
+                UsageTier = string.IsNullOrWhiteSpace(d.UsageTier) ? UsageTiersOptions.FreeTierName : d.UsageTier,
                 FirmwareBuild = d.FirmwareBuild,
                 PartitionName = d.PartitionName,
                 FirmwareReportedAt = d.FirmwareReportedAt,
@@ -698,6 +702,47 @@ public class InternalController : ControllerBase
     public Task<IActionResult> PauseDeviceAction(
         Guid deviceId, [FromBody] InternalDeviceActionRequest req, CancellationToken ct)
         => DeviceFlagActionAsync(deviceId, req, "device_pause", ct);
+
+    /// <summary>
+    /// Usage-tier metering foundation (2026-09-11, ships behind
+    /// <c>Usage:Tiers:Enabled</c>=false): set a device's usage tier. 400 on
+    /// a tier name that is not in <c>Usage:Tiers:Plans</c> — there is no
+    /// silent fallback here, unlike <c>UsageAllowance.Resolve</c>'s runtime
+    /// fallback for a tier an operator already set before a plan was
+    /// renamed out from under it. Idempotent; a reason is required and
+    /// audit-logged, same posture as revoke/pause above.
+    /// </summary>
+    [HttpPost("devices/{deviceId:guid}/tier")]
+    public async Task<IActionResult> SetDeviceUsageTier(
+        Guid deviceId, [FromBody] InternalSetUsageTierRequest? req, CancellationToken ct)
+    {
+        if (req is null || string.IsNullOrWhiteSpace(req.Reason))
+            return BadRequest(new { error = "A reason is required for operator actions." });
+        if (string.IsNullOrWhiteSpace(req.Tier))
+            return BadRequest(new { error = "A tier name is required." });
+
+        var tier = req.Tier.Trim();
+        if (!_usageTiersOptions.Plans.Any(p => string.Equals(p.Name, tier, StringComparison.OrdinalIgnoreCase)))
+            return BadRequest(new { error = "Unknown usage tier." });
+
+        var device = await _db.Devices.FirstOrDefaultAsync(d => d.Id == deviceId, ct);
+        if (device is null)
+            return NotFound(new { error = "Device not found." });
+
+        var changed = !string.Equals(device.UsageTier, tier, StringComparison.Ordinal);
+        device.UsageTier = tier;
+
+        if (changed)
+        {
+            var op = HttpContext?.Items["InternalOperator"] as string ?? "unknown";
+            _db.AuditEvents.Add(AuditEvent.InternalConsoleUsageTierSet(op, deviceId, tier, req.Reason.Trim()));
+            await _db.SaveChangesAsync(ct);
+            _logger.LogWarning("Operator {Operator} set usage tier={Tier} on device {DeviceId}",
+                op, tier, deviceId);
+        }
+
+        return Ok(new { deviceId, tier, changed });
+    }
 
     /// <summary>
     /// What this toy is entitled to: every catalogue story, plus any override
