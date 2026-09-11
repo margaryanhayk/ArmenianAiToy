@@ -1,0 +1,22 @@
+{
+  "lullaby-melody": {
+    "prompt": "A gentle Armenian folk-inspired lullaby. Slow tempo, around 60 beats per minute. A warm duduk-like woodwind carries a simple, repeating melodic phrase over soft plucked strings. Minimal to no percussion. Tender, unhurried, night-time mood, never mournful. Instrumental only: no vocals, no lyrics, no singing, no spoken words. An original, generic instrumental piece, not a recognisable real composer's or performer's work or a specific existing piece.",
+    "durationSecondsRequested": 200,
+    "targetLufs": -23.0
+  },
+  "under-the-stars": {
+    "prompt": "A dreamy, soft instrumental evoking a quiet starlit night. Gentle plucked strings like a kanun carry a slow, flowing melody. Airy and spacious, no percussion, warm rather than cold, nothing tense or dramatic. Instrumental only: no vocals, no lyrics, no singing, no spoken words. An original, generic instrumental piece, not a recognisable real composer's or performer's work or a specific existing piece.",
+    "durationSecondsRequested": 230,
+    "targetLufs": -23.0
+  },
+  "calm-night": {
+    "prompt": "A hushed, minimal instrumental for falling asleep. Very slow tempo, sparse warm piano-like tones over a soft sustained pad. Extremely gentle dynamics throughout, no build-up, no climax, quiet and still from start to end. Instrumental only: no vocals, no lyrics, no singing, no spoken words. An original, generic instrumental piece, not a recognisable real composer's or performer's work or a specific existing piece.",
+    "durationSecondsRequested": 260,
+    "targetLufs": -23.0
+  },
+  "gentle-breeze": {
+    "prompt": "A soft, flowing pastoral instrumental evoking a gentle breeze over hills. Light Armenian folk melodic character, gentle woodwind answered by soft strings. Slow and airy, calm and unhurried, never energetic or driving. Instrumental only: no vocals, no lyrics, no singing, no spoken words. An original, generic instrumental piece, not a recognisable real composer's or performer's work or a specific existing piece.",
+    "durationSecondsRequested": 290,
+    "targetLufs": -23.0
+  }
+}

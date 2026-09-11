@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using System.Linq;
 
 namespace ArmenianAiToy.Application.Tests;
 
@@ -89,25 +90,29 @@ public class ContentSyncMusicTests
         Assert.Null(new ContentManifestService(options).Build().Music);
     }
 
-    // Pins that the four shipped ContentSync:Music rows — all placeholders
-    // (SizeBytes 0) until real tracks are rendered — stay dropped from the
-    // manifest, same posture as a placeholder Stories row. Reads the real
-    // appsettings.json rather than constructing options by hand, so a
-    // future row that is only HALF filled in (a real hash with no size, or
+    // All four bedtime-music tracks were rendered 2026-09-11 (see
+    // docs/bedtime-music-render-runbook.md); the shipped ContentSync:Music
+    // rows now carry real SizeBytes/Sha256 and reach the manifest. Reads the
+    // real appsettings.json rather than constructing options by hand, so a
+    // row that regresses to HALF filled in (a real hash with no size, or
     // vice versa) would still fail this the same way it fails
     // ContentSyncAudioRootTests' shipped-config keystone.
     [Fact]
-    public void Manifest_ShippedPlaceholderTracks_AreDropped()
+    public void Manifest_ShippedTracks_AllFourReachTheManifest()
     {
         var repoRoot = FindRepoRoot();
         var appsettings = Path.Combine(repoRoot, "backend", "src", "ArmenianAiToy.Api", "appsettings.json");
         var config = new ConfigurationBuilder().AddJsonFile(appsettings).Build();
 
         var options = ContentSyncOptions.Resolve(config);
-        Assert.NotEmpty(options.Music); // the rows exist and are bound
+        Assert.Equal(4, options.Music.Count); // the rows exist and are bound
 
         var manifest = new ContentManifestService(options).Build();
-        Assert.Null(manifest.Music); // every one is a placeholder, so none is advertised
+        Assert.NotNull(manifest.Music);
+        Assert.Equal(4, manifest.Music!.Count); // every track is rendered, none is a placeholder
+        Assert.Equal(
+            new[] { "lullaby-melody", "under-the-stars", "calm-night", "gentle-breeze" },
+            manifest.Music!.Select(t => t.TrackId));
     }
 
     private static string FindRepoRoot()

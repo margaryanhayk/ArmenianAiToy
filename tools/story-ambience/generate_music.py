@@ -27,22 +27,16 @@ editing mistake to the JSON.
 
 ON THE ENDPOINT SHAPE, HONESTLY
 ---------------------------------
-This session's network egress is restricted to GitHub for tool calls made
-through this agent (confirmed: a WebFetch to elevenlabs.io returned
-EGRESS_BLOCKED), so the endpoint, request body and response shape below
-could NOT be re-verified against ElevenLabs' current docs before this PR —
-unlike generate_sounds.py's `/v1/sound-generation`, which an earlier
-session did verify live. They reflect the Music API's documented shape as
-of this assistant's last training data (a JSON POST to `/v1/music`,
-`prompt` + `music_length_ms`, raw audio bytes back — the same "POST JSON,
-get audio bytes back" shape sound-generation uses, not the alternate
-`/v1/music/compose` two-step plan-then-render flow ElevenLabs also
-documents). Treat ENDPOINT and the `generate()` request body as the one
-part of this file that is UNVERIFIED. Before the first real
-`--render --confirm-paid-api`, check https://elevenlabs.io/docs for the
-current music-generation endpoint and parameter names and update this file
-first — the same two-man rule as spending money applies to trusting an
-unverified API shape with it.
+Verified live against `api.elevenlabs.io` (2026-09-11, render session):
+a single cheap probe (`music_length_ms: 10000` on the lullaby-melody
+prompt) returned HTTP 200 with a real 10.03s MP3 (ID3v2.4, MPEG layer
+III) back in the response body — confirming the JSON POST to `/v1/music`,
+`prompt` + `music_length_ms` + `force_instrumental`, raw audio bytes back
+shape below, not the alternate `/v1/music/compose` two-step plan-then-
+render flow ElevenLabs also documents. `force_instrumental: true` was
+added to the request body as a belt-and-suspenders on top of the
+in-prompt instrumental instruction, since the probe proved the field is
+accepted.
 
 ON THE LOUDNESS TARGET
 ------------------------
@@ -98,8 +92,7 @@ TRACKS_PATH = REPO / "backend/content/bedtime-music/tracks.json"
 MUSIC_ROOT = REPO / "backend/src/ArmenianAiToy.Api/story-audio/music"
 PROMPTS_PATH = MUSIC_ROOT / "prompts.json"
 
-# See "ON THE ENDPOINT SHAPE, HONESTLY" above — unverified against live docs
-# this session.
+# See "ON THE ENDPOINT SHAPE, HONESTLY" above — verified live 2026-09-11.
 ENDPOINT = "https://api.elevenlabs.io/v1/music"
 
 # Requested window is the owner's brief; the actual generated length is not
@@ -174,6 +167,7 @@ def generate(job: dict, token: str) -> None:
     body = {
         "prompt": job["prompt"],
         "music_length_ms": int(job["seconds"] * 1000),
+        "force_instrumental": True,
     }
     job["raw_path"].parent.mkdir(parents=True, exist_ok=True)
     r = subprocess.run(
