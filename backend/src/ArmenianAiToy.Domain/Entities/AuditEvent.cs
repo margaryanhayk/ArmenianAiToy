@@ -472,6 +472,62 @@ public class AuditEvent
     };
 
     /// <summary>
+    /// Retention (2026-09-11) — emitted by <c>RetentionPurgeService</c>'s
+    /// audio-blob orphan sweep on any tick that actually deleted at least
+    /// one blob directory. Same posture as
+    /// <see cref="ConversationsPurgedByRetention"/>: system-actor
+    /// (<see cref="ActorParentId"/> null, invisible to every parent-facing
+    /// feed), no targets (the sweep is fleet-wide), metadata is
+    /// counts-only — never a blob directory name or a conversation id.
+    /// </summary>
+    public static AuditEvent AudioBlobOrphansSwept(
+        int directoriesExamined,
+        int directoriesDeleted,
+        int filesDeleted,
+        int deleteFailures,
+        DateTime graceCutoffUtc) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.AudioBlobOrphansSwept,
+        ActorParentId = null,
+        TargetDeviceId = null,
+        TargetChildId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            directories_examined = directoriesExamined,
+            directories_deleted = directoriesDeleted,
+            files_deleted = filesDeleted,
+            delete_failures = deleteFailures,
+            grace_cutoff_utc = graceCutoffUtc
+        })
+    };
+
+    /// <summary>
+    /// Retention (2026-09-11) — emitted by <c>RetentionPurgeService</c>'s
+    /// uploaded-content orphan sweep on any tick that actually deleted at
+    /// least one file. Same posture as <see cref="AudioBlobOrphansSwept"/>.
+    /// </summary>
+    public static AuditEvent UploadedContentOrphansSwept(
+        int filesExamined,
+        int filesDeleted,
+        int deleteFailures) => new()
+    {
+        Id = Guid.NewGuid(),
+        Timestamp = DateTime.UtcNow,
+        EventType = AuditEventType.UploadedContentOrphansSwept,
+        ActorParentId = null,
+        TargetDeviceId = null,
+        TargetChildId = null,
+        Metadata = JsonSerializer.Serialize(new
+        {
+            files_examined = filesExamined,
+            files_deleted = filesDeleted,
+            delete_failures = deleteFailures
+        })
+    };
+
+    /// <summary>
     /// Manual parent-driven conversation deletion via
     /// <c>DELETE /api/conversations/{id}</c>. Complements the scheduled
     /// retention sweep: this one has a real human actor (the

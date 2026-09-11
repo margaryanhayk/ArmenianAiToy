@@ -15,12 +15,16 @@
 #include <Arduino.h>
 
 int cs_manifest_parse(JsonArrayConst stories, CsStory *out, int max_out,
-                      CsManifestStats *stats) {
+                      CsManifestStats *stats, CsRetiredIds *retired_out) {
     CsManifestStats local{};
     if (stats == nullptr) {
         stats = &local;
     }
     *stats = CsManifestStats{};
+    if (retired_out != nullptr) {
+        retired_out->count     = 0;
+        retired_out->truncated = 0;
+    }
 
     if (out == nullptr || max_out <= 0) {
         return 0;
@@ -48,11 +52,32 @@ int cs_manifest_parse(JsonArrayConst stories, CsStory *out, int max_out,
         const char *sha256    = item["sha256"]   | "";
         const long  size      = item["sizeBytes"] | 0L;
         const bool  enabled   = item["enabled"]  | false;
+        // Additive (2026-09-11). Checked BEFORE `enabled`, deliberately:
+        // a retired item is also not a download candidate, but it must
+        // still be remembered by story_id so content_sync.cpp's
+        // carry-forward loop knows to drop it (and delete its file)
+        // instead of keeping it forever like an ordinary disabled item.
+        const bool retired = item["retired"] | false;
+        if (retired) {
+            stats->retired++;
+            if (retired_out != nullptr && cs_is_valid_story_id(story_id)) {
+                if (retired_out->count < CS_MAX_RETIRED) {
+                    cs_copy_bounded(retired_out->ids[retired_out->count],
+                                    sizeof(retired_out->ids[0]), story_id);
+                    retired_out->count++;
+                } else {
+                    retired_out->truncated++;
+                }
+            }
+            Serial.printf("[content-sync] item %s retired — will drop from index\n",
+                          story_id);
+            continue;
+        }
 
         if (!enabled) {
-            // Retirement (deleting a cached copy) is deliberately NOT
-            // implemented: the file stays, the story just does not enter
-            // the active index.
+            // Absence and enabled:false both mean "not offered", and stay
+            // carried forward forever — see content_retirement_rules.h for
+            // the signal that actually retires (deletes) a cached copy.
             stats->disabled++;
             Serial.printf("[content-sync] item #%d disabled — skip\n", examined - 1);
             continue;
@@ -380,7 +405,12 @@ bool cs_index_intro_enabled(JsonDocument &doc) {
     return doc["introEnabled"] | true;
 }
 
-int cs_manifest_parse_music(JsonArrayConst music, CsMusic *out, int max_out) {
+int cs_manifest_parse_music(JsonArrayConst music, CsMusic *out, int max_out,
+                            CsRetiredIds *retired_out) {
+    if (retired_out != nullptr) {
+        retired_out->count     = 0;
+        retired_out->truncated = 0;
+    }
     if (out == nullptr || max_out <= 0 || music.isNull()) {
         return 0;
     }
@@ -393,6 +423,22 @@ int cs_manifest_parse_music(JsonArrayConst music, CsMusic *out, int max_out) {
         const char *sha256   = item["sha256"]    | "";
         const long  size     = item["sizeBytes"] | 0L;
         const bool  enabled  = item["enabled"]   | false;
+        // Additive — see cs_manifest_parse's retired handling.
+        const bool  retired  = item["retired"]   | false;
+        if (retired) {
+            if (retired_out != nullptr && cs_is_valid_story_id(track_id)) {
+                if (retired_out->count < CS_MAX_RETIRED) {
+                    cs_copy_bounded(retired_out->ids[retired_out->count],
+                                    sizeof(retired_out->ids[0]), track_id);
+                    retired_out->count++;
+                } else {
+                    retired_out->truncated++;
+                }
+            }
+            Serial.printf("[content-sync] music %s retired — will drop from index\n",
+                          track_id);
+            continue;
+        }
         if (!enabled || !cs_is_valid_story_id(track_id)
             || !cs_is_sha256_hex(sha256) || !cs_is_valid_size(size)) {
             Serial.printf("[content-sync] music item rejected (%s)\n", track_id);
@@ -469,7 +515,12 @@ bool cs_index_music_enabled(JsonDocument &doc) {
 
 // ---- welcome flow (index schema v4) --------------------------------
 
-int cs_manifest_parse_voice(JsonArrayConst voice, CsVoice *out, int max_out) {
+int cs_manifest_parse_voice(JsonArrayConst voice, CsVoice *out, int max_out,
+                            CsRetiredIds *retired_out) {
+    if (retired_out != nullptr) {
+        retired_out->count     = 0;
+        retired_out->truncated = 0;
+    }
     if (out == nullptr || max_out <= 0 || voice.isNull()) {
         return 0;
     }
@@ -485,6 +536,22 @@ int cs_manifest_parse_voice(JsonArrayConst voice, CsVoice *out, int max_out) {
         const char *sha256   = item["sha256"]    | "";
         const long  size     = item["sizeBytes"] | 0L;
         const bool  enabled  = item["enabled"]   | false;
+        // Additive — see cs_manifest_parse's retired handling.
+        const bool  retired  = item["retired"]   | false;
+        if (retired) {
+            if (retired_out != nullptr && cs_is_valid_story_id(voice_id)) {
+                if (retired_out->count < CS_MAX_RETIRED) {
+                    cs_copy_bounded(retired_out->ids[retired_out->count],
+                                    sizeof(retired_out->ids[0]), voice_id);
+                    retired_out->count++;
+                } else {
+                    retired_out->truncated++;
+                }
+            }
+            Serial.printf("[content-sync] voice %s retired — will drop from index\n",
+                          voice_id);
+            continue;
+        }
         if (!enabled || !cs_is_valid_story_id(voice_id)
             || !cs_is_sha256_hex(sha256) || !cs_is_valid_size(size)) {
             Serial.printf("[content-sync] voice item rejected (%s)\n", voice_id);
@@ -595,6 +662,21 @@ bool cs_index_questions_enabled(JsonDocument &doc) {
     // Absent → true: a card written before this flag existed keeps asking
     // the after-story question, which is what every toy did before it.
     return doc["questionsEnabled"] | true;
+}
+
+// Retirement (2026-09-11) — the bounded SD orphan sweep's own opt-in flag,
+// cached into the index root exactly like the toggles above so the last-
+// known value applies offline. A separate call for the same reason
+// cs_index_add_questions_flag is separate: cs_index_build's signature,
+// callers and tests stay untouched.
+void cs_index_add_orphan_sweep_flag(JsonDocument &doc, bool enabled) {
+    doc["orphanSweepEnabled"] = enabled;
+}
+
+bool cs_index_orphan_sweep_enabled(JsonDocument &doc) {
+    // Absent → false: a card written before this flag existed, or a
+    // backend that never opted in, must never sweep by default.
+    return doc["orphanSweepEnabled"] | false;
 }
 
 // ---- offline-game clips (index schema v7) ---------------------------

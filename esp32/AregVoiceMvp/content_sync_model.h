@@ -26,9 +26,42 @@ struct CsManifestStats {
     int accepted;    ///< valid, non-duplicate, enabled items stored
     int invalid;     ///< rejected for a field-level reason
     int duplicate;   ///< same storyId as an earlier accepted item
-    int disabled;    ///< enabled:false (retirement is NOT implemented)
+    int disabled;    ///< enabled:false — carried forward forever, never deleted
+    int retired;     ///< retired:true — dropped from the index AND deleted
+                     ///< (2026-09-11); see content_retirement_rules.h
     int truncated;   ///< offered beyond CS_MAX_STORIES, never examined
 };
+
+// Bounded output for "ids explicitly marked retired:true this manifest
+// round", collected by cs_manifest_parse / cs_manifest_parse_music /
+// cs_manifest_parse_voice. A retired item is NOT a download candidate —
+// same as a disabled one — so it never enters the normal `out` table;
+// this is the one place content_sync.cpp's carry-forward loops can ask
+// "was THIS id retired today?" before deciding to keep an old copy.
+//
+// One shared bound across all three namespaces (not each namespace's own
+// CS_MAX_*): retirement is an occasional operator action, not routine
+// traffic, so 32 in-flight retirements per sync is generous headroom at
+// a trivial ~800 B stack cost. Anything past the bound is truncated —
+// reported, never fatal — and simply retires on the NEXT sync instead.
+#ifndef CS_MAX_RETIRED
+#define CS_MAX_RETIRED 32
+#endif
+struct CsRetiredIds {
+    char ids[CS_MAX_RETIRED][CS_MAX_STORY_ID_LEN + 1];
+    int  count;
+    int  truncated;   ///< retired ids seen beyond CS_MAX_RETIRED, dropped
+};
+
+/// True when `id` is in `retired->ids[0..count)`. `retired == nullptr` (a
+/// namespace that did not ask to collect retirements) always reads false.
+inline bool cs_retired_contains(const CsRetiredIds *retired, const char *id) {
+    if (retired == nullptr || id == nullptr) return false;
+    for (int i = 0; i < retired->count; i++) {
+        if (cs_story_ids_equal(retired->ids[i], id)) return true;
+    }
+    return false;
+}
 
 /// Parses `stories` into `out`, in manifest order, stopping at
 /// `max_out`. Every item is validated independently: one bad item is
@@ -38,8 +71,13 @@ struct CsManifestStats {
 /// Rejects an item when storyId fails the allowlist, audioUrl is empty
 /// or too long, sha256 is not 64 hex chars, sizeBytes is out of range,
 /// the cache path would not fit, or the id duplicates an earlier one.
+/// `retired_out`, when non-null, is filled with the ids of any items
+/// marked retired:true (see CsRetiredIds above) — additive, so a caller
+/// that passes nullptr (every existing call site) sees no behavior
+/// change at all.
 int cs_manifest_parse(JsonArrayConst stories, CsStory *out, int max_out,
-                      CsManifestStats *stats);
+                      CsManifestStats *stats,
+                      CsRetiredIds *retired_out = nullptr);
 
 /// Reads an index document into `out`. Understands the v2 stories[]
 /// shape and MIGRATES the pre-multi-story flat v1 object. Returns the
@@ -66,8 +104,10 @@ void cs_index_build(JsonDocument &doc, const CsStory *active, int count,
 bool cs_index_intro_enabled(JsonDocument &doc);
 
 /// Slice E — parses the manifest's `music` array (validated per item,
-/// dedup keeps first). Returns the accepted count.
-int cs_manifest_parse_music(JsonArrayConst music, CsMusic *out, int max_out);
+/// dedup keeps first). Returns the accepted count. `retired_out` — see
+/// cs_manifest_parse.
+int cs_manifest_parse_music(JsonArrayConst music, CsMusic *out, int max_out,
+                            CsRetiredIds *retired_out = nullptr);
 
 /// Slice E — reads the index's `music` array (absent on pre-music cards
 /// → 0, never an error).
@@ -87,8 +127,10 @@ bool cs_index_music_enabled(JsonDocument &doc);
 
 /// Parses the manifest's `voice` array — the device-global spoken clips
 /// (greetings, menu prompts, fallback lines). Validated per item, dedupe
-/// keeps first. Returns the accepted count.
-int cs_manifest_parse_voice(JsonArrayConst voice, CsVoice *out, int max_out);
+/// keeps first. Returns the accepted count. `retired_out` — see
+/// cs_manifest_parse.
+int cs_manifest_parse_voice(JsonArrayConst voice, CsVoice *out, int max_out,
+                            CsRetiredIds *retired_out = nullptr);
 
 /// Reads the index's `voice` array (absent on every pre-v4 card → 0,
 /// never an error).
@@ -142,6 +184,19 @@ bool cs_index_questions_enabled(JsonDocument &doc);
 /// true, the shipped default. Harmless on a card with no alternate
 /// endings cached: nothing resolves, so the base narration plays.
 bool cs_index_variants_enabled(JsonDocument &doc);
+
+// ---- retirement (2026-09-11) ----------------------------------------
+
+/// Appends the bounded orphan sweep's own opt-in flag (root
+/// `orphanSweepEnabled`) to an index document already built by
+/// cs_index_build. A separate call for the same reason
+/// cs_index_add_questions_flag is separate.
+void cs_index_add_orphan_sweep_flag(JsonDocument &doc, bool enabled);
+
+/// Reads the root `orphanSweepEnabled` flag. Absent → false — a card
+/// written before this flag existed, or a backend that never opted in,
+/// must never sweep by default. See content_retirement_rules.h.
+bool cs_index_orphan_sweep_enabled(JsonDocument &doc);
 
 // ---- offline-game clips (index schema v7) ---------------------------
 //

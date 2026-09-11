@@ -12,7 +12,10 @@
 // lives in story_select.cpp.
 //
 // NOT here (later slices): spoken story shelf, the child naming a title,
-// semantic matching, age/bedtime filtering, entitlements, retirement.
+// semantic matching, age/bedtime filtering, entitlements. Retirement
+// itself lives in content_sync.cpp / content_retirement_rules.h (2026-
+// 09-11); story_select_paused_story_id() below is the one narrow
+// accessor it needs from here.
 // -------------------------------------------------------------
 #pragma once
 
@@ -218,6 +221,18 @@ inline bool story_series_member_allowed(const CsStory *stories, int count, int i
     }
     return true;
 }
+
+// ---- retirement guard (implemented in the .ino) ---------------------
+
+/// The story id currently paused mid-way (s_story_offset > 0), or "" when
+/// no story is paused right now. content_sync's retirement sweep needs
+/// exactly this one fact to avoid deleting a retired story's file (and
+/// dropping its index entry) out from under a session the child will
+/// resume — see content_retirement_rules.h. s_story_offset and
+/// s_current_story_id are private to the .ino, so this is the narrow
+/// accessor that lets content_sync.cpp ask without either module owning
+/// the other's state.
+const char *story_select_paused_story_id();
 
 // ---- index-backed API (implemented in story_select.cpp) -------------
 

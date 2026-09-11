@@ -357,12 +357,84 @@ never has to be erased.**
 every cached file untouched (absence is not a retirement instruction). A
 story absent from the manifest but still verified on the card is carried
 forward into the index. `enabled:false` skips the story without deleting
-its file. Retirement deletion and an orphan sweeper are **deferred**.
+its file.
+
+**Retirement (2026-09-11).** `retired:true` on a manifest item — additive,
+distinct from `enabled:false` — IS a retirement instruction: the story
+(or music/voice item) is dropped from the index and its cached file is
+deleted, unless it is the story currently paused mid-way (`s_story_offset
+> 0` for that id), which is spared until the session ends and retires on
+the next sync attempt. Reasoning, the pure decision function, and the
+backend-side signal design live in `content_retirement_rules.h` and
+`ContentStoryItem.Retired` (backend). Games are not covered — see the
+comment on `s_story_retired` in `content_sync.cpp` for why — the bounded
+orphan sweep below is games' safety net instead.
+
+**Bounded SD orphan sweep (2026-09-11).** Off by default
+(`orphanSweepEnabled` in the manifest/index root, absent → false). Once a
+sync attempt finishes with every namespace's index write successful, it
+walks `/stories`, `/voice`, `/games/<key>`, `/music` for files no index
+entry references at all, and `/tmp` for a stale `.part` left by an
+interrupted download, removing at most `AREG_ORPHAN_SWEEP_MAX_PER_BOOT`
+(default 20) per boot. A `.part` counts as stale once its last-write time
+predates the current boot's start (requires NTP time; fails closed —
+never swept — when the clock is not yet trustworthy). See
+`content_orphan_sweep_run()` in `content_sync.cpp`.
+
+**Per-namespace index writes (2026-09-11).** `/content_index.json` is now
+written after EACH of the four namespaces (stories, music, voice, games)
+finishes syncing, not once at the very end — the 2026-08-14 crash loop
+lost the record of every download on a crash partway through the LAST
+namespace. A namespace not yet processed this attempt publishes its
+unchanged previous state in the interim write (never an empty one), so an
+interim write can never look like the exact bug it exists to prevent. An
+index write failure at any checkpoint still fails the whole sync attempt.
 
 **Index replacement is atomic**: written to `/content_index.json.new`,
 then swapped in. A crash before the swap leaves the previous known-good
 index; a crash inside the remove/rename window leaves the `.new` file and
 the next boot rebuilds from the manifest. No MP3 is at risk either way.
+This was already true before the per-namespace write change above; that
+change only made the write happen more often, not differently.
+
+**Bench checklist — what a human must verify on hardware** (none of this
+was possible from this session; nothing here has ever been flashed):
+
+- [ ] Trigger a sync with several stories/voice/games items pending, then
+      power-cycle the board mid-sync (after the stories phase has clearly
+      logged `index written` but before the whole attempt's `PASS` line) →
+      on reboot, `[content-sync] index v7 loaded entries=N` reports the
+      stories that DID finish, not zero — confirms the per-namespace write
+      actually survived the earlier phases.
+- [ ] Same crash-mid-sync test, timed for right after the MUSIC phase's
+      write → reboot's loaded index reports the finished stories AND
+      music, with voice/games still whatever they were before this sync
+      attempt (not empty) — confirms the "publish previous, not empty"
+      interim-write fallback.
+- [ ] Mark one story `retired:true` on the backend (real url/sha/size,
+      not a stub) while the toy has it cached and is NOT playing it → next
+      sync attempt logs `story <id> retired — dropped from index`, the
+      file is gone from `/stories`, and the story no longer appears in
+      `/content_index.json`.
+- [ ] Same, but pause THAT story mid-way (press to pause, do not resume)
+      before the sync attempt fires → log shows `retired but PAUSED —
+      sparing until the session ends`, the file and index entry survive,
+      resume still works. Resume the story, let the session end, wait for
+      the next sync attempt → NOW it retires.
+- [ ] Set `orphanSweepEnabled:true` on the backend, manually drop a stray
+      MP3 into `/stories` that no index entry names (or leave a `.part`
+      in `/tmp` from a killed download, then power-cycle so NTP re-syncs
+      and a full boot has passed) → next successful sync logs `orphan
+      swept: <path>` and the file is gone; the content report's new
+      deletion counts (see below) tick up.
+- [ ] With `orphanSweepEnabled` absent/false (the shipped default), repeat
+      the stray-file setup → the file is NOT touched, confirming the
+      opt-in gate.
+- [ ] Heartbeat / content report payload after a sync with at least one
+      retirement or one swept orphan → confirms the new counts reach the
+      backend (check the `/api/internal/devices/{id}` sync diagnostics or
+      the raw heartbeat body) additively — every pre-existing field is
+      still present and unchanged.
 
 ### Telling the backend what is on the card (`content_report.{h,cpp}`)
 

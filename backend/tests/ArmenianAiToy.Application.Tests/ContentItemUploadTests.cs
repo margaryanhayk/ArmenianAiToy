@@ -447,7 +447,7 @@ public class ContentItemUploadTests : IDisposable
     }
 
     [Fact]
-    public async Task Retire_RemovesItFromEveryManifest_ButLeavesTheFile()
+    public async Task Retire_MarksItRetiredInEveryManifest_ButLeavesTheFile()
     {
         var db = NewDb();
         var device = Dev();
@@ -466,16 +466,57 @@ public class ContentItemUploadTests : IDisposable
         await controller.RetireContentItem(
             id, new InternalContentItemActionRequest(true, "wrong ending"), default);
 
-        Assert.DoesNotContain("new-story",
-            (await Catalog(db, Fleet()).ResolveForDeviceAsync(device.Id))
-                .ResolveStories().Select(s => s.StoryId));
-        Assert.DoesNotContain("new-story",
-            (await Catalog(db, Fleet()).ResolveFleetAsync()).ResolveStories().Select(s => s.StoryId));
+        // Retirement (2026-09-11): the item is no longer silently ABSENT from
+        // the manifest — that would be indistinguishable on the wire from
+        // "never entitled", and CLAUDE.md's own contract is that absence is
+        // carried forward on the card FOREVER, so a device that had already
+        // cached it would never delete it. It is now emitted with
+        // retired:true / enabled:false — the explicit signal a device acts
+        // on (content_retirement_rules.h).
+        var deviceManifest = new ContentManifestService(
+            await Catalog(db, Fleet()).ResolveForDeviceAsync(device.Id)).Build();
+        var deviceItem = Assert.Single(deviceManifest.Stories, s => s.StoryId == "new-story");
+        Assert.True(deviceItem.Retired);
+        Assert.False(deviceItem.Enabled);
 
-        // Soft delete: no child loses a story mid-listen because an adult
-        // pressed a button in a console.
+        var fleetManifest = new ContentManifestService(
+            await Catalog(db, Fleet()).ResolveFleetAsync()).Build();
+        var fleetItem = Assert.Single(fleetManifest.Stories, s => s.StoryId == "new-story");
+        Assert.True(fleetItem.Retired);
+        Assert.False(fleetItem.Enabled);
+
+        // Soft delete on the BACKEND: no child loses a story mid-listen
+        // because an adult pressed a button in a console. Actual file
+        // deletion is the device's job once it sees retired:true.
         Assert.True(System.IO.File.Exists(Path.Combine(_uploadRoot, "new-story-v1.mp3")));
         Assert.NotNull(db.ContentItems.Single().RetiredAt);
+    }
+
+    [Fact]
+    public async Task RetiredItem_ReachesEveryDevice_EvenOneNeverGrantedIt()
+    {
+        // The retired signal must reach a device REGARDLESS of entitlement:
+        // a device never granted the item has no cached copy, so an extra
+        // id it ignores costs nothing; a device that WAS granted it (or
+        // will be, if a grant race lands after the retire) must still see
+        // retired:true rather than the id simply vanishing.
+        var db = NewDb();
+        var neverGranted = Dev();
+        db.Devices.Add(neverGranted);
+        await db.SaveChangesAsync();
+
+        var controller = NewController(db, Config());
+        await controller.UploadStoryContent("new-story", "T", "bench", File(Mp3Bytes()), default);
+        var id = db.ContentItems.Single().Id;
+        // Fleet-dark, never released, never granted to this device.
+        await controller.RetireContentItem(
+            id, new InternalContentItemActionRequest(true, "changed my mind"), default);
+
+        var manifest = new ContentManifestService(
+            await Catalog(db, Fleet()).ResolveForDeviceAsync(neverGranted.Id)).Build();
+        var item = Assert.Single(manifest.Stories, s => s.StoryId == "new-story");
+        Assert.True(item.Retired);
+        Assert.False(item.Enabled);
     }
 
     // ── Operator discipline on the two flag actions ─────────────────
@@ -557,6 +598,22 @@ public class ContentItemUploadTests : IDisposable
         // the containment check by construction.
         var absolute = escaping with { RelativePath = Path.Combine(Path.GetTempPath(), "x.mp3") };
         Assert.Same(fleet, ContentItemOverlay.Apply(fleet, new[] { absolute }));
+    }
+
+    [Fact]
+    public void Overlay_CarriesRetiredThroughToTheStoryOptions()
+    {
+        // ContentCatalogService (2026-09-11) no longer filters RetiredAt rows
+        // out of the query — it tags them Retired=true instead, so this is
+        // the one place that tag has to survive the trip into
+        // ContentSyncStoryOptions for ContentManifestService to see it.
+        var fleet = Fleet();
+        var item = new ContentItemOverlay.Item(
+            "story", "gone", "T", 1, "gone-v1.mp3", new string('b', 64), 10, Retired: true);
+
+        var applied = ContentItemOverlay.Apply(fleet, new[] { item });
+        var story = Assert.Single(applied.ResolveStories(), s => s.StoryId == "gone");
+        Assert.True(story.Retired);
     }
 
     [Fact]

@@ -1,7 +1,10 @@
+using System.Text.RegularExpressions;
 using ArmenianAiToy.Application.Audio;
+using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Notifications;
 using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Domain.Entities;
+using ArmenianAiToy.Infrastructure.Audio;
 using ArmenianAiToy.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -167,6 +170,51 @@ public sealed class RetentionPurgeService : BackgroundService
     /// </summary>
     public const int DefaultDormancyDevicesDeleteAfterDays = 0;
 
+    /// <summary>
+    /// Fallback for <c>Retention:AudioOrphanSweep:MaxPerTick</c>. <b>0
+    /// (disabled)</b> — deleting filesystem directories by a name-pattern
+    /// match is new, unproven territory, and a misconfigured
+    /// <c>Audio:BlobStoreRoot</c> would otherwise be a silent landmine. An
+    /// operator opts in with a positive value, same posture as every other
+    /// destructive knob in this class.
+    /// </summary>
+    public const int DefaultAudioOrphanSweepMaxPerTick = 0;
+
+    /// <summary>
+    /// Fallback for <c>Retention:AudioOrphanSweep:GraceHours</c>. A blob
+    /// directory is eligible only once its last-write time is older than
+    /// this many hours — protects a conversation whose audio just landed
+    /// but whose row has not (yet, or ever, under a concurrent read) been
+    /// seen by this sweep's existence check.
+    /// </summary>
+    public const int DefaultAudioOrphanSweepGraceHours = 24;
+
+    /// <summary>
+    /// Fallback for <c>Retention:UploadOrphanSweep:MaxPerTick</c>. <b>0
+    /// (disabled)</b> — same opt-in posture as
+    /// <see cref="DefaultAudioOrphanSweepMaxPerTick"/>.
+    /// </summary>
+    public const int DefaultUploadOrphanSweepMaxPerTick = 0;
+
+    /// <summary>
+    /// Fallback for <c>Retention:UploadOrphanSweep:GraceHours</c>. An
+    /// upload writes its file to disk BEFORE its <c>ContentItem</c> row
+    /// commits (see <c>InternalController.UploadStoryContent</c>), so a
+    /// file that has not been referenced yet may simply be mid-request —
+    /// this grace window is what keeps the sweep from racing it.
+    /// </summary>
+    public const int DefaultUploadOrphanSweepGraceHours = 24;
+
+    /// <summary>
+    /// A candidate audio-blob directory's NAME must match this before it
+    /// is ever combined into a path — a <c>Guid:"N"</c> shape that cannot
+    /// contain <c>/</c> or <c>..</c> by construction, so nothing under the
+    /// configured root but a genuine conversation-id directory is ever a
+    /// delete candidate for <see cref="SweepAudioBlobOrphansAsync"/>.
+    /// </summary>
+    private static readonly Regex AudioBlobDirNameRegex =
+        new("^[0-9a-fA-F]{32}$", RegexOptions.Compiled);
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IConfiguration _config;
     private readonly ILogger<RetentionPurgeService> _logger;
@@ -269,6 +317,12 @@ public sealed class RetentionPurgeService : BackgroundService
         await PurgeStalePasswordResetTokensAsync(db, stoppingToken);
         await PurgeStaleEmailVerificationTokensAsync(db, stoppingToken);
         await PurgeStaleDeviceInvitesAsync(db, stoppingToken);
+        // Two independent orphan sweeps (2026-09-11), both disabled by
+        // default — see their own doc comments. Order relative to each
+        // other and to the dormancy chain below does not matter: neither
+        // reads a row the other writes.
+        await SweepAudioBlobOrphansAsync(db, stoppingToken);
+        await SweepUploadedContentOrphansAsync(db, stoppingToken);
         // Anonymize before warn is deliberate. If warn ran first it
         // would stamp DormancyWarnedAt to "now" for every refire-due
         // parent, and the 7-day grace-floor condition on anonymize
@@ -1093,6 +1147,289 @@ public sealed class RetentionPurgeService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Retention (2026-09-11) — bounded orphan sweep for directories under
+    /// <c>Audio:BlobStoreRoot</c> with no matching <see cref="Conversation"/>
+    /// row. <c>LocalDiskAudioBlobStore</c> never deletes anything of its
+    /// own (C1's scope statement), and even the conversation-purge cascade
+    /// above is best-effort — a per-file I/O failure there can leave a
+    /// directory (or a straggler file inside one) behind after its
+    /// Conversation row is long gone. This is the sweep that eventually
+    /// reclaims it.
+    /// <para>
+    /// <b>Disabled by default</b> (<c>MaxPerTick &lt;= 0</c>, see
+    /// <see cref="DefaultAudioOrphanSweepMaxPerTick"/>) — an explicit
+    /// operator opt-in, the same posture as every dormancy pass in this
+    /// class.
+    /// </para>
+    /// <para>
+    /// <b>Path-traversal hardened</b>: a candidate directory's NAME must
+    /// match <see cref="AudioBlobDirNameRegex"/> (a bare <c>Guid:"N"</c>,
+    /// unable to contain <c>/</c> or <c>..</c> by construction) before it
+    /// is ever combined into a path or parsed as a conversation id.
+    /// </para>
+    /// <para>
+    /// <b>Grace window</b>: eligible only once the directory's last-write
+    /// time is older than <c>Retention:AudioOrphanSweep:GraceHours</c> —
+    /// protects a conversation whose blob just landed from a race with
+    /// this sweep's existence check.
+    /// </para>
+    /// <para>
+    /// One <see cref="AuditEvent.AudioBlobOrphansSwept"/> system-actor row
+    /// per tick that actually deleted something; a no-op tick writes
+    /// nothing, matching every other pass in this class. Metadata is
+    /// counts-only — never a directory name or a conversation id.
+    /// </para>
+    /// </summary>
+    private async Task SweepAudioBlobOrphansAsync(
+        AppDbContext db, CancellationToken stoppingToken)
+    {
+        var maxPerTick = ReadAudioOrphanSweepMaxPerTick();
+        if (maxPerTick <= 0)
+        {
+            return;
+        }
+
+        var root = _config["Audio:BlobStoreRoot"];
+        if (string.IsNullOrWhiteSpace(root))
+        {
+            root = LocalDiskAudioBlobStore.DefaultBlobStoreRoot;
+        }
+        if (!Directory.Exists(root))
+        {
+            return;   // nothing has ever been written — not a failure
+        }
+
+        var graceCutoffUtc =
+            DateTime.UtcNow - TimeSpan.FromHours(ReadAudioOrphanSweepGraceHours());
+
+        string[] candidateDirs;
+        try
+        {
+            candidateDirs = Directory.GetDirectories(root);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Audio blob orphan sweep: failed to enumerate the configured root.");
+            return;
+        }
+
+        var examined = 0;
+        var deleted = 0;
+        var filesDeleted = 0;
+        var failures = 0;
+        foreach (var dir in candidateDirs)
+        {
+            if (deleted >= maxPerTick) break;
+            stoppingToken.ThrowIfCancellationRequested();
+
+            var name = Path.GetFileName(dir);
+            if (!AudioBlobDirNameRegex.IsMatch(name)
+                || !Guid.TryParseExact(name, "N", out var conversationId))
+            {
+                continue;   // not a conversation-id directory at all
+            }
+            examined++;
+
+            DateTime lastWriteUtc;
+            try
+            {
+                lastWriteUtc = Directory.GetLastWriteTimeUtc(dir);
+            }
+            catch (Exception)
+            {
+                continue;   // vanished between listing and stat — leave it for next tick
+            }
+            if (lastWriteUtc >= graceCutoffUtc)
+            {
+                continue;   // too recent — spare it
+            }
+
+            var stillReferenced = await db.Set<Conversation>()
+                .AsNoTracking()
+                .AnyAsync(c => c.Id == conversationId, stoppingToken);
+            if (stillReferenced)
+            {
+                continue;
+            }
+
+            try
+            {
+                foreach (var file in Directory.GetFiles(dir))
+                {
+                    File.Delete(file);
+                    filesDeleted++;
+                }
+                Directory.Delete(dir, recursive: false);
+                deleted++;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                failures++;
+                _logger.LogWarning(ex,
+                    "Audio blob orphan sweep: failed to remove a candidate directory.");
+            }
+        }
+
+        if (deleted == 0)
+        {
+            return;   // nothing removed — no audit row, same posture as every other pass
+        }
+
+        var audit = AuditEvent.AudioBlobOrphansSwept(
+            directoriesExamined: examined,
+            directoriesDeleted: deleted,
+            filesDeleted: filesDeleted,
+            deleteFailures: failures,
+            graceCutoffUtc: graceCutoffUtc);
+        db.Set<AuditEvent>().Add(audit);
+        AppMeter.AuditEventsWritten.Add(1,
+            new KeyValuePair<string, object?>("event_type", audit.EventType.ToString()));
+        await db.SaveChangesAsync(stoppingToken);
+
+        _logger.LogInformation(
+            "RetentionPurgeService tick: audio-blob orphan sweep examined={Examined} "
+            + "deleted={Deleted} files_deleted={FilesDeleted} failures={Failures}.",
+            examined, deleted, filesDeleted, failures);
+    }
+
+    /// <summary>
+    /// Retention (2026-09-11) — bounded orphan sweep for files under
+    /// <c>ContentSync:UploadRoot</c> with no matching <see cref="ContentItem"/>
+    /// row. <c>InternalController.UploadStoryContent</c> writes its file to
+    /// disk and moves it into place BEFORE the row commits (deliberately —
+    /// see that method's doc comment), so a request that dies between the
+    /// move and <c>SaveChangesAsync</c> — or an abandoned <c>.part</c> from
+    /// a request that died even earlier — can leave a file nothing points
+    /// at. This is the sweep that eventually reclaims it.
+    /// <para>
+    /// <b>Disabled by default</b>, same posture as
+    /// <see cref="SweepAudioBlobOrphansAsync"/>.
+    /// </para>
+    /// <para>
+    /// <b>Path-traversal hardened</b>: <see cref="ContentItemOverlay.TryResolveRoot"/>
+    /// is the one place the configured root becomes an absolute directory —
+    /// the SAME call the upload and manifest read paths use — and every
+    /// candidate is re-resolved through <see cref="ContentItemOverlay.TryResolveUploadPath"/>
+    /// before it is ever deleted, belt and braces over a plain directory
+    /// listing.
+    /// </para>
+    /// <para>
+    /// <b>Top-level files only</b> (no recursion): every upload lands
+    /// directly under the root, so a subdirectory found here is left
+    /// alone rather than guessed at.
+    /// </para>
+    /// <para>
+    /// <b>Grace window</b>: eligible only once the file's last-write time
+    /// is older than <c>Retention:UploadOrphanSweep:GraceHours</c> — the
+    /// exact race the write-before-commit ordering above creates.
+    /// </para>
+    /// </summary>
+    private async Task SweepUploadedContentOrphansAsync(
+        AppDbContext db, CancellationToken stoppingToken)
+    {
+        var maxPerTick = ReadUploadOrphanSweepMaxPerTick();
+        if (maxPerTick <= 0)
+        {
+            return;
+        }
+
+        var options = ContentSyncOptions.Resolve(_config);
+        if (!ContentItemOverlay.TryResolveRoot(options.UploadRoot, out var root)
+            || !Directory.Exists(root))
+        {
+            return;
+        }
+
+        var graceCutoffUtc =
+            DateTime.UtcNow - TimeSpan.FromHours(ReadUploadOrphanSweepGraceHours());
+
+        var referenced = await db.Set<ContentItem>()
+            .AsNoTracking()
+            .Select(i => i.RelativePath)
+            .ToListAsync(stoppingToken);
+        var referencedSet = new HashSet<string>(referenced, StringComparer.Ordinal);
+
+        string[] candidateFiles;
+        try
+        {
+            candidateFiles = Directory.GetFiles(root);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Uploaded-content orphan sweep: failed to enumerate the configured root.");
+            return;
+        }
+
+        var examined = 0;
+        var deleted = 0;
+        var failures = 0;
+        foreach (var file in candidateFiles)
+        {
+            if (deleted >= maxPerTick) break;
+            stoppingToken.ThrowIfCancellationRequested();
+
+            var name = Path.GetFileName(file);
+            if (!ContentItemOverlay.TryResolveUploadPath(options.UploadRoot, name, out var resolved)
+                || !string.Equals(resolved, file, StringComparison.Ordinal))
+            {
+                continue;   // could not be re-derived as a plain top-level upload path
+            }
+            examined++;
+            if (referencedSet.Contains(name))
+            {
+                continue;
+            }
+
+            DateTime lastWriteUtc;
+            try
+            {
+                lastWriteUtc = File.GetLastWriteTimeUtc(file);
+            }
+            catch (Exception)
+            {
+                continue;
+            }
+            if (lastWriteUtc >= graceCutoffUtc)
+            {
+                continue;   // too recent — likely an in-flight upload
+            }
+
+            try
+            {
+                File.Delete(file);
+                deleted++;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                failures++;
+                _logger.LogWarning(ex,
+                    "Uploaded-content orphan sweep: failed to remove a candidate file.");
+            }
+        }
+
+        if (deleted == 0)
+        {
+            return;
+        }
+
+        var audit = AuditEvent.UploadedContentOrphansSwept(
+            filesExamined: examined, filesDeleted: deleted, deleteFailures: failures);
+        db.Set<AuditEvent>().Add(audit);
+        AppMeter.AuditEventsWritten.Add(1,
+            new KeyValuePair<string, object?>("event_type", audit.EventType.ToString()));
+        await db.SaveChangesAsync(stoppingToken);
+
+        _logger.LogInformation(
+            "RetentionPurgeService tick: uploaded-content orphan sweep examined={Examined} "
+            + "deleted={Deleted} failures={Failures}.",
+            examined, deleted, failures);
+    }
+
     private async Task PurgeStalePasswordResetTokensAsync(
         AppDbContext db, CancellationToken stoppingToken)
     {
@@ -1312,6 +1649,43 @@ public sealed class RetentionPurgeService : BackgroundService
         => ParseIntOrDefault(
             _config["Dormancy:Parent:AnonymizeAfterDays"],
             DefaultDormancyAnonymizeAfterDays);
+
+    // Retention:AudioOrphanSweep:MaxPerTick — fallback 0 (disabled).
+    // Non-positive disables the whole pass; no clamp beyond that, the
+    // same "0 is the safe disable signal" rule the dormancy readers use.
+    private int ReadAudioOrphanSweepMaxPerTick()
+        => ParseIntOrDefault(
+            _config["Retention:AudioOrphanSweep:MaxPerTick"],
+            DefaultAudioOrphanSweepMaxPerTick);
+
+    // Retention:AudioOrphanSweep:GraceHours — fallback 24. Floor-clamped
+    // to 0 (a negative override would move the cutoff into the future
+    // and sweep nothing, which is confusing rather than unsafe, but
+    // there is no reason to allow it).
+    private int ReadAudioOrphanSweepGraceHours()
+    {
+        var raw = ParseIntOrDefault(
+            _config["Retention:AudioOrphanSweep:GraceHours"],
+            DefaultAudioOrphanSweepGraceHours);
+        return raw < 0 ? 0 : raw;
+    }
+
+    // Retention:UploadOrphanSweep:MaxPerTick — fallback 0 (disabled).
+    // Same shape as ReadAudioOrphanSweepMaxPerTick.
+    private int ReadUploadOrphanSweepMaxPerTick()
+        => ParseIntOrDefault(
+            _config["Retention:UploadOrphanSweep:MaxPerTick"],
+            DefaultUploadOrphanSweepMaxPerTick);
+
+    // Retention:UploadOrphanSweep:GraceHours — fallback 24. Same
+    // floor-clamp as ReadAudioOrphanSweepGraceHours.
+    private int ReadUploadOrphanSweepGraceHours()
+    {
+        var raw = ParseIntOrDefault(
+            _config["Retention:UploadOrphanSweep:GraceHours"],
+            DefaultUploadOrphanSweepGraceHours);
+        return raw < 0 ? 0 : raw;
+    }
 
     private static int ParseIntOrDefault(string? raw, int fallback)
         => int.TryParse(raw, out var parsed) ? parsed : fallback;

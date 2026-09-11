@@ -60,7 +60,16 @@ public class RetentionPurgeServiceTests
         // C2.2b — caller can override with FailingBlobStore (etc.)
         // to pin the IO-failure-non-fatal contract. Default is the
         // recording in-memory double exposed on Harness.Blob.
-        IAudioBlobStore? blobStore = null)
+        IAudioBlobStore? blobStore = null,
+        // Retention (2026-09-11) — the two orphan sweepers, both off by
+        // default (null leaves the config key absent, which the service
+        // reads as MaxPerTick=0/disabled).
+        string? audioBlobStoreRoot = null,
+        int? audioOrphanSweepMaxPerTick = null,
+        int? audioOrphanSweepGraceHours = null,
+        string? uploadRoot = null,
+        int? uploadOrphanSweepMaxPerTick = null,
+        int? uploadOrphanSweepGraceHours = null)
     {
         var conn = new SqliteConnection("Data Source=:memory:");
         await conn.OpenAsync();
@@ -103,6 +112,22 @@ public class RetentionPurgeServiceTests
         if (dormancyAnonymizeAfterDays is not null)
             configDict["Dormancy:Parent:AnonymizeAfterDays"]
                 = dormancyAnonymizeAfterDays.Value.ToString();
+        if (audioBlobStoreRoot is not null)
+            configDict["Audio:BlobStoreRoot"] = audioBlobStoreRoot;
+        if (audioOrphanSweepMaxPerTick is not null)
+            configDict["Retention:AudioOrphanSweep:MaxPerTick"]
+                = audioOrphanSweepMaxPerTick.Value.ToString();
+        if (audioOrphanSweepGraceHours is not null)
+            configDict["Retention:AudioOrphanSweep:GraceHours"]
+                = audioOrphanSweepGraceHours.Value.ToString();
+        if (uploadRoot is not null)
+            configDict["ContentSync:UploadRoot"] = uploadRoot;
+        if (uploadOrphanSweepMaxPerTick is not null)
+            configDict["Retention:UploadOrphanSweep:MaxPerTick"]
+                = uploadOrphanSweepMaxPerTick.Value.ToString();
+        if (uploadOrphanSweepGraceHours is not null)
+            configDict["Retention:UploadOrphanSweep:GraceHours"]
+                = uploadOrphanSweepGraceHours.Value.ToString();
         IConfiguration config = new ConfigurationBuilder()
             .AddInMemoryCollection(configDict)
             .Build();
@@ -2330,5 +2355,346 @@ public class RetentionPurgeServiceTests
 
         var call = Assert.Single(notifier.DeviceCalls);
         Assert.Null(call.DeleteAtUtc);
+    }
+
+    // -------------------------------------------------------------------
+    // Retention (2026-09-11) — audio-blob orphan sweep.
+    // -------------------------------------------------------------------
+
+    private static string NewTempDir(string prefix)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), prefix + "-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    private static void DeleteTempDir(string dir)
+    {
+        try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
+        catch { /* best-effort temp cleanup */ }
+    }
+
+    /// <summary>Creates {root}/{id:N}/blob.bin and backdates the DIRECTORY's
+    /// last-write time so the sweep's grace-window check sees it as old
+    /// (or recent, for <paramref name="ageHours"/> &lt;= the grace).</summary>
+    private static void SeedBlobDir(string root, Guid conversationId, int ageHours)
+    {
+        var dir = Path.Combine(root, conversationId.ToString("N"));
+        Directory.CreateDirectory(dir);
+        File.WriteAllBytes(Path.Combine(dir, "blob.bin"), new byte[] { 1, 2, 3 });
+        var stamp = DateTime.UtcNow - TimeSpan.FromHours(ageHours);
+        Directory.SetLastWriteTimeUtc(dir, stamp);
+    }
+
+    [Fact]
+    public async Task AudioOrphanSweep_DisabledByDefault_DeletesNothing()
+    {
+        var root = NewTempDir("areg-audio-sweep");
+        try
+        {
+            await using var h = await CreateHarnessAsync(audioBlobStoreRoot: root);
+            SeedBlobDir(root, Guid.NewGuid(), ageHours: 48);
+
+            await h.Service.RunTickAsync(CancellationToken.None);
+
+            Assert.Single(Directory.GetDirectories(root));
+            Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+                .Where(a => a.EventType == AuditEventType.AudioBlobOrphansSwept)
+                .ToListAsync());
+        }
+        finally { DeleteTempDir(root); }
+    }
+
+    [Fact]
+    public async Task AudioOrphanSweep_DeletesOldDirectoryWithNoConversationRow()
+    {
+        var root = NewTempDir("areg-audio-sweep");
+        try
+        {
+            await using var h = await CreateHarnessAsync(
+                audioBlobStoreRoot: root, audioOrphanSweepMaxPerTick: 10,
+                audioOrphanSweepGraceHours: 24);
+            var orphanId = Guid.NewGuid();
+            SeedBlobDir(root, orphanId, ageHours: 48);
+
+            await h.Service.RunTickAsync(CancellationToken.None);
+
+            Assert.Empty(Directory.GetDirectories(root));
+            var audit = Assert.Single(await h.Db.Set<AuditEvent>().AsNoTracking()
+                .Where(a => a.EventType == AuditEventType.AudioBlobOrphansSwept)
+                .ToListAsync());
+            Assert.Null(audit.ActorParentId);
+            Assert.Null(audit.TargetDeviceId);
+            Assert.Contains("\"directories_deleted\":1", audit.Metadata);
+            // No directory name / conversation id in the metadata — counts only.
+            Assert.DoesNotContain(orphanId.ToString("N"), audit.Metadata);
+        }
+        finally { DeleteTempDir(root); }
+    }
+
+    [Fact]
+    public async Task AudioOrphanSweep_SparesADirectoryWithAMatchingConversationRow()
+    {
+        var root = NewTempDir("areg-audio-sweep");
+        try
+        {
+            await using var h = await CreateHarnessAsync(
+                audioBlobStoreRoot: root, audioOrphanSweepMaxPerTick: 10,
+                audioOrphanSweepGraceHours: 24);
+            var deviceId = SeedDevice(h.Db);
+            var convId = SeedConversationNoMessages(h.Db, deviceId, DateTime.UtcNow);
+            await h.Db.SaveChangesAsync();
+            SeedBlobDir(root, convId, ageHours: 48);
+
+            await h.Service.RunTickAsync(CancellationToken.None);
+
+            Assert.Single(Directory.GetDirectories(root));
+        }
+        finally { DeleteTempDir(root); }
+    }
+
+    [Fact]
+    public async Task AudioOrphanSweep_SparesADirectoryWithinTheGraceWindow()
+    {
+        var root = NewTempDir("areg-audio-sweep");
+        try
+        {
+            await using var h = await CreateHarnessAsync(
+                audioBlobStoreRoot: root, audioOrphanSweepMaxPerTick: 10,
+                audioOrphanSweepGraceHours: 24);
+            SeedBlobDir(root, Guid.NewGuid(), ageHours: 1);   // just landed
+
+            await h.Service.RunTickAsync(CancellationToken.None);
+
+            Assert.Single(Directory.GetDirectories(root));
+        }
+        finally { DeleteTempDir(root); }
+    }
+
+    [Theory]
+    [InlineData("not-a-guid-at-all")]
+    [InlineData("00000000000000000000000000000g")]  // 32 chars, one non-hex
+    [InlineData("0000000000000000000000000000000")] // 33 chars — one too many
+    [InlineData("0000000000000000000000000000")]     // 30 chars — one too few
+    public async Task AudioOrphanSweep_IgnoresAMalformedDirectoryName(string name)
+    {
+        // A candidate that fails the Guid:"N" regex is never even a
+        // deletion candidate — proving the gate runs BEFORE any path is
+        // built or parsed, the same discipline TryResolveUploadPath uses
+        // for the upload sweep below.
+        var root = NewTempDir("areg-audio-sweep");
+        try
+        {
+            await using var h = await CreateHarnessAsync(
+                audioBlobStoreRoot: root, audioOrphanSweepMaxPerTick: 10,
+                audioOrphanSweepGraceHours: 24);
+            var dir = Path.Combine(root, name);
+            Directory.CreateDirectory(dir);
+            Directory.SetLastWriteTimeUtc(dir, DateTime.UtcNow - TimeSpan.FromHours(48));
+
+            await h.Service.RunTickAsync(CancellationToken.None);
+
+            Assert.True(Directory.Exists(dir));
+            Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+                .Where(a => a.EventType == AuditEventType.AudioBlobOrphansSwept)
+                .ToListAsync());
+        }
+        finally { DeleteTempDir(root); }
+    }
+
+    [Fact]
+    public async Task AudioOrphanSweep_RespectsThePerTickCap()
+    {
+        var root = NewTempDir("areg-audio-sweep");
+        try
+        {
+            await using var h = await CreateHarnessAsync(
+                audioBlobStoreRoot: root, audioOrphanSweepMaxPerTick: 2,
+                audioOrphanSweepGraceHours: 24);
+            for (var i = 0; i < 5; i++)
+            {
+                SeedBlobDir(root, Guid.NewGuid(), ageHours: 48);
+            }
+
+            await h.Service.RunTickAsync(CancellationToken.None);
+
+            Assert.Equal(3, Directory.GetDirectories(root).Length);   // 5 - cap(2)
+        }
+        finally { DeleteTempDir(root); }
+    }
+
+    // -------------------------------------------------------------------
+    // Retention (2026-09-11) — uploaded-content orphan sweep.
+    // -------------------------------------------------------------------
+
+    private static void SeedUploadFile(string root, string fileName, int ageHours)
+    {
+        var path = Path.Combine(root, fileName);
+        File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow - TimeSpan.FromHours(ageHours));
+    }
+
+    private static void SeedContentItemRow(AppDbContext db, string itemKey, string relativePath)
+    {
+        db.Set<ContentItem>().Add(new ContentItem
+        {
+            Id = Guid.NewGuid(),
+            Kind = "story",
+            ItemKey = itemKey,
+            Title = itemKey,
+            Version = 1,
+            RelativePath = relativePath,
+            Sha256 = new string('a', 64),
+            SizeBytes = 3,
+            CreatedBy = "owner",
+            CreatedAt = DateTime.UtcNow,
+        });
+    }
+
+    [Fact]
+    public async Task UploadOrphanSweep_DisabledByDefault_DeletesNothing()
+    {
+        var root = NewTempDir("areg-upload-sweep");
+        try
+        {
+            await using var h = await CreateHarnessAsync(uploadRoot: root);
+            SeedUploadFile(root, "orphan-v1.mp3", ageHours: 48);
+
+            await h.Service.RunTickAsync(CancellationToken.None);
+
+            Assert.Single(Directory.GetFiles(root));
+        }
+        finally { DeleteTempDir(root); }
+    }
+
+    [Fact]
+    public async Task UploadOrphanSweep_DeletesAnOldFileWithNoContentItemRow()
+    {
+        var root = NewTempDir("areg-upload-sweep");
+        try
+        {
+            await using var h = await CreateHarnessAsync(
+                uploadRoot: root, uploadOrphanSweepMaxPerTick: 10,
+                uploadOrphanSweepGraceHours: 1);
+            SeedUploadFile(root, "orphan-v1.mp3", ageHours: 48);
+
+            await h.Service.RunTickAsync(CancellationToken.None);
+
+            Assert.Empty(Directory.GetFiles(root));
+            var audit = Assert.Single(await h.Db.Set<AuditEvent>().AsNoTracking()
+                .Where(a => a.EventType == AuditEventType.UploadedContentOrphansSwept)
+                .ToListAsync());
+            Assert.Null(audit.ActorParentId);
+            Assert.Contains("\"files_deleted\":1", audit.Metadata);
+            Assert.DoesNotContain("orphan-v1.mp3", audit.Metadata);
+        }
+        finally { DeleteTempDir(root); }
+    }
+
+    [Fact]
+    public async Task UploadOrphanSweep_SparesAFileWithAMatchingContentItemRow()
+    {
+        var root = NewTempDir("areg-upload-sweep");
+        try
+        {
+            await using var h = await CreateHarnessAsync(
+                uploadRoot: root, uploadOrphanSweepMaxPerTick: 10,
+                uploadOrphanSweepGraceHours: 1);
+            SeedContentItemRow(h.Db, "kept", "kept-v1.mp3");
+            await h.Db.SaveChangesAsync();
+            SeedUploadFile(root, "kept-v1.mp3", ageHours: 48);
+
+            await h.Service.RunTickAsync(CancellationToken.None);
+
+            Assert.Single(Directory.GetFiles(root));
+        }
+        finally { DeleteTempDir(root); }
+    }
+
+    [Fact]
+    public async Task UploadOrphanSweep_SparesAFileWithinTheGraceWindow()
+    {
+        // The exact race UploadStoryContent's write-before-commit ordering
+        // creates: a file that landed moments ago may simply be mid-request.
+        var root = NewTempDir("areg-upload-sweep");
+        try
+        {
+            await using var h = await CreateHarnessAsync(
+                uploadRoot: root, uploadOrphanSweepMaxPerTick: 10,
+                uploadOrphanSweepGraceHours: 24);
+            SeedUploadFile(root, "in-flight-v1.mp3", ageHours: 0);
+
+            await h.Service.RunTickAsync(CancellationToken.None);
+
+            Assert.Single(Directory.GetFiles(root));
+        }
+        finally { DeleteTempDir(root); }
+    }
+
+    [Fact]
+    public async Task UploadOrphanSweep_SparesAnAbandonedPartFile_WithinTheGraceWindow()
+    {
+        var root = NewTempDir("areg-upload-sweep");
+        try
+        {
+            await using var h = await CreateHarnessAsync(
+                uploadRoot: root, uploadOrphanSweepMaxPerTick: 10,
+                uploadOrphanSweepGraceHours: 1);
+            SeedUploadFile(root, "mid-upload-v1.mp3.part", ageHours: 0);
+
+            await h.Service.RunTickAsync(CancellationToken.None);
+
+            Assert.Single(Directory.GetFiles(root));
+        }
+        finally { DeleteTempDir(root); }
+    }
+
+    [Fact]
+    public async Task UploadOrphanSweep_RespectsThePerTickCap()
+    {
+        var root = NewTempDir("areg-upload-sweep");
+        try
+        {
+            await using var h = await CreateHarnessAsync(
+                uploadRoot: root, uploadOrphanSweepMaxPerTick: 2,
+                uploadOrphanSweepGraceHours: 1);
+            for (var i = 0; i < 5; i++)
+            {
+                SeedUploadFile(root, $"orphan-{i}-v1.mp3", ageHours: 48);
+            }
+
+            await h.Service.RunTickAsync(CancellationToken.None);
+
+            Assert.Equal(3, Directory.GetFiles(root).Length);   // 5 - cap(2)
+        }
+        finally { DeleteTempDir(root); }
+    }
+
+    [Fact]
+    public async Task UploadOrphanSweep_NeverTouchesAFileOutsideTheUploadRoot()
+    {
+        // Directory.GetFiles(root) cannot itself produce a traversal, but the
+        // re-resolution through TryResolveUploadPath is belt-and-braces —
+        // this pins that a sibling file OUTSIDE root is never a candidate,
+        // let alone deleted, however old it is.
+        var root = NewTempDir("areg-upload-sweep");
+        var outsideFile = Path.Combine(Path.GetDirectoryName(root)!, "canary-" + Guid.NewGuid().ToString("N") + ".mp3");
+        try
+        {
+            await File.WriteAllBytesAsync(outsideFile, new byte[] { 9 });
+            File.SetLastWriteTimeUtc(outsideFile, DateTime.UtcNow - TimeSpan.FromHours(48));
+            await using var h = await CreateHarnessAsync(
+                uploadRoot: root, uploadOrphanSweepMaxPerTick: 10,
+                uploadOrphanSweepGraceHours: 1);
+
+            await h.Service.RunTickAsync(CancellationToken.None);
+
+            Assert.True(File.Exists(outsideFile));
+        }
+        finally
+        {
+            DeleteTempDir(root);
+            try { File.Delete(outsideFile); } catch { /* best-effort */ }
+        }
     }
 }

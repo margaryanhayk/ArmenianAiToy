@@ -108,4 +108,21 @@ int32_t content_sync_seconds_since_ok();
 // crash loop visible: a toy that panics mid-sync reports a climbing streak on
 // the next boot even though it never got to report a status at all.
 uint16_t content_sync_fail_streak();
+
+// Retirement + bounded orphan sweep (2026-09-11). Reported on the heartbeat
+// alongside the four fields above so "did retiring that story actually reach
+// the toy?" has an answer somewhere other than a cable. See
+// content_retirement_rules.h for the decisions behind these counts.
+//
+// How many cached files the LAST COMPLETED sync attempt retired (dropped
+// from the index and deleted) because the manifest marked their id
+// retired:true. Resets to 0 every attempt — a per-attempt fact, not a
+// running total.
+int content_sync_last_retired_deleted();
+
+// How many files the bounded orphan sweep has removed THIS BOOT. The sweep
+// itself runs at most once per boot (content_orphan_sweep_run()), so unlike
+// the count above this persists across sync attempts within one boot rather
+// than resetting each time.
+int content_sync_last_orphans_swept();
 #endif

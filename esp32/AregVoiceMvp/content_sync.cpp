@@ -23,13 +23,16 @@
 #include <Preferences.h>   // NVS: the failure streak must survive a panic
 #include <esp_task_wdt.h>
 #include <mbedtls/sha256.h>
+#include <time.h>          // time() — orphan-sweep .part staleness (wall clock)
 
 #include "config.h"
 #include "net_transport.h"
 #include "content_sync_rules.h"  // pure validation / path / decision logic
 #include "content_sync_model.h"  // JSON <-> CsStory (manifest + index schemas)
+#include "content_retirement_rules.h"  // pure retirement / orphan-sweep decisions
 #include "audio_io.h"      // audio_sd_available() — reuse the boot mount
 #include "voice_client.h"  // voice_wifi_is_connected / voice_add_device_auth_headers
+#include "story_select.h"  // story_select_paused_story_id() — the retirement guard
 
 #ifndef AREG_HTTP_CONNECT_MS
 #define AREG_HTTP_CONNECT_MS 5000
@@ -141,6 +144,52 @@ bool s_mode_game      = true;
 bool s_mode_riddle    = true;
 bool s_mode_curiosity = true;
 
+// ---- retirement + per-namespace index writes (2026-09-11) ----------
+//
+// Ids the CURRENT manifest round marked retired:true, one bounded list
+// per namespace — populated by cs_manifest_parse[_music|_voice] and
+// consulted by each namespace's own carry-forward loop. Games are not
+// included: retirement is keyed by a single id everywhere else, but a
+// game clip is addressed by a (gameKey, clipId) PAIR, and the added
+// complexity was not worth it for a namespace the bounded orphan sweep
+// already has a safety net for. See content_retirement_rules.h.
+CsRetiredIds s_story_retired{};
+CsRetiredIds s_music_retired{};
+CsRetiredIds s_voice_retired{};
+int s_stories_retired_deleted = 0;
+int s_music_retired_deleted   = 0;
+int s_voice_retired_deleted   = 0;
+
+// Each namespace publishes its OWN just-synced data to the index only
+// once its own pass has finished THIS attempt; write_index() falls back
+// to the unchanged previous state for anything not yet finalized, so an
+// interim write (see the per-namespace write calls in the main sync
+// function) can never look like a namespace that lost everything
+// mid-sync — which is the exact 2026-08-14 crash-loop bug this exists
+// to prevent. Reset at the top of every attempt by load_previous_index().
+bool s_stories_finalized = false;
+bool s_music_finalized   = false;
+bool s_voice_finalized   = false;
+bool s_games_finalized   = false;
+// A persistent copy of the previous index's "games" array, captured by
+// load_previous_index() while the previous document is still in scope.
+// Stories/music/voice already keep their previous snapshot in
+// s_previous / s_music_previous / s_voice_previous; games streams (see
+// the s_games_index comment above) and has no such table, so an interim
+// write before sync_games() has run this attempt needs this instead.
+JsonDocument s_games_previous_snapshot(&s_json_psram);
+
+// Bounded SD orphan sweep — see content_retirement_rules.h and
+// content_orphan_sweep_run() near the end of this file. Off by default
+// until an operator opts in on the backend; see s_orphan_sweep_enabled's
+// manifest parse for the reasoning.
+bool s_orphan_sweep_enabled    = false;
+bool s_orphan_swept_this_boot  = false;
+int  s_orphan_files_removed    = 0;
+#ifndef AREG_ORPHAN_SWEEP_MAX_PER_BOOT
+#define AREG_ORPHAN_SWEEP_MAX_PER_BOOT 20
+#endif
+
 // ---- small helpers (duplicated from ota_apply's file-locals by repo
 // convention: no shared util until a third caller) ----
 
@@ -187,6 +236,15 @@ char     s_last_error[24]  = "";       // bounded reason, "" when none
 uint32_t s_last_ok_ms      = 0;        // millis() of the last clean pass
 bool     s_had_ok          = false;
 uint16_t s_fail_streak     = 0;        // persisted; survives a panic
+// Retirement + orphan sweep (2026-09-11) — the last COMPLETED attempt's
+// counts, reported on the heartbeat exactly like the four fields above.
+// Deletions are exactly the kind of thing that went unreported before
+// 2026-08-14: without these, "did retiring that story actually reach the
+// toy?" has no answer anywhere but a cable. Retired-deleted resets every
+// attempt (a per-attempt fact); orphans-swept persists across attempts
+// within a boot (the sweep itself runs at most once per boot).
+int s_last_retired_deleted = 0;
+int s_last_orphans_swept   = 0;
 
 void set_status(const char *status, const char *reason) {
     snprintf(s_last_status, sizeof(s_last_status), "%s", status);
@@ -318,7 +376,22 @@ void load_previous_index() {
     s_previous_count       = 0;
     s_music_previous_count = 0;
     s_voice_previous_count = 0;
+    s_games_previous_count = 0;
+    s_games_previous_snapshot.clear();
     s_prev_index_state     = CS_PREV_ABSENT;
+    // Fresh attempt: nothing has been finalized yet. Every namespace
+    // starts an interim write from "unchanged previous" until its own
+    // sync pass actually runs — see the comment above these statics.
+    s_stories_finalized = false;
+    s_music_finalized   = false;
+    s_voice_finalized   = false;
+    s_games_finalized   = false;
+    // Retired-deletion counts are per ATTEMPT (reported in this attempt's
+    // summary line); the orphan-sweep count deliberately is NOT reset
+    // here — it is per BOOT (see s_orphan_swept_this_boot).
+    s_stories_retired_deleted = 0;
+    s_music_retired_deleted   = 0;
+    s_voice_retired_deleted   = 0;
     if (!SD.exists(kIndexPath)) {
         Serial.println("[content-sync] no existing index");
         return;
@@ -347,6 +420,16 @@ void load_previous_index() {
     s_previous_count = cs_index_parse(doc, s_previous, CS_MAX_STORIES, &schema);
     s_music_previous_count = cs_index_parse_music(doc, s_music_previous, CS_MAX_MUSIC);
     s_voice_previous_count = cs_index_parse_voice(doc, s_voice_previous, CS_MAX_VOICE);
+    // Games has no previous-table like the other three (see s_games_index's
+    // comment) — captured here as a raw sub-document copy instead, while
+    // `doc` is still alive, purely so an interim write before sync_games()
+    // runs this attempt can publish "unchanged", never "empty" (the same
+    // guarantee the other three namespaces get for free from their tables).
+    JsonVariantConst prev_games = doc["games"];
+    if (prev_games.is<JsonArrayConst>()) {
+        s_games_previous_snapshot.set(prev_games);
+        s_games_previous_count = prev_games.as<JsonArrayConst>().size();
+    }
     s_prev_index_state = CS_PREV_READABLE;
     // A readable index clears the strike count: whatever went wrong before,
     // the card is back to a state the next boot can build on. Read first so a
@@ -415,20 +498,41 @@ bool write_index() {
     }
 
     JsonDocument idx(&s_json_psram);
+    // Per-namespace index writes (2026-09-11): a namespace whose OWN sync
+    // pass has not run yet this attempt publishes its unchanged PREVIOUS
+    // state here, never the still-empty active table — otherwise an
+    // interim write (see the per-namespace write_index() calls in the
+    // main sync function) would look exactly like the namespace lost
+    // everything, which is the bug this whole mechanism exists to
+    // prevent. Once finalized, a namespace publishes what it actually
+    // just synced, same as before this change.
+    const CsStory *stories_src   = s_stories_finalized ? s_active       : s_previous;
+    const int      stories_count = s_stories_finalized ? s_active_count : s_previous_count;
+    const CsMusic *music_src   = s_music_finalized ? s_music_active       : s_music_previous;
+    const int      music_count = s_music_finalized ? s_music_active_count : s_music_previous_count;
+    const CsVoice *voice_src   = s_voice_finalized ? s_voice_active       : s_voice_previous;
+    const int      voice_count = s_voice_finalized ? s_voice_active_count : s_voice_previous_count;
+    JsonArrayConst games_src = s_games_finalized
+        ? s_games_index.as<JsonArrayConst>()
+        : s_games_previous_snapshot.as<JsonArrayConst>();
+
     // AREG_STORY_ID drives ONLY the legacy compatibility mirror, so the
     // three readers that still parse the flat shape keep behaving exactly
     // as they did in the single-story build. It has no effect on which
     // stories are synced or indexed.
-    cs_index_build(idx, s_active, s_active_count, AREG_STORY_ID, s_intro_enabled);
-    cs_index_add_music(idx, s_music_active, s_music_active_count, s_music_enabled);
-    cs_index_add_voice(idx, s_voice_active, s_voice_active_count);
-    // Offline games — attached from the array sync_games() streamed into,
-    // which is still alive here and is cleared right after the write.
-    cs_index_add_games(idx, s_games_index.as<JsonArrayConst>());
+    cs_index_build(idx, stories_src, stories_count, AREG_STORY_ID, s_intro_enabled);
+    cs_index_add_music(idx, music_src, music_count, s_music_enabled);
+    cs_index_add_voice(idx, voice_src, voice_count);
+    // Offline games — attached from the array sync_games() streamed into
+    // (once finalized this attempt) or the previous-index snapshot
+    // captured above (until then). s_games_index itself is still alive
+    // here and is cleared right after the LAST write of the attempt.
+    cs_index_add_games(idx, games_src);
     cs_index_add_modes(idx, s_mode_story, s_mode_game,
                        s_mode_riddle, s_mode_curiosity);
     cs_index_add_story_flags(idx, s_pauses_enabled, s_variants_enabled);
     cs_index_add_questions_flag(idx, s_questions_enabled);
+    cs_index_add_orphan_sweep_flag(idx, s_orphan_sweep_enabled);
 
     // Shrink alarm. This is an ALARM, NOT A BLOCK: a namespace legitimately
     // shrinks when a file is genuinely deleted or its size changed on the
@@ -442,23 +546,30 @@ bool write_index() {
             s_prev_index_state == CS_PREV_READABLE   ? "readable"
           : s_prev_index_state == CS_PREV_UNREADABLE ? "UNREADABLE"
                                                      : "absent";
+        // Guarded by each namespace's OWN finalized flag: a namespace not
+        // yet processed this attempt is publishing s_previous_count as
+        // both "previous" and "active" (see stories_src/music_src/etc
+        // above) — same number on both sides, never a shrink, and
+        // checking it here too would fire a false alarm on every one of
+        // the (harmless, expected) interim writes before that namespace's
+        // own pass has run.
         bool shrank = false;
-        if (s_previous_count > s_active_count) {
+        if (s_stories_finalized && s_previous_count > s_active_count) {
             Serial.printf("[content-sync] INDEX SHRINK stories %d->%d prev=%s\n",
                           s_previous_count, s_active_count, prev_state);
             shrank = true;
         }
-        if (s_music_previous_count > s_music_active_count) {
+        if (s_music_finalized && s_music_previous_count > s_music_active_count) {
             Serial.printf("[content-sync] INDEX SHRINK music %d->%d prev=%s\n",
                           s_music_previous_count, s_music_active_count, prev_state);
             shrank = true;
         }
-        if (s_voice_previous_count > s_voice_active_count) {
+        if (s_voice_finalized && s_voice_previous_count > s_voice_active_count) {
             Serial.printf("[content-sync] INDEX SHRINK voice %d->%d prev=%s\n",
                           s_voice_previous_count, s_voice_active_count, prev_state);
             shrank = true;
         }
-        if (s_games_previous_count > s_games_active_count) {
+        if (s_games_finalized && s_games_previous_count > s_games_active_count) {
             Serial.printf("[content-sync] INDEX SHRINK games %d->%d prev=%s\n",
                           s_games_previous_count, s_games_active_count, prev_state);
             shrank = true;
@@ -545,6 +656,178 @@ bool write_index() {
     // and the block would start again from zero.
     if (rebuilding) index_bad_set(0);
     return true;
+}
+
+// ---- bounded SD orphan sweep (2026-09-11) --------------------------
+//
+// A file under /stories, /voice, /games/<key> or /music that NO index
+// entry references at all — not carried forward, not pending
+// retirement, simply orphaned: an interrupted rename, a version bump
+// that changed the filename, or a retirement that could not remove the
+// file THIS boot because it was the paused story. Runs at most once per
+// boot (s_orphan_swept_this_boot), and only once the index this attempt
+// wrote is genuinely on disk and every namespace reflects this attempt's
+// own truth — see the call site in the main sync function. Off by
+// default (s_orphan_sweep_enabled); see its manifest parse. Bounded and
+// best-effort: a SD.remove() failure is logged and skipped, never fatal.
+
+bool story_file_is_referenced(const char *path) {
+    for (int i = 0; i < s_active_count; i++) {
+        if (strcmp(s_active[i].cache_path, path) == 0) return true;
+        for (int c = 0; c < s_active[i].clip_count; c++) {
+            char clip_path[CS_MAX_PATH_LEN];
+            if (cs_build_clip_cache_path(clip_path, sizeof(clip_path),
+                    s_active[i].story_id, s_active[i].version,
+                    s_active[i].clips[c].kind)
+                && strcmp(clip_path, path) == 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool music_file_is_referenced(const char *path) {
+    for (int i = 0; i < s_music_active_count; i++) {
+        char cache_path[CS_MAX_PATH_LEN];
+        if (cs_build_music_cache_path(cache_path, sizeof(cache_path),
+                s_music_active[i].track_id, s_music_active[i].version)
+            && strcmp(cache_path, path) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool voice_file_is_referenced(const char *path) {
+    for (int i = 0; i < s_voice_active_count; i++) {
+        char cache_path[CS_MAX_PATH_LEN];
+        if (cs_build_voice_cache_path(cache_path, sizeof(cache_path),
+                s_voice_active[i].voice_id, s_voice_active[i].version)
+            && strcmp(cache_path, path) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool game_file_is_referenced(const char *path) {
+    for (JsonObjectConst e : s_games_index.as<JsonArrayConst>()) {
+        const char *game_key = e["gameKey"] | "";
+        const char *clip_id  = e["clipId"]  | "";
+        char cache_path[CS_MAX_PATH_LEN];
+        if (cs_build_game_cache_path(cache_path, sizeof(cache_path), game_key, clip_id)
+            && strcmp(cache_path, path) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Walks one directory, removing any file `is_referenced` says no to, up
+// to the shared per-boot budget. Recurses at most ONE level (the /games
+// per-key subdirectories) — there is no content deeper than that in any
+// namespace, and a depth bound is one more thing a card with no symlinks
+// cannot loop on.
+void sweep_dir(const char *dir_path, bool (*is_referenced)(const char *), int depth) {
+    if (!SD.exists(dir_path)) return;
+    File dir = SD.open(dir_path);
+    if (!dir || !dir.isDirectory()) {
+        if (dir) dir.close();
+        return;
+    }
+    for (File entry = dir.openNextFile(); entry; entry = dir.openNextFile()) {
+        if (content_orphan_sweep_budget_reached(s_orphan_files_removed,
+                                                AREG_ORPHAN_SWEEP_MAX_PER_BOOT)) {
+            entry.close();
+            break;
+        }
+        char full_path[CS_MAX_PATH_LEN];
+        const char *name = entry.name();
+        // Some SD core versions return the full path from name(), others
+        // just the leaf — handle both rather than guess which ships on
+        // this board (unverified: see the bench checklist in README.md).
+        if (name[0] == '/') {
+            cs_copy_bounded(full_path, sizeof(full_path), name);
+        } else {
+            snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, name);
+        }
+        const bool is_dir = entry.isDirectory();
+        entry.close();
+        if (is_dir) {
+            if (depth < 1) sweep_dir(full_path, is_referenced, depth + 1);
+            continue;
+        }
+        if (!is_referenced(full_path)) {
+            if (SD.remove(full_path)) {
+                s_orphan_files_removed++;
+                Serial.printf("[content-sync] orphan swept: %s\n", full_path);
+            } else {
+                Serial.printf("[content-sync] orphan sweep FAILED to remove %s\n",
+                              full_path);
+            }
+        }
+    }
+    dir.close();
+}
+
+// Reclaims a stale /tmp/*.part left by a download that never finished
+// (crash, panic, power loss). Bounded by the SAME per-boot budget as
+// sweep_dir() above — one budget for "how much SD housekeeping happens
+// per boot", not two.
+void sweep_stale_temp_files() {
+    if (!SD.exists("/tmp")) return;
+    File dir = SD.open("/tmp");
+    if (!dir || !dir.isDirectory()) {
+        if (dir) dir.close();
+        return;
+    }
+    // TLS to the backend already requires correct wall-clock time, so by
+    // the time a sync attempt reaches this point NTP has long since
+    // landed — see content_orphan_part_file_is_stale's doc comment for
+    // what happens when it has not.
+    const long boot_start_epoch = (long)time(nullptr) - (long)(millis() / 1000UL);
+    for (File entry = dir.openNextFile(); entry; entry = dir.openNextFile()) {
+        if (content_orphan_sweep_budget_reached(s_orphan_files_removed,
+                                                AREG_ORPHAN_SWEEP_MAX_PER_BOOT)) {
+            entry.close();
+            break;
+        }
+        const char *name = entry.name();
+        const char *slash = strrchr(name, '/');
+        const char *leaf = slash ? slash + 1 : name;
+        const size_t len = strlen(leaf);
+        const bool is_part = len > 5 && strcmp(leaf + len - 5, ".part") == 0;
+        const long mtime = (long)entry.getLastWrite();
+        const bool is_dir = entry.isDirectory();
+        entry.close();
+        if (is_dir || !is_part) continue;
+        if (content_orphan_part_file_is_stale(mtime, boot_start_epoch)) {
+            char full_path[CS_MAX_PATH_LEN];
+            snprintf(full_path, sizeof(full_path), "/tmp/%s", leaf);
+            if (SD.remove(full_path)) {
+                s_orphan_files_removed++;
+                Serial.printf("[content-sync] orphan .part swept: %s\n", full_path);
+            }
+        }
+    }
+    dir.close();
+}
+
+void content_orphan_sweep_run() {
+    if (s_orphan_swept_this_boot || !s_orphan_sweep_enabled) return;
+    s_orphan_swept_this_boot = true;   // at most once per boot, success or not
+    s_orphan_files_removed = 0;
+    sweep_dir("/stories", story_file_is_referenced, 0);
+    sweep_dir("/voice",   voice_file_is_referenced, 0);
+    sweep_dir(CS_GAMES_DIR, game_file_is_referenced, 0);
+    sweep_dir("/music",   music_file_is_referenced, 0);
+    sweep_stale_temp_files();
+    if (s_orphan_files_removed > 0) {
+        Serial.printf("[content-sync] orphan sweep removed %d file(s) this boot\n",
+                      s_orphan_files_removed);
+        Serial.flush();
+    }
 }
 
 // ---- verified download (stories AND clips) ------------------------
@@ -893,6 +1176,22 @@ void sync_music() {
     for (int i = 0; i < s_music_previous_count && s_music_active_count < CS_MAX_MUSIC; i++) {
         const CsMusic *prev = &s_music_previous[i];
         if (!prev->verified) continue;
+        // Retirement (2026-09-11): explicitly retired:true this round, so
+        // drop the index entry AND delete the file — never carry it
+        // forward like an ordinary "not in this manifest" track. Music
+        // has no "paused mid-way" concept, so this always retires now.
+        if (cs_retired_contains(&s_music_retired, prev->track_id)) {
+            char retire_path[CS_MAX_PATH_LEN];
+            if (cs_build_music_cache_path(retire_path, sizeof(retire_path),
+                                          prev->track_id, prev->version)
+                && SD.exists(retire_path)) {
+                SD.remove(retire_path);
+            }
+            s_music_retired_deleted++;
+            Serial.printf("[content-sync] music %s retired — dropped from index\n",
+                          prev->track_id);
+            continue;
+        }
         bool present = false;
         for (int a = 0; a < s_music_active_count; a++) {
             if (cs_story_ids_equal(s_music_active[a].track_id, prev->track_id)) {
@@ -979,6 +1278,19 @@ void sync_voice() {
     for (int i = 0; i < s_voice_previous_count && s_voice_active_count < CS_MAX_VOICE; i++) {
         const CsVoice *prev = &s_voice_previous[i];
         if (!prev->verified) continue;
+        // Retirement (2026-09-11) — see the identical check in sync_music().
+        if (cs_retired_contains(&s_voice_retired, prev->voice_id)) {
+            char retire_path[CS_MAX_PATH_LEN];
+            if (cs_build_voice_cache_path(retire_path, sizeof(retire_path),
+                                          prev->voice_id, prev->version)
+                && SD.exists(retire_path)) {
+                SD.remove(retire_path);
+            }
+            s_voice_retired_deleted++;
+            Serial.printf("[content-sync] voice %s retired — dropped from index\n",
+                          prev->voice_id);
+            continue;
+        }
         bool present = false;
         for (int a = 0; a < s_voice_active_count; a++) {
             if (cs_story_ids_equal(s_voice_active[a].voice_id, prev->voice_id)) {
@@ -1342,10 +1654,16 @@ void content_sync_run() {
     s_pauses_enabled   = doc["storyPausesEnabled"]    | true;
     s_variants_enabled = doc["variantEndingsEnabled"] | true;
     s_questions_enabled = doc["storyQuestionsEnabled"] | true;
+    // Bounded SD orphan sweep (2026-09-11) — off until an operator opts
+    // in on the backend AND it has been verified on hardware; absent (or
+    // false) is the shipped default, same posture as the two backend
+    // orphan sweepers. See content_retirement_rules.h.
+    s_orphan_sweep_enabled = doc["orphanSweepEnabled"] | false;
     // Slice E — bedtime-music opt-in + track list (absent → off/none).
     s_music_enabled = doc["bedtimeMusicEnabled"] | false;
     s_music_manifest_count = cs_manifest_parse_music(
-        doc["music"].as<JsonArrayConst>(), s_music_manifest, CS_MAX_MUSIC);
+        doc["music"].as<JsonArrayConst>(), s_music_manifest, CS_MAX_MUSIC,
+        &s_music_retired);
     // Welcome flow — the four parent mode switches and the device-global
     // spoken clips. Every field absent (a pre-welcome backend) means
     // "every mode on, no clips", which is exactly the pre-welcome toy.
@@ -1354,7 +1672,8 @@ void content_sync_run() {
     s_mode_riddle    = doc["riddleEnabled"]    | true;
     s_mode_curiosity = doc["curiosityEnabled"] | true;
     s_voice_manifest_count = cs_manifest_parse_voice(
-        doc["voice"].as<JsonArrayConst>(), s_voice_manifest, CS_MAX_VOICE);
+        doc["voice"].as<JsonArrayConst>(), s_voice_manifest, CS_MAX_VOICE,
+        &s_voice_retired);
     // Offline games — deliberately NOT parsed into a table here (there is
     // none); the array is handed to sync_games() below and streamed.
     JsonArrayConst game_clips = doc["games"].as<JsonArrayConst>();
@@ -1384,7 +1703,8 @@ void content_sync_run() {
     }
 
     CsManifestStats stats{};
-    s_manifest_count = cs_manifest_parse(stories, s_manifest, CS_MAX_STORIES, &stats);
+    s_manifest_count = cs_manifest_parse(stories, s_manifest, CS_MAX_STORIES, &stats,
+                                          &s_story_retired);
     if (stats.truncated > 0) {
         Serial.printf("[content-sync] manifest truncated: %d offered, max %d, %d ignored\n",
                       stats.offered, CS_MAX_STORIES, stats.truncated);
@@ -1440,9 +1760,38 @@ void content_sync_run() {
     // is still on the card stays usable. Manifest order is preserved
     // first; carried-forward entries follow.
     int carried = 0;
+    const char *paused_story_id = story_select_paused_story_id();
     for (int i = 0; i < s_previous_count && s_active_count < CS_MAX_STORIES; i++) {
         const CsStory *prev = &s_previous[i];
         if (!prev->verified || active_contains(prev->story_id)) {
+            continue;
+        }
+        // Retirement (2026-09-11): explicitly retired:true this round —
+        // drop the index entry AND delete the file, UNLESS this is the
+        // story paused mid-way through right now (content_retirement_
+        // rules.h). A spared retirement is tried again on the next sync
+        // attempt, once the session has ended.
+        if (cs_retired_contains(&s_story_retired, prev->story_id)) {
+            const bool is_paused = cs_story_ids_equal(prev->story_id, paused_story_id);
+            if (content_retirement_should_delete(/*is_retired=*/true, is_paused)) {
+                if (SD.exists(prev->cache_path)) SD.remove(prev->cache_path);
+                for (int c = 0; c < prev->clip_count; c++) {
+                    char clip_path[CS_MAX_PATH_LEN];
+                    if (cs_build_clip_cache_path(clip_path, sizeof(clip_path),
+                            prev->story_id, prev->version, prev->clips[c].kind)
+                        && SD.exists(clip_path)) {
+                        SD.remove(clip_path);
+                    }
+                }
+                s_stories_retired_deleted++;
+                Serial.printf("[content-sync] story %s retired — dropped from index\n",
+                              prev->story_id);
+            } else {
+                Serial.printf("[content-sync] story %s retired but PAUSED — sparing "
+                              "until the session ends\n", prev->story_id);
+                s_active[s_active_count++] = *prev;
+                carried++;
+            }
             continue;
         }
         const long actual = sd_file_size(prev->cache_path);
@@ -1452,30 +1801,58 @@ void content_sync_run() {
         s_active[s_active_count++] = *prev;
         carried++;
     }
+    // Stories are the first namespace finalized; the write below is the
+    // FIRST of four per-namespace writes (2026-09-11) — see the comment
+    // on s_stories_finalized and write_index()'s stories_src/music_src/
+    // voice_src/games_src selection.
+    s_stories_finalized = true;
+    bool stories_written = write_index();
+    if (!stories_written) {
+        Serial.println("[content-sync] index write FAILED after stories phase");
+        Serial.flush();
+    }
 
     // ---- 4b. Bedtime music (Slice E) ----
     sync_music();
+    s_music_finalized = true;
+    bool music_written = write_index();
+    if (!music_written) {
+        Serial.println("[content-sync] index write FAILED after music phase");
+        Serial.flush();
+    }
 
     // ---- 4c. Welcome-flow spoken clips ----
     sync_voice();
+    s_voice_finalized = true;
+    bool voice_written = write_index();
+    if (!voice_written) {
+        Serial.println("[content-sync] index write FAILED after voice phase");
+        Serial.flush();
+    }
 
     // ---- 4d. Offline-game clips (streamed; no table) ----
     sync_games(doc, game_clips);   // frees the manifest doc internally
+    s_games_finalized = true;
+    bool games_written = write_index();
+    if (!games_written) {
+        Serial.println("[content-sync] index write FAILED after games phase");
+        Serial.flush();
+    }
 
-    // ---- 5. Index written LAST, once ----
-    bool index_written = false;
-    if (s_active_count > 0 || s_music_active_count > 0
-        || s_voice_active_count > 0 || s_games_active_count > 0) {
-        index_written = write_index();
-        if (!index_written) {
-            // The previous index survives a failed replacement; every MP3
-            // is untouched. Next boot rebuilds it.
-            fail("index_write_failed");
-        } else {
-            Serial.println("[content-sync] index written");
-        }
+    // ---- 5. Aggregate the four per-namespace writes ----
+    // Written after EACH namespace completes, not once at the very end
+    // (2026-09-11): a crash partway through a LATER namespace can no
+    // longer discard the record of an earlier one's downloads — the
+    // exact 2026-08-14 crash-loop bug. A write failure at ANY checkpoint
+    // still counts as a sync failure, exactly as the single write did.
+    const bool index_written =
+        stories_written && music_written && voice_written && games_written;
+    if (!index_written) {
+        // The previous index survives a failed replacement; every MP3
+        // is untouched. Next boot rebuilds it.
+        fail("index_write_failed");
     } else {
-        Serial.println("[content-sync] nothing verified — index left unchanged");
+        Serial.println("[content-sync] index written");
     }
     // The streamed games array is only needed until the index is on disk;
     // releasing it here gives the ~90-entry document's heap back for the
@@ -1485,16 +1862,33 @@ void content_sync_run() {
     // library the child will actually hear. Reads the INDEX rather than
     // s_active[] on purpose — see content_report.h.
     content_report_refresh();
+    // Bounded orphan sweep (2026-09-11) — only once every namespace is
+    // finalized and the index this attempt built is genuinely on disk:
+    // "referenced" reads s_active / s_music_active / s_voice_active /
+    // s_games_index directly, which is only trustworthy once all four
+    // reflect this attempt's own truth rather than an interim mix.
+    if (index_written) {
+        content_orphan_sweep_run();
+    }
     Serial.flush();
 
     // ---- 6. Aggregate result (no credentials, no URLs, no headers) ----
+    const int retired_deleted =
+        s_stories_retired_deleted + s_music_retired_deleted + s_voice_retired_deleted;
+    // Reported on the heartbeat via content_sync_last_retired_deleted() /
+    // content_sync_last_orphans_swept() — see their declarations in
+    // content_sync.h.
+    s_last_retired_deleted = retired_deleted;
+    s_last_orphans_swept   = s_orphan_files_removed;
     Serial.printf("[content-sync] summary manifest_items=%d accepted_items=%d "
                   "invalid_items=%d duplicate_items=%d disabled_items=%d "
-                  "truncated_items=%d already_current=%d downloaded=%d failed=%d "
-                  "carried_forward=%d active_index_items=%d index_written=%d\n",
+                  "retired_items=%d truncated_items=%d already_current=%d "
+                  "downloaded=%d failed=%d carried_forward=%d active_index_items=%d "
+                  "index_written=%d retired_deleted=%d orphans_swept=%d\n",
                   stats.offered, s_manifest_count, stats.invalid, stats.duplicate,
-                  stats.disabled, stats.truncated, already, downloaded, failed, carried,
-                  s_active_count, index_written ? 1 : 0);
+                  stats.disabled, stats.retired, stats.truncated, already, downloaded,
+                  failed, carried, s_active_count, index_written ? 1 : 0,
+                  retired_deleted, s_orphan_files_removed);
     Serial.printf("[content-sync] heap after=%u\n", (unsigned)ESP.getFreeHeap());
     Serial.flush();
 
@@ -1821,5 +2215,8 @@ int32_t content_sync_seconds_since_ok() {
     if (!s_had_ok) return -1;
     return (int32_t)((millis() - s_last_ok_ms) / 1000UL);
 }
+
+int content_sync_last_retired_deleted() { return s_last_retired_deleted; }
+int content_sync_last_orphans_swept()   { return s_last_orphans_swept; }
 
 #endif  // AREG_CONTENT_SYNC_BENCH

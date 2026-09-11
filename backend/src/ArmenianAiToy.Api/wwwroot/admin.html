@@ -560,6 +560,17 @@ const tabs = {
       if (!m) return '<span class="mut">—</span>';
       if (r.eventType==='InternalConsoleAction')
         return `<b>${esc(m.action)}</b> = ${esc(String(m.value))} <span class="mut">·</span> ${esc(m.reason||'')}`;
+      // Retention orphan sweeps (2026-09-11) — counts-only metadata, read
+      // straight off the raw JSON so a field renamed there shows up here
+      // too rather than silently going stale.
+      if (r.eventType==='AudioBlobOrphansSwept')
+        return `${m.directories_deleted} dir(s), ${m.files_deleted} file(s) deleted `
+          + `<span class="mut">(examined ${m.directories_examined}`
+          + `${m.delete_failures ? ', ' + m.delete_failures + ' failed' : ''})</span>`;
+      if (r.eventType==='UploadedContentOrphansSwept')
+        return `${m.files_deleted} file(s) deleted `
+          + `<span class="mut">(examined ${m.files_examined}`
+          + `${m.delete_failures ? ', ' + m.delete_failures + ' failed' : ''})</span>`;
       return `<code class="mono">${esc(JSON.stringify(m))}</code>`;
     };
     const cols = [

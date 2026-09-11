@@ -87,8 +87,14 @@ public sealed class ContentManifestService : IContentManifestService
                 AudioUrl: ResolveAudioUrl(story),
                 Sha256: story.Sha256.ToLowerInvariant(),
                 SizeBytes: story.SizeBytes,
-                Enabled: true)
+                // Retirement (2026-09-11) — a retired item is never a
+                // download candidate, and is emitted with retired:true
+                // (still with a fully valid url/sha/size — see
+                // ContentStoryItem.Retired for why) instead of the
+                // ordinary enabled:true.
+                Enabled: !story.Retired)
             {
+                Retired = story.Retired,
                 Clips = BuildClips(story),
                 SeriesId = hasSeries ? story.SeriesId : null,
                 SeriesIndex = hasSeries ? story.SeriesIndex : null,
@@ -156,7 +162,10 @@ public sealed class ContentManifestService : IContentManifestService
                     : clip.AudioUrl,
                 Sha256: clip.Sha256.ToLowerInvariant(),
                 SizeBytes: clip.SizeBytes,
-                Enabled: true));
+                Enabled: !clip.Retired)
+            {
+                Retired = clip.Retired,
+            });
         }
         return items.Count == 0 ? null : items;
     }
@@ -186,7 +195,10 @@ public sealed class ContentManifestService : IContentManifestService
                     : clip.AudioUrl,
                 Sha256: clip.Sha256.ToLowerInvariant(),
                 SizeBytes: clip.SizeBytes,
-                Enabled: true));
+                Enabled: !clip.Retired)
+            {
+                Retired = clip.Retired,
+            });
         }
         return items.Count == 0 ? null : items;
     }
@@ -217,7 +229,10 @@ public sealed class ContentManifestService : IContentManifestService
                     : track.AudioUrl,
                 Sha256: track.Sha256.ToLowerInvariant(),
                 SizeBytes: track.SizeBytes,
-                Enabled: true));
+                Enabled: !track.Retired)
+            {
+                Retired = track.Retired,
+            });
         }
         return items.Count == 0 ? null : items;
     }
