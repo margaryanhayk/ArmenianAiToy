@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 2810 tests, ~35 s in Release
+dotnet test            # 2841 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -234,14 +234,17 @@ factory station (backend done, firmware + factory station compile/dry-run
 verified, never bench-flashed — see the subsection below); content
 retirement, per-namespace index writes, and the bounded SD orphan sweep
 (backend + firmware done, both compile-verified, never bench-flashed —
-see the subsection below).
+see the subsection below); durable child audio (backend fails closed and
+tests green — see the subsection below — but `Audio__BlobStoreRoot` still
+needs to actually be SET on Railway for the durability guarantee to hold;
+until then voice chat refuses with 503 instead of losing recordings
+silently, which is the point, but it is not yet a working deployment).
 
 Still to implement: a `sound-detective` firmware game (backend content
 ready — 21 clips already in `ContentSync:Games` — no engine written); two
 Simon tone clips (`tone-green` / `tone-red`, not yet rendered); render
-variant endings + serial; music tracks; durable child recordings
-(`Audio:BlobStoreRoot` unset on Railway — data lost on redeploy); narrator
-PVC; rev-A PCB routing + speaker test + order; usage tiers.
+variant endings + serial; music tracks; narrator PVC; rev-A PCB routing +
+speaker test + order; usage tiers.
 
 ### Online Game/Riddle/Curiosity/Calm voice contract (2026-09-11)
 
@@ -371,6 +374,80 @@ Compile-verified both sides (`dotnet build`/`dotnet test` green;
 nothing here has been heard on real hardware. See
 `esp32/AregVoiceMvp/README.md`'s bench checklist for what a human still
 has to verify.
+
+### Durable child audio + child recording download (2026-09-11)
+
+`Audio:BlobStoreRoot` used to have no fail-closed contract at all (unlike
+`ContentSync:UploadRoot`): unset or relative on Railway meant every child
+and assistant recording was written inside the container and silently
+destroyed on the next redeploy.
+
+**Fail-closed resolver.** `AudioBlobStoreRootResolver.Resolve` (pure,
+`Api/Security/`, pinned by test) treats unset OR relative as "not
+configured" in any non-Development environment; Development keeps the
+historical relative default. `POST /api/chat/audio` calls it before
+STT/chat/TTS and refuses the whole turn with 503 when unconfigured — never
+silently drops a recording after the fact. `GET /api/health` gains an
+additive, non-fatal `audioStore: ok|unconfigured` field (liveness stays
+DB-only, same posture as the existing `openai` field). `Program.cs` logs a
+loud startup warning. Operators: set `Audio__BlobStoreRoot=/data/audio-blobs`
+on Railway — see `docs/ops-runbook.md`.
+
+**Backups.** `DatabaseBackupService` now zips `Audio:BlobStoreRoot` beside
+the DB snapshot and the uploads archive, same one-per-UTC-day idiom, with
+its own opt-out (`Backup:AudioBlobs:Enabled=false`) and size cap
+(`Backup:AudioBlobs:MaxSizeBytes`, default 500 MB — voice recordings have
+no natural ceiling the way curated uploads do; over-cap skips the tick
+with a warning, DB snapshot unaffected). Root resolution mirrors
+`RetentionPurgeService`'s existing orphan-sweep fallback, so it archives
+whatever directory the store is actually writing to. Does not touch, race,
+or duplicate PR #40's orphan sweepers.
+
+**Child audio download closes the C2.2 honesty gap.** Parents could
+already replay Areg's assistant replies (C2.1) but never their own child's
+recordings. `GET /api/parents/messages/{messageId}/child-audio` is the
+mirror image of the assistant replay endpoint: same
+Message→Conversation→Device→ParentDevice ownership join
+(`ParentService.GetChildAudioMessageAsync`), same uniform 404 on every
+miss, gated on `MessageRole.User` instead of `Assistant` (an assistant MP3
+can never serve through this endpoint and vice versa — the keystone test
+in both directions), a MIME whitelist (`audio/wav`, `audio/mpeg` — the
+only two `LocalDiskAudioBlobStore.ReadAsync` can ever report), served as
+`Content-Disposition: attachment` with a messageId-only (PII-free)
+filename. No audit row for a read, same posture as the assistant replay.
+`MessageDto.ChildAudioAvailable` (User role AND `AudioBlobPath != null`)
+drives a new control on `parent.html`'s child message rows — listen
+first (reusing "▶ Listen", the same fetch-with-Authorization-header +
+inline `<audio>` pattern as the assistant control), then an additional
+"⬇ Save recording" button on the same fetched blob saves it as a file
+(untracked object URL, revoked on a timeout, matching the existing export
+download's idiom — NOT the player's `trackObjectUrl`, which a view change
+would revoke mid-save). The export's `audioDisclosure.childAudioStatus`
+now describes the endpoint instead of disclaiming the gap;
+`docs/privacy-parents.md` updated, including that a saved copy is the
+parent's own and outlives conversation/account deletion. Mobile
+(`mobile/AregParent`) has no conversation-detail audio UI at all yet for
+either direction (C2.1 was never mirrored there either), so no mobile
+changes — nothing to hook new i18n keys into.
+
+**Known gap, not closed in this slice:** `ChildAudioAvailable` reflects
+the DB column only (`AudioBlobPath != null`), not whether the file still
+exists on disk. Every child recording written before this slice was
+written under a NON-durable `Audio:BlobStoreRoot` on Railway, so on a
+fleet that has ever redeployed since the toy launched, many historical
+rows will show the control and 404 when pressed. Mitigated with calm,
+non-red copy («այս ձայնագրությունն այլևս պահված չէ») rather than the red
+"unavailable" wording, so it reads as an honest limitation, not a fault —
+but the control still appears where it cannot work. Closing this for real
+means an existence check in the `ConversationService`/export projections
+(a new `IAudioBlobStore` method, and a per-row disk stat on every
+conversation-list render), which is its own plan-and-approval item, not a
+copy fix.
+
+Backend fully compile- and test-verified (`dotnet build`/`dotnet test`
+green, new resolver/backup/endpoint tests). NOT verified: an operator
+actually setting `Audio__BlobStoreRoot` on a live Railway instance, or the
+dashboard control against a real browser session.
 
 ## Working in this repo (agents)
 

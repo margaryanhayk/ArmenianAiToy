@@ -11,8 +11,10 @@ using ArmenianAiToy.Infrastructure.Data;
 using ArmenianAiToy.Infrastructure.OpenAI;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HostFiltering;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
@@ -303,6 +305,23 @@ if (!app.Environment.IsDevelopment())
             "indefinitely with no automatic purge. Set a positive MaxAgeDays in prod.");
 }
 
+// 2026-09-11 — fail-closed check for the voice-recording blob store, same
+// posture as the DB connection string above but non-fatal: an unset or
+// relative Audio:BlobStoreRoot in a non-Development environment does NOT
+// stop the app booting (the rest of the toy still works), but every
+// endpoint that WRITES an audio blob refuses with 503
+// (see AudioChatController + AudioBlobStoreRootResolver) and /api/health
+// carries the same signal in its additive `audioStore` field. This warning
+// is the one place an operator sees it without reading logs per-request.
+var audioBlobStoreResolution = AudioBlobStoreRootResolver.Resolve(
+    app.Environment.IsDevelopment(), builder.Configuration["Audio:BlobStoreRoot"]);
+if (!audioBlobStoreResolution.IsConfigured)
+{
+    app.Logger.LogWarning(
+        "{AudioBlobStoreWarning} Voice chat will refuse with 503 until this is set.",
+        audioBlobStoreResolution.Reason);
+}
+
 // Apply any unapplied EF Core migrations. Replaces the previous
 // EnsureCreated() call — migrations are now the single source of truth
 // for the schema. First-pull-after-this-commit policy: delete any
@@ -567,12 +586,19 @@ app.UseOpenTelemetryPrometheusScrapingEndpoint();
 // quota burn) that surfaces a sustained outage to dashboards/alerts without
 // affecting the LB verdict. See HealthProbe + OpenAIReliabilityGate.IsCircuitOpen.
 app.MapGet("/api/health", async (
-    AppDbContext db, OpenAIReliabilityGate openAiGate, CancellationToken ct) =>
+    AppDbContext db, OpenAIReliabilityGate openAiGate,
+    IConfiguration config, IWebHostEnvironment env, CancellationToken ct) =>
 {
     var dbOk = await HealthProbe.IsDatabaseReachableAsync(db, TimeSpan.FromSeconds(2), ct);
     AppMeter.HealthProbe.Add(1,
         new KeyValuePair<string, object?>("result", dbOk ? "ok" : "unhealthy"));
     var openAiDegraded = openAiGate.IsCircuitOpen();
+    // 2026-09-11 — additive, non-fatal: mirrors the `openai` field's
+    // posture. A misconfigured Audio:BlobStoreRoot does not fail liveness
+    // (the rest of the toy still serves), it just means voice-chat turns
+    // are currently refusing with 503 — see AudioBlobStoreRootResolver.
+    var audioStoreOk = AudioBlobStoreRootResolver.Resolve(
+        env.IsDevelopment(), config["Audio:BlobStoreRoot"]).IsConfigured;
     var payload = new
     {
         status = dbOk ? "ok" : "unhealthy",
@@ -581,7 +607,8 @@ app.MapGet("/api/health", async (
         // Non-fatal: "degraded" means the breaker is currently open (recent
         // OpenAI failures); the instance is still live and serves cached /
         // gated paths. Does NOT flip the HTTP status.
-        openai = openAiDegraded ? "degraded" : "ok"
+        openai = openAiDegraded ? "degraded" : "ok",
+        audioStore = audioStoreOk ? "ok" : "unconfigured"
     };
     return dbOk ? Results.Ok(payload) : Results.Json(payload, statusCode: 503);
 });

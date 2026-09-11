@@ -2167,7 +2167,8 @@ public class ParentService : IParentService
                         m.Timestamp,
                         m.SafetyFlag,
                         AudioAvailable: m.Role == MessageRole.Assistant && m.AudioBlobPath != null,
-                        Mode: m.Mode
+                        Mode: m.Mode,
+                        ChildAudioAvailable: m.Role == MessageRole.User && m.AudioBlobPath != null
                     )).ToList()
                 )).ToList()
                 : new List<ConversationDto>()
@@ -2251,9 +2252,11 @@ public class ParentService : IParentService
                       "'audioAvailable' flag indicates whether a replayable assistant " +
                       "recording exists for it.",
                 AssistantAudioEndpoint: "GET /api/parents/messages/{messageId}/audio",
-                ChildAudioStatus: "The child's own uploaded audio is retained under the " +
-                      "configured retention policy but is not currently included in this " +
-                      "export or exposed through a per-recording download endpoint."),
+                ChildAudioStatus: "The child's own recorded audio is retained under the " +
+                      "configured retention policy and is not embedded in this export, but " +
+                      "IS downloadable per-recording via " +
+                      "GET /api/parents/messages/{messageId}/child-audio — each message's " +
+                      "'childAudioAvailable' flag indicates whether one exists."),
             // #067 — disclose the data-retention policy so a parent can see
             // "deleted after N days" (GDPR storage-limitation transparency).
             DataRetention: BuildRetentionDisclosure());
@@ -2558,6 +2561,36 @@ public class ParentService : IParentService
         var hit = await _db.Set<Message>()
             .Where(m => m.Id == messageId
                      && m.Role == MessageRole.Assistant
+                     && m.AudioBlobPath != null)
+            .Join(
+                _db.Set<Conversation>(),
+                m => m.ConversationId,
+                c => c.Id,
+                (m, c) => new { ConversationId = c.Id, MessageId = m.Id, c.DeviceId })
+            .Where(x => _db.Set<ParentDevice>().Any(
+                pd => pd.ParentId == parentId && pd.DeviceId == x.DeviceId))
+            .Select(x => new { x.ConversationId, x.MessageId })
+            .FirstOrDefaultAsync();
+
+        if (hit is null)
+            return null;
+        return (hit.ConversationId, hit.MessageId);
+    }
+
+    /// <summary>
+    /// 2026-09-11 — resolve a message id for parent-dashboard CHILD audio
+    /// download. Identical shape and ownership join to
+    /// <see cref="GetAssistantAudioMessageAsync"/> above, gated on
+    /// <see cref="MessageRole.User"/> instead of
+    /// <see cref="MessageRole.Assistant"/>. No DB write, no audit row —
+    /// same posture as the assistant replay read.
+    /// </summary>
+    public async Task<(Guid ConversationId, Guid MessageId)?> GetChildAudioMessageAsync(
+        Guid parentId, Guid messageId)
+    {
+        var hit = await _db.Set<Message>()
+            .Where(m => m.Id == messageId
+                     && m.Role == MessageRole.User
                      && m.AudioBlobPath != null)
             .Join(
                 _db.Set<Conversation>(),

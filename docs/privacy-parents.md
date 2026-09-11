@@ -65,13 +65,14 @@ From the parent dashboard, at any time:
 - **Delete your account.** Everything belonging to you goes with it.
 - **Pause the toy**, or set quiet hours, or switch off any of the play modes.
 
-### One honest limitation
+### Your child's recordings
 
-Your child's own recordings are kept for the 90 days and are **not currently
-downloadable one by one** — the export tells you they exist and when, but does
-not hand you the audio files. Areg's replies *are* playable. This is a gap in
-what we have built, not a policy: the recordings are yours, and a download for
-them is on the list.
+Your child's own recordings are kept for the 90 days and, like Areg's
+replies, can be played back from the dashboard — look for "▶ Listen" on a
+message that has one. Underneath it, "⬇ Save recording" saves it as a file
+on your own device, because it is your child's voice and it is yours to
+keep. A recording you save this way is a copy on your own device: deleting
+the conversation, or your account, removes our copy — not yours.
 
 ## Who can see it
 
@@ -101,6 +102,6 @@ than none, and we would rather fix either the page or the software.
 
 ---
 
-*Last updated 2026-08-12. The retention period on this page is read from the
+*Last updated 2026-09-11. The retention period on this page is read from the
 same configuration the automatic deletion uses; if you find it disagrees with
 your export, that is a bug and we want to hear about it.*

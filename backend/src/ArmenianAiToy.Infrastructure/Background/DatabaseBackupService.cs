@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ArmenianAiToy.Application.Helpers;
+using ArmenianAiToy.Infrastructure.Audio;
 using ArmenianAiToy.Infrastructure.Data;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -76,6 +77,21 @@ public sealed class DatabaseBackupService : BackgroundService
     /// <see cref="FilePrefix"/> so each prune pass only ever matches its own
     /// files — the rule that keeps a prune from touching the live DB.</summary>
     public const string UploadsFilePrefix = "areg-uploads-";
+
+    /// <summary>Audio-blob archive prefix (2026-09-11) — child + assistant
+    /// voice recordings under <c>Audio:BlobStoreRoot</c>. Own namespace, same
+    /// reason as <see cref="UploadsFilePrefix"/>.</summary>
+    public const string AudioBlobsFilePrefix = "areg-audio-blobs-";
+
+    /// <summary>Default cap on the TOTAL size of <c>Audio:BlobStoreRoot</c>
+    /// this service will zip in one tick. Unlike uploaded story content
+    /// (small, curated, operator-reviewed), voice recordings accumulate from
+    /// every child turn with no natural ceiling — an unbounded zip could
+    /// exhaust disk or take the tick well past its interval. A tick that
+    /// exceeds the cap logs a warning and skips (the database snapshot and
+    /// the uploads archive are unaffected either way); it tries again next
+    /// tick, so shrinking the source (e.g. retention) unblocks it.</summary>
+    public const long DefaultAudioBlobsMaxSizeBytes = 500L * 1024 * 1024;
 
     private static readonly TimeSpan InitialDelay = TimeSpan.FromMinutes(1);
 
@@ -160,6 +176,11 @@ public sealed class DatabaseBackupService : BackgroundService
         // so skipping it because the database happened to be current would
         // defeat the reason it is backed up at all.
         BackupUploads(dir);
+
+        // Same reasoning applies to voice recordings: a child's own spoken
+        // turn exists nowhere else either. Runs last so a slow/huge audio
+        // archive can never delay or crowd out the database snapshot above.
+        BackupAudioBlobs(dir);
     }
 
     /// <summary>Where snapshots go: the configured directory, else
@@ -277,6 +298,90 @@ public sealed class DatabaseBackupService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Archives <c>Audio:BlobStoreRoot</c> — child + assistant voice
+    /// recordings — beside the database snapshot, on the same
+    /// one-per-UTC-day, write-a-.part-then-move, keep-the-newest-N idiom as
+    /// <see cref="BackupUploads"/>.
+    ///
+    /// <para>
+    /// Root resolution mirrors <c>LocalDiskAudioBlobStore</c>'s own default
+    /// (unset falls back to <see cref="LocalDiskAudioBlobStore.DefaultBlobStoreRoot"/>)
+    /// — the same fallback <see cref="RetentionPurgeService"/>'s orphan sweep
+    /// uses — so this always archives whatever directory the store is
+    /// actually writing to, on every environment including Development.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Opt-out</b> (<c>Backup:AudioBlobs:Enabled=false</c>) and a
+    /// <b>size cap</b> (<c>Backup:AudioBlobs:MaxSizeBytes</c>, default
+    /// <see cref="DefaultAudioBlobsMaxSizeBytes"/>) — see their doc comments.
+    /// Skipped entirely when the root does not exist or is empty. Failures
+    /// are logged and swallowed: this must never take the API down, and
+    /// must never prevent the database snapshot, which is why it runs last.
+    /// </para>
+    /// </summary>
+    private void BackupAudioBlobs(string dir)
+    {
+        try
+        {
+            if (string.Equals(_config["Backup:AudioBlobs:Enabled"], "false", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogDebug("Audio-blob backup disabled via Backup:AudioBlobs:Enabled=false");
+                return;
+            }
+
+            var configuredRoot = _config["Audio:BlobStoreRoot"];
+            var root = string.IsNullOrWhiteSpace(configuredRoot)
+                ? LocalDiskAudioBlobStore.DefaultBlobStoreRoot
+                : configuredRoot;
+
+            if (!Directory.Exists(root) || !Directory.EnumerateFileSystemEntries(root).Any())
+            {
+                return;
+            }
+
+            var maxBytes = ReadLong("Backup:AudioBlobs:MaxSizeBytes", DefaultAudioBlobsMaxSizeBytes);
+            var totalBytes = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+                .Sum(f => new FileInfo(f).Length);
+            if (totalBytes > maxBytes)
+            {
+                _logger.LogWarning(
+                    "Audio-blob backup skipped: {SizeBytes} bytes exceeds the " +
+                    "{MaxBytes}-byte cap (Backup:AudioBlobs:MaxSizeBytes) — this tick's " +
+                    "recordings are NOT archived. Raise the cap or shrink Audio:BlobStoreRoot " +
+                    "(e.g. via retention).",
+                    totalBytes, maxBytes);
+                return;
+            }
+
+            var finalPath = Path.Combine(dir, $"{AudioBlobsFilePrefix}{DateTime.UtcNow:yyyyMMdd}.zip");
+            if (File.Exists(finalPath))
+            {
+                _logger.LogDebug("Audio-blob backup for today already exists at {Path}", finalPath);
+                Prune(dir, AudioBlobsFilePrefix, "*.zip");
+                return;
+            }
+
+            var partPath = finalPath + ".part";
+            if (File.Exists(partPath)) File.Delete(partPath);
+
+            ZipFile.CreateFromDirectory(root, partPath, CompressionLevel.Fastest, false);
+            File.Move(partPath, finalPath);
+
+            _logger.LogInformation(
+                "Audio-blob backup written: {Path} ({SizeBytes} bytes)",
+                finalPath, new FileInfo(finalPath).Length);
+
+            Prune(dir, AudioBlobsFilePrefix, "*.zip");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Audio-blob backup failed; the database snapshot is unaffected");
+        }
+    }
+
     /// <summary>Keep the newest KeepCount snapshots (date-stamped names
     /// sort chronologically); delete the rest. Only files matching the
     /// given prefix AND extension are ever considered, so each family prunes
@@ -307,4 +412,7 @@ public sealed class DatabaseBackupService : BackgroundService
 
     private int ReadInt(string key, int fallback)
         => int.TryParse(_config[key], out var v) ? v : fallback;
+
+    private long ReadLong(string key, long fallback)
+        => long.TryParse(_config[key], out var v) ? v : fallback;
 }

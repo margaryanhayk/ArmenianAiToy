@@ -1,4 +1,5 @@
 using ArmenianAiToy.Api.RateLimiting;
+using ArmenianAiToy.Api.Security;
 using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Helpers;
@@ -7,9 +8,11 @@ using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Domain.Enums;
 using ArmenianAiToy.Infrastructure.Data;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -28,6 +31,15 @@ namespace ArmenianAiToy.Api.Controllers;
 /// <see cref="Message.Content"/> via the existing ChatService flow;
 /// audio is an attachment that the retention / audit / export
 /// contracts can catch up to in C2.
+/// </para>
+/// <para>
+/// <b>Fails closed on a non-durable blob store</b> (2026-09-11): a turn
+/// refuses with 503 before any STT/chat/TTS cost when
+/// <c>Audio:BlobStoreRoot</c> is unset or relative in a non-Development
+/// environment (see <see cref="ArmenianAiToy.Api.Security.AudioBlobStoreRootResolver"/>) —
+/// the same posture as <c>ContentSync:UploadRoot</c>, because on Railway the
+/// container filesystem is wiped on every redeploy and a misconfigured root
+/// would otherwise lose every recording with no error at all.
 /// </para>
 /// <para>
 /// Story mode only for C1. The mode-enabled gate checks
@@ -51,6 +63,8 @@ public class AudioChatController : ControllerBase
     private readonly AppDbContext _db;
     private readonly OpenAICostMeter _costMeter;
     private readonly IOptions<OpenAIDailyCostCapOptions> _costCapOptions;
+    private readonly IWebHostEnvironment _env;
+    private readonly IConfiguration _config;
     private readonly ILogger<AudioChatController> _logger;
 
     public AudioChatController(
@@ -63,6 +77,8 @@ public class AudioChatController : ControllerBase
         AppDbContext db,
         OpenAICostMeter costMeter,
         IOptions<OpenAIDailyCostCapOptions> costCapOptions,
+        IWebHostEnvironment env,
+        IConfiguration config,
         ILogger<AudioChatController> logger)
     {
         _chatService = chatService;
@@ -74,6 +90,8 @@ public class AudioChatController : ControllerBase
         _db = db;
         _costMeter = costMeter;
         _costCapOptions = costCapOptions;
+        _env = env;
+        _config = config;
         _logger = logger;
     }
 
@@ -94,6 +112,7 @@ public class AudioChatController : ControllerBase
     [ProducesResponseType(413)]
     [ProducesResponseType(429)]
     [ProducesResponseType(502)]
+    [ProducesResponseType(503)]
     public async Task<IActionResult> Chat(CancellationToken cancellationToken)
     {
         var deviceId = (Guid)HttpContext.Items["DeviceId"]!;
@@ -106,6 +125,26 @@ public class AudioChatController : ControllerBase
         if (string.Equals(Request.Headers["X-Areg-Continue"], "1", StringComparison.Ordinal))
         {
             return await ContinueAutoplayAsync(deviceId, cancellationToken);
+        }
+
+        // Fail closed like ContentSync:UploadRoot: this turn WRITES both the
+        // child's audio and Areg's synthesized reply to Audio:BlobStoreRoot.
+        // A misconfigured (unset/relative in non-Development) root would
+        // silently lose every recording on the next redeploy, so refuse the
+        // whole turn up front — before paying for STT/chat/TTS — rather than
+        // discovering it later as a quietly-null AudioBlobPath. Autoplay-
+        // continue above never writes a blob and is unaffected.
+        var blobStoreResolution = AudioBlobStoreRootResolver.Resolve(
+            _env.IsDevelopment(), _config["Audio:BlobStoreRoot"]);
+        if (!blobStoreResolution.IsConfigured)
+        {
+            _logger.LogError(
+                "Audio chat refused: {Reason}", blobStoreResolution.Reason);
+            return StatusCode(503, new
+            {
+                error = "Voice recordings are not configured durably on this deployment " +
+                        "(Audio:BlobStoreRoot is unset or relative)."
+            });
         }
 
         var inboundContentType = Request.ContentType;

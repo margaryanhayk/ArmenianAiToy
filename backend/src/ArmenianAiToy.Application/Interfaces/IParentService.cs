@@ -245,4 +245,19 @@ public interface IParentService
     /// </summary>
     Task<(Guid ConversationId, Guid MessageId)?> GetAssistantAudioMessageAsync(
         Guid parentId, Guid messageId);
+
+    /// <summary>
+    /// 2026-09-11 — resolve a message id for parent-dashboard CHILD audio
+    /// download. The mirror image of <see cref="GetAssistantAudioMessageAsync"/>:
+    /// same Message → Conversation → Device → ParentDevice ownership chain,
+    /// but gated on <see cref="Domain.Enums.MessageRole.User"/> instead of
+    /// <see cref="Domain.Enums.MessageRole.Assistant"/>. Returns
+    /// <c>null</c> on every miss reason (unknown id, message owned by
+    /// another family, assistant role, null <c>AudioBlobPath</c>) so the
+    /// controller surfaces an identical 404 in every case — no existence
+    /// leak across families, and an assistant MP3 is never served through
+    /// this endpoint even if the parent owns the conversation.
+    /// </summary>
+    Task<(Guid ConversationId, Guid MessageId)?> GetChildAudioMessageAsync(
+        Guid parentId, Guid messageId);
 }

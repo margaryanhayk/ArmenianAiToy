@@ -1394,4 +1394,70 @@ public class ParentController : ControllerBase
         Response.Headers["Cache-Control"] = "no-store";
         return File(blob.Value.Content, "audio/mpeg");
     }
+
+    /// <summary>
+    /// 2026-09-11 — closes the C2.2 honesty gap: parents can now download
+    /// their own child's recorded audio, not just Areg's assistant replies.
+    /// Mirror image of <see cref="GetMessageAudio"/>: same ownership join
+    /// (via <see cref="IParentService.GetChildAudioMessageAsync"/>), same
+    /// uniform 404 on every miss reason, but gated on
+    /// <see cref="ArmenianAiToy.Domain.Enums.MessageRole.User"/> instead of
+    /// Assistant — an assistant MP3 can never be served through this
+    /// endpoint even if the parent owns the conversation.
+    /// <para>
+    /// <b>Download, not inline replay.</b> Served with
+    /// <c>Content-Disposition: attachment</c> and a filename built from the
+    /// message id only (no email, device name, or transcript text) — the
+    /// same PII-free convention as the export's filename.
+    /// </para>
+    /// <para>
+    /// <b>MIME whitelist.</b> <see cref="ArmenianAiToy.Infrastructure.Audio.LocalDiskAudioBlobStore.ReadAsync"/>
+    /// only ever reports <c>audio/wav</c> or <c>audio/mpeg</c> (the two
+    /// extensions the C1 writer actually persists) — anything else
+    /// collapses to the same uniform 404, defense-in-depth against a future
+    /// blob-store change or a manual file placement serving an unexpected
+    /// payload through this endpoint.
+    /// </para>
+    /// <para>No audit row for a read — same posture as the assistant replay.</para>
+    /// </summary>
+    [HttpGet("messages/{messageId}/child-audio")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetChildAudio(
+        Guid messageId,
+        [FromServices] IAudioBlobStore blobStore,
+        CancellationToken cancellationToken)
+    {
+        var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var hit = await _parentService.GetChildAudioMessageAsync(parentId, messageId);
+        if (hit is null)
+            return NotFound(new { error = "Audio not available." });
+
+        var blob = await blobStore.ReadAsync(
+            hit.Value.ConversationId, hit.Value.MessageId, cancellationToken);
+        if (blob is null)
+            return NotFound(new { error = "Audio not available." });
+
+        if (!ChildAudioMimeWhitelist.Contains(blob.Value.MimeType))
+            return NotFound(new { error = "Audio not available." });
+
+        Response.Headers["Cache-Control"] = "no-store";
+        var extension = string.Equals(blob.Value.MimeType, "audio/wav", StringComparison.OrdinalIgnoreCase)
+            ? "wav" : "mp3";
+        var filename = $"areg-recording-{messageId:N}.{extension}";
+        return File(blob.Value.Content, blob.Value.MimeType, fileDownloadName: filename);
+    }
+
+    /// <summary>
+    /// The exact set of MIME types <c>LocalDiskAudioBlobStore.ReadAsync</c>
+    /// can ever report (it probes only <c>.wav</c> and <c>.mp3</c> on
+    /// disk) — kept as an explicit allow-list here rather than trusting
+    /// the store's reported MIME, so a future store change cannot widen
+    /// what this endpoint will serve without a matching code change.
+    /// </summary>
+    private static readonly HashSet<string> ChildAudioMimeWhitelist =
+        new(StringComparer.OrdinalIgnoreCase) { "audio/wav", "audio/mpeg" };
 }
