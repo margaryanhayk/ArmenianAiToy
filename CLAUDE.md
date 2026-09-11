@@ -233,10 +233,10 @@ mid-story shout pauses (never bench-run); the 10 story variant endings
 `check_story_audio.py` PASS 20/20, `dotnet test` green, listen test
 still open); the Tsivik serial (drafts + speaker maps + placeholder
 ContentSync rows prepared 2026-09-11 — see the subsection below — still
-not rendered or promoted, blocked on owner sign-off); bedtime music (4
-tracks defined, reviewed and pipeline-verified 2026-09-11, render still
-blocked on live-docs verification of the Music API endpoint — see the
-subsection below — still no rendered audio, no listen test); hold-to-menu (unverified by hand, not
+not rendered or promoted, blocked on owner sign-off); bedtime music (all 4
+tracks rendered and shipped 2026-09-11 — see the subsection below —
+`check_music_audio.py` PASS 4/4, `dotnet test` green, listen test still
+open); hold-to-menu (unverified by hand, not
 staged for OTA); streaming Q&A firmware flag off; mobile app has a
 documented, partially-exercised local Android build recipe but still no
 verified APK or on-device run (see the subsection below); listen tests of
@@ -259,9 +259,7 @@ Still to implement: a `sound-detective` firmware game (backend content
 ready — 21 clips already in `ContentSync:Games` — no engine written); two
 Simon tone clips (`tone-green` / `tone-red`, not yet rendered); render
 variant endings + serial (inputs prepared, see below — the render itself
-is still open); render bedtime music (inputs prepared, see below — the
-render itself is still open); narrator PVC; rev-A PCB routing + speaker
-test + order.
+is still open); narrator PVC; rev-A PCB routing + speaker test + order.
 
 ### Online Game/Riddle/Curiosity/Calm voice contract (2026-09-11)
 
@@ -710,18 +708,32 @@ placeholder `ContentSync:Stories` rows are unchanged from PR #45.
 **The human listen test is still open for all 10 rendered endings** —
 nobody has heard any of them yet.
 
-### Bedtime music — render still blocked (2026-09-11, render session)
+### Bedtime music — 4 of 4 rendered and shipped (2026-09-11, render session)
 
-`ELEVENLABS_API_KEY` became available, but step 0 of
-`docs/bedtime-music-render-runbook.md` — verifying the ElevenLabs Music
-API endpoint against live docs before spending — could not be closed:
-`WebFetch` to `elevenlabs.io` returned `EGRESS_BLOCKED` in this session
-too. No render was attempted; the 4 `ContentSync:Music` rows are
-unchanged from PR #46 (`SizeBytes: 0`, placeholder). See
-`tools/quality-evidence/bedtime-music-prep-20260911.md`'s "Render
-attempt" section. Still needs a human (or a session with `elevenlabs.io`
-reachable) to confirm `generate_music.py`'s `ENDPOINT`/request body
-before the first real `--render --confirm-paid-api`.
+`ELEVENLABS_API_KEY` became available. Step 0 of
+`docs/bedtime-music-render-runbook.md` (verify the Music API before
+spending) was closed by calling `api.elevenlabs.io` directly rather than
+fetching docs — `elevenlabs.io` (the docs site) stayed `EGRESS_BLOCKED`,
+but the API host itself is reachable: one cheap probe
+(`music_length_ms: 10000`) returned HTTP 200 with a real MP3 back,
+confirming `generate_music.py`'s `POST /v1/music` shape.
+`force_instrumental: true` was added to the request body as a verified
+belt-and-suspenders on the in-prompt instrumental instruction.
+
+All four tracks rendered on the first call each (no retries), passed
+`check_music_audio.py` (4/4, one ID3 tag each, all inside the 3–5 min
+window at their exact requested lengths), and measured within 0.9 LU of
+the -23 LUFS target. The four `ContentSync:Music` placeholder rows now
+carry real `SizeBytes`/`Sha256`;
+`ContentSyncMusicTests.Manifest_ShippedPlaceholderTracks_AreDropped` was
+replaced with `Manifest_ShippedTracks_AllFourReachTheManifest`. `dotnet
+build`/`dotnet test` green (2931 tests, none added — one renamed). Full
+sha256 table and commands: `tools/quality-evidence/
+bedtime-music-prep-20260911.md`'s "Render" section.
+
+**The human listen test is still open for all four tracks** — nobody has
+heard any of them yet, at any volume; the -23 LUFS target itself remains
+unconfirmed by ear on the toy's actual speaker.
 
 ## Working in this repo (agents)
 

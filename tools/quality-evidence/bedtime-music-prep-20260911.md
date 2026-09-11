@@ -162,3 +162,97 @@ four `ContentSync:Music` rows are unchanged (`SizeBytes: 0`, all-zero
 **Still open, unchanged from the prior session's blockers above**: the
 endpoint verification itself, the human listen test, and the -23 LUFS
 choice being untested on hardware.
+
+## Render — 4 of 4 rendered and shipped (2026-09-11, later render session)
+
+`ELEVENLABS_API_KEY` was set. Step 0's endpoint check was closed by direct
+verification instead of a docs fetch, since `elevenlabs.io` (the docs
+site) is still unreachable from this environment but `api.elevenlabs.io`
+(the API itself) is: one cheap probe,
+`{"prompt": "...", "music_length_ms": 10000, "force_instrumental": true}`
+against `POST https://api.elevenlabs.io/v1/music`, returned HTTP 200 with
+a real 10.03s MP3 (ID3v2.4, MPEG layer III, confirmed via `ffprobe`/`file`)
+in the response body — confirming `generate_music.py`'s documented shape
+(`prompt` + `music_length_ms`, raw audio bytes back, not the alternate
+`/v1/music/compose` plan-then-render flow). `force_instrumental: true` was
+added to the request body on top of the in-prompt instrumental
+instruction, since the probe proved the field is accepted; the script's
+"ON THE ENDPOINT SHAPE, HONESTLY" docstring section was updated to record
+the verification instead of flagging it as open.
+
+All four tracks were then rendered once each via
+`python3 tools/story-ambience/generate_music.py --render --confirm-paid-api`
+(no `--force`, no re-renders needed — every track succeeded on the first
+call) and post-processed through the fade/loudnorm/encode pipeline exactly
+as designed:
+
+| Track | Requested | Actual | SizeBytes | Sha256 |
+|---|---|---|---|---|
+| lullaby-melody | 200s | 3:20 (200s) | 4,802,460 | `346af002e819077e15726ccf8ee5d0d6d3f98c8b627a8b335aa5461dd664cef3` |
+| under-the-stars | 230s | 3:50 (230s) | 5,522,800 | `37d9054e6d9f62c7d10dc43b3046456ac1b7e41d28acba0eb208cb841d8c69b7` |
+| calm-night | 260s | 4:20 (260s) | 6,241,276 | `0a5edc1358e02100a186003b55c173ffc27471c120f42b891567709be11c80f2` |
+| gentle-breeze | 290s | 4:50 (290s) | 6,962,875 | `80b7eab7352534907fc26d009709fe9e5c2a3dfd2895893fc35bc3c2e97a2d9a` |
+
+Every requested length landed exactly on request (the runbook's own margin
+against a possible mismatch turned out not to be needed this time).
+
+**Structural gate**:
+
+```
+$ python3 tools/story-audio/check_music_audio.py
+track                         length  kbps  verdict
+------------------------------------------------------------
+calm-night-v1                   4:20   192  ok
+gentle-breeze-v1                4:50   192  ok
+lullaby-melody-v1               3:20   192  ok
+under-the-stars-v1              3:50   192  ok
+
+PASS - 4 bedtime-music track(s) are complete and cleanly encoded.
+```
+
+**Loudness check** (measured post-encode, not just trusted from the
+pipeline):
+
+```
+$ ffmpeg -i <file> -af loudnorm=print_format=summary -f null -
+lullaby-melody-v1:    Output Integrated -23.6 LUFS
+under-the-stars-v1:   Output Integrated -23.5 LUFS
+calm-night-v1:        Output Integrated -23.5 LUFS
+gentle-breeze-v1:     Output Integrated -23.9 LUFS
+```
+
+All four land within 0.9 LU of the -23.0 LUFS target — the same normal
+loudnorm tolerance the earlier synthetic-audio dry run observed (0.2 LU).
+
+**Config and tests**: the four placeholder `ContentSync:Music` rows in
+`appsettings.json` were replaced with the real SizeBytes/Sha256 above.
+`ContentSyncMusicTests.Manifest_ShippedPlaceholderTracks_AreDropped`
+(asserted the opposite — that shipped rows stay dropped as placeholders)
+was replaced with
+`Manifest_ShippedTracks_AllFourReachTheManifest`, which asserts all four
+tracks now reach the manifest in config order.
+`ContentSyncAudioRootTests.ShippedMusicConfiguration_PointsAtFilesThatActuallyExist`
+needed no change — it already branches on `SizeBytes == 0` vs. a real row
+and now exercises its real-file branch for the first time.
+
+```
+$ cd backend && dotnet build && dotnet test
+Build succeeded. 0 Error(s).
+Passed! - Failed: 0, Passed: 2931, Skipped: 0, Total: 2931
+```
+
+(Test count unchanged: one test was renamed/repurposed rather than added.)
+
+`story-audio/music/prompts.json` was written by the render, recording the
+exact prompt sent (reviewed text + the two in-code instrumental/no-real-work
+instructions) and target LUFS per track, same idiom as
+`story-ambience/sounds/<storyId>/prompts.json`.
+
+**What was not attempted or verified**: `docs/elevenlabs.io` docs pages
+themselves were still not fetched (still `EGRESS_BLOCKED`) — the API shape
+was confirmed by calling the API directly instead, which this session
+judges sufficient since it is the thing that actually gets called.
+**The human listen test is still open for all four tracks** — nobody has
+heard any of them yet, at any volume. The -23 LUFS choice remains a
+reasoned target confirmed only by a loudness meter, not by an ear at the
+toy's actual bedtime volume.
