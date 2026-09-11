@@ -1060,6 +1060,48 @@ was possible from this session; nothing here has ever been flashed):
       See "Offline games" below for its own bench checklist, including the
       round-robin persistence and the fallback path.
 
+### Per-toy BLE PoP + factory station (2026-09-11) — NOT yet bench-verified
+
+Every toy used to advertise the same shared BLE provisioning PoP
+(`AREG_PROV_POP`, `"areg-pair"`). `ble_provisioning.cpp` now reads a
+per-device PoP from NVS (`device_creds.h`, namespace `aregdev`, key `pop`,
+beside `devid`/`apikey`), validated by the pure `device_creds_rules::
+pop_is_wellformed` before it is trusted over the bench fallback. The
+one-shot `AREG_PROVISION_IDENTITY_ONCE` burn in `AregVoiceMvp.ino` burns the
+PoP too when the bench-only `AREG_BLE_POP` macro is defined. Production
+path is the factory station, `tools/factory/provision_toy.py` — see
+`docs/factory-provisioning-runbook.md` — which writes id/key/pop straight
+to the NVS partition over esptool and never touches this compile-time
+macro. `check_release_image.py` now refuses an OTA image containing a
+real-looking PoP.
+
+Compile-verified only (arduino-cli, esp32:esp32@3.3.8, default BLE-on
+config): the pure PoP shape check and NVS key names are host-tested
+(`host_tests/device_creds_rules_test.cpp`); the factory station's
+register → build-NVS-image → render-label pipeline ran end to end against
+a live local backend (no hardware, this only proves the script and the
+backend contract, not a real flash+boot).
+
+**Bench checklist — what a human must verify on hardware:**
+
+- [ ] Factory-provision a real unit (`provision_toy.py --port ...`) →
+      `esptool write-flash` succeeds → the toy's own `[heartbeat]
+      status=200` appears within the script's timeout.
+- [ ] That same toy, held 2 s at power-on into BLE setup mode, advertises
+      and a phone (ESP BLE Provisioning app, or the parent app once wired)
+      connects using the PRINTED PoP from its label — NOT `areg-pair`.
+- [ ] A second, un-provisioned bench unit (nothing burned to NVS) still
+      advertises with the shared bench fallback `areg-pair` — confirms the
+      fallback path is intact for ordinary bench work.
+- [ ] Corrupt/hand-clear only the `pop` NVS key (leave `devid`/`apikey`
+      alone) → serial log prints `stored PoP missing/malformed — using the
+      bench fallback`, not a crash, not a silent wrong PoP.
+- [ ] A single-unit `AREG_PROVISION_IDENTITY_ONCE` + `AREG_BLE_POP` bench
+      burn: serial log prints `identity burned to NVS (id=... pop=set)`,
+      and BLE setup then uses that value, not `areg-pair`.
+- [ ] Build a release image with `AREG_BLE_POP` left defined (a deliberate
+      mistake) → `check_release_image.py` refuses it and names the reason.
+
 ## OTA — surviving the first boot of a new image
 
 The apply pipeline (`ota_apply.{h,cpp}`) and the phone-home loop

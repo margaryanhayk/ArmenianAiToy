@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 2784 tests, ~35 s in Release
+dotnet test            # 2787 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -229,16 +229,17 @@ wired 2026-09-11, never bench-flashed — see the subsection below);
 mid-story shout pauses (never bench-run); variant endings and serial (no
 audio); bedtime music (no tracks); hold-to-menu (unverified by hand, not
 staged for OTA); streaming Q&A firmware flag off; mobile app never built;
-listen tests of the cast library on the toy still open; every toy shares
-one BLE PoP.
+listen tests of the cast library on the toy still open; per-toy BLE PoP +
+factory station (backend done, firmware + factory station compile/dry-run
+verified, never bench-flashed — see the subsection below).
 
 Still to implement: a `sound-detective` firmware game (backend content
 ready — 21 clips already in `ContentSync:Games` — no engine written); two
 Simon tone clips (`tone-green` / `tone-red`, not yet rendered); render
-variant endings + serial; music tracks; per-toy PoP + factory station; card
-retirement / orphan sweeps / per-namespace index writes; durable child
-recordings (`Audio:BlobStoreRoot` unset on Railway — data lost on redeploy);
-narrator PVC; rev-A PCB routing + speaker test + order; usage tiers.
+variant endings + serial; music tracks; card retirement / orphan sweeps /
+per-namespace index writes; durable child recordings (`Audio:BlobStoreRoot`
+unset on Railway — data lost on redeploy); narrator PVC; rev-A PCB routing +
+speaker test + order; usage tiers.
 
 ### Online Game/Riddle/Curiosity/Calm voice contract (2026-09-11)
 
@@ -274,6 +275,41 @@ button-simon reports won/stopped + the length reached. Nothing here has
 been heard on hardware; Simon still needs `tone-green`/`tone-red` clips —
 see `esp32/AregVoiceMvp/README.md`'s "Offline games" section and bench
 checklist.
+
+### Per-toy BLE PoP + factory station (2026-09-11)
+
+Every toy used to advertise the same shared BLE provisioning PoP
+(`areg-pair`). `POST /api/devices/register` now mints a per-device PoP (8
+chars, same read-aloud-safe alphabet as invite codes) alongside the claim
+code, returned once and additive inside `QrPayload`
+(`{deviceId, claim, pop}`). **Never persisted, not even hashed** — the
+backend never verifies a PoP (the toy's own BLE stack does), so there is no
+read side that would ever need it back; see `DeviceService.GeneratePop`'s
+doc comment. Pinned by tests: alphabet/length, absence from the `Device`
+row, absence from every log call the registration path makes.
+
+Firmware: `ble_provisioning.cpp` reads the PoP from the `device_creds`
+NVS namespace (`aregdev`, key `pop`, beside `devid`/`apikey`), validated by
+the pure `device_creds_rules::pop_is_wellformed` before it is trusted over
+the bench fallback (`AREG_PROV_POP`, unchanged, still `"areg-pair"`) —
+host-tested (`host_tests/device_creds_rules_test.cpp`). The one-shot
+`AREG_PROVISION_IDENTITY_ONCE` burn burns the PoP too when the bench-only
+`AREG_BLE_POP` macro is defined; `check_release_image.py` now refuses an
+OTA image containing a real-looking PoP (8 chars, the mint alphabet),
+proven against both a synthetic bad image and a clean one
+(`tools/firmware/test_check_release_image.py`).
+
+Production path is `tools/factory/provision_toy.py`: registers a device,
+builds an NVS partition image (id/key/pop) with Espressif's own
+`nvs_partition_gen` (vendored via its PyPI package, not reimplemented),
+writes it with esptool at the offset read live from `partitions.csv`,
+verifies a post-flash heartbeat when a serial port is given, and renders a
+QR + one-page PDF label — the device key is never printed or logged. A
+`--dry-run` mode renders the label from a saved JSON response with no
+network or hardware. Runbook: `docs/factory-provisioning-runbook.md`.
+Compile-verified (firmware) and run end-to-end against a live local backend
+(factory station, register→NVS build→label, no hardware in this
+container) — nothing here has been heard on real hardware.
 
 ## Working in this repo (agents)
 

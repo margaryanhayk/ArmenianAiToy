@@ -140,6 +140,16 @@
 #define AREG_DEVICE_API_KEY     "YOUR_DEVICE_API_KEY"
 #endif
 
+// Optional: this unit's BLE provisioning PoP, from the same registration
+// response above (the "pop" field). Only used by the AREG_PROVISION_IDENTITY_ONCE
+// one-shot NVS burn as a single-unit bench convenience -- the factory
+// station (tools/factory/provision_toy.py) writes this straight to NVS and
+// never touches this macro. Leave undefined for a normal bench build; if you
+// do set it, DROP THE FLAG AND THE VALUE after the one burn, same as
+// AREG_DEVICE_ID / AREG_DEVICE_API_KEY above. Never define this in a build
+// that becomes an OTA image -- check_release_image.py refuses one that does.
+// #define AREG_BLE_POP "YOURBLEPOP"
+
 // --- Pin map (ESP32-S3-DevKitC-1 defaults) -------------------
 // INMP441 I2S mic (RX)
 #define AREG_PIN_MIC_BCK        4      // SCK
@@ -527,9 +537,13 @@
 #ifndef AREG_PROV_SERVICE_NAME
 #define AREG_PROV_SERVICE_NAME "Areg-Setup"
 #endif
-// Proof-of-possession string. PRODUCTION: set this to the toy's printed
-// pairing code (QR / box label) so provisioning requires physical possession.
-// The shared default below is for the bench only.
+// Proof-of-possession BENCH FALLBACK ONLY. Every factory-provisioned toy now
+// reads its OWN per-device PoP from NVS (ble_provisioning.cpp, factory
+// pairing 2026-09-11) and ignores this value entirely; it is used only for a
+// unit with nothing burned to NVS yet. Leave this at the shared placeholder
+// below -- it is not a secret and must never be overridden with a real
+// per-device value (that belongs in NVS via the factory station or
+// AREG_BLE_POP, not here).
 #ifndef AREG_PROV_POP
 #define AREG_PROV_POP "areg-pair"
 #endif

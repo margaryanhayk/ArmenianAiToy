@@ -25,17 +25,24 @@
 #include <WiFiProv.h>
 
 #include "wifi_creds.h"   // wifi_creds_save — persist the received creds (B.1)
+#include "device_creds.h" // device_creds_pop_load — per-device PoP (factory pairing)
+#include "device_creds_rules.h" // pop_is_wellformed — reject NVS garbage before advertising it
 
 // Non-secret knobs. Self-defaulted so the build never depends on config.h
 // carrying them (same pattern as the #047 watchdog tunables). Override in
-// config.h to brand the BLE name / set a per-unit pairing code.
+// config.h to brand the BLE name.
 #ifndef AREG_PROV_SERVICE_NAME
 #define AREG_PROV_SERVICE_NAME "Areg-Setup"
 #endif
 #ifndef AREG_PROV_POP
-// Proof-of-possession. In production this should be the toy's printed pairing
-// code (QR / box label) so provisioning requires physical possession. A shared
-// default here is fine for the bench only.
+// Proof-of-possession BENCH FALLBACK ONLY, used when NVS holds no per-device
+// PoP (device_creds_pop_load returns false — a unit that was never run
+// through the factory station, or one factory-provisioned before the PoP
+// slice). Every real toy advertises its own per-device PoP instead (factory
+// pairing, 2026-09-11) — see device_creds.h / tools/factory/provision_toy.py.
+// This value is a fixed, shared, checked-in placeholder: NOT a secret, and
+// tools/firmware/check_release_image.py refuses to release an image if this
+// macro is ever overridden with something that looks like a real PoP.
 #define AREG_PROV_POP "areg-pair"
 #endif
 
@@ -138,11 +145,31 @@ void ble_provisioning_begin() {
     const scheme_handler_t kMemHandler = NETWORK_PROV_SCHEME_HANDLER_NONE;
 #endif
 
+    // Factory pairing (2026-09-11): the toy advertises its OWN PoP, burned to
+    // NVS at manufacture, so a printed pairing code on one box does not open
+    // every other toy. Falls back to the shared bench placeholder only for a
+    // unit with nothing in NVS (never flashed through the factory station).
+    static char s_pop[24];
+    const char *pop = AREG_PROV_POP;
+    if (device_creds_pop_load(s_pop, sizeof(s_pop))
+        && device_creds_rules::pop_is_wellformed(s_pop)) {
+        pop = s_pop;
+    } else if (device_creds_present()) {
+        // An id/key were burned but the PoP is missing or malformed (torn
+        // write, older factory-station version, hand-edited NVS image) —
+        // worth a distinct log line, since this toy WAS factory-provisioned
+        // and a silent fallback here would look identical to "never
+        // provisioned" in the serial log.
+        Serial.println("[prov] stored PoP missing/malformed — using the bench fallback");
+    } else {
+        Serial.println("[prov] no per-device PoP in NVS — using the bench fallback");
+    }
+
     WiFiProv.beginProvision(
         NETWORK_PROV_SCHEME_BLE,
         kMemHandler,
         NETWORK_PROV_SECURITY_1,
-        AREG_PROV_POP,
+        pop,
         AREG_PROV_SERVICE_NAME);
     Serial.printf("[prov] advertising BLE service '%s' (pop set)\n",
                   AREG_PROV_SERVICE_NAME);

@@ -1,0 +1,22 @@
+# Factory station (provision_toy.py). Install with:
+#   pip install -r tools/factory/requirements.txt
+#
+# esptool        -- writes the NVS image to the toy over serial.
+# esp-idf-nvs-partition-gen
+#                -- Espressif's OWN NVS partition binary generator, published
+#                   on PyPI (Apache License 2.0), same source as esp-idf's
+#                   components/nvs_flash/nvs_partition_generator/
+#                   nvs_partition_gen.py. Vendored via this package rather
+#                   than reimplemented -- see provision_toy.py's module
+#                   docstring ("VENDORING") for why.
+# qrcode[pil]    -- renders the label's QR code (needs Pillow, pulled in by
+#                   the [pil] extra).
+# reportlab      -- renders the one-page PDF label.
+# requests       -- calls POST /api/devices/register. Not needed for
+#                   --dry-run, but installed unconditionally to keep this
+#                   file a single `pip install` for the common case.
+esptool>=5.0
+esp-idf-nvs-partition-gen>=0.1.0
+qrcode[pil]>=7.4
+reportlab>=4.0
+requests>=2.31

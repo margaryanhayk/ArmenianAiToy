@@ -797,6 +797,20 @@ const D = {
     ru: 'Игрушка не смогла подключиться к «{ssid}». Проверьте пароль и попробуйте снова.',
     hy: 'Խաղալիքը չկարողացավ միանալ «{ssid}»-ին։ Ստուգեք գաղտնաբառը և կրկին փորձեք։',
   },
+  // Factory pairing (2026-09-11): every toy now advertises its OWN BLE
+  // pairing code (printed on the box), replacing the one every toy used to
+  // share.
+  wifi_pop_label: {
+    en: "Pairing code (printed on the toy's box)",
+    ru: 'Код привязки (напечатан на коробке игрушки)',
+    hy: 'Կապակցման կոդը (տպված է խաղալիքի տուփի վրա)',
+  },
+  ph_pop: { en: 'Pairing code', ru: 'Код привязки', hy: 'Կապակցման կոդ' },
+  e_pop_required: {
+    en: 'Enter the pairing code from the box before searching.',
+    ru: 'Прежде чем искать игрушку, введите код привязки с коробки.',
+    hy: 'Որոնելուց առաջ մուտքագրեք տուփի վրայի կապակցման կոդը։',
+  },
 } satisfies Record<string, Entry>;
 
 export type Key = keyof typeof D;
