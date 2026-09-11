@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { clearToken, getToken, saveToken } from './src/auth';
 import { loadLanguage } from './src/i18n';
 import { LinkedDevice } from './src/api';
+import { knownPop } from './src/knownPop';
 import LoginScreen from './src/screens/LoginScreen';
 import CapabilitiesScreen from './src/screens/CapabilitiesScreen';
 import DevicesScreen from './src/screens/DevicesScreen';
@@ -183,6 +184,7 @@ function AuthedNavigator({ onLogout }: { onLogout: () => void }) {
     return (
       <ProvisioningScreen
         device={screen.device}
+        initialPop={knownPop(screen.device.deviceId)}
         onBack={() => setScreen({ name: 'settings', device: screen.device })}
       />
     );

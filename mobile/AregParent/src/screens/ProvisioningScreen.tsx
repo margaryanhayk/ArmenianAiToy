@@ -2,6 +2,8 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  PermissionsAndroid,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -47,6 +49,68 @@ function loadEsp(): EspModule | null {
 
 type Phase = 'idle' | 'searching' | 'connecting' | 'wifi' | 'provisioning' | 'done' | 'unavailable';
 
+// How long to wait for a BLE scan to return before giving up and letting
+// the parent retry — searchESPDevices has no timeout of its own, so a toy
+// that never answers (out of range, already left setup mode) would
+// otherwise leave the screen on "Looking for your toy…" forever.
+const SCAN_TIMEOUT_MS = 20000;
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
+/**
+ * Android 12+ (API 31+) requires BLUETOOTH_SCAN/BLUETOOTH_CONNECT to be
+ * granted at RUNTIME, not just declared in the manifest; older Android
+ * needs ACCESS_FINE_LOCATION for BLE scanning instead. The native module
+ * (EspIdfProvisioningModule.kt) only checks — it never asks — so this must
+ * happen before the first searchESPDevices call, every time, since a
+ * parent can revoke the grant from system Settings between runs.
+ *
+ * Requests ONLY the permissions the native module's own gate actually
+ * checks for this API level — never all three unconditionally. The
+ * provisioning library's manifest declares ACCESS_FINE_LOCATION with no
+ * `maxSdkVersion` cap, so on API 31+ an unconditional request would still
+ * surface the system's precise-location dialog even though BLE scanning
+ * there needs BLUETOOTH_SCAN/CONNECT instead — an unexplained location
+ * prompt during Wi-Fi setup on a children's toy is its own trust problem,
+ * not just a redundant one.
+ */
+async function ensureBlePermissions(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+  try {
+    // Exact mirror of the native module's own hasBTPermissions() gate
+    // (EspIdfProvisioningModule.kt): API 31+ needs BOTH BLUETOOTH_SCAN and
+    // BLUETOOTH_CONNECT; below that it needs ACCESS_FINE_LOCATION instead
+    // (BLUETOOTH/BLUETOOTH_ADMIN are normal permissions there, granted at
+    // install, never a runtime prompt).
+    const apiLevel =
+      typeof Platform.Version === 'number' ? Platform.Version : parseInt(String(Platform.Version), 10);
+    const wanted =
+      apiLevel >= 31
+        ? [PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN, PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT]
+        : [PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
+    const results = await PermissionsAndroid.requestMultiple(wanted);
+    const granted = (perm: string) =>
+      (results as Record<string, string>)[perm] === PermissionsAndroid.RESULTS.GRANTED;
+    return wanted.every(granted);
+  } catch {
+    return false;
+  }
+}
+
 type Props = {
   device: LinkedDevice;
   onBack: () => void;
@@ -81,12 +145,16 @@ export default function ProvisioningScreen({ device, onBack, initialPop }: Props
       setPhase('unavailable');
       return;
     }
+    const hasPermission = await ensureBlePermissions();
+    if (!hasPermission) {
+      setError(t('e_ble_permission'));
+      return;
+    }
     setPhase('searching');
     try {
-      const found = await esp.ESPProvisionManager.searchESPDevices(
-        PREFIX,
-        esp.ESPTransport.ble,
-        esp.ESPSecurity.secure,
+      const found = await withTimeout(
+        esp.ESPProvisionManager.searchESPDevices(PREFIX, esp.ESPTransport.ble, esp.ESPSecurity.secure),
+        SCAN_TIMEOUT_MS,
       );
       if (!found.length) {
         setError(t('e_no_toy_found'));
@@ -96,7 +164,7 @@ export default function ProvisioningScreen({ device, onBack, initialPop }: Props
       const dev = found[0];
       setEspDevice(dev);
       setPhase('connecting');
-      await dev.connect(trimmedPop);
+      await withTimeout(dev.connect(trimmedPop), SCAN_TIMEOUT_MS);
       const list = await dev.scanWifiList();
       // Strongest signal first, de-duplicated by ssid.
       const seen = new Set<string>();
@@ -106,7 +174,10 @@ export default function ProvisioningScreen({ device, onBack, initialPop }: Props
       setNetworks(unique);
       setPhase('wifi');
     } catch (e) {
-      setError(t('e_bluetooth'));
+      // The retry action is the same primary button, back in view once the
+      // phase resets to idle — a distinct message just tells the parent
+      // WHAT to check before pressing it again.
+      setError(e instanceof Error && e.message === 'timeout' ? t('e_ble_timeout') : t('e_bluetooth'));
       setPhase('idle');
     }
   }
@@ -145,6 +216,7 @@ export default function ProvisioningScreen({ device, onBack, initialPop }: Props
       ) : phase === 'idle' ? (
         <View style={styles.card}>
           <Text style={styles.body}>{t('wifi_setup_mode')}</Text>
+          {Platform.OS === 'android' ? <Text style={styles.body}>{t('wifi_ble_ask')}</Text> : null}
           <Text style={styles.label}>{t('wifi_pop_label')}</Text>
           <TextInput
             style={styles.input}

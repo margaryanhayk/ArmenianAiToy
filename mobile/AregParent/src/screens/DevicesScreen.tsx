@@ -23,6 +23,8 @@ import {
   UnauthorizedError,
 } from '../api';
 import { getLanguage, t, tf } from '../i18n';
+import { rememberPop } from '../knownPop';
+import { parsePairingQr } from '../pairingQr';
 import { useLang } from '../useLang';
 import { theme } from '../theme';
 
@@ -59,6 +61,25 @@ export default function DevicesScreen({
   const [claimCode, setClaimCode] = useState('');
   const [claimBusy, setClaimBusy] = useState(false);
   const [claimMsg, setClaimMsg] = useState<string | null>(null);
+  const [qrPaste, setQrPaste] = useState('');
+  const [qrPasteOk, setQrPasteOk] = useState(false);
+
+  // Leniently parses the pasted QR JSON on every keystroke/paste — cheap,
+  // and lets the two fields below fill in the instant a full paste lands
+  // rather than needing a separate "parse" tap. A partial/invalid paste
+  // just leaves the typed fields alone (parsePairingQr returns null).
+  function handleQrPaste(text: string) {
+    setQrPaste(text);
+    const parsed = parsePairingQr(text);
+    if (!parsed) {
+      setQrPasteOk(false);
+      return;
+    }
+    setClaimId(parsed.deviceId);
+    setClaimCode(parsed.claim);
+    rememberPop(parsed.deviceId, parsed.pop);
+    setQrPasteOk(true);
+  }
 
   // Joining a toy someone else already set up.
   const [inviteCode, setInviteCode] = useState('');
@@ -125,6 +146,8 @@ export default function DevicesScreen({
       await claimDevice(claimId.trim(), claimCode.trim());
       setClaimId('');
       setClaimCode('');
+      setQrPaste('');
+      setQrPasteOk(false);
       setShowClaim(false);
       await load();
     } catch (err) {
@@ -228,6 +251,28 @@ export default function DevicesScreen({
           {inviteMsg ? <Text style={styles.claimHelp}>{inviteMsg}</Text> : null}
 
           <View style={styles.claimDivider} />
+          {/* Paste-the-QR first: it is the fastest path when it applies,
+              same "fastest path first" ordering as the invite block above.
+              claim_help then introduces the two typed fields as the
+              fallback, rather than "Or" pointing back at fields the parent
+              has not reached yet. */}
+          <Text style={styles.claimLabel}>{t('qr_paste_label')}</Text>
+          <TextInput
+            style={[styles.input, styles.inputMultiline]}
+            placeholder={t('qr_paste_ph')}
+            autoCapitalize="none"
+            autoCorrect={false}
+            multiline
+            textAlignVertical="top"
+            value={qrPaste}
+            onChangeText={handleQrPaste}
+            editable={!claimBusy}
+          />
+          {qrPasteOk ? (
+            <Text style={styles.claimOk}>{t('qr_paste_ok')}</Text>
+          ) : qrPaste.trim() ? (
+            <Text style={styles.claimHelp}>{t('qr_paste_retry')}</Text>
+          ) : null}
           <Text style={styles.claimHelp}>{t('claim_help')}</Text>
           <TextInput
             style={styles.input}
@@ -670,8 +715,14 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   claimHelp: { color: theme.ok, marginBottom: 8 },
+  // A field label and a success line, kept visually distinct from
+  // claimHelp's body-instruction green so a state change (qr_paste_ok)
+  // actually registers instead of reading as one more sentence in the box.
+  claimLabel: { color: theme.ink, fontSize: 13, fontWeight: '600', marginBottom: 6 },
+  claimOk: { color: theme.ok, fontWeight: '700', marginBottom: 8 },
   claimDivider: { height: 1, backgroundColor: theme.okLine, marginVertical: 12 },
   input: { borderWidth: 1, borderColor: theme.lineInput, borderRadius: 8, padding: 10, marginBottom: 8 },
+  inputMultiline: { minHeight: 64 },
   primaryBtn: { backgroundColor: theme.brand, borderRadius: 8, padding: 12, alignItems: 'center' },
   primaryBtnText: { color: theme.surface, fontWeight: '600' },
   disabled: { opacity: 0.6 },

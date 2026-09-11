@@ -229,8 +229,10 @@ verified, never bench-flashed — see the subsection below); offline games
 wired 2026-09-11, never bench-flashed — see the subsection below);
 mid-story shout pauses (never bench-run); variant endings and serial (no
 audio); bedtime music (no tracks); hold-to-menu (unverified by hand, not
-staged for OTA); streaming Q&A firmware flag off; mobile app never built;
-listen tests of the cast library on the toy still open; per-toy BLE PoP +
+staged for OTA); streaming Q&A firmware flag off; mobile app has a
+documented, partially-exercised local Android build recipe but still no
+verified APK or on-device run (see the subsection below); listen tests of
+the cast library on the toy still open; per-toy BLE PoP +
 factory station (backend done, firmware + factory station compile/dry-run
 verified, never bench-flashed — see the subsection below); content
 retirement, per-namespace index writes, and the bounded SD orphan sweep
@@ -553,6 +555,38 @@ throwaway SQLite DB and reading the produced schema). NOT verified: the
 mobile app was not built or run (same standing limitation as every other
 mobile change in this file) — the new usage line has not been seen on a
 phone; no fleet has ever had the flag turned on.
+
+### Mobile: Android build recipe, BLE hardening, parent-surface parity (2026-09-11)
+
+`mobile/AregParent/scripts/build-android.sh` builds a local, signed release
+APK with no EAS account — `expo prebuild`, a throwaway keystore generated
+on the fly (never committed), `gradlew assembleRelease`. In this session's
+container the Android SDK could not be fetched (`dl.google.com` 403s under
+the network policy); `npm install`, `npx tsc --noEmit`, and `expo prebuild`
+all ran clean and the script's keystore + Gradle signing-config patch steps
+were exercised directly, but `assembleRelease` itself never ran — no APK,
+no size, no on-device install this session. BLE provisioning
+(`ProvisioningScreen.tsx`) gained Android 12+ runtime permission requests
+(the native module only checks, never asks), a 20s scan timeout with retry,
+and PoP pickup from a pairing QR pasted as decoded text (no camera scanner
+added — see `mobile/AregParent/README.md`), parsed leniently for both the
+pre-factory-pairing and current QR shapes and held in-memory only
+(`knownPop.ts`), never persisted, mirroring the backend's own posture on
+the PoP. Parity pass against `parent.html` (everything shipped since
+2026-08-15) found two real gaps and closed both: the after-story question
+toggle (`storyQuestionsEnabled`, `/story-questions`) and conversation audio
+— Areg's spoken replies and the child's own recordings had no playback
+control anywhere in the app; both now have ▶ Listen, and the child's own
+also ⬇ Save recording, via `expo-audio` + `expo-file-system` + `expo-sharing`
+(new dependencies, native-only, no config plugin applied for any of the
+three — deliberately: the default `RECORD_AUDIO` permission expo-audio's
+plugin would add is never needed since this app only ever plays audio, and
+adding it would ask a parent for a permission the app does not use).
+Everything else the parity pass checked (fault codes, invites, story
+requests, modes-today chips, the usage line) was already present and wired.
+`npx tsc --noEmit` is clean; the project has no lint config and no test
+suite. NOT verified: none of this has run in a built app on a device —
+same standing mobile limitation as every entry above.
 
 ## Working in this repo (agents)
 

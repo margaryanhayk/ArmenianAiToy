@@ -298,6 +298,35 @@ const D = {
   ph_device_id: { en: 'Device ID', ru: 'ID устройства', hy: 'Սարքի ID' },
   ph_pairing_code: { en: 'Pairing code', ru: 'Код привязки', hy: 'Կապակցման կոդ' },
   pair_toy: { en: 'Pair toy', ru: 'Привязать', hy: 'Կապակցել' },
+  // 2026-09-11 — a scanner app already on the phone can decode the box's QR
+  // to text; pasting it here fills in Device ID + pairing code (and, when
+  // present, the toy's own Wi-Fi setup PoP — see knownPop.ts) leniently, so
+  // it accepts both the pre-factory-pairing {deviceId, claim} QR still on
+  // some boxes and the current {deviceId, claim, pop} one. The two fields
+  // above stay the always-available typed fallback; this is optional.
+  qr_paste_label: {
+    en: 'Scanned the QR on the box? Paste the text here.',
+    ru: 'Отсканировали QR на коробке? Вставьте текст сюда.',
+    hy: 'Սկանավորե՞լ եք տուփի QR-ը։ Տեղադրեք տեքստը այստեղ։',
+  },
+  qr_paste_ph: {
+    en: 'Paste here',
+    ru: 'Вставьте сюда',
+    hy: 'Տեղադրեք այստեղ',
+  },
+  qr_paste_ok: {
+    en: '✓ Got it — filled in below.',
+    ru: '✓ Готово — поля заполнены ниже.',
+    hy: '✓ Ստացվեց — ներքևի դաշտերը լրացվեցին։',
+  },
+  // Shown only once something has actually been pasted and failed to
+  // parse — never on an empty/untouched field. Names the way out (the
+  // typed fields still work) rather than just saying "invalid".
+  qr_paste_retry: {
+    en: 'That does not look like the toy’s code yet. You can fill in the two fields below instead.',
+    ru: 'Это пока не похоже на код игрушки. Можно просто заполнить два поля ниже.',
+    hy: 'Սա դեռ նման չէ խաղալիքի կոդին։ Փոխարենը կարող եք լրացնել ներքևի երկու դաշտը։',
+  },
   e_pair_fields: {
     en: 'Please enter both the Device ID and the pairing code.',
     ru: 'Введите и ID устройства, и код привязки.',
@@ -515,6 +544,32 @@ const D = {
     hy: 'Քնելուց առաջ հանգստացնող ռեժիմը միշտ հասանելի է։',
   },
   modes_updated: { en: 'Modes updated.', ru: 'Режимы обновлены.', hy: 'Ռեժիմները թարմացվեցին։' },
+  // After-story question toggle — lifted verbatim from parent.html
+  // (story_questions_label / story_questions_note, 2026-09-07) rather than
+  // retyped, same drift concern as caps_* above. The toy DOES ask the
+  // question today (70 per-story clips shipped 2026-08-16); only OFF is
+  // pending its next firmware update — the note's last sentence is
+  // deliberately temporary and must be dropped the day that update ships.
+  story_questions_label: { en: 'A question after the story', ru: 'Вопрос после сказки', hy: 'Հարց հեքիաթից հետո' },
+  story_questions_note: {
+    en: 'The toy always ends with what the story teaches. With this on, it also asks one question and waits for an answer. Turning it off reaches your toy with its next update.',
+    ru: 'Игрушка всегда говорит, чему учит сказка. Когда включено, она ещё задаёт один вопрос и ждёт ответа. Выключение заработает после следующего обновления.',
+    hy: 'Խաղալիքը միշտ ասում է, թե ինչ է սովորեցնում հեքիաթը։ Երբ միացված է, տալիս է նաև մեկ հարց ու սպասում պատասխանին։ Անջատումը կգործի հաջորդ թարմացումից հետո։',
+  },
+  story_questions_updated: {
+    en: 'Setting updated.',
+    ru: 'Настройка обновлена.',
+    hy: 'Կարգավորումը թարմացվեց։',
+  },
+  // Distinct from story_questions_updated: turning it OFF does not reach
+  // the toy immediately (see story_questions_note's last sentence), and a
+  // plain "updated" confirmation right next to that note would contradict
+  // it in the moment.
+  story_questions_off_pending: {
+    en: 'Saved. Your toy will stop asking after its next update.',
+    ru: 'Сохранено. Игрушка перестанет спрашивать после следующего обновления.',
+    hy: 'Պահպանվեց։ Խաղալիքը կդադարի հարցնել հաջորդ թարմացումից հետո։',
+  },
   bedtime_title: { en: 'Quiet hours (bedtime)', ru: 'Часы сна', hy: 'Քնի ժամեր' },
   bedtime_hint: {
     en: "The toy won't respond during this window. 24-hour time.",
@@ -567,6 +622,38 @@ const D = {
   who_child: { en: '🧒 Child', ru: '🧒 Ребёнок', hy: '🧒 Երեխա' },
   who_toy: { en: '🧸 Areg', ru: '🧸 Арег', hy: '🧸 Արեգ' },
 
+  // ---------- conversation audio (C2.1 assistant replay, C2.2 child recording) ----------
+  // Wording lifted verbatim from parent.html (listen_btn/save_recording_btn/
+  // recording_not_kept, 2026-09-11) — same reviewed sentence in both places.
+  listen_btn: { en: '▶ Listen', ru: '▶ Послушать', hy: '▶ Լսել' },
+  // No parent.html counterpart by design — the web player is a native
+  // <audio controls> with its own pause button; this row has to provide
+  // one itself.
+  stop_btn: { en: '■ Stop', ru: '■ Остановить', hy: '■ Կանգնեցնել' },
+  audio_loading: { en: 'Loading…', ru: 'Загрузка…', hy: 'Բեռնվում է…' },
+  audio_playing: { en: 'Playing…', ru: 'Звучит…', hy: 'Հնչում է…' },
+  save_recording_btn: { en: '⬇ Save recording', ru: '⬇ Сохранить запись', hy: '⬇ Պահպանել ձայնագրությունը' },
+  saved_status: { en: 'Saved.', ru: 'Сохранено.', hy: 'Պահպանվեց։' },
+  e_audio_unavailable: {
+    en: 'This recording is no longer available.',
+    ru: 'Эта запись больше недоступна.',
+    hy: 'Այս ձայնագրությունն այլևս հասանելի չէ։',
+  },
+  e_save_unavailable: {
+    en: 'This phone cannot save the recording from here.',
+    ru: 'С этого телефона запись сохранить нельзя.',
+    hy: 'Այս հեռախոսից ձայնագրությունը հնարավոր չէ պահպանել։',
+  },
+  // Calm, not red: on a fleet that has ever redeployed before durable audio
+  // storage was configured, many older child recordings genuinely no
+  // longer exist on disk. This reads as an honest limitation, not a fault
+  // — see CLAUDE.md "Durable child audio" for why the control still shows.
+  recording_not_kept: {
+    en: 'This recording is no longer kept. The words above stay here.',
+    ru: 'Эта запись больше не хранится. Текст выше остаётся здесь.',
+    hy: 'Այս ձայնագրությունն այլևս պահված չէ։ Վերևի բառերը մնում են այստեղ։',
+  },
+
   // ---------- Wi-Fi setup ----------
   wifi_title: { en: 'Connect {name} to Wi-Fi', ru: 'Подключить «{name}» к Wi-Fi', hy: 'Միացնել «{name}»-ը Wi-Fi-ին' },
   wifi_search: { en: 'Search for my toy', ru: 'Найти мою игрушку', hy: 'Գտնել իմ խաղալիքը' },
@@ -594,6 +681,34 @@ const D = {
     en: 'Bluetooth setup failed. Please try again.',
     ru: 'Не удалось настроить по Bluetooth. Попробуйте снова.',
     hy: 'Bluetooth-ով կարգավորումը չհաջողվեց։ Կրկին փորձեք։',
+  },
+  // Fires when the parent taps Deny on the runtime permission prompt (BLE
+  // scan/connect on API 31+, location below that — see ensureBlePermissions
+  // in ProvisioningScreen.tsx). Says "Bluetooth" even on the pre-31 phones
+  // where the actual system dialog is titled "location": naming the rarer,
+  // shrinking case correctly would need a second string for one word, and
+  // the fix offered (tap search again, or Settings) is identical either way.
+  e_ble_permission: {
+    en: 'Areg needs Bluetooth permission to find your toy. Tap “Search for my toy” again and allow it, or turn it on in your phone’s Settings.',
+    ru: 'Чтобы найти игрушку, Areg нужен доступ к Bluetooth. Нажмите «Найти мою игрушку» ещё раз и разрешите — или включите доступ в настройках телефона.',
+    hy: 'Խաղալիքը գտնելու համար Areg-ին անհրաժեշտ է Bluetooth-ի թույլտվություն։ Կրկին սեղմեք «Գտնել իմ խաղալիքը» և թույլատրեք, կամ միացրեք հեռախոսի կարգավորումներում։',
+  },
+  // Shown once, before the system permission dialog appears, so the dialog
+  // itself is not a surprise on a children's-toy app.
+  wifi_ble_ask: {
+    en: 'Your phone will ask for Bluetooth permission — that is how it finds the toy.',
+    ru: 'Телефон запросит доступ к Bluetooth — так он находит игрушку.',
+    hy: 'Հեռախոսը կխնդրի Bluetooth-ի թույլտվություն — այդպես է գտնում խաղալիքը։',
+  },
+  // Distinct from e_no_toy_found: the search never returned at all inside
+  // the timeout window (a slow phone, a toy that fell asleep) rather than
+  // returning an empty result quickly — same "try again" action, different
+  // diagnosis, so a parent who hits it twice knows it is the wait, not the
+  // toy's setup mode.
+  e_ble_timeout: {
+    en: 'This is taking too long. Make sure the toy is in setup mode and close by, then try again.',
+    ru: 'Это занимает слишком много времени. Убедитесь, что игрушка в режиме настройки и находится рядом, и попробуйте снова.',
+    hy: 'Սա շատ երկար է տևում։ Համոզվեք, որ խաղալիքը կարգավորման ռեժիմում է և մոտ է, ապա կրկին փորձեք։',
   },
   e_send_wifi: {
     en: 'Could not send the Wi-Fi details to the toy.',
