@@ -1,4 +1,5 @@
-// Three offline SD-card games (bench scaffold — AREG_OFFLINE_GAMES_BENCH).
+// Three offline SD-card games — production since 2026-08-19, the 30-second
+// AUTO-START only stays behind AREG_OFFLINE_GAMES_BENCH (see below).
 //
 // Siblings of offline_quiz.{h,cpp}: no Wi-Fi, no STT, no model, no mic —
 // pre-rendered Armenian MP3s on the card, the GREEN/RED answer buttons,
@@ -55,9 +56,9 @@
 //   - The toy claims only what the buttons measured. The mic is off in
 //     every game here, so nothing may claim to have heard the child.
 //
-// Bench-only: production builds compile ZERO bytes of this, exactly like
-// offline_quiz. Requires the answer buttons; a build with the flag but no
-// AREG_PIN_BUTTON_YES / _NO pins logs once and does nothing.
+// Requires the answer buttons; a build with no AREG_PIN_BUTTON_YES / _NO
+// pins logs once per call and does nothing (offline_games_available()
+// says so up front, so the menu never offers what it cannot start).
 #pragma once
 
 // PROMOTED TO PRODUCTION 2026-08-19 (owner decision, menu redesign):
@@ -101,14 +102,17 @@ void offline_games_run_mindreader();
 void offline_games_run_buzzer();
 void offline_games_run_simon();
 
-// Menu entry point: runs the NEXT game in a per-boot rotation
-// (mind-reader -> buzzer -> simon -> ...), so a child who asks twice in an
-// evening gets two different games. RAM cursor only -- across a power
-// cycle starting from the first game again is the right behaviour, not a
-// bug (mirrors Simon's own always-start-at-2 rule).
+// Menu entry point: runs the NEXT game in rotation (mind-reader -> who-
+// first -> button-simon -> ...), skipping any game whose intro clip is not
+// on the card, so a child who asks twice gets two different games and is
+// never offered one that would play silence. The cursor is persisted in
+// its own NVS namespace ("areggame", key written only on the pick that
+// actually changes it) — same idiom as story_select's "aregstory" cursor
+// — so the rotation survives a power cycle instead of restarting at
+// mind-reader every boot.
 void offline_games_run_next();
 
 // True when the games can actually run HERE AND NOW: answer buttons
-// compiled in, SD up, and the first game's entry clip verified on the
+// compiled in, SD up, and AT LEAST ONE game's intro clip verified on the
 // card. The menu must never say yes to a game it cannot start.
 bool offline_games_available();

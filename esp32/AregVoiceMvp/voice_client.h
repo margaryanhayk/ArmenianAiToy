@@ -113,6 +113,12 @@ bool voice_post_voice_intent(const uint8_t *payload, size_t length,
 // (story_report.cpp) owns the queue/retry logic; this is just the transport.
 int voice_post_story_plays(const char *json_body);
 
+// Offline-game-play reporting (store-and-forward) — same shape as
+// voice_post_story_plays, POSTed to /api/devices/game-plays instead. The
+// caller (game_report.cpp) owns the queue/retry logic; this is just the
+// transport.
+int voice_post_game_plays(const char *json_body);
+
 // Result of a single voice turn upload.
 struct VoiceTurnResult {
     // true iff HTTP status was 200 AND a response body was

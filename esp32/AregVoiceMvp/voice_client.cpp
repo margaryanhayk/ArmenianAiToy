@@ -576,6 +576,26 @@ int voice_post_story_plays(const char *json_body) {
     return status;
 }
 
+int voice_post_game_plays(const char *json_body) {
+    if (json_body == nullptr || !voice_wifi_is_connected()) {
+        return -1;
+    }
+    String url = AREG_BACKEND_URL;
+    url.replace("/api/chat/audio", "/api/devices/game-plays");
+
+    HTTPClient http;
+    if (!areg_http_begin(http, url)) {
+        return -1;
+    }
+    add_device_auth_headers(http);
+    http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
+    http.setTimeout(AREG_HTTP_READ_MS);
+    http.addHeader("Content-Type", "application/json");
+    const int status = http.POST((uint8_t *)json_body, strlen(json_body));
+    http.end();
+    return status;
+}
+
 // -------------------------------------------------------------
 // Upload
 // -------------------------------------------------------------
