@@ -733,9 +733,15 @@ static bool read_response_into(HTTPClient &http, VoiceTurnResult &result) {
     result.response_bytes = buf;
     result.response_length = (size_t)body_len;
     result.continue_more = (http.header("X-Areg-Continue") == "1");
-    Serial.printf("[voice] http 200, body=%u bytes (psram), continue=%s\n",
+    // Empty string (header not present / not collected on this call) reads
+    // as "!= \"1\"" — false — so this is a safe no-op default for every
+    // caller of read_response_into() that never asked http.collectHeaders()
+    // for X-Areg-Turn-End.
+    result.turn_ended = (http.header("X-Areg-Turn-End") == "1");
+    Serial.printf("[voice] http 200, body=%u bytes (psram), continue=%s turn_end=%s\n",
                   (unsigned)result.response_length,
-                  result.continue_more ? "1" : "0");
+                  result.continue_more ? "1" : "0",
+                  result.turn_ended ? "1" : "0");
     Serial.flush();
     return true;
 }
@@ -767,8 +773,8 @@ VoiceTurnResult voice_upload_turn(const uint8_t *payload, size_t length) {
     DIAG_MARK(5002, "http_begin_after_ok");
     http.addHeader("Content-Type", "audio/wav");
     add_device_auth_headers(http);
-    static const char *kCollectHeaders[] = {"X-Areg-Continue"};
-    http.collectHeaders(kCollectHeaders, 1);
+    static const char *kCollectHeaders[] = {"X-Areg-Continue", "X-Areg-Turn-End"};
+    http.collectHeaders(kCollectHeaders, 2);
 
     // Same bounded AI wait as the reflection answer, same watchdog hazard —
     // this one runs on loopTask via handle_online_chat_session(). See WdtPause.

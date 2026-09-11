@@ -865,7 +865,7 @@ like a story session is a blocking call from the IDLE branch.
 | Nobody answers, **at power-on** | goes quiet | Silence usually means nobody is there. A toy that keeps asking an empty room is the opposite of what a parent wants |
 | Nobody answers, **after a hold** | falls through to the graceful default — one short line, then a story | A hand was on the button seconds ago, so the room is not empty: silence means "did not understand", and asking a child what they want and then going dead silent is worse than playing something. This is the `child_present` argument threaded through `handle_welcome_flow` / `welcome_offer_story` |
 | Mis-heard | «say again» once, then a story | Two tries. A third reads as nagging to a five-year-old |
-| Child asks for game / riddle / curiosity | **opens the online chat session** (`handle_online_chat_session`) | The child's own recorded utterance is POSTed to `/api/chat/audio` — the backend's ModeDetector routes it and speaks the opener. Loop: play reply → press-to-talk within `AREG_CHAT_LISTEN_MS` (default 12 s) → upload → play, until silence closes it quietly. Turn cap `AREG_CHAT_SESSION_MAX_TURNS` (default 30) bounds cost. Parent gates re-checked server-side every turn. **NOT yet bench-verified on hardware.** |
+| Child asks for game (no offline game clips yet) / riddle / curiosity / **calm (outside bedtime)** | **opens the online chat session** (`handle_online_chat_session`) | The child's own recorded utterance is POSTed to `/api/chat/audio` — the backend's ModeDetector routes it and speaks the opener. Loop: play reply → press-to-talk within `AREG_CHAT_LISTEN_MS` (default 12 s) → upload → play, until one of the online-session rules ends it (see below). Turn cap `AREG_CHAT_SESSION_MAX_TURNS` (default 12) bounds cost. Parent gates re-checked server-side every turn. **NOT yet bench-verified on hardware.** |
 | Every mode disabled | greeting only, then stop | Never promise something the parent switched off |
 | A story has no `offer` clip | plays it instead of offering | A missing recording must never be why a child hears nothing |
 | A quick press (not power-on) | unchanged — starts/resumes a story | A child who wants the next story should not be interrogated every time |
@@ -947,6 +947,107 @@ index v4 round-trip, **v3 forward compatibility**) is covered by
 `content_sync_test.cpp` under `-DAREG_CONTENT_SYNC_TEST_BENCH`. The NVS and SD
 halves — greeting rotation persistence, the heard set, the flow itself — are
 hardware-only, as the music and clip sync were before them.
+
+### Online Game / Riddle / Curiosity / Calm voice loop (`handle_online_chat_session`)
+
+**NOT yet bench-verified on hardware — compile-verified only.** This is the
+firmware half of the feature CLAUDE.md's "State of the toy" used to call
+"backend done, firmware voice-chat path never flashed". The welcome flow
+already routed here for riddle/curiosity and for game-with-no-offline-clips;
+this pass adds Calm (outside the bedtime window) and tightens how the loop
+ends.
+
+**Loop shape** — unchanged from `handle_record_upload_playback`'s
+play-clip / listen-window / record / upload / act shape: no new state enum,
+no new LED vocabulary, no second MP3 decoder. One blocking call from
+`handle_welcome_flow`, same as a story session is a blocking call from the
+IDLE branch.
+
+**Ending rules** (pure logic in `online_session_rules.h`, host-tested by
+`host_tests/online_session_rules_test.cpp`), checked in this order every turn:
+
+1. **Upload failure** — network/backend error. Canned failure clip, honest
+   `transition_to(ST_ERROR)` then `ST_IDLE`.
+2. **`X-Areg-Turn-End: 1` on the response** — the backend already knows this
+   turn closed the conversation: a Game round the child stopped with a stop
+   word (`GameIntent.Stop`), or ANY parent-gate canned clip (unclaimed /
+   paused / bedtime / mode-disabled / cost-cap — every one of those is
+   inherently a conversation-ender). The toy plays that reply and stops —
+   no failure clip stacked on top of a goodbye the child just heard.
+3. **Two CONSECUTIVE silent listen windows** — never one. A single silent
+   window re-opens a second window on the SAME turn (no re-upload, no turn
+   consumed); only back-to-back silence ends the session. Mirrors the
+   welcome flow's own "ask twice" pattern (`AREG_WELCOME_MAX_TRIES`).
+4. **Turn cap** — `AREG_CHAT_SESSION_MAX_TURNS` (default **12**, was 30
+   before this pass — a cost-bound per session, not a UX target).
+5. **Decode error, or a mic/alloc edge on the child's answer.**
+
+Every ending calls `transition_to(ST_IDLE)` explicitly (never a bare LED
+reset) — see the "never" list: leaving `s_state` stuck at `ST_ERROR` /
+`ST_PLAYING` / `ST_RECORDING` / `ST_UPLOADING` is how the main button stops
+responding until a power cycle. This was a real bug in the
+pre-this-pass version of this function (`led_for_state(ST_IDLE)` only sets
+the LED colour; it does not touch `s_state`).
+
+**Backend signal**: `X-Areg-Turn-End` is an additive response header on
+`POST /api/chat/audio` — absent on every response before this feature, and
+on every mode with no known close (Riddle/Curiosity/Calm have none in the
+current pipeline; the loop's silence/turn-cap/error rules cover those).
+`ChatResponse.TurnEnded` is a pure REPORT of state `ChatService` already
+tracked for its own turn-taking (the `GameSessions` round going empty) —
+setting it changes no orchestration decision. Pinned by backend tests in
+`AudioChatControllerTests.cs` and `GameLoopIntegrationTests.cs`.
+
+**Offline-game fallback seam**: `online_session_offline_game_fallback()` is
+called (today: always returns `false`, a no-op) when a "game" session's
+very FIRST upload fails — the shape of "child asked for game, the cloud
+could not be reached". Not implemented in this pass; see CLAUDE.md /
+the PR for the follow-up.
+
+**Message.Mode / dashboard tabs**: verified, not changed. `AudioChatController`
+calls the exact same `IChatService.GetResponseAsync` the text endpoint uses,
+which already stamps `Message.Mode` on the assistant row before returning —
+so audio-path Game/Riddle/Curiosity/Calm conversations already appear in the
+parent dashboard's Games / Riddles / Questions tabs with no firmware or
+backend change needed.
+
+**Bench checklist — what a human must verify on hardware** (none of this
+was possible from this session; nothing here has ever been flashed):
+
+- [ ] Hold 2 s in idle → say «խաղանք» with no game clips synced → hears the
+      backend's Game opener (not an offline game, not silence).
+- [ ] Say «հանելուկ» (riddle) → same.
+- [ ] Say a curiosity-shaped question → same.
+- [ ] Outside the bedtime window, say a calm/settle-down phrase → hears the
+      Calm wind-down opener, NOT a story.
+- [ ] Inside the bedtime window, hold-to-menu is silent at all (unchanged
+      precondition) — Calm-over-voice must never be reachable there.
+- [ ] Mid-session: answer promptly for a few turns → each reply plays, the
+      loop keeps going, `[chat] turn N (<intent>) played — listening`
+      advances N each time.
+- [ ] Mid-session: stay silent for one window → hear
+      `[chat] silent window — listening once more` in the serial log, NOT a
+      session end, and the SAME turn number logged twice.
+- [ ] Mid-session: stay silent for two windows in a row → session ends
+      quietly (no failure clip, no re-prompt), toy returns to IDLE, main
+      button works immediately (proves `s_state` was actually reset).
+- [ ] Say a Game stop word («բավ է» / similar) → the goodbye plays and the
+      session ends on THAT turn (not one turn later) — confirms
+      `X-Areg-Turn-End` reached the firmware.
+- [ ] Pause the toy in the dashboard mid-session, then answer a turn → the
+      paused canned clip plays and the session ends immediately (confirms
+      the same header on a gate reply).
+- [ ] Turn the router off mid-session → canned failure clip, clean return
+      to IDLE, button responsive afterwards.
+- [ ] Run 12+ turns of a Game session → confirms the cap stops the 13th
+      upload rather than running indefinitely.
+- [ ] Free heap / PSRAM before vs. after this change (see "Measured size
+      cost" below) — confirm no regression from the added listen-retry loop.
+- [ ] Confirm the heartbeat resumes on its normal interval once the session
+      returns to IDLE (it cannot fire DURING the loop — `handle_online_chat_
+      session` is a blocking call from `loop()`, exactly like a story
+      session or the welcome flow; that is not new here) and that a long
+      Game session does not leave a stray open TLS connection behind.
 
 ## OTA — surviving the first boot of a new image
 

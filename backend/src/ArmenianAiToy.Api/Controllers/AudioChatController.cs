@@ -187,7 +187,7 @@ public class AudioChatController : ControllerBase
         {
             var response = await _chatService.GetResponseAsync(deviceId, transcript);
             chatResult = new ChatResponseShape(
-                response.Response, response.ConversationId, response.MessageId);
+                response.Response, response.ConversationId, response.MessageId, response.TurnEnded);
             autoContinue = response.LibraryAutoContinue;
             // Canonical Message.Content (already persisted by ChatService) is the
             // stripped story text. The toy has no screen — the choice handoff has
@@ -271,6 +271,15 @@ public class AudioChatController : ControllerBase
         {
             Response.Headers["X-Areg-Continue"] = "1";
         }
+        // Additive turn-end signal for the firmware's online Game/Riddle/
+        // Curiosity/Calm voice loop (see ChatResponse.TurnEnded). Absent
+        // on every response before this feature and on every mode with no
+        // known close — the loop's own silence/turn-cap/error rules still
+        // apply regardless.
+        if (chatResult.TurnEnded)
+        {
+            Response.Headers["X-Areg-Turn-End"] = "1";
+        }
         return File(tts.Content, tts.MimeType);
     }
 
@@ -334,6 +343,10 @@ public class AudioChatController : ControllerBase
             if (autoContinue)
             {
                 Response.Headers["X-Areg-Continue"] = "1";
+            }
+            if (chatResult.TurnEnded)
+            {
+                Response.Headers["X-Areg-Turn-End"] = "1";
             }
             Response.ContentType = stream.MimeType;
             Response.StatusCode = 200;
@@ -513,6 +526,11 @@ public class AudioChatController : ControllerBase
         try
         {
             var clip = await _canned.GetAsync(key, cancellationToken);
+            // Every canned-clip result is a gate trip (unclaimed / paused /
+            // bedtime / mode-disabled / cost-cap) — always a turn-ender, so
+            // the firmware's online voice loop can stop on it honestly
+            // instead of trying to record a next turn nobody can answer.
+            Response.Headers["X-Areg-Turn-End"] = "1";
             return File(clip.Content, clip.MimeType);
         }
         catch (OperationCanceledException) { throw; }
@@ -594,5 +612,5 @@ public class AudioChatController : ControllerBase
     }
 
     private sealed record ChatResponseShape(
-        string Text, Guid ConversationId, Guid AssistantMessageId);
+        string Text, Guid ConversationId, Guid AssistantMessageId, bool TurnEnded = false);
 }

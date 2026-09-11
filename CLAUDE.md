@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 2779 tests, ~35 s in Release
+dotnet test            # 2784 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -222,18 +222,32 @@ sync + content report, OTA, BLE Wi-Fi setup (toy side), volume knob, bedtime
 silence, the whole parent dashboard, operator console, backend safety.
 
 Built but not active or unverified: Game/Riddle/Curiosity/Calm by voice on
-the toy (backend done, firmware voice-chat path never flashed — menu offers
-them and plays a story); offline games (bench flag only); mid-story shout
-pauses (never bench-run); variant endings and serial (no audio); bedtime
-music (no tracks); hold-to-menu (unverified by hand, not staged for OTA);
-streaming Q&A firmware flag off; mobile app never built; listen tests of the
-cast library on the toy still open; every toy shares one BLE PoP.
+the toy (backend done, firmware online chat loop written and compile-
+verified, never bench-flashed — see the subsection below); offline games
+(bench flag only); mid-story shout pauses (never bench-run); variant
+endings and serial (no audio); bedtime music (no tracks); hold-to-menu
+(unverified by hand, not staged for OTA); streaming Q&A firmware flag off;
+mobile app never built; listen tests of the cast library on the toy still
+open; every toy shares one BLE PoP.
 
-Still to implement: online modes on the toy; offline games into production;
-render variant endings + serial; music tracks; per-toy PoP + factory station;
-card retirement / orphan sweeps / per-namespace index writes; durable child
+Still to implement: offline games into production; an offline-game
+fallback for online Game when Wi-Fi is down (seam left, not built); render
+variant endings + serial; music tracks; per-toy PoP + factory station; card
+retirement / orphan sweeps / per-namespace index writes; durable child
 recordings (`Audio:BlobStoreRoot` unset on Railway — data lost on redeploy);
 narrator PVC; rev-A PCB routing + speaker test + order; usage tiers.
+
+### Online Game/Riddle/Curiosity/Calm voice contract (2026-09-11)
+
+Welcome-flow hold-to-menu now opens `handle_online_chat_session` for
+Riddle, Curiosity, Calm (outside bedtime), and Game when no offline game
+clips are synced. Loop: play reply → listen → upload → play, ending on
+upload failure, the backend's `X-Areg-Turn-End` response header (Game
+stop word or any parent-gate reply), two CONSECUTIVE silent windows, or
+the turn cap (12). Always returns to `ST_IDLE` explicitly. Pure
+loop-termination logic is host-tested (`online_session_rules.h` /
+`host_tests/online_session_rules_test.cpp`). Nothing here has been heard
+on hardware — see `esp32/AregVoiceMvp/README.md`'s bench checklist.
 
 ## Working in this repo (agents)
 

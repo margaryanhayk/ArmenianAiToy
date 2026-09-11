@@ -22,6 +22,7 @@
 #include "net_transport.h"     // TLS/plain transport seam for every backend call
 #include "audio_io.h"
 #include "voice_client.h"
+#include "online_session_rules.h" // pure loop-termination logic for the online chat session (host-testable)
 #include "canned_clip.h"
 #include "diag.h"
 #include "wifi_creds.h"        // B.1 — NVS cred clear (factory reset gesture)
@@ -1013,28 +1014,67 @@ static bool welcome_listen(const char *expect, char *out_intent, size_t out_len,
     return true;
 }
 
-// --- Online multi-turn chat session (game / riddle / curiosity) -----
+// --- Online multi-turn chat session (game / riddle / curiosity / calm) -
 // The welcome flow lands here when the child asked for a mode the toy
-// holds no offline content for. The recorded utterance itself opens the
-// session — POSTed to /api/chat/audio, where the backend's ModeDetector
-// routes «խաղանք» to Game (or riddle/curiosity) and speaks the opener.
-// Then the loop is: play reply → press-to-talk within the listen window
-// → upload → play, until the child stops answering. Silence closes the
-// session quietly (never badger); the turn cap bounds cost. The parent
-// gates (pause / bedtime / per-mode flags) are enforced server-side on
-// every single turn.
+// either holds no offline content for, or that only ever runs online
+// (Riddle, Curiosity, and Calm outside the bedtime window). The recorded
+// utterance itself opens the session — POSTed to /api/chat/audio, where
+// the backend's ModeDetector routes it and speaks the opener. Then the
+// loop is: play reply → press-to-talk within the listen window → upload
+// → play, until one of the rules in online_session_rules.h says stop.
+// The parent gates (pause / bedtime / per-mode flags) are enforced
+// server-side on every single turn regardless.
+//
+// Ends on, in the order checked:
+//   1. the upload failing (network/backend error) — canned failure clip;
+//   2. the backend's own X-Areg-Turn-End header — a Game round the child
+//      stopped, or ANY parent-gate canned clip (paused/bedtime/mode-off/
+//      cost-cap). No canned-failure clip: this ending is not an error,
+//      the reply the child just heard (the goodbye, or the gate clip
+//      itself) already said what happened;
+//   3. two CONSECUTIVE silent listen windows (never one — a child pausing
+//      to think is not a child who left the room);
+//   4. the turn cap (cost-bound per session);
+//   5. a decode error, or an allocation/mic edge on the child's answer.
+// Every ending is honest: no badgering, no lying about what happened, and
+// the toy always returns to IDLE via transition_to() (see the "never"
+// list — a bare LED reset with s_state left dangling is how the button
+// dies until a power cycle).
 //
 // Takes ownership of `payload` (PSRAM); frees it on every path.
+// `intent` is "game" | "riddle" | "curiosity" | "calm" — logging only,
+// plus the seam below for a later offline fallback.
 
 #ifndef AREG_CHAT_LISTEN_MS
 #define AREG_CHAT_LISTEN_MS 12000UL       // child's window to answer, ms
 #endif
 #ifndef AREG_CHAT_SESSION_MAX_TURNS
-#define AREG_CHAT_SESSION_MAX_TURNS 30    // cost-bound per session
+#define AREG_CHAT_SESSION_MAX_TURNS 12    // cost-bound per session
+#endif
+#ifndef AREG_CHAT_MAX_CONSECUTIVE_SILENCE
+#define AREG_CHAT_MAX_CONSECUTIVE_SILENCE 2
 #endif
 
-static void handle_online_chat_session(uint8_t *payload, size_t payload_len) {
-    for (int turn_no = 1; turn_no <= AREG_CHAT_SESSION_MAX_TURNS; turn_no++) {
+// Seam for a LATER offline-game fallback. Called only when the very
+// FIRST turn of a "game" online session fails to upload — the shape of
+// "child asked for game, the cloud could not be reached" — right before
+// the existing canned-failure clip plays. Today this is a deliberate
+// no-op: it always returns false, so behaviour is UNCHANGED (the caller
+// falls straight through to the failure clip and an honest transition to
+// IDLE). When an offline fallback is implemented, this is where it hands
+// off to something like offline_games_run_next() instead, and returns
+// true so the caller skips the failure clip. Not implemented here by
+// design — see the PR / CLAUDE.md note for this feature.
+static bool online_session_offline_game_fallback(const char *intent) {
+    (void)intent;
+    return false;
+}
+
+static void handle_online_chat_session(uint8_t *payload, size_t payload_len,
+                                        const char *intent) {
+    int consecutive_silence = 0;
+    for (int turn_no = 1; !online_session_turn_cap_reached(turn_no, AREG_CHAT_SESSION_MAX_TURNS);
+         turn_no++) {
         transition_to(ST_UPLOADING);
         audio_speaker_begin();
         audio_play_thinking_earcon();   // immediate acoustic ack while we upload
@@ -1042,12 +1082,28 @@ static void handle_online_chat_session(uint8_t *payload, size_t payload_len) {
         VoiceTurnResult turn = voice_upload_turn(payload, payload_len);
         heap_caps_free(payload);
         payload = nullptr;
-        if (!turn.ok) {
-            Serial.printf("[chat] upload failed (http=%d)\n", turn.http_status);
-            Serial.flush();
-            voice_release_last_response();
-            transition_to(ST_ERROR);
-            play_canned_failure_clip();
+
+        if (online_session_ends_after_reply(turn.ok, turn.turn_ended)) {
+            if (!turn.ok) {
+                Serial.printf("[chat] upload failed (http=%d)\n", turn.http_status);
+                Serial.flush();
+                voice_release_last_response();
+                transition_to(ST_ERROR);
+                if (turn_no == 1 && strcmp(intent, "game") == 0
+                    && online_session_offline_game_fallback(intent)) {
+                    break;   // fallback handled it (not implemented today)
+                }
+                play_canned_failure_clip();
+            } else {
+                // A real, spoken ending — the backend already said
+                // goodbye or played the gate clip. Play it, then stop;
+                // no failure clip on top of a reply the child just heard.
+                Serial.println("[chat] backend closed the turn (X-Areg-Turn-End)");
+                Serial.flush();
+                transition_to(ST_PLAYING);
+                audio_play_mp3_buffer(turn.response_bytes, turn.response_length);
+                voice_release_last_response();
+            }
             break;
         }
 
@@ -1068,21 +1124,39 @@ static void handle_online_chat_session(uint8_t *payload, size_t payload_len) {
             Serial.println("[chat] unexpected continue flag — ignoring");
         }
 
-        // The child's turn: press-to-talk within the window, else the
-        // session is over. Longer window than the welcome menu — a game
-        // answer may need a moment's thought.
-        Serial.printf("[chat] turn %d played — listening\n", turn_no);
-        Serial.flush();
-        led_for_state(ST_RECORDING);
+        // The child's turn: press-to-talk within the window. Longer
+        // window than the welcome menu — a game answer may need a
+        // moment's thought. A silent window does NOT end the session by
+        // itself: it re-opens a second window, nothing new to upload, no
+        // turn consumed — only TWO CONSECUTIVE silent windows give up
+        // (online_session_should_give_up_on_silence). Same "ask twice"
+        // shape as the welcome flow's own retry.
         bool got_press = false;
-        const uint32_t started = millis();
-        while (millis() - started < AREG_CHAT_LISTEN_MS) {
-            if (button_poll() == 'P') { got_press = true; break; }
-            delay(AREG_BUTTON_POLL_MS);
-            esp_task_wdt_reset();
+        for (;;) {
+            Serial.printf("[chat] turn %d (%s) played — listening\n", turn_no, intent);
+            Serial.flush();
+            led_for_state(ST_RECORDING);
+            got_press = false;
+            const uint32_t started = millis();
+            while (millis() - started < AREG_CHAT_LISTEN_MS) {
+                if (button_poll() == 'P') { got_press = true; break; }
+                delay(AREG_BUTTON_POLL_MS);
+                esp_task_wdt_reset();
+            }
+            consecutive_silence = online_session_note_listen_result(consecutive_silence, got_press);
+            if (got_press) {
+                break;
+            }
+            if (online_session_should_give_up_on_silence(
+                    consecutive_silence, AREG_CHAT_MAX_CONSECUTIVE_SILENCE)) {
+                break;   // got_press stays false — the caller ends the session
+            }
+            Serial.println("[chat] silent window — listening once more");
+            Serial.flush();
+            // Loop again: a second window, same turn, no re-upload.
         }
         if (!got_press) {
-            Serial.println("[chat] no answer — session over");
+            Serial.println("[chat] two silent windows — session over");
             Serial.flush();
             break;
         }
@@ -1109,7 +1183,11 @@ static void handle_online_chat_session(uint8_t *payload, size_t payload_len) {
         // Loop continues: upload this answer as the next turn.
     }
     if (payload != nullptr) heap_caps_free(payload);
-    led_for_state(ST_IDLE);
+    // Honest, explicit return to IDLE (see the "never" list) — a bare LED
+    // reset here would leave s_state dangling at whatever this loop last
+    // set it to (ST_ERROR / ST_PLAYING / ST_RECORDING / ST_UPLOADING) and
+    // the main button would not respond again until a power cycle.
+    transition_to(ST_IDLE);
 }
 
 // Offers stories by name until the child says yes, then plays one.
@@ -1372,12 +1450,22 @@ static void handle_welcome_flow(bool child_present) {
             if (heard != nullptr) heap_caps_free(heard);
             break;
         }
-        // Calm is always available (MODES.md), and a bedtime cue must not
-        // open a menu — it should settle things down, which here means a
-        // story rather than a game.
+        // Calm is always available (MODES.md) and — outside the bedtime
+        // window, which is the only time this line is reachable at all
+        // (the whole welcome flow stays silent during bedtime; see the
+        // guard near the top of this function) — opens the same ONLINE
+        // chat session as game/riddle/curiosity: the backend's
+        // ModeDetector routes the transcript to Calm and speaks the
+        // wind-down opener. The re-check here is defense-in-depth against
+        // a stale cached bedtime flag (bounded to one heartbeat interval
+        // by design elsewhere) rather than trusting the guard alone.
         if (strcmp(intent, "calm") == 0) {
+            if (heard != nullptr && !voice_in_bedtime_window()) {
+                handle_online_chat_session(heard, heard_len, "calm");
+                return;
+            }
             if (heard != nullptr) heap_caps_free(heard);
-            break;
+            break;   // bedtime after all, or alloc edge -- graceful default
         }
         // game / riddle / curiosity → the ONLINE chat session. The
         // child's own recorded words open it (the backend's ModeDetector
@@ -1397,7 +1485,7 @@ static void handle_welcome_flow(bool child_present) {
                 return;
             }
             if (heard != nullptr) {
-                handle_online_chat_session(heard, heard_len);
+                handle_online_chat_session(heard, heard_len, "game");
                 return;
             }
             break;   // alloc edge -- fall to the graceful default
@@ -1409,7 +1497,7 @@ static void handle_welcome_flow(bool child_present) {
         // the backend re-checks per turn anyway.
         if (strcmp(intent, "riddle") == 0 || strcmp(intent, "curiosity") == 0) {
             if (heard != nullptr) {
-                handle_online_chat_session(heard, heard_len);
+                handle_online_chat_session(heard, heard_len, intent);
                 return;
             }
             break;   // alloc edge -- fall to the graceful default
