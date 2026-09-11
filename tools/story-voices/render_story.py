@@ -441,12 +441,17 @@ def stitch(parts, outdir, name):
                 # the gap belongs to the span that just ENDED — its punctuation
                 # is what earned the air, not the one about to start
                 gap = PAUSE_SPEAKER if who != prev else prev_pause
-                f.write(f"file '{silence(gap)}'\n")
-            f.write(f"file '{wav}'\n")
+                # Absolute path — see the matching note in assemble(): the
+                # concat demuxer resolves a relative "file" entry against the
+                # LIST FILE's directory, not the process cwd.
+                f.write(f"file '{os.path.abspath(silence(gap))}'\n")
+            f.write(f"file '{os.path.abspath(wav)}'\n")
             prev, prev_pause = who, pause
     out = os.path.join(outdir, name)
-    subprocess.run(["ffmpeg","-v","error","-y","-f","concat","-safe","0","-i",lst,
+    concat = subprocess.run(["ffmpeg","-v","error","-y","-f","concat","-safe","0","-i",lst,
                     "-ac","1","-ar","44100","-b:a","128k",out], capture_output=True)
+    if concat.returncode != 0 or not os.path.exists(out):
+        sys.exit(f"concat failed for {name}: {concat.stderr.decode(errors='replace')[:500]}")
     return out
 
 def span_timings(parts):
@@ -508,17 +513,23 @@ def assemble(sid, seg_files, outdir):
                     "-i","anullsrc=r=44100:cl=mono",sil], capture_output=True)
     lst = os.path.join(outdir, f"_{sid}.txt")
     starts, t = [], 0.0
+    # Absolute paths: the concat demuxer resolves relative "file" entries
+    # against the LIST FILE's own directory, not the process cwd, so a
+    # cwd-relative path here (e.g. "render-out/x/seg0.mp3") gets re-prefixed
+    # with outdir and fails to open. Discovered live on this host 2026-09-11.
     with open(lst, "w") as f:
         for i, seg in enumerate(seg_files):
             if i:
-                f.write(f"file '{sil}'\n")
+                f.write(f"file '{os.path.abspath(sil)}'\n")
                 t += PAUSE_SEGMENT
             starts.append(round(t, 3))
-            f.write(f"file '{seg}'\n")
+            f.write(f"file '{os.path.abspath(seg)}'\n")
             t += duration(seg)
     out = os.path.join(outdir, f"{sid}.mp3")
-    subprocess.run(["ffmpeg","-v","error","-y","-f","concat","-safe","0","-i",lst,
+    concat = subprocess.run(["ffmpeg","-v","error","-y","-f","concat","-safe","0","-i",lst,
                     "-ac","1","-ar","44100","-b:a","192k",out], capture_output=True)
+    if concat.returncode != 0 or not os.path.exists(out):
+        sys.exit(f"concat failed for {sid}: {concat.stderr.decode(errors='replace')[:500]}")
     mp = os.path.join(outdir, f"{sid}.segments.json")
     json.dump({"storyId": sid, "unit": "seconds", "starts": starts},
               open(mp, "w", encoding="utf-8"))

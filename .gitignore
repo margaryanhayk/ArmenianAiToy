@@ -68,6 +68,11 @@ esp32/AregVoiceMvp/config.h
 # per-chunk pieces are regenerable and just bulk.
 tools/voice-audition/_chunks/
 
-# Scratch output from tools/ElevenLabsRender � the installed copies under
+# Scratch output from tools/ElevenLabsRender — the installed copies under
 # story-audio/ are the shipped ones; these are the pre-levelling renders.
 tools/.render-out/
+
+# Scratch output from tools/story-voices/render_story.py (per
+# docs/variant-endings-serial-render-runbook.md) — same posture: the shipped
+# copies under story-audio/ are what ships, these are pre-levelling.
+render-out/

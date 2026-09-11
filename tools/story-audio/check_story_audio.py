@@ -151,6 +151,32 @@ def story_chars(story_json: Path) -> int:
     return len(" ".join(story.get("segments", [])))
 
 
+def load_variant_endings(path: Path) -> dict:
+    """storyId -> endingText, from variant-endings.json. An alt ending has no
+    <id>-alt.story.json of its own (it grafts onto the base story's segments,
+    see docs/variant-endings-serial-render-runbook.md) - this is how its
+    expected length is found instead."""
+    if not path.exists():
+        return {}
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    return {e["storyId"]: e["endingText"] for e in doc.get("endings", [])}
+
+
+def alt_expected_chars(story_id: str, content_dir: Path, endings: dict) -> int | None:
+    """For a "<baseId>-alt" id: the base story's segments plus the new ending
+    text - the exact shape render_story.py produces for an alt (base segments
+    verbatim + one new final segment). Returns None if this isn't a resolvable
+    alt (no -alt suffix, unknown base, or base story.json missing)."""
+    if not story_id.endswith("-alt"):
+        return None
+    base_id = story_id[: -len("-alt")]
+    ending_text = endings.get(base_id)
+    base_json = content_dir / f"{base_id}.story.json"
+    if ending_text is None or not base_json.exists():
+        return None
+    return story_chars(base_json) + len(ending_text)
+
+
 def mmss(seconds: float) -> str:
     return f"{int(seconds // 60)}:{int(seconds % 60):02d}"
 
@@ -170,7 +196,15 @@ def main() -> int:
         default=repo / "backend/src/ArmenianAiToy.Application/Stories/Content",
         help="folder holding <storyId>.story.json",
     )
+    parser.add_argument(
+        "--variant-endings",
+        type=Path,
+        default=repo / "backend/content/variant-endings/variant-endings.json",
+        help="storyId -> endingText, for resolving a <baseId>-alt id's expected length",
+    )
     args = parser.parse_args()
+
+    variant_endings = load_variant_endings(args.variant_endings)
 
     files = sorted(args.audio_dir.glob("*.mp3"))
     if not files:
@@ -187,8 +221,14 @@ def main() -> int:
         story_json = args.content_dir / f"{story_id}.story.json"
 
         expected = 0.0
-        if story_json.exists():
+        has_text = story_json.exists()
+        if has_text:
             expected = story_chars(story_json) / CHARS_PER_SECOND
+        else:
+            alt_chars = alt_expected_chars(story_id, args.content_dir, variant_endings)
+            if alt_chars is not None:
+                expected = alt_chars / CHARS_PER_SECOND
+                has_text = True
 
         issues = []
         if expected > 0 and info["seconds"] < expected * SHORT_FLOOR:
@@ -197,7 +237,7 @@ def main() -> int:
             issues.append(
                 f"{info['id3_tags']} ID3 tags - pieces glued badly, will stop early"
             )
-        if not story_json.exists():
+        if not has_text:
             issues.append("no story text to check the length against")
 
         share = f"{info['seconds'] / expected:.0%}" if expected > 0 else "-"
