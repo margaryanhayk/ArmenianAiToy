@@ -136,6 +136,49 @@ public class ContentSyncAudioRootTests
         }
     }
 
+    [Fact]
+    public void ShippedMusicConfiguration_PointsAtFilesThatActuallyExist()
+    {
+        // Mirrors ShippedConfiguration_PointsAtFilesThatActuallyExist above,
+        // for ContentSync:Music instead of Stories — same placeholder-row
+        // exemption (SizeBytes 0 + 64-zero Sha256), same reason: a shipped
+        // row with a mismatched hash would have a toy download a track that
+        // fails its own SHA-256 check.
+        var repoRoot = FindRepoRoot();
+        var audioDir = Path.Combine(repoRoot, "backend", "src", "ArmenianAiToy.Api", "story-audio");
+        var appsettings = Path.Combine(repoRoot, "backend", "src", "ArmenianAiToy.Api", "appsettings.json");
+
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(appsettings));
+        var contentSync = doc.RootElement.GetProperty("ContentSync");
+        if (!contentSync.TryGetProperty("Music", out var music))
+        {
+            return; // no Music section configured — nothing to check
+        }
+
+        foreach (var track in music.EnumerateArray())
+        {
+            var id = track.GetProperty("TrackId").GetString()!;
+            var file = Path.Combine(audioDir, track.GetProperty("AudioPath").GetString()!);
+
+            if (track.GetProperty("SizeBytes").GetInt64() == 0)
+            {
+                Assert.Equal(new string('0', 64), track.GetProperty("Sha256").GetString());
+                Assert.False(File.Exists(file),
+                    $"{id}: has audio on disk but is still configured as a placeholder — "
+                    + "fill in its size, hash and Version once it is rendered");
+                continue;
+            }
+
+            Assert.True(File.Exists(file), $"{id}: configured audio file is missing ({file})");
+
+            var bytes = File.ReadAllBytes(file);
+            Assert.Equal(track.GetProperty("SizeBytes").GetInt64(), bytes.LongLength);
+            Assert.Equal(
+                Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant(),
+                track.GetProperty("Sha256").GetString());
+        }
+    }
+
     private static string FindRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

@@ -1,0 +1,42 @@
+{
+  "_status": "Reviewed and ready to render. Tracks are GENERATED, not recorded - tools/story-ambience/generate_music.py, one ElevenLabs Music request per track, prompts recorded in story-audio/music/prompts.json beside the rendered audio, same idiom as story-ambience/generate_sounds.py. Titles reviewed by the armenian-story-master agent 2026-09-11 (one fix applied: lullaby-melody's title was corrected from the non-standard Օրորային to Օրորոցային).",
+  "_rules": {
+    "instrumentalOnly": "Every prompt is instrumental music: no vocals, no lyrics, no singing, no spoken words. That instruction is appended in code (generate_music.py's build_prompt), not repeated in every prompt string here, so it cannot be dropped by an editing mistake.",
+    "noRealWork": "Owner instruction: folk-flavoured where the prompt can say so, but never naming a real composer, performer, ensemble or existing piece. armenian-story-master flagged the closest miss on review: the word Օրոր alone is also the title of the best-known Armenian classical lullaby, so track 1 is named Օրորոցային մեղեդի (an adjective, \"lullaby-like melody\"), never the bare noun.",
+    "duration": "3 to 5 minutes each, matching tools/story-audio/check_music_audio.py's gate. Requested lengths are spread inside that window with margin on both ends (3:20-4:50) because the generator's actual output length is not guaranteed to land exactly on the request.",
+    "loudness": "Post-processed to -23 LUFS in generate_music.py - see that script's docstring for why quieter than the -16.4 LUFS narration target. Never hand-levelled separately from the fade pass.",
+    "fades": "3s fade in, 8s fade out, applied in the same ffmpeg pass as the loudness normalisation. A bedtime track that starts or stops abruptly defeats the point of the feature.",
+    "prompt": "tracks[].prompt is the reviewed English text sent to the generator. No field here is ever placement rationale (there is nothing to place - a whole-track loop, not a cue) so nothing needs the note/prompt split generate_sounds.py's cue sheet has.",
+    "licence": "Every track's licence field states output ownership comes from the ElevenLabs plan's terms, not from the audio being synthetic - the same honest phrasing ambience-cues.json uses, not a claim that the question is settled."
+  },
+  "tracks": [
+    {
+      "id": "lullaby-melody",
+      "title": "Օրորոցային մեղեդի",
+      "durationSeconds": 200,
+      "prompt": "A gentle Armenian folk-inspired lullaby. Slow tempo, around 60 beats per minute. A warm duduk-like woodwind carries a simple, repeating melodic phrase over soft plucked strings. Minimal to no percussion. Tender, unhurried, night-time mood, never mournful.",
+      "licence": "generated - no licence fee. Output ownership comes from the ElevenLabs plan's terms, not from the audio being synthetic."
+    },
+    {
+      "id": "under-the-stars",
+      "title": "Աստղերի տակ",
+      "durationSeconds": 230,
+      "prompt": "A dreamy, soft instrumental evoking a quiet starlit night. Gentle plucked strings like a kanun carry a slow, flowing melody. Airy and spacious, no percussion, warm rather than cold, nothing tense or dramatic.",
+      "licence": "generated - no licence fee. Output ownership comes from the ElevenLabs plan's terms, not from the audio being synthetic."
+    },
+    {
+      "id": "calm-night",
+      "title": "Հանգիստ գիշեր",
+      "durationSeconds": 260,
+      "prompt": "A hushed, minimal instrumental for falling asleep. Very slow tempo, sparse warm piano-like tones over a soft sustained pad. Extremely gentle dynamics throughout, no build-up, no climax, quiet and still from start to end.",
+      "licence": "generated - no licence fee. Output ownership comes from the ElevenLabs plan's terms, not from the audio being synthetic."
+    },
+    {
+      "id": "gentle-breeze",
+      "title": "Մեղմ քամի",
+      "durationSeconds": 290,
+      "prompt": "A soft, flowing pastoral instrumental evoking a gentle breeze over hills. Light Armenian folk melodic character, gentle woodwind answered by soft strings. Slow and airy, calm and unhurried, never energetic or driving.",
+      "licence": "generated - no licence fee. Output ownership comes from the ElevenLabs plan's terms, not from the audio being synthetic."
+    }
+  ]
+}

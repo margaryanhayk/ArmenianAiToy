@@ -89,6 +89,37 @@ public class ContentSyncMusicTests
         Assert.Null(new ContentManifestService(options).Build().Music);
     }
 
+    // Pins that the four shipped ContentSync:Music rows — all placeholders
+    // (SizeBytes 0) until real tracks are rendered — stay dropped from the
+    // manifest, same posture as a placeholder Stories row. Reads the real
+    // appsettings.json rather than constructing options by hand, so a
+    // future row that is only HALF filled in (a real hash with no size, or
+    // vice versa) would still fail this the same way it fails
+    // ContentSyncAudioRootTests' shipped-config keystone.
+    [Fact]
+    public void Manifest_ShippedPlaceholderTracks_AreDropped()
+    {
+        var repoRoot = FindRepoRoot();
+        var appsettings = Path.Combine(repoRoot, "backend", "src", "ArmenianAiToy.Api", "appsettings.json");
+        var config = new ConfigurationBuilder().AddJsonFile(appsettings).Build();
+
+        var options = ContentSyncOptions.Resolve(config);
+        Assert.NotEmpty(options.Music); // the rows exist and are bound
+
+        var manifest = new ContentManifestService(options).Build();
+        Assert.Null(manifest.Music); // every one is a placeholder, so none is advertised
+    }
+
+    private static string FindRepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, ".git")))
+        {
+            dir = dir.Parent;
+        }
+        return dir?.FullName ?? throw new InvalidOperationException("repo root not found");
+    }
+
     private static DeviceController Controller()
     {
         var controller = new DeviceController(
