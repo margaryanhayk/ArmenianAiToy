@@ -118,6 +118,15 @@ export default function ConversationsScreen({
                       warn={today.flaggedMessagesCount > 0}
                     />
                   </View>
+                  {today.modes && today.modes.length > 0 ? (
+                    <View style={styles.todayModes}>
+                      {today.modes.map((mo) => (
+                        <Text key={mo} style={styles.modeChip}>
+                          {modeChipLabel(mo)}
+                        </Text>
+                      ))}
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
               {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -154,6 +163,22 @@ export default function ConversationsScreen({
   );
 }
 
+// Same bounded-vocabulary mapping as parent.html's modeChipLabel — any
+// value TodaySummary.modes can ever carry (server-stamped, never free
+// text) maps to a translated label here. An unrecognized string renders
+// verbatim rather than being passed to t(), which throws on a key it
+// does not know.
+function modeChipLabel(mode: string): string {
+  switch (mode) {
+    case 'story': return t('mode_story');
+    case 'game': return t('mode_game');
+    case 'riddle': return t('mode_riddle');
+    case 'curiosity': return t('mode_curiosity');
+    case 'calm': return t('mode_calm');
+    default: return mode;
+  }
+}
+
 function Stat({ labelKey, value, warn }: { labelKey: Key; value: number; warn?: boolean }) {
   return (
     <View style={styles.stat}>
@@ -178,6 +203,20 @@ const styles = StyleSheet.create({
   },
   todayTitle: { fontSize: 14, fontWeight: '600', color: theme.brand, marginBottom: 10 },
   todayRow: { flexDirection: 'row', justifyContent: 'space-around' },
+  todayModes: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10 },
+  modeChip: {
+    fontSize: 12,
+    color: theme.brand,
+    backgroundColor: theme.surface,
+    borderColor: theme.line,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginRight: 6,
+    marginBottom: 4,
+    overflow: 'hidden',
+  },
   stat: { alignItems: 'center' },
   statValue: { fontSize: 26, fontWeight: '700', color: theme.brand },
   statWarn: { color: theme.danger },

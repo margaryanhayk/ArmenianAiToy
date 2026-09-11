@@ -69,6 +69,11 @@ export type LinkedDevice = {
     | 'crash_looping';
   storiesOnToy?: number;
   storiesAvailable?: number;
+  // The short code a parent reads to support (e.g. "E-101", "E-401",
+  // "E-501"), empty/absent when there is nothing to report. Mirrors
+  // parent.html's `d.faultCode` — never a diagnosis, just a code. Optional
+  // for the same older-backend reason as contentHealth above.
+  faultCode?: string;
 };
 
 export type ModeFlags = {
@@ -246,6 +251,10 @@ export type TodaySummary = {
   messagesCount: number;
   flaggedMessagesCount: number;
   assistantMessagesWithAudio: number;
+  // Distinct Message.Mode values stamped among today's messages, bounded
+  // to 'story' | 'game' | 'riddle' | 'curiosity' | 'calm'. Optional so the
+  // app keeps working against a server older than this field (2026-09-11).
+  modes?: string[];
 };
 
 export type ConversationSummary = {

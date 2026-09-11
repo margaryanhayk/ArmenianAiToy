@@ -2947,6 +2947,13 @@ vendor questions, and the paid test that gates the whole decision:
 `docs/voice-decision-brief.md`; its Gemini/Azure re-audition is now a fallback,
 not the decision.
 
+**Correction (2026-09-11):** the "owner's ElevenLabs clone" above, rendered
+into `story-audio/` as `areg-storyteller`, is an ElevenLabs INSTANT clone,
+not a Professional Voice Clone (PVC) â€” see CLAUDE.md Â§ Content pipelines.
+The PVC referenced under "State of the toy" (owner's own recording, 1 slot
+free) is a separate, still-pending decision for the LIVE voice, not a
+description of this narrator clone.
+
 ## Story cast — one voice per character (owner direction 2026-09-03, pilot approved 2026-09-06)
 
 The owner's direction after the Ուլիկը listen: "for each part we can use
@@ -2960,7 +2967,9 @@ it is ok"). It is a LISTENING COPY in scratch; the shipped
   speaker carries `voiceId` / `modelId` / `voiceSettings`, and a span may
   override `voiceSettings` for one line. Narrator: `areg-storyteller` on
   `eleven_v3` (the conversational model let sentence endings fall away "as if
-  out of breath"); characters on `eleven_v3_conversational`. Wolf: an
+  out of breath") — an ElevenLabs **INSTANT** clone, not a Professional Voice
+  Clone (correction, 2026-09-11; see CLAUDE.md § Content pipelines);
+  characters on `eleven_v3_conversational`. Wolf: an
   ElevenLabs Voice Design voice (every library voice was rejected for its
   accent; "child" in a design prompt is refused, so the kid is "a young goat
   character"). `check_speaker_map.py` still pins that the spans join back to
@@ -3171,6 +3180,13 @@ reaches the action, so no request can reach GPT (`{"storyId":â€¦,"segmentInd
 moving the environment check ahead of model binding (a filter or a middleware
 path check, as `/metrics` and `/api/internal/*` already do). Not done â€”
 recorded here so the gap is a known one rather than a doc that lies.
+
+**Correction (2026-09-11): done.** `StoryQaTextDevGate` (`Api/Observability/`)
+is now wired as pre-routing middleware in `Program.cs`, ahead of
+`app.MapControllers()` — the exact pattern named above — so a malformed or
+bodyless request outside Development now gets the same 404 as a well-formed
+one, before model binding ever runs. The controller's own check stays as
+defense in depth.
 
 **Dual moderation, mirroring the voice path.** `LibraryStoryQuestionService`
 has no moderation of its own (it takes only `IAiChatClient`), and

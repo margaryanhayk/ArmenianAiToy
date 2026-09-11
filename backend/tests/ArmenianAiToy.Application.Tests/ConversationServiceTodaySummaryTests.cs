@@ -69,7 +69,7 @@ public class ConversationServiceTodaySummaryTests
 
     private static Message NewMessage(
         Guid conversationId, MessageRole role, string content, DateTime ts,
-        SafetyFlag flag = SafetyFlag.Clean, string? audioBlobPath = null)
+        SafetyFlag flag = SafetyFlag.Clean, string? audioBlobPath = null, string? mode = null)
         => new()
         {
             Id = Guid.NewGuid(),
@@ -79,6 +79,7 @@ public class ConversationServiceTodaySummaryTests
             Timestamp = ts,
             SafetyFlag = flag,
             AudioBlobPath = audioBlobPath,
+            Mode = mode,
         };
 
     // Reference instant: 2026-04-30 12:00 UTC. dayStart = 2026-04-30 00:00 UTC.
@@ -106,6 +107,7 @@ public class ConversationServiceTodaySummaryTests
         Assert.Equal(0, result.AssistantMessagesWithAudio);
         Assert.Empty(result.Newest);
         Assert.Empty(result.Flagged);
+        Assert.Empty(result.Modes);
     }
 
     [Fact]
@@ -547,5 +549,67 @@ public class ConversationServiceTodaySummaryTests
         Assert.Equal(
             new DateTime(2026, 4, 21, 0, 0, 0, DateTimeKind.Utc),
             result.DayStartUtc);
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // Modes (2026-09-11) — distinct Message.Mode values among today's
+    // messages, bounded to the five-mode vocabulary.
+    // ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Modes_DistinctValuesToday_AreReturned()
+    {
+        var (service, db) = CreateService();
+        var deviceId = Guid.NewGuid();
+        var conv = NewConversation(deviceId, DayStart.AddHours(1));
+        db.Set<Conversation>().Add(conv);
+        db.Set<Message>().AddRange(
+            NewMessage(conv.Id, MessageRole.Assistant, "a1", DayStart.AddHours(1), mode: "story"),
+            // A repeat of "story" must not duplicate in the result.
+            NewMessage(conv.Id, MessageRole.Assistant, "a2", DayStart.AddHours(2), mode: "story"),
+            NewMessage(conv.Id, MessageRole.Assistant, "a3", DayStart.AddHours(3), mode: "calm"),
+            // Unmoded rows (null) must never surface as a mode value.
+            NewMessage(conv.Id, MessageRole.User, "u1", DayStart.AddHours(1)));
+        await db.SaveChangesAsync();
+
+        var result = await service.GetTodaySummaryAsync(deviceId, AsOf);
+
+        Assert.Equal(new[] { "story", "calm" }, result.Modes.OrderBy(m => m == "story" ? 0 : 1));
+        Assert.Equal(2, result.Modes.Count);
+        Assert.Contains("story", result.Modes);
+        Assert.Contains("calm", result.Modes);
+    }
+
+    [Fact]
+    public async Task Modes_YesterdaysModes_AreExcluded()
+    {
+        var (service, db) = CreateService();
+        var deviceId = Guid.NewGuid();
+        var conv = NewConversation(deviceId, Yesterday);
+        db.Set<Conversation>().Add(conv);
+        db.Set<Message>().Add(
+            NewMessage(conv.Id, MessageRole.Assistant, "a", Yesterday, mode: "riddle"));
+        await db.SaveChangesAsync();
+
+        var result = await service.GetTodaySummaryAsync(deviceId, AsOf);
+
+        Assert.Empty(result.Modes);
+    }
+
+    [Fact]
+    public async Task Modes_OtherDevicesModes_AreExcluded()
+    {
+        var (service, db) = CreateService();
+        var deviceId = Guid.NewGuid();
+        var otherDeviceId = Guid.NewGuid();
+        var conv = NewConversation(otherDeviceId, DayStart.AddHours(1));
+        db.Set<Conversation>().Add(conv);
+        db.Set<Message>().Add(
+            NewMessage(conv.Id, MessageRole.Assistant, "a", DayStart.AddHours(1), mode: "game"));
+        await db.SaveChangesAsync();
+
+        var result = await service.GetTodaySummaryAsync(deviceId, AsOf);
+
+        Assert.Empty(result.Modes);
     }
 }

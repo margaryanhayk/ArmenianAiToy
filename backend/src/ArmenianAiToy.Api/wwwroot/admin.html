@@ -245,7 +245,10 @@ const tabs = {
       // rebooting every three minutes, and that truth is the whole trap.
       {h:'Status',f:r=> (r.isRevoked?'<span class="pill blk">revoked</span> ':'')
         + (r.contentHealth === 'crash_looping'
-            ? `<span class="pill crit">CRASH LOOP</span><div class="mono mut">${esc(r.resetReason || 'fault')}`
+            // faultCode (E-501) is the exact code the parent was told to
+            // quote to support — shown beside the raw resetReason/bootCount,
+            // never in place of them, so a mismatch is visible here too.
+            ? `<span class="pill crit">CRASH LOOP${r.faultCode ? ' ' + esc(r.faultCode) : ''}</span><div class="mono mut">${esc(r.resetReason || 'fault')}`
               + (r.bootCount != null ? ` · ${r.bootCount} boots` : '') + '</div>'
             : r.isPaused?'<span class="pill blk">paused</span>':'<span class="pill on">active</span>')},
       // Device-reported identity. Stored since the OTA foundation, never
@@ -278,7 +281,10 @@ const tabs = {
         // verdict, and it is the one that survives when a failed sync leaves
         // the card looking complete via carry-forward.
         if (h === 'sync_failed') {
-          return '<span class="pill blk">sync failed</span>'
+          // faultCode (E-401) is the exact code the parent was told to
+          // quote to support — shown beside the raw diagnostic, never in
+          // place of it.
+          return `<span class="pill blk">sync failed${r.faultCode ? ' ' + esc(r.faultCode) : ''}</span>`
             + `<div class="mono mut">${esc(r.contentSyncError || r.contentSyncStatus || 'no reason reported')}</div>`;
         }
         if (h === 'unknown') return '<span class="mut">not reported</span>';
@@ -674,13 +680,15 @@ window.openDevice = async function(id){
     // banner is deliberately loud and deliberately first — a crash loop is
     // not a row in a details table.
     const syncBanner = crash
-      ? `<div class="msg err"><b>CRASH LOOP.</b> This toy is rebooting on a fault, not running.
+      ? `<div class="msg err"><b>CRASH LOOP${d.faultCode ? ' · ' + esc(d.faultCode) : ''}.</b> This toy is rebooting on a fault, not running.
           Last reset <b>${esc(d.resetReason || 'fault')}</b>${d.bootCount != null ? `, <b>${d.bootCount}</b> boots since its last clean sync` : ''}.
-          It heartbeats between crashes, so "last seen" stays fresh — that is not evidence this toy is working.</div>`
+          It heartbeats between crashes, so "last seen" stays fresh — that is not evidence this toy is working.
+          ${d.faultCode ? `The parent was told to quote <b>${esc(d.faultCode)}</b> to support.` : ''}</div>`
       : (d && d.contentHealth === 'sync_failed'
-        ? `<div class="msg err"><b>Last content sync failed.</b>
+        ? `<div class="msg err"><b>Last content sync failed${d.faultCode ? ' · ' + esc(d.faultCode) : ''}.</b>
             ${esc(d.contentSyncError || 'no reason reported')}
-            — the card keeps its previous stories, so the library on the devices list can look complete.</div>`
+            — the card keeps its previous stories, so the library on the devices list can look complete.
+            ${d.faultCode ? `The parent was told to quote <b>${esc(d.faultCode)}</b> to support.` : ''}</div>`
         : '');
     // The detail line runs for EVERY reporting toy, not just a failing one:
     // "when did this toy last sync at all" is the first question of any

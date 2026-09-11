@@ -76,6 +76,16 @@ public sealed record AdminDeviceDto(
     /// </summary>
     public string ContentHealth { get; init; } = DeviceContentHealth.Unknown;
 
+    /// <summary>
+    /// The same short code (e.g. "E-401", "E-501") a parent would be told to
+    /// quote to support, derived from <see cref="ContentHealth"/> via
+    /// <c>DeviceFaultCode.FromContentHealth</c>. Empty when there is nothing
+    /// to report. Added 2026-09-11 so an operator can see exactly what code
+    /// a parent is reading over the phone, alongside the raw diagnostics
+    /// below rather than in place of them.
+    /// </summary>
+    public string FaultCode { get; init; } = DeviceFaultCode.None;
+
     /// <summary>Advertised stories the toy does NOT hold at the advertised
     /// version. Empty when it has never reported — naming every story as
     /// missing would be a fabricated fault.</summary>

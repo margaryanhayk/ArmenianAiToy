@@ -152,55 +152,68 @@ public class InternalController : ControllerBase
         IReadOnlyCollection<(string StoryId, int Version)> AdvertisedFor(Guid id)
             => advertisedByDevice.TryGetValue(id, out var own) ? own : fleetAdvertised;
 
-        var rows = devices.Select(d => new AdminDeviceDto(
-            Id: d.Id,
-            Name: d.Name,
-            MacAddress: d.MacAddress,
-            FirmwareVersion: d.FirmwareVersion,
-            LastOtaStatus: d.LastOtaStatus,
-            OtaHealth: DeviceOtaHealth.Resolve(d.LastOtaStatus, d.LastSeenAt, now),
-            RegisteredAt: d.RegisteredAt,
-            LastSeenAt: d.LastSeenAt,
-            IsPaused: d.IsPaused,
-            IsRevoked: d.IsRevoked,
-            BedtimeStart: d.BedtimeStart,
-            BedtimeEnd: d.BedtimeEnd,
-            TimeZone: d.TimeZone,
-            StoryEnabled: d.StoryEnabled,
-            GameEnabled: d.GameEnabled,
-            RiddleEnabled: d.RiddleEnabled,
-            CuriosityEnabled: d.CuriosityEnabled,
-            DormancyWarnedAt: d.DormancyWarnedAt,
-            LinkedParents: linkCounts.TryGetValue(d.Id, out var lc) ? lc : 0,
-            CostTodayUsd: _costMeter.GetCurrentTotal(d.Id, now),
-            ChildrenList: (childrenByDevice.TryGetValue(d.Id, out var kids) ? kids : new())
-                .Select(c => new AdminChildDto(
-                    c.Id, c.Name, c.Gender.ToString(), c.GetAge(),
-                    c.StoryEnabled, c.GameEnabled, c.RiddleEnabled, c.CuriosityEnabled))
-                .ToList())
+        var rows = devices.Select(d =>
         {
-            ContentHealth = DeviceContentHealth.Resolve(
+            var contentHealth = DeviceContentHealth.Resolve(
                 d.ContentStories, AdvertisedFor(d.Id), d.LastSeenAt, now,
                 DeviceContentHealth.DefaultOnlineThresholdSeconds,
-                d.ContentSyncStatus, d.ResetReason, d.BootCount),
-            MissingStoryIds = DeviceContentHealth.MissingStoryIds(
-                d.ContentStories, AdvertisedFor(d.Id)),
-            ContentStories = d.ContentStories,
-            ContentIndexSchema = d.ContentIndexSchema,
-            ContentGameClips = d.ContentGameClips,
-            ContentVoiceClips = d.ContentVoiceClips,
-            ContentMusicTracks = d.ContentMusicTracks,
-            ContentReportedAt = d.ContentReportedAt,
-            ContentSyncStatus = d.ContentSyncStatus,
-            ContentSyncError = d.ContentSyncError,
-            ContentSyncReportedAt = d.ContentSyncReportedAt,
-            ContentSyncedAt = d.ContentSyncedAt,
-            ResetReason = d.ResetReason,
-            BootCount = d.BootCount,
-            BoardModel = d.BoardModel,
-            FirmwareBuild = d.FirmwareBuild,
-            PartitionName = d.PartitionName,
-            FirmwareReportedAt = d.FirmwareReportedAt,
+                d.ContentSyncStatus, d.ResetReason, d.BootCount);
+
+            return new AdminDeviceDto(
+                Id: d.Id,
+                Name: d.Name,
+                MacAddress: d.MacAddress,
+                FirmwareVersion: d.FirmwareVersion,
+                LastOtaStatus: d.LastOtaStatus,
+                OtaHealth: DeviceOtaHealth.Resolve(d.LastOtaStatus, d.LastSeenAt, now),
+                RegisteredAt: d.RegisteredAt,
+                LastSeenAt: d.LastSeenAt,
+                IsPaused: d.IsPaused,
+                IsRevoked: d.IsRevoked,
+                BedtimeStart: d.BedtimeStart,
+                BedtimeEnd: d.BedtimeEnd,
+                TimeZone: d.TimeZone,
+                StoryEnabled: d.StoryEnabled,
+                GameEnabled: d.GameEnabled,
+                RiddleEnabled: d.RiddleEnabled,
+                CuriosityEnabled: d.CuriosityEnabled,
+                DormancyWarnedAt: d.DormancyWarnedAt,
+                LinkedParents: linkCounts.TryGetValue(d.Id, out var lc) ? lc : 0,
+                CostTodayUsd: _costMeter.GetCurrentTotal(d.Id, now),
+                ChildrenList: (childrenByDevice.TryGetValue(d.Id, out var kids) ? kids : new())
+                    .Select(c => new AdminChildDto(
+                        c.Id, c.Name, c.Gender.ToString(), c.GetAge(),
+                        c.StoryEnabled, c.GameEnabled, c.RiddleEnabled, c.CuriosityEnabled))
+                    .ToList())
+            {
+                ContentHealth = contentHealth,
+                // The same code a parent would be told to quote to
+                // support (DeviceFaultCode.FromContentHealth) — the
+                // operator console still shows the raw diagnostics below
+                // (ContentSyncStatus/ContentSyncError/ResetReason/BootCount)
+                // beside it, never in place of it, so a mismatch between
+                // "the code" and "what actually happened" is visible, not
+                // hidden behind the abstraction the parent sees.
+                FaultCode = DeviceFaultCode.FromContentHealth(contentHealth),
+                MissingStoryIds = DeviceContentHealth.MissingStoryIds(
+                    d.ContentStories, AdvertisedFor(d.Id)),
+                ContentStories = d.ContentStories,
+                ContentIndexSchema = d.ContentIndexSchema,
+                ContentGameClips = d.ContentGameClips,
+                ContentVoiceClips = d.ContentVoiceClips,
+                ContentMusicTracks = d.ContentMusicTracks,
+                ContentReportedAt = d.ContentReportedAt,
+                ContentSyncStatus = d.ContentSyncStatus,
+                ContentSyncError = d.ContentSyncError,
+                ContentSyncReportedAt = d.ContentSyncReportedAt,
+                ContentSyncedAt = d.ContentSyncedAt,
+                ResetReason = d.ResetReason,
+                BootCount = d.BootCount,
+                BoardModel = d.BoardModel,
+                FirmwareBuild = d.FirmwareBuild,
+                PartitionName = d.PartitionName,
+                FirmwareReportedAt = d.FirmwareReportedAt,
+            };
         })
             .OrderByDescending(d => d.LastSeenAt)
             .ToList();

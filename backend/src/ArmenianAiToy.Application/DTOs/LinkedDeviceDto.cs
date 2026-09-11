@@ -49,10 +49,14 @@ public record LinkedDeviceDto(
     string StoryHealth,
 
     /// <summary>
-    /// The short fault code the PARENT sees (e.g. "E-101"), empty when there
-    /// is nothing to report. Owner decision 2026-08-03: parents get a code to
-    /// quote to support, never a technical explanation or a self-service fix.
-    /// See <c>DeviceFaultCode</c>.
+    /// The short fault code the PARENT sees (e.g. "E-101", "E-401", "E-501"),
+    /// empty when there is nothing to report. Owner decision 2026-08-03:
+    /// parents get a code to quote to support, never a technical explanation
+    /// or a self-service fix. Derived from BOTH <see cref="StoryHealth"/> and
+    /// <see cref="ContentHealth"/> (crash-looping / sync-failed get their own
+    /// codes as of 2026-09-11) via <c>DeviceFaultCode.FromHealth</c> — see
+    /// that method's doc comment for the ranking when more than one fault is
+    /// true at once.
     /// </summary>
     string FaultCode)
 {

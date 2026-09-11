@@ -25,6 +25,14 @@ namespace ArmenianAiToy.Api.Controllers;
 /// open relay against the deployment's own OpenAI key, outside the
 /// per-device daily cost cap (which keys on <c>X-Device-Id</c>).
 ///
+/// Concealment is enforced TWICE: <see cref="Observability.StoryQaTextDevGate"/>
+/// is a pre-routing middleware gate in <c>Program.cs</c> that returns 404
+/// for every request shape (well-formed, malformed, bodyless) before
+/// model binding ever runs — the check below is defense in depth for a
+/// direct in-process call and no longer the only thing standing between
+/// a malformed request and ASP.NET's own 400/415 (that leak is closed by
+/// the middleware, not by this line alone).
+///
 /// Moderation is NOT optional here even though the route is dev-gated:
 /// <see cref="LibraryStoryQuestionService"/> has no moderation of its own
 /// (<see cref="StoryAnswerFilter"/> validates story fidelity and format,
@@ -73,8 +81,11 @@ public class StoryQaTextController : ControllerBase
     public async Task<IActionResult> Ask(
         [FromBody] QaTextRequest request, CancellationToken cancellationToken = default)
     {
-        // Concealment before validation: a non-Development caller learns
-        // nothing about the route, not even that it exists.
+        // Defense in depth only — StoryQaTextDevGate (Program.cs) is the
+        // gate that actually conceals this route from a non-Development
+        // HTTP caller, ahead of model binding. This check still protects
+        // a direct in-process call (e.g. from a test) that bypasses the
+        // HTTP pipeline entirely.
         if (!_env.IsDevelopment())
         {
             return NotFound();

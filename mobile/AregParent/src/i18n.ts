@@ -88,6 +88,13 @@ const D = {
   // is exactly the reassurance this must not give. Says the state, never a
   // code: the sentence under the card carries what to do.
   fault_chip: { en: '⚠ Needs attention', ru: '⚠ Требуется внимание', hy: '⚠ Ուշադրություն է պետք' },
+  // Code only — no diagnosis, no repair instructions. Mirrors parent.html
+  // verbatim so a parent reads the same sentence on the phone and the web.
+  fault_help: {
+    en: 'Please contact support and give them this code:',
+    ru: 'Пожалуйста, свяжитесь с поддержкой и назовите этот код:',
+    hy: 'Խնդրում ենք կապվել աջակցման ծառայության հետ և ասել այս կոդը՝',
+  },
 
   // ---------- errors ----------
   e_generic: {
@@ -487,6 +494,11 @@ const D = {
   mode_game: { en: 'Game', ru: 'Игра', hy: 'Խաղ' },
   mode_riddle: { en: 'Riddle', ru: 'Загадка', hy: 'Հանելուկ' },
   mode_curiosity: { en: 'Curiosity questions', ru: 'Вопросы «почему»', hy: 'Հետաքրքրության հարցեր' },
+  // Calm has no toggle (it can never be disabled), so this key is new here
+  // — added only for the Today-panel mode chip. Text mirrors parent.html's
+  // mode_calm verbatim, minus the emoji already carried by that surface's
+  // own chip style, not this one's.
+  mode_calm: { en: 'Calm', ru: 'Спокойствие', hy: 'Հանգիստ' },
   modes_hint: {
     en: 'The bedtime calm-down stays available no matter what.',
     ru: 'Спокойный режим перед сном доступен всегда.',

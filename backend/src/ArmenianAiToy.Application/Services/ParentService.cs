@@ -1932,47 +1932,56 @@ public class ParentService : IParentService
         IReadOnlyCollection<(string StoryId, int Version)> AdvertisedFor(Guid id)
             => advertisedByDevice.TryGetValue(id, out var own) ? own : fleetAdvertised;
 
-        return links.Select(l => new LinkedDeviceDto(
-            l.Device.Id,
-            l.Device.Name,
-            l.Device.LastSeenAt,
-            l.LinkedAt,
-            lastConversationByDevice.TryGetValue(l.Device.Id, out var lastConv) ? lastConv : null,
-            childrenByDevice.TryGetValue(l.Device.Id, out var children)
-                ? children.Select(c => new LinkedDeviceChildDto(
-                    c.Id, c.Name, c.GetAge(), c.Gender,
-                    c.StoryEnabled, c.GameEnabled, c.RiddleEnabled, c.CuriosityEnabled)).ToList()
-                : new List<LinkedDeviceChildDto>(),
-            l.Device.IsPaused,
-            l.Device.IsRevoked,
-            l.Device.BedtimeStart,
-            l.Device.BedtimeEnd,
-            l.Device.StoryEnabled,
-            l.Device.GameEnabled,
-            l.Device.RiddleEnabled,
-            l.Device.CuriosityEnabled,
-            IsDormant: l.Device.LastSeenAt <= dormancyCutoff,
-            IsOnline: l.Device.LastSeenAt >= onlineCutoff,
-            // Same snapshot-once nowUtc as the two cutoffs above, so every
-            // device in this response is judged against one clock.
-            StoryHealth: DeviceStoryHealth.Resolve(
-                l.Device.SdCardOk, l.Device.LastSeenAt, nowUtc, ReadOnlineThresholdSeconds()),
-            FaultCode: DeviceFaultCode.FromStoryHealth(DeviceStoryHealth.Resolve(
-                l.Device.SdCardOk, l.Device.LastSeenAt, nowUtc, ReadOnlineThresholdSeconds()))
-        )
+        return links.Select(l =>
         {
-            ContentHealth = DeviceContentHealth.Resolve(
+            // Computed once and shared by StoryHealth/ContentHealth AND by
+            // FaultCode (which used to recompute StoryHealth a second time
+            // and never saw ContentHealth at all — sync_failed/crash_looping
+            // had no code of their own). Same snapshot-once nowUtc as the
+            // two cutoffs above, so every device in this response is judged
+            // against one clock.
+            var storyHealth = DeviceStoryHealth.Resolve(
+                l.Device.SdCardOk, l.Device.LastSeenAt, nowUtc, ReadOnlineThresholdSeconds());
+            var contentHealth = DeviceContentHealth.Resolve(
                 l.Device.ContentStories, AdvertisedFor(l.Device.Id), l.Device.LastSeenAt, nowUtc,
                 ReadOnlineThresholdSeconds(),
-                l.Device.ContentSyncStatus, l.Device.ResetReason, l.Device.BootCount),
-            StoriesOnToy = DeviceContentHealth.Count(
-                l.Device.ContentStories, AdvertisedFor(l.Device.Id)).Present,
-            StoriesAvailable = AdvertisedFor(l.Device.Id).Count,
-            StoryIntroEnabled = l.Device.StoryIntroEnabled,
-            StoryPausesEnabled = l.Device.StoryPausesEnabled,
-            StoryQuestionsEnabled = l.Device.StoryQuestionsEnabled,
-            VariantEndingsEnabled = l.Device.VariantEndingsEnabled,
-            BedtimeMusicEnabled = l.Device.BedtimeMusicEnabled,
+                l.Device.ContentSyncStatus, l.Device.ResetReason, l.Device.BootCount);
+
+            return new LinkedDeviceDto(
+                l.Device.Id,
+                l.Device.Name,
+                l.Device.LastSeenAt,
+                l.LinkedAt,
+                lastConversationByDevice.TryGetValue(l.Device.Id, out var lastConv) ? lastConv : null,
+                childrenByDevice.TryGetValue(l.Device.Id, out var children)
+                    ? children.Select(c => new LinkedDeviceChildDto(
+                        c.Id, c.Name, c.GetAge(), c.Gender,
+                        c.StoryEnabled, c.GameEnabled, c.RiddleEnabled, c.CuriosityEnabled)).ToList()
+                    : new List<LinkedDeviceChildDto>(),
+                l.Device.IsPaused,
+                l.Device.IsRevoked,
+                l.Device.BedtimeStart,
+                l.Device.BedtimeEnd,
+                l.Device.StoryEnabled,
+                l.Device.GameEnabled,
+                l.Device.RiddleEnabled,
+                l.Device.CuriosityEnabled,
+                IsDormant: l.Device.LastSeenAt <= dormancyCutoff,
+                IsOnline: l.Device.LastSeenAt >= onlineCutoff,
+                StoryHealth: storyHealth,
+                FaultCode: DeviceFaultCode.FromHealth(storyHealth, contentHealth)
+            )
+            {
+                ContentHealth = contentHealth,
+                StoriesOnToy = DeviceContentHealth.Count(
+                    l.Device.ContentStories, AdvertisedFor(l.Device.Id)).Present,
+                StoriesAvailable = AdvertisedFor(l.Device.Id).Count,
+                StoryIntroEnabled = l.Device.StoryIntroEnabled,
+                StoryPausesEnabled = l.Device.StoryPausesEnabled,
+                StoryQuestionsEnabled = l.Device.StoryQuestionsEnabled,
+                VariantEndingsEnabled = l.Device.VariantEndingsEnabled,
+                BedtimeMusicEnabled = l.Device.BedtimeMusicEnabled,
+            };
         }).ToList();
     }
 

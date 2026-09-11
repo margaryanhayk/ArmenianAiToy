@@ -17,10 +17,14 @@ namespace ArmenianAiToy.Application.DTOs;
 /// instant of midnight in the resolved time zone, so messages that
 /// crossed midnight in the wrong direction are not double-counted.
 ///
-/// Modes-used-today is deliberately NOT included — DetectedMode is not
-/// persisted today (lives only in the in-memory ChatService.ActiveModes
-/// dictionary), so any aggregate here would diverge from runtime
-/// resolution. Deferred to E1.3.
+/// <see cref="Modes"/> (2026-09-11): distinct Message.Mode values stamped
+/// among today's messages, bounded — Message.Mode is stamped only from
+/// DetectedMode.ToString().ToLowerInvariant() (ChatService), so this is
+/// always a subset of {"story","game","riddle","curiosity","calm"}, never
+/// free text. This closes the earlier gap noted here (DetectedMode used to
+/// live only in the in-memory ChatService.ActiveModes dictionary, with
+/// nothing persisted to aggregate) now that Message.Mode is a persisted,
+/// queryable column.
 ///
 /// The response intentionally does NOT expose ChildId or AudioBlobPath:
 ///  - per-child filtering is a separate concern (would need ChildId in
@@ -42,7 +46,13 @@ public record TodaySummaryDto(
     int FlaggedMessagesCount,
     int AssistantMessagesWithAudio,
     List<TodaySummaryConversationLink> Newest,
-    List<TodaySummaryConversationLink> Flagged);
+    List<TodaySummaryConversationLink> Flagged)
+{
+    /// <summary>See the class doc comment. Additive init-prop, empty list
+    /// default, so every existing positional construction site (tests
+    /// included) compiles unchanged.</summary>
+    public List<string> Modes { get; init; } = new();
+}
 
 public record TodaySummaryConversationLink(
     Guid Id,
