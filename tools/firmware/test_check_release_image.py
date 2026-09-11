@@ -57,14 +57,22 @@ class CheckReleaseImagePopGateTests(unittest.TestCase):
         self.assertNotIn(REAL_POP, out)
 
     def test_good_image_without_a_real_pop_passes(self):
-        # A correctly-built image: only the bench placeholder and the
-        # config.h.example placeholder are present, neither of which is
-        # PoP-alphabet-shaped at 8 chars.
+        # A correctly-built image: only the bench placeholder, the
+        # config.h.example placeholder, and the four KNOWN coincidental
+        # library-string collisions are present. The four are not synthetic
+        # — a real `arduino-cli compile` of AregVoiceMvp.ino at
+        # esp32:esp32@3.3.8, with NO PoP-related build flag set at all,
+        # contains exactly these as printable 8-char runs (confirmed
+        # 2026-09-11; see the KNOWN_SAFE_POP_STRINGS comment in
+        # check_release_image.py for what each one actually is). The first
+        # version of this test used a blob without them and PASSED while the
+        # real compiled binary FAILED — this blob is what closes that gap.
         blob = (
             b"junk header bytes\x00"
             + b"areg-pair\x00"
             + PLACEHOLDER_POP.encode("ascii")
-            + b"\x00YOUR_DEVICE_GUID\x00YOUR_DEVICE_API_KEY\x00more junk"
+            + b"\x00YOUR_DEVICE_GUID\x00YOUR_DEVICE_API_KEY\x00"
+            + b"ESPHTTPD\x00EXCVADDR\x00BBB6BHHB\x00B8BH8B4B\x00more junk"
         )
         code, out = run_check(blob, self.tmp_path)
         self.assertEqual(code, 0, f"a clean image must pass; got:\n{out}")
@@ -77,6 +85,16 @@ class CheckReleaseImagePopGateTests(unittest.TestCase):
         blob = b"junk\x00areg-pair\x00junk"
         code, out = run_check(blob, self.tmp_path)
         self.assertEqual(code, 0)
+
+    def test_allowlisting_one_string_does_not_blind_the_gate_to_others(self):
+        # The allowlist must stay a set of EXACT, individually-approved
+        # strings, never a loophole a real leaked PoP could hide behind.
+        # A known-safe string alongside an unrelated real-looking one must
+        # still fail on the real one.
+        blob = b"junk\x00ESPHTTPD\x00" + REAL_POP.encode("ascii") + b"\x00junk"
+        code, out = run_check(blob, self.tmp_path)
+        self.assertNotEqual(code, 0)
+        self.assertIn("PoP-shaped", out)
 
 
 if __name__ == "__main__":

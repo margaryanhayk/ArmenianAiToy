@@ -60,7 +60,21 @@ POP_RE = re.compile(rf"^[{POP_ALPHABET}]{{8}}$")
 # The bench-only shared fallback (AREG_PROV_POP default, ble_provisioning.cpp)
 # is fine to ship -- it carries no per-device secret. It never matches POP_RE
 # anyway (lowercase, contains a hyphen), listed for readability only.
-KNOWN_SAFE_POP_STRINGS = {"areg-pair"}
+#
+# The other four are coincidental library artifacts, NOT related to any
+# build flag: a plain esp32:esp32@3.3.8 image with nothing PoP-related
+# defined still contains them (confirmed 2026-09-11 against a real compiled
+# AregVoiceMvp.ino.bin -- see tools/firmware/test_check_release_image.py's
+# note). "ESPHTTPD"/"EXCVADDR" are literal identifiers from the ESP-IDF core
+# (an HTTP server name, a panic-handler register name); "BBB6BHHB"/
+# "B8BH8B4B" are fixed-width binary struct-format descriptors from a core
+# library, not ASCII text at all -- they only decode as 8 printable bytes by
+# chance. Same "exact-value only, never widen the pattern" discipline as
+# KNOWN_LIBRARY_GUIDS above: if the next core bump introduces a NEW
+# coincidental hit, read the FAIL line, confirm by hand it is not a real PoP
+# (it will not be 8 chars of a printf'd credential near AREG_BLE_POP in the
+# source), and add the exact string here -- never loosen POP_RE itself.
+KNOWN_SAFE_POP_STRINGS = {"areg-pair", "ESPHTTPD", "EXCVADDR", "BBB6BHHB", "B8BH8B4B"}
 
 # The 8 MB whole-flash artifact. Serving it over OTA writes a bootloader and a
 # partition table into a 3 MB app slot; the runbook says it would produce an
