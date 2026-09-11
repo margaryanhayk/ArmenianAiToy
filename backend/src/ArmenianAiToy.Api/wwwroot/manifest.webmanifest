@@ -7,7 +7,7 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f6f4fb",
-  "theme_color": "#fff6e3",
+  "theme_color": "#F6E7C4",
   "icons": [
     {
       "src": "/icons/areg-192.png",
