@@ -110,9 +110,88 @@ public class DeviceServiceTests
         Assert.DoesNotContain(result.ApiKey, result.QrPayload!);
     }
 
-    // A re-registration (key rotation, #011) does NOT re-mint a claim code.
+    // Factory pairing (2026-09-11) — a NEW registration also mints a
+    // per-device BLE PoP, returned once and additive inside QrPayload.
     [Fact]
-    public async Task RegisterDeviceAsync_ReRegister_DoesNotMintClaimCode()
+    public async Task RegisterDeviceAsync_NewDevice_MintsPop()
+    {
+        var (service, _) = CreateService();
+        const string popAlphabet = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
+
+        var result = (await service.RegisterDeviceAsync(
+            new DeviceRegistrationRequest("AA:BB:CC:DD:EE:FF")))!;
+
+        Assert.False(string.IsNullOrWhiteSpace(result.Pop));
+        Assert.Equal(8, result.Pop!.Length);
+        Assert.All(result.Pop, c => Assert.Contains(c, popAlphabet));
+        // Excluded on purpose — read-aloud confusable characters.
+        Assert.DoesNotContain(result.Pop, c => "ILOU01".Contains(c));
+
+        // Additive inside the QR JSON, alongside deviceId + claim.
+        Assert.Contains(result.Pop, result.QrPayload!);
+        // Independent of the other two secrets.
+        Assert.NotEqual(result.Pop, result.ClaimCode);
+        Assert.DoesNotContain(result.Pop, result.ApiKey);
+    }
+
+    // The backend never verifies the PoP (the toy's own BLE stack does), so
+    // it must never be persisted — not plaintext, not hashed. Pinned here
+    // rather than asserted structurally because "absent from a row that does
+    // not exist" cannot be checked any other way: Device carries no Pop /
+    // PopHash column at all, by design (see DeviceService.GeneratePop).
+    [Fact]
+    public async Task RegisterDeviceAsync_NewDevice_PopNeverPersistedOnDeviceRow()
+    {
+        var (service, db) = CreateService();
+
+        var result = (await service.RegisterDeviceAsync(
+            new DeviceRegistrationRequest("AA:BB:CC:DD:EE:FF")))!;
+
+        var device = await db.Set<Device>().FindAsync(result.DeviceId);
+        Assert.NotNull(device);
+        // Every one of the device's own persisted string columns must be
+        // something OTHER than the pop that was just minted for it — the
+        // strongest available proxy for "no column stores it".
+        var deviceType = typeof(Device);
+        foreach (var prop in deviceType.GetProperties())
+        {
+            if (prop.PropertyType != typeof(string)) continue;
+            var value = prop.GetValue(device) as string;
+            Assert.NotEqual(result.Pop, value);
+        }
+    }
+
+    // Same discipline LoggingNotifierTests pins for reset/verification
+    // tokens: the raw PoP must never appear in any log call this method
+    // makes, in the template OR in an argument.
+    [Fact]
+    public async Task RegisterDeviceAsync_NewDevice_DoesNotLogPop()
+    {
+        var options = new DbContextOptionsBuilder<TestDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        var db = new TestDbContext(options);
+        var logger = Substitute.For<ILogger<DeviceService>>();
+        var service = new DeviceService(db, logger);
+
+        var result = (await service.RegisterDeviceAsync(
+            new DeviceRegistrationRequest("AA:BB:CC:DD:EE:FF")))!;
+
+        foreach (var call in logger.ReceivedCalls())
+        {
+            foreach (var arg in call.GetArguments())
+            {
+                if (arg is null) continue;
+                Assert.DoesNotContain(result.Pop!, arg.ToString() ?? "", StringComparison.Ordinal);
+            }
+        }
+    }
+
+    // A re-registration (key rotation, #011) does NOT re-mint a claim code
+    // or a PoP — a BLE pairing code already printed on the box must not
+    // silently change under its owner on a routine key rotation.
+    [Fact]
+    public async Task RegisterDeviceAsync_ReRegister_DoesNotMintClaimCodeOrPop()
     {
         var (service, db) = CreateService();
         db.Set<Device>().Add(new Device
@@ -128,6 +207,7 @@ public class DeviceServiceTests
 
         Assert.Null(result.ClaimCode);
         Assert.Null(result.QrPayload);
+        Assert.Null(result.Pop);
     }
 
     [Fact]

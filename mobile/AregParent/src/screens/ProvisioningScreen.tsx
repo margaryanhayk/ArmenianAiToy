@@ -17,9 +17,13 @@ import { useLang } from '../useLang';
 import { theme } from '../theme';
 
 // Must match the firmware (ble_provisioning.cpp): the toy advertises
-// "Areg-Setup" (prefix "Areg"), proof-of-possession "areg-pair", security 1.
+// "Areg-Setup" (prefix "Areg"), security 1. The proof-of-possession itself
+// is no longer one shared constant (factory pairing, 2026-09-11) — every toy
+// now has its own, printed on the box (and inside its claim QR's "pop"
+// field). BENCH_FALLBACK_POP is only what an un-provisioned bench unit
+// (nothing burned to NVS yet) still advertises.
 const PREFIX = 'Areg';
-const POP = 'areg-pair';
+const BENCH_FALLBACK_POP = 'areg-pair';
 
 type EspModule = {
   ESPProvisionManager: {
@@ -46,9 +50,16 @@ type Phase = 'idle' | 'searching' | 'connecting' | 'wifi' | 'provisioning' | 'do
 type Props = {
   device: LinkedDevice;
   onBack: () => void;
+  // Pairing (2026-09-11): the PoP printed on the box travels inside the
+  // claim QR's JSON as {deviceId, claim, pop} — a caller that scanned that
+  // QR to claim this toy can pass the parsed "pop" straight through here.
+  // No scanner is wired into the claim flow yet (DevicesScreen.tsx takes
+  // deviceId/claim as typed text), so in practice this is almost always
+  // undefined today and the field below is the real, always-available path.
+  initialPop?: string;
 };
 
-export default function ProvisioningScreen({ device, onBack }: Props) {
+export default function ProvisioningScreen({ device, onBack, initialPop }: Props) {
   useLang();
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -56,9 +67,15 @@ export default function ProvisioningScreen({ device, onBack }: Props) {
   const [networks, setNetworks] = useState<ESPWifiList[]>([]);
   const [ssid, setSsid] = useState('');
   const [password, setPassword] = useState('');
+  const [pop, setPop] = useState(initialPop?.trim() ?? '');
 
   async function startSearch() {
     setError(null);
+    const trimmedPop = pop.trim();
+    if (!trimmedPop) {
+      setError(t('e_pop_required'));
+      return;
+    }
     const esp = loadEsp();
     if (!esp) {
       setPhase('unavailable');
@@ -79,7 +96,7 @@ export default function ProvisioningScreen({ device, onBack }: Props) {
       const dev = found[0];
       setEspDevice(dev);
       setPhase('connecting');
-      await dev.connect(POP);
+      await dev.connect(trimmedPop);
       const list = await dev.scanWifiList();
       // Strongest signal first, de-duplicated by ssid.
       const seen = new Set<string>();
@@ -123,11 +140,19 @@ export default function ProvisioningScreen({ device, onBack }: Props) {
       {phase === 'unavailable' ? (
         <View style={styles.card}>
           <Text style={styles.body}>{t('wifi_unavailable')}</Text>
-          <Text style={styles.code}>areg-pair</Text>
+          <Text style={styles.code}>{pop.trim() || BENCH_FALLBACK_POP}</Text>
         </View>
       ) : phase === 'idle' ? (
         <View style={styles.card}>
           <Text style={styles.body}>{t('wifi_setup_mode')}</Text>
+          <Text style={styles.label}>{t('wifi_pop_label')}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={t('ph_pop')}
+            autoCapitalize="characters"
+            value={pop}
+            onChangeText={setPop}
+          />
           <Pressable style={styles.primaryBtn} onPress={startSearch}>
             <Text style={styles.primaryBtnText}>{t('wifi_search')}</Text>
           </Pressable>
@@ -201,6 +226,7 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderColor: theme.line, borderRadius: 10, padding: 16, backgroundColor: theme.surfaceSunken },
   center: { alignItems: 'center', marginTop: 40 },
   body: { color: theme.inkMuted, fontSize: 15, marginBottom: 10 },
+  label: { color: theme.ink, fontSize: 13, fontWeight: '600', marginBottom: 4 },
   code: { fontSize: 18, fontWeight: '700', color: theme.warn },
   primaryBtn: { backgroundColor: theme.brand, borderRadius: 8, padding: 13, alignItems: 'center', marginTop: 6 },
   primaryBtnText: { color: theme.surface, fontWeight: '600' },

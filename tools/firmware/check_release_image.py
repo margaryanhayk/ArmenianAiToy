@@ -48,6 +48,34 @@ GUID_RE = re.compile(
 # What a correctly-built OTA image carries instead of real credentials.
 PLACEHOLDERS = ("YOUR_DEVICE_GUID", "YOUR_DEVICE_API_KEY")
 
+# A BLE provisioning PoP (factory pairing, 2026-09-11). DeviceService.cs mints
+# 8 chars from this exact alphabet -- excludes I, L, O, U, 0, 1 because the
+# code is printed on the box and read aloud. A hit here means AREG_BLE_POP
+# was left defined with a real value in a build that became an OTA image
+# (config.h.example's own placeholder "YOURBLEPOP" is 10 chars and contains
+# excluded letters, so it can never match this by construction).
+POP_ALPHABET = "ABCDEFGHJKMNPQRSTVWXYZ23456789"
+POP_RE = re.compile(rf"^[{POP_ALPHABET}]{{8}}$")
+
+# The bench-only shared fallback (AREG_PROV_POP default, ble_provisioning.cpp)
+# is fine to ship -- it carries no per-device secret. It never matches POP_RE
+# anyway (lowercase, contains a hyphen), listed for readability only.
+#
+# The other four are coincidental library artifacts, NOT related to any
+# build flag: a plain esp32:esp32@3.3.8 image with nothing PoP-related
+# defined still contains them (confirmed 2026-09-11 against a real compiled
+# AregVoiceMvp.ino.bin -- see tools/firmware/test_check_release_image.py's
+# note). "ESPHTTPD"/"EXCVADDR" are literal identifiers from the ESP-IDF core
+# (an HTTP server name, a panic-handler register name); "BBB6BHHB"/
+# "B8BH8B4B" are fixed-width binary struct-format descriptors from a core
+# library, not ASCII text at all -- they only decode as 8 printable bytes by
+# chance. Same "exact-value only, never widen the pattern" discipline as
+# KNOWN_LIBRARY_GUIDS above: if the next core bump introduces a NEW
+# coincidental hit, read the FAIL line, confirm by hand it is not a real PoP
+# (it will not be 8 chars of a printf'd credential near AREG_BLE_POP in the
+# source), and add the exact string here -- never loosen POP_RE itself.
+KNOWN_SAFE_POP_STRINGS = {"areg-pair", "ESPHTTPD", "EXCVADDR", "BBB6BHHB", "B8BH8B4B"}
+
 # The 8 MB whole-flash artifact. Serving it over OTA writes a bootloader and a
 # partition table into a 3 MB app slot; the runbook says it would produce an
 # unbootable toy. Size alone catches it long before anything else does.
@@ -144,6 +172,18 @@ def main() -> int:
             f"join that house. Set AREG_WIFI_SSID / AREG_WIFI_PASSWORD back to "
             f"the config.h.example placeholders and provision Wi-Fi onto the "
             f"toy instead. Values are not printed here.")
+
+    pops = [s for s in strings
+            if POP_RE.match(s) and s not in KNOWN_SAFE_POP_STRINGS]
+    if pops:
+        failures.append(
+            f"{len(pops)} BLE provisioning PoP-shaped string(s) compiled in "
+            f"(8 chars, the DeviceService.cs PoP alphabet). An OTA image "
+            f"reaches every toy; one toy's per-device pairing code must never "
+            f"ride inside it. If you set AREG_BLE_POP for a single-unit bench "
+            f"burn, unset it and rebuild -- the factory station "
+            f"(tools/factory/provision_toy.py) writes the PoP straight to NVS "
+            f"and never needs this macro. The value is not printed here.")
 
     present_placeholders = [p for p in PLACEHOLDERS if p in strings]
     if present_placeholders:

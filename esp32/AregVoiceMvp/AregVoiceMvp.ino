@@ -2482,8 +2482,21 @@ void setup() {
                || strcmp(AREG_DEVICE_API_KEY, "YOUR_DEVICE_API_KEY") == 0) {
         Serial.println("[device] refusing to burn placeholder credentials");
     } else {
+        // Factory pairing (2026-09-11): burns the BLE PoP alongside the
+        // identity too, IF the bench build defined AREG_BLE_POP. This macro
+        // is a bench-only convenience for a single-unit serial flash (the
+        // production path is the factory station in
+        // tools/factory/provision_toy.py, which writes an NVS partition
+        // image directly and never touches this compile-time constant). Must
+        // NEVER be a real PoP in anything that becomes an OTA image —
+        // check_release_image.py refuses a build with one left in.
+#ifdef AREG_BLE_POP
+        device_creds_save(AREG_DEVICE_ID, AREG_DEVICE_API_KEY, AREG_BLE_POP);
+        Serial.printf("[device] identity burned to NVS (id=%s, pop=set)\n", AREG_DEVICE_ID);
+#else
         device_creds_save(AREG_DEVICE_ID, AREG_DEVICE_API_KEY);
-        Serial.printf("[device] identity burned to NVS (id=%s)\n", AREG_DEVICE_ID);
+        Serial.printf("[device] identity burned to NVS (id=%s, pop=not set)\n", AREG_DEVICE_ID);
+#endif
     }
     Serial.flush();
 #endif

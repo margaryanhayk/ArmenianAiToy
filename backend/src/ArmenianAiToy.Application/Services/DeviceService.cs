@@ -92,6 +92,11 @@ public class DeviceService : IDeviceService
         // factory prints it (in the QR) so a parent can claim the toy; the
         // device key (above) is never printed. The two secrets are independent.
         var claimCode = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+        // Factory pairing (2026-09-11) — mint a per-device BLE provisioning
+        // PoP, replacing the single shared "areg-pair" every toy used to
+        // advertise. See GeneratePop for the alphabet/length; see
+        // DeviceRegistrationResponse.Pop for why it is never stored.
+        var pop = GeneratePop();
         var device = new Device
         {
             Id = Guid.NewGuid(),
@@ -113,9 +118,48 @@ public class DeviceService : IDeviceService
 
         _logger.LogInformation("New device registered: {DeviceId} ({MacAddress})", device.Id, device.MacAddress);
         // QR payload = the exact JSON the toy's QR should encode; the app's
-        // claim scanner parses { deviceId, claim }. Device key is NOT included.
-        var qrPayload = JsonSerializer.Serialize(new { deviceId = device.Id, claim = claimCode });
-        return new DeviceRegistrationResponse(device.Id, plaintext, claimCode, qrPayload);
+        // claim scanner parses { deviceId, claim, pop }. Device key is NOT
+        // included. Neither is logged above — LogInformation only ever takes
+        // DeviceId/MacAddress here; keep it that way.
+        var qrPayload = JsonSerializer.Serialize(new { deviceId = device.Id, claim = claimCode, pop });
+        return new DeviceRegistrationResponse(device.Id, plaintext, claimCode, qrPayload, pop);
+    }
+
+    /// <summary>
+    /// Characters a BLE provisioning PoP is drawn from — identical alphabet to
+    /// <c>ParentService.InviteAlphabet</c> (excludes I, L, O, U, 0, 1; the code
+    /// is printed on the box and often read aloud down a phone). Kept as its
+    /// own copy rather than a shared constant: the two call sites have no
+    /// other coupling, and CLAUDE.md's "diff minimal" rule outweighs
+    /// de-duplicating one string literal across services.
+    /// </summary>
+    private const string PopAlphabet = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
+    private const int PopLength = 8;
+
+    /// <summary>
+    /// Mints a fresh per-device BLE provisioning PoP (8 chars, ~38 bits —
+    /// plenty for a proof-of-possession the phone presents over an already
+    /// short-range, encrypted BLE session; this is not a backend credential).
+    ///
+    /// <para>
+    /// <b>Why it is never stored, not even hashed.</b> The backend is not a
+    /// party to BLE provisioning — the phone presents the PoP to the TOY
+    /// directly, and the toy's own BLE stack (Espressif's WiFiProv/SECURITY_1)
+    /// is what checks it. The backend has no verification step that would
+    /// ever read a stored value back, so persisting one (plaintext OR hashed)
+    /// would only be one more secret at rest with no corresponding use —
+    /// exactly the asymmetry that makes the device API key and the claim code
+    /// worth hashing (both ARE verified here) not apply to the PoP. A lost
+    /// label is a support case, not a re-mint — same as a lost claim code
+    /// (re-registration mints neither; see RegisterDeviceAsync's #011 note).
+    /// </para>
+    /// </summary>
+    private static string GeneratePop()
+    {
+        var chars = new char[PopLength];
+        for (var i = 0; i < PopLength; i++)
+            chars[i] = PopAlphabet[RandomNumberGenerator.GetInt32(PopAlphabet.Length)];
+        return new string(chars);
     }
 
     public async Task<Device?> ValidateDeviceAsync(Guid deviceId, string apiKey)

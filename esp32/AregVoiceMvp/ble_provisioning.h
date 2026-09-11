@@ -28,11 +28,13 @@
 #include <Arduino.h>
 
 // Start BLE provisioning. Advertises a BLE service (AREG_PROV_SERVICE_NAME);
-// the parent app connects with the proof-of-possession (AREG_PROV_POP) and
-// sends the home Wi-Fi SSID + password encrypted over BLE. On receipt the
-// creds are persisted to NVS (B.1) and the provisioning manager connects the
-// STA to validate them. Non-blocking: returns immediately; the manager runs
-// in the background and surfaces progress via the serial log.
+// the parent app connects with the proof-of-possession — this toy's OWN PoP,
+// read from NVS (factory pairing, 2026-09-11; AREG_PROV_POP is only the
+// bench fallback for a unit with none stored) — and sends the home Wi-Fi
+// SSID + password encrypted over BLE. On receipt the creds are persisted to
+// NVS (B.1) and the provisioning manager connects the STA to validate them.
+// Non-blocking: returns immediately; the manager runs in the background and
+// surfaces progress via the serial log.
 void ble_provisioning_begin();
 
 // True while a provisioning session is advertising / in progress (i.e. no
