@@ -15,6 +15,7 @@ import {
   setBedtime,
   setModeFlags,
   setPaused,
+  setStoryQuestions,
   UnauthorizedError,
 } from '../api';
 import { t, tf } from '../i18n';
@@ -51,6 +52,9 @@ export default function DeviceSettingsScreen({
   });
   const [bedStart, setBedStart] = useState(toHHmm(device.bedtimeStart));
   const [bedEnd, setBedEnd] = useState(toHHmm(device.bedtimeEnd));
+  // `!== false`, not `=== true`: an older backend that predates this field
+  // must still read as on, same rule as the mode flags above.
+  const [storyQuestions, setStoryQuestionsState] = useState(device.storyQuestionsEnabled !== false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,6 +108,18 @@ export default function DeviceSettingsScreen({
       await onChanged();
     } catch (err) {
       fail(err);
+    }
+  }
+
+  async function toggleStoryQuestions(value: boolean) {
+    setStoryQuestionsState(value);
+    try {
+      await setStoryQuestions(device.deviceId, value);
+      flash(value ? t('story_questions_updated') : t('story_questions_off_pending'));
+      await onChanged();
+    } catch (e) {
+      setStoryQuestionsState(!value);
+      fail(e);
     }
   }
 
@@ -195,6 +211,22 @@ export default function DeviceSettingsScreen({
         <Text style={styles.rowHint}>{t('modes_hint')}</Text>
       </View>
 
+      {/* After-story question. Its own card, not folded into the modes
+          card above: it shapes HOW a story ends, not WHETHER a mode runs
+          at all — same distinction the web dashboard draws by grouping it
+          with the other story-shaping toggles rather than the mode list. */}
+      <View style={styles.card}>
+        {/* Top-aligned, not the shared row's centred default: the note is
+            3-4 lines of Armenian at phone width, and centring the switch
+            against a paragraph read as unattached to the title. */}
+        <View style={[styles.rowBetween, { alignItems: 'flex-start' }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowTitle}>{t('story_questions_label')}</Text>
+            <Text style={styles.rowHint}>{t('story_questions_note')}</Text>
+          </View>
+          <Switch value={storyQuestions} onValueChange={toggleStoryQuestions} />
+        </View>
+      </View>
 
       <Text style={styles.groupTitle}>{t('set_toy')}</Text>
       <Pressable style={styles.wifiBtn} onPress={onOpenProvisioning}>
@@ -234,9 +266,15 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   wifiBtnText: { color: theme.brand, fontWeight: '700', fontSize: 15 },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
+  rowBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 6,
+  },
   rowTitle: { fontSize: 16, color: theme.ink },
-  rowHint: { fontSize: 12, color: theme.inkHint, marginTop: 4 },
+  rowHint: { fontSize: 12, lineHeight: 17, color: theme.inkHint, marginTop: 4 },
   modeLabel: { fontSize: 15, color: theme.ink },
   timeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
   timeInput: {

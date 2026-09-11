@@ -83,6 +83,11 @@ export type LinkedDevice = {
     questionsToday: number;
     allowanceToday: number | null;
   };
+  // Whether the toy asks its one reflection question at the end of a story
+  // and waits for an answer. ON by default (`!== false`, not `=== true` —
+  // an older backend that predates this field must still read as on).
+  // Mirrors parent.html's `d.storyQuestionsEnabled`.
+  storyQuestionsEnabled?: boolean;
 };
 
 export type ModeFlags = {
@@ -281,7 +286,11 @@ export type ConversationMessage = {
   content: string;
   timestamp: string;
   safetyFlag: number;
+  // True only for an assistant message with a stored reply clip (C2.1).
   audioAvailable: boolean;
+  // True only for a user/child message with a stored recording (C2.2,
+  // 2026-09-11). Mirrors backend MessageDto.ChildAudioAvailable.
+  childAudioAvailable: boolean;
 };
 
 export type ConversationDetail = {
@@ -528,6 +537,13 @@ export function setBedtime(
   return mutate(`/api/parents/devices/${encodeURIComponent(deviceId)}/bedtime-window`, 'PUT', {
     start,
     end,
+  });
+}
+
+/** PUT /api/parents/devices/{id}/story-questions — the after-story question toggle. */
+export function setStoryQuestions(deviceId: string, enabled: boolean): Promise<void> {
+  return mutate(`/api/parents/devices/${encodeURIComponent(deviceId)}/story-questions`, 'PUT', {
+    enabled,
   });
 }
 

@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import * as Sharing from 'expo-sharing';
 import {
+  ApiError,
   ConversationDetail,
   ConversationMessage,
   errText,
   getConversation,
   UnauthorizedError,
 } from '../api';
+import { fetchAssistantAudio, fetchChildAudio, playLocalFile, stopPlayback, type FetchedAudio } from '../audio';
 import { getLanguage, t } from '../i18n';
 import { useLang } from '../useLang';
 import { theme } from '../theme';
@@ -53,6 +56,10 @@ export default function ConversationDetailScreen({ conversationId, onBack, onLog
     })();
   }, [load]);
 
+  // Leaving the conversation stops any clip still playing — matching the
+  // web dashboard's own view-change behaviour (releaseObjectUrls on nav).
+  useEffect(() => () => stopPlayback(), []);
+
   return (
     <View style={styles.container}>
       <Pressable onPress={onBack}>
@@ -96,6 +103,112 @@ function Bubble({ message }: { message: ConversationMessage }) {
         {fmtTime(message.timestamp)}
         {flagged ? '  ·  ' + t('flagged_tag') : ''}
       </Text>
+      {/* C2.1 — the wire shape guarantees audioAvailable is true ONLY for
+          assistant messages with a stored clip; the role check is
+          belt-and-suspenders, same posture as parent.html. */}
+      {message.audioAvailable && !isChild ? (
+        <AudioRow fetchAudio={() => fetchAssistantAudio(message.id)} allowSave={false} align="flex-start" />
+      ) : null}
+      {/* C2.2 (2026-09-11) — mirror image for the child's own recording. */}
+      {message.childAudioAvailable && isChild ? (
+        <AudioRow fetchAudio={() => fetchChildAudio(message.id)} allowSave align="flex-end" />
+      ) : null}
+    </View>
+  );
+}
+
+type AudioRowState = 'idle' | 'loading' | 'playing' | 'notKept';
+
+/**
+ * ▶ Listen (+ ⬇ Save recording for the child's own audio), mirroring
+ * parent.html's buildListenAffordance / buildDownloadRecordingAffordance.
+ * Listen first: that is the parent's actual need, and it is offered for
+ * both directions now, not just the child's. Save appears once the clip is
+ * in hand, sharing the same fetched bytes rather than a second request.
+ */
+function AudioRow({
+  fetchAudio,
+  allowSave,
+  align,
+}: {
+  fetchAudio: () => Promise<FetchedAudio>;
+  allowSave: boolean;
+  align: 'flex-start' | 'flex-end';
+}) {
+  const [state, setState] = useState<AudioRowState>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const [clip, setClip] = useState<FetchedAudio | null>(null);
+
+  async function onListen() {
+    if (state === 'loading') return;
+    if (state === 'playing') {
+      stopPlayback();
+      setState('idle');
+      return;
+    }
+    setError(null);
+    setState('loading');
+    try {
+      const audio = clip ?? (await fetchAudio());
+      setClip(audio);
+      setState('playing');
+      playLocalFile(
+        audio.uri,
+        () => setState('idle'),
+        () => {
+          setState('idle');
+          setError(t('e_generic'));
+        },
+      );
+    } catch (e) {
+      if (e instanceof UnauthorizedError) {
+        setState('idle');
+        return;
+      }
+      // recording_not_kept is calm information, not a failure — the button
+      // stays permanently spent rather than inviting a retry that cannot
+      // succeed, same as parent.html's btn.disabled = true on this path.
+      if (e instanceof ApiError && e.key === 'recording_not_kept') {
+        setState('notKept');
+        return;
+      }
+      setState('idle');
+      setError(errText(e, 'e_generic'));
+    }
+  }
+
+  async function onSave() {
+    if (!clip) return;
+    try {
+      if (!(await Sharing.isAvailableAsync())) {
+        setError(t('e_save_unavailable'));
+        return;
+      }
+      await Sharing.shareAsync(clip.uri, { mimeType: clip.contentType || undefined });
+    } catch {
+      // A cancelled share sheet is not an error worth a status line — the
+      // parent already has the clip playing above.
+    }
+  }
+
+  return (
+    <View style={[styles.audioRow, { justifyContent: align }]}>
+      <Pressable
+        style={styles.audioBtn}
+        onPress={onListen}
+        disabled={state === 'loading' || state === 'notKept'}
+      >
+        <Text style={styles.audioBtnText}>{state === 'playing' ? t('stop_btn') : t('listen_btn')}</Text>
+      </Pressable>
+      {allowSave && clip ? (
+        <Pressable style={styles.audioBtn} onPress={onSave}>
+          <Text style={styles.audioBtnText}>{t('save_recording_btn')}</Text>
+        </Pressable>
+      ) : null}
+      {state === 'loading' ? <Text style={styles.audioStatus}>{t('audio_loading')}</Text> : null}
+      {state === 'playing' ? <Text style={styles.audioStatus}>{t('audio_playing')}</Text> : null}
+      {error && state !== 'notKept' ? <Text style={styles.audioStatusErr}>{error}</Text> : null}
+      {state === 'notKept' ? <Text style={styles.audioStatus}>{t('recording_not_kept')}</Text> : null}
     </View>
   );
 }
@@ -117,4 +230,18 @@ const styles = StyleSheet.create({
   childText: { color: theme.brand, fontSize: 15 },
   aregText: { color: theme.ink, fontSize: 15 },
   time: { fontSize: 11, color: theme.inkHint, marginTop: 3 },
+  audioRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 6 },
+  audioBtn: {
+    borderWidth: 1,
+    borderColor: theme.line,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minHeight: 44,
+    justifyContent: 'center',
+    backgroundColor: theme.surface,
+  },
+  audioBtnText: { color: theme.brand, fontWeight: '600', fontSize: 13 },
+  audioStatus: { fontSize: 12, color: theme.inkMuted },
+  audioStatusErr: { fontSize: 12, color: theme.danger },
 });
