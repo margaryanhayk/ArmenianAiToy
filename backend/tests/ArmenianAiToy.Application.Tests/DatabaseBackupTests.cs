@@ -298,6 +298,146 @@ public class DatabaseBackupServiceTests : IDisposable
         Assert.True(File.Exists(Path.Combine(backupDir, "something-else.zip")));
         Assert.NotEmpty(Directory.GetFiles(backupDir, "areg-backup-*.db"));
     }
+
+    // --- Audio-blob archive (2026-09-11) ------------------------------
+    // Same one-per-UTC-day / write-.part-then-move / keep-newest-N idiom
+    // as the uploads archive above, plus an opt-out switch and a size cap
+    // (voice recordings have no natural ceiling the way curated uploads do).
+
+    private string SeedAudioBlobRoot(params string[] relativeFileNames)
+    {
+        var root = Path.Combine(_root, "audio-blobs-src");
+        Directory.CreateDirectory(root);
+        foreach (var name in relativeFileNames)
+        {
+            var path = Path.Combine(root, name);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, new byte[] { 0x52, 0x49, 0x46, 0x46 });
+        }
+        return root;
+    }
+
+    [Fact]
+    public async Task Tick_ArchivesTheAudioBlobRoot_BesideTheDatabaseSnapshot()
+    {
+        var convId = Guid.NewGuid().ToString("N");
+        var audioRoot = SeedAudioBlobRoot(Path.Combine(convId, "child.wav"), Path.Combine(convId, "assistant.mp3"));
+        var backupDir = Path.Combine(_root, "backups");
+        var (service, _, provider) = MakeHarness(new Dictionary<string, string?>
+        {
+            ["Backup:Database:DirectoryPath"] = backupDir,
+            ["Audio:BlobStoreRoot"] = audioRoot,
+        });
+        using (provider)
+        {
+            await service.RunTickAsync(CancellationToken.None);
+        }
+
+        var archive = Assert.Single(Directory.GetFiles(backupDir, "areg-audio-blobs-*.zip"));
+        Assert.False(File.Exists(archive + ".part"));
+
+        using var zip = System.IO.Compression.ZipFile.OpenRead(archive);
+        Assert.Equal(2, zip.Entries.Count);
+    }
+
+    [Fact]
+    public async Task Tick_WithAudioBlobRootThatDoesNotExist_WritesNoArchive()
+    {
+        // Points at a directory that was never created — same "nothing to
+        // archive yet" idempotent no-op as an unset upload root, without
+        // relying on the process's current directory (parallel test runs
+        // must not share that global state).
+        var backupDir = Path.Combine(_root, "backups");
+        var (service, _, provider) = MakeHarness(new Dictionary<string, string?>
+        {
+            ["Backup:Database:DirectoryPath"] = backupDir,
+            ["Audio:BlobStoreRoot"] = Path.Combine(_root, "never-created"),
+        });
+        using (provider)
+        {
+            await service.RunTickAsync(CancellationToken.None);
+        }
+
+        Assert.Single(Directory.GetFiles(backupDir, "areg-backup-*.db"));
+        Assert.Empty(Directory.GetFiles(backupDir, "areg-audio-blobs-*.zip"));
+    }
+
+    [Fact]
+    public async Task Tick_AudioBlobBackupDisabled_WritesNoArchive_ButStillBacksUpTheDatabase()
+    {
+        var audioRoot = SeedAudioBlobRoot("child.wav");
+        var backupDir = Path.Combine(_root, "backups");
+        var (service, _, provider) = MakeHarness(new Dictionary<string, string?>
+        {
+            ["Backup:Database:DirectoryPath"] = backupDir,
+            ["Audio:BlobStoreRoot"] = audioRoot,
+            ["Backup:AudioBlobs:Enabled"] = "false",
+        });
+        using (provider)
+        {
+            await service.RunTickAsync(CancellationToken.None);
+        }
+
+        Assert.Single(Directory.GetFiles(backupDir, "areg-backup-*.db"));
+        Assert.Empty(Directory.GetFiles(backupDir, "areg-audio-blobs-*.zip"));
+    }
+
+    [Fact]
+    public async Task Tick_AudioBlobRootOverSizeCap_SkipsArchive_AndLogsWarning()
+    {
+        var audioRoot = SeedAudioBlobRoot("child.wav");
+        var backupDir = Path.Combine(_root, "backups");
+        var (service, _, provider) = MakeHarness(new Dictionary<string, string?>
+        {
+            ["Backup:Database:DirectoryPath"] = backupDir,
+            ["Audio:BlobStoreRoot"] = audioRoot,
+            // The 4-byte seeded file exceeds a cap this small.
+            ["Backup:AudioBlobs:MaxSizeBytes"] = "1",
+        });
+        using (provider)
+        {
+            await service.RunTickAsync(CancellationToken.None);
+        }
+
+        Assert.Empty(Directory.GetFiles(backupDir, "areg-audio-blobs-*.zip"));
+        // Database snapshot is unaffected by the audio-blob cap.
+        Assert.Single(Directory.GetFiles(backupDir, "areg-backup-*.db"));
+    }
+
+    [Fact]
+    public async Task AudioBlobsPrune_KeepsTheNewest_AndTouchesNothingElse()
+    {
+        var audioRoot = SeedAudioBlobRoot("child.wav");
+        var backupDir = Path.Combine(_root, "backups");
+        Directory.CreateDirectory(backupDir);
+
+        foreach (var day in new[] { "20260101", "20260102", "20260103" })
+        {
+            File.WriteAllText(Path.Combine(backupDir, $"areg-audio-blobs-{day}.zip"), "x");
+        }
+        File.WriteAllText(Path.Combine(backupDir, "areg-backup-20260101.db"), "x");
+        File.WriteAllText(Path.Combine(backupDir, "areg-uploads-20260101.zip"), "x");
+
+        var (service, _, provider) = MakeHarness(new Dictionary<string, string?>
+        {
+            ["Backup:Database:DirectoryPath"] = backupDir,
+            ["Audio:BlobStoreRoot"] = audioRoot,
+            ["Backup:Database:KeepCount"] = "2",
+        });
+        using (provider)
+        {
+            await service.RunTickAsync(CancellationToken.None);
+        }
+
+        var archives = Directory.GetFiles(backupDir, "areg-audio-blobs-*.zip")
+            .Select(Path.GetFileName).OrderBy(n => n, StringComparer.Ordinal).ToArray();
+        Assert.Equal(2, archives.Length);
+        Assert.Contains($"areg-audio-blobs-{DateTime.UtcNow:yyyyMMdd}.zip", archives);
+        Assert.Contains("areg-audio-blobs-20260103.zip", archives);
+
+        Assert.True(File.Exists(Path.Combine(backupDir, "areg-uploads-20260101.zip")));
+        Assert.NotEmpty(Directory.GetFiles(backupDir, "areg-backup-*.db"));
+    }
 }
 
 public class InternalControllerBackupTests : IDisposable

@@ -7,10 +7,12 @@ using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Domain.Enums;
 using ArmenianAiToy.Infrastructure.Data;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -103,7 +105,9 @@ public class AudioChatControllerTests
         Action<Harness>? configure = null,
         byte[]? inboundBody = null,
         string inboundContentType = "audio/wav",
-        bool streamingSynthesis = false)
+        bool streamingSynthesis = false,
+        bool isDevelopment = true,
+        string? blobStoreRoot = null)
     {
         var conn = new SqliteConnection("Data Source=:memory:");
         await conn.OpenAsync();
@@ -143,9 +147,18 @@ public class AudioChatControllerTests
         var costCapOptions = Options.Create(
             new OpenAIDailyCostCapOptions { Enabled = false });
 
+        // Fail-closed blob-store gate: defaults to Development/unset so the
+        // large body of pre-existing tests exercises exactly the code path
+        // it always did. Dedicated tests below drive isDevelopment=false +
+        // an unset/relative blobStoreRoot to hit the 503 branch.
+        var env = Substitute.For<IWebHostEnvironment>();
+        env.EnvironmentName = isDevelopment ? "Development" : "Production";
+        var config = Substitute.For<IConfiguration>();
+        config["Audio:BlobStoreRoot"].Returns(blobStoreRoot);
+
         var controller = new AudioChatController(
             chatService, deviceService, transcription, synthesis,
-            blobStore, canned, db, costMeter, costCapOptions, logger);
+            blobStore, canned, db, costMeter, costCapOptions, env, config, logger);
 
         var httpContext = new DefaultHttpContext();
         var deviceId = Guid.NewGuid();
@@ -225,6 +238,92 @@ public class AudioChatControllerTests
                 return new ChatResponse(
                     assistantText, convId, assistantMsgId, SafetyFlag.Clean);
             });
+    }
+
+    // --- Fail-closed blob store (2026-09-11) -------------------------
+
+    [Fact]
+    public async Task AudioChat_ProdUnsetBlobStoreRoot_Returns503_NeverCallsSttOrChat()
+    {
+        // Audio:BlobStoreRoot unset in a non-Development environment: the
+        // turn must refuse BEFORE paying for STT/chat, not silently lose
+        // the recording after the fact.
+        await using var h = await CreateAsync(isDevelopment: false, blobStoreRoot: null);
+        WireHappyPath(h);
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        var status = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(503, status.StatusCode);
+        await h.Transcription.DidNotReceiveWithAnyArgs().TranscribeArmenianAsync(
+            default!, default!, default);
+        await h.ChatService.DidNotReceiveWithAnyArgs().GetResponseAsync(
+            default, default!, default, default, default);
+        Assert.Empty(h.BlobStore.Written);
+    }
+
+    [Fact]
+    public async Task AudioChat_ProdRelativeBlobStoreRoot_Returns503()
+    {
+        // A relative root in production is exactly as non-durable as unset
+        // (it resolves under the app's own directory) — same refusal.
+        await using var h = await CreateAsync(isDevelopment: false, blobStoreRoot: "audio-blobs");
+        WireHappyPath(h);
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        var status = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(503, status.StatusCode);
+        Assert.Empty(h.BlobStore.Written);
+    }
+
+    [Fact]
+    public async Task AudioChat_ProdAbsoluteBlobStoreRoot_ProceedsNormally()
+    {
+        // An absolute root in production is durable and configured — the
+        // turn proceeds exactly as the Development-default tests do.
+        await using var h = await CreateAsync(isDevelopment: false, blobStoreRoot: "/data/audio-blobs");
+        WireHappyPath(h);
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        Assert.Equal(2, h.BlobStore.Written.Count);
+    }
+
+    [Fact]
+    public async Task AudioChat_DevUnsetBlobStoreRoot_ProceedsNormally()
+    {
+        // Development keeps today's behavior: unset is fine, no 503.
+        await using var h = await CreateAsync(isDevelopment: true, blobStoreRoot: null);
+        WireHappyPath(h);
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+    }
+
+    [Fact]
+    public async Task AudioChat_ProdUnsetBlobStoreRoot_AutoplayContinue_StillWorks()
+    {
+        // Autoplay-continue never writes a blob (it replays a cached
+        // library segment) — the fail-closed gate must not affect it even
+        // when the blob store is unconfigured.
+        await using var h = await CreateAsync(isDevelopment: false, blobStoreRoot: null);
+        h.DeviceService.IsDevicePausedAsync(h.DeviceId).Returns(false);
+        h.DeviceService.IsDeviceInBedtimeWindowAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(false);
+        h.DeviceService.IsModeEnabledForRequestAsync(
+            h.DeviceId, (Guid?)null, DetectedMode.Story).Returns(true);
+        h.ChatService.ContinueLibraryStoryAsync(h.DeviceId)
+            .Returns(new ChatResponse("Հաջորդ հատվածը", Guid.NewGuid(), Guid.NewGuid(), SafetyFlag.Clean));
+        h.Synthesis.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisResult(TtsMp3, MimeMp3));
+        h.Controller.ControllerContext.HttpContext.Request.Headers["X-Areg-Continue"] = "1";
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
     }
 
     // --- Happy path -------------------------------------------------

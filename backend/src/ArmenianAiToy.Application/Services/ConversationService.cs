@@ -115,7 +115,8 @@ public class ConversationService : IConversationService
                 m.Timestamp,
                 m.SafetyFlag,
                 AudioAvailable: m.Role == MessageRole.Assistant && m.AudioBlobPath != null,
-                Mode: m.Mode
+                Mode: m.Mode,
+                ChildAudioAvailable: m.Role == MessageRole.User && m.AudioBlobPath != null
             )).ToList()
         )).ToList();
     }
@@ -251,7 +252,8 @@ public class ConversationService : IConversationService
                 m.Timestamp,
                 m.SafetyFlag,
                 AudioAvailable: m.Role == MessageRole.Assistant && m.AudioBlobPath != null,
-                Mode: m.Mode
+                Mode: m.Mode,
+                ChildAudioAvailable: m.Role == MessageRole.User && m.AudioBlobPath != null
             )).ToList()
         );
     }

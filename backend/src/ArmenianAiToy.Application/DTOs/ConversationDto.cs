@@ -29,4 +29,10 @@ public record MessageDto(
     // "game", "riddle", "curiosity", "calm"). Null on rows written
     // before the Mode column existed, on guard/fallback replies, and on
     // child rows. Additive — older consumers ignore it.
-    string? Mode = null);
+    string? Mode = null,
+    // 2026-09-11 — true ONLY when role is User AND AudioBlobPath is
+    // non-null. Mirror image of AudioAvailable: drives the dashboard's
+    // ▶ "Download recording" control on the CHILD's own message. The role
+    // gate lives at every projection site, same discipline as
+    // AudioAvailable, so an assistant MP3 can never surface true here.
+    bool ChildAudioAvailable = false);

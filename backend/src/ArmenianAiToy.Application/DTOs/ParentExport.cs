@@ -59,9 +59,11 @@ public record ParentExportRetention(
 /// Per-message, the existing <c>MessageDto.AudioAvailable</c> flag already
 /// indicates which assistant messages have a replayable recording.
 /// <see cref="AssistantAudioEndpoint"/> is the path that streams it.
-/// <see cref="ChildAudioStatus"/> states the current limitation for the
-/// child's own uploaded audio (no per-blob download endpoint yet — the
-/// child-audio replay slice is deferred; see CLAUDE.md § Voice chat C2.2).
+/// <see cref="ChildAudioStatus"/> (2026-09-11) states the access path for
+/// the child's own recorded audio: <c>MessageDto.ChildAudioAvailable</c>
+/// flags which messages have one, and
+/// <c>GET /api/parents/messages/{messageId}/child-audio</c> downloads it —
+/// the C2.2 honesty gap this closed.
 /// </para>
 /// </summary>
 public record ParentExportAudioDisclosure(

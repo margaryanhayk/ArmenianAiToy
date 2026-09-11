@@ -17,10 +17,10 @@ curl -s https://<host>/api/health
 ```
 
 ```json
-{"status":"ok","service":"ArmenianAiToy API","database":"ok","openai":"ok"}
+{"status":"ok","service":"ArmenianAiToy API","database":"ok","openai":"ok","audioStore":"ok"}
 ```
 
-**Read the two fields separately — they mean different things.**
+**Read the fields separately — they mean different things.**
 
 - `status` / `database` decide **200 vs 503**, and they reflect *only* whether
   the database is reachable. Railway's healthcheck watches this.
@@ -30,8 +30,30 @@ curl -s https://<host>/api/health
   by every instance, so failing the healthcheck during an OpenAI outage would
   pull the whole fleet out of the load balancer at once — an outage we caused
   ourselves on top of the one we were having.
+- `audioStore` (2026-09-11) is **also advisory and never changes the status
+  code.** It reads `unconfigured` when `Audio:BlobStoreRoot` is unset or a
+  relative path in a non-Development environment. The app still boots and
+  everything else still works — voice CHAT specifically refuses with 503
+  (see below) rather than write recordings somewhere that gets wiped on the
+  next redeploy.
 
-So: **`openai: degraded` is not a reason to restart anything.**
+So: **`openai: degraded` is not a reason to restart anything. `audioStore:
+unconfigured` means set the variable below — restarting will not fix it.**
+
+### Voice recordings are not durable → set `Audio__BlobStoreRoot`
+
+`POST /api/chat/audio` refuses every turn with **503** when
+`Audio:BlobStoreRoot` is unset or relative in a non-Development environment —
+the same fail-closed contract `ContentSync:UploadRoot` already has. Set it to
+an absolute path on the mounted volume:
+
+```
+Audio__BlobStoreRoot=/data/audio-blobs
+```
+
+Development is unaffected (it keeps the historical relative default next to
+the binary, no configuration needed). See
+`ArmenianAiToy.Api.Security.AudioBlobStoreRootResolver` for the exact rule.
 
 ## Where are the logs?
 
@@ -137,4 +159,7 @@ queues those events in flash and uploads them when the backend returns.
 
 *Verified 2026-08-12 against a live instance; the health output above is
 copied from it, not written from memory. See
-`tools/quality-evidence/clean-clone-boot-20260812.md`.*
+`tools/quality-evidence/clean-clone-boot-20260812.md`. The `audioStore` field
+and the `Audio__BlobStoreRoot` section (2026-09-11) are NOT yet re-verified
+against a live instance — confirmed by unit test only
+(`AudioBlobStoreRootResolverTests`, `AudioChatControllerTests`).*

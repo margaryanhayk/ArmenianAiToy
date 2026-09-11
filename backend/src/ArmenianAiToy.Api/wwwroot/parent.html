@@ -1737,6 +1737,9 @@
       no_more_convos: { en: 'No more conversations.', ru: 'Больше разговоров нет.', hy: 'Այլ զրույցներ չկան։' },
       no_stories: { en: 'No stories yet. New ones appear here as we publish them.', ru: 'Сказок пока нет. Новые появятся здесь по мере выпуска.', hy: 'Հեքիաթներ դեռ չկան։ Նորերը կհայտնվեն այստեղ, երբ հրապարակենք։' },
       listen_btn: { en: '▶ Listen', ru: '▶ Послушать', hy: '▶ Լսել' },
+      save_recording_btn: { en: '⬇ Save recording', ru: '⬇ Сохранить запись', hy: '⬇ Պահպանել ձայնագրությունը' },
+      saved_status: { en: 'Saved. Check your downloads folder.', ru: 'Сохранено. Проверьте папку загрузок.', hy: 'Պահպանված է։ Ստուգեք ներբեռնումների թղթապանակը։' },
+      recording_not_kept: { en: 'This recording is no longer kept. The words above stay here.', ru: 'Эта запись больше не хранится. Текст выше остаётся здесь.', hy: 'Այս ձայնագրությունն այլևս պահված չէ։ Վերևի բառերը մնում են այստեղ։' },
       tile_conversations: { en: 'Conversations', ru: 'Разговоры', hy: 'Զրույցներ' },
       tile_conversations_sub: { en: 'What your child talked about', ru: 'О чём говорил ваш ребёнок', hy: 'Ինչի մասին է խոսել ձեր երեխան' },
       tile_library: { en: 'Story library', ru: 'Библиотека сказок', hy: 'Հեքիաթների գրադարան' },
@@ -6032,6 +6035,13 @@
       if (m.audioAvailable === true && m.role === 'assistant' && m.id) {
         div.appendChild(buildListenAffordance(m.id));
       }
+      // 2026-09-11 — mirror image for the child's own recording: the wire
+      // shape guarantees childAudioAvailable is true ONLY for user/child
+      // messages with a non-null AudioBlobPath. Role check is
+      // belt-and-suspenders, same posture as the assistant check above.
+      if (m.childAudioAvailable === true && m.role === 'user' && m.id) {
+        div.appendChild(buildDownloadRecordingAffordance(m.id));
+      }
       return div;
     }
 
@@ -6052,6 +6062,8 @@
       btn.className = 'btn-ghost';
 
       var status = document.createElement('span');
+      // Announced to a screen reader: "Loading…", errors, etc.
+      status.setAttribute('role', 'status');
       status.style.cssText = 'font-size:12px;color:var(--ink-muted);';
 
       btn.onclick = function () {
@@ -6107,6 +6119,121 @@
           // doesn't pile up controls if the parent listens twice.
           wrap.innerHTML = '';
           wrap.appendChild(audio);
+        }).catch(function () {
+          status.textContent = t('err_network');
+          status.style.color = 'var(--danger-ink-2)';
+          btn.disabled = false;
+        });
+      };
+
+      wrap.appendChild(btn);
+      wrap.appendChild(status);
+      return wrap;
+    }
+
+    // 2026-09-11 — render the child's own recording affordance. LISTEN
+    // first, SAVE second, on one fetch: a parent's most common need is to
+    // hear their child's tone in the page, not to receive a file, and
+    // Areg's replies (buildListenAffordance above) already play inline —
+    // making the child's own voice the *only* one that can't be heard
+    // without leaving the browser would be a strange, backwards asymmetry.
+    // The endpoint's Content-Disposition: attachment header is harmless
+    // here — the bytes are consumed via fetch, not direct navigation.
+    function buildDownloadRecordingAffordance(messageId) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = t('listen_btn');
+      btn.className = 'btn-ghost';
+
+      var status = document.createElement('span');
+      status.setAttribute('role', 'status');
+      status.style.cssText = 'font-size:12px;color:var(--ink-muted);';
+
+      btn.onclick = function () {
+        btn.disabled = true;
+        status.textContent = t('busy_loading');
+        status.style.color = 'var(--ink-muted)';
+
+        var token = getToken();
+        if (!token) {
+          status.textContent = t('session_expired');
+          status.style.color = 'var(--danger-ink-2)';
+          btn.disabled = false;
+          return;
+        }
+        fetch('/api/parents/messages/' + encodeURIComponent(messageId) + '/child-audio', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function (res) {
+          if (res.status === 401) {
+            sessionExpired();
+            return null;
+          }
+          if (res.status === 404) {
+            // Deliberately calm, not the red "unavailable" wording: on
+            // Railway this endpoint predates durable storage
+            // (Audio:BlobStoreRoot), so a conversation from before this
+            // shipped can legitimately have a row with no surviving file.
+            // A red error next to the child's own sentence would read as
+            // a fault; this says plainly that the recording is gone and
+            // the words above it are not.
+            status.textContent = t('recording_not_kept');
+            status.style.color = 'var(--ink-muted)';
+            btn.disabled = true;
+            return null;
+          }
+          if (!res.ok) {
+            status.textContent = t('err_generic');
+            status.style.color = 'var(--danger-ink-2)';
+            btn.disabled = false;
+            return null;
+          }
+          var ext = (res.headers.get('Content-Type') || '').indexOf('mpeg') !== -1 ? 'mp3' : 'wav';
+          return res.blob().then(function (blob) { return { blob: blob, ext: ext }; });
+        }).then(function (result) {
+          if (!result) return;
+          var url = trackObjectUrl(URL.createObjectURL(result.blob));
+          var audio = document.createElement('audio');
+          audio.controls = true;
+          audio.autoplay = true;
+          audio.src = url;
+          audio.setAttribute('data-areg-preview', '1');
+          audio.style.cssText = 'max-width:100%;vertical-align:middle;';
+          audio.addEventListener('play', function () { stopOtherPreviews(audio); });
+          stopOtherPreviews(audio);
+
+          // Saving is the secondary act, offered only once the parent has
+          // the recording in front of them — its own untracked object URL,
+          // revoked on a timeout exactly like downloadMyData's export copy
+          // below, NOT via trackObjectUrl: a view change (Back) calls
+          // releaseObjectUrls() on every navigation, which would revoke
+          // this URL mid-save if it were tracked the same way the player's
+          // is.
+          var save = document.createElement('button');
+          save.type = 'button';
+          save.className = 'btn-ghost';
+          save.textContent = t('save_recording_btn');
+          save.onclick = function () {
+            var dlUrl = URL.createObjectURL(result.blob);
+            var a = document.createElement('a');
+            a.href = dlUrl;
+            a.download = 'areg-recording-' + messageId + '.' + result.ext;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function () {
+              try { URL.revokeObjectURL(dlUrl); } catch (e) { /* already gone */ }
+            }, 4000);
+            status.textContent = t('saved_status');
+            status.style.color = 'var(--ink-muted)';
+          };
+
+          wrap.innerHTML = '';
+          wrap.appendChild(audio);
+          wrap.appendChild(save);
+          wrap.appendChild(status);
         }).catch(function () {
           status.textContent = t('err_network');
           status.style.color = 'var(--danger-ink-2)';
