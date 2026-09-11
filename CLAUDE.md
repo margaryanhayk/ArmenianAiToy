@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 2929 tests, ~35 s in Release
+dotnet test            # 2931 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -228,12 +228,15 @@ the toy (backend done, firmware online chat loop written and compile-
 verified, never bench-flashed — see the subsection below); offline games
 (compiled into every build since 2026-08-19, round-robin + play reporting
 wired 2026-09-11, never bench-flashed — see the subsection below);
-mid-story shout pauses (never bench-run); variant endings and the Tsivik
-serial (drafts + speaker maps + placeholder ContentSync rows prepared
-2026-09-11 — see the subsection below — still no rendered audio, no
-promoted episodes, no listen test); bedtime music (4 tracks defined,
-reviewed and pipeline-verified 2026-09-11 — see the subsection below —
-still no rendered audio, no listen test); hold-to-menu (unverified by hand, not
+mid-story shout pauses (never bench-run); the 10 story variant endings
+(all 10 rendered and shipped 2026-09-11 — see the subsection below —
+`check_story_audio.py` PASS 20/20, `dotnet test` green, listen test
+still open); the Tsivik serial (drafts + speaker maps + placeholder
+ContentSync rows prepared 2026-09-11 — see the subsection below — still
+not rendered or promoted, blocked on owner sign-off); bedtime music (4
+tracks defined, reviewed and pipeline-verified 2026-09-11, render still
+blocked on live-docs verification of the Music API endpoint — see the
+subsection below — still no rendered audio, no listen test); hold-to-menu (unverified by hand, not
 staged for OTA); streaming Q&A firmware flag off; mobile app has a
 documented, partially-exercised local Android build recipe but still no
 verified APK or on-device run (see the subsection below); listen tests of
@@ -666,6 +669,59 @@ was run for real against synthetic audio (not a paid render) — see
 `tools/quality-evidence/bedtime-music-prep-20260911.md`. `dotnet build`/
 `dotnet test` green (2931 tests). NOT done: any paid render, any listen
 test, any real track.
+
+### Variant endings — 10 of 10 rendered and shipped (2026-09-11, render session)
+
+`ELEVENLABS_API_KEY` became available in a later session the same day;
+executed part 1 of `docs/variant-endings-serial-render-runbook.md` (the 10
+alt endings only — the Tsivik serial stayed blocked, see below). All 10
+`backend/content/story-voices/<id>-alt.voices.json` rendered via
+`render_story.py`, shipped at -16.4 LUFS/192 kbps mono/single ID3 (a
+manual ffmpeg equivalent of `Ship-StoryAudio.ps1`'s Repair-And-Level —
+PowerShell is not on this host), byte-mapped via `segments_to_bytes.py`.
+The 10 `ContentSync:Stories` placeholder rows now carry real
+`SizeBytes`/`Sha256`. `check_story_audio.py` PASS across the full shipped
+library (20/20: 10 base + 10 alt). `dotnet build`/`dotnet test` green
+(2931 tests, none needed updating). Full sha256 table and commands:
+`tools/quality-evidence/variant-endings-serial-prep-20260911.md`'s
+"Render update" section.
+
+Found and fixed two real tooling bugs while exercising the pipeline for
+the first time with a paid key: `render_story.py`'s ffmpeg concat step
+was silently failing on every story (relative paths resolved against the
+wrong directory, no return-code check) — fixed with absolute paths and a
+return-code check; `check_story_audio.py` had no way to compute an alt
+ending's expected length and would have failed the whole gate on the
+first shipped alt — extended to resolve it from the base story plus
+`variant-endings.json`'s `endingText`. Three spans failed a render guard
+and needed one `RENDER_ONLY` retry each (all resolved on the first
+retry); `little-cloud-alt` was fully re-rendered once while diagnosing
+the concat bug (an unavoidable extra cost from that bug, not repeated for
+any other story) — see the evidence file for the honest accounting.
+
+**The Tsivik serial was deliberately NOT rendered or promoted.** The
+runbook's own step 1 requires owner sign-off on new reflection/goal/
+lesson text, an owner decision on the pre-existing ellipsis character in
+several episode bodies (it reaches the TTS-bound body text, not just
+promotion metadata), and a casting confirmation on the sample-first
+listen — none of which an unattended session can supply. The 6
+placeholder `ContentSync:Stories` rows are unchanged from PR #45.
+
+**The human listen test is still open for all 10 rendered endings** —
+nobody has heard any of them yet.
+
+### Bedtime music — render still blocked (2026-09-11, render session)
+
+`ELEVENLABS_API_KEY` became available, but step 0 of
+`docs/bedtime-music-render-runbook.md` — verifying the ElevenLabs Music
+API endpoint against live docs before spending — could not be closed:
+`WebFetch` to `elevenlabs.io` returned `EGRESS_BLOCKED` in this session
+too. No render was attempted; the 4 `ContentSync:Music` rows are
+unchanged from PR #46 (`SizeBytes: 0`, placeholder). See
+`tools/quality-evidence/bedtime-music-prep-20260911.md`'s "Render
+attempt" section. Still needs a human (or a session with `elevenlabs.io`
+reachable) to confirm `generate_music.py`'s `ENDPOINT`/request body
+before the first real `--render --confirm-paid-api`.
 
 ## Working in this repo (agents)
 

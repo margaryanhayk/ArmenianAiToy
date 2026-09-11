@@ -132,3 +132,123 @@ for that byte-pin suite to cover until promotion.
 Any paid render, any use of the pasted-in-chat pattern this repo has
 explicitly burned before — `ELEVENLABS_API_KEY` was read from the
 environment only, confirmed unset, and no render command was run.
+
+## Render update (2026-09-11, later session — `ELEVENLABS_API_KEY` set)
+
+Executed part 1 of `docs/variant-endings-serial-render-runbook.md`: the 10
+variant endings only. The 6 Tsivik episodes were deliberately NOT rendered
+or promoted — see "Tsivik serial: not rendered this session" below.
+
+**Commands run, per story** (`$id` = the 10 alt ids):
+
+```bash
+ELEVENLABS_VOICE_ID=NxAsEwnikgCJa5tyBwEf python3 tools/story-voices/render_story.py "$id" "render-out/$id"
+# loudnorm -16.4 LUFS, 192kbps mono, single ID3 (manual ffmpeg equivalent of
+# Ship-StoryAudio.ps1's Repair-And-Level — PowerShell is not on this host)
+python3 tools/story-audio/segments_to_bytes.py --seconds render-out/$id/$id.segments.json \
+  --mp3 backend/src/ArmenianAiToy.Api/story-audio/$id.mp3 \
+  --out backend/src/ArmenianAiToy.Api/story-audio/$id.segments.json
+python3 tools/story-audio/check_story_audio.py --audio-dir backend/src/ArmenianAiToy.Api/story-audio
+cd backend && dotnet build && dotnet test
+```
+
+**Two real tooling bugs found and fixed while exercising this pipeline
+for the first time with a paid key** (both in this PR, see commit
+1a356f4):
+
+- `render_story.py`'s `assemble()`/`stitch()` wrote the ffmpeg concat
+  list with paths relative to the process cwd, but the concat demuxer
+  resolves a relative `file` entry against the LIST FILE's own directory,
+  not the cwd — every segment/story concat was silently failing (the
+  subprocess return code was never checked), so the finished `<id>.mp3`
+  was never actually produced even though every span rendered and was
+  paid for. Fixed by writing absolute paths and checking the ffmpeg
+  return code. **Cost note**: `little-cloud-alt` was re-rendered once
+  while diagnosing this — the fix was verified by re-running the whole
+  script before RENDER_ONLY-scoped resume was understood to not apply
+  without it, so every span of that one story was rendered twice. No
+  other story was affected; every span check for the remaining 9 stories
+  and thereafter is idempotent (resumed from the kept `.wav` files where
+  a re-run was needed).
+- `check_story_audio.py` had no way to compute an alt ending's expected
+  length (`alt endings have no <id>-alt.story.json` by design) and would
+  have flagged every one of the 10 as "no story text to check the length
+  against", failing the whole gate the moment any alt shipped. Extended
+  with `alt_expected_chars()`: resolves an alt id's expected length from
+  its base story's `.story.json` segments plus
+  `variant-endings.json`'s `endingText` for that base id.
+
+**Spans that failed a guard and were retried** (per the runbook's
+RENDER_ONLY guidance, each within the "at most 3 retries" budget — all
+resolved on the first retry, none needed a second or third):
+
+- `hedgehog-apple-alt` seg 3 span 3 — tail-chop («— Հիմա կսպասենք,» cut
+  short twice by the model itself, inside the script's own 2-attempt
+  budget) — `RENDER_ONLY="3:3"`, fixed.
+- `khosogh-dzuk-alt` seg 9 span 1 — transcript mismatch on «- Գնա՛,
+  ձկնիկ ջան,» — `RENDER_ONLY="9:1"`, fixed.
+- `sutlik-orskan-alt` seg 3 span 0 — transcript mismatch on dialect-heavy
+  tall-tale text («Հադին շալակեց, չկարաց, Հյուդին շալակեց,…», ASR
+  consistently mis-hearing the non-standard dialect forms even across
+  3 attempts) — `RENDER_ONLY="3:0"`, fixed on the first retry.
+
+**Gate result**, full library (`check_story_audio.py`, no `--audio-dir`
+override — the shipped `story-audio/` directory):
+
+```
+PASS - 20 stories are complete and cleanly encoded.
+```
+
+(10 base + 10 alt; all ratios 100-128% of expected length, all single
+ID3, all 192 kbps.)
+
+**Backend**: `dotnet build` clean; `dotnet test` — 2931/2931 passed, 0
+failed (no test needed updating for the newly-real rows; the existing
+`ShippedConfig_AdvertisesExactlyTheStoriesThatHaveAudio` /
+`ShippedConfig_AltOfAndSeriesFields_AreInternallyConsistent` tests already
+tolerate a mix of real and still-placeholder `ContentSync:Stories` rows).
+
+**Shipped files** (`backend/src/ArmenianAiToy.Api/story-audio/<id>.mp3`,
+also the `ContentSync:Stories[].Sha256`/`SizeBytes` values in
+`appsettings.json`):
+
+| storyId | sha256 | bytes |
+|---|---|---|
+| little-cloud-alt | `2986389bea006642a547d58f0a61366ce3af942fb3fa82e0869fd95c3a3b1bbd` | 1447018 |
+| hedgehog-apple-alt | `a68da6e5b1c1692a995b0b07fff8dfad52257ed75e017b9025ac0ad8ec23a9b3` | 1509085 |
+| khosogh-dzuk-alt | `68d4b0d32ce29d392956d26ce19c311e04c3e71c0a77b699dfa5033d927361df` | 9934515 |
+| pochat-aghves-alt | `aabfefd80bc2e3add54ad2a868f3420e4be0948f4d1ebd4e24542a786d606c59` | 7262502 |
+| princess-and-pea-alt | `ab531145bc4c6d6d72d82cd0e20a0c7ac767a4f897233e58515872d617c54f60` | 2511560 |
+| sutasan-alt | `5f5421055249b5d0dc789fb5c977280fea731eb4099f8f91042cc26692346793` | 2973614 |
+| sutlik-orskan-alt | `b7c799b0fc956971ecc635306f13c2820fb62e9b5065440ad7e2ffa4bfdb45e8` | 4898316 |
+| three-piglets-alt | `dfe8f9b5806e773a627368d50bd3650bd4e23b8d823fd21d6dce9176f2117451` | 2885216 |
+| ulik-alt | `e376d781be367c73954ea1b17bd5cc5472569c8bf3cd0cc05859e0ea3785700a` | 4289559 |
+| anban-huri-alt | `6c36c2c61efe69eb4a10c66c7847fe87f9f27837fd99ec2eeabd4f4214ad9233` | 6805464 |
+
+No cost figures are available: `render_story.py`/`segments_to_bytes.py`
+call the raw ElevenLabs HTTP API directly and do not surface a per-call
+credit cost in their output, and this session has no access to the
+ElevenLabs account dashboard to read it after the fact.
+
+**The human listen test is still open for all 10** — nothing here
+substitutes for it. Nobody has listened to any of these files yet.
+
+## Tsivik serial: not rendered this session
+
+Deliberately not promoted, not rendered. The runbook's own step 1 ("Text
+review — blocking everything after it") requires **owner sign-off** on
+the new `goal`/`lesson`/`reflectionText`/`reflectionQuestions`/
+`reflectionConclusions` text, plus an owner decision on the pre-existing
+ellipsis (`…`) character in several episode bodies before those bodies
+are safe to send to TTS, plus a casting confirmation on the sample-first
+listen. None of those is something an unattended agent session can
+supply — they are explicitly the owner's calls, not a review pass that
+can be rubber-stamped. Rendering the episode narration anyway (skipping
+straight to step 3) was considered and rejected: the ellipsis question
+specifically affects the episode BODY text that would be sent to TTS, so
+rendering now risks paying for narration that needs to be redone once
+that question is resolved.
+
+Nothing about the drafts, speaker maps, or placeholder `ContentSync:
+Stories` rows for `tsivik-{one..six}` changed. They remain exactly as PR
+#45 left them: `SizeBytes: 0`, all-zero `Sha256`, invisible to every toy.
