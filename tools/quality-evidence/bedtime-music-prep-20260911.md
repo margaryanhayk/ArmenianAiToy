@@ -138,3 +138,27 @@ still passes.
 Any paid render, any use of the pasted-in-chat pattern this repo has
 explicitly burned before — `ELEVENLABS_API_KEY` was read from the
 environment only, confirmed unset, and no render command was run.
+
+## Render attempt (2026-09-11, later session — `ELEVENLABS_API_KEY` set)
+
+Still blocked — not rendered. `ELEVENLABS_API_KEY` was confirmed set this
+session, but step 0 of `docs/bedtime-music-render-runbook.md` ("Check the
+current ElevenLabs Music API docs... the one open item a human must close
+before step 2 can run for real") could not be closed: `WebFetch` against
+`https://elevenlabs.io/docs/api-reference/music/compose` returned
+`EGRESS_BLOCKED`, same as the prior session. `generate_music.py`'s
+`ENDPOINT` (`POST /v1/music`) and request body remain unverified against
+live docs.
+
+Rendering anyway was considered and rejected: an unverified endpoint shape
+risks either a wasted paid call against the wrong URL/parameters, or —
+worse — a call that succeeds against a real but different endpoint/plan
+than intended, at real cost, before anyone has confirmed the request is
+correct. The runbook is explicit that this check is not optional. No
+`--render --confirm-paid-api` command was run; no track was generated; the
+four `ContentSync:Music` rows are unchanged (`SizeBytes: 0`, all-zero
+`Sha256`, exactly as PR #46 left them).
+
+**Still open, unchanged from the prior session's blockers above**: the
+endpoint verification itself, the human listen test, and the -23 LUFS
+choice being untested on hardware.
