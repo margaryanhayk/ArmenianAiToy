@@ -543,6 +543,22 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
+// Development-only text harness concealment (`/api/story-qa-text`):
+// a path-based gate BEFORE routing/model binding, same pre-routing
+// pattern as the /api/internal/* gate above. See StoryQaTextDevGate's
+// xmldoc for why the controller's own Development check alone let a
+// malformed or bodyless request outside Development leak past it via
+// ASP.NET's automatic model-binding 400/415.
+app.Use(async (ctx, next) =>
+{
+    if (StoryQaTextDevGate.IsStoryQaTextPath(ctx.Request.Path) && !app.Environment.IsDevelopment())
+    {
+        ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+    await next();
+});
+
 app.MapControllers();
 
 // Prometheus scrape surface for the AppMeter + AspNetCore/Runtime

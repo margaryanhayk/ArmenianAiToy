@@ -3172,6 +3172,13 @@ moving the environment check ahead of model binding (a filter or a middleware
 path check, as `/metrics` and `/api/internal/*` already do). Not done â€”
 recorded here so the gap is a known one rather than a doc that lies.
 
+**Correction (2026-09-11): done.** `StoryQaTextDevGate` (`Api/Observability/`)
+is now wired as pre-routing middleware in `Program.cs`, ahead of
+`app.MapControllers()` — the exact pattern named above — so a malformed or
+bodyless request outside Development now gets the same 404 as a well-formed
+one, before model binding ever runs. The controller's own check stays as
+defense in depth.
+
 **Dual moderation, mirroring the voice path.** `LibraryStoryQuestionService`
 has no moderation of its own (it takes only `IAiChatClient`), and
 `StoryAnswerFilter` validates story fidelity and format â€” it is **not** a
