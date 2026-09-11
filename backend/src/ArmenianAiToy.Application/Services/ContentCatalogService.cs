@@ -64,15 +64,23 @@ public sealed class ContentCatalogService : IContentCatalogService
     /// overlay is handed a list that has already been decided.</summary>
     private sealed record Row(
         string Kind, string ItemKey, string Title, int Version,
-        string RelativePath, string Sha256, long SizeBytes, bool DefaultEnabled);
+        string RelativePath, string Sha256, long SizeBytes, bool DefaultEnabled,
+        bool Retired);
 
     /// <summary>
-    /// Every non-retired catalogue row, narrowed by <paramref name="keep"/>.
+    /// Every catalogue row this device/fleet may see, narrowed by
+    /// <paramref name="keep"/> — EXCEPT a retired one, which is always kept
+    /// regardless of <paramref name="keep"/> or <c>DefaultEnabled</c>.
     /// <para>
-    /// <c>RetiredAt</c> is filtered in the QUERY, in this one place: a retired
-    /// item must leave every manifest by construction rather than by each
-    /// caller remembering, because forgetting it would keep serving a story the
-    /// owner believed he had removed.
+    /// Before 2026-09-11, <c>RetiredAt</c> was filtered in the QUERY, so a
+    /// retired item simply vanished from every manifest — indistinguishable
+    /// from "never entitled" on the wire, and a device that had already
+    /// cached it kept the file forever (CLAUDE.md: absence is not a
+    /// retirement instruction). It is no longer filtered here: a retired row
+    /// still reaches <see cref="ContentItemOverlay.Apply"/>, tagged
+    /// <see cref="ContentItemOverlay.Item.Retired"/>, so
+    /// <c>ContentManifestService</c> can emit it with <c>retired:true</c> —
+    /// the one signal that tells a device to actually delete its copy.
     /// </para>
     /// </summary>
     private async Task<List<ContentItemOverlay.Item>> LoadItemsAsync(
@@ -80,17 +88,17 @@ public sealed class ContentCatalogService : IContentCatalogService
     {
         var rows = await _db.Set<ContentItem>()
             .AsNoTracking()
-            .Where(i => i.RetiredAt == null)
             .Select(i => new Row(
                 i.Kind, i.ItemKey, i.Title, i.Version,
-                i.RelativePath, i.Sha256, i.SizeBytes, i.DefaultEnabled))
+                i.RelativePath, i.Sha256, i.SizeBytes, i.DefaultEnabled,
+                i.RetiredAt != null))
             .ToListAsync(ct);
 
         return rows
-            .Where(keep)
+            .Where(r => r.Retired || keep(r))
             .Select(r => new ContentItemOverlay.Item(
                 r.Kind, r.ItemKey, r.Title, r.Version,
-                r.RelativePath, r.Sha256, r.SizeBytes))
+                r.RelativePath, r.Sha256, r.SizeBytes, r.Retired))
             .ToList();
     }
 

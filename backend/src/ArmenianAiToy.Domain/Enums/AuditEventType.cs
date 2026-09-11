@@ -104,5 +104,22 @@ public enum AuditEventType
     /// path (ParentDeviceClaimed). ActorParentId = the linker; TargetDeviceId =
     /// the toy. Gives the durable record the link path previously lacked so a
     /// second-parent attach on an already-claimed toy is not invisible.</summary>
-    ParentDeviceLinked
+    ParentDeviceLinked,
+
+    /// <summary>Retention (2026-09-11) — the audio-blob orphan sweep on
+    /// <c>RetentionPurgeService</c> deleted at least one directory under
+    /// <c>Audio:BlobStoreRoot</c> with no matching <c>Conversation</c> row.
+    /// System-actor row (ActorParentId null, out of every parent-facing
+    /// feed) written only on a tick that actually deleted something.
+    /// Metadata is counts-only (directories examined/deleted, files
+    /// deleted, the grace-window cutoff) — never a blob path or a
+    /// conversation id.</summary>
+    AudioBlobOrphansSwept,
+
+    /// <summary>Retention (2026-09-11) — the uploaded-content orphan sweep
+    /// on <c>RetentionPurgeService</c> deleted at least one file under
+    /// <c>ContentSync:UploadRoot</c> with no matching <c>ContentItem</c>
+    /// row. Same system-actor, deletions-only, counts-only posture as
+    /// <see cref="AudioBlobOrphansSwept"/>.</summary>
+    UploadedContentOrphansSwept
 }

@@ -259,6 +259,60 @@ void test_manifest_disabled_item_skipped() {
     check(strcmp(out[0].story_id, "on-one") == 0, "manifest_enabled_sibling_kept");
 }
 
+// Retirement (2026-09-11). A retired:true item must NOT become a download
+// candidate (same as disabled), but — unlike disabled — its id must be
+// recorded so content_sync.cpp's carry-forward loop can drop it (and
+// delete its file) instead of carrying it forward forever. Note the item
+// still carries a fully valid audioUrl/sha256/sizeBytes: see
+// ContentStoryItem.Retired's doc comment for why the backend never sends
+// a stub for a retired entry.
+void test_manifest_retired_item_recorded_not_synced() {
+    JsonDocument doc;
+    JsonArray arr = doc["stories"].to<JsonArray>();
+    add_item(arr, "keep-one", 1, kShaA, 1000, "/u", true);
+    JsonObject retired = arr.add<JsonObject>();
+    retired["storyId"]   = "ret-one";
+    retired["version"]   = 1;
+    retired["title"]     = "t";
+    retired["audioUrl"]  = "/u";
+    retired["sha256"]    = kShaB;
+    retired["sizeBytes"] = 1000;
+    retired["enabled"]   = true;   // still a fully valid entry, not a stub
+    retired["retired"]   = true;
+
+    CsStory *out = g_story_scratch;
+    CsManifestStats st{};
+    CsRetiredIds retiredIds{};
+    const int n = cs_manifest_parse(doc["stories"].as<JsonArrayConst>(),
+                                    out, CS_MAX_STORIES, &st, &retiredIds);
+    check(n == 1, "manifest_retired_not_a_download_candidate");
+    check(strcmp(out[0].story_id, "keep-one") == 0, "manifest_retired_sibling_kept");
+    check(st.retired == 1, "manifest_counts_retired");
+    check(retiredIds.count == 1, "manifest_retired_id_recorded");
+    check(cs_retired_contains(&retiredIds, "ret-one"), "manifest_retired_id_matches");
+    check(!cs_retired_contains(&retiredIds, "keep-one"), "manifest_retired_id_is_specific");
+
+    // A caller that does not ask (passes nullptr, every existing call site
+    // before this slice) sees no behavior change at all — additive only.
+    CsManifestStats st2{};
+    const int n2 = cs_manifest_parse(doc["stories"].as<JsonArrayConst>(),
+                                     out, CS_MAX_STORIES, &st2);
+    check(n2 == 1, "manifest_retired_nullptr_caller_unaffected");
+    check(!cs_retired_contains(nullptr, "ret-one"), "retired_contains_nullptr_is_false");
+}
+
+// The bounded orphan sweep's opt-in flag (2026-09-11): absent -> false
+// (never sweep by default), and it round-trips through the index like
+// every other parent-toggle flag (introEnabled, musicEnabled, ...).
+void test_orphan_sweep_flag_round_trip() {
+    JsonDocument doc;
+    check(!cs_index_orphan_sweep_enabled(doc), "orphan_sweep_flag_absent_defaults_false");
+    cs_index_add_orphan_sweep_flag(doc, true);
+    check(cs_index_orphan_sweep_enabled(doc), "orphan_sweep_flag_round_trips_true");
+    cs_index_add_orphan_sweep_flag(doc, false);
+    check(!cs_index_orphan_sweep_enabled(doc), "orphan_sweep_flag_round_trips_false");
+}
+
 void test_manifest_duplicates() {
     JsonDocument doc;
     JsonArray arr = doc["stories"].to<JsonArray>();
@@ -1146,6 +1200,8 @@ void run_all() {
     test_manifest_empty();
     test_manifest_invalid_item_does_not_block_siblings();
     test_manifest_disabled_item_skipped();
+    test_manifest_retired_item_recorded_not_synced();
+    test_orphan_sweep_flag_round_trip();
     test_manifest_duplicates();
     test_manifest_truncation();
     test_index_round_trip_three();

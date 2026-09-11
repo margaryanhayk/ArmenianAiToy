@@ -263,6 +263,107 @@ public class ContentManifestServiceTests
         Assert.True(item.Enabled);
     }
 
+    // ---- retirement (2026-09-11) ------------------------------------
+
+    /// <summary>KEYSTONE for retirement: a config-driven story marked
+    /// Retired=true is still emitted (not dropped, not stubbed) so a
+    /// device that already cached it can be told to delete it — but with
+    /// retired:true AND enabled:false, so nothing NEW ever downloads
+    /// something already on its way out.</summary>
+    [Fact]
+    public void RetiredStory_IsEmitted_WithRetiredTrueAndEnabledFalse()
+    {
+        var story = Story("gone-story", ValidSha, size: 12345);
+        story.Retired = true;
+
+        var item = Assert.Single(MultiSvc(story).Build().Stories);
+        Assert.Equal("gone-story", item.StoryId);
+        Assert.True(item.Retired);
+        Assert.False(item.Enabled);
+        // A fully valid entry, never a stub — see ContentStoryItem.Retired.
+        Assert.Equal(ValidSha, item.Sha256);
+        Assert.Equal(12345, item.SizeBytes);
+        Assert.NotEmpty(item.AudioUrl);
+    }
+
+    [Fact]
+    public void NonRetiredStory_HasRetiredFalse()
+    {
+        var item = Assert.Single(MultiSvc(Story("kept", ValidSha)).Build().Stories);
+        Assert.False(item.Retired);
+        Assert.True(item.Enabled);
+    }
+
+    [Fact]
+    public void RetiredMusicTrack_IsEmitted_WithRetiredTrueAndEnabledFalse()
+    {
+        var svc = new ContentManifestService(new ContentSyncOptions
+        {
+            Enabled = true,
+            Music =
+            {
+                new ContentSyncMusicOptions
+                {
+                    TrackId = "gone-track",
+                    Sha256 = ValidSha,
+                    SizeBytes = 100,
+                    Retired = true,
+                },
+            },
+        });
+
+        var item = Assert.Single(svc.Build().Music!);
+        Assert.True(item.Retired);
+        Assert.False(item.Enabled);
+    }
+
+    [Fact]
+    public void RetiredVoiceClip_IsEmitted_WithRetiredTrueAndEnabledFalse()
+    {
+        var svc = new ContentManifestService(new ContentSyncOptions
+        {
+            Enabled = true,
+            Voice =
+            {
+                new ContentSyncVoiceOptions
+                {
+                    VoiceId = "gone-clip",
+                    Sha256 = ValidSha,
+                    SizeBytes = 100,
+                    Retired = true,
+                },
+            },
+        });
+
+        var item = Assert.Single(svc.Build().Voice!);
+        Assert.True(item.Retired);
+        Assert.False(item.Enabled);
+    }
+
+    [Fact]
+    public void RetiredGameClip_IsEmitted_WithRetiredTrueAndEnabledFalse()
+    {
+        var svc = new ContentManifestService(new ContentSyncOptions
+        {
+            Enabled = true,
+            Games =
+            {
+                new ContentSyncGameOptions
+                {
+                    GameKey = "mind-reader",
+                    ClipId = "intro",
+                    Sha256 = ValidSha,
+                    SizeBytes = 100,
+                    Retired = true,
+                },
+            },
+        });
+
+        var item = Assert.Single(svc.Build().Games!);
+        Assert.True(item.Retired);
+        Assert.False(item.Enabled);
+    }
+
     // ---- the shipped configuration ----
 
     // Two stories have approved text but no narration yet (hedgehog-apple,

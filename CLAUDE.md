@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 2787 tests, ~35 s in Release
+dotnet test            # 2810 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -231,15 +231,17 @@ audio); bedtime music (no tracks); hold-to-menu (unverified by hand, not
 staged for OTA); streaming Q&A firmware flag off; mobile app never built;
 listen tests of the cast library on the toy still open; per-toy BLE PoP +
 factory station (backend done, firmware + factory station compile/dry-run
-verified, never bench-flashed — see the subsection below).
+verified, never bench-flashed — see the subsection below); content
+retirement, per-namespace index writes, and the bounded SD orphan sweep
+(backend + firmware done, both compile-verified, never bench-flashed —
+see the subsection below).
 
 Still to implement: a `sound-detective` firmware game (backend content
 ready — 21 clips already in `ContentSync:Games` — no engine written); two
 Simon tone clips (`tone-green` / `tone-red`, not yet rendered); render
-variant endings + serial; music tracks; card retirement / orphan sweeps /
-per-namespace index writes; durable child recordings (`Audio:BlobStoreRoot`
-unset on Railway — data lost on redeploy); narrator PVC; rev-A PCB routing +
-speaker test + order; usage tiers.
+variant endings + serial; music tracks; durable child recordings
+(`Audio:BlobStoreRoot` unset on Railway — data lost on redeploy); narrator
+PVC; rev-A PCB routing + speaker test + order; usage tiers.
 
 ### Online Game/Riddle/Curiosity/Calm voice contract (2026-09-11)
 
@@ -310,6 +312,59 @@ network or hardware. Runbook: `docs/factory-provisioning-runbook.md`.
 Compile-verified (firmware) and run end-to-end against a live local backend
 (factory station, register→NVS build→label, no hardware in this
 container) — nothing here has been heard on real hardware.
+
+### Content retirement, per-namespace index writes, and the bounded orphan sweep (2026-09-11)
+
+Three deferred content-sync cleanup items, closed together because they
+share one contract change. Absence from the manifest and `enabled:false`
+still mean "not offered, carried forward forever" (unchanged); an
+additive `retired:true` per item is the one new signal that IS a
+retirement instruction.
+
+**Backend.** `ContentStoryItem`/`Music`/`Voice`/`Game` items gain a
+`Retired` field (default false); a retired item is still emitted with a
+fully valid url/sha/size (never a stub — the firmware's per-item
+validation would reject an empty one before ever reading the flag), just
+with `enabled:false` alongside it. Two sources feed it: a config-driven
+item's own new `Retired` bool (an operator hand-edit, same posture as
+every other config field), and an uploaded `ContentItem`'s existing
+`RetiredAt` — no longer filtered out of the catalogue query entirely
+(that made it silently vanish, indistinguishable from "never entitled");
+it now reaches every device's manifest tagged retired, regardless of
+entitlement, since a device with no cached copy simply ignores the id.
+
+**Firmware.** `content_sync.cpp` now writes `/content_index.json` after
+EACH namespace (stories, music, voice, games) finishes, not once at the
+very end — a namespace not yet processed this attempt publishes its
+unchanged previous state in the interim write, never an empty one, so a
+crash partway through a later namespace can no longer discard an earlier
+one's downloads (the 2026-08-14 crash-loop bug, closed for good). A
+retired id is dropped from the index and its file deleted, unless it is
+the story paused mid-way right now (spared until the session ends). A new
+bounded, **off-by-default** SD orphan sweep (`orphanSweepEnabled` in the
+manifest, `content_orphan_sweep_run()`) removes files under
+`/stories`/`/voice`/`/games`/`/music` no index entry references, plus a
+stale `/tmp/*.part`, at most `AREG_ORPHAN_SWEEP_MAX_PER_BOOT` (20) per
+boot — games are not covered by the retirement signal itself (clip-pair
+addressing made it low-value for this slice) but the sweep is a safety
+net for them too. Pure decisions in `content_retirement_rules.h`,
+host-tested. Deletion/sweep counts ride the heartbeat additively
+(`contentRetiredDeleted`, `contentOrphansSwept`).
+
+**Backend orphan sweepers** on `RetentionPurgeService`, both **off by
+default**, per-tick capped, path-traversal hardened, system-actor audit
+row only on a tick that deleted something: an audio-blob pass (a
+`Audio:BlobStoreRoot` directory matching `^[0-9a-fA-F]{32}$` with no
+`Conversation` row, past a 24 h grace window) and an uploaded-content pass
+(a `ContentSync:UploadRoot` file with no `ContentItem` row, same grace —
+`UploadStoryContent` writes its file before the row commits, so a fresh
+file may simply be mid-request).
+
+Compile-verified both sides (`dotnet build`/`dotnet test` green;
+`arduino-cli compile` green, firmware image +~6 KB flash / +~5 KB RAM) —
+nothing here has been heard on real hardware. See
+`esp32/AregVoiceMvp/README.md`'s bench checklist for what a human still
+has to verify.
 
 ## Working in this repo (agents)
 

@@ -397,6 +397,15 @@ void voice_send_heartbeat() {
                              ",\"contentSyncedSecondsAgo\":%ld", (long)since_ok);
                 if (n > 0 && (size_t)used + (size_t)n < sizeof(body)) used += n;
             }
+            // Retirement + orphan sweep (2026-09-11) — additive, same
+            // unconditional posture as the fields above: these are RAM
+            // facts about the last attempt/this boot, not card contents,
+            // so a toy with a dead card can still report them.
+            n = snprintf(body + used, sizeof(body) - (size_t)used,
+                         ",\"contentRetiredDeleted\":%d,\"contentOrphansSwept\":%d",
+                         content_sync_last_retired_deleted(),
+                         content_sync_last_orphans_swept());
+            if (n > 0 && (size_t)used + (size_t)n < sizeof(body)) used += n;
         }
     }
 #endif

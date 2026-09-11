@@ -86,7 +86,11 @@ public sealed record ContentVoiceItem(
     string AudioUrl,
     string Sha256,
     long SizeBytes,
-    bool Enabled);
+    bool Enabled)
+{
+    /// <inheritdoc cref="ContentStoryItem.Retired" />
+    public bool Retired { get; init; }
+}
 
 /// <summary>Offline games — one downloadable game clip, addressed by the
 /// (gameKey, clipId) PAIR rather than a single id: four of the five games
@@ -100,7 +104,11 @@ public sealed record ContentGameItem(
     string AudioUrl,
     string Sha256,
     long SizeBytes,
-    bool Enabled);
+    bool Enabled)
+{
+    /// <inheritdoc cref="ContentStoryItem.Retired" />
+    public bool Retired { get; init; }
+}
 
 /// <summary>Slice E — one downloadable bedtime-music track.</summary>
 public sealed record ContentMusicItem(
@@ -110,12 +118,17 @@ public sealed record ContentMusicItem(
     string AudioUrl,
     string Sha256,
     long SizeBytes,
-    bool Enabled);
+    bool Enabled)
+{
+    /// <inheritdoc cref="ContentStoryItem.Retired" />
+    public bool Retired { get; init; }
+}
 
-/// <summary>One downloadable story-audio item. <c>Enabled=false</c> tells
-/// the device to remove its cached copy (retire) — the device may ignore
-/// this in the minimal slice, but the field is on the wire from day one so
-/// retirement never needs a contract change.</summary>
+/// <summary>One downloadable story-audio item. <c>Enabled=false</c> means
+/// "not offered right now" — same as the item being ABSENT from the list
+/// entirely — and a device holds onto a cached copy it already has
+/// forever in either case; one manifest response is not a retirement
+/// instruction (CLAUDE.md).</summary>
 public sealed record ContentStoryItem(
     string StoryId,
     int Version,
@@ -125,6 +138,29 @@ public sealed record ContentStoryItem(
     long SizeBytes,
     bool Enabled)
 {
+    /// <summary>Retirement (2026-09-11) — the one signal that IS a
+    /// retirement instruction: the device must drop this id from its
+    /// index and delete its cached file(s) (unless the story is paused
+    /// mid-way through right now — the firmware then spares it until the
+    /// session ends and retires it on the NEXT sync). Additive and
+    /// distinct from <see cref="Enabled"/> so a firmware build that
+    /// predates this field keeps its pre-existing "carry forward forever"
+    /// behavior — it simply never sees <c>retired:true</c> at all, the
+    /// same way it never saw <c>enabled:false</c> mean anything but
+    /// "skip".
+    /// <para>
+    /// A retired item is still emitted with a fully valid
+    /// <see cref="AudioUrl"/>/<see cref="Sha256"/>/<see cref="SizeBytes"/>
+    /// (never a stub) — a device that has never cached it and downloads
+    /// it anyway before retiring it costs nothing, and the firmware's
+    /// per-item validation would otherwise reject an empty URL/hash
+    /// before it ever read this flag. <see cref="Enabled"/> is set false
+    /// alongside it for the same reason retired content is also "not
+    /// offered": nothing new should ever download something already on
+    /// its way out.
+    /// </para></summary>
+    public bool Retired { get; init; }
+
     /// <summary>B2 — optional per-story clips (intro / question / summary),
     /// each downloaded and sha-verified like the narration and sharing the
     /// story's <c>Version</c>. Null/empty for stories that ship no clips;

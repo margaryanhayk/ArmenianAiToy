@@ -308,6 +308,7 @@ public sealed class ContentSyncOptions
                 AudioPath = ResolveAudioPath(AudioRoot, g.AudioPath),
                 Sha256 = g.Sha256,
                 SizeBytes = g.SizeBytes,
+                Retired = g.Retired,
             })
             .ToList();
 
@@ -324,6 +325,7 @@ public sealed class ContentSyncOptions
                 AudioPath = ResolveAudioPath(AudioRoot, v.AudioPath),
                 Sha256 = v.Sha256,
                 SizeBytes = v.SizeBytes,
+                Retired = v.Retired,
             })
             .ToList();
 
@@ -341,6 +343,7 @@ public sealed class ContentSyncOptions
                 AudioPath = ResolveAudioPath(AudioRoot, m.AudioPath),
                 Sha256 = m.Sha256,
                 SizeBytes = m.SizeBytes,
+                Retired = m.Retired,
             })
             .ToList();
 
@@ -412,6 +415,7 @@ public sealed class ContentSyncOptions
                     SeriesTitle = s.SeriesTitle,
                     SeriesIndex = s.SeriesIndex,
                     AltOf = s.AltOf,
+                    Retired = s.Retired,
                     Clips = s.Clips
                         .Select(c => new ContentSyncClipOptions
                         {
@@ -479,6 +483,18 @@ public sealed class ContentSyncStoryOptions
 
     /// <summary>Exact byte length of the MP3.</summary>
     public long SizeBytes { get; set; }
+
+    /// <summary>
+    /// Retirement (2026-09-11) — an operator hand-edit for a config-driven
+    /// story: <c>true</c> tells <c>ContentManifestService</c> to emit this
+    /// item with <c>retired:true</c> (and <c>enabled:false</c>) instead of
+    /// its ordinary entry, which tells a device to delete its cached copy
+    /// rather than carry it forward forever. See
+    /// <see cref="ArmenianAiToy.Application.DTOs.ContentStoryItem.Retired"/>
+    /// for the full contract. Additive; default <c>false</c> so every
+    /// existing config is unaffected.
+    /// </summary>
+    public bool Retired { get; set; }
 
     /// <summary>
     /// Serial support — the series this story is an EPISODE of (e.g.
@@ -577,6 +593,9 @@ public sealed class ContentSyncMusicOptions
     public string AudioPath { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
     public long SizeBytes { get; set; }
+
+    /// <inheritdoc cref="ContentSyncStoryOptions.Retired" />
+    public bool Retired { get; set; }
 }
 
 /// <summary>
@@ -612,6 +631,9 @@ public sealed class ContentSyncVoiceOptions
     public string AudioPath { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
     public long SizeBytes { get; set; }
+
+    /// <inheritdoc cref="ContentSyncStoryOptions.Retired" />
+    public bool Retired { get; set; }
 }
 
 /// <summary>
@@ -664,6 +686,9 @@ public sealed class ContentSyncGameOptions
     public string AudioPath { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
     public long SizeBytes { get; set; }
+
+    /// <inheritdoc cref="ContentSyncStoryOptions.Retired" />
+    public bool Retired { get; set; }
 }
 
 /// <summary>

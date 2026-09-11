@@ -250,6 +250,15 @@ static uint32_t s_story_offset = 0;
 // rather than a new state flag.
 static char s_current_story_id[CS_MAX_STORY_ID_LEN + 1] = "";
 
+// content_sync's retirement sweep (2026-09-11) needs exactly this one
+// fact — declared in story_select.h, defined here because the two
+// statics above are private to this file. Deleting a retired story's
+// file out from under a paused session would break resume and orphan
+// the playback position, so the sweep asks before it ever removes one.
+const char *story_select_paused_story_id() {
+    return s_story_offset > 0 ? s_current_story_id : "";
+}
+
 // --- Welcome flow: the child chose this story out loud -------
 // One-shot. Set with s_current_story_id just before handle_story_session,
 // consumed (and cleared) by story_pick_for_session so the very next press

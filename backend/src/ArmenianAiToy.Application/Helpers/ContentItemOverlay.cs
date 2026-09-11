@@ -47,7 +47,8 @@ public static class ContentItemOverlay
         int Version,
         string RelativePath,
         string Sha256,
-        long SizeBytes);
+        long SizeBytes,
+        bool Retired = false);
 
     /// <summary>
     /// The configured upload root as an absolute directory, or false when none
@@ -134,9 +135,12 @@ public static class ContentItemOverlay
     /// </summary>
     /// <param name="baseline">The config catalogue (the DI singleton).</param>
     /// <param name="items">The uploaded rows the caller has already decided
-    /// belong in this catalogue — non-retired, and either fleet-enabled or
-    /// explicitly allowed on the device being resolved. Empty / null returns
-    /// <paramref name="baseline"/> itself.</param>
+    /// belong in this catalogue — either fleet-enabled or explicitly allowed
+    /// on the device being resolved, OR retired (2026-09-11: a retired row is
+    /// no longer excluded here — it must still reach the manifest, with
+    /// <see cref="Item.Retired"/> set, so a device that cached it is told to
+    /// delete it). Empty / null returns <paramref name="baseline"/>
+    /// itself.</param>
     public static ContentSyncOptions Apply(
         ContentSyncOptions baseline, IEnumerable<Item>? items)
     {
@@ -192,6 +196,13 @@ public static class ContentItemOverlay
                 AudioPath = absolute,
                 Sha256 = item.Sha256 ?? string.Empty,
                 SizeBytes = item.SizeBytes,
+                // Retirement (2026-09-11) — carried through from the
+                // ContentItem row's RetiredAt (see ContentCatalogService),
+                // so ContentManifestService emits retired:true instead of
+                // silently dropping the item. A retired row is no longer
+                // filtered out of the query it came from — see that
+                // service's LoadItemsAsync doc comment.
+                Retired = item.Retired,
             });
         }
 
