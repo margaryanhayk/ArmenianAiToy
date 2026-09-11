@@ -5736,6 +5736,25 @@
       }
       counts.appendChild(tiles);
 
+      // Modes used today — small chips, same label mapping and chip class
+      // already used per-conversation (modeChipLabel / .chip-info), so a
+      // parent reads the same word for "story" here as on a conversation
+      // row below. Additive field; an older backend simply omits it.
+      var modesToday = Array.isArray(dto.modes) ? dto.modes : [];
+      if (modesToday.length > 0) {
+        var modesRow = document.createElement('div');
+        modesRow.className = 'today-modes';
+        modesRow.style.margin = '4px 0 2px';
+        modesToday.forEach(function (mo) {
+          var chip = document.createElement('span');
+          chip.className = 'chip chip-info';
+          chip.style.margin = '2px 6px 4px 0';
+          chip.textContent = modeChipLabel(mo);
+          modesRow.appendChild(chip);
+        });
+        counts.appendChild(modesRow);
+      }
+
       // Flagged — server pre-orders by latest-flagged-today timestamp
       // desc, caps at 3, and excludes today-clean conversations.
       if (flaggedRows.length > 0) {

@@ -312,6 +312,20 @@ public class ConversationService : IConversationService
         var assistantAudioCount = await todayMessages
             .CountAsync(m => m.Role == MessageRole.Assistant
                            && m.AudioBlobPath != null);
+        // Modes used today. Bounded vocabulary: Message.Mode is stamped only
+        // from DetectedMode.ToString().ToLowerInvariant() (ChatService), so
+        // this is always a subset of {"story","game","riddle","curiosity",
+        // "calm"} — never free text. Dedupe in memory rather than
+        // .Distinct().ToListAsync(), same caution as
+        // GetConversationSummariesAsync's Modes (see the comment there): the
+        // set is small (one device, one day), so no cost to staying
+        // consistent with that established idiom.
+        var modesToday = (await todayMessages
+                .Where(m => m.Mode != null)
+                .Select(m => m.Mode!)
+                .ToListAsync())
+            .Distinct()
+            .ToList();
 
         // Newest 3 conversations with today activity, by StartedAt desc.
         // Per-conversation rollups (MessageCountToday, FlaggedMessageCountToday)
@@ -400,7 +414,10 @@ public class ConversationService : IConversationService
             FlaggedMessagesCount: flaggedCount,
             AssistantMessagesWithAudio: assistantAudioCount,
             Newest: newest,
-            Flagged: flagged);
+            Flagged: flagged)
+        {
+            Modes = modesToday,
+        };
     }
 
     // E2.1 — resolution chain for the Today panel's effective timezone.

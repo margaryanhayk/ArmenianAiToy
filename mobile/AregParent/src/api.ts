@@ -251,6 +251,10 @@ export type TodaySummary = {
   messagesCount: number;
   flaggedMessagesCount: number;
   assistantMessagesWithAudio: number;
+  // Distinct Message.Mode values stamped among today's messages, bounded
+  // to 'story' | 'game' | 'riddle' | 'curiosity' | 'calm'. Optional so the
+  // app keeps working against a server older than this field (2026-09-11).
+  modes?: string[];
 };
 
 export type ConversationSummary = {
