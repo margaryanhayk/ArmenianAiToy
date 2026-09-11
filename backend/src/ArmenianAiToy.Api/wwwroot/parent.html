@@ -3835,8 +3835,10 @@
       // is where the product says "something is wrong". Without the second
       // clause the row reads a lone green "● Online" on a toy that has been
       // rebooting on a fault all night — which is exactly the reassurance this
-      // slice exists to stop giving. (It has no faultCode of its own yet:
-      // DeviceFaultCode maps only NoStorage → E-101. See the note below.)
+      // slice exists to stop giving. (crash_looping and sync_failed have
+      // carried their own faultCode — E-501 / E-401 — since 2026-09-11, so
+      // the OR is now belt-and-suspenders against an older backend rather
+      // than the only thing making this badge show.)
       if (d.faultCode || d.contentHealth === 'crash_looping') {
         var sb = document.createElement('span');
         sb.textContent = t('fault_chip');

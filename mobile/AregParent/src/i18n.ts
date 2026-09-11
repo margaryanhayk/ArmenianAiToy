@@ -88,6 +88,13 @@ const D = {
   // is exactly the reassurance this must not give. Says the state, never a
   // code: the sentence under the card carries what to do.
   fault_chip: { en: '⚠ Needs attention', ru: '⚠ Требуется внимание', hy: '⚠ Ուշադրություն է պետք' },
+  // Code only — no diagnosis, no repair instructions. Mirrors parent.html
+  // verbatim so a parent reads the same sentence on the phone and the web.
+  fault_help: {
+    en: 'Please contact support and give them this code:',
+    ru: 'Пожалуйста, свяжитесь с поддержкой и назовите этот код:',
+    hy: 'Խնդրում ենք կապվել աջակցման ծառայության հետ և ասել այս կոդը՝',
+  },
 
   // ---------- errors ----------
   e_generic: {

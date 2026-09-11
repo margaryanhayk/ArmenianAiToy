@@ -527,11 +527,25 @@ function DeviceCard({
         {/* A crash loop is a device fault, not a library fact, and this row
             is where the card says "something is wrong". Without it the row
             reads a lone green "Online" on a toy that has been rebooting on
-            a fault all night — the same defect caught in parent.html. */}
-        {device.contentHealth === 'crash_looping' ? (
+            a fault all night — the same defect caught in parent.html.
+            faultCode is the general case (mirrors parent.html's
+            `d.faultCode || d.contentHealth === 'crash_looping'`); the OR is
+            belt-and-suspenders against an older backend that has not sent
+            one yet. */}
+        {device.faultCode || device.contentHealth === 'crash_looping' ? (
           <Text style={styles.faultTag}>{t('fault_chip')}</Text>
         ) : null}
       </View>
+
+      {/* Code only — no diagnosis, no repair instructions. The parent reads
+          this to support, who decide what it means. Same posture and
+          placement (right under the badges) as parent.html. */}
+      {device.faultCode ? (
+        <Text style={styles.faultCodeLine}>
+          {t('fault_help') + ' '}
+          <Text style={styles.faultCodeValue}>{device.faultCode}</Text>
+        </Text>
+      ) : null}
 
       {childLine ? (
         <Text style={styles.children}>{childLine}</Text>
@@ -689,6 +703,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     overflow: 'hidden',
   },
+  faultCodeLine: { color: theme.danger, marginTop: 6, fontSize: 13, lineHeight: 19 },
+  faultCodeValue: { fontWeight: '700' },
   children: { color: theme.inkMuted, marginTop: 6 },
   libraryLine: { color: theme.inkMuted, marginTop: 6, fontSize: 13, lineHeight: 19 },
   // Something went wrong rather than "not finished yet", so it is coloured
