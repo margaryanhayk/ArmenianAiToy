@@ -99,7 +99,30 @@ public record LinkedDeviceDto(
     /// <summary>How many stories the library currently offers. Zero when
     /// content sync is disabled.</summary>
     public int StoriesAvailable { get; init; }
+
+    /// <summary>
+    /// Usage-tier metering foundation (2026-09-11). Null when
+    /// <c>Usage:Tiers:Enabled</c> is false (today's shipped default) — no
+    /// parent sees a usage line until an operator opts a fleet in. Never
+    /// carries a price or the word "limit"; see
+    /// <see cref="ArmenianAiToy.Application.DTOs.UsageSummaryDto"/>.
+    /// </summary>
+    public UsageSummaryDto? Usage { get; init; }
 }
+
+/// <summary>
+/// The parent-facing half of a device's usage-tier standing — deliberately
+/// narrower than <see cref="UsageAllowanceStatus"/> (no monthly figures, no
+/// dollar estimate): the brainstorm doc's constraint is that running out
+/// must never read as a bill, so this DTO can only ever say "N of M
+/// questions today". <c>AllowanceToday</c> null means the tier is uncapped
+/// on the daily axis (parent.html/mobile render no line at all in that
+/// case, same as a plan with no configured limit).
+/// </summary>
+public sealed record UsageSummaryDto(
+    string Tier,
+    int QuestionsToday,
+    int? AllowanceToday);
 
 public record LinkedDeviceChildDto(
     Guid ChildId,

@@ -711,6 +711,14 @@ window.openDevice = async function(id){
         <button class="ghost" onclick="issueClaimCode('${id}')">New pairing code</button>
         <span class="mut">operator action — a reason is required and audit-logged</span>
       </div>` : '';
+    // Usage-tier metering foundation (2026-09-11, ships behind
+    // Usage:Tiers:Enabled=false). The tier is always settable — an operator
+    // can stage a fleet's tiers before a flag flip — but has no effect on
+    // behavior until that flag is on. Same reason-prompt idiom as opAction.
+    const usageTierRow = d ? `<div class="row" style="margin-top:6px">
+        <span class="mut">usage tier <b class="mono">${esc(d.usageTier || 'free')}</b></span>
+        <button class="ghost" onclick="setUsageTier('${id}','${esc(d.usageTier || 'free')}')">Change tier</button>
+      </div>` : '';
     // Command history. The two questions it answers are the ones no other
     // surface can: did this toy ever POLL (status leaves Pending), and what
     // did it ACK. The ack diagnostics are free-form JSON by design — the
@@ -784,6 +792,7 @@ window.openDevice = async function(id){
       + head
       + syncDetail
       + actions
+      + usageTierRow
       + cmdRows
       + contentRows
       + `<div class="row mut" style="margin-top:14px">Conversations on this device — click to open in context.</div>`
@@ -811,6 +820,24 @@ window.opAction = async function(kind, id, value){
     await apiPost('/devices/'+id+'/'+kind, { value: value, reason: reason.trim() });
     _devices = (await api('/devices')).devices; // refresh cached flags
     openDevice(id);                             // re-render with the new state
+  } catch(e){ err(e.message); }
+};
+
+// Usage-tier metering foundation (2026-09-11, ships behind
+// Usage:Tiers:Enabled=false). Same reason-prompt idiom as opAction, but the
+// value is a tier NAME rather than a bool, and the endpoint 400s on a name
+// that isn't configured — surfaced as a plain error, not a confirm dialog.
+window.setUsageTier = async function(id, currentTier){
+  const tier = prompt('Usage tier for this toy (current: '+currentTier+'):', currentTier);
+  if (tier === null) return;                    // cancelled
+  if (!tier.trim()){ alert('A tier name is required.'); return; }
+  const reason = prompt('Reason for the change\n(required — recorded in the audit log):', '');
+  if (reason === null) return;
+  if (!reason.trim()){ alert('A reason is required.'); return; }
+  try {
+    await apiPost('/devices/'+id+'/tier', { tier: tier.trim(), reason: reason.trim() });
+    _devices = (await api('/devices')).devices;
+    openDevice(id);
   } catch(e){ err(e.message); }
 };
 

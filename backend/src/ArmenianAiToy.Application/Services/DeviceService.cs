@@ -14,11 +14,18 @@ public class DeviceService : IDeviceService
 {
     private readonly DbContext _db;
     private readonly ILogger<DeviceService> _logger;
+    private readonly UsageTiersOptions _usageTiersOptions;
 
-    public DeviceService(DbContext db, ILogger<DeviceService> logger)
+    // usageTiersOptions is OPTIONAL (default null → an all-off instance) so
+    // every existing call site — production DI and the six DeviceService
+    // test files that construct this directly — keeps compiling unchanged.
+    // Same idiom as InternalController's optional `sessions` parameter.
+    public DeviceService(
+        DbContext db, ILogger<DeviceService> logger, UsageTiersOptions? usageTiersOptions = null)
     {
         _db = db;
         _logger = logger;
+        _usageTiersOptions = usageTiersOptions ?? new UsageTiersOptions();
     }
 
     public async Task<DeviceRegistrationResponse?> RegisterDeviceAsync(
@@ -690,5 +697,55 @@ public class DeviceService : IDeviceService
         // Null override means inherit — fall through to device flag.
         return childOverride
             ?? await IsDeviceModeEnabledAsync(deviceId, mode);
+    }
+
+    public async Task RecordUsageQuestionAsync(Guid deviceId, decimal costUsd, DateTime nowUtc)
+    {
+        var dayUtc = nowUtc.Date;
+        var row = await _db.Set<DeviceUsageDay>()
+            .FirstOrDefaultAsync(u => u.DeviceId == deviceId && u.DayUtc == dayUtc);
+        if (row is null)
+        {
+            row = new DeviceUsageDay
+            {
+                Id = Guid.NewGuid(),
+                DeviceId = deviceId,
+                DayUtc = dayUtc,
+            };
+            _db.Set<DeviceUsageDay>().Add(row);
+        }
+        row.Questions += 1;
+        row.EstimatedUsd += costUsd < 0m ? 0m : costUsd;
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task<UsageAllowanceStatus> GetUsageAllowanceStatusAsync(Guid deviceId, DateTime nowUtc)
+    {
+        var tier = await _db.Set<Device>()
+            .Where(d => d.Id == deviceId)
+            .Select(d => d.UsageTier)
+            .FirstOrDefaultAsync();
+        if (string.IsNullOrWhiteSpace(tier))
+            tier = UsageTiersOptions.FreeTierName;
+
+        var dayUtc = nowUtc.Date;
+        var monthStartUtc = new DateTime(dayUtc.Year, dayUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var questionsToday = await _db.Set<DeviceUsageDay>()
+            .Where(u => u.DeviceId == deviceId && u.DayUtc == dayUtc)
+            .Select(u => (int?)u.Questions)
+            .FirstOrDefaultAsync() ?? 0;
+
+        var questionsThisMonth = await _db.Set<DeviceUsageDay>()
+            .Where(u => u.DeviceId == deviceId && u.DayUtc >= monthStartUtc && u.DayUtc <= dayUtc)
+            .Select(u => (int?)u.Questions)
+            .SumAsync() ?? 0;
+
+        var plan = UsageAllowance.Resolve(_usageTiersOptions, tier);
+        var exhausted = UsageAllowance.IsExhausted(plan, questionsToday, questionsThisMonth);
+
+        return new UsageAllowanceStatus(
+            tier, questionsToday, questionsThisMonth,
+            plan.QuestionsPerDay, plan.QuestionsPerMonth, exhausted);
     }
 }

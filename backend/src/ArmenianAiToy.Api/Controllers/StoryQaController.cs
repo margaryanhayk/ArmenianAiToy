@@ -89,6 +89,7 @@ public class StoryQaController : ControllerBase
     private readonly IWebHostEnvironment _env;
     private readonly IConfiguration _config;
     private readonly ILogger<StoryQaController> _logger;
+    private readonly UsageTiersOptions _usageTiersOptions;
 
     // Reflection-dialogue slice: optional (defaults null) so the many
     // pre-existing controller-constructing tests compile unchanged; a null
@@ -110,7 +111,8 @@ public class StoryQaController : ControllerBase
         IWebHostEnvironment env,
         IConfiguration config,
         ILogger<StoryQaController> logger,
-        ReflectionDialogueService? reflectionDialogue = null)
+        ReflectionDialogueService? reflectionDialogue = null,
+        UsageTiersOptions? usageTiersOptions = null)
     {
         _transcription = transcription;
         _synthesis = synthesis;
@@ -127,6 +129,7 @@ public class StoryQaController : ControllerBase
         _config = config;
         _logger = logger;
         _reflectionDialogue = reflectionDialogue;
+        _usageTiersOptions = usageTiersOptions ?? new UsageTiersOptions();
     }
 
     [HttpPost]
@@ -182,11 +185,24 @@ public class StoryQaController : ControllerBase
             return await CannedResultAsync(CannedVoiceClips.ModeDisabledKey, cancellationToken);
         }
 
-        // Per-device daily OpenAI cost cap — story-qa is the costliest path
-        // (STT + GPT + TTS), so it MUST be capped exactly like /api/chat/audio.
-        // Fires before STT so a runaway client cannot keep spending.
+        // Per-device daily OpenAI cost cap / usage-tier allowance —
+        // story-qa is the costliest path (STT + GPT + TTS), so it MUST be
+        // capped exactly like /api/chat/audio. Fires before STT so a
+        // runaway client cannot keep spending. Usage:Tiers:Enabled REPLACES
+        // the flat cap with the per-tier allowance — see ChatController.
         var costCapOpts = _costCapOptions.Value;
-        if (costCapOpts.Enabled)
+        var usageTiersOpts = _usageTiersOptions;
+        if (usageTiersOpts.Enabled)
+        {
+            var allowance = await _deviceService.GetUsageAllowanceStatusAsync(deviceId, DateTime.UtcNow);
+            if (allowance.IsExhausted)
+            {
+                AppMeter.UsageAllowanceExhausted.Add(1,
+                    new KeyValuePair<string, object?>("tier", allowance.Tier));
+                return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
+            }
+        }
+        else if (costCapOpts.Enabled)
         {
             var nowUtc = DateTime.UtcNow;
             // #022 — fleet-wide ceiling (kill-switch), opt-in (skipped when Global <= 0).
@@ -568,7 +584,9 @@ public class StoryQaController : ControllerBase
                 var chatCost = OpenAICostEstimator.EstimateChatCostUsdFromPrompt(
                     answerPromptChars, answerText);
                 var ttsCost = OpenAICostEstimator.EstimateTtsCostUsd(answerText);
-                _costMeter.Record(deviceId, sttCost + chatCost + ttsCost, DateTime.UtcNow);
+                var turnCost = sttCost + chatCost + ttsCost;
+                _costMeter.Record(deviceId, turnCost, DateTime.UtcNow);
+                await _deviceService.RecordUsageQuestionAsync(deviceId, turnCost, DateTime.UtcNow);
             }
             catch (Exception ex)
             {
@@ -779,10 +797,23 @@ public class StoryQaController : ControllerBase
             return await CannedResultAsync(CannedVoiceClips.ModeDisabledKey, cancellationToken);
         }
 
-        // Daily cost cap — cheaper than Ask() (STT only; ack + close TTS are
-        // cached after first render), but STT still costs, so cap it the same.
+        // Daily cost cap / usage-tier allowance — cheaper than Ask() (STT
+        // only; ack + close TTS are cached after first render), but STT
+        // still costs, so cap it the same. Usage:Tiers:Enabled REPLACES the
+        // flat cap with the per-tier allowance — see ChatController.
         var costCapOpts = _costCapOptions.Value;
-        if (costCapOpts.Enabled)
+        var usageTiersOpts = _usageTiersOptions;
+        if (usageTiersOpts.Enabled)
+        {
+            var allowance = await _deviceService.GetUsageAllowanceStatusAsync(deviceId, DateTime.UtcNow);
+            if (allowance.IsExhausted)
+            {
+                AppMeter.UsageAllowanceExhausted.Add(1,
+                    new KeyValuePair<string, object?>("tier", allowance.Tier));
+                return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
+            }
+        }
+        else if (costCapOpts.Enabled)
         {
             var nowUtc = DateTime.UtcNow;
             // #022 — fleet-wide ceiling (kill-switch), opt-in (skipped when Global <= 0).
@@ -1029,7 +1060,9 @@ public class StoryQaController : ControllerBase
                 // Zero when the reaction was skipped or the gate is off.
                 var chatCost = OpenAICostEstimator.EstimateChatCostUsdFromPrompt(
                     reactionPromptChars, reactionText);
-                _costMeter.Record(deviceId, sttCost + chatCost, DateTime.UtcNow);
+                var turnCost = sttCost + chatCost;
+                _costMeter.Record(deviceId, turnCost, DateTime.UtcNow);
+                await _deviceService.RecordUsageQuestionAsync(deviceId, turnCost, DateTime.UtcNow);
             }
             catch (Exception ex)
             {

@@ -142,6 +142,15 @@ public sealed record AdminDeviceDto(
     public string? FirmwareBuild { get; init; }
     public string? PartitionName { get; init; }
     public DateTime? FirmwareReportedAt { get; init; }
+
+    /// <summary>
+    /// Usage-tier metering foundation (2026-09-11). Always present (the
+    /// operator sets this whether or not <c>Usage:Tiers:Enabled</c> is on,
+    /// so the tier is ready before a fleet flips the flag) — unlike the
+    /// parent-facing <c>LinkedDeviceDto.Usage</c>, which stays null while
+    /// the flag is off.
+    /// </summary>
+    public string UsageTier { get; init; } = "free";
 }
 
 public sealed record AdminParentDto(
@@ -224,6 +233,15 @@ public sealed record InternalDeviceActionRequest(bool Value, string Reason);
 /// <summary>An operator action that carries no value of its own — only the
 /// mandatory reason that every console action must record.</summary>
 public sealed record InternalReasonRequest(string Reason);
+
+/// <summary>
+/// Usage-tier metering foundation (2026-09-11, ships behind
+/// <c>Usage:Tiers:Enabled</c>=false): set a device's tier. <c>Tier</c> must
+/// name a plan in <c>Usage:Tiers:Plans</c> (400 otherwise); <c>Reason</c> is
+/// required and audit-logged, same posture as every other console device
+/// action.
+/// </summary>
+public sealed record InternalSetUsageTierRequest(string Tier, string Reason);
 
 /// <summary>
 /// Per-toy content entitlement: give this toy this item

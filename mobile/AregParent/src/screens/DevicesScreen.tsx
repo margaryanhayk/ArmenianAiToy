@@ -547,6 +547,20 @@ function DeviceCard({
         </Text>
       ) : null}
 
+      {/* Usage-tier metering foundation (2026-09-11, ships behind
+          Usage:Tiers:Enabled=false). device.usage is only ever present when
+          the backend flag is on — invisible today by construction, not by
+          a client check. allowanceToday null (an uncapped tier) renders
+          nothing, mirroring parent.html. Never a price, never "limit". */}
+      {device.usage && device.usage.allowanceToday != null ? (
+        <Text style={styles.usageLine}>
+          {tf('usage_questions_today', {
+            today: device.usage.questionsToday,
+            allowance: device.usage.allowanceToday,
+          })}
+        </Text>
+      ) : null}
+
       {childLine ? (
         <Text style={styles.children}>{childLine}</Text>
       ) : (
@@ -705,6 +719,7 @@ const styles = StyleSheet.create({
   },
   faultCodeLine: { color: theme.danger, marginTop: 6, fontSize: 13, lineHeight: 19 },
   faultCodeValue: { fontWeight: '700' },
+  usageLine: { color: theme.inkMuted, marginTop: 6, fontSize: 13, lineHeight: 19 },
   children: { color: theme.inkMuted, marginTop: 6 },
   libraryLine: { color: theme.inkMuted, marginTop: 6, fontSize: 13, lineHeight: 19 },
   // Something went wrong rather than "not finished yet", so it is coloured

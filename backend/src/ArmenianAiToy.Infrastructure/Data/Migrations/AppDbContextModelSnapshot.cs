@@ -314,6 +314,10 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                         .HasColumnType("TEXT")
                         .HasDefaultValue("Asia/Yerevan");
 
+                    b.Property<string>("UsageTier")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("VariantEndingsEnabled")
                         .HasColumnType("INTEGER");
 
@@ -460,6 +464,32 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("DeviceInvites");
+                });
+
+            modelBuilder.Entity("ArmenianAiToy.Domain.Entities.DeviceUsageDay", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("DayUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("EstimatedUsd")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Questions")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId", "DayUtc")
+                        .IsUnique();
+
+                    b.ToTable("DeviceUsageDays");
                 });
 
             modelBuilder.Entity("ArmenianAiToy.Domain.Entities.GamePlay", b =>
@@ -843,6 +873,17 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                 });
 
             modelBuilder.Entity("ArmenianAiToy.Domain.Entities.DeviceInvite", b =>
+                {
+                    b.HasOne("ArmenianAiToy.Domain.Entities.Device", "Device")
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Device");
+                });
+
+            modelBuilder.Entity("ArmenianAiToy.Domain.Entities.DeviceUsageDay", b =>
                 {
                     b.HasOne("ArmenianAiToy.Domain.Entities.Device", "Device")
                         .WithMany()

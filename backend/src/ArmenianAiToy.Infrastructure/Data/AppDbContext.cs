@@ -25,6 +25,7 @@ public class AppDbContext : DbContext
     public DbSet<DeviceInvite> DeviceInvites => Set<DeviceInvite>();
     public DbSet<DeviceContentOverride> DeviceContentOverrides => Set<DeviceContentOverride>();
     public DbSet<ContentItem> ContentItems => Set<ContentItem>();
+    public DbSet<DeviceUsageDay> DeviceUsageDays => Set<DeviceUsageDay>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -268,6 +269,23 @@ public class AppDbContext : DbContext
             e.HasKey(r => r.Id);
             e.HasIndex(r => r.ParentId);
             e.HasIndex(r => new { r.Status, r.CreatedAtUtc });
+        });
+
+        // DeviceUsageDay — usage-tier metering foundation (2026-09-11,
+        // ships behind Usage:Tiers:Enabled=false). One upserted row per
+        // (DeviceId, DayUtc), same FK-cascade posture as StoryPlay/GamePlay
+        // (usage history is parent-facing activity data, not audit
+        // material, so it dies with the device). The unique (DeviceId,
+        // DayUtc) index is the upsert key the cost-recording call site
+        // reads-then-writes against.
+        modelBuilder.Entity<DeviceUsageDay>(e =>
+        {
+            e.HasKey(u => u.Id);
+            e.HasOne(u => u.Device)
+                .WithMany()
+                .HasForeignKey(u => u.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(u => new { u.DeviceId, u.DayUtc }).IsUnique();
         });
     }
 }

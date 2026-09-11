@@ -1731,6 +1731,16 @@
       state_revoked: { en: 'Access revoked', ru: 'Доступ отозван', hy: 'Մուտքը կասեցված է' },
       state_dormant: { en: 'Not seen recently', ru: 'Давно не в сети', hy: 'Վաղուց առցանց չի եղել' },
       bedtime_chip: { en: 'Bedtime', ru: 'Сон', hy: 'Քնի ժամ' },
+      // Usage-tier metering foundation (2026-09-11, ships behind
+      // Usage:Tiers:Enabled=false) — rendered only when the backend sends
+      // d.usage (never a price, never the word "limit"). Placeholder order
+      // is reversed in Armenian on purpose — see the review note this key
+      // was drafted against.
+      usage_questions_today: {
+        en: '{today} of {allowance} questions today',
+        ru: '{today} из {allowance} вопросов сегодня',
+        hy: 'Այսօր՝ {allowance}-ից {today} հարց',
+      },
       bedtime_music_inactive: { en: 'On, but nothing will play — set a bedtime window below.', ru: 'Включено, но играть нечего — задайте часы сна ниже.', hy: 'Միացված է, բայց ոչինչ չի հնչի — ներքևում նշեք քնի ժամերը։' },
       no_devices: { en: 'No toys linked yet. Add one with the pairing code from its box.', ru: 'Игрушек пока нет. Добавьте игрушку кодом привязки с коробки.', hy: 'Խաղալիքներ դեռ չկան։ Ավելացրեք ձեր խաղալիքը տուփի կապակցման կոդով։' },
       no_convos: { en: 'No conversations yet. They appear here after your child talks to the toy.', ru: 'Разговоров пока нет. Они появятся, когда ребёнок поговорит с игрушкой.', hy: 'Զրույցներ դեռ չկան։ Դրանք կհայտնվեն, երբ ձեր երեխան խոսի խաղալիքի հետ։' },
@@ -4086,6 +4096,22 @@
               '–' + d.bedtimeEnd.substring(0, 5);
             bedtimeBadge.className = 'chip chip-info';
             btn.appendChild(bedtimeBadge);
+          }
+
+          // Usage-tier metering foundation (2026-09-11) — d.usage is only
+          // ever present when Usage:Tiers:Enabled is on server-side, so
+          // this chip is invisible today by construction, not by a client
+          // check. AllowanceToday null (an uncapped tier) renders nothing,
+          // same as a plan with no configured limit — never "N of null".
+          // Never a price, never the word "limit".
+          if (d.usage && d.usage.allowanceToday != null) {
+            var usageBadge = document.createElement('div');
+            usageBadge.textContent = tf('usage_questions_today', {
+              today: d.usage.questionsToday,
+              allowance: d.usage.allowanceToday,
+            });
+            usageBadge.className = 'chip chip-info';
+            btn.appendChild(usageBadge);
           }
 
           // Dormant-device observational badge. Reporting-only — the

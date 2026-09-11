@@ -298,6 +298,21 @@ public class Device
     /// </summary>
     public DateTime? DormancyWarnedAt { get; set; }
 
+    /// <summary>
+    /// Usage-tier METERING FOUNDATION (2026-09-11, shipped behind
+    /// <c>Usage:Tiers:Enabled</c>, default OFF). The tier name this device
+    /// is entitled to, resolved against <c>Usage:Tiers:Plans</c> config by
+    /// <c>UsageAllowance</c>. Defaults to <c>UsageTiersOptions.FreeTierName</c>
+    /// ("free") — every existing and newly-registered device starts on the
+    /// free tier;
+    /// nothing about a price is decided here (see
+    /// <c>docs/usage-tiers-brainstorm.md</c>). While the flag is off this
+    /// column is written and read by nothing on the request path — set only
+    /// by the operator endpoint <c>POST /api/internal/devices/{id}/tier</c>,
+    /// which itself has no effect on behavior until the flag flips.
+    /// </summary>
+    public string UsageTier { get; set; } = "free";
+
     public ICollection<Conversation> Conversations { get; set; } = new List<Conversation>();
     public ICollection<ParentDevice> ParentDevices { get; set; } = new List<ParentDevice>();
 }

@@ -74,6 +74,15 @@ export type LinkedDevice = {
   // parent.html's `d.faultCode` — never a diagnosis, just a code. Optional
   // for the same older-backend reason as contentHealth above.
   faultCode?: string;
+  // Usage-tier metering foundation (2026-09-11, ships behind
+  // Usage:Tiers:Enabled=false). Absent/undefined while the flag is off —
+  // same optionality contract as contentHealth/faultCode above. Never a
+  // price, never the word "limit". Mirrors parent.html's `d.usage`.
+  usage?: {
+    tier: string;
+    questionsToday: number;
+    allowanceToday: number | null;
+  };
 };
 
 export type ModeFlags = {

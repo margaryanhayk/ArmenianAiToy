@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 2871 tests, ~35 s in Release
+dotnet test            # 2921 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -154,8 +154,9 @@ Unknown values refuse boot. Moderation stays on OpenAI, fail-closed.
   story plays + reflection answers, story requests, audit feed, export.
 - **Internal** (`/api/internal/*`): overview, devices, parents, stories,
   flagged, conversations, audit, backup pull, story-qa test playground,
-  reversible device actions (revoke, pause, claim code, sync now, enqueue
-  command), per-toy content entitlement, story upload/release/retire.
+  reversible device actions (revoke, pause, usage tier, claim code, sync
+  now, enqueue command), per-toy content entitlement, story upload/release/
+  retire.
 - **Ops**: `/api/health` (DB-only liveness, non-fatal `openai` field),
   `/metrics` (fail-closed bearer), JSON console logs, OTel counters with
   bounded tags, daily SQLite snapshots + upload-root archive, retention purge
@@ -238,13 +239,17 @@ see the subsection below); durable child audio (backend fails closed and
 tests green — see the subsection below — but `Audio__BlobStoreRoot` still
 needs to actually be SET on Railway for the durability guarantee to hold;
 until then voice chat refuses with 503 instead of losing recordings
-silently, which is the point, but it is not yet a working deployment).
+silently, which is the point, but it is not yet a working deployment);
+usage-tier metering foundation (backend done, tests green — see the
+subsection below — shipped behind `Usage:Tiers:Enabled=false`, so today's
+flat daily cost cap keeps governing every device until an operator opts a
+fleet in; nothing about a price has been decided).
 
 Still to implement: a `sound-detective` firmware game (backend content
 ready — 21 clips already in `ContentSync:Games` — no engine written); two
 Simon tone clips (`tone-green` / `tone-red`, not yet rendered); render
 variant endings + serial; music tracks; narrator PVC; rev-A PCB routing +
-speaker test + order; usage tiers.
+speaker test + order.
 
 ### Online Game/Riddle/Curiosity/Calm voice contract (2026-09-11)
 
@@ -488,6 +493,60 @@ Backend: `dotnet build` / `dotnet test` green (2871 tests). NOT verified:
 the mobile app was not built or run (no toolchain in this container, per
 `mobile/AregParent/AGENTS.md`) — the new fault codes and mode chips have
 not been seen on a phone or in a browser.
+
+### Usage-tier metering foundation (2026-09-11)
+
+The machinery for `docs/usage-tiers-brainstorm.md` §6 steps 1 and 3 (fix
+the counter, make it durable), shipped as pure plumbing behind
+`Usage:Tiers:Enabled` (default **false**). Nothing about a price, a tier
+number, or when tiers ship to production is decided here — that stays the
+owner's, per the brainstorm doc's own recommendation (shape A now, shape D
+later).
+
+**Flag off (today's shipped state): byte-identical.** The flat per-device
+daily `OpenAI:DailyCostCap` dollar cap keeps governing chat, `/api/chat/
+audio`, and both story-qa voice endpoints exactly as before; the per-tier
+allowance is never even queried. Pinned by test on all four gate sites.
+
+**What exists, inert until flipped:** `Device.UsageTier` (string, defaults
+`"free"`, hand-written migration `20260911140000_AddUsageTiers`); per-tier
+allowances in `Usage:Tiers:Plans` config (name + questions/day + questions/
+month, each cap independently optional); the pure `UsageAllowance` helper
+that resolves a tier's effective allowance (falling back to `free`, then to
+the first configured plan, so a renamed/removed plan can never strand a
+device on an unbounded allowance); an additive `DeviceUsageDay` table
+(device × UTC day → question count + estimated USD) upserted wherever the
+existing cost estimator already records a turn — **written unconditionally**,
+independent of the flag, so the counter is honest before anyone turns
+gating on. When the flag is on, an exhausted allowance replaces the flat
+cap in the gate and the child hears the SAME existing daily-cap canned
+clip — no new copy, no number, no word for "limit" reaches the toy.
+
+**Parent surface**, flag-gated, never a price: `LinkedDeviceDto.usage`
+(`{ tier, questionsToday, allowanceToday }`, null when the flag is off,
+pinned) renders as one line — "N of M questions today" — under the toy
+card on `parent.html` and the Expo app's `DevicesScreen`, trilingual copy
+reviewed by the armenian-story-master agent (Armenian places the numbers
+in reversed order from English/Russian — the natural word order for the
+language, not a bug).
+
+**Operator surface:** `POST /api/internal/devices/{id}/tier` (reason +
+audit, idempotent, 400 on a tier name outside `Usage:Tiers:Plans`) sets a
+device's tier regardless of the flag, so a fleet's tiers can be staged
+before it flips; `admin.html`'s device drill-down gained a matching
+"Change tier" control, same reason-prompt idiom as pause/revoke.
+
+**Metric** `aat_usage_allowance_exhausted_total{tier}` (bounded tag — the
+configured plan-name vocabulary, never a device id) fires only on the
+flag-on exhaustion path; the existing `aat_openai_cost_cap_trip_total`
+keeps recording every flat-cap trip on the flag-off path, unchanged.
+
+Backend fully compile- and test-verified (`dotnet build`/`dotnet test`
+green, 50 new tests; migration verified by booting the API against a
+throwaway SQLite DB and reading the produced schema). NOT verified: the
+mobile app was not built or run (same standing limitation as every other
+mobile change in this file) — the new usage line has not been seen on a
+phone; no fleet has ever had the flag turned on.
 
 ## Working in this repo (agents)
 
