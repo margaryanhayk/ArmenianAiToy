@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 2841 tests, ~35 s in Release
+dotnet test            # 2871 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -442,6 +442,52 @@ Backend fully compile- and test-verified (`dotnet build`/`dotnet test`
 green, new resolver/backup/endpoint tests). NOT verified: an operator
 actually setting `Audio__BlobStoreRoot` on a live Railway instance, or the
 dashboard control against a real browser session.
+
+### Loose ends — fault codes, modes-today, dev-harness gate, doc fixes (2026-09-11)
+
+Seven small deferred items, closed together:
+
+- **Parent-visible fault codes for `sync_failed`/`crash_looping`.**
+  `DeviceFaultCode` gains `E-401` (library sync failed) and `E-501`
+  (crash-looping), combined via `FromHealth` (crash-looping ranks
+  highest). Surfaced through the existing `faultCode` mechanism already
+  wired into parent.html and admin.html; added to mobile for the first
+  time (`api.ts`, `DevicesScreen.tsx`, new `fault_help` i18n key) — mobile
+  previously showed no fault code at all, not even E-101.
+- **"Modes used today."** `GET /api/conversations/today-summary` gains
+  additive `modes` (distinct `Message.Mode` values today, bounded to the
+  five modes), rendered as chips on parent.html's Today panel and
+  mobile's Today card (new `mode_calm` i18n key there). `ChildId` /
+  `AudioBlobPath` absence stays pinned.
+- **`/api/story-qa-text` dev-harness gate.** `StoryQaTextDevGate`
+  middleware now runs before routing/model binding (same pre-routing
+  pattern as `/metrics`, `/api/internal/*`), so a malformed or bodyless
+  request outside Development gets the same 404 as a well-formed one —
+  closing the gap `docs/CLAUDE-history.md` § "Story Q&A text harness"
+  recorded as known-and-accepted. Controller's own check kept as defense
+  in depth.
+- **CLAUDE-history.md correction.** § "Story cast" and § "The voice Areg
+  speaks in" each gain a one-line note that `areg-storyteller` is an
+  ElevenLabs INSTANT clone, not a PVC — this file already said so; the
+  archive did not.
+- **Heartbeat `resetReason`/`bootCount` in admin.html** — checked,
+  already fully wired (list + drill-down banners); nothing to add.
+- **`anban-huri` source-fidelity re-check** — report only, no story text
+  edited: `tools/quality-evidence/anban-huri-source-fidelity-20260911.md`
+  finds the runtime text no longer byte-matches the 2026-07-27 pinned
+  snapshot (`Հուռնին` → `Հուռուն`, two spots — the same dialect/standard
+  difference class as the 19 already catalogued there), with no
+  repository record explaining the edit. Owner decision plus an
+  evidence-artifact regeneration is recommended, not made.
+- **`manifest.webmanifest`.** Icons and `start_url` still resolve
+  correctly; fixed one drift from documented intent — `theme_color` no
+  longer matched the header's `<meta name="theme-color">` pixel for
+  pixel.
+
+Backend: `dotnet build` / `dotnet test` green (2871 tests). NOT verified:
+the mobile app was not built or run (no toolchain in this container, per
+`mobile/AregParent/AGENTS.md`) — the new fault codes and mode chips have
+not been seen on a phone or in a browser.
 
 ## Working in this repo (agents)
 
