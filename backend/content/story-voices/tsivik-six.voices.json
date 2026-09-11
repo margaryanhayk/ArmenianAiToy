@@ -1,0 +1,86 @@
+{
+  "storyId": "tsivik-six",
+  "title": "Ծովը",
+  "_status": "DRAFT — text approved by the owner 2026-08-13 (tsivik-series.json blanket approval); NOT rendered, NOT listen-tested. Cast assignment for stork/crow/putik/alik is a first pass by this slice, flagged CASTING OPEN FOR OWNER EAR in each speaker's note — unlike narrator/Ծիվիկ/Տատիկ, which reuse the exact standing-cast voice+settings already approved on Ուլիկը.",
+  "_why": "Mirrors the standing cast-per-role convention (CLAUDE.md § Story cast): narrator stays areg-storyteller on eleven_v3, every character on eleven_v3_conversational.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with — same reasoning as every other story's narrator entry."
+    },
+    "tsivik": {
+      "role": "Ծիվիկը, մի փոքրիկ ծիծեռնակ",
+      "pitch": 1.0,
+      "directionForHumanNarrator": "small young swallow, bright, a little unsure at first, then excited and warm",
+      "voiceSettings": {
+        "stability": 0.4,
+        "similarity_boost": 0.8,
+        "style": 0.45
+      },
+      "voiceId": "PgFHHZMKb19tJbjBe6aY",
+      "voiceName": "vardan-v2",
+      "modelId": "eleven_v3_conversational",
+      "note": "Same voice and settings as Ուլիկը's title role — the standing 'young animal hero' cast, unshifted."
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Դեռ արևը նոր էր բարձրանում, երբ Ծիվիկը թռավ լճի վրայով՝ աղի քամու ետևից։ Նա թռչում էր ամբողջ օրը՝ բլուրների, ձորերի, ծաղկած դաշտերի վրայով։ Քամին գնալով ավելի աղի էր դառնում, ավելի թարմ։ Եվ հանկարծ Ծիվիկը լսեց… երգը։ Շը-շը, շը-շը։ Նույն երգը, որ տատիկը երգում էր հին տան կտուրի տակ։ Սրտիկը սկսեց արագ-արագ բաբախել։ Նա բարձրացավ վերջին բլուրի վրայով և… կանգ առավ օդի մեջ։ Նրա առաջ, մինչև երկնքի ծայրը, փռված էր ծովը։ Կապույտ էր, այնքա՜ն կապույտ, որ երկինքը նրա կողքին գունատ էր թվում։ Ալիքները գալիս էին ափին ու երգում՝ շը-շը, շը-շը։ Իսկ ջրի վրա արևը փայլում էր հազար ոսկե կայծիկով՝ ճիշտ այնպես, ինչպես տատիկն էր պատմել։ "
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Ծո՜վը,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— շշնջաց Ծիվիկը։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "tsivik",
+          "text": "— Ես հասա՜։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Նա իջավ ցած ու թռավ ալիքների վրայով։ Ջրի կաթիլները թռչում էին վեր ու գույնզգույն փայլում արևի տակ։ Ծիվիկը ծիծաղում էր ու պտտվում օդի մեջ։ Հետո նստեց ափի մի տաք քարի վրա ու երկար նայեց ծովին։ Եվ հանկարծ հասկացավ մի բան։ Նա այստեղ հասավ ոչ միայն իր թևիկներով։ Տատիկը նրան երազանք տվեց։ Արագիլը սովորեցրեց վստահել քամուն։ Պուտիկը ցույց տվեց ամպերի սարը։ Ծեր ագռավը գտավ տաք կածանը։ Ալիկը նվիրեց աղի քամու գաղտնիքը։ Փոքրիկ թևերը մեծ ճանապարհ անցան, որովհետև ճանապարհին բարի սրտեր կային։ Ծիվիկը վեր կացավ ու բարձր, ուրախ ծիվ-ծիվ արեց՝ շնորհակալություն բոլորին։ Ծովը պատասխանեց իր երգով՝ շը-շը, շը-շը։ Նրանք երկար երգեցին միասին՝ փոքրիկ ծիծեռնակը և մեծ ծովը։ Իսկ երբ արևը սկսեց իջնել ալիքների մեջ, Ծիվիկը մտածեց տան մասին։ Հին կտուրը, տատիկը, թոռնիկները… Նրանք դեռ չգիտեն, թե ինչ գեղեցիկ է ծովը։ "
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Ես կվերադառնամ ու ամեն ինչ կպատմեմ,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— որոշեց Ծիվիկը։"
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Ամենամեծ ուրախությունը տեսած հրաշքը սիրելի սրտերի հետ կիսելն է։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Նա նայեց ետ՝ անցած երկար ճանապարհին, ու ժպտաց։ Տուն տանող ճամփան լի է ընկերներով։ Իսկ փոքրիկ թևերի համար աշխարհում դեռ շա՜տ մեծ ճանապարհներ կան։"
+        }
+      ]
+    }
+  ],
+  "_renderRule": "Render order for the sample-first listen test (per tsivik-series.json _renderNote): the refrain (series-refrain), episode one, the closing clip (series-closing) — verify «Ծիվի́կ» before batching the rest.",
+  "_cast": "Episode 6: narrator=areg-storyteller, tsivik=vardan-v2"
+}

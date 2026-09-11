@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 2921 tests, ~35 s in Release
+dotnet test            # 2929 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -227,8 +227,10 @@ the toy (backend done, firmware online chat loop written and compile-
 verified, never bench-flashed — see the subsection below); offline games
 (compiled into every build since 2026-08-19, round-robin + play reporting
 wired 2026-09-11, never bench-flashed — see the subsection below);
-mid-story shout pauses (never bench-run); variant endings and serial (no
-audio); bedtime music (no tracks); hold-to-menu (unverified by hand, not
+mid-story shout pauses (never bench-run); variant endings and the Tsivik
+serial (drafts + speaker maps + placeholder ContentSync rows prepared
+2026-09-11 — see the subsection below — still no rendered audio, no
+promoted episodes, no listen test); bedtime music (no tracks); hold-to-menu (unverified by hand, not
 staged for OTA); streaming Q&A firmware flag off; mobile app has a
 documented, partially-exercised local Android build recipe but still no
 verified APK or on-device run (see the subsection below); listen tests of
@@ -250,8 +252,9 @@ fleet in; nothing about a price has been decided).
 Still to implement: a `sound-detective` firmware game (backend content
 ready — 21 clips already in `ContentSync:Games` — no engine written); two
 Simon tone clips (`tone-green` / `tone-red`, not yet rendered); render
-variant endings + serial; music tracks; narrator PVC; rev-A PCB routing +
-speaker test + order.
+variant endings + serial (inputs prepared, see below — the render itself
+is still open); music tracks; narrator PVC; rev-A PCB routing + speaker
+test + order.
 
 ### Online Game/Riddle/Curiosity/Calm voice contract (2026-09-11)
 
@@ -587,6 +590,52 @@ requests, modes-today chips, the usage line) was already present and wired.
 `npx tsc --noEmit` is clean; the project has no lint config and no test
 suite. NOT verified: none of this has run in a built app on a device —
 same standing mobile limitation as every entry above.
+
+### Variant endings + Tsivik serial — render inputs prepared (2026-09-11)
+
+`ELEVENLABS_API_KEY` unset this session, so this slice prepares and
+validates every input the render pipeline needs without spending
+anything. Full detail: `docs/variant-endings-serial-render-runbook.md`,
+`tools/quality-evidence/variant-endings-serial-prep-20260911.md`.
+
+**Variant endings.** Verified against `story_select.cpp` (not guessed):
+an alt plays as the WHOLE narration for a re-listen session, and
+reflection dialogue always resolves by the BASE story id — so an alt
+needs no `*.story.json` of its own, only a speaker map. All 10
+`backend/content/story-voices/<id>-alt.voices.json` copy their base
+story's segments verbatim and append one new final segment for the
+owner-approved `endingText`, dialogue-split by hand against the text.
+
+**Tsivik serial.** Six `backend/content/story-drafts/tsivik-{one..six}
+.story.json` — episode body text byte-identical to the owner-approved
+`tsivik-series.json`, re-segmented for TTS/ambience (verified by
+reconstruction, no word touched); goal/lesson/reflection metadata is NEW
+text pending armenian-story-master + owner review. **Deliberately NOT
+promoted to `Stories/Content/`**: that embedding loader hard-requires
+`review.status: "approved"` with a real `listenTestAt` for every file
+under it, unconditionally, so an unlisten-tested episode there would
+crash the whole app at startup — not just this feature. Matching
+`backend/content/story-voices/tsivik-*.voices.json` cast: Ծիվիկ/Տատիկ
+reuse exact standing-cast settings (Ուլիկ/old-woman precedents); the four
+new supporting characters are a first pass flagged "CASTING OPEN FOR
+OWNER EAR".
+
+`tools/story-voices/check_speaker_map.py` and
+`tools/story-audio/check_ambience_anchors.py` were extended to validate
+both shapes (drafts via a `story-drafts/` fallback; alts via
+`[base segments] + [endingText]` instead of a story file) — both PASS
+(26 maps, 34 cues). 16 placeholder `ContentSync:Stories` rows appended
+(`SizeBytes: 0`, dropped before the manifest ever reaches `AltOf`/series
+resolution — same posture as every other unaudited story row), pinned by
+the existing `ShippedConfig_AdvertisesExactlyTheStoriesThatHaveAudio`
+test plus a new narrower one guarding `AltOf`/`SeriesIndex` typos.
+`dotnet build`/`dotnet test` green (2929 tests). **Known gap surfaced,
+not fixed**: several owner-approved episode bodies use `…` (ellipsis),
+outside the TTS-safe whitelist — invisible today (drafts are not linted),
+will fail at promotion, needs an owner call before then. NOT done: any
+render, any promotion, any listen test, ambience for two episodes and all
+10 alts, the `serialnext`/series-refrain clip tooling gap (documented,
+not built).
 
 ## Working in this repo (agents)
 

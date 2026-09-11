@@ -1,0 +1,89 @@
+{
+  "storyId": "hedgehog-apple-alt",
+  "altOf": "hedgehog-apple",
+  "title": "Ոզնիկն ու խնձորը — այլընտրանքային ավարտ",
+  "_status": "DRAFT — ending TEXT approved by the owner 2026-08-13 (variant-endings.json blanket approval, \"I approve all\"); NOT rendered, NOT listen-tested. The base narration segments below are COPIED VERBATIM from hedgehog-apple.voices.json (byte-identical spans — same speakers, same text, same settings) so the render can reuse the already-approved takes where a take-cache allows it; only the final segment (the graft) is new.",
+  "_why": "AltOf contract (ContentSyncStoryOptions.AltOf, story_select.cpp): the alt ships as a FULL standalone narration file — the base story's segments 0..2 unchanged, plus one new final segment holding the alternate ending, grafted immediately after the base story's existing final line (afterLine, verified byte-exact against the shipped story text). Not embedded as a curated story: the device always tracks the BASE story id for rotation, the heard-set and reflection dialogue — see docs/variant-endings-serial-render-runbook.md.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with (the Ուլիկը pilot showed eleven_v3_conversational lets sentence endings fall away). Characters use the conversational model."
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Անտառում ապրում էր մի փոքրիկ ոզնիկ։ Մի առավոտ նա գտավ մի մեծ կարմիր խնձոր։ Խնձորը շատ համով էր երևում։ Բայց խնձորը ծանր էր, շատ ծանր։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Ոզնիկը կանչեց իր ընկեր նապաստակին։ Նրանք միասին գլորեցին խնձորը։ Խնձորը դանդաղ գլորվեց մինչև ոզնիկի տնակը։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Ոզնիկն ու նապաստակը միասին կերան խնձորը։ Խնձորն իսկապես շատ քաղցր էր։ Հետո նրանք նստեցին ծառի տակ։ Անտառում խաղաղ էր ու հանգիստ։"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Ոզնիկը և նապաստակը նստած էին ծառի տակ՝ կուշտ ու գոհ։ Հանկարծ ոզնիկը խոտերի մեջ մի բան նկատեց՝ խնձորի փայլուն սերմիկներ։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "— Եկ դրանք հողի մեջ դնենք,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց նապաստակը։ Նրանք միասին մի փոքրիկ փոս փորեցին, սերմիկները դրեցին ու առվակից ջուր բերեցին։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "— Հիմա կսպասենք,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց ոզնիկը։ Ամեն օր ընկերները գալիս էին, ջրում ու նայում։ Եվ մի առավոտ հողից դուրս եկավ մի կանաչ ծիլիկ։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "— Սա մեր ծառն է,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ուրախացավ նապաստակը։"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— Մի օր սրա խնձորները բոլորին կհերիքեն։ Ընկերները ժպտացին իրար։ Միասին արված գործը քաղցր է, իսկ միասին ցանած սերմիկը՝ ամենաքաղցրը։"
+        }
+      ]
+    }
+  ]
+}

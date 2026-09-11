@@ -1,0 +1,88 @@
+{
+  "storyId": "three-piglets-alt",
+  "altOf": "three-piglets",
+  "title": "Երեք խոզուկները — այլընտրանքային ավարտ",
+  "_status": "DRAFT — ending TEXT approved by the owner 2026-08-13 (variant-endings.json blanket approval, \"I approve all\"); NOT rendered, NOT listen-tested. The base narration segments below are COPIED VERBATIM from three-piglets.voices.json (byte-identical spans — same speakers, same text, same settings) so the render can reuse the already-approved takes where a take-cache allows it; only the final segment (the graft) is new.",
+  "_why": "AltOf contract (ContentSyncStoryOptions.AltOf, story_select.cpp): the alt ships as a FULL standalone narration file — the base story's segments 0..5 unchanged, plus one new final segment holding the alternate ending, grafted immediately after the base story's existing final line (afterLine, verified byte-exact against the shipped story text). Not embedded as a curated story: the device always tracks the BASE story id for rotation, the heard-set and reflection dialogue — see docs/variant-endings-serial-render-runbook.md.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with (the Ուլիկը pilot showed eleven_v3_conversational lets sentence endings fall away). Characters use the conversational model."
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Լինում են, չեն լինում՝ երեք խոզուկ եղբայրներ՝ Նիֆ-Նիֆը, Նաֆ-Նաֆը և կրտսերը՝ Նուֆ-Նուֆը։ Ամբողջ ամառ նրանք ուրախ խաղում էին անտառի եզրին։ Ուտելիքն առատ էր, եղանակը՝ տաք։ Թվում էր՝ ամառը երբեք չի վերջանա։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Աշնանը տերևները սկսեցին թափվել։ Նուֆ-Նուֆն ասաց, որ ժամանակն է տներ շինել։ Եղբայրները ծիծաղեցին ու շարունակեցին խաղալ։ Իսկ Նուֆ-Նուֆը քարեր բերեց ու սկսեց քարե տուն շինել՝ ամուր դռնով ու ծխնելույզով։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Երբ եկան առաջին անձրևները, եղբայրներն էլ գործի անցան։ Նիֆ-Նիֆն արագ տուն շինեց փայտե տախտակներից։ Նաֆ-Նաֆն էլ ավելի արագ շինեց ծղոտից ու բարակ ճյուղերից։ Շուտով եկավ ձմեռը, և անտառից լսվեց սոված գայլի ձայնը։"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Գայլը մոտեցավ ծղոտե տնակին ու փչեց ամբողջ ուժով։ Ծղոտե տնակը քանդվեց։ Նաֆ-Նաֆը վազեց Նիֆ-Նիֆի փայտե տնակը։ Գայլը փչեց, փչեց, ու փայտե տնակն էլ փլվեց։ Երկու եղբայրները վազեցին Նուֆ-Նուֆի քարե տան դուռը։"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Գայլը փչեց, փչեց, փչեց, բայց քարե տունը տեղից անգամ չշարժվեց։ Այդ ժամանակ գայլը բարձրացավ կտուր, որ ծխնելույզից ներս մտնի։ Բայց Նուֆ-Նուֆը վառարանի վրա մի մեծ կաթսա տաք ջուր էր դրել։ Տաք գոլորշին դիպավ գայլի քթին։"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Գայլը վախեցավ, ցատկեց կտուրից ու փախավ անտառ՝ էլ երբեք չվերադառնալու։ Երեք եղբայրներն ամբողջ ձմեռն ապրեցին քարե տանը՝ տաք ու հանգիստ։ Իսկ գարնանը Նիֆ-Նիֆն ու Նաֆ-Նաֆն էլ իրենց համար քարե տներ շինեցին։"
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Ամբողջ գարունը երեք եղբայրները միասին աշխատեցին։ Նուֆ-Նուֆը սովորեցնում էր, թե ինչպես են քարերը իրար վրա ամուր շարում, իսկ Նիֆ-Նիֆը և Նաֆ-Նաֆը այս անգամ չէին շտապում։ Քար առ քար, օր առ օր՝ անտառի եզրին բարձրացան երեք քարե տնակներ՝ կողք կողքի, ամուր դռներով ու տաք ծխնելույզներով։ Ամռանը եղբայրները նորից խաղում էին մարգագետնում, բայց երեկոյան ամեն մեկը գնում էր իր տնակը։ Իսկ երբ եկավ նոր ձմեռը, ոչ մի քամի, ոչ մի բուք չկարողացավ շարժել նրանց տները։ Եղբայրները նստում էին տաք վառարանի մոտ ու հիշում․ համբերությամբ արվածը ամուր է լինում, իսկ ամուրը ոչ մի փորձանքից չի վախենում։"
+        }
+      ]
+    }
+  ]
+}

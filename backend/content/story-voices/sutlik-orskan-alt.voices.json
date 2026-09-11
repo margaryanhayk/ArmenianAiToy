@@ -1,0 +1,188 @@
+{
+  "storyId": "sutlik-orskan-alt",
+  "altOf": "sutlik-orskan",
+  "title": "Սուտլիկ որսկանը — այլընտրանքային ավարտ",
+  "_status": "DRAFT — ending TEXT approved by the owner 2026-08-13 (variant-endings.json blanket approval, \"I approve all\"); NOT rendered, NOT listen-tested. The base narration segments below are COPIED VERBATIM from sutlik-orskan.voices.json (byte-identical spans — same speakers, same text, same settings) so the render can reuse the already-approved takes where a take-cache allows it; only the final segment (the graft) is new.",
+  "_why": "AltOf contract (ContentSyncStoryOptions.AltOf, story_select.cpp): the alt ships as a FULL standalone narration file — the base story's segments 0..4 unchanged, plus one new final segment holding the alternate ending, grafted immediately after the base story's existing final line (afterLine, verified byte-exact against the shipped story text). Not embedded as a curated story: the device always tracks the BASE story id for rotation, the heard-set and reflection dialogue — see docs/variant-endings-serial-render-runbook.md.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with (the Ուլիկը pilot showed eleven_v3_conversational lets sentence endings fall away). Characters use the conversational model."
+    },
+    "boaster": {
+      "role": "Սուտլիկ որսկանը — the tall-tale teller himself",
+      "pitch": 1.0,
+      "note": "This story has no neutral narrator: the teller IS the liar, first person throughout. He must never signal that he knows it is nonsense — the child does the laughing.",
+      "directionForHumanNarrator": "a village braggart telling an impossible hunting story with total conviction, delighted with himself, never winking",
+      "voiceSettings": {
+        "stability": 0.35,
+        "similarity_boost": 0.8,
+        "style": 0.55
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: the teller is the boaster: Areg on the conversational model, unshifted, so the tale stays his own voice with a touch more acting"
+    },
+    "companion": {
+      "role": "Հադի, Հյուդի, Չատի, Մատի — the companions",
+      "pitch": 0.97,
+      "note": "One voice for all four on purpose. They are a chorus, not four characters, and distinguishing them would slow the run of gags.",
+      "directionForHumanNarrator": "flat, unbothered, answering the same way every time — the joke is the repetition",
+      "voiceSettings": {
+        "stability": 0.75,
+        "similarity_boost": 0.8,
+        "style": 0.1
+      },
+      "voiceId": "PgFHHZMKb19tJbjBe6aY",
+      "voiceName": "vardan-v2",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: Vardan as the flat chorus of four"
+    },
+    "mother": {
+      "role": "Մայրս (the boaster's mother)",
+      "pitch": 1.0,
+      "directionForHumanNarrator": "warm, amused mother, mock-stern then laughing",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "bpss31fpiTyvjz5XZUT0",
+      "voiceName": "katrin-v3",
+      "modelId": "eleven_v3_conversational",
+      "note": "NEW speaker, not in the base story's cast (the mother never speaks in the canonical narration). Katrin unshifted, matching the standing 'plain adult woman' pitch band. CASTING OPEN FOR OWNER EAR."
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "boaster",
+          "text": "Հորս կնունքով, մորս ծնունդով, վեր կացանք մի օր հինգ ու վեց հոգով, թրով—թվանքով որսի գնացինք։ Հադին էր, Հյուդին էր, Չատին էր, Մատին էր, հերս էր, ես էի․ գնացինք որսի․․․ Սարեր, ձորեր դուզ գնացինք, որտեղ որս կար՝ սուսուփուս գնացինք, որտեղ ահ էր՝ կուզեկուզ գնացինք․․․"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Գնացի՜նք, գնացի՜նք, շատ թե քիչ, մին էլ տեսնենք երեք լիճ․ երկուսը՝ ցամաք, մնի մեջ էլ իսկի ջուր չկա։ Մին էլ, ըհը՛, մտիկ տանք, որ էս անջուր լճում լողում են, ճչում երեք հատ սիպտակ բադ, երկուսը սատկած են, մինն էլ կենդանի չի։ "
+        },
+        {
+          "speaker": "boaster",
+          "text": "— Հադի՛, տո՛ւր հա, տո՛ւր։ "
+        },
+        {
+          "speaker": "companion",
+          "text": "Թե՝ թվանք չունեմ։ "
+        },
+        {
+          "speaker": "boaster",
+          "text": "— Հյուդի՛, տո՛ւր հա, տո՛ւր։ "
+        },
+        {
+          "speaker": "companion",
+          "text": "— Ես էլ չունեմ։ "
+        },
+        {
+          "speaker": "boaster",
+          "text": "— Չատի․․․ Մատի․․․ "
+        },
+        {
+          "speaker": "companion",
+          "text": "— Մենք էլ չունենք։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "boaster",
+          "text": "— Բա ի՞նչ անենք․․․ Հորս ձեռին կարճ ու երկար, հաստ ու բարակ մի փետ կար․ երեսն առավ, նշան դրեց, մին էլ տրա՜ք, որ կրակեց․․․ Նա կրակեց, ես զարկեցի․ որ զարկեցի՝ փռվեց էսպես, ամեն թևը հինգ գազ ու կես․․․ "
+        },
+        {
+          "speaker": "boaster",
+          "text": "— Հադի, դանա՜կ․․․ "
+        },
+        {
+          "speaker": "companion",
+          "text": "Թե՝ դանակ չունեմ։ "
+        },
+        {
+          "speaker": "boaster",
+          "text": "— Հյուդի, դու․․․ "
+        },
+        {
+          "speaker": "companion",
+          "text": "— Ես էլ չունեմ․․․ "
+        },
+        {
+          "speaker": "boaster",
+          "text": "- Չատի՞, Մատի՞․․․ "
+        },
+        {
+          "speaker": "companion",
+          "text": "- Մենք էլ չունենք։ "
+        },
+        {
+          "speaker": "boaster",
+          "text": "- Բա ի՞նչ անենք․․․ Հերս էլ ունի, բերան չունի։ Էս անբերան դանակը քաշեցինք։ Հադին մորթեց, չկարաց․ Հյուդին մորթեց, չկարաց, Չատին չկարաց, Մատին չկարաց, հերս էլ չկարաց, ես քաշեցի մորթեցի։ Մորթեցի, վեր գցեցի, բադ մի ասիլ, մի գոմեշ ասա։"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "spans": [
+        {
+          "speaker": "boaster",
+          "text": "Հադին շալակեց, չկարաց, Հյուդին շալակեց, չկարաց, Չատին չկարաց, Մատին չկարաց, հերս էլ չկարաց, ես շալակեցի։ Շալակեցի, գնացինք։ Գնացինք, գնացինք, հասանք մի տեղ, մին էլ տեսնենք երեք գեղ, երկուսի տեղն իսկի չի երևում, մնումն էլ իսկի շենլիկ չկա։ Էս անշեն գեղում դես ման եկանք, դեն ման եկանք, մի տուն գտանք, մեջը՝ երեք պառավ, երկուսը՝ մեռած, մնի բերնումն էլ շունչ չկա։"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "spans": [
+        {
+          "speaker": "boaster",
+          "text": "- Տղերք,- ասինք,- եկեք բադով փլավ անենք։ Էս անշունչ պառավը գնաց դես ման եկավ, դեն ման եկավ, կես բրինձ գտավ, երեք պղինձ, երկուսը՝ ծակ, մինն էլ իսկի տակ չունի։ Ջուրը լցրինք էս անտակ պղինձը, մեջը ածինք բադն ու բրինձը, անկրակ եփեցինք։ Եփեց, եփեց, միսն ու բրինձը գնացին, մնաց ջուրը։ Որսից եկած սոված մարդի՜կ, վրա եկանք, կերա՜նք, կերա՜նք․ ոչ աչքերս բան տեսավ, ոչ բերաններս բան մտավ։"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "spans": [
+        {
+          "speaker": "boaster",
+          "text": "Էս անհամ ու անհոտ փլավից կուշտ-կուշտ կերանք, վեր կացանք, որ տուն գնանք։ Դուռը բացինք, մին էլ տեսնենք՝ դռան առաջ կանգնած են երեք ձի․ երկուսը թամք չունեն, մնի էլ իսկի ոտքերը չկան։ Էս անոտ ձիուն նստեցինք վեց հոգով, քշեցինք։ Էնպես արագ վազեց, որ տուն հասանք դուրս գալուց էլ շուտ։ Մայրս դուռը բացեց, ասաց․ "
+        },
+        {
+          "speaker": "mother",
+          "text": "— Բա ո՞րտեղ էիք։ "
+        },
+        {
+          "speaker": "boaster",
+          "text": "Ասինք․ "
+        },
+        {
+          "speaker": "boaster",
+          "text": "— Որսի էինք, մի բադ ենք բերել՝ գոմեշի չափ։ Մայրս ծիծաղեց, ծիծաղեց, փորը բռնեց ծիծաղից, հետո մեզ իսկական տաք փլավ դրեց առաջներս։ Էս անգամ որ կերանք՝ բերաններս էլ բան մտավ, աչքերս էլ բան տեսավ։"
+        }
+      ]
+    }
+  ],
+  "_castNote": "New speaker(s) not in the base cast: mother — see each one's own note. CASTING OPEN FOR OWNER EAR."
+}

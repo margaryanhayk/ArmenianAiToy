@@ -16,6 +16,7 @@ import json, glob, os, sys, unicodedata
 
 CUES = 'backend/content/story-ambience/ambience-cues.json'
 CONTENT = 'backend/src/ArmenianAiToy.Application/Stories/Content'
+DRAFTS = 'backend/content/story-drafts'
 
 def norm(s):
     s = unicodedata.normalize('NFC', s or '')
@@ -31,7 +32,13 @@ for story in d['stories']:
     sid = story['storyId']
     path = os.path.join(CONTENT, sid + '.story.json')
     if not os.path.exists(path):
-        bad.append((sid, '-', 'no story file at ' + path)); continue
+        # A draft-status story (e.g. a serial episode not yet promoted)
+        # still needs its cues checked before promotion.
+        draft_path = os.path.join(DRAFTS, sid + '.story.json')
+        if os.path.exists(draft_path):
+            path = draft_path
+        else:
+            bad.append((sid, '-', 'no story file at ' + path)); continue
     js = json.load(open(path, encoding='utf-8'))
     segs = [norm(x if isinstance(x, str) else x.get('text', '')) for x in js.get('segments', [])]
     for c in story['cues']:

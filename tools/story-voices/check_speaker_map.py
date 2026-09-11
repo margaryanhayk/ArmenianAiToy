@@ -14,18 +14,54 @@ this must be runnable on the day it matters.
 import json, glob, os, sys, unicodedata
 
 CONTENT = "backend/src/ArmenianAiToy.Application/Stories/Content"
+DRAFTS  = "backend/content/story-drafts"
 MAPS    = "backend/content/story-voices"
+ENDINGS = "backend/content/variant-endings/variant-endings.json"
 
 def seg_texts(story):
     return [s if isinstance(s, str) else s.get("text", "") for s in story["segments"]]
 
+def _load_ending_text(base_id):
+    """Returns the endingText for base_id from variant-endings.json, or
+    None if no ending is drafted for it."""
+    if not os.path.exists(ENDINGS):
+        return None
+    doc = json.load(open(ENDINGS, encoding="utf-8"))
+    for e in doc.get("endings", []):
+        if e.get("storyId") == base_id:
+            return e.get("endingText")
+    return None
+
 def check(path):
     m = json.load(open(path, encoding="utf-8"))
     sid = m["storyId"]
-    sp = os.path.join(CONTENT, f"{sid}.story.json")
-    if not os.path.exists(sp):
-        return [f"{sid}: no such story {sp}"]
-    texts = seg_texts(json.load(open(sp, encoding="utf-8")))
+    alt_of = m.get("altOf")
+
+    if alt_of:
+        # Variant-ending map: no <sid>.story.json exists (the alt is not a
+        # curated story — story_select always tracks the BASE id for
+        # rotation/reflection, per ContentSyncStoryOptions.AltOf). Validate
+        # instead against [base story segments] + [the approved ending
+        # text], both owner-approved sources.
+        base_path = os.path.join(CONTENT, f"{alt_of}.story.json")
+        if not os.path.exists(base_path):
+            return [f"{sid}: altOf='{alt_of}' but no such base story {base_path}"]
+        ending_text = _load_ending_text(alt_of)
+        if ending_text is None:
+            return [f"{sid}: altOf='{alt_of}' but no ending found in {ENDINGS}"]
+        texts = seg_texts(json.load(open(base_path, encoding="utf-8"))) + [ending_text]
+    else:
+        sp = os.path.join(CONTENT, f"{sid}.story.json")
+        if not os.path.exists(sp):
+            # Fall back to the drafts folder — a serial episode or any other
+            # draft-status story is never embedded (StoryDraftFolderTests
+            # enforces that), but its speaker map still needs checking
+            # before promotion.
+            sp = os.path.join(DRAFTS, f"{sid}.story.json")
+        if not os.path.exists(sp):
+            return [f"{sid}: no such story {sp}"]
+        texts = seg_texts(json.load(open(sp, encoding="utf-8")))
+
     errs = []
 
     if len(m["segments"]) != len(texts):
@@ -58,6 +94,8 @@ def main():
         print("no speaker maps found"); return 1
     stories = {os.path.basename(p).split(".")[0]
                for p in glob.glob(os.path.join(CONTENT, "*.story.json"))}
+    stories |= {os.path.basename(p).split(".")[0]
+                for p in glob.glob(os.path.join(DRAFTS, "*.story.json"))}
     mapped, bad = set(), []
     print(f"{'story':20} {'segments':>9} {'spans':>6} {'speakers':>9}  verdict")
     print("-" * 66)

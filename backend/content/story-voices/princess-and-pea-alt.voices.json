@@ -1,0 +1,102 @@
+{
+  "storyId": "princess-and-pea-alt",
+  "altOf": "princess-and-pea",
+  "title": "Արքայադուստրը և սիսեռահատիկը — այլընտրանքային ավարտ",
+  "_status": "DRAFT — ending TEXT approved by the owner 2026-08-13 (variant-endings.json blanket approval, \"I approve all\"); NOT rendered, NOT listen-tested. The base narration segments below are COPIED VERBATIM from princess-and-pea.voices.json (byte-identical spans — same speakers, same text, same settings) so the render can reuse the already-approved takes where a take-cache allows it; only the final segment (the graft) is new.",
+  "_why": "AltOf contract (ContentSyncStoryOptions.AltOf, story_select.cpp): the alt ships as a FULL standalone narration file — the base story's segments 0..4 unchanged, plus one new final segment holding the alternate ending, grafted immediately after the base story's existing final line (afterLine, verified byte-exact against the shipped story text). Not embedded as a curated story: the device always tracks the BASE story id for rotation, the heard-set and reflection dialogue — see docs/variant-endings-serial-render-runbook.md.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with (the Ուլիկը pilot showed eleven_v3_conversational lets sentence endings fall away). Characters use the conversational model."
+    },
+    "queen": {
+      "role": "Ծեր թագուհին",
+      "pitch": 0.92,
+      "note": "A thought, not a spoken line — she smiles silently. Should sound inward, almost under the breath.",
+      "directionForHumanNarrator": "an old queen thinking to herself, quiet, shrewd, amused",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "bpss31fpiTyvjz5XZUT0",
+      "voiceName": "katrin-v3",
+      "modelId": "eleven_v3_conversational",
+      "castNote": "v1 cast 2026-09-07: the only female clone; the old queen is Katrin shifted down, the same decision as the mother-in-law in «Անբան Հուռին» so one verdict covers both"
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Լինում է, չի լինում՝ մի արքայազն։ Նա ուզում էր ամուսնանալ միայն իսկական արքայադստեր հետ։ Երկար ման եկավ աշխարհով մեկ, բայց ամեն անգամ մի բան այն չէր։ Տխուր վերադարձավ տուն։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Մի երեկո եղանակը շատ վատացավ։ Որոտում էր, ու անձրևը թափվում էր առատ։ Հանկարծ պալատի դուռը թակեցին։ Դռան մոտ կանգնած էր մի աղջիկ՝ թրջված մազերով ու մաշիկների միջից հոսող ջրով։ Նա ասաց, որ իսկական արքայադուստր է։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Ծեր թագուհին լուռ ժպտաց ու մտածեց՝ "
+        },
+        {
+          "speaker": "queen",
+          "text": "հիմա կստուգենք։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Նա մահճակալի տախտակին դրեց մի փոքրիկ սիսեռ։ Սիսեռի վրա շարեց տասներկու ներքնակ, ներքնակների վրա էլ՝ տասներկու փետրալից բարձ։ Աղջիկը բարձրացավ ամենավերևն ու պառկեց քնելու։"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Առավոտյան թագուհին հարցրեց, թե ինչպես էր քնել։ Աղջիկն ասաց, որ ամբողջ գիշեր մի կոշտ բան էր խանգարում իրեն, ու աչքը չէր փակել։ Բոլորը հասկացան, որ նա իսկական արքայադուստր է․ միայն իսկականը կզգար փոքրիկ սիսեռն այդքան ներքնակի տակ։"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Արքայազնն ամուսնացավ նրա հետ, և պալատում բոլորն ուրախ էին։ Իսկ փոքրիկ սիսեռը տարան թանգարան։ Ասում են՝ այն մինչև հիմա էլ այնտեղ դրված է։"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Իսկ թանգարանում փոքրիկ սիսեռը դրված է մի ոսկեգույն բարձիկի վրա։ Ամեն օր մարդիկ գալիս են ու զարմանում․ ինչո՞ւ է այս փոքրիկ սիսեռը այսքան կարևոր։ Այդ ժամանակ թանգարանի ծեր պահակը ժպտում է ու պատմում․ մի անգամ մի աղջիկ զգաց այս սիսեռը տասներկու ներքնակի ու տասներկու փետրալից բարձի տակից, և բոլորը հասկացան, որ նա իսկական արքայադուստր է։ Երբեմն արքայադուստրը և արքայազնը նույնպես գալիս են թանգարան։ Արքայադուստրը նայում է սիսեռին ու կամաց ժպտում՝ հիշելով այն գիշերը։ Իսկ երեխաները տուն են գնում՝ մտածելով, որ ամենափոքր բանը երբեմն ամենակարևորն է լինում։ Իսկականը թաքցնել չես կարող՝ այն միշտ երևում է։"
+        }
+      ]
+    }
+  ]
+}

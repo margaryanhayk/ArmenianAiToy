@@ -1,0 +1,137 @@
+{
+  "storyId": "tsivik-three",
+  "title": "Ոսկե արտի երգը",
+  "_status": "DRAFT — text approved by the owner 2026-08-13 (tsivik-series.json blanket approval); NOT rendered, NOT listen-tested. Cast assignment for stork/crow/putik/alik is a first pass by this slice, flagged CASTING OPEN FOR OWNER EAR in each speaker's note — unlike narrator/Ծիվիկ/Տատիկ, which reuse the exact standing-cast voice+settings already approved on Ուլիկը.",
+  "_why": "Mirrors the standing cast-per-role convention (CLAUDE.md § Story cast): narrator stays areg-storyteller on eleven_v3, every character on eleven_v3_conversational.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with — same reasoning as every other story's narrator entry."
+    },
+    "putik": {
+      "role": "Պուտիկը, մի փոքրիկ զատիկ (ladybug)",
+      "pitch": 1.08,
+      "directionForHumanNarrator": "tiny, a little scared at first, then delighted and grateful",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "bpss31fpiTyvjz5XZUT0",
+      "voiceName": "katrin-v3",
+      "modelId": "eleven_v3_conversational",
+      "note": "Higher pitch (1.08), matching the standing 'small creature' cast pattern (Ծաղիկը in little-cloud). CASTING OPEN FOR OWNER EAR: no prior small-creature precedent this close in tone; flagged in the PR."
+    },
+    "tsivik": {
+      "role": "Ծիվիկը, մի փոքրիկ ծիծեռնակ",
+      "pitch": 1.0,
+      "directionForHumanNarrator": "small young swallow, bright, a little unsure at first, then excited and warm",
+      "voiceSettings": {
+        "stability": 0.4,
+        "similarity_boost": 0.8,
+        "style": 0.45
+      },
+      "voiceId": "PgFHHZMKb19tJbjBe6aY",
+      "voiceName": "vardan-v2",
+      "modelId": "eleven_v3_conversational",
+      "note": "Same voice and settings as Ուլիկը's title role — the standing 'young animal hero' cast, unshifted."
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Առավոտյան Ծիվիկը թռավ ոսկեգույն արտի վրայով։ Ցորենի հասկերը շրշում էին քամուց, և ամբողջ արտը երգում էր մի կամաց, արևոտ երգ։ Հանկարծ Ծիվիկը լսեց մի ուրիշ ձայն։ Մի փոքրիկ, բարակ ձայն լալիս էր հասկերի արանքում։ Ծիվիկը իջավ ներքև։ Մի ցորենի հասկի վրա նստած էր մի փոքրիկ զատիկ՝ կարմիր, յոթ պուտիկով։ "
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Ինչո՞ւ ես լալիս,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— հարցրեց Ծիվիկը։ "
+        },
+        {
+          "speaker": "putik",
+          "text": "— Ես Պուտիկն եմ,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց զատիկը։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "putik",
+          "text": "— Քամին ինձ բերեց այստեղ, ու ես կորցրել եմ իմ վարդի թուփը։ Իմ տունը այնտեղ է, իսկ ես չգիտեմ, թե որ կողմում է։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ծիվիկը մի պահ մտածեց։ Ծովը սպասում էր նրան այնտեղ՝ հեռվում։ Բայց Պուտիկը այստեղ էր՝ փոքրիկ ու մենակ։ "
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Մի՛ վախեցիր,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց Ծիվիկը։"
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Ես թռչել գիտեմ։ Բարձրից ամեն ինչ երևում է։ Հիմա կգտնենք քո տունը։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ծիվիկը թափ առավ ու բարձրացավ երկինք։ Ներքևում փռված էր ամբողջ արտը՝ ոսկե ծովի նման։ Ահա արահետը։ Ահա հին ջրաղացը։ Իսկ ահա… ջրաղացի պատի տակ՝ մի կանաչ պարտեզ, իսկ պարտեզում՝ վարդի թփեր՝ վարդագույն ծաղիկներով։ Ծիվիկը իջավ Պուտիկի մոտ։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "tsivik",
+          "text": "— Գտա՜։ Քո տունը ջրաղացի պարտեզում է։ Նստի՛ր մեջքիս, ամուր բռնվի՛ր։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Պուտիկը զգույշ բարձրացավ Ծիվիկի փափուկ մեջքին, ու նրանք թռան արտի վրայով։ Շուտով Պուտիկը տեսավ իր վարդի թուփը ու ուրախությունից ծափ տվեց իր փոքրիկ թաթիկներով։ "
+        },
+        {
+          "speaker": "putik",
+          "text": "— Իմ տո՜ւնը։ Շնորհակալ եմ, Ծիվի՛կ։ Դու իմ ընկերն ես։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Պուտիկի քույրիկները դուրս թռան վարդի տերևների տակից ու շրջապատեցին նրանց։ Բոլորը ուրախ էին։ Իսկ ամենամեծ վարդի թերթիկի վրա Պուտիկի մայրիկը Ծիվիկի համար քաղցր ցող էր պահել։ Ծիվիկը խմեց ցողը ու զգաց, որ հոգնածությունը անցել է։ Երեկոյան, երբ արևը իջնում էր, Ծիվիկը մտածեց․ «Այսօր ես ծովին չմոտեցա։ Բայց սիրտս այնպես լիքն է, կարծես մի ամբողջ ծով է մեջը»։ Ճանապարհին ընկեր գտնելը նույնպես մեծ բան է։ Իսկ Պուտիկը թևիկով ցույց տվեց հեռուն․ "
+        },
+        {
+          "speaker": "putik",
+          "text": "— Տեսնո՞ւմ ես այն մեծ սարը։ Ամպերը գիշերում են նրա գագաթին։ Սարից այն կողմ, ասում են, փայլում է մի արծաթե հրաշք։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ծիվիկը որոշեց՝ վաղը կբարձրանա ամպերի սարը՝ իր աչքով տեսնելու այդ հրաշքը։"
+        }
+      ]
+    }
+  ],
+  "_renderRule": "Render order for the sample-first listen test (per tsivik-series.json _renderNote): the refrain (series-refrain), episode one, the closing clip (series-closing) — verify «Ծիվի́կ» before batching the rest.",
+  "_cast": "Episode 3: narrator=areg-storyteller, putik=katrin-v3, tsivik=vardan-v2"
+}

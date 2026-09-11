@@ -1,0 +1,170 @@
+{
+  "storyId": "tsivik-five",
+  "title": "Արծաթե ժապավենը",
+  "_status": "DRAFT — text approved by the owner 2026-08-13 (tsivik-series.json blanket approval); NOT rendered, NOT listen-tested. Cast assignment for stork/crow/putik/alik is a first pass by this slice, flagged CASTING OPEN FOR OWNER EAR in each speaker's note — unlike narrator/Ծիվիկ/Տատիկ, which reuse the exact standing-cast voice+settings already approved on Ուլիկը.",
+  "_why": "Mirrors the standing cast-per-role convention (CLAUDE.md § Story cast): narrator stays areg-storyteller on eleven_v3, every character on eleven_v3_conversational.",
+  "speakers": {
+    "narrator": {
+      "role": "The storyteller",
+      "pitch": 1.0,
+      "directionForHumanNarrator": null,
+      "voiceSettings": {
+        "stability": 0.55,
+        "similarity_boost": 0.8,
+        "style": 0.2
+      },
+      "voiceId": "NxAsEwnikgCJa5tyBwEf",
+      "voiceName": "areg-storyteller",
+      "modelId": "eleven_v3",
+      "note": "Narration stays on eleven_v3, the model the approved library was rendered with — same reasoning as every other story's narrator entry."
+    },
+    "alik": {
+      "role": "Ալիկը, ճայը (gull)",
+      "pitch": 1.0,
+      "directionForHumanNarrator": "bright, friendly, a little playful — the first non-family voice that is entirely reassuring",
+      "voiceSettings": {
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.3
+      },
+      "voiceId": "bpss31fpiTyvjz5XZUT0",
+      "voiceName": "katrin-v3",
+      "modelId": "eleven_v3_conversational",
+      "note": "Unshifted, distinguished from Տատիկ (0.92) and Պուտիկ (1.08) by pitch alone. CASTING OPEN FOR OWNER EAR — Ալիկ's gender is left unstated in the text on purpose; this is a placeholder assignment, not a decision."
+    },
+    "tsivik": {
+      "role": "Ծիվիկը, մի փոքրիկ ծիծեռնակ",
+      "pitch": 1.0,
+      "directionForHumanNarrator": "small young swallow, bright, a little unsure at first, then excited and warm",
+      "voiceSettings": {
+        "stability": 0.4,
+        "similarity_boost": 0.8,
+        "style": 0.45
+      },
+      "voiceId": "PgFHHZMKb19tJbjBe6aY",
+      "voiceName": "vardan-v2",
+      "modelId": "eleven_v3_conversational",
+      "note": "Same voice and settings as Ուլիկը's title role — the standing 'young animal hero' cast, unshifted."
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "spans": [
+        {
+          "speaker": "narrator",
+          "text": "Առավոտյան Ծիվիկը թռավ սարից ներքև՝ ուղիղ դեպի արծաթե ժապավենը։ Թռչում էր ու երազում՝ ահա հիմա կտեսնի ալիքները, կլսի ծովի երգը։ Բայց երբ մոտեցավ, տեսավ՝ ջուրը հանգիստ է, ալիքներ չկան, իսկ ափերը երևում են բոլոր կողմերից։ Դա ծովը չէր։ Դա մի մեծ, գեղեցիկ լիճ էր։ Ծիվիկը նստեց եղեգնիկի վրա, ու նրա սրտիկը տխրեց։ Այսքան ճանապարհ, այսքան օր… իսկ ծովը դեռ չկա։ "
+        },
+        {
+          "speaker": "alik",
+          "text": "— Ինչո՞ւ ես տխուր, փոքրիկ թռչնակ,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— լսվեց մի ձայն։ Ջրի վրա ճախրում էր մի սպիտակ ճայ։ "
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Ես կարծում էի, թե սա ծովն է,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց Ծիվիկը։"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "spans": [
+        {
+          "speaker": "tsivik",
+          "text": "— Բայց սա լիճ է։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ճայը ծիծաղեց՝ պարզ ու բարի։ "
+        },
+        {
+          "speaker": "alik",
+          "text": "— Ես Ալիկն եմ,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց նա։"
+        },
+        {
+          "speaker": "alik",
+          "text": "— Ես ծովում եմ ծնվել։ Իսկ գիտե՞ս, թե ինչու եմ այստեղ։ Ծովից թռչում եմ լիճ, լճից՝ ծով։ Ծովը այստեղից մեկ օրվա ճանապարհ է։ Դու արդեն շատ մոտ ես։ "
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— Իսկապե՞ս,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— Ծիվիկի աչքերը փայլեցին։"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "spans": [
+        {
+          "speaker": "alik",
+          "text": "— Իսկապես,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց Ալիկը։"
+        },
+        {
+          "speaker": "alik",
+          "text": "— Փակի՛ր աչքերդ ու շնչի՛ր։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ծիվիկը փակեց աչքերը ու խորը շնչեց։ Քամին բերում էր մի նոր, անծանոթ հոտ՝ թարմ ու մի քիչ աղի։ "
+        },
+        {
+          "speaker": "alik",
+          "text": "— Սա ծովի հոտն է,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց Ալիկը։"
+        },
+        {
+          "speaker": "alik",
+          "text": "— Քամին այն բերում է ալիքների վրայից։ Այնտեղ, որտեղից փչում է աղի քամին, այնտեղ էլ ծովն է։ Գնա՛ քամու հոտի ետևից, ու չես մոլորվի։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Ծիվիկը բացեց աչքերը։ Տխրությունը չքացել էր։ Նա նայեց լճին ու տեսավ, թե ինչ գեղեցիկ է այն՝ արծաթե ջուր, կանաչ եղեգներ, սպիտակ շուշաններ։"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "spans": [
+        {
+          "speaker": "tsivik",
+          "text": "— Գիտե՞ս, Ալի՛կ,"
+        },
+        {
+          "speaker": "narrator",
+          "text": "— ասաց նա,"
+        },
+        {
+          "speaker": "tsivik",
+          "text": "— ես այսօր ծովը չգտա։ Բայց գտա մի գեղեցիկ լիճ, մի նոր ընկեր ու ծովի հոտը։ Երկար ճանապարհին կանգառը վերջ չէ։ Կանգառը պարզապես հանգիստ է՝ նոր թռիչքից առաջ։ "
+        },
+        {
+          "speaker": "narrator",
+          "text": "Այդ երեկո Ալիկը Ծիվիկին հյուրասիրեց լճափի ամենահամեղ մոշով, ու նրանք երկար զրուցեցին։ Ալիկը պատմում էր ծովի մասին՝ ալիքների, նավերի, ափի ոսկե ավազի։ Ծիվիկը լսում էր ու ժպտում։ Վաղը լուսադեմին նա կթռչի աղի քամու ետևից։ Եվ այս անգամ՝ մինչև ծովը։"
+        }
+      ]
+    }
+  ],
+  "_renderRule": "Render order for the sample-first listen test (per tsivik-series.json _renderNote): the refrain (series-refrain), episode one, the closing clip (series-closing) — verify «Ծիվի́կ» before batching the rest.",
+  "_cast": "Episode 5: alik=katrin-v3, narrator=areg-storyteller, tsivik=vardan-v2"
+}
