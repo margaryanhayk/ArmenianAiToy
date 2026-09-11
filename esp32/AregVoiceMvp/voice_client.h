@@ -130,6 +130,14 @@ struct VoiceTurnResult {
     // should auto-fetch the next segment via voice_continue_turn()
     // with no button press. false ends hands-free autoplay.
     bool continue_more = false;
+    // true when the backend set `X-Areg-Turn-End: 1` on the response —
+    // it already knows this turn closed the conversation (a Game round
+    // the child stopped, or any parent-gate canned clip: unclaimed /
+    // paused / bedtime / mode-disabled / cost-cap). Only voice_upload_turn()
+    // collects this header, so it is always false on every other call
+    // (Q&A, reflection, autoplay-continue) whether or not the server sets
+    // it. See handle_online_chat_session's loop-termination rules.
+    bool turn_ended = false;
     // AREG_QA_STREAM_PLAYBACK only. true means "HTTP 200, headers are in,
     // the body has NOT been buffered — decode it live off the socket".
     // response_bytes is null in this case; response_length carries the

@@ -413,6 +413,70 @@ public class AudioChatControllerTests
         await h.ChatService.Received(1).GetResponseAsync(h.DeviceId, "խաղանք");
     }
 
+    // --- Turn-end signal (online voice loop) -------------------------
+
+    [Fact]
+    public async Task AudioChat_ChatServiceReportsTurnEnded_SetsTurnEndHeader()
+    {
+        // A Game session the child stopped: ChatService.TurnEnded=true is
+        // purely a REPORT of state it already tracked (see ChatResponse.
+        // TurnEnded / ChatService's closing return). The header is what
+        // lets the firmware's online Game/Riddle/Curiosity/Calm loop end
+        // honestly instead of guessing from silence alone.
+        await using var h = await CreateAsync();
+        h.DeviceService.IsDevicePausedAsync(h.DeviceId).Returns(false);
+        h.DeviceService.IsDeviceInBedtimeWindowAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(false);
+        h.DeviceService.IsModeEnabledForRequestAsync(
+            h.DeviceId, (Guid?)null, DetectedMode.Game).Returns(true);
+        h.Transcription.TranscribeArmenianAsync(
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns("բավ է");
+        h.ChatService.GetResponseAsync(h.DeviceId, "բավ է")
+            .Returns(new ChatResponse(
+                "Լավ խաղ էր, ցտեսություն։", Guid.NewGuid(), Guid.NewGuid(),
+                SafetyFlag.Clean, Mode: "game", TurnEnded: true));
+        h.Synthesis.SynthesizeArmenianAsync(
+                Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisResult(TtsMp3, MimeMp3));
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        Assert.Equal("1", h.Controller.HttpContext.Response.Headers["X-Areg-Turn-End"].ToString());
+    }
+
+    [Fact]
+    public async Task AudioChat_ChatServiceDoesNotReportTurnEnded_OmitsTurnEndHeader()
+    {
+        await using var h = await CreateAsync();
+        WireHappyPath(h);   // Story turn — ChatResponse.TurnEnded defaults to false
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        Assert.True(string.IsNullOrEmpty(
+            h.Controller.HttpContext.Response.Headers["X-Areg-Turn-End"].ToString()));
+    }
+
+    [Fact]
+    public async Task AudioChat_PausedDevice_CannedResult_SetsTurnEndHeader()
+    {
+        // Every canned-clip gate result (unclaimed / paused / bedtime /
+        // mode-disabled / cost-cap) is a conversation-ender — nobody can
+        // answer a "the toy is paused" clip with a next turn.
+        await using var h = await CreateAsync();
+        h.DeviceService.IsDevicePausedAsync(h.DeviceId).Returns(true);
+        h.Synthesis.SynthesizeArmenianAsync(
+                Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisResult(TtsMp3, MimeMp3));
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        Assert.Equal("1", h.Controller.HttpContext.Response.Headers["X-Areg-Turn-End"].ToString());
+    }
+
     [Fact]
     public async Task AudioChat_AutoplayContinue_OnPausedDevice_ReturnsCanned_NoChatService()
     {

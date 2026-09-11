@@ -2689,7 +2689,23 @@ public class ChatService : IChatService
 
         // Set storySessionId when story choices are present (active story mode)
         Guid? activeStorySession = (choiceA != null || choiceB != null) ? conversation.Id : null;
-        return new ChatResponse(aiResponse, conversation.Id, responseMsg.Id, safetyFlag, choiceA, choiceB, activeStorySession, modeName);
+
+        // Step 12: Report whether THIS turn closed an online Game session —
+        // read-only, decided nowhere else. GameIntent.Stop (Step 7a-tris,
+        // BuildGameTurnDirective) already cleared GameSessions'
+        // CurrentRound before the model ran; a switch/continue/new-game
+        // turn re-populates it above (Step 10a-tris) when the model
+        // followed the tail-block format. So "Game turn, no round left"
+        // is exactly a closed session — the goodbye the child asked for,
+        // or a round that never got established. Riddle/Curiosity/Calm
+        // have no equivalent explicit close in this pipeline; TurnEnded
+        // stays false for them and the caller's own loop rules decide.
+        var turnEnded = detectedMode == DetectedMode.Game
+            && (!GameSessions.TryGetValue(conversation.Id, out var endedGameState)
+                || endedGameState.CurrentRound is null);
+
+        return new ChatResponse(aiResponse, conversation.Id, responseMsg.Id, safetyFlag,
+            choiceA, choiceB, activeStorySession, modeName, TurnEnded: turnEnded);
     }
 
     /// <summary>

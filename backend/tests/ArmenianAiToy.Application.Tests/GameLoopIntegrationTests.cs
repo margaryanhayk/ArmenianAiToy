@@ -191,7 +191,7 @@ public class GameLoopIntegrationTests
         _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
             .Returns("\u053c\u0561\u055b\u057e, \u056c\u0561\u057e \u056d\u0561\u0572 \u0567\u0580\u0589");
 
-        await _chatService.GetResponseAsync(_deviceId, "\u0562\u0561\u057e \u0567"); // բավ է
+        var result = await _chatService.GetResponseAsync(_deviceId, "\u0562\u0561\u057e \u0567"); // բավ է
 
         await _aiClient.Received().GetCompletionAsync(
             Arg.Is<string>(s => s.Contains("GAME_TURN_KIND: stop_game")),
@@ -199,6 +199,35 @@ public class GameLoopIntegrationTests
 
         Assert.True(ChatService.GameSessions.TryGetValue(_conversationId, out var state));
         Assert.Null(state!.CurrentRound);
+        // The audio transport's turn-end header (X-Areg-Turn-End) reads
+        // straight off this flag -- see AudioChatControllerTests.
+        Assert.True(result.TurnEnded);
+    }
+
+    [Fact]
+    public async Task NewGame_DoesNotReportTurnEnded()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(GameWithBlock);
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        Assert.False(result.TurnEnded);
+    }
+
+    [Fact]
+    public async Task ContinueGame_DoesNotReportTurnEnded()
+    {
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns(GameWithBlock);
+        await _chatService.GetResponseAsync(_deviceId, "let's play");
+
+        _aiClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("\u0531\u057a\u0580\u0565\u055b\u057d\u0589");
+
+        var result = await _chatService.GetResponseAsync(_deviceId, "ok");
+
+        Assert.False(result.TurnEnded);
     }
 
     [Fact]
