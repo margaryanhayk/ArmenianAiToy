@@ -122,7 +122,15 @@ Ordered by what unblocks the most.
 - Mobile parity: no unlink, no delete-conversation, no delete-child in
   `mobile/AregParent/src/api.ts`; `app.json:24` owner is a placeholder EAS
   account; `eas.json` production submit block empty. *(night session for the
-  API calls; accounts are OWNER)*
+  API calls; accounts are OWNER)* — **done (N7): the three API calls,
+  screen controls, and trilingual confirm copy are in
+  (`api.ts`/`DevicesScreen.tsx`/`ConversationDetailScreen.tsx`/`i18n.ts`);
+  `app.json`'s placeholder `owner` removed with a loud README note instead
+  of a fake value; `eas.json`'s empty `submit.production` documented the
+  same way; `BENCH_FALLBACK_POP` confirmed display-only, never sent over
+  BLE, so no `__DEV__` gate was needed. `npx tsc --noEmit` clean, no test
+  suite exists. Real EAS account (`owner`, `submit` credentials) is still
+  OWNER's; nothing here ran on a device.**
 - `admin.html` tables overflow the page at 400 px. *(night session)* — **done
   (N2): tables scroll inside their own container, inputs no longer force a
   wide layout below 480 px.**

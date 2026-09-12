@@ -355,6 +355,51 @@ const D = {
   },
   this_toy: { en: 'This toy', ru: 'Эта игрушка', hy: 'Այս խաղալիքը' },
   rename_failed: { en: 'Rename failed', ru: 'Не удалось переименовать', hy: 'Չհաջողվեց վերանվանել' },
+  // Unlink / delete-child / delete-conversation controls (2026-09-12, N7).
+  // Button labels and confirm wording are the SAME words parent.html uses
+  // (own i18n table, keys unlink/remove/delete_conversation and
+  // confirm_unlink/confirm_delete_child/confirm_delete_conversation) —
+  // the Armenian there already went through linguistic review, and a
+  // family using both the web dashboard and this app must not be shown two
+  // different words for the same action. Only the shape changes: the web's
+  // single confirm() string (question, then two \n\n-separated paragraphs)
+  // is split into a title (the question) and a body (the paragraphs),
+  // because Alert.alert takes both separately — same split this file
+  // already uses for confirm_revoke_title/confirm_revoke_body.
+  unlink_device: { en: 'Unlink', ru: 'Отвязать', hy: 'Հեռացնել հաշվից' },
+  confirm_unlink_title: {
+    en: 'Remove {name} from your account?',
+    ru: 'Убрать «{name}» из вашего аккаунта?',
+    hy: 'Հեռացնե՞լ «{name}»-ը ձեր հաշվից։',
+  },
+  confirm_unlink_body: {
+    en: 'Everything from this toy is deleted — the conversations, your child’s answers, and any recordings. That part cannot be undone.\n\nThe toy itself is fine. It goes quiet until someone pairs it again by scanning the QR code on it.',
+    ru: 'Всё с этой игрушки будет удалено — разговоры, ответы вашего ребёнка и записи голоса. Это уже не вернуть.\n\nСама игрушка цела. Она замолчит, пока кто-нибудь снова не привяжет её, отсканировав QR-код на ней.',
+    hy: 'Այս խաղալիքի ամեն ինչ կջնջվի՝ զրույցները, ձեր երեխայի պատասխանները և ձայնագրությունները։ Այդ մասն անդառնալի է։\n\nԽաղալիքն ինքը կմնա անվնաս։ Այն կլռի, մինչև որևէ մեկը նորից չկապակցի՝ սկանավորելով վրայի QR-կոդը։',
+  },
+  remove_child: { en: 'Remove', ru: 'Удалить', hy: 'Հեռացնել' },
+  confirm_delete_child_title: {
+    en: "Delete {name}'s profile?",
+    ru: 'Удалить профиль «{name}»?',
+    hy: 'Ջնջե՞լ «{name}»-ի պրոֆիլը։',
+  },
+  confirm_delete_child_body: {
+    en: "All of {name}'s conversations and messages are deleted too. This cannot be undone.",
+    ru: 'Все разговоры и сообщения «{name}» также будут удалены. Это нельзя отменить.',
+    hy: 'Նաև կջնջվեն «{name}»-ի բոլոր զրույցներն ու հաղորդագրությունները։ Սա անդառնալի է։',
+  },
+  this_child: { en: 'this child', ru: 'этого ребёнка', hy: 'այս երեխա' },
+  delete_conversation: { en: 'Delete conversation', ru: 'Удалить разговор', hy: 'Ջնջել զրույցը' },
+  confirm_delete_conversation_title: {
+    en: 'Delete this conversation?',
+    ru: 'Удалить этот разговор?',
+    hy: 'Ջնջե՞լ այս զրույցը։',
+  },
+  confirm_delete_conversation_body: {
+    en: 'Every message in it is removed for good. This cannot be undone.',
+    ru: 'Все сообщения в нём будут удалены навсегда. Это нельзя отменить.',
+    hy: 'Դրա բոլոր հաղորդագրությունները կհեռացվեն ընդմիշտ։ Սա անդառնալի է։',
+  },
   // Story library freshness. The parent is told READY or NOT READY and
   // nothing else: no versions, no story ids, no megabytes.
   //

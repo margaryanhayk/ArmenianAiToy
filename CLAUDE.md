@@ -810,6 +810,18 @@ counts + a parent login match — run twice, both green (evidence:
 test` green (2955 tests, unchanged). NOT done: restoring the real Railway
 volume, or a network pull — still OWNER's.
 
+### Mobile parity — unlink, delete conversation, delete child (2026-09-12, N7)
+
+Added the three missing data controls to `mobile/AregParent`: `unlinkDevice`,
+`deleteConversation`, `deleteChild` in `api.ts`, wired into `DevicesScreen.tsx`
+and `ConversationDetailScreen.tsx` with the same trilingual confirm wording
+`parent.html` already uses. Also removed `app.json`'s placeholder EAS
+`owner` (documented in the README instead of a fake value) and confirmed
+`BENCH_FALLBACK_POP` is display-only, never sent over BLE. `npx tsc
+--noEmit` clean; no test suite exists (per `AGENTS.md`). NOT done: nothing
+here has run in a built app on a device — same standing mobile limitation
+as every entry above; the real EAS account is still OWNER's.
+
 ## Working in this repo (agents)
 
 - Classify first: workstream, mode, risk. HIGH risk (ChatService, system

@@ -24,6 +24,21 @@ import { theme } from '../theme';
 // now has its own, printed on the box (and inside its claim QR's "pop"
 // field). BENCH_FALLBACK_POP is only what an un-provisioned bench unit
 // (nothing burned to NVS yet) still advertises.
+//
+// Confirmed (2026-09-12, N7) that this constant cannot be used against a
+// production-provisioned toy: it is display text only, never sent over
+// BLE. `dev.connect(trimmedPop)` below always uses whatever the parent
+// actually typed into the `pop` field (required non-empty before a search
+// can even start — see startSearch()); this file never substitutes
+// BENCH_FALLBACK_POP into that call. The one place it IS shown
+// (the "unavailable" card, `pop.trim() || BENCH_FALLBACK_POP`) is
+// unreachable with an empty pop in practice, since reaching "unavailable"
+// requires trimmedPop to already be non-empty — so it is dead-code display
+// text, not a working credential. A wrong PoP is rejected by the TOY'S
+// OWN BLE stack (per-toy PoP validated against NVS, ble_provisioning.cpp),
+// not by anything this app checks — no __DEV__ gate is needed because
+// there is no code path here that could authenticate against a real toy
+// with the bench value.
 const PREFIX = 'Areg';
 const BENCH_FALLBACK_POP = 'areg-pair';
 
