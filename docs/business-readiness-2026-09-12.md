@@ -67,7 +67,7 @@ Ordered by what unblocks the most.
    `parent.html:1207-1211` promises an app QR scanner that does not exist
    (`ProvisioningScreen.tsx:118-121`) and asks for the device id by hand.
    Fix: paste-the-QR-string parser on web, honest copy, scanner later.
-   *(night session)*
+   *(night session)* — **web paste parser done (N2), scanner still open.**
 9. **SD-card content loading is undocumented and unscripted** for the
    factory. Identity provisioning is automated
    (`tools/factory/provision_toy.py`) but the card that carries every story
@@ -97,7 +97,9 @@ Ordered by what unblocks the most.
   `mobile/AregParent/src/api.ts`; `app.json:24` owner is a placeholder EAS
   account; `eas.json` production submit block empty. *(night session for the
   API calls; accounts are OWNER)*
-- `admin.html` tables overflow the page at 400 px. *(night session)*
+- `admin.html` tables overflow the page at 400 px. *(night session)* — **done
+  (N2): tables scroll inside their own container, inputs no longer force a
+  wide layout below 480 px.**
 - Staging environment and a written backend rollback procedure.
 - PoP re-issue when a label is lost is a support case by design
   (`docs/factory-provisioning-runbook.md:142-157`). Decide the policy.

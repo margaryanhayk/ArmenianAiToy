@@ -745,6 +745,20 @@ now share `json_psram.h`'s `g_json_psram` with `content_sync.cpp`.
 (arduino-cli, canonical FQBN); host tests + gate tests green; NOT
 bench-verified on hardware.
 
+### Onboarding paste-QR parser, admin table overflow (2026-09-12, N2)
+
+`parent.html`'s claim form gained a lenient paste-the-QR-JSON field
+(mirrors `mobile/AregParent/src/pairingQr.ts`; `pop` is parsed and
+discarded, never stored/shown), honest help copy (no app scanner claimed),
+and a client-side Device ID shape check. `admin.html`'s `table()` now
+wraps every table in a scrollable, shadowed `.table-wrap`; a ≤480px media
+query relaxes the fixed input min-widths. ux-ui-designer review applied
+(state-clear on re-claim, case-sensitive claim code, focus/aria fixes,
+scroll affordance); its mobile-copy-sync suggestion is deferred, out of
+scope for a web-only slice. `dotnet test` green (2931 tests); Playwright
+confirmed no page-level horizontal scroll at 400/1280px. NOT verified: a
+real browser session against the live backend.
+
 ## Working in this repo (agents)
 
 - Classify first: workstream, mode, risk. HIGH risk (ChatService, system

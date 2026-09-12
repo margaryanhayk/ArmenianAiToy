@@ -1184,7 +1184,9 @@
         a second toy can be added. Posts to POST /api/parents/devices/claim.
       -->
       <div style="margin:0 0 12px;">
-        <button id="toggleClaimBtn" class="link" type="button" data-i18n="add_toy">＋ Add a toy</button>
+        <button id="toggleClaimBtn" class="link" type="button"
+                aria-expanded="false" aria-controls="claimDeviceForm"
+                data-i18n="add_toy">＋ Add a toy</button>
         <div id="claimDeviceForm" hidden
              style="margin-top:8px;padding:10px 12px;background:var(--ok-bg-soft);
                     border:1px solid var(--ok-line-soft);border-radius:6px;max-width:420px;">
@@ -1204,9 +1206,33 @@
             <button id="redeemInviteBtn" type="button" data-i18n="invite_join">Join this toy</button>
             <div id="redeemInviteStatus" class="status muted" aria-live="polite"></div>
           </div>
+          <!--
+            ux-ui-designer review (2026-09-12): claim_help introduces BOTH
+            paths below (type or paste), so it now sits above both rather
+            than reading as an intro to only the typed fields.
+          -->
           <p style="margin:0 0 8px;font-size:13px;color:var(--ok-ink-soft);" data-i18n="claim_help">
-            Enter the pairing code from your toy's box or setup card (the app can
-            scan its QR instead). This links the toy to your account.</p>
+            Type the code from the label on the toy's bottom, or paste the
+            text from its QR code.</p>
+          <!--
+            Paste-the-QR path. There is no in-app camera scanner (the old
+            copy below used to claim one) — a parent who already scanned the
+            box's QR with their phone's own camera app can paste the
+            decoded text here and skip typing the two fields below by hand.
+            Always leaves those two fields visible and editable, both as the
+            fallback for a plain typed code and so a parent can fix a stray
+            character after a successful paste.
+          -->
+          <div style="margin:0 0 12px;padding-bottom:12px;border-bottom:1px dashed var(--ok-line-soft);">
+            <label for="claimQrPasteInput" style="display:block;font-size:12px;color:var(--ink-3);"
+                   data-i18n="qr_paste_label">Paste what the QR code says</label>
+            <textarea id="claimQrPasteInput" rows="3" autocomplete="off" spellcheck="false"
+                      placeholder="Paste here" data-i18n-ph="qr_paste_ph"
+                      style="width:100%;padding:10px;margin:2px 0 6px;box-sizing:border-box;
+                             font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px;
+                             resize:vertical;"></textarea>
+            <div id="claimQrPasteStatus" class="status muted" aria-live="polite"></div>
+          </div>
           <label for="claimDeviceIdInput" style="display:block;font-size:12px;color:var(--ink-3);" data-i18n="device_id">Device ID</label>
           <input id="claimDeviceIdInput" type="text" autocomplete="off" inputmode="text"
                  placeholder="00000000-0000-0000-0000-000000000000"
@@ -1946,7 +1972,24 @@
       back_to_login: { en: 'Back to login', ru: 'Вернуться ко входу', hy: 'Վերադառնալ մուտքի էջ' },
       device_id: { en: 'Device ID', ru: 'ID устройства', hy: 'Սարքի ID' },
       pairing_code: { en: 'Pairing code', ru: 'Код привязки', hy: 'Կապակցման կոդ' },
-      claim_help: { en: "Enter the pairing code from your toy's box or setup card. This links the toy to your account.", ru: 'Введите код привязки с коробки или карточки игрушки. Это привяжет игрушку к вашему аккаунту.', hy: 'Մուտքագրեք կապակցման կոդը խաղալիքի տուփից կամ քարտից։ Սա կկապի խաղալիքը ձեր հաշվին։' },
+      claim_help: { en: "Type the code from the label on the toy's bottom, or paste the text from its QR code.", ru: 'Введите код с этикетки на дне игрушки или вставьте текст с её QR-кода.', hy: 'Մուտքագրեք կոդը խաղալիքի տակի պիտակից կամ տեղադրեք դրա QR կոդի տեքստը։' },
+      // Paste-the-QR path (2026-09-12): this page has no camera scanner —
+      // the old claim_help wrongly promised one. A parent who scanned the
+      // box's QR with some other app can paste the decoded JSON text here
+      // instead of typing the two fields below by hand. Same idea as
+      // mobile/AregParent/src/i18n.ts's qr_paste_* keys (not yet
+      // byte-identical wording — ux-ui-designer review flagged the small
+      // divergence, left for a follow-up slice since this one is web-only).
+      qr_paste_label: { en: 'Paste what the QR code says', ru: 'Вставьте текст QR-кода', hy: 'Տեղադրեք QR կոդի տեքստը' },
+      qr_paste_ph: { en: 'Paste here', ru: 'Вставьте сюда', hy: 'Տեղադրեք այստեղ' },
+      qr_paste_ok: { en: '✓ Got it — filled in below.', ru: '✓ Готово — поля заполнены ниже.', hy: '✓ Ստացվեց — ներքևի դաշտերը լրացվեցին։' },
+      // Shown only once something has actually been pasted and failed to
+      // parse — never on an empty/untouched field. Names the way out (the
+      // typed fields still work) rather than just saying "invalid".
+      qr_paste_retry: { en: 'That does not look like the toy’s code yet. You can fill in the two fields below instead.', ru: 'Это пока не похоже на код игрушки. Можно заполнить два поля ниже.', hy: 'Սա կարծես խաղալիքի կոդը չէ։ Կարող եք պարզապես լրացնել ներքևի երկու դաշտը։' },
+      // Client-side shape check only (looksLikeDeviceId) — the server stays
+      // the authority on whether the id actually exists.
+      err_pair_guid: { en: 'The device id should look like 8-4-4-4-12 characters.', ru: 'ID устройства должен выглядеть как 8-4-4-4-12 символов.', hy: 'Սարքի ID-ն պետք է ունենա 8-4-4-4-12 նիշերի ձևաչափ։' },
       new_password: { en: 'New password', ru: 'Новый пароль', hy: 'Նոր գաղտնաբառ' },
       confirm_new_password: { en: 'Confirm new password', ru: 'Повторите пароль', hy: 'Կրկնեք գաղտնաբառը' },
       current_password: { en: 'Current password', ru: 'Текущий пароль', hy: 'Ընթացիկ գաղտնաբառ' },
@@ -2615,6 +2658,16 @@
     // bouncing off the server in English. The server stays the authority.
     function looksLikeEmail(v) {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || ''));
+    }
+
+    // Same idea for the Device ID field: a hand-typed GUID missing a
+    // character or a dash used to fail silently at the server with the
+    // same generic "that code didn't work" message the pairing code itself
+    // gets, which pointed a parent at the wrong field. This only checks
+    // shape (8-4-4-4-12 hex), never uniqueness — the server stays the
+    // authority on whether the id actually exists.
+    function looksLikeDeviceId(v) {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || '').trim());
     }
 
     // Turn any failure into one calm sentence a parent can act on. Never
@@ -5307,6 +5360,40 @@
       });
     }
 
+    // Lenient parser for a toy's pairing QR payload, pasted as decoded text
+    // — this page has no camera scanner, and the earlier help copy that
+    // claimed one was wrong (there is no scanner on the mobile app either;
+    // see mobile/AregParent/src/pairingQr.ts, which this mirrors).
+    //
+    // Current shape (factory pairing, 2026-09-11): {"deviceId":"...","claim":"...","pop":"..."}
+    // Older shape (toys boxed before that date): {"deviceId":"...","claim":"..."}
+    // Both must keep working — a parent's box does not know which firmware
+    // generation minted its QR. A few likely key spellings are accepted too,
+    // in case a parent hand-copies the JSON rather than pasting a scanner's
+    // exact output. The "pop" field, when present, is a BLE pairing secret
+    // this page has no use for — parsed only so it can be thrown away
+    // rather than left sitting in whatever JSON the parent pasted; never
+    // stored, never rendered.
+    function pickPairingField(o, keys) {
+      for (var i = 0; i < keys.length; i++) {
+        var v = o[keys[i]];
+        if (typeof v === 'string' && v.trim()) return v.trim();
+      }
+      return undefined;
+    }
+    function parsePairingQr(raw) {
+      var text = String(raw || '').trim();
+      if (!text) return null;
+      var obj;
+      try { obj = JSON.parse(text); } catch (e) { return null; }
+      if (!obj || typeof obj !== 'object') return null;
+      var deviceId = pickPairingField(obj, ['deviceId', 'device_id', 'id']);
+      var claim = pickPairingField(obj, ['claim', 'claimCode', 'claim_code', 'code']);
+      if (!deviceId || !claim) return null;
+      return { deviceId: deviceId, claim: claim };
+      // obj.pop, if any, is intentionally never read into the result.
+    }
+
     // Consumer pairing (Phase A.2): claim a toy with its single-use pairing
     // code (NOT the API key). POST /api/parents/devices/claim. The server
     // returns ONE uniform 400 for every failure reason (unknown device /
@@ -5321,6 +5408,10 @@
       var codeRaw = codeInput.value.trim();
       if (!deviceIdRaw || !codeRaw) {
         setStatus('claimDeviceStatus', t('err_pair_fields'), 'err');
+        return;
+      }
+      if (!looksLikeDeviceId(deviceIdRaw)) {
+        setStatus('claimDeviceStatus', t('err_pair_guid'), 'err');
         return;
       }
       // The pairing code is single-use. A double tap sent it twice and the
@@ -5364,6 +5455,11 @@
         if (data && data.claimed) {
           idInput.value = '';
           codeInput.value = '';
+          // The paste field is a single-use claim code too — leaving it
+          // filled would show a stale "✓ Got it" over two now-empty fields
+          // the next time a parent opens this form to add a second toy.
+          document.getElementById('claimQrPasteInput').value = '';
+          setStatus('claimQrPasteStatus', '', '');
           setStatus('claimDeviceStatus', t('ok_paired'), 'ok');
           document.getElementById('claimDeviceForm').hidden = true;
           loadDevices();
@@ -6556,10 +6652,35 @@
     document.getElementById('linkDeviceBtn').addEventListener('click', submitLinkDevice);
     document.getElementById('claimDeviceBtn').addEventListener('click', claimDevice);
     document.getElementById('redeemInviteBtn').addEventListener('click', redeemInvite);
+    // Parses on every keystroke/paste — cheap, and fills the two fields
+    // below the instant a full paste lands rather than needing a separate
+    // "parse" tap. A partial/invalid paste just leaves the typed fields
+    // alone (parsePairingQr returns null); the retry note only appears once
+    // something non-empty failed to parse, never on an untouched field.
+    document.getElementById('claimQrPasteInput').addEventListener('input', function (ev) {
+      var raw = ev.target.value;
+      var parsed = parsePairingQr(raw);
+      if (!parsed) {
+        setStatus('claimQrPasteStatus', raw.trim() ? t('qr_paste_retry') : '', raw.trim() ? 'muted' : '');
+        return;
+      }
+      document.getElementById('claimDeviceIdInput').value = parsed.deviceId;
+      // NOT .toUpperCase(): the server's claim-code check
+      // (ParentService.ClaimDeviceAsync -> DeviceApiKeyHasher.Verify) is
+      // case-sensitive. Today's hex claim codes happen to already be
+      // uppercase, but normalizing pasted-exact text here would silently
+      // corrupt a valid code the moment that alphabet ever changes.
+      document.getElementById('claimCodeInput').value = parsed.claim;
+      setStatus('claimQrPasteStatus', t('qr_paste_ok'), 'ok');
+    });
     document.getElementById('toggleClaimBtn').addEventListener('click', function () {
       var f = document.getElementById('claimDeviceForm');
       f.hidden = !f.hidden;
-      if (!f.hidden) document.getElementById('claimDeviceIdInput').focus();
+      this.setAttribute('aria-expanded', f.hidden ? 'false' : 'true');
+      // Focus the FIRST field in the form (the invite code), not the third
+      // one down — the invite path and the QR paste are both faster than
+      // typing the two fields that used to be the only option here.
+      if (!f.hidden) document.getElementById('redeemInviteInput').focus();
     });
     document.getElementById('backFromAudit').addEventListener('click', openAccount);
     document.getElementById('libraryBackToDevices').addEventListener('click', function () {
