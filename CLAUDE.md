@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 2931 tests, ~35 s in Release
+dotnet test            # 2935 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -180,7 +180,8 @@ question. Content sync runs ~180 s after boot then on a crash-safe backoff
 schedule, writes the index once at the end (per-namespace writes still TODO),
 reports what the card holds on the heartbeat. OTA: no ack before reboot, the
 check-in is the health gate, bootloader rollback on failure. BLE Wi-Fi
-provisioning is on by default (shared PoP `areg1234` — must become per-toy).
+provisioning uses a per-toy PoP minted at registration (2026-09-11); the
+shared `areg-pair` PoP remains only as the cable-flash bench fallback.
 
 Bench truths: the SD breakout module needs 5 V (its own regulator), the card
 itself is 3.3 V; corrupt SD reads at 16 MHz were the "aaaa" tone; a bench
@@ -257,9 +258,10 @@ fleet in; nothing about a price has been decided).
 
 Still to implement: a `sound-detective` firmware game (backend content
 ready — 21 clips already in `ContentSync:Games` — no engine written); two
-Simon tone clips (`tone-green` / `tone-red`, not yet rendered); render
-variant endings + serial (inputs prepared, see below — the render itself
-is still open); narrator PVC; rev-A PCB routing + speaker test + order.
+Simon tone clips (`tone-green` / `tone-red`, not yet rendered); render the
+Tsivik serial (variant endings are rendered and shipped, see below —
+the serial is blocked on owner sign-off); narrator PVC; rev-A PCB
+routing + speaker test + order.
 
 ### Online Game/Riddle/Curiosity/Calm voice contract (2026-09-11)
 
@@ -770,6 +772,17 @@ Runbook §2a; `--dry-run`/`--verify`, stdlib-only, idempotent. Verified
 end-to-end against a live throwaway backend (240 items, ~117 MB, the real
 catalogue); `dotnet test` green (2931 tests). NOT verified: a real card in
 a real toy.
+
+### Forwarded-headers boot warning, stale comments and docs (2026-09-12, N4)
+
+`Program.cs` now warns at startup when `ForwardedHeaders:Enabled` is false
+outside Development, naming the env vars to set (pure decision in
+`ForwardedHeadersConfig.ShouldWarnDisabledOutsideDevelopment`, unit-tested;
+confirmed by booting once in Production). Also fixed the stale
+`InternalController`/`StoryAudioController` comments, the stale
+`railway-deploy.md`/CLAUDE.md sentences, and added the ops-runbook entry.
+`dotnet test` green (2935 tests, 4 new). NOT done: the Railway env vars
+themselves are still OWNER's to set.
 
 ## Working in this repo (agents)
 

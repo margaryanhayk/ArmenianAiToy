@@ -104,7 +104,10 @@ public class StoryAudioController : ControllerBase
         // device-authed /api/chat/story-audio-token endpoint). A missing /
         // tampered / expired / wrong-story token returns the SAME 404 as an
         // unknown story — concealment, so the endpoint reveals nothing to a
-        // token-less caller. Unset key => open (dev/bench), opt-in posture.
+        // token-less caller. Unset key => FAIL-CLOSED (deny) by default; an
+        // operator opts into open access only via the separate
+        // StoryAudio:AllowUnauthenticated flag (dev/bench). See
+        // IsTokenAccepted.
         if (!IsTokenAccepted(storyId, token))
         {
             // Wire response is the SAME 404 as an unknown story (concealment —

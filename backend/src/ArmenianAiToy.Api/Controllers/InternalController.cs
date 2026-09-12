@@ -29,10 +29,17 @@ namespace ArmenianAiToy.Api.Controllers;
 /// </para>
 ///
 /// <para>
-/// <b>Read-only by design (Phase 1).</b> No mutations: an admin token that
-/// could pause devices, promote drafts, or delete data is a much larger
-/// blast radius and is deliberately deferred to a later, separately-
-/// approved phase. Every action here is a GET.
+/// <b>Read-only core, plus a guarded mutation surface.</b> The overview,
+/// device/parent/conversation/audit/story listings and the backup pull are
+/// all GETs. Roughly a dozen <c>[HttpPost]</c> actions layer on top of
+/// that — device revoke/pause/tier/claim-code, content release/retire,
+/// queued device commands, story-request status, an operator's own
+/// console session, the story-qa test playground, and an operator-
+/// initiated parent password reset. Every one is reason-required and
+/// behind the same fail-closed console gate; most write a system-actor
+/// <c>InternalConsoleAction</c> audit row (see the "Phase 3: reversible
+/// operator ACTIONS" section below), the rest log structurally instead.
+/// There is still no destructive delete here.
 /// </para>
 ///
 /// <para>

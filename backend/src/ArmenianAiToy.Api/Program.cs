@@ -367,6 +367,21 @@ else if (builder.Configuration.GetValue<bool>("ForwardedHeaders:Enabled"))
         "X-Forwarded-For is NOT processed and the per-IP rate limiters key on the proxy, not the client. " +
         "Check the ForwardedHeaders__KnownNetworks value.");
 }
+else if (ForwardedHeadersConfig.ShouldWarnDisabledOutsideDevelopment(
+             app.Environment.IsDevelopment(),
+             builder.Configuration.GetValue<bool>("ForwardedHeaders:Enabled")))
+{
+    // Mirror of the warning above, for the opposite gap: disabled outright
+    // outside Development, where a reverse proxy (e.g. Railway) means every
+    // parent's Connection.RemoteIpAddress is the proxy's own IP, so
+    // AuthRateLimiter keys them all into one shared bucket.
+    app.Logger.LogWarning(
+        "ForwardedHeaders:Enabled=false in a non-Development environment — if this app runs " +
+        "behind a reverse proxy, every caller shares one Connection.RemoteIpAddress and the " +
+        "per-IP auth rate limiter (AuthRateLimiter) keys them all into one bucket. Set " +
+        "ForwardedHeaders__Enabled=true plus ForwardedHeaders__KnownProxies and/or " +
+        "ForwardedHeaders__KnownNetworks to the proxy's address(es) if that applies here.");
+}
 
 // Diagnostic for the managed-host case: on a PaaS the edge proxy's address is
 // not documented, so an operator cannot pin it without observing it once. When
