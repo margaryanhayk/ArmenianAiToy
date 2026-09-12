@@ -126,8 +126,13 @@ Ordered by what unblocks the most.
 
 ## 3. IMPORTANT (before 100 units, not before the first 10)
 
-- **HARD STOP — JWTs survive a password change** (`Program.cs:146-154`,
-  30-day tokens). Add a security-stamp claim checked in `OnTokenValidated`.
+- ~~**HARD STOP — JWTs survive a password change** (`Program.cs:146-154`,
+  30-day tokens). Add a security-stamp claim checked in `OnTokenValidated`.~~
+  — **done (N10)**: `Parent.SecurityStamp` + `sst` claim, rotated on
+  password change / reset completion / anonymize, checked by
+  `ParentTokenValidation`; `Jwt:RequireSecurityStamp` is the rollback
+  switch; one-time re-login for every parent on first deploy
+  (`docs/ops-runbook.md`). Owner approved in chat ("fix them also").
 - **HARD STOP — `ChatService.GetResponseAsync` has no `CancellationToken`**
   (`ChatService.cs:1685`): a toy that drops Wi-Fi mid-turn cannot abort the
   paid OpenAI calls.

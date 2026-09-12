@@ -605,6 +605,10 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                     b.Property<DateTime>("RegisteredAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("TermsAcceptedAt")
                         .HasColumnType("TEXT");
 

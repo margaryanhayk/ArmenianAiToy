@@ -144,32 +144,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
 
         // Reject a token whose parent row no longer exists (hard-deleted or
-        // anonymized). Tokens are otherwise valid for 30 days with no
-        // server-side revocation, so a DELETED account's token could still
-        // read parent-scoped endpoints (e.g. its retained audit history)
-        // for up to 30 days. This existence check runs once per authenticated
-        // request against the request-scoped DbContext and closes that leak.
-        // (Password-change invalidation would need a per-parent security
-        // stamp — a separate, larger change; this covers the deletion case.)
+        // anonymized), and — N10 — a token whose "sst" security-stamp claim
+        // no longer matches the row (the parent changed or reset their
+        // password, or was anonymized, after the token was issued). Tokens
+        // are otherwise valid for 30 days with no server-side revocation.
+        // One query per authenticated request against the request-scoped
+        // DbContext — see ParentTokenValidation. Jwt:RequireSecurityStamp
+        // (default true) is the rollback switch: false lets a pre-N10 token
+        // without the claim through; a token WITH a stale claim is rejected
+        // either way.
+        var requireSecurityStamp = ParentTokenValidation.RequireSecurityStamp(builder.Configuration);
         options.Events = new JwtBearerEvents
         {
-            OnTokenValidated = async ctx =>
-            {
-                var sub = ctx.Principal?.FindFirst(
-                    System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                if (!Guid.TryParse(sub, out var parentId))
-                {
-                    ctx.Fail("Invalid subject.");
-                    return;
-                }
-                var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
-                var exists = await db.Set<ArmenianAiToy.Domain.Entities.Parent>()
-                    .AnyAsync(p => p.Id == parentId && p.AnonymizedAt == null);
-                if (!exists)
-                {
-                    ctx.Fail("Account no longer exists.");
-                }
-            }
+            OnTokenValidated = ctx => ParentTokenValidation.ValidateAsync(ctx, requireSecurityStamp)
         };
     });
 

@@ -3271,6 +3271,11 @@
         }
         return res.json().then(function (data) {
           if (res.ok && data && data.changed) {
+            // N10: the token that authorized this call is now invalid
+            // (security stamp rotated); keep this session alive with the
+            // fresh one the endpoint returns. Every other session of the
+            // account is signed out on its next request.
+            if (data.token) { setToken(data.token); }
             document.getElementById('currentPasswordInput').value = '';
             document.getElementById('newPasswordInput').value = '';
             document.getElementById('confirmPasswordInput').value = '';

@@ -50,7 +50,16 @@ public interface IParentService
     /// </para>
     /// </summary>
     Task<LinkedDevicesResponse> GetLinkedDeviceDetailsWithSummaryAsync(Guid parentId);
-    Task<bool> ChangePasswordAsync(Guid parentId, string currentPassword, string newPassword);
+    /// <summary>
+    /// Change the parent's own password after re-verifying the current one.
+    /// Returns a FRESH JWT on success (N10: the change rotates the
+    /// parent's security stamp, so the token that authorized the call —
+    /// and every other one issued before it — stops validating; the
+    /// caller must store the returned token to stay logged in), or null
+    /// on wrong current password / unknown parent, without mutating the
+    /// stored hash.
+    /// </summary>
+    Task<string?> ChangePasswordAsync(Guid parentId, string currentPassword, string newPassword);
     Task<bool> SetDevicePauseStateAsync(Guid parentId, Guid deviceId, bool paused);
     Task<bool> SetDeviceNameAsync(Guid parentId, Guid deviceId, string name);
     Task<bool> SetDeviceRevocationAsync(Guid parentId, Guid deviceId, bool revoked);

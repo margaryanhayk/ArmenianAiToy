@@ -55,6 +55,31 @@ Development is unaffected (it keeps the historical relative default next to
 the binary, no configuration needed). See
 `ArmenianAiToy.Api.Security.AudioBlobStoreRootResolver` for the exact rule.
 
+### After the N10 deploy every parent logs in once (`Jwt:RequireSecurityStamp`)
+
+Since 2026-09-12 (N10) every parent JWT carries the parent's security
+stamp (`sst` claim) and is rejected once the stamp rotates — a password
+change, a password-reset completion or a dormancy anonymization signs
+that account out everywhere. Tokens issued BEFORE that deploy carry no
+stamp, so with the shipped default (`Jwt:RequireSecurityStamp=true`) the
+first deploy rejects every existing session with the usual 401: each
+parent logs in once on the dashboard and once in the app, and nothing
+else changes. That is a one-time effect of that first deploy, not
+something that recurs.
+
+If that one-time re-login is unacceptable at deploy time, set
+
+```
+Jwt__RequireSecurityStamp=false
+```
+
+BEFORE deploying: tokens without the claim then pass (a token WITH a
+rotated-away stamp is still rejected either way, so the password-change
+protection holds for every session started after the deploy). Remove
+the variable — or set it to `true` — within 30 days: that is the token
+lifetime, after which no pre-N10 token can exist and the switch does
+nothing. It is a rollback switch, not a mode; do not leave it off.
+
 ### Parents locking each other out → set `ForwardedHeaders__Enabled`
 
 Behind Railway's edge proxy, `Connection.RemoteIpAddress` is the proxy's own

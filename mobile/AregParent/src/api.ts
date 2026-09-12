@@ -651,8 +651,14 @@ export async function fetchExport(): Promise<string> {
   return res.text();
 }
 
-/** POST /api/parents/password — change password. */
-export async function changePassword(current: string, next: string): Promise<void> {
+/**
+ * POST /api/parents/password — change password. Resolves to the FRESH JWT
+ * the endpoint returns (N10: the change rotates the parent's security
+ * stamp, so the token that authorized the call stops validating; the
+ * caller must persist the returned one to stay signed in), or null on a
+ * pre-N10 backend that does not return one.
+ */
+export async function changePassword(current: string, next: string): Promise<string | null> {
   let res: Response;
   try {
     res = await fetch(url('/api/parents/password'), {
@@ -668,6 +674,8 @@ export async function changePassword(current: string, next: string): Promise<voi
     throw new ApiError('e_password_rules');
   }
   if (!res.ok) throw new ApiError('e_generic');
+  const data = (await res.json().catch(() => null)) as { token?: string } | null;
+  return typeof data?.token === 'string' && data.token ? data.token : null;
 }
 
 /** DELETE /api/parents/account — permanent; requires the current password. */
