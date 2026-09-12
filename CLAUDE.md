@@ -735,6 +735,16 @@ bedtime-music-prep-20260911.md`'s "Render" section.
 heard any of them yet, at any volume; the -23 LUFS target itself remains
 unconfirmed by ear on the toy's actual speaker.
 
+### Firmware P0s — PSRAM index parse, HMAC release gate (2026-09-12, N1)
+
+`content_report.cpp` and several `story_select.cpp` accessors parsed
+`/content_index.json` on internal heap (the 2026-08-14 failure class); all
+now share `json_psram.h`'s `g_json_psram` with `content_sync.cpp`.
+`check_release_image.py` now refuses an image with `ota_apply.cpp`'s
+`OTA_SIG_CHECK_DISABLED` marker (HMAC key compiled empty). Compile-verified
+(arduino-cli, canonical FQBN); host tests + gate tests green; NOT
+bench-verified on hardware.
+
 ## Working in this repo (agents)
 
 - Classify first: workstream, mode, risk. HIGH risk (ChatService, system

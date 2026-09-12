@@ -97,5 +97,59 @@ class CheckReleaseImagePopGateTests(unittest.TestCase):
         self.assertIn("PoP-shaped", out)
 
 
+class CheckReleaseImageOtaSigGateTests(unittest.TestCase):
+    """ota_apply.cpp skips manifest HMAC verification when
+    AREG_MANIFEST_HMAC_KEY is empty and logs the OTA_SIG_CHECK_DISABLED
+    marker instead of failing loudly. The release gate must refuse any
+    image carrying that marker and pass one that does not."""
+
+    def setUp(self):
+        import tempfile
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self._tmpdir.name)
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def test_image_with_sig_check_disabled_marker_fails(self):
+        blob = b"junk header bytes\x00OTA_SIG_CHECK_DISABLED\x00more junk"
+        code, out = run_check(blob, self.tmp_path)
+        self.assertNotEqual(code, 0,
+                            "an image with signature verification compiled "
+                            "off must fail the release gate")
+        self.assertIn("OTA_SIG_CHECK_DISABLED", out)
+
+    def test_marker_split_by_a_surrounding_em_dash_still_fails(self):
+        # Regression: ota_apply.cpp's real log sentence wraps the marker in
+        # human-readable text with an em-dash right after it. `strings`
+        # extraction (STRING_RE, printable-ASCII-only) breaks the sentence
+        # at that non-ASCII byte, so the marker never appears as its own
+        # complete entry in the extracted-strings list — an `in strings`
+        # check missed this against a real compiled image (2026-09-12,
+        # confirmed with `strings` directly). The gate must search raw
+        # bytes, not the strings list, so this must still fail.
+        em_dash = "—".encode("utf-8")
+        sentence = (b"[ota] WARNING: OTA_SIG_CHECK_DISABLED " + em_dash
+                    + b" manifest signature check SKIPPED")
+        blob = b"junk\x00" + sentence + b"\x00junk"
+        code, out = run_check(blob, self.tmp_path)
+        self.assertNotEqual(code, 0,
+                            "a marker split by a non-ASCII byte must still "
+                            "be caught")
+        self.assertIn("OTA_SIG_CHECK_DISABLED", out)
+
+    def test_image_without_the_marker_passes(self):
+        blob = (
+            b"junk header bytes\x00"
+            + b"areg-pair\x00"
+            + PLACEHOLDER_POP.encode("ascii")
+            + b"\x00YOUR_DEVICE_GUID\x00YOUR_DEVICE_API_KEY\x00"
+            + b"ESPHTTPD\x00EXCVADDR\x00BBB6BHHB\x00B8BH8B4B\x00more junk"
+        )
+        code, out = run_check(blob, self.tmp_path)
+        self.assertEqual(code, 0, f"a clean image must pass; got:\n{out}")
+        self.assertIn("PASS", out)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -185,8 +185,15 @@ OtaApplyOutcome ota_apply_run(const char *command_id, char *err_out, size_t err_
         }
         Serial.println("[ota] manifest signature OK");
     } else {
-        Serial.println("[ota] WARNING: manifest signature check SKIPPED "
-                       "(no AREG_MANIFEST_HMAC_KEY — Stage-A bench only)");
+        // OTA_SIG_CHECK_DISABLED — stable, unique marker string. Never
+        // reword without updating tools/firmware/check_release_image.py's
+        // matching literal: the release gate scans the compiled image for
+        // this exact text and refuses to ship a build that would reach a
+        // toy with signature verification silently off (this Stage-A path
+        // is bench-only and must never leave the bench).
+        Serial.println("[ota] WARNING: OTA_SIG_CHECK_DISABLED — manifest "
+                       "signature check SKIPPED (no AREG_MANIFEST_HMAC_KEY "
+                       "— Stage-A bench only)");
     }
     // Device has no synced wall clock (no RTC/NTP in this slice): device-side
     // expiry is skipped; the backend enforces manifest TTL + command expiry.
