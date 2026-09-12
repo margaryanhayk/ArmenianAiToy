@@ -124,12 +124,23 @@ export async function login(email: string, password: string): Promise<string> {
   return data.token;
 }
 
-/** POST /api/parents/register. Anti-enumeration: always 201 on a valid shape. */
-export async function register(email: string, password: string): Promise<void> {
+/**
+ * POST /api/parents/register. Anti-enumeration: always 201 on a valid shape.
+ * `acceptedTerms` must come from the caller's own checkbox state — the
+ * backend rejects a `false` with 400, same as parent.html's signup form.
+ * There is no terms-version field on the wire; the server always stamps
+ * its own current version (`ParentService.CurrentTermsVersion`) regardless
+ * of what the client sends.
+ */
+export async function register(
+  email: string,
+  password: string,
+  acceptedTerms: boolean,
+): Promise<void> {
   const res = await fetch(url('/api/parents/register'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, acceptedTerms: true }),
+    body: JSON.stringify({ email, password, acceptedTerms }),
   });
   if (!res.ok) {
     throw new ApiError(res.status === 400 ? 'e_register_shape' : 'e_generic');

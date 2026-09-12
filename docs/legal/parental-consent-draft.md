@@ -315,16 +315,21 @@ CLAUDE.md's "never touch auth without a plan and owner approval" rule.
   (`#signupAcceptTerms`) the user must tick, linked to `/terms.html` and
   `/privacy.html`, gating the submit button client-side
   (`parent.html:3383,3389`).
-- **`mobile/AregParent/src/api.ts:132` hardcodes `acceptedTerms: true` on
-  every register call. The mobile registration screen
-  (`mobile/AregParent/src/screens/LoginScreen.tsx:25,42-45,72-115`) shows
-  no terms/privacy link and no checkbox at all** — a parent registering
-  from the phone app today is recorded as having accepted terms they were
-  never shown. This is not a "verifiable consent" gap so much as a
-  **currently-shipping falsehood in the audit trail** (`TermsAcceptedAt`
-  is stamped as if the parent agreed, and they were never asked) — flagging
-  this as the single item in this whole document the owner should treat as
-  most urgent, independent of whatever else is decided below.
+- **`mobile/AregParent/src/api.ts:132` hardcoded `acceptedTerms: true` on
+  every register call. The mobile registration screen showed no
+  terms/privacy link and no checkbox at all** — a parent registering
+  from the phone app was recorded as having accepted terms they were
+  never shown. This was not a "verifiable consent" gap so much as a
+  **shipping falsehood in the audit trail** (`TermsAcceptedAt` stamped as
+  if the parent agreed, and they were never asked). **Fixed (N9,
+  2026-09-12):** `LoginScreen.tsx` now shows an unchecked-by-default
+  checkbox (same wording as `parent.html`'s `#signupAcceptTerms`) with
+  links to `/terms.html` and `/privacy.html`, gates the register button
+  until checked, and `api.ts`'s `register()` sends the checkbox's real
+  state instead of a literal `true`. This closes the audit-trail
+  falsehood; it does **not** implement any of the "verifiable parental
+  consent" options below — that design decision is still open and still
+  the owner's.
 
 **What today's flow does NOT establish:** that the *account holder* is
 actually an adult, and that they are actually the child's parent/guardian
@@ -382,9 +387,9 @@ complete.
   regulatory exposure is Armenian law and general GDPR-style hygiene, not
   US COPPA enforcement specifically.
 
-**Recommendation:** (a), with the mobile hardcoded-consent bug fixed as
-part of the same change regardless of which option is chosen — that part
-isn't really a design decision, it's a defect. (b) is worth revisiting
+**Recommendation:** (a). The mobile hardcoded-consent bug itself is fixed
+(N9) independent of which option is chosen — that part was never really a
+design decision, it was a defect. (b) is worth revisiting
 once there is an actual US-market/COPPA-enforcement reason to want a
 stronger evidentiary trail; (c) is not recommended at this stage for the
 reasons above.
@@ -404,8 +409,9 @@ owner can scope a slice precisely):
 - `wwwroot/parent.html:1048-1069` — new/updated checkbox copy (route
   through `ux-ui-designer` per CLAUDE.md, this is a UI change).
 - `mobile/AregParent/src/screens/LoginScreen.tsx` and
-  `mobile/AregParent/src/api.ts:132` — add the missing checkbox/links and
-  stop hardcoding `acceptedTerms: true`.
+  `mobile/AregParent/src/api.ts` — checkbox/links landed (N9); the
+  distinct `ConsentAcceptedAt`/`ConsentVersion` fields this option
+  proposes are still not implemented.
 - `wwwroot/privacy.html` — the gaps listed in §1 should land in the same
   revision as this change, not a separate one, so the policy a parent
   agrees to actually describes what happens to their data.

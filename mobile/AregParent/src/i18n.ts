@@ -194,6 +194,19 @@ const D = {
     ru: 'Аккаунт готов. Войдите, пожалуйста.',
     hy: 'Ձեր հաշիվը պատրաստ է։ Խնդրում ենք մուտք գործել։',
   },
+  // Same wording as parent.html's signupAcceptTerms checkbox — reviewed
+  // Armenian, kept in step on purpose (CLAUDE.md's mirrored-copy rule).
+  accept_terms: {
+    en: 'I accept the Terms of Service and the Privacy Policy.',
+    ru: 'Я принимаю Условия использования и Политику конфиденциальности.',
+    hy: 'Ընդունում եմ Օգտագործման պայմանները և Գաղտնիության քաղաքականությունը։',
+  },
+  terms_link: { en: 'Terms of Service', ru: 'Условия использования', hy: 'Օգտագործման պայմաններ' },
+  privacy_link: {
+    en: 'Privacy Policy',
+    ru: 'Политика конфиденциальности',
+    hy: 'Գաղտնիության քաղաքականություն',
+  },
 
   // ---------- the diary ----------
   // Named as things that happened, not as screens. Short enough for three
