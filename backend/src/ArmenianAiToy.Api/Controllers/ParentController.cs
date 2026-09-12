@@ -142,13 +142,18 @@ public class ParentController : ControllerBase
             return BadRequest(new { error = "New password must be different from the current password." });
 
         var parentId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var changed = await _parentService.ChangePasswordAsync(
+        var freshToken = await _parentService.ChangePasswordAsync(
             parentId, request.CurrentPassword, request.NewPassword);
 
-        if (!changed)
+        if (freshToken is null)
             return BadRequest(new { error = "Current password is incorrect." });
 
-        return Ok(new { changed = true });
+        // N10 — the token that authorized this request is now invalid
+        // (security stamp rotated); the response carries a fresh one,
+        // additively beside the existing `changed` flag, so the caller
+        // stays signed in while every other session of the account is
+        // signed out.
+        return Ok(new { changed = true, token = freshToken });
     }
 
     /// <summary>

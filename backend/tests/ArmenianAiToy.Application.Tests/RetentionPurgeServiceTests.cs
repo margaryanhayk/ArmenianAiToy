@@ -1100,6 +1100,8 @@ public class RetentionPurgeServiceTests
             lastLoginAt: DateTime.UtcNow.AddDays(-260),
             dormancyWarnedAt: DateTime.UtcNow.AddDays(-30),
             googleSubject: "gsub-anonymize-scrub-test");
+        var stampBefore = ParentService.GenerateSecurityStamp();
+        h.Db.Set<Parent>().Local.Single(p => p.Id == parentId).SecurityStamp = stampBefore;
         await h.Db.SaveChangesAsync();
         var before = DateTime.UtcNow;
 
@@ -1111,6 +1113,11 @@ public class RetentionPurgeServiceTests
         Assert.Null(row.GoogleSubject);
         Assert.Null(row.LastLoginAt);
         Assert.Null(row.DormancyWarnedAt);
+        // N10 — anonymize rotates the security stamp too, so a token
+        // issued before the scrub cannot match even if the AnonymizedAt
+        // filter were ever relaxed.
+        Assert.NotEqual(stampBefore, row.SecurityStamp);
+        Assert.Matches("^[0-9a-f]{32}$", row.SecurityStamp);
         Assert.NotNull(row.AnonymizedAt);
         Assert.InRange(row.AnonymizedAt!.Value, before, DateTime.UtcNow);
 

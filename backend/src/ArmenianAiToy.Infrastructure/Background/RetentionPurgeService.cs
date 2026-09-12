@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using ArmenianAiToy.Application.Audio;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Notifications;
+using ArmenianAiToy.Application.Services;
 using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Infrastructure.Audio;
@@ -744,6 +745,11 @@ public sealed class RetentionPurgeService : BackgroundService
             parent.LastLoginAt = null;
             parent.DormancyWarnedAt = null;
             parent.AnonymizedAt = nowUtc;
+            // N10 — belt and braces: AnonymizedAt alone already makes the
+            // validator reject this row's tokens; rotating the stamp too
+            // means even a future relaxation of that check could not
+            // revive a pre-anonymization token.
+            parent.SecurityStamp = ParentService.GenerateSecurityStamp();
 
             // C2.2b — DB-first ordering. Commit the link removals,
             // orphan device deletes, and parent scrub BEFORE running

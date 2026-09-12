@@ -105,5 +105,21 @@ public class Parent
     /// </summary>
     public string? GoogleSubject { get; set; }
 
+    /// <summary>
+    /// Per-parent security stamp (N10). A random opaque value minted at
+    /// registration (password or Google) and carried into every parent
+    /// JWT as the <c>sst</c> claim; <c>Program.cs</c>'s
+    /// <c>OnTokenValidated</c> rejects a token whose claim no longer
+    /// matches the row. Rotated on password change, password-reset
+    /// completion and dormancy anonymization — NOT on ordinary login —
+    /// so a 30-day token issued before any of those stops validating
+    /// the moment they happen. Never logged, never exposed on any DTO;
+    /// it is not a secret in the credential sense (it grants nothing on
+    /// its own) but it is not for anyone to read either. Existing rows
+    /// were backfilled with a distinct random value by the
+    /// <c>AddParentSecurityStamp</c> migration. See CLAUDE.md § Auth.
+    /// </summary>
+    public string SecurityStamp { get; set; } = string.Empty;
+
     public ICollection<ParentDevice> ParentDevices { get; set; } = new List<ParentDevice>();
 }

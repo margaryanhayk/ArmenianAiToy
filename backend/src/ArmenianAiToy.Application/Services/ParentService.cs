@@ -239,7 +239,8 @@ public class ParentService : IParentService
             PasswordHash = hash,
             RegisteredAt = now,
             TermsAcceptedAt = now,
-            TermsVersion = CurrentTermsVersion
+            TermsVersion = CurrentTermsVersion,
+            SecurityStamp = GenerateSecurityStamp()
         };
 
         // Email-verification token for the new parent. Collision
@@ -838,21 +839,29 @@ public class ParentService : IParentService
             .ToListAsync();
     }
 
-    public async Task<bool> ChangePasswordAsync(Guid parentId, string currentPassword, string newPassword)
+    public async Task<string?> ChangePasswordAsync(Guid parentId, string currentPassword, string newPassword)
     {
         var parent = await _db.Set<Parent>().FirstOrDefaultAsync(p => p.Id == parentId);
         if (parent == null)
-            return false;
+            return null;
 
         if (!BCrypt.Net.BCrypt.Verify(currentPassword, parent.PasswordHash))
-            return false;
+            return null;
 
         parent.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        // N10 — rotating the stamp invalidates every token issued before
+        // this call (including the one that authorized it), so the caller
+        // gets a fresh token carrying the NEW stamp back and stays logged
+        // in; every other session of this account is signed out. Minted
+        // before SaveChanges so a JWT misconfig fails fast without
+        // persisting a half-applied change (same posture as LoginAsync).
+        parent.SecurityStamp = GenerateSecurityStamp();
+        var freshToken = GenerateJwt(parent);
         TrackAndAddAudit(AuditEvent.ParentPasswordChanged(parentId));
         await _db.SaveChangesAsync();
 
         _logger.LogInformation("Parent {ParentId} changed password", parentId);
-        return true;
+        return freshToken;
     }
 
     // Default TTL for reset tokens. Overridable via
@@ -938,6 +947,11 @@ public class ParentService : IParentService
             return false; // parent deleted between issue and completion; token is moot
 
         parent.PasswordHash = _hashPassword(newPassword);
+        // N10 — a completed reset signs out every existing session: the
+        // parent asked for a reset because they (or someone else) could
+        // not use the old credentials, so nothing issued under them may
+        // keep working. The parent logs in fresh with the new password.
+        parent.SecurityStamp = GenerateSecurityStamp();
         row.ConsumedAt = now;
         TrackAndAddAudit(AuditEvent.ParentPasswordResetCompleted(parent.Id));
         await _db.SaveChangesAsync();
@@ -946,6 +960,18 @@ public class ParentService : IParentService
             "Parent {ParentId} completed password reset", parent.Id);
         return true;
     }
+
+    /// <summary>
+    /// N10 — mints a fresh <see cref="Parent.SecurityStamp"/>: 16 CSPRNG
+    /// bytes as 32 lower-case hex chars, the same shape the
+    /// <c>AddParentSecurityStamp</c> migration backfills existing rows
+    /// with (<c>lower(hex(randomblob(16)))</c>). Never logged. Called at
+    /// registration (password and Google), on password change, on
+    /// password-reset completion and by the dormancy anonymize pass —
+    /// never on login.
+    /// </summary>
+    public static string GenerateSecurityStamp()
+        => Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16));
 
     private static string GenerateRawResetToken()
     {
@@ -1233,7 +1259,8 @@ public class ParentService : IParentService
             RegisteredAt = createdAt,
             TermsAcceptedAt = createdAt,
             TermsVersion = CurrentTermsVersion,
-            LastLoginAt = createdAt
+            LastLoginAt = createdAt,
+            SecurityStamp = GenerateSecurityStamp()
         };
         _db.Set<Parent>().Add(parent);
         TrackAndAddAudit(AuditEvent.ParentGoogleSignIn(
@@ -2715,10 +2742,17 @@ public class ParentService : IParentService
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(primary));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
+        // N10 — the "sst" (security stamp) claim pins this token to the
+        // parent's CURRENT SecurityStamp; Program.cs's OnTokenValidated
+        // rejects it once the row's stamp has rotated. Claim name is
+        // deliberately short (JWTs ride in every request header) and is
+        // the one place its spelling lives on the issue side —
+        // ParentSecurityStampClaim.Name is the validator's mirror.
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, parent.Id.ToString()),
-            new Claim(ClaimTypes.Email, parent.Email)
+            new Claim(ClaimTypes.Email, parent.Email),
+            new Claim(ParentSecurityStampClaim.Name, parent.SecurityStamp)
         };
 
         var token = new JwtSecurityToken(

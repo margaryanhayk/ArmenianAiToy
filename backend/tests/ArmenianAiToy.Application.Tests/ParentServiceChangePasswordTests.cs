@@ -10,9 +10,11 @@ namespace ArmenianAiToy.Application.Tests;
 
 /// <summary>
 /// Tests for <c>ParentService.ChangePasswordAsync</c> (B1). The contract:
-/// returns <c>true</c> only when the current password verifies against the
+/// returns a fresh JWT only when the current password verifies against the
 /// stored BCrypt hash; on any failure path (wrong password, unknown parent)
-/// returns <c>false</c> without mutating the stored hash.
+/// returns <c>null</c> without mutating the stored hash. (N10 changed the
+/// success value from <c>true</c> to the fresh token — the stamp rotation
+/// itself is pinned in <c>ParentSecurityStampTests</c>.)
 /// </summary>
 public class ParentServiceChangePasswordTests
 {
@@ -62,7 +64,7 @@ public class ParentServiceChangePasswordTests
 
         var result = await service.ChangePasswordAsync(parentId, "oldPassword123", "newPassword456");
 
-        Assert.True(result);
+        Assert.NotNull(result);
         var updated = await db.Set<Parent>().FindAsync(parentId);
         Assert.NotNull(updated);
         Assert.True(BCrypt.Net.BCrypt.Verify("newPassword456", updated!.PasswordHash),
@@ -72,7 +74,7 @@ public class ParentServiceChangePasswordTests
     }
 
     [Fact]
-    public async Task ChangePasswordAsync_WrongCurrentPassword_ReturnsFalseAndDoesNotMutate()
+    public async Task ChangePasswordAsync_WrongCurrentPassword_ReturnsNullAndDoesNotMutate()
     {
         var (service, db) = CreateService();
         var parentId = await SeedParentAsync(db, "oldPassword123");
@@ -80,20 +82,20 @@ public class ParentServiceChangePasswordTests
 
         var result = await service.ChangePasswordAsync(parentId, "wrongCurrent", "newPassword456");
 
-        Assert.False(result);
+        Assert.Null(result);
         var unchanged = await db.Set<Parent>().FindAsync(parentId);
         Assert.Equal(originalHash, unchanged!.PasswordHash);
     }
 
     [Fact]
-    public async Task ChangePasswordAsync_UnknownParent_ReturnsFalse()
+    public async Task ChangePasswordAsync_UnknownParent_ReturnsNull()
     {
         var (service, _) = CreateService();
 
         var result = await service.ChangePasswordAsync(
             Guid.NewGuid(), "anything", "newPassword456");
 
-        Assert.False(result);
+        Assert.Null(result);
     }
 
     [Fact]
@@ -102,7 +104,7 @@ public class ParentServiceChangePasswordTests
         var (service, db) = CreateService();
         var parentId = await SeedParentAsync(db, "oldPassword123");
 
-        Assert.True(await service.ChangePasswordAsync(parentId, "oldPassword123", "newPassword456"));
+        Assert.NotNull(await service.ChangePasswordAsync(parentId, "oldPassword123", "newPassword456"));
 
         var audits = await db.Set<AuditEvent>().ToListAsync();
         var audit = Assert.Single(audits);
@@ -120,7 +122,7 @@ public class ParentServiceChangePasswordTests
         var (service, db) = CreateService();
         var parentId = await SeedParentAsync(db, "oldPassword123");
 
-        Assert.False(await service.ChangePasswordAsync(parentId, "wrong", "newPassword456"));
+        Assert.Null(await service.ChangePasswordAsync(parentId, "wrong", "newPassword456"));
 
         Assert.Empty(await db.Set<AuditEvent>().ToListAsync());
     }

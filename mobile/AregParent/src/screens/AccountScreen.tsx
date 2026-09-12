@@ -23,6 +23,7 @@ import { LANG_NAMES, LANGS, getLanguage, setLanguage, t, tf } from '../i18n';
 import { useLang } from '../useLang';
 import PasswordInput from '../PasswordInput';
 import { theme } from '../theme';
+import { saveToken } from '../auth';
 
 type Props = {
   onBack: () => void;
@@ -119,7 +120,10 @@ export default function AccountScreen({
     }
     setBusy(true);
     try {
-      await changePassword(curPw, newPw);
+      const freshToken = await changePassword(curPw, newPw);
+      // N10: the old token is now rejected server-side; store the fresh one
+      // so this session stays signed in.
+      if (freshToken) await saveToken(freshToken);
       setCurPw('');
       setNewPw('');
       ok(t('password_changed'));

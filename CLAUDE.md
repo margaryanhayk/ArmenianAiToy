@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 2955 tests, ~35 s in Release
+dotnet test            # 2997 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -118,7 +118,10 @@ Key files: `ChatService.cs`, `ModeDetector.cs` (5-mode keyword detection),
 `ContentSyncOptions.cs` / `ContentManifestService.cs` (what toys download).
 
 Auth: devices use `X-Device-Id`/`X-Api-Key` (revocable via `Device.IsRevoked`);
-parents use JWT (`Jwt:Keys` rotation list); operators use the fail-closed
+parents use JWT (`Jwt:Keys` rotation list; each token carries the parent's
+`SecurityStamp` as the `sst` claim and stops validating once a password
+change / reset / anonymization rotates it — `Jwt:RequireSecurityStamp`,
+default true, is the rollback switch); operators use the fail-closed
 `/api/internal/*` bearer gate (`Internal:Operators`, optional JIT sessions +
 TOTP). Everything sensitive is audited in the append-only, FK-free
 `AuditEvents` table; system-actor rows have null `ActorParentId` and are
@@ -849,6 +852,19 @@ gating the register button; `api.ts` sends its real state instead of a
 hardcoded `true`. `npx tsc --noEmit` clean; no test suite exists for this
 app. NOT done: nothing here has run on a device — same standing mobile
 limitation as every entry above.
+
+### Parent JWT security stamp (2026-09-12, N10)
+
+`Parent.SecurityStamp` (32 hex, minted at register/Google sign-up, rotated
+on password change, reset completion and dormancy anonymize — never on
+login) rides in every parent JWT as `sst`; `ParentTokenValidation` (the
+extracted `OnTokenValidated`, one query) rejects a stale/missing claim with
+the same body-less 401. `POST /api/parents/password` now returns a fresh
+`token` beside `changed`; parent.html and mobile store it. One-time deploy
+effect: every logged-in parent logs in once (`docs/ops-runbook.md`). The
+hand-written migration backfills a distinct random stamp per existing row.
+`dotnet test` green (2997 tests, 42 new); migration verified by upgrading
+a real pre-N10 DB with rows. NOT verified: a real browser/phone session.
 
 ## Working in this repo (agents)
 
