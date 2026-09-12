@@ -14,12 +14,15 @@ import {
   addChild,
   claimDevice,
   createInvite,
+  deleteChild,
   redeemInvite,
   errText,
   getDevices,
   LinkedDevice,
+  LinkedDeviceChild,
   renameDevice,
   setRevoked,
+  unlinkDevice,
   UnauthorizedError,
 } from '../api';
 import { getLanguage, t, tf } from '../i18n';
@@ -188,6 +191,36 @@ export default function DevicesScreen({
     }
   }
 
+  // Unlink = factory reset that keeps the Device row (see api.ts's
+  // unlinkDevice doc comment). Distinct from revoke: revoke is a reversible
+  // pause, unlink permanently erases this family's data on the toy and
+  // frees it to be claimed again — hence its own, stronger confirm text.
+  function confirmUnlink(d: LinkedDevice) {
+    const label = d.deviceName || t('this_toy');
+    Alert.alert(
+      tf('confirm_unlink_title', { name: label }),
+      t('confirm_unlink_body'),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('unlink_device'),
+          style: 'destructive',
+          onPress: () => void doUnlink(d.deviceId),
+        },
+      ],
+    );
+  }
+
+  async function doUnlink(deviceId: string) {
+    try {
+      await unlinkDevice(deviceId);
+      await load();
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return onLogout();
+      setError(errText(err));
+    }
+  }
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -321,6 +354,7 @@ export default function DevicesScreen({
           <DeviceCard
             device={item}
             onRevoke={confirmRevoke}
+            onUnlink={confirmUnlink}
             onRenamed={load}
             onLogout={onLogout}
             onOpen={() => onOpenDevice(item)}
@@ -487,6 +521,7 @@ function InviteBlock({ deviceId }: { deviceId: string }) {
 function DeviceCard({
   device,
   onRevoke,
+  onUnlink,
   onRenamed,
   onLogout,
   onOpen,
@@ -496,6 +531,7 @@ function DeviceCard({
 }: {
   device: LinkedDevice;
   onRevoke: (d: LinkedDevice) => void;
+  onUnlink: (d: LinkedDevice) => void;
   onRenamed: () => Promise<void> | void;
   onLogout: () => void;
   onOpen: () => void;
@@ -520,9 +556,35 @@ function DeviceCard({
     }
   }
 
-  const childLine = device.children
-    .map((c) => (c.age != null ? tf('child_with_age', { name: c.name, n: c.age }) : c.name))
-    .join(', ');
+  function confirmDeleteChild(c: LinkedDeviceChild) {
+    const label = c.name || t('this_child');
+    Alert.alert(
+      tf('confirm_delete_child_title', { name: label }),
+      tf('confirm_delete_child_body', { name: label }),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          // delete_word ("Ջնջել"), not remove_child ("Հեռացնել") — the
+          // title/body above ask "Ջնջե՞լ...": Alert.alert shows the button
+          // text directly under that title, so the two must use the same
+          // verb (armenian-linguistic-reviewer, N7). remove_child stays the
+          // label for the standing per-child row link below, a separate
+          // element unaffected by this dialog's wording.
+          text: t('delete_word'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteChild(c.childId);
+              await onRenamed();
+            } catch (err) {
+              if (err instanceof UnauthorizedError) return onLogout();
+              Alert.alert(errText(err));
+            }
+          },
+        },
+      ],
+    );
+  }
 
   // Returns the sentence AND whether it is a fault, because the two fault
   // verdicts must not sit in the same quiet grey as a progress note.
@@ -606,8 +668,29 @@ function DeviceCard({
         </Text>
       ) : null}
 
-      {childLine ? (
-        <Text style={styles.children}>{childLine}</Text>
+      {device.children.length > 0 ? (
+        // One row per child, each with its own Remove — a joined comma
+        // line had no way to single one out. Deleting a child also
+        // deletes their conversations (service-side cascade); the confirm
+        // text says so explicitly (see confirmDeleteChild above).
+        device.children.map((c) => (
+          <View key={c.childId} style={styles.childRow}>
+            <Text style={styles.children} numberOfLines={1}>
+              {c.age != null ? tf('child_with_age', { name: c.name, n: c.age }) : c.name}
+            </Text>
+            {/* Padding gives a real 44px target instead of hitSlop, which
+                grows the touch area invisibly — with two Remove links a
+                childRow apart, invisible overlap is how the wrong child
+                gets deleted (ux-ui-designer, N7). */}
+            <Pressable
+              onPress={() => confirmDeleteChild(c)}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('remove_child')} — ${c.name}`}
+            >
+              <Text style={styles.childRemove}>{t('remove_child')}</Text>
+            </Pressable>
+          </View>
+        ))
       ) : (
         /* No child profile means the toy has no name, no age and no GENDER
            for the prompt - and Armenian grammar needs the gender, so it is
@@ -675,11 +758,29 @@ function DeviceCard({
         </Pressable>
       </View>
 
-      <Pressable style={styles.revokeBtn} onPress={() => onRevoke(device)}>
-        <Text style={[styles.revokeText, { color: device.isRevoked ? theme.ok : theme.danger }]}>
-          {device.isRevoked ? t('restore_access') : t('revoke_access')}
-        </Text>
-      </Pressable>
+      {/* Revoke (reversible pause) and unlink (permanent, keeps the Device
+          row — see api.ts's unlinkDevice) sit side by side: both are
+          account-level controls over this toy, but they must never be
+          mistaken for each other, hence the distinct wording and the
+          stronger confirm text on unlink. */}
+      <View style={styles.dangerRow}>
+        {/* Reversible: amber (theme.warn), bare text — a pause is not
+            dressed up as destructive. */}
+        <Pressable style={styles.revokeBtn} onPress={() => onRevoke(device)} accessibilityRole="button">
+          <Text style={[styles.revokeText, { color: device.isRevoked ? theme.ok : theme.warn }]}>
+            {device.isRevoked ? t('restore_access') : t('revoke_access')}
+          </Text>
+        </Pressable>
+        {/* Irreversible: bordered, filled, deep-pomegranate — same visual
+            grammar as AccountScreen's own delete-account control, so the
+            app has one look for "this cannot be undone", not two
+            (ux-ui-designer, N7: the two controls used to be visually
+            identical, a reversible pause dressed as destructive as the
+            permanent wipe next to it). */}
+        <Pressable style={styles.unlinkBtn} onPress={() => onUnlink(device)} accessibilityRole="button">
+          <Text style={styles.unlinkText}>{t('unlink_device')}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -771,7 +872,25 @@ const styles = StyleSheet.create({
   faultCodeLine: { color: theme.danger, marginTop: 6, fontSize: 13, lineHeight: 19 },
   faultCodeValue: { fontWeight: '700' },
   usageLine: { color: theme.inkMuted, marginTop: 6, fontSize: 13, lineHeight: 19 },
-  children: { color: theme.inkMuted, marginTop: 6 },
+  // theme.ink/15px, not the muted caption style the joined line used to be:
+  // the name is the content, "Remove" is the destructive control, and the
+  // control must not outrank what it destroys (ux-ui-designer, N7).
+  children: { color: theme.ink, fontSize: 15, flexShrink: 1 },
+  childRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    minHeight: 44,
+    marginTop: 6,
+  },
+  childRemove: {
+    color: theme.danger,
+    fontSize: 13,
+    fontWeight: '500',
+    paddingVertical: 12,
+    paddingLeft: 12,
+  },
   libraryLine: { color: theme.inkMuted, marginTop: 6, fontSize: 13, lineHeight: 19 },
   // Something went wrong rather than "not finished yet", so it is coloured
   // like a fault rather than sitting in the same grey as a progress note.
@@ -876,7 +995,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   saveBtnText: { color: theme.brand, fontWeight: '600' },
-  revokeBtn: { marginTop: 10, alignSelf: 'flex-start' },
-  revokeText: { fontWeight: '600' },
+  dangerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: 10,
+    rowGap: 8,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: theme.line,
+  },
+  revokeBtn: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
+  revokeText: { fontWeight: '600', fontSize: 14 },
+  unlinkBtn: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.dangerLine,
+    backgroundColor: theme.dangerBg,
+  },
+  unlinkText: { fontWeight: '700', fontSize: 14, color: theme.dangerDeep },
   error: { color: theme.danger, marginVertical: 8 },
 });

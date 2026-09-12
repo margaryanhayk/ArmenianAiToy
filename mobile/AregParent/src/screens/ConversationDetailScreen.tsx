@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Sharing from 'expo-sharing';
 import {
   ApiError,
   ConversationDetail,
   ConversationMessage,
+  deleteConversation,
   errText,
   getConversation,
   UnauthorizedError,
@@ -60,6 +61,33 @@ export default function ConversationDetailScreen({ conversationId, onBack, onLog
   // web dashboard's own view-change behaviour (releaseObjectUrls on nav).
   useEffect(() => () => stopPlayback(), []);
 
+  // Hard delete — messages cascade at the DB level, no recovery path. On
+  // success, onBack() returns to the conversation list, which remounts and
+  // reloads on its own (same as every other back-navigation in this app),
+  // so the deleted row is simply gone rather than needing a manual refresh.
+  function confirmDelete() {
+    Alert.alert(
+      t('confirm_delete_conversation_title'),
+      t('confirm_delete_conversation_body'),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('delete_word'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteConversation(conversationId);
+              onBack();
+            } catch (err) {
+              if (err instanceof UnauthorizedError) return onLogout();
+              Alert.alert(errText(err));
+            }
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Pressable onPress={onBack}>
@@ -78,6 +106,17 @@ export default function ConversationDetailScreen({ conversationId, onBack, onLog
           keyExtractor={(m) => m.id}
           renderItem={({ item }) => <Bubble message={item} />}
           ListEmptyComponent={<Text style={styles.empty}>{t('no_messages')}</Text>}
+          // Below the transcript, not opposite Back — that top-right slot is
+          // where iOS/Android put Done/Save, and an irreversible delete there
+          // is a muscle-memory trap (ux-ui-designer, N7). Only offered once
+          // a conversation actually loaded, same as before.
+          ListFooterComponent={
+            detail ? (
+              <Pressable style={styles.deleteBtn} onPress={confirmDelete} accessibilityRole="button">
+                <Text style={styles.deleteLink}>{t('delete_conversation')}</Text>
+              </Pressable>
+            ) : null
+          }
         />
       )}
     </View>
@@ -216,6 +255,16 @@ function AudioRow({
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, paddingTop: 56, backgroundColor: theme.surface },
   back: { color: theme.brand, fontSize: 15, marginBottom: 4 },
+  deleteBtn: {
+    alignSelf: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  deleteLink: { color: theme.dangerDeep, fontSize: 13, fontWeight: '600' },
   title: { fontSize: 22, fontWeight: '700', color: theme.brand, marginBottom: 12 },
   error: { color: theme.danger, marginTop: 16 },
   empty: { textAlign: 'center', color: theme.inkHint, marginTop: 24 },

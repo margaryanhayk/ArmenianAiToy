@@ -248,6 +248,37 @@ export async function setRevoked(deviceId: string, revoked: boolean): Promise<vo
   if (!res.ok) throw new ApiError('e_generic');
 }
 
+/**
+ * DELETE /api/parents/devices/{id}/link. Unlink = factory reset that keeps
+ * the Device row: only this parent's join row is removed, so the toy's
+ * data for THIS family (its children, conversations, messages) is gone for
+ * this account, but the toy itself is untouched and can be claimed again
+ * by anyone who scans the QR on it. Idempotent — mirrors parent.html's
+ * unlinkDevice.
+ */
+export async function unlinkDevice(deviceId: string): Promise<void> {
+  const res = await fetch(url(`/api/parents/devices/${encodeURIComponent(deviceId)}/link`), {
+    method: 'DELETE',
+    headers: await authHeader(),
+  });
+  if (res.status === 401) throw new UnauthorizedError();
+  if (!res.ok) throw new ApiError('e_generic');
+}
+
+/**
+ * DELETE /api/parents/children/{id}. Hard delete: the child's profile and
+ * all of its conversations/messages are gone for good (service-side
+ * cascade). Mirrors parent.html's deleteChild.
+ */
+export async function deleteChild(childId: string): Promise<void> {
+  const res = await fetch(url(`/api/parents/children/${encodeURIComponent(childId)}`), {
+    method: 'DELETE',
+    headers: await authHeader(),
+  });
+  if (res.status === 401) throw new UnauthorizedError();
+  if (!res.ok) throw new ApiError('e_generic');
+}
+
 async function getJson<T>(path: string): Promise<T> {
   let res: Response;
   try {
@@ -319,6 +350,20 @@ export async function getConversation(conversationId: string): Promise<Conversat
     `/api/conversations/${encodeURIComponent(conversationId)}`,
   );
   return data.conversation;
+}
+
+/**
+ * DELETE /api/conversations/{id}. Hard delete: every message in it cascades
+ * at the DB level, no recovery path. Mirrors parent.html's
+ * deleteConversation.
+ */
+export async function deleteConversation(conversationId: string): Promise<void> {
+  const res = await fetch(url(`/api/conversations/${encodeURIComponent(conversationId)}`), {
+    method: 'DELETE',
+    headers: await authHeader(),
+  });
+  if (res.status === 401) throw new UnauthorizedError();
+  if (!res.ok) throw new ApiError('e_generic');
 }
 
 // ── Story plays, library, music, requests, activity ────────────────────

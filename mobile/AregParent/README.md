@@ -28,7 +28,10 @@ the repo root `CLAUDE.md`.
   line ("N of M questions today"); pair by code or by pasting a pairing QR's
   decoded text (`/devices/claim`), a short invite code instead
   (`/devices/redeem-invite`), or generate one to share with a second parent
-  (`/devices/{id}/invite`); rename (`/name`), revoke/restore (`/revoke`).
+  (`/devices/{id}/invite`); rename (`/name`), revoke/restore (`/revoke`),
+  unlink (`DELETE /devices/{id}/link`, 2026-09-12 — factory reset that
+  keeps the Device row, the toy can be claimed again), add/remove a child
+  profile (`POST`/`DELETE /api/children`).
 - **Story library** — freshness line (up to date / syncing / none yet /
   sync failed / crash-looping), per-story listen counts, parent-language
   descriptions (`/api/parents/stories`).
@@ -38,7 +41,8 @@ the repo root `CLAUDE.md`.
   (`/conversations/{id}`), with **▶ Listen** on Areg's spoken replies and
   **▶ Listen / ⬇ Save recording** on the child's own recordings
   (2026-09-11, C2.1/C2.2 — new this slice, native-only via `expo-audio` +
-  `expo-sharing`, not available on web).
+  `expo-sharing`, not available on web); delete a single conversation
+  (2026-09-12, `DELETE /conversations/{id}`).
 - **Safety** — Flagged view (`/conversations/flagged`) with an "all clear"
   state; tap through to the conversation.
 - **Stories heard / games played** — per-toy listen and play history with
@@ -146,6 +150,19 @@ Profiles (`eas.json`):
 - **development** — dev client + live reload (`npx expo start --dev-client`). Best for iterating + Bluetooth testing.
 - **production** — store / TestFlight build. Already points at the live
   HTTPS backend.
+
+**Before any store build, two things still need a real account (owner's,
+not this session's):**
+- `app.json`'s `expo.owner` field was a placeholder EAS account
+  (`test111111s-team`) that cannot actually own this project — removed
+  rather than left in place, so `eas build`/`submit` fail loudly (an
+  ownership mismatch against the logged-in account) instead of silently
+  targeting the wrong team. **Set `owner` to the real EAS account slug
+  before any store build.**
+- `eas.json`'s `submit.production` block is empty (`{}`) — no App Store
+  Connect / Google Play credentials configured. `eas submit` will prompt
+  interactively the first time; for a repeatable pipeline, fill this in
+  with the real account's credentials once they exist.
 
 The backend URL is baked in at build time from `eas.json` →
 `env.EXPO_PUBLIC_API_BASE_URL`:
