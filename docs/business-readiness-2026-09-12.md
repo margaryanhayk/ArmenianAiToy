@@ -61,7 +61,16 @@ Ordered by what unblocks the most.
    off-by-default (N5); Railway env vars still OWNER.**
 6. **Backup restore drill, once, documented.** Snapshots exist
    (`docs/ops-runbook.md:93-107`) but no restore has ever been proven.
-   *(night session, against a throwaway DB, evidence file)*
+   *(night session, against a throwaway DB, evidence file)* — **done
+   locally (N6):** a scripted drill (`tools/ops/restore_drill.sh`) boots
+   the real API against a throwaway DB, creates data through the public
+   API, pulls a snapshot the same way `GET /api/internal/backup` does,
+   restores it to a fresh path, boots a second instance on it, and proves
+   row counts + a parent login match — run twice, both green (evidence:
+   `tools/quality-evidence/backup-restore-drill-20260912.md`).
+   `docs/ops-runbook.md` gained a step-by-step "Restore procedure" section
+   an operator can follow. **Restoring against the real Railway volume,
+   and pulling a snapshot over the network, are still OWNER's to prove.**
 7. **Alerting.** Nothing pages anyone when health fails, the cost cap
    trips, or the OpenAI circuit opens. `/metrics` exists but nothing reads
    it. *(night session: webhook alerter, off by default)* — **done (N5):**
