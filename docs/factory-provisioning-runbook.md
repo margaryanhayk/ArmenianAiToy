@@ -104,6 +104,39 @@ printed and every image is flashed.
 
 Print `label.pdf`, affix it to the box, move to the next unit.
 
+## 2a. Load the SD card
+
+Between the NVS burn (above) and printing the label: the toy's identity is
+now burned, so its device id/key can authenticate a content-manifest
+fetch. Mount the card the toy will ship with (formatted FAT32, empty is
+fine — no `AREG_PROVISION_IDENTITY_ONCE`-style flag on the toy gates
+trusting a pre-written index; `story_select.cpp` reads
+`/content_index.json` straight off the card at playback time) and run:
+
+```bash
+export AREG_DEVICE_ID=<deviceId from the register step>
+export AREG_DEVICE_KEY=<apiKey from the register step -- never a CLI flag>
+python3 tools/factory/load_sd_card.py \
+    --backend http://<backend-host>:<port> \
+    --mount /media/<the-mounted-card>
+```
+
+This downloads every enabled, non-retired story/clip/music/voice/game
+clip this device is entitled to, sha256-verifies each one, and writes
+`/content_index.json` in the exact shape a real Wi-Fi content sync would
+have left — so the toy's FIRST boot already has every story, with no wait
+on the ~180 s post-boot sync. Re-running it (a card that already has some
+files from a previous attempt) skips anything whose sha256 already
+matches; `--dry-run` prints the plan without touching the card, and
+`--verify` checks an already-loaded card against the current manifest with
+no writes. Exit code is non-zero on any download/verification failure —
+read the printed reason before shipping that card. See the script's own
+docstring for the full on-card contract (directory layout, file naming,
+the index schema) with exact firmware source citations.
+
+Unmount the card only after a `0` exit code (or a following `--verify`
+passes), then proceed to render the label below.
+
 ## 3. No serial port on the bench (register + flash later)
 
 Drop `--port`. The script still registers, builds `nvs.bin`, and renders the

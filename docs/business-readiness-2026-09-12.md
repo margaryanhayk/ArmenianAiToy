@@ -71,7 +71,12 @@ Ordered by what unblocks the most.
 9. **SD-card content loading is undocumented and unscripted** for the
    factory. Identity provisioning is automated
    (`tools/factory/provision_toy.py`) but the card that carries every story
-   is a manual step. *(night session: `tools/factory/load_sd_card.py`)*
+   is a manual step. *(night session: `tools/factory/load_sd_card.py`)* —
+   **done (N3): `tools/factory/load_sd_card.py` downloads every entitled
+   item and writes a firmware-shaped `/content_index.json`; runbook §2a.
+   Verified against a live throwaway backend (240 items, ~117 MB, the full
+   real story/music/voice/game catalogue) — a real card in a real toy is
+   still NOT verified.**
 10. **OWNER + legal — parental consent.** Add COPPA / GDPR-K wording and a
     verifiable parental-consent step (not just a ToS click). *(night session
     drafts the text; owner signs off; consent step is a HARD STOP)*
@@ -148,7 +153,8 @@ price.
 1. Flash the release image (cable; `docs/ota-release-runbook.md`).
 2. `tools/factory/provision_toy.py`: register, per-toy PoP, NVS burn, label.
 3. Delete the plaintext `nvs.bin` (manual, trusted step).
-4. Load the SD card — **no script, no doc** (mandatory item 9).
+4. Load the SD card — `tools/factory/load_sd_card.py`
+   (`docs/factory-provisioning-runbook.md` §2a; mandatory item 9, **done N3**).
 5. Print the claim QR (already on the label).
 6. Box it.
 
