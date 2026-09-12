@@ -259,4 +259,37 @@ public class GeminiChatClientAdapterTests
             Assert.Equal("BLOCK_MEDIUM_AND_ABOVE", s.GetProperty("threshold").GetString());
         }
     }
+
+
+    // N11: the caller's token (a toy that dropped mid-turn) reaches the
+    // HTTP call and aborts it.
+    private sealed class HangingHandler : HttpMessageHandler
+    {
+        public CancellationToken SeenToken;
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken ct)
+        {
+            SeenToken = ct;
+            await Task.Delay(Timeout.Infinite, ct);
+            throw new InvalidOperationException("unreachable");
+        }
+    }
+
+    [Fact]
+    public async Task CallerCancellation_AbortsTheHttpCall()
+    {
+        var handler = new HangingHandler();
+        var svc = new GeminiChatClientAdapter(
+            new HttpClient(handler), "test-key", "gemini-3-flash-preview",
+            Substitute.For<ILogger<GeminiChatClientAdapter>>());
+        using var cts = new CancellationTokenSource();
+        cts.CancelAfter(TimeSpan.FromMilliseconds(50));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            svc.GetCompletionAsync(
+                "SYSTEM", new List<(string, string)> { ("user", "խաղանք") }, cts.Token));
+
+        Assert.True(handler.SeenToken.CanBeCanceled);
+        Assert.True(handler.SeenToken.IsCancellationRequested);
+    }
 }

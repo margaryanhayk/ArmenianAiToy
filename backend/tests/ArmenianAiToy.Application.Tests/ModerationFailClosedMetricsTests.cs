@@ -284,7 +284,8 @@ public class ModerationFailClosedMetricsTests
             Logger = logger;
         }
 
-        protected override Task<ModerationResult> ClassifyOnceAsync(string content)
+        protected override Task<ModerationResult> ClassifyOnceAsync(
+            string content, CancellationToken cancellationToken)
         {
             CallCount++;
             if (Responses.Count == 0)

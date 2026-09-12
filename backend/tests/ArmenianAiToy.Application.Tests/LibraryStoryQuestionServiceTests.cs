@@ -47,7 +47,8 @@ public class LibraryStoryQuestionServiceTests
         public List<(string SystemPrompt, List<(string Role, string Content)> Messages)> Calls { get; } = [];
 
         public Task<string> GetCompletionAsync(
-            string systemPrompt, List<(string Role, string Content)> messages)
+            string systemPrompt, List<(string Role, string Content)> messages,
+            CancellationToken cancellationToken = default)
         {
             Calls.Add((systemPrompt, messages));
             if (_responses.Count == 0)

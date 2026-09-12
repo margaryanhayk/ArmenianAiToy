@@ -327,7 +327,8 @@ public class InternalControllerTests
     {
         private readonly string _answer;
         public FixedAi(string answer) => _answer = answer;
-        public Task<string> GetCompletionAsync(string systemPrompt, List<(string Role, string Content)> messages)
+        public Task<string> GetCompletionAsync(string systemPrompt, List<(string Role, string Content)> messages,
+            CancellationToken cancellationToken = default)
             => Task.FromResult(_answer);
     }
 

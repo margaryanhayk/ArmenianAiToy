@@ -87,7 +87,7 @@ public class OpenAIModerationAdapter : IModerationService
         _logger = logger;
     }
 
-    public async Task<AppModerationResult> CheckContentAsync(string content)
+    public async Task<AppModerationResult> CheckContentAsync(string content, CancellationToken cancellationToken = default)
     {
         // Reuse the existing Stopwatch — it already drives the
         // latency_ms field in log messages below. The outer try/finally
@@ -100,7 +100,14 @@ public class OpenAIModerationAdapter : IModerationService
         {
             try
             {
-                return await ClassifyOnceAsync(content);
+                return await ClassifyOnceAsync(content, cancellationToken);
+            }
+            // Caller gone (the toy dropped mid-turn): not a moderation
+            // outage — no fail-closed row, no Error log, no metric. The
+            // adapter's own 10 s timeout keeps the `timeout` branch below.
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (ClientResultException cre) when (cre.Status == 429)
             {
@@ -109,12 +116,16 @@ public class OpenAIModerationAdapter : IModerationService
                     (int)RetryDelay.TotalMilliseconds, Preview(content));
                 try
                 {
-                    await Task.Delay(RetryDelay);
-                    var result = await ClassifyOnceAsync(content);
+                    await Task.Delay(RetryDelay, cancellationToken);
+                    var result = await ClassifyOnceAsync(content, cancellationToken);
                     _logger.LogInformation(
                         "Moderation transient 429 — recovered on retry. latency_ms={LatencyMs} preview={Preview}",
                         sw.ElapsedMilliseconds, Preview(content));
                     return result;
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
                 }
                 catch (Exception retryEx)
                 {
@@ -154,9 +165,11 @@ public class OpenAIModerationAdapter : IModerationService
     /// to simulate specific exceptions or results. Production code always
     /// calls the real <c>ModerationClient</c>.
     /// </summary>
-    protected virtual async Task<AppModerationResult> ClassifyOnceAsync(string content)
+    protected virtual async Task<AppModerationResult> ClassifyOnceAsync(
+        string content, CancellationToken cancellationToken)
     {
-        using var cts = new CancellationTokenSource(RequestTimeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(RequestTimeout);
         var raw = await _client.ClassifyTextAsync(content, cts.Token);
         var categories = raw.Value;
 

@@ -319,4 +319,71 @@ public class ChatControllerPath5Tests
         await deviceService.DidNotReceive().IsModeEnabledForRequestAsync(
             Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<DetectedMode>());
     }
+
+
+    // ─────────────────────────────────────────────────────────────────────
+    // N11: a toy that drops mid-turn. The controller hands
+    // HttpContext.RequestAborted to ChatService and lets the resulting
+    // OperationCanceledException propagate (Kestrel logs an aborted
+    // request at Debug) — never the Path-5 502, never a 500-shaped body.
+    // An adapter timeout (same exception type, token NOT cancelled) must
+    // keep the 502 path.
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Chat_PassesRequestAbortedToChatService()
+    {
+        using var cts = new CancellationTokenSource();
+        var chatService = Substitute.For<IChatService>();
+        chatService.GetResponseAsync(
+                Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
+                Arg.Any<Guid?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new ChatResponse("ok", Guid.NewGuid(), Guid.NewGuid(), SafetyFlag.Clean));
+        var controller = CreateController(chatService);
+        controller.HttpContext.RequestAborted = cts.Token;
+
+        var result = await controller.Chat(new ChatRequest("hi"));
+
+        Assert.IsType<OkObjectResult>(result);
+        await chatService.Received(1).GetResponseAsync(
+            Arg.Any<Guid>(), "hi", Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<string?>(), cts.Token);
+    }
+
+    [Fact]
+    public async Task Chat_WhenRequestAbortedMidTurn_PropagatesCancellation_No502()
+    {
+        using var cts = new CancellationTokenSource();
+        var chatService = Substitute.For<IChatService>();
+        chatService.GetResponseAsync(
+                Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
+                Arg.Any<Guid?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns<ChatResponse>(_ =>
+            {
+                cts.Cancel();
+                throw new OperationCanceledException(cts.Token);
+            });
+        var controller = CreateController(chatService);
+        controller.HttpContext.RequestAborted = cts.Token;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => controller.Chat(new ChatRequest("hi")));
+    }
+
+    [Fact]
+    public async Task Chat_WhenAdapterTimesOut_RequestNotAborted_Still502()
+    {
+        // Same exception type as a disconnect, but the request is alive:
+        // this is an upstream failure and keeps today's sanitized 502.
+        var chatService = Substitute.For<IChatService>();
+        chatService.GetResponseAsync(
+                Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
+                Arg.Any<Guid?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Throws(new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout"));
+        var controller = CreateController(chatService);
+
+        var result = await controller.Chat(new ChatRequest("hi"));
+
+        var obj = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(502, obj.StatusCode);
+    }
 }

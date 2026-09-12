@@ -133,7 +133,8 @@ public class GeminiChatClientAdapter : IAiChatClient
     }
 
     public Task<string> GetCompletionAsync(
-        string systemPrompt, List<(string Role, string Content)> messages)
+        string systemPrompt, List<(string Role, string Content)> messages,
+        CancellationToken cancellationToken = default)
     {
         // Same reliability semantics as the OpenAI adapter: retry-once on
         // 429/5xx/timeout with jittered backoff, circuit breaker on
@@ -141,10 +142,10 @@ public class GeminiChatClientAdapter : IAiChatClient
         // classifier reads HttpRequestException.StatusCode, which
         // SendAsync sets. Null gate (older tests) = direct call.
         return _gate is null
-            ? CoreAsync(systemPrompt, messages, CancellationToken.None)
+            ? CoreAsync(systemPrompt, messages, cancellationToken)
             : _gate.RunAsync(
                 ct => CoreAsync(systemPrompt, messages, ct),
-                CancellationToken.None);
+                cancellationToken);
     }
 
     private async Task<string> CoreAsync(

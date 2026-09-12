@@ -15,7 +15,8 @@ public class OpenAIChatClientAdapter : IAiChatClient
         _gate = gate;
     }
 
-    public async Task<string> GetCompletionAsync(string systemPrompt, List<(string Role, string Content)> messages)
+    public async Task<string> GetCompletionAsync(string systemPrompt, List<(string Role, string Content)> messages,
+        CancellationToken cancellationToken = default)
     {
         var chatMessages = new List<ChatMessage>
         {
@@ -32,7 +33,12 @@ public class OpenAIChatClientAdapter : IAiChatClient
             });
         }
 
-        using var cts = new CancellationTokenSource(RequestTimeout);
+        // Caller cancellation (a toy that dropped mid-turn) linked with the
+        // 30 s ceiling — same shape as GeminiChatClientAdapter.CoreAsync.
+        // Either one aborts the SDK call; the gate sees a single token, so
+        // a caller abort is accounted exactly like a timeout (no retry).
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(RequestTimeout);
         // Route the SDK call through the reliability gate — classification,
         // one retry on retryable kinds, and circuit-breaker protection.
         // The gate rethrows the classified exception on final failure,
