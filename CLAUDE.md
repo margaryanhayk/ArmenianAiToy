@@ -835,8 +835,10 @@ story plays/reflection answers and audit events aren't covered by the
 90-day purge), and one real bug — `mobile/AregParent` hardcodes
 `acceptedTerms: true` on every register call with no checkbox or
 terms/privacy link shown at all. Docs only; `privacy.html`/`terms.html`/
-registration code untouched. NOT done: no lawyer has read any of it; the
-Armenian draft's armenian-linguistic-reviewer pass; the Russian draft has
+registration code untouched. The Armenian draft went through the
+armenian-linguistic-reviewer agent (a false-friend word choice, a
+grammar-agreement error, and several English-syntax calques found and
+fixed). NOT done: no lawyer has read any of it; the Russian draft has
 had no linguistic review at all.
 
 ## Working in this repo (agents)

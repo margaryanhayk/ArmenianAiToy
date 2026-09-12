@@ -104,7 +104,8 @@ Ordered by what unblocks the most.
     **draft ready (N8), owner + lawyer sign-off, consent step HARD STOP.**
     `docs/legal/parental-consent-draft.md`: full data map (12 categories,
     cited to entity/service file:line), PROPOSED trilingual COPPA/GDPR-K
-    notice text (Armenian pending armenian-linguistic-reviewer sign-off),
+    notice text (Armenian reviewed and corrected by
+    armenian-linguistic-reviewer; Russian still machine-assisted only),
     a verifiable-consent proposal for registration with exact code
     touch-points, and a box/app-store checklist. Flags one urgent bug
     found while researching, unrelated to the consent design question:
