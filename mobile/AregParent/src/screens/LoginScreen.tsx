@@ -41,6 +41,13 @@ export default function LoginScreen({ onLoggedIn }: Props) {
     setStatus(null);
   }
 
+  function openLegal(path: string) {
+    // openURL rejects on Android when nothing can handle it; without a
+    // catch that is an unhandled rejection and the parent's tap does
+    // nothing with no feedback at all.
+    Linking.openURL(`${API_BASE_URL}${path}`).catch(() => setError(t('e_generic')));
+  }
+
   async function submit() {
     setError(null);
     setStatus(null);
@@ -53,8 +60,10 @@ export default function LoginScreen({ onLoggedIn }: Props) {
     try {
       if (mode === 'register') {
         await register(e, password, acceptedTerms);
-        setStatus(t('account_created'));
+        // switchMode clears status/error (and the checkbox) — set the
+        // success line AFTER it, or it's wiped in the same batch.
         switchMode('login');
+        setStatus(t('account_created'));
       } else {
         const token = await login(e, password);
         onLoggedIn(token);
@@ -120,21 +129,23 @@ export default function LoginScreen({ onLoggedIn }: Props) {
             <Text style={styles.termsText}>{t('accept_terms')}</Text>
           </Pressable>
           <View style={styles.termsLinksRow}>
-            <Text
-              style={styles.termsLink}
+            <Pressable
+              style={styles.termsLinkBtn}
+              onPress={() => openLegal('/terms.html')}
               accessibilityRole="link"
-              onPress={() => Linking.openURL(`${API_BASE_URL}/terms.html`)}
+              accessibilityLabel={t('terms_link')}
             >
-              {t('terms_link')}
-            </Text>
-            <Text style={styles.termsLinkSep}> · </Text>
-            <Text
-              style={styles.termsLink}
+              <Text style={styles.termsLink}>{t('terms_link')}</Text>
+            </Pressable>
+            <Text style={styles.termsLinkSep}>·</Text>
+            <Pressable
+              style={styles.termsLinkBtn}
+              onPress={() => openLegal('/privacy.html')}
               accessibilityRole="link"
-              onPress={() => Linking.openURL(`${API_BASE_URL}/privacy.html`)}
+              accessibilityLabel={t('privacy_link')}
             >
-              {t('privacy_link')}
-            </Text>
+              <Text style={styles.termsLink}>{t('privacy_link')}</Text>
+            </Pressable>
           </View>
         </>
       )}
@@ -143,6 +154,8 @@ export default function LoginScreen({ onLoggedIn }: Props) {
         style={[styles.button, submitDisabled && styles.buttonDisabled]}
         onPress={submit}
         disabled={submitDisabled}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: submitDisabled, busy }}
       >
         {busy ? (
           <ActivityIndicator color={theme.onBrand} />
@@ -211,7 +224,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    marginBottom: 6,
+    minHeight: 44,
+    paddingVertical: 10,
   },
   checkbox: {
     width: 20,
@@ -226,8 +240,17 @@ const styles = StyleSheet.create({
   checkboxOn: { backgroundColor: theme.brand, borderColor: theme.brand },
   checkmark: { color: theme.onBrand, fontSize: 13, fontWeight: '700', lineHeight: 14 },
   termsText: { flex: 1, fontSize: 13, color: theme.inkMuted, lineHeight: 18 },
-  termsLinksRow: { flexDirection: 'row', justifyContent: 'center', marginBottom: 14 },
-  termsLink: { color: theme.brand, fontSize: 12, textDecorationLine: 'underline' },
+  termsLinksRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  // A real tap target (44pt), not a bare 12px Text — this is the only
+  // route to the documents being consented to.
+  termsLinkBtn: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
+  termsLink: { color: theme.brand, fontSize: 12, textDecorationLine: 'underline', flexShrink: 1 },
   termsLinkSep: { color: theme.inkMuted, fontSize: 12 },
   link: { color: theme.brand, textAlign: 'center', marginTop: 16 },
   status: { color: theme.ok, textAlign: 'center', marginTop: 16 },
