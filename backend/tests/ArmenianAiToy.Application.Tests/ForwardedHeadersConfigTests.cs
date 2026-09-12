@@ -152,4 +152,22 @@ public class ForwardedHeadersConfigTests
         var opts = ForwardedHeadersConfig.TryBuild(cfg);
         Assert.Equal(2, opts!.ForwardLimit);
     }
+
+    /// <summary>
+    /// Mirror of the enabled-but-untrusted warning, for the opposite gap:
+    /// disabled outright outside Development, where AuthRateLimiter would key
+    /// every parent behind a reverse proxy into one shared bucket.
+    /// </summary>
+    [Theory]
+    [InlineData(false, false, true)]  // non-Dev, disabled => warn
+    [InlineData(false, true, false)]  // non-Dev, enabled => no warn (other branch handles it)
+    [InlineData(true, false, false)]  // Development, disabled => no warn (no proxy in the loop)
+    [InlineData(true, true, false)]   // Development, enabled => no warn
+    public void ShouldWarnDisabledOutsideDevelopment_MatchesExpectation(
+        bool isDevelopment, bool enabled, bool expectedWarn)
+    {
+        Assert.Equal(
+            expectedWarn,
+            ForwardedHeadersConfig.ShouldWarnDisabledOutsideDevelopment(isDevelopment, enabled));
+    }
 }

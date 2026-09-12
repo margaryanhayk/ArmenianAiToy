@@ -57,9 +57,8 @@ var / secret, or in `mobile/AregParent/eas.json`.
 
 ### Branch note
 Railway deploys a specific branch. The deploy config (`railway.json`,
-`docs/railway-deploy.md`) is being developed on a feature branch. To
-deploy from `main`, that branch has to be merged first — or point Railway
-at the feature branch temporarily for a first smoke test.
+`Dockerfile`, `docs/railway-deploy.md`) is on `main` — point Railway's
+service at `main` (or whichever branch you deploy from) directly.
 
 ### SQLite caveat
 SQLite on a single Railway volume is fine for a beta / small pilot. It

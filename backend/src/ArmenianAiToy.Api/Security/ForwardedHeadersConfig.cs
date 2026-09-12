@@ -107,6 +107,21 @@ public static class ForwardedHeadersConfig
             .Where(v => v.Length > 0);
     }
 
+    /// <summary>
+    /// Should the boot-time "you're probably behind a proxy but
+    /// ForwardedHeaders is off" warning fire? Mirrors <c>TryBuild</c>'s
+    /// enabled-but-untrusted warning for the opposite gap: disabled outright
+    /// in a real deployment, where <see cref="RateLimiting.AuthRateLimiter"/>
+    /// keys on <c>Connection.RemoteIpAddress</c> — behind a reverse proxy
+    /// (Railway et al.) that is the proxy's own IP for every caller, so every
+    /// parent shares one auth-rate-limit bucket and a handful of families can
+    /// lock each other out. Development is exempt: there is no proxy in the
+    /// loop, so the direct TCP peer already IS the real client. Pure — no
+    /// config/host access beyond the two inputs — so it is unit-testable.
+    /// </summary>
+    public static bool ShouldWarnDisabledOutsideDevelopment(bool isDevelopment, bool enabled)
+        => !isDevelopment && !enabled;
+
     private static System.Net.IPNetwork? ParseNetwork(string? entry)
     {
         var raw = entry?.Trim();

@@ -55,6 +55,24 @@ Development is unaffected (it keeps the historical relative default next to
 the binary, no configuration needed). See
 `ArmenianAiToy.Api.Security.AudioBlobStoreRootResolver` for the exact rule.
 
+### Parents locking each other out → set `ForwardedHeaders__Enabled`
+
+Behind Railway's edge proxy, `Connection.RemoteIpAddress` is the proxy's own
+IP for every request unless forwarded-header processing is turned on — the
+per-IP auth rate limiter (`AuthRateLimiter`) then keys every parent into one
+shared bucket, so a handful of families can lock each other out of
+login/register. A boot-time warning names this when it applies. Set:
+
+```
+ForwardedHeaders__Enabled=true
+ForwardedHeaders__KnownNetworks=<Railway's internal proxy CIDR>
+```
+
+(`ForwardedHeaders__KnownProxies` also works for a fixed proxy IP; on a
+managed host like Railway there is no single stable IP to pin, so
+`KnownNetworks` — a CIDR — is the pinnable unit.) Development is unaffected;
+see `ArmenianAiToy.Api.Security.ForwardedHeadersConfig` for the exact rule.
+
 ## Where are the logs?
 
 Stdout, as JSON, one object per line. On Railway that is the deploy log.

@@ -55,8 +55,8 @@ Ordered by what unblocks the most.
    service; set `Audio__BlobStoreRoot=/data/audio-blobs`; set
    `ForwardedHeaders__Enabled=true` + known proxies, otherwise the auth rate
    limiter (`AuthRateLimiter.cs:53-58`) sees every parent as one IP and a
-   handful of families lock each other out. *(night session adds a boot
-   warning for the last one)*
+   handful of families lock each other out. **Boot warning added (N4);
+   Railway env vars still OWNER.**
 6. **Backup restore drill, once, documented.** Snapshots exist
    (`docs/ops-runbook.md:93-107`) but no restore has ever been proven.
    *(night session, against a throwaway DB, evidence file)*
@@ -119,12 +119,15 @@ Ordered by what unblocks the most.
 - Log retention/rotation.
 - `today-summary` does four `CountAsync` round-trips
   (`ConversationService.cs:294-314`).
-- Stale comments: `InternalController.cs:30-35` says read-only but has ~15
-  POSTs; `StoryAudioController.cs` doc says fail-open, code is fail-closed.
-  *(night session)*
-- Stale docs: `docs/railway-deploy.md:64-67` says deploy config is on a
-  feature branch (it is on `main`); CLAUDE.md "Still to implement" still
-  lists the variant-ending render and the shared BLE PoP. *(night session)*
+- Stale comments/docs → **done (N4).** `InternalController.cs` class doc now
+  describes the real, guarded ~dozen-`[HttpPost]` mutation surface instead of
+  "every action is a GET"; `StoryAudioController.cs`'s unset-token comment now
+  says fail-closed (matching `IsTokenAccepted`), not open/opt-in;
+  `docs/railway-deploy.md`'s branch note now says the deploy config is on
+  `main`; `docs/ops-runbook.md` gained a `ForwardedHeaders__Enabled` section
+  next to `Audio__BlobStoreRoot`; CLAUDE.md's "Still to implement" and
+  "Firmware (current contract)" sentences no longer list the variant-ending
+  render or the shared BLE PoP as open.
 
 ---
 
