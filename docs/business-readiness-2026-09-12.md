@@ -100,7 +100,16 @@ Ordered by what unblocks the most.
    still NOT verified.**
 10. **OWNER + legal — parental consent.** Add COPPA / GDPR-K wording and a
     verifiable parental-consent step (not just a ToS click). *(night session
-    drafts the text; owner signs off; consent step is a HARD STOP)*
+    drafts the text; owner signs off; consent step is a HARD STOP)* —
+    **draft ready (N8), owner + lawyer sign-off, consent step HARD STOP.**
+    `docs/legal/parental-consent-draft.md`: full data map (12 categories,
+    cited to entity/service file:line), PROPOSED trilingual COPPA/GDPR-K
+    notice text (Armenian pending armenian-linguistic-reviewer sign-off),
+    a verifiable-consent proposal for registration with exact code
+    touch-points, and a box/app-store checklist. Flags one urgent bug
+    found while researching, unrelated to the consent design question:
+    `mobile/AregParent` hardcodes `acceptedTerms: true` on every register
+    call with no checkbox or terms/privacy link shown to the parent at all.
 11. **OWNER — Rotate the burned ElevenLabs key** and the shared bench PoP
     once per-toy PoP is verified.
 12. **OWNER — Pricing decision.** Tiers are built behind

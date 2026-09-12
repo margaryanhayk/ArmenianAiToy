@@ -822,6 +822,23 @@ and `ConversationDetailScreen.tsx` with the same trilingual confirm wording
 here has run in a built app on a device — same standing mobile limitation
 as every entry above; the real EAS account is still OWNER's.
 
+### Legal draft — parental consent, data map, COPPA/GDPR-K (2026-09-12, N8)
+
+`docs/legal/parental-consent-draft.md`: a 12-category data map (each cited
+to its Domain entity or service file:line), PROPOSED trilingual COPPA-style
+and GDPR-K-style notice text, an ElevenLabs/OpenAI sub-processor table, a
+verifiable-parental-consent proposal for registration (HARD STOP, not
+implemented), and a box/app-store checklist. Surfaced, unprompted: several
+things `privacy.html` doesn't yet disclose (ElevenLabs/Gemini as
+conditional sub-processors, IP handling, usage counters, backups, that
+story plays/reflection answers and audit events aren't covered by the
+90-day purge), and one real bug — `mobile/AregParent` hardcodes
+`acceptedTerms: true` on every register call with no checkbox or
+terms/privacy link shown at all. Docs only; `privacy.html`/`terms.html`/
+registration code untouched. NOT done: no lawyer has read any of it; the
+Armenian draft's armenian-linguistic-reviewer pass; the Russian draft has
+had no linguistic review at all.
+
 ## Working in this repo (agents)
 
 - Classify first: workstream, mode, risk. HIGH risk (ChatService, system
