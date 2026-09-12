@@ -164,11 +164,56 @@ else.
 recordings and is the one part that cannot be regenerated. Nothing backs it up
 today.
 
-## Restore
+## Restore procedure
 
-Stop the service, put the snapshot at `/data/armenian_ai_toy.db`, remove any
-`-wal` / `-shm` sidecars beside it, start. Migrations re-apply themselves and
-are no-ops if the snapshot is current.
+Proven end-to-end for the first time 2026-09-12 — a scripted local drill
+(register a parent, register + claim a device, rename it, pull a snapshot,
+restore it to a fresh path, boot the API on it, verify row counts and a
+parent login) passed twice. See
+`tools/quality-evidence/backup-restore-drill-20260912.md` and
+`tools/ops/restore_drill.sh`. **Not yet proven against the real Railway
+volume or a network pull** — that step is still the operator's.
+
+1. **Get a snapshot.** Either the newest `/data/backups/areg-backup-*.db`
+   already on the volume, or a fresh offsite pull (see "Take a backup,
+   right now" above) — the offsite pull is preferred, since it does not
+   depend on the volume you may be trying to recover from.
+2. **Check it before trusting it.**
+   ```bash
+   sqlite3 areg-2026-09-12.db "PRAGMA integrity_check;"
+   ```
+   Must print exactly `ok`. Anything else (e.g. `database disk image is
+   malformed`) means this snapshot is not safe to restore from — get an
+   older one and repeat this check.
+3. **Stop the service.** Restoring under live traffic risks the running
+   process writing to the file out from under you.
+4. **Replace the live database file.** The path is whatever
+   `Database__ConnectionString` is set to on this deployment — the
+   Railway default is `/data/armenian_ai_toy.db` (`Dockerfile`); confirm
+   with `railway variables` if unsure, never assume.
+   ```bash
+   rm -f /data/armenian_ai_toy.db-wal /data/armenian_ai_toy.db-shm
+   cp areg-2026-09-12.db /data/armenian_ai_toy.db
+   ```
+   The `-wal`/`-shm` removal matters: those are sidecars of the file you
+   are REPLACING, not the snapshot — leaving them behind risks SQLite
+   trying to replay stale WAL frames against the restored file.
+5. **Restart the service.** Migrations re-apply and are no-ops if the
+   snapshot is current.
+6. **Verify.**
+   ```bash
+   curl -s https://<host>/api/health   # expect "database":"ok"
+   ```
+   Then log in as a real parent account from before the incident (or ask
+   one to) to confirm the data is not just present but usable — a restore
+   that boots green but silently corrupted a password hash or a foreign
+   key is worse than an obvious failure.
+
+**Audio blobs are a separate, manual restore** — the offsite pull above
+covers the database only. If `/data/audio-blobs` needs restoring too, it
+comes from `DatabaseBackupService`'s own on-volume
+`areg-audio-blobs-*.zip` (same `/data/backups` directory, same retention);
+unzip it to `Audio:BlobStoreRoot` after step 4, before restarting.
 
 ## Get into the operator console
 

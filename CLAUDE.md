@@ -798,6 +798,18 @@ against a real local receiver (a genuine `backup_stale` alert delivered
 and received — see the commit message for the payload). NOT done: a real
 Slack/Railway delivery — `Alerts__WebhookUrl` is still OWNER's to set.
 
+### Backup restore drill — proven locally (2026-09-12, N6)
+
+Nobody had ever restored a `DatabaseBackupService` snapshot. `tools/ops/
+restore_drill.sh` boots the real API against a throwaway DB, creates data
+through the public API, pulls a snapshot (`GET /api/internal/backup`),
+restores it to a fresh path, boots a second instance on it, and proves row
+counts + a parent login match — run twice, both green (evidence:
+`tools/quality-evidence/backup-restore-drill-20260912.md`).
+`docs/ops-runbook.md` gained a step-by-step "Restore procedure". `dotnet
+test` green (2955 tests, unchanged). NOT done: restoring the real Railway
+volume, or a network pull — still OWNER's.
+
 ## Working in this repo (agents)
 
 - Classify first: workstream, mode, risk. HIGH risk (ChatService, system
