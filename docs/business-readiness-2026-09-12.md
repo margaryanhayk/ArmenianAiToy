@@ -107,10 +107,15 @@ Ordered by what unblocks the most.
     notice text (Armenian reviewed and corrected by
     armenian-linguistic-reviewer; Russian still machine-assisted only),
     a verifiable-consent proposal for registration with exact code
-    touch-points, and a box/app-store checklist. Flags one urgent bug
+    touch-points, and a box/app-store checklist. Flagged one urgent bug
     found while researching, unrelated to the consent design question:
-    `mobile/AregParent` hardcodes `acceptedTerms: true` on every register
-    call with no checkbox or terms/privacy link shown to the parent at all.
+    `mobile/AregParent` hardcoded `acceptedTerms: true` on every register
+    call with no checkbox or terms/privacy link shown to the parent at all
+    — **fixed (N9)**: a real, unchecked-by-default checkbox with links to
+    `/terms.html`/`/privacy.html` now gates the register button, and
+    `api.ts` sends the checkbox's actual state. The verifiable-consent
+    design question itself (email-plus, a distinct `ConsentAcceptedAt`)
+    remains the HARD STOP above — N9 only closed the bug, not the design.
 11. **OWNER — Rotate the burned ElevenLabs key** and the shared bench PoP
     once per-toy PoP is verified.
 12. **OWNER — Pricing decision.** Tiers are built behind
@@ -216,6 +221,7 @@ Steps 1, 3 and 4 are where a hundred units will go wrong.
 | N6 | Backup restore drill against a throwaway DB, evidence file | LOW | tools/quality-evidence, docs |
 | N7 | Mobile parity: unlink, delete conversation, delete child | LOW | mobile |
 | N8 | Legal draft: COPPA / GDPR-K section + consent-step proposal (docs only) | LOW | docs/legal |
+| N9 | Mobile registration: real terms/privacy consent checkbox, replacing hardcoded `acceptedTerms: true` (bug found by N8) | LOW | mobile |
 
 Not touched tonight (HARD STOP, owner's word needed): JWT security stamp,
 ChatService cancellation, consent step in registration, pricing/tiers.

@@ -841,6 +841,15 @@ grammar-agreement error, and several English-syntax calques found and
 fixed). NOT done: no lawyer has read any of it; the Russian draft has
 had no linguistic review at all.
 
+### Mobile registration consent checkbox (2026-09-12, N9)
+
+Fixed the N8 bug: `LoginScreen.tsx` now shows an unchecked-by-default
+terms/privacy checkbox (wording mirrors `parent.html`'s reviewed Armenian)
+gating the register button; `api.ts` sends its real state instead of a
+hardcoded `true`. `npx tsc --noEmit` clean; no test suite exists for this
+app. NOT done: nothing here has run on a device — same standing mobile
+limitation as every entry above.
+
 ## Working in this repo (agents)
 
 - Classify first: workstream, mode, risk. HIGH risk (ChatService, system
