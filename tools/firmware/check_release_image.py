@@ -81,6 +81,20 @@ KNOWN_SAFE_POP_STRINGS = {"areg-pair", "ESPHTTPD", "EXCVADDR", "BBB6BHHB", "B8BH
 # unbootable toy. Size alone catches it long before anything else does.
 OTA_SLOT_BYTES = 3 * 1024 * 1024
 
+# ota_apply.cpp skips manifest HMAC verification whenever AREG_MANIFEST_HMAC_KEY
+# is "" (the config.h.example default) and logs this exact marker instead of
+# failing loudly -- a deliberate Stage-A bench allowance
+# (tools/firmware/README.md history: signature checking arrived before the
+# backend had a key to sign with). The release gate never checked for it, so
+# an image built with no key -- the default, unless a release machine sets
+# one -- could ship over OTA to every toy with signature verification
+# silently off. The string is a compile-time literal Serial.println() always
+# embeds in .rodata when the branch is reachable, so scanning the image bytes
+# finds it exactly like every other marker in this file, no toolchain needed.
+# Keep this in sync with ota_apply.cpp's log line -- never reword one without
+# the other.
+OTA_SIG_CHECK_DISABLED_MARKER = "OTA_SIG_CHECK_DISABLED"
+
 
 def extract_strings(data: bytes) -> list[str]:
     return [m.group().decode("ascii") for m in STRING_RE.finditer(data)]
@@ -184,6 +198,25 @@ def main() -> int:
             f"burn, unset it and rebuild -- the factory station "
             f"(tools/factory/provision_toy.py) writes the PoP straight to NVS "
             f"and never needs this macro. The value is not printed here.")
+
+    # Raw byte search, not the extracted-strings list: the marker sits inside
+    # a longer human-readable log sentence (ota_apply.cpp), and that sentence
+    # contains an em-dash -- a non-ASCII byte that STRING_RE's printable-ASCII
+    # match splits the sentence around, so the marker never appears as its
+    # own complete entry in `strings`. Confirmed against a real compiled
+    # image (2026-09-12): `strings` cut it as "...OTA_SIG_CHECK_DISABLED "
+    # (trailing space, no more) — an exact `in strings` check missed it
+    # silently. A raw substring search over `data` cannot be fooled by where
+    # the surrounding sentence happens to break.
+    if OTA_SIG_CHECK_DISABLED_MARKER.encode("ascii") in data:
+        failures.append(
+            f"manifest HMAC signature verification is compiled OFF "
+            f"(AREG_MANIFEST_HMAC_KEY is empty — the '{OTA_SIG_CHECK_DISABLED_MARKER}' "
+            f"marker is in the image). An OTA image reaches every toy with no "
+            f"human checking each one; shipping this means any manifest, "
+            f"forged or not, would be applied unverified. Stage-A bench-only — "
+            f"set AREG_MANIFEST_HMAC_KEY to the real signing key and rebuild "
+            f"before release.")
 
     present_placeholders = [p for p in PLACEHOLDERS if p in strings]
     if present_placeholders:

@@ -8,6 +8,7 @@
 
 #include "audio_io.h"            // audio_sd_available()
 #include "content_report_rules.h"  // pure buffer arithmetic (host-testable)
+#include "json_psram.h"          // g_json_psram — the shared PSRAM JsonDocument allocator
 
 namespace {
 
@@ -59,7 +60,11 @@ void content_report_refresh() {
     if (!f) {
         return;
     }
-    JsonDocument doc;
+    // PSRAM, not internal heap (CLAUDE.md standing "never" — 2026-08-14
+    // field failure): this is the same /content_index.json every other
+    // reader (content_sync.cpp, story_select.cpp) parses through
+    // g_json_psram, up to 156 items with a 64-char sha256 each.
+    JsonDocument doc(&g_json_psram);
     const DeserializationError err = deserializeJson(doc, f);
     f.close();
     if (err) {

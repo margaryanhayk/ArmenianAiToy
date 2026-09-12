@@ -14,6 +14,7 @@
 
 #include "config.h"
 #include "audio_io.h"  // audio_sd_begin/available/has_file + audio_play_story_file
+#include "json_psram.h"  // g_json_psram — the shared PSRAM JsonDocument allocator
 
 namespace {
 
@@ -34,7 +35,10 @@ void resolve_path(char *out, size_t out_len) {
     if (SD.exists(kIndexPath)) {
         File idx = SD.open(kIndexPath, FILE_READ);
         if (idx) {
-            JsonDocument doc;
+            // Same real /content_index.json every other reader parses
+            // through g_json_psram — bench-only file, but the index is the
+            // same size class that caused the 2026-08-14 crash.
+            JsonDocument doc(&g_json_psram);
             const DeserializationError err = deserializeJson(doc, idx);
             idx.close();
             if (err == DeserializationError::Ok) {

@@ -119,9 +119,12 @@ The build produces both. They are not interchangeable.
 
    It exits non-zero and refuses the image if it carries a real device API key
    (`dtk_<32 hex>`) or a device id, if the expected version is missing, if the
-   old version is still inside, or if you pointed it at the 8 MB
-   `.merged.bin`. No toolchain needed — plain Python, so there is no excuse
-   to skip it.
+   old version is still inside, if you pointed it at the 8 MB `.merged.bin`,
+   or if manifest HMAC signature verification is compiled OFF (2026-09-12 —
+   see § 8's "Device key empty" case: `AREG_MANIFEST_HMAC_KEY ""` compiles in
+   the `OTA_SIG_CHECK_DISABLED` marker, and the gate now refuses to ship
+   that). No toolchain needed — plain Python, so there is no excuse to skip
+   it.
 
    A pass looks like this (verified against the field 1.2.0 image, 2026-08-14):
 
@@ -347,8 +350,11 @@ there is more than one board to protect.
 
 The device decides whether to verify, based on **its own compiled key**:
 
-- Device key empty → it logs `signature check SKIPPED` and applies whatever the
-  server sent. The server's key is irrelevant.
+- Device key empty → it logs `OTA_SIG_CHECK_DISABLED ... signature check
+  SKIPPED` and applies whatever the server sent. The server's key is
+  irrelevant. **This is a bench-only allowance** — since 2026-09-12 § 4's
+  release gate refuses to stage any image carrying that marker, so this path
+  can no longer reach a released image, only a bench build flashed by cable.
 - Device key set → it verifies. The server **must** sign with that same key, or
   the toy refuses with `manifest_sig_invalid`.
 

@@ -33,6 +33,7 @@
 #include "audio_io.h"      // audio_sd_available() — reuse the boot mount
 #include "voice_client.h"  // voice_wifi_is_connected / voice_add_device_auth_headers
 #include "story_select.h"  // story_select_paused_story_id() — the retirement guard
+#include "json_psram.h"    // g_json_psram — the shared PSRAM JsonDocument allocator
 
 #ifndef AREG_HTTP_CONNECT_MS
 #define AREG_HTTP_CONNECT_MS 5000
@@ -67,20 +68,12 @@ constexpr uint64_t kFreeSpaceSlack = 256ULL * 1024ULL;
 // two-phase comment) and it takes the same answer: JSON lives in PSRAM
 // (7.8 MB idle), internal heap stays free for TLS, which cannot use PSRAM.
 // Falls back to internal heap so a board without PSRAM still works.
-struct PsramJsonAllocator : ArduinoJson::Allocator {
-    void *allocate(size_t n) override {
-        void *p = heap_caps_malloc(n, MALLOC_CAP_SPIRAM);
-        return p != nullptr ? p : malloc(n);
-    }
-    void deallocate(void *p) override { heap_caps_free(p); }
-    void *reallocate(void *p, size_t n) override {
-        void *q = heap_caps_realloc(p, n, MALLOC_CAP_SPIRAM);
-        return q != nullptr ? q : realloc(p, n);
-    }
-};
-// File-scope so it outlives every document below, including the
-// module-level s_games_index.
-PsramJsonAllocator s_json_psram;
+//
+// Shared with every other reader of /content_index.json (json_psram.h) --
+// this file, story_select.cpp and content_report.cpp all used to carry
+// their own copy of this struct (or, for content_report.cpp, none at all);
+// see json_psram.h for why that was fixed for good in one place: use
+// g_json_psram below, not a new local copy.
 
 // Bounded tables. static (not stack): the sync runs from the Arduino
 // loop task, whose stack is 8 KB — ~2.3 KB per table would be reckless
@@ -130,7 +123,7 @@ int s_voice_active_count   = 0;
 // of the pass only. The document lives at file scope solely so write_index()
 // can attach it after sync_games() has returned; it is cleared as soon as
 // the index is on disk.
-JsonDocument s_games_index(&s_json_psram);
+JsonDocument s_games_index(&g_json_psram);
 int s_games_active_count = 0;
 // How many entries the previous index carried for games. The other three
 // namespaces keep their previous count in a file static already; games
@@ -177,7 +170,7 @@ bool s_games_finalized   = false;
 // s_previous / s_music_previous / s_voice_previous; games streams (see
 // the s_games_index comment above) and has no such table, so an interim
 // write before sync_games() has run this attempt needs this instead.
-JsonDocument s_games_previous_snapshot(&s_json_psram);
+JsonDocument s_games_previous_snapshot(&g_json_psram);
 
 // Bounded SD orphan sweep — see content_retirement_rules.h and
 // content_orphan_sweep_run() near the end of this file. Off by default
@@ -402,7 +395,7 @@ void load_previous_index() {
         Serial.println("[content-sync] index open FAILED — previous contents UNKNOWN");
         return;
     }
-    JsonDocument doc(&s_json_psram);
+    JsonDocument doc(&g_json_psram);
     const DeserializationError err = deserializeJson(doc, f);
     f.close();
     if (err != DeserializationError::Ok) {
@@ -497,7 +490,7 @@ bool write_index() {
         Serial.flush();
     }
 
-    JsonDocument idx(&s_json_psram);
+    JsonDocument idx(&g_json_psram);
     // Per-namespace index writes (2026-09-11): a namespace whose OWN sync
     // pass has not run yet this attempt publishes its unchanged PREVIOUS
     // state here, never the still-empty active table — otherwise an
@@ -631,7 +624,7 @@ bool write_index() {
     //    PSRAM-allocated like every other document in this file — internal
     //    heap stays free for TLS.
     {
-        JsonDocument verify(&s_json_psram);
+        JsonDocument verify(&g_json_psram);
         const DeserializationError verr = deserializeJson(verify, vf);
         vf.close();
         if (verr != DeserializationError::Ok) {
@@ -1388,7 +1381,7 @@ void sync_games(JsonDocument &manifest_doc, JsonArrayConst games) {
     CsGame *prevs = nullptr;     // previous-index entries (carry candidates)
     int work_n = 0, prevs_n = 0;
     {
-        JsonDocument prev(&s_json_psram);
+        JsonDocument prev(&g_json_psram);
         JsonArrayConst prev_games;
         if (SD.exists(kIndexPath)) {
             File f = SD.open(kIndexPath, FILE_READ);
@@ -1633,7 +1626,7 @@ void content_sync_run() {
     // here rather than guessed, so the decision has a number behind it.
     const size_t mbytes = (size_t)http.getSize();
     const uint32_t heap_pre_parse = ESP.getFreeHeap();
-    JsonDocument doc(&s_json_psram);
+    JsonDocument doc(&g_json_psram);
     const DeserializationError jerr = deserializeJson(doc, http.getString());
     http.end();
     Serial.printf("[content-sync] manifest bytes=%d heap parse %lu->%lu psram=%lu\n",

@@ -1174,6 +1174,26 @@ backend contract, not a real flash+boot).
 - [ ] Build a release image with `AREG_BLE_POP` left defined (a deliberate
       mistake) → `check_release_image.py` refuses it and names the reason.
 
+### Release gate now catches a disabled signature check (2026-09-12)
+
+`ota_apply.cpp` skips manifest HMAC verification whenever
+`AREG_MANIFEST_HMAC_KEY` is empty (the `config.h.example` default) and logs
+the marker `OTA_SIG_CHECK_DISABLED` — a deliberate Stage-A bench allowance,
+but `check_release_image.py` never checked for it, so an image built
+without a key (unless a release machine sets one) could ship over OTA with
+signature verification silently off. The gate now refuses any image
+carrying that marker; see `docs/ota-release-runbook.md` § 4/§ 8. Firmware
+behavior is unchanged — a bench build with no key still runs, cable-flashed
+only; it just cannot become a release artifact. Also fixed in the same
+slice: `content_report.cpp` parsed `/content_index.json` on internal heap
+(the 2026-08-14 PSRAM-allocator failure class) — it, and several
+`story_select.cpp` accessors that had the same gap, now share one allocator
+(`json_psram.h`, `g_json_psram`) with `content_sync.cpp`. Compile-verified
+(arduino-cli, esp32:esp32@3.3.8, canonical FQBN: 1,641,328 B, -160 B vs. the
+pre-fix build — two duplicate allocator copies became one shared instance)
+and host-tested (`tools/firmware/test_check_release_image.py`); not
+bench-verified on hardware.
+
 ## OTA — surviving the first boot of a new image
 
 The apply pipeline (`ota_apply.{h,cpp}`) and the phone-home loop

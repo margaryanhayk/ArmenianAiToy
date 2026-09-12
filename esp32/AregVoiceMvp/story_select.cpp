@@ -17,6 +17,7 @@
 
 #include "content_sync_model.h"   // cs_index_parse — one owner of the schema
 #include "audio_io.h"             // audio_sd_available / audio_sd_has_file
+#include "json_psram.h"           // g_json_psram — the shared PSRAM JsonDocument allocator
 
 namespace {
 
@@ -40,20 +41,10 @@ constexpr const char *kIndexPath = "/content_index.json";
 // listening, and reports itself as missing content rather than as an
 // out-of-memory error, which is why it went unexplained for days.
 //
-// PSRAM is 7.8 MB and idle. TLS cannot use it; plain data can.
-struct PsramJsonAllocator : ArduinoJson::Allocator {
-    void *allocate(size_t n) override {
-        void *p = heap_caps_malloc(n, MALLOC_CAP_SPIRAM);
-        return p != nullptr ? p : malloc(n);   // never worse than before
-    }
-    void deallocate(void *p) override { heap_caps_free(p); }
-    void *reallocate(void *p, size_t n) override {
-        void *q = heap_caps_realloc(p, n, MALLOC_CAP_SPIRAM);
-        return q != nullptr ? q : realloc(p, n);
-    }
-};
-// File-scope so it outlives every document that borrows it.
-PsramJsonAllocator s_json_psram;
+// PSRAM is 7.8 MB and idle. TLS cannot use it; plain data can. This file
+// used to carry its own copy of the allocator struct (and several call
+// sites below never picked it up at all — see json_psram.h); every
+// JsonDocument in this file now shares g_json_psram.
 
 // NVS namespace/key for the rotation cursor. Its own namespace so it can
 // never collide with device_creds / wifi_creds / ota_state.
@@ -105,7 +96,7 @@ int load_raw_index(CsStory *out, int max_out) {
     // saying "no card" calmly. A panic reboot is the worst possible answer
     // to a loose wire.
     esp_task_wdt_reset();
-    JsonDocument doc(&s_json_psram);
+    JsonDocument doc(&g_json_psram);
     const DeserializationError err = deserializeJson(doc, f);
     f.close();
     esp_task_wdt_reset();   // see above -- the read may have taken seconds
@@ -435,7 +426,7 @@ bool story_select_intro_enabled() {
     if (!f) {
         return true;
     }
-    JsonDocument doc;
+    JsonDocument doc(&g_json_psram);
     const DeserializationError err = deserializeJson(doc, f);
     f.close();
     if (err != DeserializationError::Ok) {
@@ -452,7 +443,7 @@ bool story_select_music_enabled() {
     if (!f) {
         return false;
     }
-    JsonDocument doc;
+    JsonDocument doc(&g_json_psram);
     const DeserializationError err = deserializeJson(doc, f);
     f.close();
     if (err != DeserializationError::Ok) {
@@ -473,7 +464,7 @@ bool music_select_next(char *out_path, size_t out_len) {
     if (!f) {
         return false;
     }
-    JsonDocument doc;
+    JsonDocument doc(&g_json_psram);
     const DeserializationError err = deserializeJson(doc, f);
     f.close();
     if (err != DeserializationError::Ok) {
@@ -668,7 +659,7 @@ bool load_index_doc(JsonDocument &doc) {
 // rewriting a working read path.
 
 bool story_pauses_enabled() {
-    JsonDocument doc;
+    JsonDocument doc(&g_json_psram);
     if (!load_index_doc(doc)) {
         return true;   // no card / no index — shipped default is ON
     }
@@ -676,7 +667,7 @@ bool story_pauses_enabled() {
 }
 
 bool story_variant_endings_enabled() {
-    JsonDocument doc;
+    JsonDocument doc(&g_json_psram);
     if (!load_index_doc(doc)) {
         return true;   // no card / no index — shipped default is ON
     }
@@ -684,7 +675,7 @@ bool story_variant_endings_enabled() {
 }
 
 bool story_questions_enabled() {
-    JsonDocument doc;
+    JsonDocument doc(&g_json_psram);
     if (!load_index_doc(doc)) {
         return true;   // no card / no index — shipped default is ON
     }
@@ -699,7 +690,7 @@ bool voice_clip_resolve_path(const char *voice_id, char *out, size_t out_len) {
     if (!cs_is_valid_story_id(voice_id)) {
         return false;
     }
-    JsonDocument doc;
+    JsonDocument doc(&g_json_psram);
     if (!load_index_doc(doc)) {
         return false;
     }
@@ -733,7 +724,7 @@ bool voice_clip_next_greeting(char *out_path, size_t out_len) {
         return false;
     }
     out_path[0] = '\0';
-    JsonDocument doc;
+    JsonDocument doc(&g_json_psram);
     if (!load_index_doc(doc)) {
         return false;
     }
@@ -802,7 +793,7 @@ bool story_select_mode_enabled(char mode) {
         case 'c': key = "curiosityEnabled"; break;
         default:  return true;   // unknown letter — never invent a refusal
     }
-    JsonDocument doc;
+    JsonDocument doc(&g_json_psram);
     if (!load_index_doc(doc)) {
         return true;   // no card / no index → the shipped default (on)
     }
