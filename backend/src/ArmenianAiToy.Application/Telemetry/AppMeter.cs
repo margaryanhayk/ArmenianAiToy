@@ -337,4 +337,20 @@ public static class AppMeter
         Instance.CreateCounter<long>(
             name: "aat_story_audio_render_total",
             description: "Count of whole-story narration TTS renders, by result.");
+
+    /// <summary>
+    /// Opt-in webhook alerter (2026-09-12). Count of alerts actually
+    /// delivered (webhook POST returned 2xx) by
+    /// <c>ArmenianAiToy.Infrastructure.Background.AlertingService</c>. Tag
+    /// <c>key</c> is the alert key (e.g. <c>health_db_unhealthy</c>,
+    /// <c>openai_circuit_open</c>, <c>moderation_unavailable</c>,
+    /// <c>cost_cap_trips_high</c>, <c>backup_stale</c>) — a small, fixed,
+    /// code-defined vocabulary, safe under the no-high-cardinality
+    /// invariant. Does NOT increment on a suppressed (cooldown) or failed
+    /// delivery — see the service's own doc comment.
+    /// </summary>
+    public static readonly Counter<long> AlertsSent =
+        Instance.CreateCounter<long>(
+            name: "aat_alerts_sent_total",
+            description: "Count of alerts actually delivered by the webhook alerter, by key.");
 }

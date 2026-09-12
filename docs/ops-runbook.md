@@ -94,6 +94,46 @@ Useful filters:
 Each line carries the ASP.NET request scope (`RequestId`, `RequestPath`), so
 one request's lines can be pulled together.
 
+## Alerting
+
+Opt-in webhook alerter (2026-09-12, N5) — `AlertingService`, a background
+worker beside `RetentionPurgeService`/`DatabaseBackupService`. **Off by
+default**: `Alerts:WebhookUrl` empty means nothing is ever posted.
+
+```json
+"Alerts": {
+  "WebhookUrl": "",
+  "CooldownMinutes": 30,
+  "HealthCheckIntervalSeconds": 60,
+  "CostCapTripsThresholdPerHour": 5
+}
+```
+
+Set `Alerts__WebhookUrl` (Railway env var, same double-underscore-for-colon
+convention as everything else here) to enable it. Works with either:
+
+- A **Slack incoming webhook** URL — Slack reads the `text` field and
+  ignores the rest.
+- Any **generic JSON receiver** — the full body is
+  `{ "text": "...", "key": "...", "severity": "...", "at": "..." }`.
+
+Signals (each cooldown-gated per `key` so a flapping condition cannot
+spam):
+
+| Key | Fires when |
+|---|---|
+| `health_db_unhealthy` / `health_db_recovered` | DB liveness check (same probe `/api/health` uses) transitions |
+| `health_audio_store_unconfigured` / `health_audio_store_recovered` | `Audio:BlobStoreRoot` fail-closed state transitions |
+| `cost_cap_trips_high` | `aat_openai_cost_cap_trip_total` trips in the last rolling hour exceed `CostCapTripsThresholdPerHour` |
+| `openai_circuit_open` | `aat_chat_openai_circuit_trip_total` increments (a closed→open transition) |
+| `moderation_unavailable` | `aat_moderation_failclosed_total` increments — moderation is fail-closing, chat turns are being blocked |
+| `backup_stale` | the newest `areg-backup-*.db` snapshot is older than 36h, or absent |
+
+Delivery: a plain `HttpClient` (10s timeout, one retry); a failed POST is
+logged at Warning and never retried in a loop. Each alert actually
+delivered increments `aat_alerts_sent_total{key}` (bounded keys — see the
+table above). Cooldown state is in-memory only and resets on restart.
+
 ## OpenAI is down or rate-limiting
 
 Nothing to do. It is handled:

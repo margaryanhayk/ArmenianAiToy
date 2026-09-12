@@ -527,6 +527,18 @@ public static class DependencyInjection
         // xmldoc for config keys and the on-volume-only caveat.
         services.AddHostedService<DatabaseBackupService>();
 
+        // Opt-in webhook alerter (2026-09-12, N5). Fully inert until
+        // Alerts:WebhookUrl is set — see AlertingService xmldoc. A
+        // dedicated HttpClient (not IHttpClientFactory — that needs a
+        // NuGet package this slice does not add) mirrors the raw-HttpClient
+        // idiom already used above for the OpenAI SDK transport.
+        services.AddHostedService(sp => new AlertingService(
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            sp.GetRequiredService<IConfiguration>(),
+            sp.GetRequiredService<Microsoft.Extensions.Hosting.IHostEnvironment>(),
+            sp.GetRequiredService<ILogger<AlertingService>>(),
+            new HttpClient { Timeout = TimeSpan.FromSeconds(10) }));
+
         return services;
     }
 

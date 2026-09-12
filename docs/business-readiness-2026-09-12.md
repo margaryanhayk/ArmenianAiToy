@@ -55,14 +55,26 @@ Ordered by what unblocks the most.
    service; set `Audio__BlobStoreRoot=/data/audio-blobs`; set
    `ForwardedHeaders__Enabled=true` + known proxies, otherwise the auth rate
    limiter (`AuthRateLimiter.cs:53-58`) sees every parent as one IP and a
-   handful of families lock each other out. **Boot warning added (N4);
-   Railway env vars still OWNER.**
+   handful of families lock each other out; set `Alerts__WebhookUrl` (a
+   Slack incoming-webhook URL or any generic JSON receiver) to turn on the
+   webhook alerter (item 7). **Boot warning added (N4); alerter shipped
+   off-by-default (N5); Railway env vars still OWNER.**
 6. **Backup restore drill, once, documented.** Snapshots exist
    (`docs/ops-runbook.md:93-107`) but no restore has ever been proven.
    *(night session, against a throwaway DB, evidence file)*
 7. **Alerting.** Nothing pages anyone when health fails, the cost cap
    trips, or the OpenAI circuit opens. `/metrics` exists but nothing reads
-   it. *(night session: webhook alerter, off by default)*
+   it. *(night session: webhook alerter, off by default)* — **done (N5):**
+   `AlertingService` (Infrastructure background worker, off by default via
+   `Alerts:WebhookUrl`) posts `{text,key,severity,at}` to a Slack-style or
+   generic webhook on DB-health transitions, `Audio:BlobStoreRoot`
+   transitions, cost-cap trips over threshold in the last hour, the OpenAI
+   circuit opening, moderation fail-closing, and a stale (>36h) or absent
+   database backup — see `docs/ops-runbook.md` § Alerting. Per-key cooldown,
+   one retry, never throws on a broken webhook. Verified against a real
+   local receiver (payload pasted in the commit message) and 20 new unit
+   tests (`dotnet test` green). **Not verified:** a real Slack/Railway
+   delivery — `Alerts__WebhookUrl` is still OWNER's to set.
 8. **Onboarding: claim a toy without typing a 36-character GUID.**
    `parent.html:1207-1211` promises an app QR scanner that does not exist
    (`ProvisioningScreen.tsx:118-121`) and asks for the device id by hand.

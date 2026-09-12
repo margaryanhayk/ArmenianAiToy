@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 2935 tests, ~35 s in Release
+dotnet test            # 2955 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -161,7 +161,8 @@ Unknown values refuse boot. Moderation stays on OpenAI, fail-closed.
   `/metrics` (fail-closed bearer), JSON console logs, OTel counters with
   bounded tags, daily SQLite snapshots + upload-root archive, retention purge
   (90-day messages, token cleanup, dormancy), rate limits (`chat` per device,
-  `auth` per IP, per-account login throttle).
+  `auth` per IP, per-account login throttle), opt-in webhook alerter
+  (`Alerts:WebhookUrl`, health/cost-cap/circuit/moderation/backup signals).
 
 ## Firmware (current contract)
 
@@ -783,6 +784,19 @@ confirmed by booting once in Production). Also fixed the stale
 `railway-deploy.md`/CLAUDE.md sentences, and added the ops-runbook entry.
 `dotnet test` green (2935 tests, 4 new). NOT done: the Railway env vars
 themselves are still OWNER's to set.
+
+### Opt-in webhook alerter (2026-09-12, N5)
+
+`AlertingService` (Infrastructure background worker, off by default via
+`Alerts:WebhookUrl`) posts `{text,key,severity,at}` on DB-health and
+`Audio:BlobStoreRoot` transitions, cost-cap trips over threshold, the
+OpenAI circuit opening, moderation fail-closing, and a stale/absent
+database backup — `docs/ops-runbook.md` § Alerting. Uses a plain
+`HttpClient`, not `IHttpClientFactory` (that needs a NuGet package this
+slice does not add). `dotnet test` green (2955 tests, 20 new). Verified
+against a real local receiver (a genuine `backup_stale` alert delivered
+and received — see the commit message for the payload). NOT done: a real
+Slack/Railway delivery — `Alerts__WebhookUrl` is still OWNER's to set.
 
 ## Working in this repo (agents)
 
