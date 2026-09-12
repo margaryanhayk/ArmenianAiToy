@@ -759,6 +759,18 @@ scope for a web-only slice. `dotnet test` green (2931 tests); Playwright
 confirmed no page-level horizontal scroll at 400/1280px. NOT verified: a
 real browser session against the live backend.
 
+### Factory SD-card loader (2026-09-12, N3)
+
+`tools/factory/load_sd_card.py` fetches a device's content-manifest,
+downloads every enabled/non-retired item into the firmware's exact
+namespace layout, sha256-verifies each one, and writes
+`/content_index.json` in the shape `content_sync.cpp` itself writes — a
+pre-loaded card is trusted on first boot, no separate "synced once" gate.
+Runbook §2a; `--dry-run`/`--verify`, stdlib-only, idempotent. Verified
+end-to-end against a live throwaway backend (240 items, ~117 MB, the real
+catalogue); `dotnet test` green (2931 tests). NOT verified: a real card in
+a real toy.
+
 ## Working in this repo (agents)
 
 - Classify first: workstream, mode, risk. HIGH risk (ChatService, system
