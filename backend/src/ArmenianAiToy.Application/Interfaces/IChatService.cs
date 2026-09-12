@@ -4,8 +4,17 @@ namespace ArmenianAiToy.Application.Interfaces;
 
 public interface IChatService
 {
+    /// <summary>
+    /// One chat turn. <paramref name="cancellationToken"/> (the request's
+    /// lifetime on the controllers) is observed before the first paid call,
+    /// inside every safety check and inside every model call — a cancelled
+    /// turn throws <see cref="OperationCanceledException"/> with nothing
+    /// stored. Once output moderation has approved the reply it is stored
+    /// unconditionally, so a disconnect never leaves a half-written turn.
+    /// </summary>
     Task<ChatResponse> GetResponseAsync(Guid deviceId, string userMessage, Guid? childId = null,
-        Guid? storySessionId = null, string? selectedChoice = null);
+        Guid? storySessionId = null, string? selectedChoice = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Hands-free autoplay step for an active library story. No child
@@ -18,5 +27,6 @@ public interface IChatService
     /// transport stops the autoplay loop. Never runs the legacy
     /// pipeline, ModeDetector, or GPT.
     /// </summary>
-    Task<ChatResponse> ContinueLibraryStoryAsync(Guid deviceId, Guid? childId = null);
+    Task<ChatResponse> ContinueLibraryStoryAsync(Guid deviceId, Guid? childId = null,
+        CancellationToken cancellationToken = default);
 }

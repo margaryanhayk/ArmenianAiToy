@@ -133,9 +133,13 @@ Ordered by what unblocks the most.
   `ParentTokenValidation`; `Jwt:RequireSecurityStamp` is the rollback
   switch; one-time re-login for every parent on first deploy
   (`docs/ops-runbook.md`). Owner approved in chat ("fix them also").
-- **HARD STOP — `ChatService.GetResponseAsync` has no `CancellationToken`**
+- ~~**HARD STOP — `ChatService.GetResponseAsync` has no `CancellationToken`**
   (`ChatService.cs:1685`): a toy that drops Wi-Fi mid-turn cannot abort the
-  paid OpenAI calls.
+  paid OpenAI calls.~~ — **done (N11)**: optional token on both ChatService
+  entry points, threaded into the moderation/chat adapters; both chat
+  controllers pass `RequestAborted`. Safety checks and model calls abort
+  with nothing stored; an approved reply is still stored. Owner approved in
+  chat.
 - Async Q&A upload task runs TLS in an 8 KB stack
   (`voice_client.cpp:1256-1268`, self-flagged, never measured). Measure
   `uxTaskGetStackHighWaterMark` on hardware before enabling streaming Q&A.

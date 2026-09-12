@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 2997 tests, ~35 s in Release
+dotnet test            # 3015 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -146,6 +146,9 @@ Unknown values refuse boot. Moderation stays on OpenAI, fail-closed.
   override) → rate limit → daily cost cap → STT → input moderation → model →
   output moderation → TTS. Story-qa streams first byte only when the toy
   sends `X-Areg-Accept-Stream: 1` (kill switch `StoryQa:StreamAnswerAudio`).
+  Both chat endpoints hand `RequestAborted` to `ChatService`: a toy that
+  drops mid-turn aborts the moderation/model calls with nothing stored,
+  while a reply output moderation already approved is stored regardless.
 - **Parents** (`/api/parents/*`, JWT): register/login (anti-enumeration,
   uniform 401/202/400 shapes, BCrypt on both paths), Google sign-in, password
   reset, email verification, devices (claim by code, invite second parent,
@@ -865,6 +868,19 @@ effect: every logged-in parent logs in once (`docs/ops-runbook.md`). The
 hand-written migration backfills a distinct random stamp per existing row.
 `dotnet test` green (2997 tests, 42 new); migration verified by upgrading
 a real pre-N10 DB with rows. NOT verified: a real browser/phone session.
+
+### Chat turns stop their provider calls on disconnect (2026-09-12, N11)
+
+`ChatService.GetResponseAsync`/`ContinueLibraryStoryAsync` take an optional
+`CancellationToken` (both chat controllers pass `RequestAborted`), threaded
+into `IAiChatClient`/`IModerationService` and the OpenAI/Gemini adapters.
+Observed before anything is stored, inside every safety check and every
+model call — cancelled ⇒ `OperationCanceledException`, nothing stored,
+no 502/500, no Error log (adapter timeouts keep their old paths); once
+output moderation approves the reply it is stored unconditionally. `dotnet
+test` green (3015 tests, 18 new). NOT verified: a real toy dropping
+mid-turn against a live provider; benchmarks not run (both need a live
+backend with a real OpenAI key).
 
 ## Working in this repo (agents)
 

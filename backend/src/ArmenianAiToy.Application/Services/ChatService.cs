@@ -1538,7 +1538,8 @@ public class ChatService : IChatService
     /// prompts, tail blocks, quality gates) is never entered.
     /// </summary>
     private async Task<ChatResponse> HandleLibraryStoryInterruptAsync(
-        Guid conversationId, LibraryStoryPlaybackState playback, string userMessage)
+        Guid conversationId, LibraryStoryPlaybackState playback, string userMessage,
+        CancellationToken cancellationToken)
     {
         // Bench mode advances on ANY input (no Q&A) — see BenchAutoStory.
         if (BenchAutoStory || ContinueCueDetector.IsContinueCue(userMessage))
@@ -1561,7 +1562,8 @@ public class ChatService : IChatService
                 // selects the first — MODES.md §1A Endings).
                 return await RespondWithLibraryTextAsync(
                     conversationId,
-                    endedStory.ReflectionText + "\n" + endedStory.ReflectionQuestions[0]);
+                    endedStory.ReflectionText + "\n" + endedStory.ReflectionQuestions[0],
+                    cancellationToken);
             }
             if (advance.Next is not null)
             {
@@ -1570,11 +1572,13 @@ public class ChatService : IChatService
                     conversationId, advance.Next.StoryId, advance.Next.SegmentIndex);
                 return await RespondWithLibraryTextAsync(
                     conversationId,
-                    LibraryStoryCannedLines.ResumeLeadIn + "\n" + advance.Next.SegmentText);
+                    LibraryStoryCannedLines.ResumeLeadIn + "\n" + advance.Next.SegmentText,
+                    cancellationToken);
             }
             return await RespondWithLibraryTextAsync(
                 conversationId,
-                LibraryStoryCannedLines.ResumeLeadIn + "\n" + playback.SegmentText);
+                LibraryStoryCannedLines.ResumeLeadIn + "\n" + playback.SegmentText,
+                cancellationToken);
         }
 
         // In-story question (W2, unchanged): bounded Q&A; position is
@@ -1588,7 +1592,7 @@ public class ChatService : IChatService
             "Library story Q&A answered. ConversationId: {ConversationId}, Story: {StoryId}, Segment: {SegmentIndex}, UsedFallback: {UsedFallback}, FirstRejection: {FirstRejection}",
             conversationId, playback.StoryId, playback.SegmentIndex,
             answer.UsedFallback, answer.FirstRejection);
-        return await RespondWithLibraryTextAsync(conversationId, answer.Text);
+        return await RespondWithLibraryTextAsync(conversationId, answer.Text, cancellationToken);
     }
 
     /// <summary>Shared tail for every library-engine reply (start /
@@ -1601,9 +1605,12 @@ public class ChatService : IChatService
     /// rewrites): approved segments are served byte-verbatim per
     /// MODES.md §1A.</summary>
     private async Task<ChatResponse> RespondWithLibraryTextAsync(
-        Guid conversationId, string responseText)
+        Guid conversationId, string responseText, CancellationToken cancellationToken)
     {
-        var outputModeration = await _moderation.CheckContentAsync(responseText);
+        // Cancellation is observed INSIDE the check only: a caller that
+        // drops mid-check ends the turn with nothing stored; a check that
+        // completed is an approved reply and is stored below regardless.
+        var outputModeration = await _moderation.CheckContentAsync(responseText, cancellationToken);
         if (!outputModeration.IsSafe)
         {
             _logger.LogWarning(
@@ -1628,8 +1635,11 @@ public class ChatService : IChatService
     }
 
     /// <inheritdoc />
-    public async Task<ChatResponse> ContinueLibraryStoryAsync(Guid deviceId, Guid? childId = null)
+    public async Task<ChatResponse> ContinueLibraryStoryAsync(Guid deviceId, Guid? childId = null,
+        CancellationToken cancellationToken = default)
     {
+        // Caller already gone → nothing advanced, nothing stored.
+        cancellationToken.ThrowIfCancellationRequested();
         // childId is client-supplied — resolve it device-scoped and fall back
         // to this device's own child when it doesn't belong here (see the
         // GetChildForDeviceAsync xmldoc).
@@ -1662,7 +1672,8 @@ public class ChatService : IChatService
                 conversation.Id, playback.StoryId);
             return await RespondWithLibraryTextAsync(
                 conversation.Id,
-                endedStory.ReflectionText + "\n" + endedStory.ReflectionQuestions[0]);
+                endedStory.ReflectionText + "\n" + endedStory.ReflectionQuestions[0],
+                cancellationToken);
         }
         if (advance.Next is not null)
         {
@@ -1671,7 +1682,8 @@ public class ChatService : IChatService
                 conversation.Id, advance.Next.StoryId, advance.Next.SegmentIndex);
             return await RespondWithLibraryTextAsync(
                 conversation.Id,
-                LibraryStoryCannedLines.ResumeLeadIn + "\n" + advance.Next.SegmentText);
+                LibraryStoryCannedLines.ResumeLeadIn + "\n" + advance.Next.SegmentText,
+                cancellationToken);
         }
         // Session expired between GetCurrent and Advance — stop.
         return StopAutoplay(conversation.Id);
@@ -1683,8 +1695,16 @@ public class ChatService : IChatService
         new(string.Empty, conversationId, Guid.Empty, SafetyFlag.Clean, LibraryAutoContinue: false);
 
     public async Task<ChatResponse> GetResponseAsync(Guid deviceId, string userMessage, Guid? childId = null,
-        Guid? storySessionId = null, string? selectedChoice = null)
+        Guid? storySessionId = null, string? selectedChoice = null,
+        CancellationToken cancellationToken = default)
     {
+        // Cancellation contract (N11). The token is observed at exactly
+        // three kinds of point: here (before anything is stored), inside
+        // every safety check, and inside every model call. A cancelled
+        // turn ends with OperationCanceledException and NOTHING stored.
+        // It is never observed after output moderation has approved the
+        // reply — Step 11 stores an approved turn unconditionally.
+        cancellationToken.ThrowIfCancellationRequested();
         // Load child profile. The provided childId is client-supplied, so it is
         // resolved DEVICE-SCOPED: an id belonging to another family resolves to
         // null and falls back to this device's own child, never that family's.
@@ -1725,8 +1745,12 @@ public class ChatService : IChatService
             return new ChatResponse(prefilterFallback, conversation.Id, prefilterMsg.Id, SafetyFlag.Blocked);
         }
 
-        // Step 2: Pre-moderate user input
-        var inputModeration = await _moderation.CheckContentAsync(userMessage);
+        // Step 2: Pre-moderate user input. The check runs to completion
+        // (or is aborted by the caller's token — same outcome: nothing
+        // stored). A caller that dropped while it ran does not get the
+        // user row or the model call either — checked BEFORE Step 3.
+        var inputModeration = await _moderation.CheckContentAsync(userMessage, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!inputModeration.IsSafe)
         {
             bool moderationUnavailable = inputModeration.FlaggedCategories.Contains("moderation_unavailable");
@@ -1804,7 +1828,8 @@ public class ChatService : IChatService
             var playback = _libraryPlayback.GetCurrent(conversation.Id);
             if (playback is not null)
             {
-                return await HandleLibraryStoryInterruptAsync(conversation.Id, playback, userMessage);
+                return await HandleLibraryStoryInterruptAsync(
+                    conversation.Id, playback, userMessage, cancellationToken);
             }
 
             // Step 3.7-start (W3): no active session — a deterministic
@@ -1842,7 +1867,8 @@ public class ChatService : IChatService
                         conversation.Id, started.StoryId, started.SegmentCount);
                     return await RespondWithLibraryTextAsync(
                         conversation.Id,
-                        LibraryStoryCannedLines.StartLeadIn + "\n" + started.SegmentText);
+                        LibraryStoryCannedLines.StartLeadIn + "\n" + started.SegmentText,
+                        cancellationToken);
                 }
                 // Start returned null (no approved story resolvable) —
                 // fall through to legacy rather than serving an error.
@@ -2061,7 +2087,13 @@ public class ChatService : IChatService
         string aiResponse;
         try
         {
-            aiResponse = await _aiClient.GetCompletionAsync(systemPrompt, history);
+            aiResponse = await _aiClient.GetCompletionAsync(systemPrompt, history, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Plain disconnect, not an AI failure: no Error log. The
+            // adapter's own timeout (token NOT cancelled) still logs below.
+            throw;
         }
         catch (Exception ex)
         {
@@ -2069,8 +2101,14 @@ public class ChatService : IChatService
             throw;
         }
 
-        // Step 9: Post-moderate AI response
-        var outputModeration = await _moderation.CheckContentAsync(aiResponse);
+        // Step 9: Post-moderate AI response. Last point at which
+        // cancellation can END the turn: a caller that drops mid-check
+        // leaves nothing stored; once this check has completed the reply
+        // is approved and Step 11 stores it whether or not the toy is
+        // still listening (the model call was paid for either way). The
+        // quality retries below still take the token, but each sits in
+        // its own catch-all and falls back to the approved reply.
+        var outputModeration = await _moderation.CheckContentAsync(aiResponse, cancellationToken);
         var safetyFlag = SafetyFlag.Clean;
 
         if (!outputModeration.IsSafe)
@@ -2251,7 +2289,7 @@ public class ChatService : IChatService
                 {
                     ("user", aiResponse)
                 };
-                var fallbackRaw = await _aiClient.GetCompletionAsync(ChoiceGenerationPrompt, choiceHistory);
+                var fallbackRaw = await _aiClient.GetCompletionAsync(ChoiceGenerationPrompt, choiceHistory, cancellationToken);
 
                 // Try to parse CHOICE_A/CHOICE_B from the raw fallback (may not have --- separator)
                 var withSeparator = "\n---\n" + fallbackRaw.Trim();
@@ -2264,7 +2302,7 @@ public class ChatService : IChatService
                     // like every other model-authored string. Without this the
                     // dual-moderation contract has a hole exactly here.
                     // Fail-closed by contract: moderation_unavailable is unsafe.
-                    var choiceModeration = await _moderation.CheckContentAsync(fbA + "\n" + fbB);
+                    var choiceModeration = await _moderation.CheckContentAsync(fbA + "\n" + fbB, cancellationToken);
                     if (!choiceModeration.IsSafe)
                     {
                         _logger.LogWarning(
@@ -2330,8 +2368,8 @@ public class ChatService : IChatService
                     conversation.Id, retryReason);
                 try
                 {
-                    var retryRaw = await _aiClient.GetCompletionAsync(systemPrompt, history);
-                    var retryMod = await _moderation.CheckContentAsync(retryRaw);
+                    var retryRaw = await _aiClient.GetCompletionAsync(systemPrompt, history, cancellationToken);
+                    var retryMod = await _moderation.CheckContentAsync(retryRaw, cancellationToken);
                     if (retryMod.IsSafe)
                     {
                         var retryResp = retryRaw;
@@ -2554,8 +2592,8 @@ public class ChatService : IChatService
                         ("assistant", aiResponse),
                         ("user", $"[SYSTEM: Your continuation does not contain any word from the chosen label \"{choiceLabel}\". Rewrite the continuation so the first sentence includes at least one key noun or verb from that label verbatim. Keep the story moving forward, do not recap.]")
                     };
-                    var fidelityRaw = await _aiClient.GetCompletionAsync(systemPrompt, fidelityHistory);
-                    var fidelityMod = await _moderation.CheckContentAsync(fidelityRaw);
+                    var fidelityRaw = await _aiClient.GetCompletionAsync(systemPrompt, fidelityHistory, cancellationToken);
+                    var fidelityMod = await _moderation.CheckContentAsync(fidelityRaw, cancellationToken);
                     if (fidelityMod.IsSafe)
                     {
                         var fidelityResp = fidelityRaw;

@@ -227,7 +227,8 @@ public class AudioChatController : ControllerBase
         var autoContinue = false;
         try
         {
-            var response = await _chatService.GetResponseAsync(deviceId, transcript);
+            var response = await _chatService.GetResponseAsync(
+                deviceId, transcript, cancellationToken: cancellationToken);
             chatResult = new ChatResponseShape(
                 response.Response, response.ConversationId, response.MessageId, response.TurnEnded);
             autoContinue = response.LibraryAutoContinue;
@@ -237,6 +238,12 @@ public class AudioChatController : ControllerBase
             // hears «Ի՞նչ անենք՝ առաջինը՝ X, թե՞ երկրորդը՝ Y։» after the opening.
             ttsText = AudioStoryResponseComposer.ComposeTtsText(
                 response.Response, response.ChoiceA, response.ChoiceB, response.Mode);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Toy dropped mid-turn: nothing stored, no TTS, no 502 — rethrow
+            // like the STT/TTS sites (Kestrel logs the abort at Debug).
+            throw;
         }
         catch (Exception ex)
         {
@@ -454,7 +461,12 @@ public class AudioChatController : ControllerBase
         ChatResponse result;
         try
         {
-            result = await _chatService.ContinueLibraryStoryAsync(deviceId);
+            result = await _chatService.ContinueLibraryStoryAsync(
+                deviceId, cancellationToken: cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

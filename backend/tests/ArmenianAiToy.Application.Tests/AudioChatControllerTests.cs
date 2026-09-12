@@ -1013,4 +1013,80 @@ public class AudioChatControllerTests
             .GetArguments()[0]!;
         Assert.Equal(reply, ttsArg);
     }
+
+
+    // --- N11: toy drops mid-turn -------------------------------------
+
+    [Fact]
+    public async Task AudioChat_RequestAbortedDuringChat_NoTts_NoBlob_Propagates()
+    {
+        // The token MVC binds from RequestAborted reaches ChatService; when
+        // the toy is gone mid-chat the OperationCanceledException propagates
+        // (no 502, no 500-shaped body), TTS is never called and no assistant
+        // blob is written.
+        await using var h = await CreateAsync();
+        WireHappyPath(h);
+        using var cts = new CancellationTokenSource();
+        h.ChatService.GetResponseAsync(
+                h.DeviceId, Arg.Any<string>(), Arg.Any<Guid?>(),
+                Arg.Any<Guid?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns<ChatResponse>(_ =>
+            {
+                cts.Cancel();
+                throw new OperationCanceledException(cts.Token);
+            });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => h.Controller.Chat(cts.Token));
+
+        await h.ChatService.Received(1).GetResponseAsync(
+            h.DeviceId, Arg.Any<string>(), Arg.Any<Guid?>(),
+            Arg.Any<Guid?>(), Arg.Any<string?>(), cts.Token);
+        await h.Synthesis.DidNotReceiveWithAnyArgs()
+            .SynthesizeArmenianAsync(default!, default);
+        Assert.Empty(h.BlobStore.Written);
+    }
+
+    [Fact]
+    public async Task AudioChat_ChatServiceTimeoutShapedOce_RequestAlive_Still502()
+    {
+        await using var h = await CreateAsync();
+        WireHappyPath(h);
+        h.ChatService.GetResponseAsync(
+                h.DeviceId, Arg.Any<string>(), Arg.Any<Guid?>(),
+                Arg.Any<Guid?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Throws(new TaskCanceledException("adapter timeout"));
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        var status = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(502, status.StatusCode);
+    }
+
+    [Fact]
+    public async Task AutoplayContinue_RequestAbortedDuringChat_NoTts_Propagates()
+    {
+        await using var h = await CreateAsync();
+        h.DeviceService.IsDevicePausedAsync(h.DeviceId).Returns(false);
+        h.DeviceService.IsDeviceInBedtimeWindowAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(false);
+        h.DeviceService.IsModeEnabledForRequestAsync(
+            h.DeviceId, (Guid?)null, DetectedMode.Story).Returns(true);
+        using var cts = new CancellationTokenSource();
+        h.ChatService.ContinueLibraryStoryAsync(h.DeviceId, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
+            .Returns<ChatResponse>(_ =>
+            {
+                cts.Cancel();
+                throw new OperationCanceledException(cts.Token);
+            });
+        h.Controller.ControllerContext.HttpContext.Request.Headers["X-Areg-Continue"] = "1";
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => h.Controller.Chat(cts.Token));
+
+        await h.ChatService.Received(1).ContinueLibraryStoryAsync(
+            h.DeviceId, Arg.Any<Guid?>(), cts.Token);
+        await h.Synthesis.DidNotReceiveWithAnyArgs()
+            .SynthesizeArmenianAsync(default!, default);
+    }
 }

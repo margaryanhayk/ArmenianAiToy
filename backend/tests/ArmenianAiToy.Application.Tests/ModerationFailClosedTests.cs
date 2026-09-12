@@ -20,7 +20,7 @@ namespace ArmenianAiToy.Application.Tests;
 /// MOCKING STRATEGY — these tests do NOT require network access.
 /// They subclass <see cref="OpenAIModerationAdapter"/> via the private
 /// <c>StubAdapter</c> below and override
-/// <c>protected virtual Task&lt;ModerationResult&gt; ClassifyOnceAsync(string)</c>
+/// <c>protected virtual Task&lt;ModerationResult&gt; ClassifyOnceAsync(string, CancellationToken)</c>
 /// — the only place the production code invokes the OpenAI SDK
 /// (<c>_client.ClassifyTextAsync(...)</c> at OpenAIModerationAdapter.cs:148).
 /// Each test scripts a sequence of responses (throws or success results)
@@ -179,7 +179,8 @@ public class ModerationFailClosedTests
             Logger = logger;
         }
 
-        protected override Task<ModerationResult> ClassifyOnceAsync(string content)
+        protected override Task<ModerationResult> ClassifyOnceAsync(
+            string content, CancellationToken cancellationToken)
         {
             CallCount++;
             if (Responses.Count == 0)
@@ -360,5 +361,67 @@ public class ModerationFailClosedTests
     public void LooksLikeStoryRequest_MatchesExpected(string content, bool expected)
     {
         Assert.Equal(expected, OverrideProbe.IsStoryRequest(content));
+    }
+
+
+    // ─────────────────────────────────────────────────────────────────────
+    // N11: a caller-cancelled check (the toy dropped mid-turn) is NOT a
+    // moderation outage. It propagates — no fail-closed row, no Error log —
+    // while the adapter's own timeout (same exception type, caller's token
+    // NOT cancelled) keeps failing closed exactly as before.
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CheckContentAsync_CallerCancelled_Propagates_NoFailClosed_NoErrorLog()
+    {
+        var adapter = new StubAdapter();
+        using var cts = new CancellationTokenSource();
+        adapter.Responses.Enqueue(() =>
+        {
+            cts.Cancel();
+            throw new OperationCanceledException(cts.Token);
+        });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => adapter.CheckContentAsync("test content", cts.Token));
+
+        Assert.Equal(1, adapter.CallCount);
+        adapter.Logger.DidNotReceive().Log(
+            LogLevel.Error,
+            Arg.Any<EventId>(),
+            Arg.Any<object>(),
+            Arg.Any<Exception?>(),
+            Arg.Any<Func<object, Exception?, string>>());
+    }
+
+    [Fact]
+    public async Task CheckContentAsync_CallerCancelledDuringRetry_Propagates_NotFailClosed()
+    {
+        var adapter = new StubAdapter();
+        using var cts = new CancellationTokenSource();
+        adapter.Responses.Enqueue(() => throw MakeClientException(429));
+        adapter.Responses.Enqueue(() =>
+        {
+            cts.Cancel();
+            throw new OperationCanceledException(cts.Token);
+        });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => adapter.CheckContentAsync("test content", cts.Token));
+
+        Assert.Equal(2, adapter.CallCount);
+    }
+
+    [Fact]
+    public async Task CheckContentAsync_TimeoutShapedCancellation_CallerAlive_StillFailsClosed()
+    {
+        var adapter = new StubAdapter();
+        using var cts = new CancellationTokenSource(); // live, never cancelled
+        adapter.Responses.Enqueue(() => throw new OperationCanceledException("10 s adapter ceiling"));
+
+        var result = await adapter.CheckContentAsync("test content", cts.Token);
+
+        Assert.False(result.IsSafe);
+        Assert.Contains("moderation_unavailable", result.FlaggedCategories);
     }
 }

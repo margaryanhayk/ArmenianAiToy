@@ -175,7 +175,7 @@ public class ChatController : ControllerBase
         try
         {
             var response = await _chatService.GetResponseAsync(deviceId, request.Message, request.ChildId,
-                request.StorySessionId, request.SelectedChoice);
+                request.StorySessionId, request.SelectedChoice, HttpContext.RequestAborted);
 
             // Cost-recording is best-effort and runs after a successful
             // ChatService completion. Wrapped in its own try/catch so a
@@ -201,6 +201,16 @@ public class ChatController : ControllerBase
             }
 
             return Ok(response);
+        }
+        catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            // The toy dropped mid-turn: ChatService stopped its provider
+            // calls and stored nothing. Rethrow like every other
+            // RequestAborted site in this project — Kestrel records an
+            // aborted request at Debug, never a 500 or an Error log. An
+            // adapter timeout (token NOT cancelled) still takes the 502
+            // path below.
+            throw;
         }
         catch (Exception)
         {
