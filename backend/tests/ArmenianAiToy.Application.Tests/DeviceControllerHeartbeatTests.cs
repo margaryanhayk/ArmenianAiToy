@@ -3,6 +3,7 @@ using ArmenianAiToy.Application.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace ArmenianAiToy.Application.Tests;
@@ -32,7 +33,7 @@ public class DeviceControllerHeartbeatTests
     {
         var deviceId = Guid.NewGuid();
         var result = await NewController(deviceId)
-            .Heartbeat(Substitute.For<IDeviceCommandService>());
+            .Heartbeat(Substitute.For<IDeviceCommandService>(), NullLogger<DeviceController>.Instance);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         // Shape: { ok = true, deviceId, serverTimeUtc } — anonymously typed, so
@@ -57,7 +58,8 @@ public class DeviceControllerHeartbeatTests
         var commands = Substitute.For<IDeviceCommandService>();
         commands.HasDeliverableCommandAsync(deviceId, Arg.Any<DateTime>()).Returns(queued);
 
-        var result = await NewController(deviceId).Heartbeat(commands);
+        var result = await NewController(deviceId)
+            .Heartbeat(commands, NullLogger<DeviceController>.Instance);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var json = System.Text.Json.JsonSerializer.Serialize(ok.Value,

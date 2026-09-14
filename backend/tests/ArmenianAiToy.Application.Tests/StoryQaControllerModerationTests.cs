@@ -51,7 +51,8 @@ public class StoryQaControllerModerationTests
         Guid DeviceId,
         Guid ConversationId);
 
-    private static Harness Create(OpenAIDailyCostCapOptions? costCap = null)
+    private static Harness Create(
+        OpenAIDailyCostCapOptions? costCap = null, UsageTiersOptions? usageTiers = null)
     {
         var transcription = Substitute.For<IAudioTranscriptionService>();
         var synthesis = Substitute.For<IAudioSynthesisService>();
@@ -112,7 +113,7 @@ public class StoryQaControllerModerationTests
         var controller = new StoryQaController(
             transcription, synthesis, library, questions, moderation,
             conversations, childService, deviceService, canned, costMeter, costCapOptions,
-            env, config, logger);
+            env, config, logger, reflectionDialogue: null, usageTiersOptions: usageTiers);
 
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = deviceId;
@@ -218,6 +219,31 @@ public class StoryQaControllerModerationTests
         await h.Moderation.Received().CheckContentAsync("Ո՞վ է փոքրիկ ամպիկը");
         await h.AiChatClient.ReceivedWithAnyArgs()
             .GetCompletionAsync(default!, default!);
+    }
+
+    // Usage-tier metering foundation (2026-09-11) / review-fix (2026-09-14):
+    // the DeviceUsageDay write used to be nested inside `if (costCapOpts.
+    // Enabled)`, so a fleet running Usage:Tiers:Enabled=true with the flat
+    // dollar cap OFF never recorded a single question. Pins that a
+    // successful Ask turn still records usage with the flat cap OFF and
+    // the tiers flag ON.
+    [Fact]
+    public async Task SafeTranscript_CostCapOff_UsageTiersOn_StillRecordsUsage()
+    {
+        var h = Create(usageTiers: new UsageTiersOptions { Enabled = true });
+        h.DeviceService.GetUsageAllowanceStatusAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(new UsageAllowanceStatus("free", 1, 1, 999, null, IsExhausted: false));
+        WireTranscript(h, "Ո՞վ է փոքրիկ ամպիկը");
+        h.Moderation.CheckContentAsync(Arg.Any<string>())
+            .Returns(new ModerationResult(IsSafe: true, FlaggedCategories: new List<string>()));
+        h.AiChatClient.GetCompletionAsync(Arg.Any<string>(), Arg.Any<List<(string, string)>>())
+            .Returns("Փոքրիկ ամպիկը երկնքի ընկերն է։");
+
+        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        await ReadBodyAsync(result);
+        await h.DeviceService.Received(1)
+            .RecordUsageQuestionAsync(h.DeviceId, Arg.Any<decimal>(), Arg.Any<DateTime>());
     }
 
     // --- Empty transcript: unchanged; moderation not consulted --------

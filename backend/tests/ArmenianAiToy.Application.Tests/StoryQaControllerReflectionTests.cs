@@ -58,7 +58,8 @@ public class StoryQaControllerReflectionTests
         Guid DeviceId,
         Guid ConversationId);
 
-    private static Harness Create(OpenAIDailyCostCapOptions? costCap = null)
+    private static Harness Create(
+        OpenAIDailyCostCapOptions? costCap = null, UsageTiersOptions? usageTiers = null)
     {
         var transcription = Substitute.For<IAudioTranscriptionService>();
         var synthesis = Substitute.For<IAudioSynthesisService>();
@@ -112,7 +113,7 @@ public class StoryQaControllerReflectionTests
         var controller = new StoryQaController(
             transcription, synthesis, library, questions, moderation,
             conversations, childService, deviceService, canned, costMeter, costCapOptions,
-            env, config, logger);
+            env, config, logger, reflectionDialogue: null, usageTiersOptions: usageTiers);
 
         var httpContext = new DefaultHttpContext();
         httpContext.Items["DeviceId"] = deviceId;
@@ -158,6 +159,28 @@ public class StoryQaControllerReflectionTests
 
         // No GPT answer model is ever consulted on this path.
         await h.AiChatClient.DidNotReceiveWithAnyArgs().GetCompletionAsync(default!, default!);
+    }
+
+    // Usage-tier metering foundation (2026-09-11) / review-fix (2026-09-14):
+    // the DeviceUsageDay write used to be nested inside `if (costCapOpts.
+    // Enabled)`, so a fleet running Usage:Tiers:Enabled=true with the flat
+    // dollar cap OFF never recorded a single question. Pins that a
+    // successful reflection-answer turn still records usage with the flat
+    // cap OFF and the tiers flag ON.
+    [Fact]
+    public async Task SafeAnswer_CostCapOff_UsageTiersOn_StillRecordsUsage()
+    {
+        var h = Create(usageTiers: new UsageTiersOptions { Enabled = true });
+        h.DeviceService.GetUsageAllowanceStatusAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(new UsageAllowanceStatus("free", 1, 1, 999, null, IsExhausted: false));
+        WireTranscript(h, "ոսկի");
+        WireSafe(h);
+
+        var result = await h.Controller.AnswerReflection(StoryId, questionIndex: 0, CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        await h.DeviceService.Received(1)
+            .RecordUsageQuestionAsync(h.DeviceId, Arg.Any<decimal>(), Arg.Any<DateTime>());
     }
 
     [Fact]

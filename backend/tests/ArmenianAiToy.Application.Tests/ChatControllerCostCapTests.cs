@@ -32,7 +32,8 @@ public class ChatControllerCostCapTests
         Guid DeviceId);
 
     private static Harness Create(
-        Action<OpenAIDailyCostCapOptions>? configureOptions = null)
+        Action<OpenAIDailyCostCapOptions>? configureOptions = null,
+        UsageTiersOptions? usageTiersOptions = null)
     {
         var chatService = Substitute.For<IChatService>();
         var deviceService = Substitute.For<IDeviceService>();
@@ -43,7 +44,7 @@ public class ChatControllerCostCapTests
         var costCapOptions = Options.Create(opts);
         var logger = Substitute.For<ILogger<ChatController>>();
         var controller = new ChatController(
-            chatService, deviceService, costMeter, costCapOptions, logger);
+            chatService, deviceService, costMeter, costCapOptions, logger, usageTiersOptions);
         var httpContext = new DefaultHttpContext();
         var deviceId = Guid.NewGuid();
         httpContext.Items["DeviceId"] = deviceId;
@@ -119,6 +120,33 @@ public class ChatControllerCostCapTests
         await h.ChatService.Received().GetResponseAsync(
             Arg.Any<Guid>(), Arg.Any<string>(),
             Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<string?>());
+    }
+
+    // Usage-tier metering foundation (2026-09-11) / review-fix (2026-09-14):
+    // the DeviceUsageDay write used to be nested inside `if (costCapOpts.
+    // Enabled)`, so a fleet running Usage:Tiers:Enabled=true with the flat
+    // dollar cap OFF never recorded a single question — the allowance gate
+    // would then always read "not exhausted". Pins that a successful chat
+    // turn still records usage with the flat cap OFF and the tiers flag ON.
+    [Fact]
+    public async Task CostCapOff_UsageTiersOn_StillRecordsUsage()
+    {
+        var h = Create(
+            o => o.Enabled = false,
+            usageTiersOptions: new UsageTiersOptions { Enabled = true });
+        h.DeviceService.GetUsageAllowanceStatusAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(new UsageAllowanceStatus("free", 1, 1, 999, null, IsExhausted: false));
+        h.ChatService.GetResponseAsync(
+                Arg.Any<Guid>(), Arg.Any<string>(),
+                Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<string?>())
+            .Returns(new ChatResponse(
+                "Կար մի կատու։", Guid.NewGuid(), Guid.NewGuid(), SafetyFlag.Clean));
+
+        var result = await h.Controller.Chat(new ChatRequest("Բարև"));
+
+        OkPayload(result);
+        await h.DeviceService.Received(1)
+            .RecordUsageQuestionAsync(h.DeviceId, Arg.Any<decimal>(), Arg.Any<DateTime>());
     }
 
     [Fact]

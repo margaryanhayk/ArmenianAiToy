@@ -180,16 +180,22 @@ public class ChatController : ControllerBase
             // Cost-recording is best-effort and runs after a successful
             // ChatService completion. Wrapped in its own try/catch so a
             // bug in the estimator can never break the chat path.
-            if (costCapOpts.Enabled)
+            //
+            // Usage-tier metering foundation: the DeviceUsageDay write
+            // fires whenever the flat cost cap OR Usage:Tiers:Enabled is
+            // on — either flag alone must keep the counter honest, since
+            // the tier gate above reads this table independently of the
+            // flat cap.
+            if (costCapOpts.Enabled || usageTiersOpts.Enabled)
             {
                 try
                 {
                     var estimate = OpenAICostEstimator.EstimateChatCostUsd(
                         request.Message, response.Response);
-                    _costMeter.Record(deviceId, estimate, DateTime.UtcNow);
-                    // Usage-tier metering foundation: written unconditionally
-                    // here (independent of Usage:Tiers:Enabled) — see
-                    // IDeviceService.RecordUsageQuestionAsync.
+                    if (costCapOpts.Enabled)
+                    {
+                        _costMeter.Record(deviceId, estimate, DateTime.UtcNow);
+                    }
                     await _deviceService.RecordUsageQuestionAsync(deviceId, estimate, DateTime.UtcNow);
                 }
                 catch (Exception ex)
