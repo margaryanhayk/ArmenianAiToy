@@ -26,3 +26,35 @@ jobs:
 
       - name: Test
         run: dotnet test ArmenianAiToy.slnx --no-build -c Release
+
+  firmware-host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run pure-logic host test suites
+        working-directory: esp32/AregVoiceMvp/host_tests
+        run: |
+          set -euo pipefail
+          for f in *_test.cpp; do
+            echo "=== $f ==="
+            g++ -std=c++17 -I.. -o /tmp/host_test "$f"
+            /tmp/host_test
+          done
+
+  python-tool-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Run OTA release-image gate tests
+        working-directory: tools/firmware
+        run: python3 test_check_release_image.py -v
+
+      - name: Run SD-card loader tests
+        working-directory: tools/factory
+        run: python3 test_load_sd_card.py -v
