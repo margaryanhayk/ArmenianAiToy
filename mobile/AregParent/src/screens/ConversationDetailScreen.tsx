@@ -59,7 +59,10 @@ export default function ConversationDetailScreen({ conversationId, onBack, onLog
 
   // Leaving the conversation stops any clip still playing — matching the
   // web dashboard's own view-change behaviour (releaseObjectUrls on nav).
-  useEffect(() => () => stopPlayback(), []);
+  // reclaim: true — the screen is gone, so the cache file is genuinely done
+  // being needed (unlike a plain in-screen pause, which keeps it for resume
+  // or Save).
+  useEffect(() => () => stopPlayback({ reclaim: true }), []);
 
   // Hard delete — messages cascade at the DB level, no recovery path. On
   // success, onBack() returns to the conversation list, which remounts and
@@ -195,6 +198,11 @@ function AudioRow({
         audio.uri,
         () => setState('idle'),
         () => {
+          // The cached file may have been reclaimed since it was fetched
+          // (a different message's clip superseded it) — drop the stale
+          // reference so the next Listen re-fetches instead of failing
+          // the same way forever.
+          setClip(null);
           setState('idle');
           setError(t('e_generic'));
         },

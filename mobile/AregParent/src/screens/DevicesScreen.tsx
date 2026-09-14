@@ -542,6 +542,14 @@ function DeviceCard({
   const [name, setName] = useState(device.deviceName ?? '');
   const [saving, setSaving] = useState(false);
 
+  // The list refresh that follows a save (onRenamed) — or a rename from the
+  // second parent, or the operator console — can change device.deviceName
+  // out from under this still-mounted row; without this, the field keeps
+  // showing whatever was typed/loaded when the row first mounted.
+  useEffect(() => {
+    setName(device.deviceName ?? '');
+  }, [device.deviceName]);
+
   async function save() {
     if (!name.trim()) return;
     setSaving(true);
