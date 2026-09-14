@@ -320,6 +320,36 @@ static const char *reset_reason_short() {
     }
 }
 
+// #P3 (2026-09-14) — the heartbeat, welcome-intent and story-audio-token
+// replies below are ordinarily a few hundred bytes, read via
+// HTTPClient::getString() into an internal-heap String with no size check.
+// On the ~300 KB internal heap, an unexpected large HTTP 200 body — an
+// HTML error page from a proxy during an outage, say — could exhaust heap
+// instead of the request simply failing. Checked against getSize() before
+// getString() is ever called, the same shape as read_response_into()'s
+// existing PSRAM buffer cap below, just against a much smaller ceiling
+// (these are never audio). A negative/unknown getSize() (chunked, no
+// Content-Length) is let through unchanged — these endpoints do not use
+// chunked transfer today, and getString() cannot be size-checked in that
+// case regardless.
+//
+// ota_apply.cpp and ota_foundation.cpp have the same unbounded getString()
+// shape and are OUT OF SCOPE for this fix (owned by different work).
+#ifndef AREG_HTTP_SMALL_JSON_MAX_BYTES
+#define AREG_HTTP_SMALL_JSON_MAX_BYTES (16 * 1024)
+#endif
+
+static bool http_small_body_size_ok(HTTPClient &http, const char *tag) {
+    const int body_len = http.getSize();
+    if (body_len > 0 && (size_t)body_len > AREG_HTTP_SMALL_JSON_MAX_BYTES) {
+        Serial.printf("[voice] %s: body %d exceeds %u byte cap, refusing\n",
+                      tag, body_len, (unsigned)AREG_HTTP_SMALL_JSON_MAX_BYTES);
+        Serial.flush();
+        return false;
+    }
+    return true;
+}
+
 void voice_send_heartbeat() {
     if (!voice_wifi_is_connected()) {
         return;  // nothing to do offline; the reconnect tick owns recovery
@@ -441,10 +471,11 @@ void voice_send_heartbeat() {
         // Slice E — the server tells us whether the bedtime window is
         // active right now (additive field; older backends omit it and the
         // cached value defaults false). Best-effort parse: a malformed
-        // body just leaves the previous value standing.
-        const String resp = http.getString();
+        // body — or one too large to be a real heartbeat reply — just
+        // leaves the previous value standing.
         JsonDocument doc;
-        if (deserializeJson(doc, resp) == DeserializationError::Ok) {
+        if (http_small_body_size_ok(http, "heartbeat")
+            && deserializeJson(doc, http.getString()) == DeserializationError::Ok) {
             const bool bedtime = doc["inBedtimeWindow"] | false;
             const bool paused  = doc["isPaused"] | false;
             // The toy used to make a SECOND HTTPS request every 60 s just to
@@ -546,6 +577,10 @@ bool voice_post_voice_intent(const uint8_t *payload, size_t length,
         http.end();
         Serial.printf("[welcome] intent status=%d\n", status);
         Serial.flush();
+        return false;
+    }
+    if (!http_small_body_size_ok(http, "welcome-intent")) {
+        http.end();
         return false;
     }
     const String resp = http.getString();
@@ -656,6 +691,10 @@ bool voice_fetch_story_audio_token(const char *story_id, char *out_token, size_t
         http.end();
         return false;
     }
+    if (!http_small_body_size_ok(http, "story-audio-token")) {
+        http.end();
+        return false;
+    }
     String body = http.getString();
     http.end();
 
@@ -730,7 +769,7 @@ static bool read_response_into(HTTPClient &http, VoiceTurnResult &result) {
     size_t read_total = 0;
     const uint32_t read_deadline = millis() + AREG_HTTP_READ_MS;
     while (read_total < (size_t)body_len) {
-        if (millis() > read_deadline) {
+        if ((int32_t)(millis() - read_deadline) >= 0) {  // rollover-safe
             Serial.println("[voice] http read timeout");
             heap_caps_free(buf);
             return false;
