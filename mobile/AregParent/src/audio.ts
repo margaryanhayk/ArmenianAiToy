@@ -73,8 +73,29 @@ export function fetchChildAudio(messageId: string): Promise<FetchedAudio> {
 
 // ---- one clip plays at a time, mirrors parent.html's stopOtherPreviews ----
 let current: AudioPlayer | null = null;
+// The cache file backing `current` (or the one most recently loaded into
+// it). Tracked separately from the player so a clip can be reclaimed once
+// nothing needs it anymore, without ever touching a file still in use.
+let currentUri: string | null = null;
 
-export function stopPlayback(): void {
+/** Best-effort cache cleanup — a leftover file is not worth surfacing. */
+async function deleteClipFile(uri: string | null): Promise<void> {
+  if (!uri) return;
+  try {
+    await FileSystem.deleteAsync(uri, { idempotent: true });
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Stops whatever is playing. Never touches the clip file on disk — a plain
+ * pause must leave it in place so the parent can still resume without a
+ * refetch, or press "Save recording" on the child audio they just heard.
+ * Pass `reclaim: true` only when the clip is genuinely done being needed
+ * (leaving the screen), which also deletes its file.
+ */
+export function stopPlayback(opts?: { reclaim?: boolean }): void {
   if (current) {
     try {
       current.pause();
@@ -88,6 +109,10 @@ export function stopPlayback(): void {
     }
     current = null;
   }
+  if (opts?.reclaim) {
+    void deleteClipFile(currentUri);
+    currentUri = null;
+  }
 }
 
 /**
@@ -97,9 +122,18 @@ export function stopPlayback(): void {
  * both, so a caller's busy/disabled state is never stuck.
  */
 export function playLocalFile(uri: string, onFinish: () => void, onError: () => void): void {
+  // A different clip taking over means whatever was loaded before it is
+  // done being useful — this is where a long session with many distinct
+  // Listens actually gets its cache files cleaned up. Replaying the SAME
+  // clip (currentUri === uri, e.g. resuming after a plain pause) must
+  // never delete the very file about to be reloaded.
+  if (currentUri && currentUri !== uri) {
+    void deleteClipFile(currentUri);
+  }
   stopPlayback();
   const player = createAudioPlayer({ uri });
   current = player;
+  currentUri = uri;
   let settled = false;
   const sub = player.addListener('playbackStatusUpdate', (status) => {
     if (settled) return;
