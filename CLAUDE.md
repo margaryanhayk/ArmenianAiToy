@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3023 tests, ~35 s in Release
+dotnet test            # 3023 tests, ~40 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -893,35 +893,6 @@ variable required; `Enabled` itself still defaults false. `dotnet test`
 green (3017 tests, 2 new); boot-verified in Production (log line pasted in
 the commit). NOT verified: the live Railway host — `Enabled=true` is still
 OWNER's to set.
-
-### Dormancy-pass review fixes: per-parent commit, shared batch cap, awaited alerts (2026-09-14, N13)
-
-Three verified bugs from a code review, fixed. `WarnDormantParentsAsync`
-now commits (`SaveChangesAsync`) inside its per-parent loop, mirroring
-`WarnDormantDevicesAsync` — a worker killed after SmtpNotifier delivered
-some warnings but before the old trailing commit could no longer strand
-already-warned parents unstamped, which would have re-emailed them on the
-next tick. All four dormancy passes (parent warn, parent anonymize, device
-warn, device delete) are now capped, oldest-first, by a new shared
-`Dormancy:MaxBatchSize` config key (default 500, same clamp range as
-`Retention:Messages:MaxBatchSize` — deliberately a separate key, see
-`RetentionPurgeService.DefaultDormancyMaxBatchSize`'s doc comment for why)
-so a fleet's first-ever dormancy sweep cannot serially email/scrub
-thousands of rows in one tick; a capped tick leaves the remainder for the
-next one. `AlertingService`'s three metric-driven checks (cost-cap trips,
-OpenAI circuit, moderation fail-closed) now `await` their `SendAlertAsync`
-call instead of firing it as `_ = SendAlertAsync(...)` — previously safe
-only because that method swallows its own exceptions, but any future throw
-between the cooldown check and the POST would have become an unobserved
-task fault instead of reaching the tick's own try/catch. `dotnet test`
-green (3023 tests, 6 new). NOT verified: a real SMTP relay or a real
-process kill mid-pass (the mid-loop-crash test simulates the crash via a
-notifier seam, not an actual process kill). Found but NOT fixed (out of
-scope — touches the `Parent` domain entity, a hard stop): `Parents.Email`
-carries an unfiltered unique index, so if two parents are ever anonymized
-in the same tick, the second collides on the shared `""` scrub value —
-pre-existing, independent of this slice's batch cap, reported to the owner
-rather than fixed here.
 
 ## Working in this repo (agents)
 
