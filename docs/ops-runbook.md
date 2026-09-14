@@ -86,17 +86,25 @@ Behind Railway's edge proxy, `Connection.RemoteIpAddress` is the proxy's own
 IP for every request unless forwarded-header processing is turned on — the
 per-IP auth rate limiter (`AuthRateLimiter`) then keys every parent into one
 shared bucket, so a handful of families can lock each other out of
-login/register. A boot-time warning names this when it applies. Set:
+login/register. A boot-time warning names this when it applies.
+
+**On Railway, `ForwardedHeaders__Enabled=true` is sufficient on its own.**
+`appsettings.json` ships a default `KnownNetworks` covering the private/
+CGNAT/ULA ranges a PaaS edge proxy connects from
+(`10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, fc00::/7`) — the
+container is reachable only through the platform's own proxy, so no internet
+client can ever present one of these as its TCP source address. Setting only:
 
 ```
 ForwardedHeaders__Enabled=true
-ForwardedHeaders__KnownNetworks=<Railway's internal proxy CIDR>
 ```
 
-(`ForwardedHeaders__KnownProxies` also works for a fixed proxy IP; on a
-managed host like Railway there is no single stable IP to pin, so
-`KnownNetworks` — a CIDR — is the pinnable unit.) Development is unaffected;
-see `ArmenianAiToy.Api.Security.ForwardedHeadersConfig` for the exact rule.
+is enough; no second variable is required. Set `ForwardedHeaders__KnownNetworks`
+(comma-separated CIDRs) only to REPLACE the shipped default — for example on a
+flat-LAN deployment (not a PaaS) where the real proxy address is narrower than
+the shipped ranges — or `ForwardedHeaders__KnownProxies` for a fixed proxy IP.
+Development is unaffected; see `ArmenianAiToy.Api.Security.ForwardedHeadersConfig`
+for the exact rule.
 
 ## Where are the logs?
 
