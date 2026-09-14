@@ -29,6 +29,12 @@ public static class ResponseCleaner
         @"^\s*(?:character|place|object|situation|mood)\s*:.*$",
         RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
 
+    // Collapses runs of 3+ blank-ish lines into one blank line. Hot path —
+    // runs on every non-story turn — so compiled and cached like its
+    // neighbours above instead of recompiled on every call.
+    private static readonly Regex ExtraBlankLinesRegex = new(
+        @"(\r?\n\s*){3,}", RegexOptions.Compiled);
+
     /// <summary>
     /// Removes leaked internal formatting lines from the visible response.
     /// Preserves all normal Armenian story text. Returns cleaned text trimmed.
@@ -47,7 +53,7 @@ public static class ResponseCleaner
         text = EmojiRegex.Replace(text, "");
 
         // Collapse multiple blank lines into one and trim
-        text = Regex.Replace(text, @"(\r?\n\s*){3,}", "\n\n");
+        text = ExtraBlankLinesRegex.Replace(text, "\n\n");
         return text.Trim();
     }
 }

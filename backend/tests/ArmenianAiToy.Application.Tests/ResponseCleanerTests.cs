@@ -90,6 +90,44 @@ public class ResponseCleanerTests
         Assert.Equal("Line one.\n\nLine two.", result);
     }
 
+    // --- Blank-line collapsing regex is hoisted to a static readonly Regex
+    // (CLAUDE.md review N-series finding); these pin the output byte-for-byte
+    // against the inline-Regex.Replace behaviour it replaced.
+
+    [Fact]
+    public void CleanText_TwoBlankLines_NotCollapsed()
+    {
+        // Boundary: {3,} requires 3+ repetitions of (newline + optional
+        // whitespace) — a single blank line between two lines of text is
+        // exactly 2 repetitions and must survive untouched.
+        var input = "Line one.\n\nLine two.";
+        Assert.Equal(input, ResponseCleaner.Clean(input));
+    }
+
+    [Fact]
+    public void CleanText_BlankLinesWithTrailingWhitespace_Collapsed()
+    {
+        var input = "Line one.\n \n\t\n\nLine two.";
+        var result = ResponseCleaner.Clean(input);
+        Assert.Equal("Line one.\n\nLine two.", result);
+    }
+
+    [Fact]
+    public void CleanText_CrlfBlankLines_Collapsed()
+    {
+        var input = "Line one.\r\n\r\n\r\n\r\nLine two.";
+        var result = ResponseCleaner.Clean(input);
+        Assert.Equal("Line one.\n\nLine two.", result);
+    }
+
+    [Fact]
+    public void CleanText_ArmenianWithExcessBlankLines_Collapsed()
+    {
+        var input = "Մի պատմություն։\n\n\n\nԵրկրորդ պատմություն։";
+        var result = ResponseCleaner.Clean(input);
+        Assert.Equal("Մի պատմություն։\n\nԵրկրորդ պատմություն։", result);
+    }
+
     [Fact]
     public void CleanText_MixedArmenianAndLeakedFormat()
     {
