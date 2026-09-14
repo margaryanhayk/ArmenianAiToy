@@ -22,8 +22,11 @@ namespace ArmenianAiToy.Api.Security;
 ///
 /// <para>Constant-time secret compare via
 /// <see cref="CryptographicOperations.FixedTimeEquals(ReadOnlySpan{byte}, ReadOnlySpan{byte})"/>.
-/// Reads only the explicit header — never <c>X-Forwarded-*</c> (the repo does
-/// not wire <c>ForwardedHeaders</c>).</para>
+/// Reads only the explicit header — never <c>X-Forwarded-*</c> or the client
+/// IP. This gate is about possessing the shared secret, not about where the
+/// request came from, so it is deliberately independent of
+/// <c>ForwardedHeaders</c> configuration (wired or not) — do not add an IP
+/// check here.</para>
 /// </summary>
 public static class DeviceProvisioningAuth
 {
