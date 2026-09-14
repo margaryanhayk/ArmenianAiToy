@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3023 tests, ~40 s in Release
+dotnet test            # 3045 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
