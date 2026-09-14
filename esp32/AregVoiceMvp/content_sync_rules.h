@@ -847,6 +847,26 @@ inline bool cs_entry_matches_manifest(const CsStory *entry,
     }
 }
 
+/// Content index power-loss safety net (2026-09-14). write_index() cannot
+/// overwrite the primary index in place — FAT rename refuses a destination
+/// that already exists — so publishing a new index always frees the
+/// primary's path first (by moving the outgoing index to the backup path)
+/// before the freshly-verified replacement takes that path. A power loss
+/// inside that narrow window leaves the primary missing and the backup
+/// holding the last index that was ever fully published.
+///
+/// load_previous_index() must recognise that exact shape and restore from
+/// the backup, rather than reading "primary missing" as "no index has ever
+/// existed" — the latter silently re-downloads the entire library (every
+/// story, voice clip, game clip and music track) on the next boot instead
+/// of the strike-counter/rebuild-refusal safety net (see
+/// kNvsIndexBadKey/kIndexBadRebuildAfter in content_sync.cpp) ever
+/// engaging. Wasteful, not corrupting — the cached MP3s themselves are
+/// never touched by this path.
+inline bool cs_index_should_restore_backup(bool primary_exists, bool backup_exists) {
+    return !primary_exists && backup_exists;
+}
+
 /// Bounded copy that always NUL-terminates. Returns false when the
 /// source had to be truncated, so callers can reject rather than store a
 /// silently shortened id/hash (truncation is only tolerated for titles).
