@@ -488,6 +488,14 @@
       color: var(--ink-faint);
       cursor: not-allowed;
     }
+    /* #deleteConversationBtn carries its danger colour and cursor as INLINE
+       styles, which outrank the button:disabled rule above — without this
+       it is the one guarded button in the file whose disabled state stays
+       full danger-red with a pointer cursor while its delete is in flight. */
+    #deleteConversationBtn:disabled {
+      color: var(--ink-faint) !important;
+      cursor: not-allowed !important;
+    }
     button:focus-visible,
     .row:focus-visible {
       outline: 2px solid var(--brand-strong);
@@ -4245,7 +4253,7 @@
               removeChildBtn.textContent = t('remove');
               removeChildBtn.className = 'btn-ghost-danger';
               removeChildBtn.addEventListener('click', function () {
-                deleteChild(c.childId, c.name);
+                deleteChild(removeChildBtn, c.childId, c.name);
               });
               childRow.appendChild(removeChildBtn);
               gWho.appendChild(childRow);
@@ -4274,7 +4282,7 @@
           pauseBtn.className = 'btn-ghost';
           pauseBtn.style.cssText = 'margin:4px 8px 12px 0;font-size:13px;';
           pauseBtn.addEventListener('click', function () {
-            toggleDevicePause(d.deviceId, d.deviceName, d.isPaused);
+            toggleDevicePause(pauseBtn, d.deviceId, d.deviceName, d.isPaused);
           });
           gWhen.appendChild(pauseBtn);
 
@@ -4605,7 +4613,7 @@
           revokeBtn.className = d.isRevoked ? 'btn-ghost-ok' : 'btn-ghost-danger';
           revokeBtn.style.cssText = 'margin:4px 8px 12px 0;';
           revokeBtn.addEventListener('click', function () {
-            toggleDeviceRevocation(d.deviceId, d.deviceName, d.isRevoked);
+            toggleDeviceRevocation(revokeBtn, d.deviceId, d.deviceName, d.isRevoked);
           });
           var dangerWrap = document.createElement('div');
           dangerWrap.className = 'danger-zone';
@@ -4627,18 +4635,23 @@
           unlink.setAttribute('data-device-id', d.deviceId);
           unlink.style.cssText = 'margin:4px 0 12px;';
           unlink.addEventListener('click', function () {
-            unlinkDevice(d.deviceId, d.deviceName);
+            unlinkDevice(unlink, d.deviceId, d.deviceName);
           });
           dangerWrap.appendChild(unlink);
     }
 
     // Toggle pause/resume on a linked device. Posts to the appropriate
     // endpoint and reloads the device list on 2xx so the button label
-    // flips. Idempotent on the server, so a double-click is harmless.
-    function toggleDevicePause(deviceId, deviceName, currentlyPaused) {
+    // flips. No confirm dialog serializes this one, so a fast double-click
+    // must not be allowed to read the same stale `currentlyPaused` closure
+    // twice and fire two overlapping requests, landing the toy in whichever
+    // response happens to arrive last rather than what the parent intended
+    // — same disable-during-request discipline as flagToggle.
+    function toggleDevicePause(btn, deviceId, deviceName, currentlyPaused) {
       var token = getToken();
       if (!token) { sessionExpired(); return; }
       var path = currentlyPaused ? 'resume' : 'pause';
+      btn.disabled = true;
       deviceStatus(currentlyPaused ? t('busy_resume') : t('busy_pause'), 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/' + path, {
         method: 'POST',
@@ -4652,12 +4665,14 @@
           return;
         }
         if (!res.ok) {
+          btn.disabled = false;
           deviceStatus(friendlyError({ status: res.status }), 'err');
           return;
         }
         window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
+        btn.disabled = false;
         deviceStatus(t('err_network'), 'err');
       });
     }
@@ -5219,11 +5234,12 @@
     // with the parent first — this is a hard delete (service-side cascade
     // removes conversations and messages) with no recovery path. Reloads
     // the device list on any 2xx so the removed child disappears.
-    function deleteChild(childId, childName) {
+    function deleteChild(btn, childId, childName) {
       var token = getToken();
       if (!token) { sessionExpired(); return; }
       var label = childName || t('this_child');
       if (!window.confirm(tf('confirm_delete_child', { name: label }))) return;
+      btn.disabled = true;
       deviceStatus(t('busy_deleting'), 'muted');
       fetch('/api/parents/children/' + encodeURIComponent(childId), {
         method: 'DELETE',
@@ -5237,11 +5253,13 @@
           return;
         }
         if (!res.ok) {
+          btn.disabled = false;
           deviceStatus(t('err_generic'), 'err');
           return;
         }
         loadDevices();
       }).catch(function () {
+        btn.disabled = false;
         deviceStatus(t('err_network'), 'err');
       });
     }
@@ -5259,6 +5277,8 @@
       var conversationId = state.detailConversationId;
       if (!conversationId) return;
       if (!window.confirm(t('confirm_delete_conversation'))) return;
+      var btn = document.getElementById('deleteConversationBtn');
+      btn.disabled = true;
       setStatus('detailStatus', t('busy_deleting'), 'muted');
       fetch('/api/conversations/' + encodeURIComponent(conversationId), {
         method: 'DELETE',
@@ -5272,12 +5292,14 @@
           return;
         }
         if (!res.ok) {
+          btn.disabled = false;
           setStatus('detailStatus', t('err_generic'), 'err');
           return;
         }
         state.detailConversationId = null;
         backFromDetail();
       }).catch(function () {
+        btn.disabled = false;
         setStatus('detailStatus', t('err_network'), 'err');
       });
     }
@@ -5285,11 +5307,12 @@
     // Unlink a device from the authenticated parent account. The server
     // response is idempotent, so the UI simply refreshes the device list
     // on any 2xx and surfaces any non-2xx as an error.
-    function unlinkDevice(deviceId, deviceName) {
+    function unlinkDevice(btn, deviceId, deviceName) {
       var token = getToken();
       if (!token) { sessionExpired(); return; }
       var label = deviceName || tf('toy_fallback', { id: shortId(deviceId) });
       if (!window.confirm(tf('confirm_unlink', { name: label }))) return;
+      btn.disabled = true;
       deviceStatus(t('busy_deleting'), 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/link', {
         method: 'DELETE',
@@ -5303,11 +5326,13 @@
           return;
         }
         if (!res.ok) {
+          btn.disabled = false;
           deviceStatus(t('err_generic'), 'err');
           return;
         }
         loadDevices();
       }).catch(function () {
+        btn.disabled = false;
         deviceStatus(t('err_network'), 'err');
       });
     }
@@ -5566,12 +5591,13 @@
     // #074 revoke / restore a device's server-side credential. Revoking signs
     // the toy out everywhere until it re-provisions, so it is confirmed first.
     // PUT /api/parents/devices/{id}/revoke  body { revoked: bool }.
-    function toggleDeviceRevocation(deviceId, deviceName, currentlyRevoked) {
+    function toggleDeviceRevocation(btn, deviceId, deviceName, currentlyRevoked) {
       var token = getToken();
       if (!token) { sessionExpired(); return; }
       var label = deviceName || tf('toy_fallback', { id: shortId(deviceId) });
       var next = !currentlyRevoked;
       if (next && !window.confirm(tf('confirm_revoke', { name: label }))) return;
+      btn.disabled = true;
       deviceStatus(next ? t('busy_revoke') : t('busy_restore'), 'muted');
       fetch('/api/parents/devices/' + encodeURIComponent(deviceId) + '/revoke', {
         method: 'PUT',
@@ -5587,12 +5613,14 @@
           return;
         }
         if (!res.ok) {
+          btn.disabled = false;
           deviceStatus(friendlyError({ status: res.status }), 'err');
           return;
         }
         window.__toyFlash = { msg: t('saved_ok'), kind: 'ok' };
         loadDevices();
       }).catch(function () {
+        btn.disabled = false;
         deviceStatus(t('err_network'), 'err');
       });
     }
@@ -6077,6 +6105,12 @@
       // Hide the delete button until the conversation actually loads —
       // a 404/network error must not leave a destructive action primed.
       deleteBtn.hidden = true;
+      // Unlike every other guarded button in this file, this one is a
+      // STATIC element — no re-render throws its disabled state away — so
+      // the double-submit guard set by deleteConversation() must be cleared
+      // here on the way in, or one successful delete (or one 401) leaves it
+      // permanently dead for the rest of the session.
+      deleteBtn.disabled = false;
       state.detailConversationId = null;
 
       authedFetch('/api/conversations/' + encodeURIComponent(conversationId)).then(function (data) {
