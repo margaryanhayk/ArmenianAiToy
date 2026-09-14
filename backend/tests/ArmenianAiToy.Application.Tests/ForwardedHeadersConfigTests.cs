@@ -170,4 +170,81 @@ public class ForwardedHeadersConfigTests
             expectedWarn,
             ForwardedHeadersConfig.ShouldWarnDisabledOutsideDevelopment(isDevelopment, enabled));
     }
+
+    /// <summary>
+    /// N12 — a Railway operator who sets ONLY <c>ForwardedHeaders__Enabled=true</c>
+    /// (no KnownProxies/KnownNetworks of their own) must get a working config,
+    /// not the "enabled but nothing trustworthy listed" null. Loads the REAL
+    /// shipped appsettings.json rather than reconstructing the default inline,
+    /// so a future edit to the shipped value is caught here.
+    /// </summary>
+    [Fact]
+    public void Enabled_WithOnlyShippedAppsettingsDefaults_TrustsFivePrivateNetworks()
+    {
+        var config = new ConfigurationBuilder()
+            .AddJsonFile(ShippedAppsettingsPath())
+            .AddInMemoryCollection(new[]
+            {
+                new KeyValuePair<string, string?>("ForwardedHeaders:Enabled", "true"),
+            })
+            .Build();
+
+        var opts = ForwardedHeadersConfig.TryBuild(config);
+
+        Assert.NotNull(opts);
+        Assert.Empty(opts!.KnownProxies); // shipped default carries no KnownProxies
+        Assert.Equal(5, opts.KnownIPNetworks.Count); // 4 private/CGNAT IPv4 + 1 ULA IPv6
+        Assert.Contains(opts.KnownIPNetworks,
+            n => n.BaseAddress.Equals(IPAddress.Parse("10.0.0.0")) && n.PrefixLength == 8);
+        Assert.Contains(opts.KnownIPNetworks,
+            n => n.BaseAddress.Equals(IPAddress.Parse("172.16.0.0")) && n.PrefixLength == 12);
+        Assert.Contains(opts.KnownIPNetworks,
+            n => n.BaseAddress.Equals(IPAddress.Parse("192.168.0.0")) && n.PrefixLength == 16);
+        Assert.Contains(opts.KnownIPNetworks,
+            n => n.BaseAddress.Equals(IPAddress.Parse("100.64.0.0")) && n.PrefixLength == 10); // CGNAT
+        Assert.Contains(opts.KnownIPNetworks,
+            n => n.BaseAddress.Equals(IPAddress.Parse("fc00::")) && n.PrefixLength == 7); // IPv6 ULA
+    }
+
+    /// <summary>
+    /// N12 — the shipped default MUST stay a comma-separated scalar, not a JSON
+    /// array. Environment variables layer AFTER appsettings.json with the exact
+    /// same flat key (<c>ForwardedHeaders:KnownNetworks</c>) and no indices; if
+    /// the shipped default were an array it would occupy the indexed child keys
+    /// (:0, :1, ...) that an env-var scalar override does not clear, so the two
+    /// would MERGE instead of the operator's value replacing the shipped one.
+    /// This test loads the real appsettings.json and layers an operator
+    /// override on top the same way ASP.NET's environment-variable provider
+    /// would, and pins that only the override survives.
+    /// </summary>
+    [Fact]
+    public void Enabled_OperatorKnownNetworksOverride_ReplacesShippedDefault_DoesNotMerge()
+    {
+        var config = new ConfigurationBuilder()
+            .AddJsonFile(ShippedAppsettingsPath())
+            .AddInMemoryCollection(new[]
+            {
+                new KeyValuePair<string, string?>("ForwardedHeaders:Enabled", "true"),
+                new KeyValuePair<string, string?>("ForwardedHeaders:KnownNetworks", "203.0.113.0/24"),
+            })
+            .Build();
+
+        var opts = ForwardedHeadersConfig.TryBuild(config);
+
+        Assert.NotNull(opts);
+        Assert.Single(opts!.KnownIPNetworks); // the operator's CIDR only — the 5 shipped defaults are gone
+        Assert.Contains(opts.KnownIPNetworks,
+            n => n.BaseAddress.Equals(IPAddress.Parse("203.0.113.0")) && n.PrefixLength == 24);
+    }
+
+    private static string ShippedAppsettingsPath()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, ".git")))
+        {
+            dir = dir.Parent;
+        }
+        var repoRoot = dir?.FullName ?? throw new InvalidOperationException("repo root not found");
+        return Path.Combine(repoRoot, "backend", "src", "ArmenianAiToy.Api", "appsettings.json");
+    }
 }

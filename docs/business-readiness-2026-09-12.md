@@ -53,12 +53,15 @@ Ordered by what unblocks the most.
    Fix: use `s_json_psram`. *(night session)*
 5. **OWNER — Railway:** confirm the `/data` volume is mounted on the live
    service; set `Audio__BlobStoreRoot=/data/audio-blobs`; set
-   `ForwardedHeaders__Enabled=true` + known proxies, otherwise the auth rate
-   limiter (`AuthRateLimiter.cs:53-58`) sees every parent as one IP and a
-   handful of families lock each other out; set `Alerts__WebhookUrl` (a
-   Slack incoming-webhook URL or any generic JSON receiver) to turn on the
-   webhook alerter (item 7). **Boot warning added (N4); alerter shipped
-   off-by-default (N5); Railway env vars still OWNER.**
+   `ForwardedHeaders__Enabled=true`, otherwise the auth rate limiter
+   (`AuthRateLimiter.cs:53-58`) sees every parent as one IP and a handful of
+   families lock each other out; set `Alerts__WebhookUrl` (a Slack
+   incoming-webhook URL or any generic JSON receiver) to turn on the webhook
+   alerter (item 7). **Done: boot warning added (N4); alerter shipped
+   off-by-default (N5); `ForwardedHeaders__Enabled=true` alone is now
+   sufficient on Railway — `KnownNetworks` defaults to the private/CGNAT/ULA
+   ranges a PaaS edge proxy connects from, no second variable needed (N12).
+   Railway env vars themselves still OWNER's to set.**
 6. **Backup restore drill, once, documented.** Snapshots exist
    (`docs/ops-runbook.md:93-107`) but no restore has ever been proven.
    *(night session, against a throwaway DB, evidence file)* — **done

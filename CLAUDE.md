@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3015 tests, ~35 s in Release
+dotnet test            # 3017 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -167,7 +167,9 @@ Unknown values refuse boot. Moderation stays on OpenAI, fail-closed.
   `/metrics` (fail-closed bearer), JSON console logs, OTel counters with
   bounded tags, daily SQLite snapshots + upload-root archive, retention purge
   (90-day messages, token cleanup, dormancy), rate limits (`chat` per device,
-  `auth` per IP, per-account login throttle), opt-in webhook alerter
+  `auth` per IP — real on Railway once `ForwardedHeaders__Enabled=true`, whose
+  `KnownNetworks` defaults to private/CGNAT ranges so nothing else need be
+  set — per-account login throttle), opt-in webhook alerter
   (`Alerts:WebhookUrl`, health/cost-cap/circuit/moderation/backup signals).
 
 ## Firmware (current contract)
@@ -881,6 +883,16 @@ output moderation approves the reply it is stored unconditionally. `dotnet
 test` green (3015 tests, 18 new). NOT verified: a real toy dropping
 mid-turn against a live provider; benchmarks not run (both need a live
 backend with a real OpenAI key).
+
+### ForwardedHeaders default KnownNetworks (2026-09-14, N12)
+
+`appsettings.json`'s `ForwardedHeaders:KnownNetworks` now ships a default
+covering the private/CGNAT/ULA ranges a PaaS edge proxy connects from, so
+`ForwardedHeaders__Enabled=true` alone is sufficient on Railway — no second
+variable required; `Enabled` itself still defaults false. `dotnet test`
+green (3017 tests, 2 new); boot-verified in Production (log line pasted in
+the commit). NOT verified: the live Railway host — `Enabled=true` is still
+OWNER's to set.
 
 ## Working in this repo (agents)
 
