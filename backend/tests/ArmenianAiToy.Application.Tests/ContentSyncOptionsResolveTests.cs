@@ -157,4 +157,148 @@ public class ContentSyncOptionsResolveTests
         Assert.Equal("/api/devices/content-file?storyId=anban-huri", manifest.Stories[0].AudioUrl);
         Assert.Equal("/api/devices/content-file?storyId=little-cloud", manifest.Stories[1].AudioUrl);
     }
+
+    // ---- Retired binding (P1 fix, 2026-09-14) --------------------------
+    //
+    // Resolve() previously never read child["Retired"] in any of the four
+    // namespace loops, so ContentSyncStoryOptions.Retired (and the Music/
+    // Voice/Games equivalents) always bound to false from configuration no
+    // matter what an operator wrote under ContentSync:<Namespace>:N:Retired
+    // — a silent no-op for the one signal that tells a toy to delete a
+    // cached file. Every existing RetiredXxx test in
+    // ContentManifestServiceTests.cs constructs the options object
+    // directly in C# and never goes through Resolve(), which is exactly
+    // why the gap went uncaught. These tests drive the real Resolve().
+
+    [Fact]
+    public void StoriesArray_BindsRetired_WhenTrue()
+    {
+        var options = ContentSyncOptions.Resolve(Config(
+            ("ContentSync:Enabled", "true"),
+            ("ContentSync:Stories:0:StoryId", "gone-story"),
+            ("ContentSync:Stories:0:Retired", "true")));
+
+        Assert.True(options.Stories[0].Retired);
+    }
+
+    [Fact]
+    public void StoriesArray_Retired_DefaultsFalse_WhenAbsent()
+    {
+        var options = ContentSyncOptions.Resolve(Config(
+            ("ContentSync:Enabled", "true"),
+            ("ContentSync:Stories:0:StoryId", "kept-story")));
+
+        Assert.False(options.Stories[0].Retired);
+    }
+
+    [Fact]
+    public void StoriesArray_Retired_GarbageValue_FallsBackToFalse_WithoutThrowing()
+    {
+        var options = ContentSyncOptions.Resolve(Config(
+            ("ContentSync:Enabled", "true"),
+            ("ContentSync:Stories:0:StoryId", "s"),
+            ("ContentSync:Stories:0:Retired", "yes")));
+
+        Assert.False(options.Stories[0].Retired);
+    }
+
+    [Fact]
+    public void MusicArray_BindsRetired_WhenTrue()
+    {
+        var options = ContentSyncOptions.Resolve(Config(
+            ("ContentSync:Enabled", "true"),
+            ("ContentSync:Music:0:TrackId", "gone-track"),
+            ("ContentSync:Music:0:Retired", "true")));
+
+        Assert.True(options.Music[0].Retired);
+    }
+
+    [Fact]
+    public void MusicArray_Retired_DefaultsFalse_WhenAbsentOrGarbage()
+    {
+        var options = ContentSyncOptions.Resolve(Config(
+            ("ContentSync:Enabled", "true"),
+            ("ContentSync:Music:0:TrackId", "a"),
+            ("ContentSync:Music:1:TrackId", "b"),
+            ("ContentSync:Music:1:Retired", "1")));
+
+        Assert.False(options.Music[0].Retired);
+        Assert.False(options.Music[1].Retired);
+    }
+
+    [Fact]
+    public void VoiceArray_BindsRetired_WhenTrue()
+    {
+        var options = ContentSyncOptions.Resolve(Config(
+            ("ContentSync:Enabled", "true"),
+            ("ContentSync:Voice:0:VoiceId", "gone-clip"),
+            ("ContentSync:Voice:0:Retired", "true")));
+
+        Assert.True(options.Voice[0].Retired);
+    }
+
+    [Fact]
+    public void VoiceArray_Retired_DefaultsFalse_WhenAbsentOrGarbage()
+    {
+        var options = ContentSyncOptions.Resolve(Config(
+            ("ContentSync:Enabled", "true"),
+            ("ContentSync:Voice:0:VoiceId", "a"),
+            ("ContentSync:Voice:1:VoiceId", "b"),
+            ("ContentSync:Voice:1:Retired", "")));
+
+        Assert.False(options.Voice[0].Retired);
+        Assert.False(options.Voice[1].Retired);
+    }
+
+    [Fact]
+    public void GamesArray_BindsRetired_WhenTrue()
+    {
+        var options = ContentSyncOptions.Resolve(Config(
+            ("ContentSync:Enabled", "true"),
+            ("ContentSync:Games:0:GameKey", "mind-reader"),
+            ("ContentSync:Games:0:ClipId", "intro"),
+            ("ContentSync:Games:0:Retired", "true")));
+
+        Assert.True(options.Games[0].Retired);
+    }
+
+    [Fact]
+    public void GamesArray_Retired_DefaultsFalse_WhenAbsentOrGarbage()
+    {
+        var options = ContentSyncOptions.Resolve(Config(
+            ("ContentSync:Enabled", "true"),
+            ("ContentSync:Games:0:GameKey", "mind-reader"),
+            ("ContentSync:Games:0:ClipId", "a"),
+            ("ContentSync:Games:1:GameKey", "mind-reader"),
+            ("ContentSync:Games:1:ClipId", "b"),
+            ("ContentSync:Games:1:Retired", "not-a-bool")));
+
+        Assert.False(options.Games[0].Retired);
+        Assert.False(options.Games[1].Retired);
+    }
+
+    /// <summary>End-to-end: a config-retired story reaches the manifest
+    /// tagged retired with a full, valid url/sha/size — never a stub — and
+    /// enabled:false alongside, proving the fix all the way through
+    /// ContentManifestService, not just the binding step.</summary>
+    [Fact]
+    public void ConfigRetiredStory_ReachesManifest_RetiredTrue_EnabledFalse_WithValidPayload()
+    {
+        var options = ContentSyncOptions.Resolve(Config(
+            ("ContentSync:Enabled", "true"),
+            ("ContentSync:Stories:0:StoryId", "gone-story"),
+            ("ContentSync:Stories:0:Sha256", ShaA),
+            ("ContentSync:Stories:0:SizeBytes", "12345"),
+            ("ContentSync:Stories:0:Retired", "true")));
+
+        var manifest = new Services.ContentManifestService(options).Build();
+
+        var item = Assert.Single(manifest.Stories);
+        Assert.Equal("gone-story", item.StoryId);
+        Assert.True(item.Retired);
+        Assert.False(item.Enabled);
+        Assert.Equal(ShaA, item.Sha256);
+        Assert.Equal(12345, item.SizeBytes);
+        Assert.NotEmpty(item.AudioUrl);
+    }
 }
