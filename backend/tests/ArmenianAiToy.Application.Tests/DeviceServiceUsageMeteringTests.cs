@@ -2,6 +2,7 @@ using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Services;
 using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Infrastructure.Data;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -105,6 +106,97 @@ public class DeviceServiceUsageMeteringTests
         var row = Assert.Single(db.Set<DeviceUsageDay>());
         Assert.Equal(1, row.Questions); // the question itself still counts
         Assert.Equal(0m, row.EstimatedUsd);
+    }
+
+    /// <summary>
+    /// Deterministically reproduces the IX_DeviceUsageDays_DeviceId_DayUtc
+    /// race described in the review finding: on its FIRST SaveChangesAsync
+    /// (the one carrying the new-row Add), sneaks in a conflicting row for
+    /// the SAME (DeviceId, DayUtc) via a separate <see cref="AppDbContext"/>
+    /// — exactly what a second concurrent turn's own
+    /// <c>RecordUsageQuestionAsync</c> call landing a moment earlier would
+    /// do — so the context-under-test's own insert collides with a REAL,
+    /// already-committed row instead of relying on genuine thread timing
+    /// (which would make this test flaky).
+    /// </summary>
+    private sealed class RaceInjectingDbContext : AppDbContext
+    {
+        private readonly DbContextOptions<AppDbContext> _options;
+        private bool _injected;
+
+        public RaceInjectingDbContext(DbContextOptions<AppDbContext> options) : base(options)
+            => _options = options;
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            if (!_injected)
+            {
+                var added = ChangeTracker.Entries<DeviceUsageDay>()
+                    .FirstOrDefault(e => e.State == EntityState.Added);
+                if (added is not null)
+                {
+                    _injected = true;
+                    await using var racer = new AppDbContext(_options);
+                    racer.Set<DeviceUsageDay>().Add(new DeviceUsageDay
+                    {
+                        Id = Guid.NewGuid(),
+                        DeviceId = added.Entity.DeviceId,
+                        DayUtc = added.Entity.DayUtc,
+                        Questions = 5,
+                        EstimatedUsd = 0.05m,
+                    });
+                    await racer.SaveChangesAsync(cancellationToken);
+                }
+            }
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    // KEYSTONE: mirrors ReportStoryPlaysAsync/ReportGamePlaysAsync's own
+    // "two concurrent writers both found no row" race, but for an
+    // increment-in-place upsert rather than an insert-dedup — a lost write
+    // here silently undercounts the day's quota rather than just skipping a
+    // harmless duplicate. Pins that RecordUsageQuestionAsync retries and
+    // BOTH the racing writer's question and this call's own question land.
+    [Fact]
+    public async Task RecordUsageQuestionAsync_ConcurrentInsertRace_RetriesAndBothLand()
+    {
+        // Real SQLite, not the in-memory provider: only a relational
+        // provider actually enforces IX_DeviceUsageDays_DeviceId_DayUtc, so
+        // only it can reproduce the SaveChangesAsync failure the fix
+        // handles.
+        var conn = new SqliteConnection("Data Source=:memory:");
+        await conn.OpenAsync();
+        try
+        {
+            var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(conn).Options;
+            var seedDb = new AppDbContext(options);
+            await seedDb.Database.EnsureCreatedAsync();
+            var device = Dev();
+            seedDb.Devices.Add(device);
+            await seedDb.SaveChangesAsync();
+
+            var dbUnderTest = new RaceInjectingDbContext(options);
+            var service = new DeviceService(dbUnderTest, Substitute.For<ILogger<DeviceService>>());
+            var now = DateTime.UtcNow;
+
+            await service.RecordUsageQuestionAsync(device.Id, 0.01m, now);
+
+            var verifyDb = new AppDbContext(options);
+            var row = await verifyDb.Set<DeviceUsageDay>()
+                .SingleAsync(u => u.DeviceId == device.Id);
+            // The racing writer's 5 questions / $0.05 AND this call's own
+            // +1 / +$0.01 must both be present — the old, unguarded
+            // SaveChangesAsync would have thrown here, the caller's
+            // best-effort try/catch would have swallowed it, and this
+            // call's question would have been silently dropped.
+            Assert.Equal(6, row.Questions);
+            Assert.Equal(0.06m, row.EstimatedUsd);
+        }
+        finally
+        {
+            await conn.DisposeAsync();
+        }
     }
 
     // ---------- GetUsageAllowanceStatusAsync ----------

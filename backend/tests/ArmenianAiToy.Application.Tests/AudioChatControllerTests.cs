@@ -107,7 +107,8 @@ public class AudioChatControllerTests
         string inboundContentType = "audio/wav",
         bool streamingSynthesis = false,
         bool isDevelopment = true,
-        string? blobStoreRoot = null)
+        string? blobStoreRoot = null,
+        UsageTiersOptions? usageTiersOptions = null)
     {
         var conn = new SqliteConnection("Data Source=:memory:");
         await conn.OpenAsync();
@@ -158,7 +159,8 @@ public class AudioChatControllerTests
 
         var controller = new AudioChatController(
             chatService, deviceService, transcription, synthesis,
-            blobStore, canned, db, costMeter, costCapOptions, env, config, logger);
+            blobStore, canned, db, costMeter, costCapOptions, env, config, logger,
+            usageTiersOptions);
 
         var httpContext = new DefaultHttpContext();
         var deviceId = Guid.NewGuid();
@@ -934,6 +936,52 @@ public class AudioChatControllerTests
             .Single(c => c.GetMethodInfo().Name == nameof(IAudioSynthesisService.SynthesizeArmenianAsync))
             .GetArguments()[0]!;
         Assert.Equal(story, ttsArg);
+    }
+
+    // Usage-tier metering foundation (2026-09-11) / review-fix (2026-09-14):
+    // the DeviceUsageDay write used to be nested inside `if (costCapOpts.
+    // Enabled)`, so a fleet running Usage:Tiers:Enabled=true with the flat
+    // dollar cap OFF never recorded a single question — the allowance gate
+    // would then always read "not exhausted". Pins that the buffered
+    // audio-chat turn still records usage with the flat cap OFF and the
+    // tiers flag ON.
+    [Fact]
+    public async Task AudioChat_CostCapOff_UsageTiersOn_StillRecordsUsage()
+    {
+        await using var h = await CreateAsync(
+            usageTiersOptions: new UsageTiersOptions { Enabled = true });
+        WireHappyPath(h);
+        h.DeviceService.GetUsageAllowanceStatusAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(new UsageAllowanceStatus("free", 1, 1, 999, null, IsExhausted: false));
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        await h.DeviceService.Received(1)
+            .RecordUsageQuestionAsync(h.DeviceId, Arg.Any<decimal>(), Arg.Any<DateTime>());
+    }
+
+    // Same fix, streaming pass-through call site (StreamTtsPassThroughAsync
+    // has its own, separate cost-recording block).
+    [Fact]
+    public async Task AudioChat_Streaming_CostCapOff_UsageTiersOn_StillRecordsUsage()
+    {
+        await using var h = await CreateAsync(
+            streamingSynthesis: true,
+            usageTiersOptions: new UsageTiersOptions { Enabled = true });
+        WireHappyPath(h);
+        h.DeviceService.GetUsageAllowanceStatusAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(new UsageAllowanceStatus("free", 1, 1, 999, null, IsExhausted: false));
+        ((IStreamingAudioSynthesisService)h.Synthesis)
+            .SynthesizeArmenianStreamAsync(AssistantText, Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisStreamResult(new MemoryStream(TtsMp3), MimeMp3));
+        h.Controller.HttpContext.Response.Body = new MemoryStream();
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<EmptyResult>(result);
+        await h.DeviceService.Received(1)
+            .RecordUsageQuestionAsync(h.DeviceId, Arg.Any<decimal>(), Arg.Any<DateTime>());
     }
 
     [Fact]

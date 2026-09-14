@@ -571,7 +571,12 @@ public class StoryQaController : ControllerBase
         // Best-effort per-device cost recording (STT + GPT + answer TTS).
         // Wrapped so an estimator bug can never break the turn; bridge/recap
         // are cached after first render, so the answer TTS dominates here.
-        if (costCapOpts.Enabled)
+        //
+        // Usage-tier metering foundation: the DeviceUsageDay write fires
+        // whenever the flat cost cap OR Usage:Tiers:Enabled is on — either
+        // flag alone must keep the counter honest, since the tier gate
+        // above reads this table independently of the flat cap.
+        if (costCapOpts.Enabled || usageTiersOpts.Enabled)
         {
             try
             {
@@ -585,7 +590,10 @@ public class StoryQaController : ControllerBase
                     answerPromptChars, answerText);
                 var ttsCost = OpenAICostEstimator.EstimateTtsCostUsd(answerText);
                 var turnCost = sttCost + chatCost + ttsCost;
-                _costMeter.Record(deviceId, turnCost, DateTime.UtcNow);
+                if (costCapOpts.Enabled)
+                {
+                    _costMeter.Record(deviceId, turnCost, DateTime.UtcNow);
+                }
                 await _deviceService.RecordUsageQuestionAsync(deviceId, turnCost, DateTime.UtcNow);
             }
             catch (Exception ex)
@@ -1050,7 +1058,12 @@ public class StoryQaController : ControllerBase
 
         // Best-effort per-device cost recording (STT only — ack/close TTS are
         // cached). Wrapped so an estimator bug can never break the turn.
-        if (costCapOpts.Enabled)
+        //
+        // Usage-tier metering foundation: the DeviceUsageDay write fires
+        // whenever the flat cost cap OR Usage:Tiers:Enabled is on — either
+        // flag alone must keep the counter honest, since the tier gate
+        // above reads this table independently of the flat cap.
+        if (costCapOpts.Enabled || usageTiersOpts.Enabled)
         {
             try
             {
@@ -1061,7 +1074,10 @@ public class StoryQaController : ControllerBase
                 var chatCost = OpenAICostEstimator.EstimateChatCostUsdFromPrompt(
                     reactionPromptChars, reactionText);
                 var turnCost = sttCost + chatCost;
-                _costMeter.Record(deviceId, turnCost, DateTime.UtcNow);
+                if (costCapOpts.Enabled)
+                {
+                    _costMeter.Record(deviceId, turnCost, DateTime.UtcNow);
+                }
                 await _deviceService.RecordUsageQuestionAsync(deviceId, turnCost, DateTime.UtcNow);
             }
             catch (Exception ex)
