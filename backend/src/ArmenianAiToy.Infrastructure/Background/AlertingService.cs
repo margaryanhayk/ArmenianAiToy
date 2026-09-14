@@ -214,9 +214,9 @@ public sealed class AlertingService : BackgroundService
         }
 
         await CheckHealthAsync(url, ct);
-        CheckCostCapTrips(url);
-        CheckOpenAiCircuit(url);
-        CheckModerationUnavailable(url);
+        await CheckCostCapTripsAsync(url);
+        await CheckOpenAiCircuitAsync(url);
+        await CheckModerationUnavailableAsync(url);
         await CheckBackupStaleAsync(url, ct);
     }
 
@@ -259,7 +259,15 @@ public sealed class AlertingService : BackgroundService
         _lastAudioStoreOk = audioStoreOk;
     }
 
-    private void CheckCostCapTrips(string url)
+    // These three checks used to fire SendAlertAsync as fire-and-forget
+    // (`_ = SendAlertAsync(...)`), safe only because SendAlertAsync/
+    // PostOnceAsync catch everything internally. Any future throw between
+    // the cooldown check and the POST would have become an unobserved
+    // task exception — never reaching RunTickAsync's caller, so it could
+    // not be logged as "Alerting tick failed" the way every other tick
+    // failure is. Now awaited: bounded by PostOnceAsync's 10s timeout, so
+    // awaiting cannot hang the tick.
+    private async Task CheckCostCapTripsAsync(string url)
     {
         int count;
         lock (_costCapLock)
@@ -272,29 +280,29 @@ public sealed class AlertingService : BackgroundService
         var threshold = ReadInt("Alerts:CostCapTripsThresholdPerHour", DefaultCostCapTripsThresholdPerHour);
         if (count > threshold)
         {
-            _ = SendAlertAsync(url, "cost_cap_trips_high", "warning",
+            await SendAlertAsync(url, "cost_cap_trips_high", "warning",
                 $"ArmenianAiToy: {count} OpenAI daily-cost-cap trips in the last hour (threshold {threshold}).",
                 CancellationToken.None);
         }
     }
 
-    private void CheckOpenAiCircuit(string url)
+    private async Task CheckOpenAiCircuitAsync(string url)
     {
         var trips = Interlocked.Exchange(ref _circuitTripsSinceLastTick, 0);
         if (trips > 0)
         {
-            _ = SendAlertAsync(url, "openai_circuit_open", "critical",
+            await SendAlertAsync(url, "openai_circuit_open", "critical",
                 $"ArmenianAiToy: OpenAI reliability circuit breaker opened ({trips} time(s) since last check).",
                 CancellationToken.None);
         }
     }
 
-    private void CheckModerationUnavailable(string url)
+    private async Task CheckModerationUnavailableAsync(string url)
     {
         var count = Interlocked.Exchange(ref _moderationUnavailableSinceLastTick, 0);
         if (count > 0)
         {
-            _ = SendAlertAsync(url, "moderation_unavailable", "critical",
+            await SendAlertAsync(url, "moderation_unavailable", "critical",
                 $"ArmenianAiToy: moderation fail-closed {count} time(s) since last check (chat turns are being blocked, not silently allowed).",
                 CancellationToken.None);
         }
@@ -377,6 +385,16 @@ public sealed class AlertingService : BackgroundService
         return Path.Combine(Path.GetDirectoryName(Path.GetFullPath(dbPath)) ?? ".", "backups");
     }
 
+    /// <summary>Test seam: when set, thrown once (then cleared) from inside
+    /// <see cref="SendAlertAsync"/> right after the cooldown check and
+    /// before the POST — the exact window the now-awaited
+    /// CheckCostCapTripsAsync/CheckOpenAiCircuitAsync/
+    /// CheckModerationUnavailableAsync calls used to leave as an
+    /// unobserved fire-and-forget task fault. Lets a test prove such a
+    /// throw now propagates out of <see cref="RunTickAsync"/> instead of
+    /// vanishing.</summary>
+    internal Exception? ThrowBeforePostForTests { get; set; }
+
     /// <summary>Cooldown-gated webhook POST. Internal so tests can invoke it
     /// directly for payload-shape assertions.</summary>
     internal async Task SendAlertAsync(string url, string key, string severity, string text, CancellationToken ct)
@@ -390,6 +408,13 @@ public sealed class AlertingService : BackgroundService
                 key, (cooldown - (now - last)).TotalSeconds);
             return;
         }
+
+        if (ThrowBeforePostForTests is { } toThrow)
+        {
+            ThrowBeforePostForTests = null;
+            throw toThrow;
+        }
+
         // Recorded up front, not after delivery: a broken webhook must not
         // turn a per-tick check into a per-tick retry storm.
         _lastSentUtc[key] = now;

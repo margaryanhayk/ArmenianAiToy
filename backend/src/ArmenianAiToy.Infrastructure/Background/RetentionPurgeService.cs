@@ -207,6 +207,34 @@ public sealed class RetentionPurgeService : BackgroundService
     public const int DefaultUploadOrphanSweepGraceHours = 24;
 
     /// <summary>
+    /// Fallback for <c>Dormancy:MaxBatchSize</c> — shared per-tick cap
+    /// on the four dormancy enumeration passes (<see cref="WarnDormantParentsAsync"/>,
+    /// <see cref="AnonymizeDormantParentsAsync"/>,
+    /// <see cref="WarnDormantDevicesAsync"/>,
+    /// <see cref="DeleteDormantDevicesAsync"/>). Each of those passes
+    /// enumerates its full eligible set and then, for warn/anonymize,
+    /// sends SMTP serially inside the same tick while holding the
+    /// <c>AppDbContext</c> scope open — uncapped, an operator turning
+    /// dormancy on for the first time against an existing fleet could
+    /// have a single tick send thousands of emails and delay every
+    /// later pass. One shared key rather than four separate ones: all
+    /// four passes are the same "one operator opt-in touching a
+    /// possibly-large historical backlog" shape, and a single dial is
+    /// simpler to reason about than four independently-tuned ones.
+    /// Deliberately distinct from <see cref="DefaultMaxBatchSize"/>
+    /// (<c>Retention:Messages:MaxBatchSize</c>) — that key tunes
+    /// conversation-row deletion, a different concern with a different
+    /// cost profile (no SMTP), and coupling the two would mean an
+    /// operator tuning one inadvertently retunes the other. Clamped to
+    /// the same <see cref="MinBatchSize"/>/<see cref="MaxAllowedBatchSize"/>
+    /// range as the message batch size — those constants are already
+    /// generic, not message-specific. A capped tick never drops rows:
+    /// eligibility is re-evaluated fresh every tick, so the remainder
+    /// rolls to the next one, oldest-first.
+    /// </summary>
+    public const int DefaultDormancyMaxBatchSize = 500;
+
+    /// <summary>
     /// A candidate audio-blob directory's NAME must match this before it
     /// is ever combined into a path — a <c>Guid:"N"</c> shape that cannot
     /// contain <c>/</c> or <c>..</c> by construction, so nothing under the
@@ -483,6 +511,27 @@ public sealed class RetentionPurgeService : BackgroundService
     /// parents enter the dormant set only once they log in at least
     /// once under the current schema.
     /// </para>
+    /// <para>
+    /// <b>Per-parent atomicity</b> (one <c>SaveChangesAsync</c> per
+    /// warned parent, same shape as <see cref="WarnDormantDevicesAsync"/>
+    /// below): a worker crash mid-pass — or the process dying after
+    /// the notifier has already delivered several emails but before a
+    /// trailing commit — leaves already-warned parents fully recorded
+    /// and not-yet-processed parents untouched. A single SaveChanges
+    /// after the loop would instead risk emailing a parent twice: the
+    /// send succeeds, the stamp never lands, and the next tick
+    /// re-selects and re-warns them.
+    /// </para>
+    /// <para>
+    /// <b>Batch cap</b>: capped to <c>Dormancy:MaxBatchSize</c>
+    /// (default <see cref="DefaultDormancyMaxBatchSize"/>), oldest-
+    /// <c>LastLoginAt</c>-first, same cap shared by
+    /// <see cref="AnonymizeDormantParentsAsync"/>,
+    /// <see cref="WarnDormantDevicesAsync"/> and
+    /// <see cref="DeleteDormantDevicesAsync"/>. A capped tick leaves
+    /// the remainder for the next tick — nothing is dropped, since
+    /// eligibility is re-evaluated fresh every tick.
+    /// </para>
     /// </summary>
     private async Task WarnDormantParentsAsync(
         IServiceProvider scopedProvider, AppDbContext db, CancellationToken stoppingToken)
@@ -501,6 +550,7 @@ public sealed class RetentionPurgeService : BackgroundService
         // date from the first warning onwards when destructive is
         // enabled. 0 (disabled) means every warn carries null.
         var anonymizeAfterDays = ReadDormancyAnonymizeAfterDays();
+        var batchSize = ReadDormancyMaxBatchSize();
         var nowUtc = DateTime.UtcNow;
         var dormantCutoff = nowUtc - TimeSpan.FromDays(warnAfterDays);
         var refireCutoff = nowUtc - TimeSpan.FromDays(refireIntervalDays);
@@ -512,6 +562,11 @@ public sealed class RetentionPurgeService : BackgroundService
         // semantics. AnonymizedAt == null is defensively explicit
         // even though a scrubbed parent has LastLoginAt == null
         // (which would already exclude them via the next check).
+        //
+        // Capped and ordered oldest-LastLoginAt-first so a fleet's
+        // first-ever dormancy sweep does not send thousands of emails
+        // serially in one tick — the most overdue parents are warned
+        // first and the remainder rolls to the next tick.
         var eligible = await db.Set<Parent>()
             .Where(p =>
                 p.AnonymizedAt == null
@@ -519,6 +574,8 @@ public sealed class RetentionPurgeService : BackgroundService
                 && p.LastLoginAt != null
                 && p.LastLoginAt < dormantCutoff
                 && (p.DormancyWarnedAt == null || p.DormancyWarnedAt < refireCutoff))
+            .OrderBy(p => p.LastLoginAt)
+            .Take(batchSize)
             .ToListAsync(stoppingToken);
 
         if (eligible.Count == 0)
@@ -576,12 +633,22 @@ public sealed class RetentionPurgeService : BackgroundService
             db.Set<AuditEvent>().Add(audit);
             AppMeter.AuditEventsWritten.Add(1,
                 new KeyValuePair<string, object?>("event_type", audit.EventType.ToString()));
+
+            // Per-parent atomicity: stamp + audit flush together, same
+            // shape as the device-warn pass below. A worker crash mid-
+            // pass (or an SMTP relay that delivers several emails before
+            // the process dies) leaves already-warned parents fully
+            // recorded and not-yet-processed parents untouched — a
+            // trailing single SaveChanges after the loop would instead
+            // let a mid-loop crash lose every stamp in this tick's batch,
+            // and the next tick would re-warn parents who were already
+            // emailed.
+            await db.SaveChangesAsync(stoppingToken);
             warned++;
         }
 
         if (warned > 0)
         {
-            await db.SaveChangesAsync(stoppingToken);
             _logger.LogInformation(
                 "RetentionPurgeService tick: sent dormancy warnings to {Warned} parent(s) (threshold={WarnAfterDays}d, refire={RefireIntervalDays}d).",
                 warned, warnAfterDays, refireIntervalDays);
@@ -629,6 +696,11 @@ public sealed class RetentionPurgeService : BackgroundService
     /// "minimize retained PII" ethos. Counts-only metadata on the
     /// anonymize row captures the same information in aggregate.
     /// </para>
+    /// <para>
+    /// <b>Batch cap</b>: same shared <c>Dormancy:MaxBatchSize</c> cap
+    /// as <see cref="WarnDormantParentsAsync"/>, oldest-
+    /// <c>LastLoginAt</c>-first — see that method's doc comment.
+    /// </para>
     /// </summary>
     private async Task AnonymizeDormantParentsAsync(
         AppDbContext db, IAudioBlobStore blobStore, CancellationToken stoppingToken)
@@ -650,6 +722,7 @@ public sealed class RetentionPurgeService : BackgroundService
         var warnAfterDays = ReadDormancyWarnAfterDays();
         var warnRefireIntervalDays = ReadDormancyRefireIntervalDays();
 
+        var batchSize = ReadDormancyMaxBatchSize();
         var nowUtc = DateTime.UtcNow;
         var destructiveCutoff = nowUtc - TimeSpan.FromDays(warnAfterDays + anonymizeAfterDays);
         var graceCutoff = nowUtc - TimeSpan.FromDays(DormancyAnonymizeGraceDays);
@@ -657,7 +730,8 @@ public sealed class RetentionPurgeService : BackgroundService
         // Six-condition eligibility. See CLAUDE.md § Parent anonymize
         // for the full contract. The two `!= null` / `== null` guards
         // are defensively explicit even where a prior inequality
-        // would also exclude null rows.
+        // would also exclude null rows. Capped and ordered oldest-
+        // LastLoginAt-first — same rationale as the warn pass above.
         var eligible = await db.Set<Parent>()
             .Where(p =>
                 p.AnonymizedAt == null
@@ -666,6 +740,8 @@ public sealed class RetentionPurgeService : BackgroundService
                 && p.DormancyWarnedAt != null
                 && p.DormancyWarnedAt > p.LastLoginAt
                 && p.DormancyWarnedAt < graceCutoff)
+            .OrderBy(p => p.LastLoginAt)
+            .Take(batchSize)
             .ToListAsync(stoppingToken);
 
         if (eligible.Count == 0)
@@ -821,6 +897,12 @@ public sealed class RetentionPurgeService : BackgroundService
     /// metadata's <c>verified_recipients_notified</c> reflects the
     /// successful-send count, not the attempt count.
     /// </para>
+    /// <para>
+    /// <b>Batch cap</b>: same shared <c>Dormancy:MaxBatchSize</c> cap
+    /// the parent passes use, oldest-<c>LastSeenAt</c>-first — see
+    /// <see cref="WarnDormantParentsAsync"/>'s doc comment for the
+    /// rationale.
+    /// </para>
     /// </summary>
     private async Task WarnDormantDevicesAsync(
         IServiceProvider scopedProvider, AppDbContext db, CancellationToken stoppingToken)
@@ -842,6 +924,7 @@ public sealed class RetentionPurgeService : BackgroundService
         // honor on a later tick (DeleteAfterDays >= 1 is clamped at
         // read-time so the date is always at least one day out).
         var deleteAfterDays = ReadDormancyDevicesDeleteAfterDays();
+        var batchSize = ReadDormancyMaxBatchSize();
         var nowUtc = DateTime.UtcNow;
         var dormantCutoff = nowUtc - TimeSpan.FromDays(warnAfterDays);
         var refireCutoff = nowUtc - TimeSpan.FromDays(refireIntervalDays);
@@ -853,6 +936,8 @@ public sealed class RetentionPurgeService : BackgroundService
         // warned past refire); has at least one verified linked
         // parent (existence check, not the recipient list — recipient
         // enumeration happens per-device below for the fan-out).
+        // Capped and ordered oldest-LastSeenAt-first, same rationale
+        // as the parent passes.
         var eligibleDevices = await db.Set<Device>()
             .Where(d =>
                 d.LastSeenAt < dormantCutoff
@@ -862,6 +947,8 @@ public sealed class RetentionPurgeService : BackgroundService
                     .Join(db.Set<Parent>(), pd => pd.ParentId, p => p.Id,
                         (pd, p) => p)
                     .Any(p => p.EmailVerifiedAt != null && p.AnonymizedAt == null))
+            .OrderBy(d => d.LastSeenAt)
+            .Take(batchSize)
             .ToListAsync(stoppingToken);
 
         if (eligibleDevices.Count == 0)
@@ -1006,6 +1093,12 @@ public sealed class RetentionPurgeService : BackgroundService
     /// A worker crash mid-pass leaves already-deleted devices fully
     /// recorded and not-yet-processed devices untouched.
     /// </para>
+    /// <para>
+    /// <b>Batch cap</b>: same shared <c>Dormancy:MaxBatchSize</c> cap
+    /// the other three dormancy passes use, oldest-<c>LastSeenAt</c>-
+    /// first — see <see cref="WarnDormantParentsAsync"/>'s doc
+    /// comment for the rationale.
+    /// </para>
     /// </summary>
     private async Task DeleteDormantDevicesAsync(
         AppDbContext db, IAudioBlobStore blobStore, CancellationToken stoppingToken)
@@ -1028,6 +1121,7 @@ public sealed class RetentionPurgeService : BackgroundService
             // rather than fire destructively without a warn channel.
             return;
         }
+        var batchSize = ReadDormancyMaxBatchSize();
         var nowUtc = DateTime.UtcNow;
         var dormantCutoff = nowUtc - TimeSpan.FromDays(warnAfterDays);
         var deleteGraceCutoff = nowUtc - TimeSpan.FromDays(deleteAfterDays);
@@ -1035,12 +1129,17 @@ public sealed class RetentionPurgeService : BackgroundService
         // Cheap projection — device id + the three count columns we
         // need for the audit row. Message.Content never lands on this
         // process. LinkedParents / Children / Conversations / Messages
-        // are aggregates over existing FK-indexed columns.
+        // are aggregates over existing FK-indexed columns. Ordered
+        // oldest-LastSeenAt-first and capped BEFORE the per-device
+        // count aggregates run, so the (relatively expensive) Select
+        // below only computes for the capped set.
         var eligible = await db.Set<Device>()
             .Where(d =>
                 d.LastSeenAt < dormantCutoff
                 && d.DormancyWarnedAt != null
                 && d.DormancyWarnedAt < deleteGraceCutoff)
+            .OrderBy(d => d.LastSeenAt)
+            .Take(batchSize)
             .Select(d => new
             {
                 d.Id,
@@ -1549,6 +1648,20 @@ public sealed class RetentionPurgeService : BackgroundService
     {
         var raw = ParseIntOrDefault(
             _config["Retention:Messages:MaxBatchSize"], DefaultMaxBatchSize);
+        if (raw < MinBatchSize) return MinBatchSize;
+        if (raw > MaxAllowedBatchSize) return MaxAllowedBatchSize;
+        return raw;
+    }
+
+    // Dormancy:MaxBatchSize — see DefaultDormancyMaxBatchSize's doc
+    // comment for why this is one key shared by all four dormancy
+    // passes rather than four separate ones, and why it is distinct
+    // from Retention:Messages:MaxBatchSize. Same clamp shape as
+    // ReadBatchSize.
+    private int ReadDormancyMaxBatchSize()
+    {
+        var raw = ParseIntOrDefault(
+            _config["Dormancy:MaxBatchSize"], DefaultDormancyMaxBatchSize);
         if (raw < MinBatchSize) return MinBatchSize;
         if (raw > MaxAllowedBatchSize) return MaxAllowedBatchSize;
         return raw;

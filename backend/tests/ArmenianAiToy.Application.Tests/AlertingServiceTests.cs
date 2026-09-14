@@ -453,4 +453,29 @@ public class AlertingServiceTests : IDisposable
 
         Assert.Null(ex);
     }
+
+    // ── Alert dispatch is awaited, not fire-and-forget ─────────────────
+
+    [Fact]
+    public async Task CostCapAlertDispatch_ThrowsBeforePost_PropagatesFromRunTick()
+    {
+        // Before the fix, CheckCostCapTripsAsync's SendAlertAsync call was
+        // `_ = SendAlertAsync(...)` — a throw here would have become an
+        // unobserved task exception and RunTickAsync would have returned
+        // normally, swallowing it. Now it must surface.
+        var (service, _, _, provider) = MakeHarness(BaseConfig());
+        using var _p = provider;
+        service.StartMeterListenerForTests();
+        service.ThrowBeforePostForTests = new InvalidOperationException("boom");
+
+        for (var i = 0; i < 6; i++) // threshold is 5
+        {
+            AppMeter.OpenAICostCapTrip.Add(1, new KeyValuePair<string, object?>("kind", "chat"));
+        }
+
+        var ex = await Record.ExceptionAsync(() => service.RunTickAsync(CancellationToken.None));
+
+        Assert.NotNull(ex);
+        Assert.IsType<InvalidOperationException>(ex);
+    }
 }
