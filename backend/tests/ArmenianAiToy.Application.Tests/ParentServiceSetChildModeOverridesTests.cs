@@ -165,4 +165,22 @@ public class ParentServiceSetChildModeOverridesTests
 
         Assert.Empty(await db.Set<AuditEvent>().ToListAsync());
     }
+
+    [Fact]
+    public async Task SetChildModeOverridesAsync_AlreadyAtRequestedValues_ReturnsTrueButNoAuditRow()
+    {
+        // No-op: a freshly seeded child has all four overrides null, so
+        // resubmitting all-null is idempotent. Same posture as
+        // SetDevicePauseStateAsync's no-op — success, no audit noise.
+        var (service, db, conn) = await CreateServiceAsync();
+        await using var _ = conn;
+        var (parentId, _, childId) = await SeedOwnedChildAsync(db);
+
+        var result = await service.SetChildModeOverridesAsync(
+            parentId, childId,
+            story: null, game: null, riddle: null, curiosity: null);
+
+        Assert.True(result);
+        Assert.Empty(await db.Set<AuditEvent>().ToListAsync());
+    }
 }
