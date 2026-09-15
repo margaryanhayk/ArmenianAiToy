@@ -13,6 +13,13 @@
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.3" />
     <PackageReference Include="OpenAI" Version="2.9.1" />
+    <!--
+      Direct pin: Microsoft.EntityFrameworkCore.Sqlite 9.0.3 resolves the
+      transitive SQLitePCLRaw.lib.e_sqlite3 to 2.1.10, GHSA-2m69-gcr7-jv3q
+      (high). Upgrading EF Core does not fix this (10.0.2 still resolves to
+      2.1.11, also vulnerable) - only a direct pin does.
+    -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
   </ItemGroup>
 
   <PropertyGroup>

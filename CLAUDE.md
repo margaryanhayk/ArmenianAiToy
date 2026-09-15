@@ -93,6 +93,18 @@ install -y dotnet-sdk-10.0` (Ubuntu archive; dot.net is proxy-blocked). See
 (`Migrate()`); verify a hand-written migration by booting against a
 throwaway DB, not with `dotnet ef`.
 
+`ArmenianAiToy.Infrastructure` direct-references `SQLitePCLRaw.lib.e_sqlite3`
+2.1.13 (2026-09-15) to override the 2.1.10 that `Microsoft.EntityFrameworkCore
+.Sqlite` 9.0.3 resolves transitively (GHSA-2m69-gcr7-jv3q, high; upgrading EF
+Core does not fix it — 10.0.2 still resolves to a vulnerable 2.1.11). The
+matching `Microsoft.OpenApi` 2.4.1 advisory (GHSA-v5pm-xwqc-g5wc, high, via
+`Microsoft.AspNetCore.OpenApi`/`Swashbuckle.AspNetCore` in Api) is NOT pinned:
+`Microsoft.OpenApi` 3.x made `IOpenApiMediaType.Example` read-only, which
+breaks `Microsoft.AspNetCore.OpenApi` 10.0.2's XML-comment source generator
+at compile time — a real incompatibility, not a config issue. That advisory
+stays open pending a compatible `Microsoft.AspNetCore.OpenApi`/Swashbuckle
+release.
+
 Firmware (`esp32/AregVoiceMvp/`): arduino-cli, core `esp32:esp32@3.3.8`,
 FQBN `esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc`,
 libraries in the firmware README, `config.h` from `config.h.example`
