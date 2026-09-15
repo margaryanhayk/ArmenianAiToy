@@ -353,4 +353,19 @@ public static class AppMeter
         Instance.CreateCounter<long>(
             name: "aat_alerts_sent_total",
             description: "Count of alerts actually delivered by the webhook alerter, by key.");
+
+    /// <summary>
+    /// Memory-sweep guard (2026-09-15). Count of stale entries removed
+    /// from one of ChatService's five process-wide, per-conversation
+    /// dictionaries by <c>RetentionPurgeService</c>'s periodic sweep —
+    /// see <c>ChatService.SweepExpiredConversationState</c>. Tag
+    /// <c>dictionary</c> is one of <c>pending_choices</c>,
+    /// <c>story_memories</c>, <c>riddle_sessions</c>,
+    /// <c>game_sessions</c>, <c>active_modes</c> — a fixed five-value
+    /// code enumeration, never a conversation/device/parent/child id.
+    /// </summary>
+    public static readonly Counter<long> ConversationStateSwept =
+        Instance.CreateCounter<long>(
+            name: "aat_conversation_state_swept_total",
+            description: "Count of stale in-memory per-conversation cache entries removed by the periodic sweep, by dictionary.");
 }

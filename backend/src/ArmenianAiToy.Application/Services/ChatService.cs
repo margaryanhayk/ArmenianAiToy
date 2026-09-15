@@ -1440,6 +1440,85 @@ public class ChatService : IChatService
     // their own per-conversation state and ignore this field.
     internal record ActiveModeEntry(DetectedMode Mode, DateTime ActivatedAt, int TurnIndex = 1);
 
+    /// <summary>
+    /// Per-dictionary removal counts from one
+    /// <see cref="SweepExpiredConversationState"/> run. Counts only —
+    /// never a conversation/device/parent/child id, so this is safe to
+    /// both log and feed into a metric tag.
+    /// </summary>
+    public readonly record struct ConversationStateSweepResult(
+        int PendingChoicesRemoved,
+        int StoryMemoriesRemoved,
+        int RiddleSessionsRemoved,
+        int GameSessionsRemoved,
+        int ActiveModesRemoved)
+    {
+        public int Total =>
+            PendingChoicesRemoved + StoryMemoriesRemoved + RiddleSessionsRemoved
+            + GameSessionsRemoved + ActiveModesRemoved;
+    }
+
+    /// <summary>
+    /// Periodic sweep for the five process-wide, per-conversation
+    /// dictionaries above. Read-time expiry (comparing against
+    /// <see cref="ChoiceExpiry"/> at the point an entry is read) only
+    /// ever frees an entry for a conversation that gets revisited; a
+    /// conversation abandoned mid-story/riddle/game and never revisited
+    /// leaks for the lifetime of the process — StoryMemories,
+    /// RiddleSessions and GameSessions have no removal call anywhere
+    /// else. This sweep is the only removal path for that case.
+    /// <para>
+    /// Never removes a live entry: each dictionary's value type already
+    /// stamps a fresh UTC timestamp on every write (PendingChoice.
+    /// ExtractedAt, StoryMemory.UpdatedAt, RiddleSessionState.UpdatedAt,
+    /// GameSessionState.UpdatedAt, ActiveModeEntry.ActivatedAt), and
+    /// staleness is judged by the same pure boundary
+    /// (<see cref="ConversationStateSweep.IsStale"/>) the read paths use.
+    /// </para>
+    /// <para>
+    /// Enumerate-then-compare-and-remove: <c>TryRemove(KeyValuePair)</c>
+    /// only removes an entry if it still equals the value snapshotted
+    /// during enumeration (record value equality), so an entry updated
+    /// concurrently with this sweep survives instead of being evicted
+    /// out from under a live turn. Never <c>Clear()</c>s a dictionary.
+    /// </para>
+    /// <para>
+    /// Called from <c>RetentionPurgeService</c>'s existing periodic
+    /// tick (Infrastructure project — hence <c>public</c> rather than
+    /// <c>internal</c>, since Application has no
+    /// <c>InternalsVisibleTo</c> for it) — see that class for why. Pure
+    /// with respect to "now" so it is directly unit-testable without a
+    /// clock seam.
+    /// </para>
+    /// </summary>
+    public static ConversationStateSweepResult SweepExpiredConversationState(DateTime nowUtc)
+    {
+        return new ConversationStateSweepResult(
+            PendingChoicesRemoved: SweepStale(PendingChoices, e => e.ExtractedAt, nowUtc),
+            StoryMemoriesRemoved: SweepStale(StoryMemories, e => e.UpdatedAt, nowUtc),
+            RiddleSessionsRemoved: SweepStale(RiddleSessions, e => e.UpdatedAt, nowUtc),
+            GameSessionsRemoved: SweepStale(GameSessions, e => e.UpdatedAt, nowUtc),
+            ActiveModesRemoved: SweepStale(ActiveModes, e => e.ActivatedAt, nowUtc));
+    }
+
+    private static int SweepStale<TValue>(
+        ConcurrentDictionary<Guid, TValue> dictionary,
+        Func<TValue, DateTime> timestampSelector,
+        DateTime nowUtc)
+    {
+        var removed = 0;
+        foreach (var entry in dictionary)
+        {
+            if (ConversationStateSweep.IsStale(timestampSelector(entry.Value), nowUtc, ChoiceExpiry)
+                && dictionary.TryRemove(entry))
+            {
+                removed++;
+            }
+        }
+
+        return removed;
+    }
+
     internal const string DefaultFallbackResponse =
         "\u0531\u0580\u056b, \u0574\u056b \u0578\u0582\u0580\u056b\u0577 \u0570\u0565\u057f\u0561\u0584\u0580\u0584\u056b\u0580 \u0562\u0561\u0576 \u056d\u0578\u057d\u0565\u0576\u0584\u0589";
 

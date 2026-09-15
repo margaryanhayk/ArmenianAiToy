@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3045 tests, ~35 s in Release
+dotnet test            # 3062 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -905,6 +905,38 @@ variable required; `Enabled` itself still defaults false. `dotnet test`
 green (3017 tests, 2 new); boot-verified in Production (log line pasted in
 the commit). NOT verified: the live Railway host — `Enabled=true` is still
 OWNER's to set.
+
+### ChatService in-memory conversation-state sweep (2026-09-15, N13)
+
+`ChatService`'s five process-wide `ConcurrentDictionary<Guid,_>` caches
+(`PendingChoices`, `StoryMemories`, `RiddleSessions`, `GameSessions`,
+`ActiveModes`) were freed only on read (a stale entry is dropped the next
+time its conversation is revisited); `StoryMemories`/`RiddleSessions`/
+`GameSessions` had no removal call anywhere else. A conversation abandoned
+mid-story/mid-riddle/mid-game and never revisited leaked for the life of
+the process — unbounded growth with no ceiling on a long-running Railway
+instance. Each value type already stamped a fresh UTC timestamp on every
+write (`ExtractedAt`/`UpdatedAt`/`ActivatedAt`), so no new field was
+needed. Added a pure boundary decision
+(`ConversationStateSweep.IsStale`, `Application/Helpers/`, unit-tested
+including the exact expiry-age boundary) and
+`ChatService.SweepExpiredConversationState` — enumerate-then-compare-and-
+remove (`TryRemove(KeyValuePair)`, record value equality, so a
+concurrently-updated live entry survives instead of being evicted),
+`public` rather than `internal` only because Application has no
+`InternalsVisibleTo` for Infrastructure. Hung off
+`RetentionPurgeService`'s existing tick (cheapest correct option, no other
+session was editing that file) — runs first, unconditionally, deliberately
+NOT gated by the `MaxAgeDays<=0` disable switch, since it is in-memory
+bookkeeping rather than a database retention feature. One summary log
+line per sweep with per-dictionary counts (never a conversation/device/
+parent/child id) plus `aat_conversation_state_swept_total{dictionary}`,
+tag bounded to the five dictionary names. `dotnet build`/`dotnet test`
+green (3062 tests, 17 new: the boundary + one stale/one fresh entry per
+dictionary + an empty-sweep no-op + two `RetentionPurgeService` wiring
+tests). NOT verified: nobody has watched memory on a live long-running
+instance — this closes the only known unbounded-growth path, not a
+measured memory ceiling.
 
 ## Working in this repo (agents)
 

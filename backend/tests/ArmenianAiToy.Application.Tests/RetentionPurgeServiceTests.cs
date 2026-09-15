@@ -770,6 +770,45 @@ public class RetentionPurgeServiceTests
         Assert.Empty(audits);
     }
 
+    // --- ChatService in-memory conversation-state sweep (2026-09-15) ---
+    // Confirms the wiring, not the sweep's own decision logic — that is
+    // covered directly in ConversationStateSweepTests. One stale entry
+    // proves RunTickAsync actually calls
+    // ChatService.SweepExpiredConversationState; running it with
+    // maxAgeDays: 0 (the "retention worker off" gate) proves the sweep
+    // is NOT gated by that switch, since it is in-memory bookkeeping,
+    // not a database retention feature.
+
+    [Fact]
+    public async Task ConversationStateSweep_RunsOnEveryTick_EvenWhenConversationPurgeIsDisabled()
+    {
+        await using var h = await CreateHarnessAsync(maxAgeDays: 0);
+        var staleId = Guid.NewGuid();
+        ArmenianAiToy.Application.Services.ChatService.PendingChoices[staleId] =
+            new ArmenianAiToy.Application.Services.ChatService.PendingChoice(
+                "A", "B", DateTime.UtcNow - TimeSpan.FromMinutes(31));
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.False(
+            ArmenianAiToy.Application.Services.ChatService.PendingChoices.ContainsKey(staleId));
+    }
+
+    [Fact]
+    public async Task ConversationStateSweep_LeavesFreshEntryUntouched()
+    {
+        await using var h = await CreateHarnessAsync(maxAgeDays: 90);
+        var freshId = Guid.NewGuid();
+        ArmenianAiToy.Application.Services.ChatService.PendingChoices[freshId] =
+            new ArmenianAiToy.Application.Services.ChatService.PendingChoice(
+                "A", "B", DateTime.UtcNow);
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.True(
+            ArmenianAiToy.Application.Services.ChatService.PendingChoices.ContainsKey(freshId));
+    }
+
     // --- Warn-only dormant-parent pass -------------------------------
 
     // Test notifier: captures the bool return the worker sees, plus

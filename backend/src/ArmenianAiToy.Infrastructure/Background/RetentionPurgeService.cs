@@ -323,6 +323,18 @@ public sealed class RetentionPurgeService : BackgroundService
     /// </summary>
     public async Task RunTickAsync(CancellationToken stoppingToken)
     {
+        // Memory-sweep guard (2026-09-15) — ChatService.PendingChoices /
+        // StoryMemories / RiddleSessions / GameSessions / ActiveModes are
+        // process-wide static dictionaries with read-time-only expiry: a
+        // conversation that is abandoned mid-flight and never revisited
+        // is never read again, so it is never freed. Runs first,
+        // unconditionally, and needs no AppDbContext — it is in-memory
+        // bookkeeping, not a database retention feature, so it is
+        // deliberately NOT gated by the MaxAgeDays<=0 disable check
+        // below (an operator who disables conversation-row purging
+        // should not also silently re-enable this leak).
+        SweepChatServiceConversationState();
+
         var maxAgeDays = ReadMaxAgeDays();
         if (maxAgeDays <= 0)
         {
@@ -376,6 +388,44 @@ public sealed class RetentionPurgeService : BackgroundService
         // DeleteAfterDays). Disabled gate (DeleteAfterDays <= 0)
         // short-circuits.
         await DeleteDormantDevicesAsync(db, blobStore, stoppingToken);
+    }
+
+    /// <summary>
+    /// Runs <see cref="ChatService.SweepExpiredConversationState"/> and
+    /// logs one summary line + an untagged-per-dictionary metric
+    /// increment when it removed anything. A no-op sweep (nothing
+    /// stale, or the process has handled no conversations yet) logs and
+    /// increments nothing — same "quiet tick" posture as every other
+    /// pass in this worker. Never logs a conversation, device, parent,
+    /// or child id — counts only.
+    /// </summary>
+    private void SweepChatServiceConversationState()
+    {
+        var result = ChatService.SweepExpiredConversationState(DateTime.UtcNow);
+        if (result.Total == 0)
+            return;
+
+        _logger.LogInformation(
+            "RetentionPurgeService tick: swept {Total} stale in-memory conversation-state entries " +
+            "(pendingChoices={PendingChoices}, storyMemories={StoryMemories}, riddleSessions={RiddleSessions}, " +
+            "gameSessions={GameSessions}, activeModes={ActiveModes}).",
+            result.Total, result.PendingChoicesRemoved, result.StoryMemoriesRemoved,
+            result.RiddleSessionsRemoved, result.GameSessionsRemoved, result.ActiveModesRemoved);
+
+        IncrementSweptCounter("pending_choices", result.PendingChoicesRemoved);
+        IncrementSweptCounter("story_memories", result.StoryMemoriesRemoved);
+        IncrementSweptCounter("riddle_sessions", result.RiddleSessionsRemoved);
+        IncrementSweptCounter("game_sessions", result.GameSessionsRemoved);
+        IncrementSweptCounter("active_modes", result.ActiveModesRemoved);
+    }
+
+    private static void IncrementSweptCounter(string dictionary, int removed)
+    {
+        if (removed == 0)
+            return;
+
+        AppMeter.ConversationStateSwept.Add(removed,
+            new KeyValuePair<string, object?>("dictionary", dictionary));
     }
 
     private async Task PurgeExpiredConversationsAsync(
