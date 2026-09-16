@@ -5,6 +5,7 @@ using ArmenianAiToy.Application.DTOs;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Application.Interfaces;
 using ArmenianAiToy.Application.Telemetry;
+using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -84,6 +85,7 @@ public class DeviceController : ControllerBase
     [ProducesResponseType(401)]
     public async Task<IActionResult> Heartbeat(
         [FromServices] IDeviceCommandService commandService,
+        [FromServices] ILogger<DeviceController> logger,
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] DeviceHeartbeatRequest? request = null)
     {
         // DeviceId is guaranteed present: the middleware sets it for this path
@@ -96,16 +98,24 @@ public class DeviceController : ControllerBase
         {
             await _deviceService.UpdateFirmwareReportAsync(deviceId, request, DateTime.UtcNow);
         }
+
+        // Bedtime window and pause used to be two separate single-field
+        // projections (IsDeviceInBedtimeWindowAsync, IsDevicePausedAsync),
+        // each its own round trip against the SAME Device row on every
+        // heartbeat. One full-row fetch here resolves both — same
+        // "unknown device id → false" fallback both methods had, since a
+        // missing row here means the same thing it meant to each of them.
+        var device = await _deviceService.GetDeviceAsync(deviceId);
         // Slice E — the toy has no wall clock, so the SERVER tells it whether
         // the bedtime window is active right now; the firmware caches the
         // last-known value between heartbeats. Additive field: legacy builds
         // ignore it.
-        var inBedtimeWindow = await _deviceService.IsDeviceInBedtimeWindowAsync(
-            deviceId, DateTime.UtcNow);
+        var inBedtimeWindow = device is not null
+            && BedtimeWindowEvaluator.IsDeviceInWindow(device, DateTime.UtcNow, logger);
         // The toy also learns its PAUSE state here so a paused toy stays
         // fully silent even for local SD playback (pause used to gate only
         // the online chat path). Cached last-known between heartbeats.
-        var isPaused = await _deviceService.IsDevicePausedAsync(deviceId);
+        var isPaused = device?.IsPaused ?? false;
         // The toy used to make a SECOND HTTPS request every ~60 s to
         // GET /api/devices/commands — ~43,200 command polls a month, each a
         // fresh TLS handshake (the expensive part in both battery and heap),
@@ -573,15 +583,55 @@ public class DeviceController : ControllerBase
             VariantEndingsEnabled = device?.VariantEndingsEnabled ?? true,
             // Slice E — bedtime-music opt-in rides the same manifest.
             BedtimeMusicEnabled = device?.BedtimeMusicEnabled ?? false,
-            StoryEnabled = await _deviceService.IsModeEnabledForRequestAsync(
-                deviceId, childId, DetectedMode.Story),
-            GameEnabled = await _deviceService.IsModeEnabledForRequestAsync(
-                deviceId, childId, DetectedMode.Game),
-            RiddleEnabled = await _deviceService.IsModeEnabledForRequestAsync(
-                deviceId, childId, DetectedMode.Riddle),
-            CuriosityEnabled = await _deviceService.IsModeEnabledForRequestAsync(
-                deviceId, childId, DetectedMode.Curiosity),
+            // Resolved from the `device`/`defaultChild` rows already loaded
+            // above instead of four separate IsModeEnabledForRequestAsync
+            // calls (each of which re-queries Child, then falls back to a
+            // second Device query) — see ResolveModeEnabled. Same precedence,
+            // zero extra round trips.
+            StoryEnabled = ResolveModeEnabled(device, defaultChild, DetectedMode.Story),
+            GameEnabled = ResolveModeEnabled(device, defaultChild, DetectedMode.Game),
+            RiddleEnabled = ResolveModeEnabled(device, defaultChild, DetectedMode.Riddle),
+            CuriosityEnabled = ResolveModeEnabled(device, defaultChild, DetectedMode.Curiosity),
         });
+    }
+
+    /// <summary>
+    /// Pure precedence resolver for the four configurable mode flags,
+    /// mirroring <c>DeviceService.IsModeEnabledForRequestAsync</c> /
+    /// <c>IsDeviceModeEnabledAsync</c> exactly: a non-null per-child
+    /// override wins in both directions (on or off); a null override means
+    /// inherit the device flag; a missing device row (shouldn't happen
+    /// behind <c>DeviceAuthMiddleware</c>) is permissive, matching those
+    /// methods' "unknown device → true" contract. Takes rows the caller has
+    /// ALREADY loaded — no DB access here — so callers that already fetched
+    /// both the device and the child (e.g. GetContentManifest) can resolve
+    /// all four flags with zero additional queries instead of one
+    /// Child-then-Device round trip per mode.
+    /// </summary>
+    private static bool ResolveModeEnabled(Device? device, Child? child, DetectedMode mode)
+    {
+        bool? childOverride = mode switch
+        {
+            DetectedMode.Story => child?.StoryEnabled,
+            DetectedMode.Game => child?.GameEnabled,
+            DetectedMode.Riddle => child?.RiddleEnabled,
+            DetectedMode.Curiosity => child?.CuriosityEnabled,
+            _ => null
+        };
+        if (childOverride is not null)
+            return childOverride.Value;
+
+        if (device is null)
+            return true;
+
+        return mode switch
+        {
+            DetectedMode.Story => device.StoryEnabled,
+            DetectedMode.Game => device.GameEnabled,
+            DetectedMode.Riddle => device.RiddleEnabled,
+            DetectedMode.Curiosity => device.CuriosityEnabled,
+            _ => true
+        };
     }
 
     // Streams a configured story MP3 to the device. Same fail-closed

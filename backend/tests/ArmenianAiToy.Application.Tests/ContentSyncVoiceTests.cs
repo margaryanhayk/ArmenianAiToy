@@ -248,19 +248,20 @@ public class ContentSyncVoiceTests
         var deviceId = Guid.NewGuid();
         var deviceService = Substitute.For<IDeviceService>();
         deviceService.GetDeviceAsync(deviceId).Returns(new Device
-        { Id = deviceId, MacAddress = "m", Name = "toy" });
-        deviceService.IsModeEnabledForRequestAsync(
-            deviceId, Arg.Any<Guid?>(), DetectedMode.Story).Returns(true);
-        deviceService.IsModeEnabledForRequestAsync(
-            deviceId, Arg.Any<Guid?>(), DetectedMode.Game).Returns(false);
-        deviceService.IsModeEnabledForRequestAsync(
-            deviceId, Arg.Any<Guid?>(), DetectedMode.Riddle).Returns(true);
-        deviceService.IsModeEnabledForRequestAsync(
-            deviceId, Arg.Any<Guid?>(), DetectedMode.Curiosity).Returns(false);
+        {
+            Id = deviceId, MacAddress = "m", Name = "toy",
+            StoryEnabled = true, GameEnabled = false,
+            RiddleEnabled = true, CuriosityEnabled = false,
+        });
 
         var manifest = Substitute.For<IContentManifestService>();
         manifest.Build().Returns(ContentManifestResponse.Empty());
 
+        // No default child (Substitute.For<IChildService>() default —
+        // GetDefaultChildForDeviceAsync returns null) — the four flags fall
+        // straight through to the Device columns above, since resolution
+        // now happens locally (ResolveModeEnabled) instead of a per-mode
+        // IsModeEnabledForRequestAsync round trip.
         var ok = Assert.IsType<OkObjectResult>(
             await ControllerFor(deviceService, deviceId)
                 .GetContentManifest(manifest, Substitute.For<IChildService>()));
@@ -272,10 +273,14 @@ public class ContentSyncVoiceTests
         Assert.False(body.CuriosityEnabled);
     }
 
-    // KEYSTONE: the flags are resolved through IsModeEnabledForRequestAsync
-    // with the device's DEFAULT CHILD, not from the raw Device columns — a
-    // child-level override must reach the toy, or the welcome prompt would
-    // offer a mode the chat gate then refuses.
+    // KEYSTONE: the flags are resolved against the device's DEFAULT CHILD,
+    // not from the raw Device columns alone — a child-level override must
+    // reach the toy, or the welcome prompt would offer a mode the chat gate
+    // then refuses. Now resolved locally (DeviceController.ResolveModeEnabled)
+    // from the already-loaded Device/Child rows instead of a per-mode
+    // IsModeEnabledForRequestAsync call, so this pins the RESULT — a non-null
+    // child override winning over the opposite device default in both
+    // directions — rather than a mock call shape.
     [Fact]
     public async Task ContentManifest_ModeFlags_HonorTheDefaultChildsOverride()
     {
@@ -284,25 +289,29 @@ public class ContentSyncVoiceTests
 
         var childService = Substitute.For<IChildService>();
         childService.GetDefaultChildForDeviceAsync(deviceId).Returns(new Child
-        { Id = childId, DeviceId = deviceId, Name = "Ani" });
+        {
+            Id = childId, DeviceId = deviceId, Name = "Ani",
+            StoryEnabled = false, GameEnabled = true,
+        });
 
         var deviceService = Substitute.For<IDeviceService>();
         deviceService.GetDeviceAsync(deviceId).Returns(new Device
-        { Id = deviceId, MacAddress = "m", Name = "toy" });
-        deviceService.IsModeEnabledForRequestAsync(
-            deviceId, Arg.Any<Guid?>(), Arg.Any<DetectedMode>()).Returns(true);
+        {
+            Id = deviceId, MacAddress = "m", Name = "toy",
+            StoryEnabled = true, GameEnabled = false,
+        });
 
         var manifest = Substitute.For<IContentManifestService>();
         manifest.Build().Returns(ContentManifestResponse.Empty());
 
-        await ControllerFor(deviceService, deviceId)
-            .GetContentManifest(manifest, childService);
+        var ok = Assert.IsType<OkObjectResult>(
+            await ControllerFor(deviceService, deviceId)
+                .GetContentManifest(manifest, childService));
+        var body = Assert.IsType<ContentManifestResponse>(ok.Value);
 
-        // The child's id — not null — is what reaches the resolver, which is
-        // the only way its per-child override can apply.
-        await deviceService.Received().IsModeEnabledForRequestAsync(
-            deviceId, childId, DetectedMode.Story);
-        await deviceService.Received().IsModeEnabledForRequestAsync(
-            deviceId, childId, DetectedMode.Game);
+        // Child overrides are the opposite of the device defaults above —
+        // the child's value must win both times.
+        Assert.False(body.StoryEnabled);
+        Assert.True(body.GameEnabled);
     }
 }

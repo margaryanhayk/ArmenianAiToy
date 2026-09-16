@@ -702,8 +702,10 @@ public class DeviceService : IDeviceService
     public async Task RecordUsageQuestionAsync(Guid deviceId, decimal costUsd, DateTime nowUtc)
     {
         var dayUtc = nowUtc.Date;
+        var addedCostUsd = costUsd < 0m ? 0m : costUsd;
         var row = await _db.Set<DeviceUsageDay>()
             .FirstOrDefaultAsync(u => u.DeviceId == deviceId && u.DayUtc == dayUtc);
+        var isNew = row is null;
         if (row is null)
         {
             row = new DeviceUsageDay
@@ -715,8 +717,35 @@ public class DeviceService : IDeviceService
             _db.Set<DeviceUsageDay>().Add(row);
         }
         row.Questions += 1;
-        row.EstimatedUsd += costUsd < 0m ? 0m : costUsd;
-        await _db.SaveChangesAsync();
+        row.EstimatedUsd += addedCostUsd;
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException) when (isNew)
+        {
+            // IX_DeviceUsageDays_DeviceId_DayUtc race, same idiom as
+            // ReportStoryPlaysAsync/ReportGamePlaysAsync above: two
+            // concurrent turns for the same device/day both found no row
+            // and both tried to Add one. Unlike those insert-dedup call
+            // sites, a lost write here silently undercounts the day's
+            // quota, so the fix is a re-read-and-increment retry rather
+            // than a skip. One retry is enough — a third concurrent writer
+            // in the same instant is not worth chasing.
+            _db.Entry(row).State = EntityState.Detached;
+            row = await _db.Set<DeviceUsageDay>()
+                .FirstOrDefaultAsync(u => u.DeviceId == deviceId && u.DayUtc == dayUtc);
+            if (row is null)
+            {
+                // The racing writer's row vanished (e.g. a concurrent
+                // purge) — nothing sane to increment; drop this write
+                // like the sibling call sites drop a lost race.
+                return;
+            }
+            row.Questions += 1;
+            row.EstimatedUsd += addedCostUsd;
+            await _db.SaveChangesAsync();
+        }
     }
 
     public async Task<UsageAllowanceStatus> GetUsageAllowanceStatusAsync(Guid deviceId, DateTime nowUtc)

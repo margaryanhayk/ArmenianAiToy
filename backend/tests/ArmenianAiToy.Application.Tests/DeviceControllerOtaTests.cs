@@ -5,6 +5,7 @@ using ArmenianAiToy.Domain.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace ArmenianAiToy.Application.Tests;
@@ -34,7 +35,8 @@ public class DeviceControllerOtaTests
         var (controller, device, deviceId) = Create();
         var body = new DeviceHeartbeatRequest(FirmwareVersion: "1.0.0", BoardModel: "areg-s3-n8");
 
-        var result = await controller.Heartbeat(Substitute.For<IDeviceCommandService>(), body);
+        var result = await controller.Heartbeat(
+            Substitute.For<IDeviceCommandService>(), NullLogger<DeviceController>.Instance, body);
 
         Assert.IsType<OkObjectResult>(result);
         await device.Received(1).UpdateFirmwareReportAsync(deviceId, body, Arg.Any<DateTime>());
@@ -46,7 +48,8 @@ public class DeviceControllerOtaTests
         var (controller, device, _) = Create();
 
         // legacy presence-only heartbeat
-        var result = await controller.Heartbeat(Substitute.For<IDeviceCommandService>(), null);
+        var result = await controller.Heartbeat(
+            Substitute.For<IDeviceCommandService>(), NullLogger<DeviceController>.Instance, null);
 
         Assert.IsType<OkObjectResult>(result);
         await device.DidNotReceiveWithAnyArgs()

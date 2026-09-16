@@ -149,9 +149,14 @@ export async function register(
 
 /** GET /api/parents/devices/details → linked devices with presence + state. */
 export async function getDevices(): Promise<LinkedDevice[]> {
-  const res = await fetch(url('/api/parents/devices/details'), {
-    headers: await authHeader(),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url('/api/parents/devices/details'), {
+      headers: await authHeader(),
+    });
+  } catch {
+    throw new ApiError('e_unreachable');
+  }
   if (res.status === 401) throw new UnauthorizedError();
   if (!res.ok) throw new ApiError('e_load');
   const data = (await res.json()) as { devices?: LinkedDevice[] };
@@ -160,11 +165,16 @@ export async function getDevices(): Promise<LinkedDevice[]> {
 
 /** POST /api/parents/devices/claim. Uniform failure (no existence leak). */
 export async function claimDevice(deviceId: string, claimCode: string): Promise<void> {
-  const res = await fetch(url('/api/parents/devices/claim'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-    body: JSON.stringify({ deviceId, claimCode }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url('/api/parents/devices/claim'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+      body: JSON.stringify({ deviceId, claimCode }),
+    });
+  } catch {
+    throw new ApiError('e_unreachable');
+  }
   if (res.status === 401) throw new UnauthorizedError();
   if (res.status === 429) {
     throw new ApiError('e_too_many');
@@ -191,11 +201,16 @@ export async function addChild(
   gender: 0 | 1,
   birthYear: number | null,
 ): Promise<void> {
-  const res = await fetch(url('/api/children'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-    body: JSON.stringify({ deviceId, name, gender, birthYear }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url('/api/children'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+      body: JSON.stringify({ deviceId, name, gender, birthYear }),
+    });
+  } catch {
+    throw new ApiError('e_unreachable');
+  }
   if (res.status === 401) throw new UnauthorizedError();
   if (!res.ok) throw new ApiError('e_generic');
 }
@@ -210,10 +225,15 @@ export async function addChild(
  * "already has its two parents" alike, so the message must not guess which.
  */
 export async function createInvite(deviceId: string): Promise<{ code: string; expiresAt: string }> {
-  const res = await fetch(url(`/api/parents/devices/${encodeURIComponent(deviceId)}/invite`), {
-    method: 'POST',
-    headers: { Accept: 'application/json', ...(await authHeader()) },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url(`/api/parents/devices/${encodeURIComponent(deviceId)}/invite`), {
+      method: 'POST',
+      headers: { Accept: 'application/json', ...(await authHeader()) },
+    });
+  } catch {
+    throw new ApiError('e_unreachable');
+  }
   if (res.status === 401) throw new UnauthorizedError();
   if (res.status === 429) throw new ApiError('e_too_many');
   if (!res.ok) throw new ApiError('e_invite_failed');
@@ -226,11 +246,16 @@ export async function createInvite(deviceId: string): Promise<{ code: string; ex
  * server, so one message here.
  */
 export async function redeemInvite(code: string): Promise<void> {
-  const res = await fetch(url('/api/parents/devices/redeem-invite'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-    body: JSON.stringify({ code }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url('/api/parents/devices/redeem-invite'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+      body: JSON.stringify({ code }),
+    });
+  } catch {
+    throw new ApiError('e_unreachable');
+  }
   if (res.status === 401) throw new UnauthorizedError();
   if (res.status === 429) throw new ApiError('e_too_many');
   if (!res.ok) throw new ApiError('e_invite_bad');
@@ -238,11 +263,16 @@ export async function redeemInvite(code: string): Promise<void> {
 
 /** PUT /api/parents/devices/{id}/name. 1..60 chars. */
 export async function renameDevice(deviceId: string, name: string): Promise<void> {
-  const res = await fetch(url(`/api/parents/devices/${encodeURIComponent(deviceId)}/name`), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-    body: JSON.stringify({ name }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url(`/api/parents/devices/${encodeURIComponent(deviceId)}/name`), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+      body: JSON.stringify({ name }),
+    });
+  } catch {
+    throw new ApiError('e_unreachable');
+  }
   if (res.status === 401) throw new UnauthorizedError();
   if (res.status === 400) throw new ApiError('e_name_length');
   if (!res.ok) throw new ApiError('e_generic');
@@ -250,11 +280,16 @@ export async function renameDevice(deviceId: string, name: string): Promise<void
 
 /** PUT /api/parents/devices/{id}/revoke. Kill-switch; reversible. */
 export async function setRevoked(deviceId: string, revoked: boolean): Promise<void> {
-  const res = await fetch(url(`/api/parents/devices/${encodeURIComponent(deviceId)}/revoke`), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-    body: JSON.stringify({ revoked }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url(`/api/parents/devices/${encodeURIComponent(deviceId)}/revoke`), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+      body: JSON.stringify({ revoked }),
+    });
+  } catch {
+    throw new ApiError('e_unreachable');
+  }
   if (res.status === 401) throw new UnauthorizedError();
   if (!res.ok) throw new ApiError('e_generic');
 }
@@ -268,10 +303,15 @@ export async function setRevoked(deviceId: string, revoked: boolean): Promise<vo
  * unlinkDevice.
  */
 export async function unlinkDevice(deviceId: string): Promise<void> {
-  const res = await fetch(url(`/api/parents/devices/${encodeURIComponent(deviceId)}/link`), {
-    method: 'DELETE',
-    headers: await authHeader(),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url(`/api/parents/devices/${encodeURIComponent(deviceId)}/link`), {
+      method: 'DELETE',
+      headers: await authHeader(),
+    });
+  } catch {
+    throw new ApiError('e_unreachable');
+  }
   if (res.status === 401) throw new UnauthorizedError();
   if (!res.ok) throw new ApiError('e_generic');
 }
@@ -282,10 +322,15 @@ export async function unlinkDevice(deviceId: string): Promise<void> {
  * cascade). Mirrors parent.html's deleteChild.
  */
 export async function deleteChild(childId: string): Promise<void> {
-  const res = await fetch(url(`/api/parents/children/${encodeURIComponent(childId)}`), {
-    method: 'DELETE',
-    headers: await authHeader(),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url(`/api/parents/children/${encodeURIComponent(childId)}`), {
+      method: 'DELETE',
+      headers: await authHeader(),
+    });
+  } catch {
+    throw new ApiError('e_unreachable');
+  }
   if (res.status === 401) throw new UnauthorizedError();
   if (!res.ok) throw new ApiError('e_generic');
 }
@@ -606,7 +651,7 @@ export function setStoryQuestions(deviceId: string, enabled: boolean): Promise<v
 // ----- Safety (flagged) -----
 
 export type FlaggedMessage = {
-  id: string;
+  messageId: string;
   conversationId: string;
   conversationStartedAt: string;
   role: string;

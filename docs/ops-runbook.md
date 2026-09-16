@@ -167,6 +167,19 @@ logged at Warning and never retried in a loop. Each alert actually
 delivered increments `aat_alerts_sent_total{key}` (bounded keys — see the
 table above). Cooldown state is in-memory only and resets on restart.
 
+## Dormancy passes — per-tick batch cap
+
+The four dormancy passes on `RetentionPurgeService` (parent warn, parent
+anonymize, device warn, device delete — each off by default, see
+`Dormancy:Parent:*` / `Dormancy:Devices:*` in the class's own doc comments)
+share one per-tick cap: `Dormancy:MaxBatchSize` (default 500). Oldest-first;
+a capped tick leaves the remainder for the next one, nothing is dropped.
+Turning any of these on for the first time against a fleet with a large
+existing backlog is the case this protects: without the cap, one tick would
+enumerate the whole eligible set and send/scrub serially in one pass. Set
+`Dormancy__MaxBatchSize` (Railway env var) only if the 500 default is too
+slow or too fast for your fleet's mail relay.
+
 ## OpenAI is down or rate-limiting
 
 Nothing to do. It is handled:

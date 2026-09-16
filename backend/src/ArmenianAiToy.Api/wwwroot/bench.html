@@ -226,7 +226,7 @@
 <script>
   let deviceId = localStorage.getItem('deviceId') || '';
   let apiKey = localStorage.getItem('apiKey') || '';
-  let parentToken = localStorage.getItem('parentToken') || '';
+  let parentToken = sessionStorage.getItem('parentToken') || '';
 
   // Restore state on load
   if (deviceId && apiKey) {
@@ -375,7 +375,7 @@
       const data = await res.json();
       if (res.ok) {
         parentToken = data.token;
-        localStorage.setItem('parentToken', parentToken);
+        sessionStorage.setItem('parentToken', parentToken);
         status.textContent = 'Logged in!';
         status.className = 'status ok';
       } else {
@@ -437,13 +437,31 @@
         const div = document.createElement('div');
         div.className = 'history-item';
         const time = new Date(conv.startedAt).toLocaleString();
-        const flagged = conv.hasFlaggedContent ? ' <span style="color:red">[FLAGGED]</span>' : '';
-        let html = `<div class="meta">${time} (${conv.messageCount} messages)${flagged}</div>`;
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = `${time} (${conv.messageCount} messages)`;
+        if (conv.hasFlaggedContent) {
+          const flag = document.createElement('span');
+          flag.style.color = 'red';
+          flag.textContent = ' [FLAGGED]';
+          meta.appendChild(flag);
+        }
+        div.appendChild(meta);
+
         conv.messages.forEach(m => {
-          if (m.role === 'user') html += `<div class="q">Child: ${m.content}</div>`;
-          else if (m.role === 'assistant') html += `<div class="a">Areg: ${m.content}</div>`;
+          if (m.role === 'user') {
+            const q = document.createElement('div');
+            q.className = 'q';
+            q.textContent = 'Child: ' + m.content;
+            div.appendChild(q);
+          } else if (m.role === 'assistant') {
+            const a = document.createElement('div');
+            a.className = 'a';
+            a.textContent = 'Areg: ' + m.content;
+            div.appendChild(a);
+          }
         });
-        div.innerHTML = html;
         list.appendChild(div);
       });
     } catch(e) {

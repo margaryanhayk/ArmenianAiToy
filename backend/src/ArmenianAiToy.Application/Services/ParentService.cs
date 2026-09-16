@@ -271,9 +271,11 @@ public class ParentService : IParentService
         // ordering the password-reset flow uses.
         await _notifier.SendEmailVerificationAsync(email, rawVerificationToken);
 
+        // Email-less, same posture as the collision branch above — avoids
+        // a log-scraping back-channel.
         _logger.LogInformation(
-            "Parent registered: {Email}, terms version {TermsVersion}",
-            email, CurrentTermsVersion);
+            "Parent registered: terms version {TermsVersion}",
+            CurrentTermsVersion);
     }
 
     public async Task<ParentLoginResponse?> LoginAsync(string email, string password)
@@ -560,17 +562,28 @@ public class ParentService : IParentService
         if (seatsTaken >= MaxParentsPerDevice)
             return null;
 
-        string selector;
         // The selector column is unique, so a collision is a real (if
         // vanishingly rare) possibility rather than something to assume away.
-        var attempts = 0;
-        do
+        // Exhausting the retry budget fails clean (null, same shape as this
+        // method's other failure cases) instead of proceeding with a
+        // known-colliding selector that would throw uncaught on SaveChangesAsync.
+        string? selector = null;
+        for (var attempts = 0; attempts < 5; attempts++)
         {
-            selector = RandomInviteString(InviteSelectorLength);
-            attempts++;
+            var candidate = RandomInviteString(InviteSelectorLength);
+            if (!await _db.Set<DeviceInvite>().AnyAsync(i => i.Selector == candidate))
+            {
+                selector = candidate;
+                break;
+            }
         }
-        while (attempts < 5 &&
-               await _db.Set<DeviceInvite>().AnyAsync(i => i.Selector == selector));
+        if (selector == null)
+        {
+            _logger.LogWarning(
+                "Parent {ParentId} invite creation for device {DeviceId} failed: " +
+                "selector retry budget exhausted", parentId, deviceId);
+            return null;
+        }
 
         var secret = RandomInviteString(InviteSecretLength);
         var ttlHours = ReadInviteTtlHours();
@@ -1856,6 +1869,14 @@ public class ParentService : IParentService
         if (device == null)
             return false;
 
+        if (device.StoryEnabled == story && device.GameEnabled == game
+            && device.RiddleEnabled == riddle && device.CuriosityEnabled == curiosity)
+        {
+            // Idempotent: already in the requested state — no mutation, no
+            // audit row, same shape as SetDevicePauseStateAsync's no-op.
+            return true;
+        }
+
         device.StoryEnabled = story;
         device.GameEnabled = game;
         device.RiddleEnabled = riddle;
@@ -1886,6 +1907,14 @@ public class ParentService : IParentService
             .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == child.DeviceId);
         if (!ownsDevice)
             return false;
+
+        if (child.StoryEnabled == story && child.GameEnabled == game
+            && child.RiddleEnabled == riddle && child.CuriosityEnabled == curiosity)
+        {
+            // Idempotent: already in the requested state — no mutation, no
+            // audit row, same shape as SetDevicePauseStateAsync's no-op.
+            return true;
+        }
 
         child.StoryEnabled = story;
         child.GameEnabled = game;

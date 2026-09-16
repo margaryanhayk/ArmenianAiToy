@@ -87,7 +87,7 @@ export default function FlaggedScreen({
         <FlatList
           data={items}
           extraData={getLanguage()}
-          keyExtractor={(m) => m.id}
+          keyExtractor={(m) => m.messageId}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListHeaderComponent={error ? <Text style={styles.error}>{error}</Text> : null}
           ListEmptyComponent={

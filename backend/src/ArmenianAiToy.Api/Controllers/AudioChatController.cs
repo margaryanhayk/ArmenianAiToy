@@ -284,7 +284,12 @@ public class AudioChatController : ControllerBase
         // TTS all succeeded. Wrapped in its own try/catch so a bug in
         // the estimator can never break the audio path. Three samples:
         // Whisper bytes-in, chat text-in/out, TTS chars-out.
-        if (_costCapOptions.Value.Enabled)
+        //
+        // Usage-tier metering foundation: the DeviceUsageDay write fires
+        // whenever the flat cost cap OR Usage:Tiers:Enabled is on — either
+        // flag alone must keep the counter honest, since the tier gate
+        // reads this table independently of the flat cap.
+        if (_costCapOptions.Value.Enabled || _usageTiersOptions.Enabled)
         {
             try
             {
@@ -292,7 +297,10 @@ public class AudioChatController : ControllerBase
                 var chatCost = OpenAICostEstimator.EstimateChatCostUsd(transcript, chatResult.Text);
                 var ttsCost = OpenAICostEstimator.EstimateTtsCostUsd(ttsText);
                 var turnCost = sttCost + chatCost + ttsCost;
-                _costMeter.Record(deviceId, turnCost, DateTime.UtcNow);
+                if (_costCapOptions.Value.Enabled)
+                {
+                    _costMeter.Record(deviceId, turnCost, DateTime.UtcNow);
+                }
                 await _deviceService.RecordUsageQuestionAsync(deviceId, turnCost, DateTime.UtcNow);
             }
             catch (Exception ex)
@@ -371,8 +379,10 @@ public class AudioChatController : ControllerBase
 
         // Cost recording — same best-effort contract as the buffered path
         // (runs before the response body so an estimator bug can never
-        // corrupt a stream in flight).
-        if (_costCapOptions.Value.Enabled)
+        // corrupt a stream in flight). Same either-flag posture as the
+        // buffered path above: the DeviceUsageDay write must not depend
+        // on the flat cost cap alone.
+        if (_costCapOptions.Value.Enabled || _usageTiersOptions.Enabled)
         {
             try
             {
@@ -380,7 +390,10 @@ public class AudioChatController : ControllerBase
                 var chatCost = OpenAICostEstimator.EstimateChatCostUsd(transcript, chatResult.Text);
                 var ttsCost = OpenAICostEstimator.EstimateTtsCostUsd(ttsText);
                 var turnCost = sttCost + chatCost + ttsCost;
-                _costMeter.Record(deviceId, turnCost, DateTime.UtcNow);
+                if (_costCapOptions.Value.Enabled)
+                {
+                    _costMeter.Record(deviceId, turnCost, DateTime.UtcNow);
+                }
                 await _deviceService.RecordUsageQuestionAsync(deviceId, turnCost, DateTime.UtcNow);
             }
             catch (Exception ex)

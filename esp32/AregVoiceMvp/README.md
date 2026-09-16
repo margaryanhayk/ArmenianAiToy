@@ -1194,6 +1194,83 @@ pre-fix build — two duplicate allocator copies became one shared instance)
 and host-tested (`tools/firmware/test_check_release_image.py`); not
 bench-verified on hardware.
 
+### Code-review fixes — rollover-safe timeouts, index power-loss gap, unbounded JSON caps (2026-09-14)
+
+Three findings from a code review, fixed in `voice_client.cpp` and
+`content_sync.cpp` only:
+
+- **Rollover-unsafe read timeout.** `read_response_into`'s HTTP body-read
+  deadline compared `millis() > read_deadline` instead of the rollover-safe
+  `(int32_t)(millis() - read_deadline) >= 0` every sibling deadline in this
+  firmware already uses (`audio_io.cpp`, `AregVoiceMvp.ino`). At the
+  ~49.7-day `millis()` wraparound this aborted a perfectly healthy
+  STT/chat-reply download mid-body — one dropped voice turn and a canned
+  failure clip, not a crash. Fixed the same way. While grepping the tree
+  for the same class of bug, also fixed `content_sync_tick`'s scheduler
+  gate (`now < s_next_attempt_ms`) — it self-heals on the very next tick
+  (worst case: one sync attempt fires a little early after the
+  wraparound), so it was lower stakes, but it is the same bug shape and
+  cost nothing to close alongside the real one.
+- **Content-index publish had a power-loss gap.** FAT cannot overwrite a
+  file in place, so publishing the synced content index was
+  `SD.remove(kIndexPath)` then `SD.rename(kIndexTmpPath, kIndexPath)` — a
+  power loss between those two calls left NEITHER file on the card, which
+  `load_previous_index()` read as "no index has ever existed" rather than
+  "index corrupt", so the strike-counter/rebuild-refusal safety net never
+  engaged and the toy silently re-downloaded the entire library (every
+  story, voice clip, game clip and music track) on its next boot. Wasteful,
+  not corrupting — the cached MP3s were never at risk. Fixed by keeping a
+  last-known-good backup (`/content_index.json.prev` — deliberately not
+  `.bak`, which `AregVoiceMvp.ino`'s `AREG_STORY_SD_FALLBACK_TEST_BENCH`
+  harness already uses for its own unrelated, temporary renames) and
+  ordering the publish as two renames instead of remove-then-rename, so at
+  no instant are both the primary and the backup absent. The one-line
+  decision `load_previous_index()` now makes first
+  (`cs_index_should_restore_backup` in `content_sync_rules.h`) is
+  host-tested (`host_tests/content_sync_index_rules_test.cpp`).
+- **Unbounded response bodies on internal heap.** Three `HTTPClient::
+  getString()` call sites in `voice_client.cpp` (heartbeat, welcome-intent,
+  story-audio-token) read a whole response into an internal-heap `String`
+  with no size check — on the ~300 KB internal heap, an unexpected large
+  HTTP 200 body (an HTML error page from a proxy during an outage, say)
+  could exhaust heap instead of the request failing cleanly. All three now
+  check `http.getSize()` against a 16 KB cap before calling `getString()`,
+  mirroring the existing PSRAM-buffer cap on the audio-download path.
+  `ota_apply.cpp` and `ota_foundation.cpp` have the same shape and are
+  explicitly OUT OF SCOPE for this fix.
+
+**NOT compile-verified — arduino-cli is not available in this environment —
+and NOT bench-verified on any hardware.** Verification here is the pure
+decision logic's host test only
+(`host_tests/content_sync_index_rules_test.cpp`, plus the five pre-existing
+host tests, all green); every line touched was reviewed by eye against the
+sibling idioms it copies, with extra care given the lack of a compiler.
+
+**Bench checklist — what a human must verify on hardware:**
+
+- [ ] `arduino-cli compile` the canonical FQBN and confirm it builds clean
+      before flashing anything — this slice has never been compiled.
+- [ ] Normal SD sync still works end to end (manifest → download → index
+      write) and the toy plays a story afterward — the publish sequence
+      changed shape even though the bytes it writes did not.
+- [ ] After a normal sync, confirm `/content_index.json.prev` now exists on
+      the card alongside `/content_index.json`.
+- [ ] Force the restore path: with the toy powered off, delete
+      `/content_index.json` by hand but leave `/content_index.json.prev` in
+      place, then boot — serial log should print `primary index missing —
+      restored from backup` and the toy should sync normally, NOT
+      re-download the whole library.
+- [ ] Confirm `AREG_STORY_SD_FALLBACK_TEST_BENCH`'s Test B/C (which rename
+      the index to `/content_index.json.bak`, a different path) still pass
+      unchanged — this slice deliberately avoided that filename, but only a
+      real build proves the two mechanisms do not collide.
+- [ ] A heartbeat, a welcome-flow voice-intent answer, and an in-story
+      Q&A/story-audio-token fetch each still work normally against a real
+      backend (the new size cap must never trip on a legitimate reply).
+- [ ] The `millis()` rollover fixes cannot be exercised on the bench (they
+      only matter after ~49.7 days uptime) — reviewed by eye only, matching
+      the exact idiom already proven on this firmware's other deadlines.
+
 ## OTA — surviving the first boot of a new image
 
 The apply pipeline (`ota_apply.{h,cpp}`) and the phone-home loop

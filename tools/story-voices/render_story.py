@@ -434,7 +434,7 @@ def stitch(parts, outdir, name):
         return made[key]
 
     lst = os.path.join(outdir, f"_{name}.txt")
-    with open(lst, "w") as f:
+    with open(lst, "w", encoding="utf-8") as f:
         prev, prev_pause = None, None
         for who, wav, pause, _chars, _dur in parts:
             if prev is not None:
@@ -517,7 +517,7 @@ def assemble(sid, seg_files, outdir):
     # against the LIST FILE's own directory, not the process cwd, so a
     # cwd-relative path here (e.g. "render-out/x/seg0.mp3") gets re-prefixed
     # with outdir and fails to open. Discovered live on this host 2026-09-11.
-    with open(lst, "w") as f:
+    with open(lst, "w", encoding="utf-8") as f:
         for i, seg in enumerate(seg_files):
             if i:
                 f.write(f"file '{os.path.abspath(sil)}'\n")

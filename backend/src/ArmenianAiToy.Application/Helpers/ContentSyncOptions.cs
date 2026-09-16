@@ -219,6 +219,7 @@ public sealed class ContentSyncOptions
             // tell "no position configured" from "position zero", which is
             // what the both-or-neither rule keys off.
             if (int.TryParse(child["SeriesIndex"], out var seriesIndex)) story.SeriesIndex = seriesIndex;
+            if (bool.TryParse(child["Retired"], out var storyRetired)) story.Retired = storyRetired;
 
             // B2 — hand-rolled clip binding, same reachable-by-tests rule as
             // the story array itself: a new field silently missing from this
@@ -251,6 +252,7 @@ public sealed class ContentSyncOptions
             };
             if (int.TryParse(child["Version"], out var trackVersion)) track.Version = trackVersion;
             if (long.TryParse(child["SizeBytes"], out var trackSize)) track.SizeBytes = trackSize;
+            if (bool.TryParse(child["Retired"], out var trackRetired)) track.Retired = trackRetired;
             options.Music.Add(track);
         }
 
@@ -267,6 +269,7 @@ public sealed class ContentSyncOptions
             };
             if (int.TryParse(child["Version"], out var clipVersion)) clip.Version = clipVersion;
             if (long.TryParse(child["SizeBytes"], out var clipSize)) clip.SizeBytes = clipSize;
+            if (bool.TryParse(child["Retired"], out var clipRetired)) clip.Retired = clipRetired;
             options.Voice.Add(clip);
         }
 
@@ -286,6 +289,7 @@ public sealed class ContentSyncOptions
             };
             if (int.TryParse(child["Version"], out var gameVersion)) gameClip.Version = gameVersion;
             if (long.TryParse(child["SizeBytes"], out var gameSize)) gameClip.SizeBytes = gameSize;
+            if (bool.TryParse(child["Retired"], out var gameRetired)) gameClip.Retired = gameRetired;
             options.Games.Add(gameClip);
         }
 

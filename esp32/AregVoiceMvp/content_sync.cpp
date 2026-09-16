@@ -46,6 +46,14 @@ namespace {
 
 constexpr const char *kIndexPath    = "/content_index.json";
 constexpr const char *kIndexTmpPath = "/content_index.json.new";
+// Last-known-good backup published alongside the primary — see
+// cs_index_should_restore_backup() in content_sync_rules.h for why this
+// exists and load_previous_index()/write_index() below for how it is kept
+// current. Deliberately NOT "*.bak": AregVoiceMvp.ino's
+// AREG_STORY_SD_FALLBACK_TEST_BENCH harness already claims
+// "/content_index.json.bak" for its own unrelated, temporary renames, and
+// this file is a PERMANENT artifact that would collide with it.
+constexpr const char *kIndexBakPath = "/content_index.json.prev";
 // Free-space slack beyond sizeBytes (FAT allocation overhead headroom).
 constexpr uint64_t kFreeSpaceSlack = 256ULL * 1024ULL;
 
@@ -385,6 +393,19 @@ void load_previous_index() {
     s_stories_retired_deleted = 0;
     s_music_retired_deleted   = 0;
     s_voice_retired_deleted   = 0;
+    // Power-loss gap fix (2026-09-14): write_index() cannot overwrite the
+    // primary in place, so publishing briefly frees the primary's path
+    // before the new index takes it. A crash in exactly that window looks
+    // identical to "no index has ever existed" unless we check for the
+    // backup FIRST — see cs_index_should_restore_backup()'s doc comment.
+    if (cs_index_should_restore_backup(SD.exists(kIndexPath), SD.exists(kIndexBakPath))) {
+        if (SD.rename(kIndexBakPath, kIndexPath)) {
+            Serial.println("[content-sync] primary index missing — restored from backup");
+        } else {
+            Serial.println("[content-sync] primary index missing — backup restore FAILED");
+        }
+        Serial.flush();
+    }
     if (!SD.exists(kIndexPath)) {
         Serial.println("[content-sync] no existing index");
         return;
@@ -457,11 +478,15 @@ bool active_contains(const char *story_id) {
 }
 
 // Writes the new index atomically: the full document goes to a .new file
-// first, and the live path is only unlinked once that replacement is
-// completely written and closed. A crash before that leaves the previous
-// known-good index in place; a crash inside the remove/rename window
-// leaves the .new file, and the next boot simply rebuilds the index from
-// the manifest. No MP3 is ever at risk either way.
+// first, verified three ways, and only then published. A crash before
+// publish leaves the previous known-good index in place untouched. FAT
+// rename cannot overwrite a destination that already exists, so publish
+// itself is two renames, not a remove-then-rename: the outgoing primary is
+// moved to the backup path (freeing the primary's name) before the .new
+// file takes it — see kIndexBakPath and
+// cs_index_should_restore_backup() (content_sync_rules.h) for why a crash
+// between those two renames is still safe. No MP3 is ever at risk either
+// way.
 bool write_index() {
     // Refuse to publish an index built on top of a previous one we could not
     // read. Everything this run learned about the card came from the manifest
@@ -636,9 +661,29 @@ bool write_index() {
         }
     }
 
-    // FAT rename cannot overwrite in place.
-    if (SD.exists(kIndexPath)) {
-        SD.remove(kIndexPath);
+    // FAT rename cannot overwrite in place, so publishing needs the
+    // primary's path freed before the verified replacement can take it.
+    // That is done by MOVING the outgoing index to the backup path rather
+    // than removing it outright: at no instant are both the primary and
+    // the backup absent, so a power loss anywhere in this sequence leaves
+    // at least one full, previously-verified index on the card for
+    // load_previous_index()'s cs_index_should_restore_backup() check to
+    // find. (A crash before this point leaves the old primary untouched;
+    // a crash after the final rename leaves both files, primary current
+    // and backup one generation behind — also fine.)
+    if (SD.exists(kIndexBakPath)) {
+        SD.remove(kIndexBakPath);
+    }
+    if (SD.exists(kIndexPath) && !SD.rename(kIndexPath, kIndexBakPath)) {
+        // Could not make the outgoing index recoverable as a backup.
+        // Leaving the current primary standing untouched is safer than an
+        // unlink we could not make reversible; this attempt's index simply
+        // is not published, same as every other early return in this
+        // function, and the next sync tries again.
+        Serial.println("[content-sync] index backup rename FAILED — not publishing");
+        Serial.flush();
+        SD.remove(kIndexTmpPath);
+        return false;
     }
     if (!SD.rename(kIndexTmpPath, kIndexPath)) {
         SD.remove(kIndexTmpPath);
@@ -2013,7 +2058,8 @@ void content_sync_tick() {
     }
     // Scheduled, not one-shot. `s_requested_now` lets the console command jump
     // the queue without disturbing the schedule arithmetic.
-    if (!s_requested_now && s_next_attempt_ms != 0 && now < s_next_attempt_ms) {
+    if (!s_requested_now && s_next_attempt_ms != 0 &&
+        (int32_t)(now - s_next_attempt_ms) < 0) {  // rollover-safe
         return;
     }
     if (!voice_wifi_is_connected()) {

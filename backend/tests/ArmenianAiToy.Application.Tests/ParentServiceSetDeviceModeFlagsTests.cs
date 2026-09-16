@@ -147,4 +147,20 @@ public class ParentServiceSetDeviceModeFlagsTests
 
         Assert.Empty(await db.Set<AuditEvent>().ToListAsync());
     }
+
+    [Fact]
+    public async Task SetDeviceModeFlagsAsync_AlreadyAtRequestedValues_ReturnsTrueButNoAuditRow()
+    {
+        // No-op: all four flags default true (matches the seeded device), so
+        // requesting all-true again is idempotent. Same posture as
+        // SetDevicePauseStateAsync's no-op — success, no audit noise.
+        var (service, db) = CreateService();
+        var (parentId, deviceId) = SeedLinkedParentAndDevice(db);
+
+        var result = await service.SetDeviceModeFlagsAsync(
+            parentId, deviceId, story: true, game: true, riddle: true, curiosity: true);
+
+        Assert.True(result);
+        Assert.Empty(await db.Set<AuditEvent>().ToListAsync());
+    }
 }
