@@ -47,8 +47,14 @@ from pathlib import Path
 # --- markers, all taken from the firmware source, not guessed ------------
 RE_LATENCY_QA = re.compile(r"\[latency\]\s+qa_release->play_begin_ms=(\d+)")
 RE_LATENCY_ANY = re.compile(r"\[latency\]\s+(\S+?)=(\d+)")
+# The version banner only prints on the FIRST OTA tick with the link up
+# (ota_foundation.cpp:509) — so on a toy that never joins Wi-Fi it never
+# appears at all. `[boot] AregVoiceMvp starting` (AregVoiceMvp.ino setup())
+# is the line that always prints, so treat that as the boot marker.
+RE_BOOT_START = re.compile(r"\[boot\]\s+AregVoiceMvp starting")
 RE_BOOT_VER = re.compile(r"\[ota\]\s+boot poll \(fw=(\S+)\s+build=(\S+)")
 RE_RESET = re.compile(r"\[boot\]\s+reset_reason=(\d+)/(\S+)")
+RE_WIFI = re.compile(r"\[(wifi|net)\].*(connected|ip=|failed|disconnect)", re.I)
 RE_STORY_SEL = re.compile(r"\[story\]\s+selected\s+(\S+)")
 RE_STORY_END = re.compile(r"\[story\]\s+finished")
 
@@ -73,17 +79,31 @@ C_OK, C_BAD, C_WARN, C_DIM, C_OFF = "\033[32m", "\033[31m", "\033[33m", "\033[2m
 
 
 class Watcher:
-    def __init__(self) -> None:
+    def __init__(self, echo: bool = True) -> None:
         self.latencies: list[int] = []
         self.stories: list[str] = []
         self.finishes = 0
         self.troubles: list[str] = []
         self.fw = self.build = None
         self.lines = 0
+        self.boots = 0
+        self.echo = echo
 
     def feed(self, line: str) -> None:
         self.lines += 1
         line = line.rstrip("\r\n")
+        if not line.strip():
+            return
+
+        if RE_BOOT_START.search(line):
+            self.boots += 1
+            print(f"\n{C_OK}BOOT{C_OFF}  the toy started (boot #{self.boots})")
+            return
+
+        if RE_WIFI.search(line):
+            bad = re.search(r"fail|disconnect", line, re.I)
+            print(f"{C_WARN if bad else C_OK}WIFI{C_OFF}  {line.strip()}")
+            return
 
         m = RE_BOOT_VER.search(line)
         if m:
@@ -128,6 +148,12 @@ class Watcher:
                 print(f"        {line.strip()}")
                 return
 
+        # Everything else is echoed dimly. An earlier version swallowed
+        # unrecognised lines, so a toy that was talking perfectly well looked
+        # like a dead screen for 214 lines. Silence must never be the default.
+        if self.echo:
+            print(f"{C_DIM}      {line.strip()}{C_OFF}")
+
     def _latency(self, ms: int) -> None:
         self.latencies.append(ms)
         perceived = ms + EARCON_MS
@@ -146,7 +172,11 @@ class Watcher:
         print("\n" + "=" * 60)
         print("  BENCH SUMMARY")
         print("=" * 60)
-        print(f"firmware {self.fw or '?'}   build {self.build or '?'}   {self.lines} log lines")
+        print(f"firmware {self.fw or '?'}   build {self.build or '?'}   "
+              f"{self.lines} log lines   {self.boots} boot(s)")
+        if self.fw is None and self.boots:
+            print(f"  {C_DIM}no version banner: it only prints on the first OTA tick"
+                  f" once Wi-Fi is up{C_OFF}")
 
         if self.latencies:
             xs = sorted(self.latencies)
@@ -196,9 +226,11 @@ def main() -> int:
     ap.add_argument("--replay", type=Path, help="score a saved log instead of a live toy")
     ap.add_argument("--log", type=Path, help="where to write the raw log "
                                              "(default: bench-<timestamp>.log)")
+    ap.add_argument("--quiet", action="store_true",
+                    help="do not echo lines the scorer does not recognise")
     args = ap.parse_args()
 
-    w = Watcher()
+    w = Watcher(echo=not args.quiet)
 
     if args.replay:
         if not args.replay.is_file():
