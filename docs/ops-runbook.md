@@ -277,6 +277,26 @@ Reading a child's conversation from the console writes an audit row naming
 the operator, what they opened and when. That is intended — look if you need
 to, and know the record exists.
 
+## Move Gemini chat to Vertex AI
+
+The Gemini API (AI Studio) terms exclude services used by under-18s; Vertex AI
+runs under the Google Cloud terms (`docs/legal/vendor-terms-and-ai-toy-laws-2026-09.md`).
+Do this only after Google confirms Vertex AI permits the use.
+
+1. Google Cloud console: create a project, enable the Vertex AI API, create a
+   service account with role **Vertex AI User**, create a JSON key for it.
+2. Railway variables:
+   - `Gemini__Backend=vertex`
+   - `Gemini__Vertex__ProjectId=<project id>`
+   - `Gemini__Vertex__ServiceAccountJson=<the whole key file, pasted as one value>`
+   - optional `Gemini__Vertex__Location` (default `global`)
+   - `Gemini__ApiKey` is no longer needed in this mode.
+3. Redeploy. A missing variable refuses boot with a message naming it; the key
+   contents are never logged.
+4. Ask the toy one question. A failure shows as `Gemini chat non-success: HTTP 403`
+   (role missing) or `Vertex AI token exchange returned HTTP 400` (bad key).
+5. Roll back: remove `Gemini__Backend` (or set `ai-studio`) and redeploy.
+
 ## Restart
 
 Railway redeploys on push and restarts on failure (max 10 retries). A manual

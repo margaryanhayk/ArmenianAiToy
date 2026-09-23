@@ -33,10 +33,9 @@ Firmware cannot be flashed from the cloud; the owner cable-flashes or stages OTA
 3. **OpenAI:** send message 4c (zero data retention).
 4. **Lawyer:** one opinion on SB 867 (§ 2 of the legal file) and the AI-disclosure
    route (SB 243 / EU Art. 50).
-5. **Railway:** check whether `OpenAI__TranscriptionModel` is set. If not,
-   `/api/chat/audio` and voice-intent run on **whisper-1** (slower, removed
-   2027-02-26). Setting it to `gpt-4o-mini-transcribe` is the already-approved
-   fast model (`a5dfcf5`).
+5. ~~**Railway:** set `OpenAI__TranscriptionModel`~~ — done in code 2026-09-23:
+   `appsettings.json` ships `gpt-4o-mini-transcribe` (was `whisper-1`); a
+   Railway value still wins.
 6. **Give the next session an `OPENAI_API_KEY`** (environment secret) so Phase 2
    can run.
 7. **Record 20–50 short Armenian questions** (adult voices first; children only
@@ -55,7 +54,7 @@ Firmware cannot be flashed from the cloud; the owner cable-flashes or stages OTA
 | # | Change | Deadline | Hard stop |
 |---|---|---|---|
 | 3.1 | Move all 3 STT keys to the Phase 2.2 winner (config only if OpenAI) + Armenian listen test | **2027-02-26** | model switch |
-| 3.2 | Chat: Vertex AI adapter (if Google says yes) or OpenAI model from 2.3 | before first sale | provider / auth |
+| 3.2 | Chat: Vertex AI adapter (if Google says yes) or OpenAI model from 2.3. **Adapter BUILT 2026-09-23** (`Gemini:Backend=vertex`, off by default; `docs/ops-runbook.md` § "Move Gemini chat to Vertex AI"); flipping it waits on Google's answer | before first sale | provider / auth |
 | 3.3 | AI-disclosure route per the lawyer (box/onboarding copy, or one spoken line) | SB 243 now; EU 2026-08-02 | system prompt if spoken |
 | 3.4 | Prompt-caching order: static system prompt first, per-turn context last | — | ChatService |
 | 3.5 | If 2.1 recall is weak: add a policy-prompted third safety check (never replacing the existing two) | — | moderation |

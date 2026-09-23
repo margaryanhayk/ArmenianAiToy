@@ -94,8 +94,38 @@ public class GeminiChatClientAdapter : IAiChatClient
         return configured;
     }
 
+    /// <summary><c>Gemini:Backend</c> values. <c>ai-studio</c> (default,
+    /// today's behaviour): the Gemini API with an API key. <c>vertex</c>:
+    /// the same model family on Vertex AI under the Google Cloud terms,
+    /// authenticated with a service account — see
+    /// <see cref="VertexAiAccessTokenProvider"/>. Unknown refuses boot.</summary>
+    public const string BackendAiStudio = "ai-studio";
+    public const string BackendVertex = "vertex";
+
+    public static string ResolveBackend(string? configured)
+    {
+        if (string.IsNullOrWhiteSpace(configured)) return BackendAiStudio;
+        var v = configured.Trim().ToLowerInvariant();
+        if (v is BackendAiStudio or BackendVertex) return v;
+        throw new InvalidOperationException(
+            $"Gemini:Backend '{configured}' is not supported. Allowed: {BackendAiStudio}, {BackendVertex}.");
+    }
+
+    /// <summary>Vertex AI <c>generateContent</c> URL. The <c>global</c>
+    /// location has no regional host prefix.</summary>
+    public static string VertexEndpointUrl(string projectId, string location, string model)
+    {
+        var host = string.Equals(location, "global", StringComparison.OrdinalIgnoreCase)
+            ? "aiplatform.googleapis.com"
+            : $"{location}-aiplatform.googleapis.com";
+        return $"https://{host}/v1/projects/{Uri.EscapeDataString(projectId)}/locations/{location}"
+               + $"/publishers/google/models/{model}:generateContent";
+    }
+
     private readonly HttpClient _http;
     private readonly string _apiKey;
+    private readonly string? _vertexEndpointUrl;
+    private readonly Func<CancellationToken, Task<string>>? _bearerToken;
     private readonly string _model;
     private readonly int? _thinkingBudget;
     private readonly string _safetyThreshold;
@@ -111,10 +141,18 @@ public class GeminiChatClientAdapter : IAiChatClient
         OpenAI.OpenAIReliabilityGate? gate = null,
         int? thinkingBudget = null,
         string? safetyThreshold = null,
-        string? safetyFallbackText = null)
+        string? safetyFallbackText = null,
+        string? vertexEndpointUrl = null,
+        Func<CancellationToken, Task<string>>? bearerToken = null)
     {
         _http = http;
         _apiKey = apiKey;
+        // Vertex mode needs both halves; one without the other is a wiring
+        // bug, not a config choice.
+        if ((vertexEndpointUrl is null) != (bearerToken is null))
+            throw new ArgumentException("Vertex mode needs both an endpoint URL and a bearer-token source.");
+        _vertexEndpointUrl = vertexEndpointUrl;
+        _bearerToken = bearerToken;
         // Default moved to the STABLE flash (2026-08-06): the -preview
         // endpoint 503'd on ~17% of raw requests during baseline capture
         // (Google-side overload), while 3.6-flash answered clean at
@@ -188,8 +226,19 @@ public class GeminiChatClientAdapter : IAiChatClient
         cts.CancelAfter(RequestTimeout);
         using var req = new HttpRequestMessage(
             HttpMethod.Post,
-            $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent");
-        req.Headers.Add("x-goog-api-key", _apiKey);
+            _vertexEndpointUrl
+                ?? $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent");
+        if (_bearerToken is not null)
+        {
+            // Same request body on both backends — Vertex's JSON mapping
+            // accepts the snake_case proto names the AI Studio body uses.
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer", await _bearerToken(cts.Token));
+        }
+        else
+        {
+            req.Headers.Add("x-goog-api-key", _apiKey);
+        }
         req.Content = JsonContent.Create(body);
 
         var resp = await _http.SendAsync(req, cts.Token);
