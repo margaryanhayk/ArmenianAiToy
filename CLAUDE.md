@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3062 tests, ~35 s in Release
+dotnet test            # 3081 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -937,6 +937,25 @@ dictionary + an empty-sweep no-op + two `RetentionPurgeService` wiring
 tests). NOT verified: nobody has watched memory on a live long-running
 instance — this closes the only known unbounded-growth path, not a
 measured memory ceiling.
+
+### AI landscape research + roadmap, STT retirement warning (2026-09-23, N14)
+
+`docs/ai-landscape-2026-09.md` (research, every claim tagged [V]/[S]) and
+`docs/ai-improvements-roadmap.md` (phased: owner / Claude / Claude-after-
+approval). Key dated risks: OpenAI removes `whisper-1`,
+`gpt-4o(-mini)-transcribe` and `-diarize` on **2027-02-26**; the Gemini API
+terms exclude under-18 services; ElevenLabs' policy excludes products
+targeting under-13s; California SB 867 bans companion-chatbot toys from
+2027-01-01 — see `docs/legal/vendor-terms-and-ai-toy-laws-2026-09.md`.
+Code: `ModelRetirementCatalog` (pure, `Application/Helpers/`) + a boot
+warning in `Program.cs` per STT key resolving to a retired model (booted in
+Production: `OpenAI:TranscriptionModel` and
+`Devices:VoiceIntentTranscriptionModel` resolve to **whisper-1** unless
+Railway sets them); Gemini default cost-cap rate $0.50/$3.00 → $0.75/$3.75.
+Tools (stdlib Python, offline-tested, NOT run live — no OpenAI key):
+`tools/safety/moderation_recall.py` (red-team corpus → moderation recall),
+`tools/stt-bench/stt_wer_bench.py` (Armenian WER/CER/latency; ElevenLabs
+refuses without `--adult-voices-only`). `dotnet test` green (3081, 19 new).
 
 ## Working in this repo (agents)
 

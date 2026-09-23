@@ -58,18 +58,20 @@ public static class DependencyInjection
         // 2026-08-06): the per-device daily cap used to price every
         // provider at gpt-4o token rates — fiction once chat moved to
         // Gemini (~8x over). Explicit AI:ChatCostPerMTokensIn/Out win;
-        // otherwise the resolved provider picks its default. Gemini
-        // flash-class list price 2026-08 research: ~$0.30 in / $2.50
-        // out per 1M tokens; configured a touch high ($0.50 / $3.00),
-        // same fires-early posture as the estimator's own defaults.
-        // Re-check when Google publishes the gemini-3.6-flash list price.
+        // otherwise the resolved provider picks its default. 2026-09
+        // research (docs/ai-landscape-2026-09.md § R8): gemini-3.6/3.7/3.8
+        // flash list at $0.75 in / $3.75 out per 1M tokens, reportedly
+        // doubling to $1.50 / $7.50 on 2027-01-01. The old $0.50 / $3.00
+        // default was now BELOW list, so the cap fired late; this restores
+        // the fires-early posture. Raise again before 2027-01-01 if the
+        // doubling is confirmed.
         var chatCostIn = TryParseDecimal(config["AI:ChatCostPerMTokensIn"])
             ?? (chatProvider == AiProviderConfig.Gemini
-                ? 0.50m
+                ? 0.75m
                 : OpenAICostEstimator.DefaultChatInputUsdPerMillionTokens);
         var chatCostOut = TryParseDecimal(config["AI:ChatCostPerMTokensOut"])
             ?? (chatProvider == AiProviderConfig.Gemini
-                ? 3.00m
+                ? 3.75m
                 : OpenAICostEstimator.DefaultChatOutputUsdPerMillionTokens);
         OpenAICostEstimator.ConfigureChatRates(chatCostIn, chatCostOut);
 
