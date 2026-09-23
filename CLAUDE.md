@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3081 tests, ~35 s in Release
+dotnet test            # 3096 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -956,6 +956,23 @@ Tools (stdlib Python, offline-tested, NOT run live — no OpenAI key):
 `tools/safety/moderation_recall.py` (red-team corpus → moderation recall),
 `tools/stt-bench/stt_wer_bench.py` (Armenian WER/CER/latency; ElevenLabs
 refuses without `--adult-voices-only`). `dotnet test` green (3081, 19 new).
+
+### Vertex AI backend for Gemini chat, default STT model (2026-09-23, N15)
+
+`Gemini:Backend` = `ai-studio` (default, byte-identical to before) | `vertex`
+(bounded; unknown refuses boot). Vertex mode posts the SAME request body to
+`VertexEndpointUrl(project, location, model)` with a Bearer token from
+`VertexAiAccessTokenProvider` (service-account JWT-bearer grant, RS256 with
+BCL `RSA` — no NuGet; token cached until 5 min before expiry; key and tokens
+never logged). Config: `Gemini:Vertex:ServiceAccountJson|ProjectId|Location`
+(default `global`); runbook in `docs/ops-runbook.md`. Reason: the Gemini API
+terms exclude under-18 services, Vertex runs under Google Cloud terms —
+flip only after Google confirms. `appsettings.json` now ships
+`OpenAI:TranscriptionModel=gpt-4o-mini-transcribe` (code default was
+`whisper-1` for `/api/chat/audio` and voice-intent). `dotnet test` green
+(3096, 15 new); booted in Production with a throwaway service account.
+NOT verified: any live Vertex call (no GCP credentials) — in particular that
+Vertex accepts the snake_case `system_instruction` field the shared body uses.
 
 ## Working in this repo (agents)
 

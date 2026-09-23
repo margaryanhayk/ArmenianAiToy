@@ -248,10 +248,34 @@ public static class DependencyInjection
                 // and an empty string is not null, so a bare ?? chain never
                 // reached the env fallback and the adapter got an empty key
                 // (Gemini answered 403 to every call; found in Gate 2).
-                var gmKey = FirstNonEmpty(config["Gemini:ApiKey"], config["GEMINI_API_KEY"])
-                    ?? throw new InvalidOperationException(
-                        "AI:ChatProvider is 'gemini' but Gemini:ApiKey / GEMINI_API_KEY is not set.");
                 var gmModel = FirstNonEmpty(config["Gemini:Model"]) ?? "gemini-3.6-flash";
+                // Backend: ai-studio (API key, default, unchanged) or vertex
+                // (Google Cloud terms, service account) — the Gemini API
+                // terms exclude under-18 services; see
+                // docs/legal/vendor-terms-and-ai-toy-laws-2026-09.md § 1.
+                var gmBackend = GeminiChatClientAdapter.ResolveBackend(
+                    FirstNonEmpty(config["Gemini:Backend"]));
+                string gmKey = "";
+                string? gmVertexUrl = null;
+                VertexAiAccessTokenProvider? gmTokens = null;
+                if (gmBackend == GeminiChatClientAdapter.BackendVertex)
+                {
+                    var saJson = FirstNonEmpty(config["Gemini:Vertex:ServiceAccountJson"])
+                        ?? throw new InvalidOperationException(
+                            "Gemini:Backend is 'vertex' but Gemini:Vertex:ServiceAccountJson is not set.");
+                    var project = FirstNonEmpty(config["Gemini:Vertex:ProjectId"])
+                        ?? throw new InvalidOperationException(
+                            "Gemini:Backend is 'vertex' but Gemini:Vertex:ProjectId is not set.");
+                    var location = FirstNonEmpty(config["Gemini:Vertex:Location"]) ?? "global";
+                    gmVertexUrl = GeminiChatClientAdapter.VertexEndpointUrl(project, location, gmModel);
+                    gmTokens = new VertexAiAccessTokenProvider(openAiHttpClient, saJson);
+                }
+                else
+                {
+                    gmKey = FirstNonEmpty(config["Gemini:ApiKey"], config["GEMINI_API_KEY"])
+                        ?? throw new InvalidOperationException(
+                            "AI:ChatProvider is 'gemini' but Gemini:ApiKey / GEMINI_API_KEY is not set.");
+                }
                 int? gmThinking = int.TryParse(
                     FirstNonEmpty(config["Gemini:ThinkingBudget"]), out var tb) ? tb : null;
                 // Gemini-side safety filter (owner approval 2026-08-06):
@@ -283,7 +307,9 @@ public static class DependencyInjection
                         sp.GetRequiredService<GeminiGateHolder>().Gate,
                         gmThinking,
                         gmSafety,
-                        gmFallback));
+                        gmFallback,
+                        gmVertexUrl,
+                        gmTokens is null ? null : gmTokens.GetAccessTokenAsync));
                 break;
             }
         }
