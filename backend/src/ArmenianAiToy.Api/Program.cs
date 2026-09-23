@@ -370,6 +370,37 @@ else if (ForwardedHeadersConfig.ShouldWarnDisabledOutsideDevelopment(
         "ForwardedHeaders__KnownNetworks to the proxy's address(es) if that applies here.");
 }
 
+// Provider model retirements (docs/ai-landscape-2026-09.md § R1). Every child
+// question is transcribed by one of these three STT keys; a removed model
+// kills the voice path outright, so say so at every boot until it moves.
+// Effective values mirror DependencyInjection: an unset per-path key falls
+// back to OpenAI:TranscriptionModel, whose own default is whisper-1.
+var sttProviderName = builder.Configuration["AI:TranscriptionProvider"];
+if (string.IsNullOrWhiteSpace(sttProviderName)
+    || string.Equals(sttProviderName.Trim(), "openai", StringComparison.OrdinalIgnoreCase))
+{
+    var defaultSttModel = builder.Configuration["OpenAI:TranscriptionModel"] ?? "whisper-1";
+    string EffectiveStt(string key)
+        => string.IsNullOrWhiteSpace(builder.Configuration[key]) ? defaultSttModel : builder.Configuration[key]!;
+
+    foreach (var retirement in ModelRetirementCatalog.Evaluate(
+                 new (string, string?)[]
+                 {
+                     ("OpenAI:TranscriptionModel", defaultSttModel),
+                     ("StoryQa:TranscriptionModel", EffectiveStt("StoryQa:TranscriptionModel")),
+                     ("Devices:VoiceIntentTranscriptionModel", EffectiveStt("Devices:VoiceIntentTranscriptionModel")),
+                 },
+                 DateOnly.FromDateTime(DateTime.UtcNow)))
+    {
+        app.Logger.LogWarning(
+            "Model retirement: {ConfigKey} resolves to {Model}, which the provider {State} on {RemovalDate:yyyy-MM-dd}. " +
+            "Replacement: {Replacement} — benchmark it (tools/stt-bench) and pass the Armenian listen test before switching.",
+            retirement.ConfigKey, retirement.Model,
+            retirement.AlreadyRemoved ? "REMOVED" : "removes",
+            retirement.RemovalDate, retirement.Replacement);
+    }
+}
+
 // Diagnostic for the managed-host case: on a PaaS the edge proxy's address is
 // not documented, so an operator cannot pin it without observing it once. When
 // ForwardedHeaders is enabled, log the peer address + XFF of the first few
