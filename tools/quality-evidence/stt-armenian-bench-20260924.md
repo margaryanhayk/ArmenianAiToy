@@ -48,7 +48,7 @@ CER is the fairer accuracy number here.
 - ElevenLabs Scribe v2 is also good (CER 6.2%) but ElevenLabs' policy forbids
   child voice data, so it can never serve the toy.
 
-## Recommendation (needs owner approval — child-facing model switch)
+## Recommendation (owner approved "go stt switch" 2026-09-24 — applied, see CLAUDE.md N18)
 
 Move `OpenAI:TranscriptionModel`, `StoryQa:TranscriptionModel` and
 `Devices:VoiceIntentTranscriptionModel` to `gpt-transcribe`. That fixes the

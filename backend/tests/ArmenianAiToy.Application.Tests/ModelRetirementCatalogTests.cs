@@ -68,4 +68,28 @@ public class ModelRetirementCatalogTests
         Assert.Equal(new[] { "OpenAI:TranscriptionModel", "StoryQa:TranscriptionModel" },
             warnings.Select(w => w.ConfigKey));
     }
+
+    /// <summary>
+    /// The shipped config runs the Armenian bench winner on every STT path
+    /// (tools/quality-evidence/stt-armenian-bench-20260924.md) — nothing a
+    /// 2027-02-26 removal would silence. Voice-intent has no key of its own
+    /// in appsettings and falls back to OpenAI:TranscriptionModel.
+    /// </summary>
+    [Fact]
+    public void ShippedConfig_SttModels_AreGptTranscribe_AndNotRetired()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+        var root = doc.RootElement;
+        var defaultModel = root.GetProperty("OpenAI").GetProperty("TranscriptionModel").GetString();
+        var storyQaModel = root.GetProperty("StoryQa").GetProperty("TranscriptionModel").GetString();
+
+        Assert.Equal("gpt-transcribe", defaultModel);
+        Assert.Equal("gpt-transcribe", storyQaModel);
+        Assert.Empty(ModelRetirementCatalog.Evaluate(new (string, string?)[]
+        {
+            ("OpenAI:TranscriptionModel", defaultModel),
+            ("StoryQa:TranscriptionModel", storyQaModel),
+        }, Before));
+    }
 }
