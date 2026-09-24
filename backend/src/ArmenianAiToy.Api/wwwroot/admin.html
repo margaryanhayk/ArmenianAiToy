@@ -121,6 +121,8 @@
      ever prevent overflow, never force a resize, so it is safe outside the
      media query too. */
   input[type=file], select { max-width:100%; }
+  /* Filter buttons that are a toggle (Logs level) show which one is on. */
+  button[aria-pressed="true"] { border-color:var(--acc); color:var(--acc); }
 </style>
 </head>
 <body>
@@ -143,6 +145,8 @@
   <a data-tab="requests">Requests</a>
   <a data-tab="audit">Audit</a>
   <a data-tab="tuning">Tuning</a>
+  <a data-tab="system">System</a>
+  <a data-tab="logs">Logs</a>
 </nav>
 <main id="main">
   <div class="msg info">Enter the admin token and press Connect. The console is read-only.</div>
@@ -305,12 +309,19 @@ const tabs = {
       // serial cable. The board matters for rollouts: the firmware offer
       // gate silently skips a device whose board differs from the
       // configured release.
-      {h:'Firmware',f:r=>r.firmwareVersion
+      {h:'Firmware',f:r=>(r.firmwareVersion
         ? esc(r.firmwareVersion)
           + (r.firmwareBuild ? ` <span class="mut">${esc(r.firmwareBuild)}</span>` : '')
           + `<div class="mono mut">${r.boardModel ? esc(r.boardModel) : 'board not reported'}`
           + (r.partitionName ? ' · ' + esc(r.partitionName) : '') + '</div>'
-        : '<span class="mut">not reported</span>'},
+          // OTA: health is derived (ok/updating/offline); the raw last
+          // attempt is shown only when it failed, so a stuck rollout shows.
+          + (r.otaHealth === 'updating' ? ' <span class="pill flag">OTA updating</span>' : '')
+          + (r.lastOtaStatus && /fail/i.test(r.lastOtaStatus) ? `<div class="mono mut">last OTA: ${esc(r.lastOtaStatus)}</div>` : '')
+        : '<span class="mut">not reported</span>')
+        // SD card: a dead card otherwise reads as "content missing".
+        + (r.sdCardOk === false ? ' <span class="pill crit">SD card fault</span>' : '')
+        + (r.dormancyWarnedAt ? `<div class="mut">dormancy warned ${dt(r.dormancyWarnedAt)}</div>` : '')},
       {h:'Last seen',f:r=>dt(r.lastSeenAt)},
       {h:'Bedtime',f:r=>r.bedtimeStart?`${esc(r.bedtimeStart)}–${esc(r.bedtimeEnd)}`:'<span class="mut">—</span>'},
       {h:'Modes (S/G/R/C)',f:r=>[r.storyEnabled,r.gameEnabled,r.riddleEnabled,r.curiosityEnabled].map(onoff).join(' ')},
@@ -584,6 +595,23 @@ const tabs = {
     $('#fBlk').addEventListener('click', ()=>draw('blk'));
     $('#fFlag').addEventListener('click', ()=>draw('flag'));
     draw('all');
+    // After-story reflection answers live in their own table; before
+    // 2026-09-24 only the parent could see a flagged one.
+    // Own try/catch: a failure here must not replace the messages above, and a
+    // 404 from an older backend must not read as an expired session in show().
+    let refl;
+    try { refl = (await api('/flagged-reflections?limit=50')).answers; }
+    catch(e){ main.insertAdjacentHTML('beforeend', `<h3>Flagged story-reflection answers</h3><div class="msg err">Could not load: ${esc(e.message)}</div>`); return; }
+    if (current !== 'flagged') return;
+    if (refl.length && !_devices.length) _devices = (await api('/devices')).devices;
+    main.insertAdjacentHTML('beforeend', `<h3>Flagged story-reflection answers (${refl.length})${refl.length?' <span class="mut">— click a row to open the toy</span>':''}</h3>`
+      + (refl.length ? table([
+          {h:'When',f:r=>dt(r.createdAtUtc)},
+          {h:'Flag',f:r=>`<span class="pill ${r.flag==='Blocked'?'blk':'flag'}">${esc(r.flag)}</span>`},
+          {h:'Story',f:r=>`<span class="mono">${esc(r.storyId)}</span> <span class="mut">q${r.questionIndex}</span>`},
+          {h:'Answer',f:r=>esc(r.snippet)},
+          {h:'Device',f:r=>`<span class="mono mut">${esc(r.deviceId.slice(0,8))}</span>`},
+        ], refl, r=>`class="click" onclick="openDevice('${r.deviceId}')"`) : '<div class="msg info">✓ Nothing here — no flagged reflection answers.</div>'));
   },
   async conversations(){
     const c = (await api('/conversations?limit=100')).conversations;
@@ -647,6 +675,108 @@ const tabs = {
     $('#aAll').onclick=()=>draw('all'); $('#aAct').onclick=()=>draw('act');
     $('#aAcc').onclick=()=>draw('acc'); $('#aSys').onclick=()=>draw('sys');
     draw('all');
+  },
+  // System (2026-09-24): what the backend runs, what it has spent, what the
+  // operator should fix. Credentials are presence-only by construction on
+  // the server (SystemStatusReport) — nothing secret ever reaches this page.
+  async system(){
+    const s = await api('/system');
+    // Top-toy rows open the device drill-down, which reads the devices cache.
+    if (s.spend.topToys.length && !_devices.length) _devices = (await api('/devices')).devices;
+    const usd = v => v==null ? '<span class="mut">off</span>' : '$'+Number(v).toFixed(2);
+    const card = (l,n,cls)=>`<div class="card"><div class="n"${cls?` style="color:var(--${cls})"`:''}>${n}</div><div class="l">${esc(l)}</div></div>`;
+    const warns = s.checks.filter(c=>c.level==='warn');
+    const ago = t => { const h=(Date.now()-new Date(t))/3.6e6; return h<1?'<1 h ago':h<48?Math.round(h)+' h ago':Math.round(h/24)+' d ago'; };
+    const checks = s.checks.length
+      ? s.checks.map(c=>`<div class="msg ${c.level==='warn'?'err':'info'}"><b>${c.level==='warn'?'Fix':'Note'}:</b> ${esc(c.message)}</div>`).join('')
+      : '<div class="msg info">All configuration checks pass.</div>';
+    const labels = {openaiKey:'OpenAI key', geminiKey:'Gemini key', elevenLabsKey:'ElevenLabs key',
+      vertexServiceAccount:'Vertex service account', alertsWebhook:'Alerts webhook', metricsToken:'Metrics token',
+      audioStore:'Audio storage', forwardedHeaders:'Forwarded headers'};
+    const maxUsd = Math.max(0.0001, ...s.spend.days.map(d=>d.estimatedUsd));
+    const bar = v => `<div style="background:var(--acc);height:8px;border-radius:4px;width:${Math.max(2,Math.round(100*v/maxUsd))}%"></div>`;
+    main.innerHTML = `<div class="cards">`
+      + card('Today, since restart', usd(s.spend.todayInProcessUsd))
+      + card('Month to date', usd(s.spend.monthToDateUsd))
+      + card('Last 30 days', usd(s.spend.last30DaysUsd))
+      + card('Per-toy daily cap', usd(s.spend.perToyDailyCapUsd))
+      + card('Fleet daily cap', usd(s.spend.fleetDailyCapUsd))
+      + card('OpenAI', s.openAiCircuitOpen?'DEGRADED':'OK', s.openAiCircuitOpen?'bad':'ok')
+      + card('Checks to fix', String(warns.length), warns.length?'warn':'ok')
+      + card('Last backup', s.backup.newestAtUtc ? ago(s.backup.newestAtUtc) : 'none', s.backup.newestAtUtc?null:'warn')
+      + `</div>`
+      + `<h3>Checks</h3>${checks}`
+      + `<h3>Models in use</h3>`
+      + table([
+          {h:'Path',f:r=>esc(r.path)},
+          {h:'Provider',f:r=>`<span class="pill on">${esc(r.provider)}</span>`},
+          {h:'Model',f:r=>`<span class="mono">${esc(r.model)}</span>`},
+          {h:'Note',f:r=>r.note?`<span class="mut mono">${esc(r.note)}</span>`:''},
+        ], s.models)
+      + `<p class="mut">Changing a model is a Railway variable today (e.g. <span class="mono">OpenAI__TranscriptionModel</span>) and needs a redeploy.</p>`
+      + `<h3>Credits left</h3><div id="sysQuota" class="mut">Loading ElevenLabs quota…</div>`
+      + `<p class="mut">OpenAI and Gemini do not expose a balance to an API key — check them here: `
+      + s.billing.map(b=>`<a href="${esc(b.url)}" target="_blank" rel="noopener" style="color:var(--acc)">${esc(b.provider)}</a>`).join(' · ')
+      + `</p>`
+      + `<h3>Configured</h3><div class="row">`
+      + Object.entries(s.configured).map(([k,v])=>`<span class="pill ${v?'on':''}">${esc(labels[k]||k)}: ${v?'set':'not set'}</span>`).join(' ')
+      + `</div>`
+      + `<h3>Estimated spend by day</h3><p class="mut">${esc(s.spend.note)}</p>`
+      + table([
+          {h:'Day (UTC)',f:r=>`<span class="mono">${esc(r.dayUtc)}</span>`},
+          {h:'Questions',f:r=>r.questions},
+          {h:'Active toys',f:r=>r.activeToys},
+          {h:'USD',f:r=>'$'+Number(r.estimatedUsd).toFixed(4)},
+          {h:'',f:r=>bar(r.estimatedUsd)},
+        ], s.spend.days)
+      + `<h3>Top toys by spend (30 days)</h3>`
+      + table([
+          {h:'Toy',f:r=>r.name?esc(r.name):`<span class="mono mut">${esc(r.deviceId.slice(0,8))}</span>`},
+          {h:'Questions',f:r=>r.questions},
+          {h:'USD',f:r=>'$'+Number(r.estimatedUsd).toFixed(4)},
+        ], s.spend.topToys, r=>`class="click" onclick="openDevice('${r.deviceId}')"`)
+      + `<p class="mut" style="overflow-wrap:anywhere">${esc(s.build.environment)} · version ${esc((s.build.version||'—').split('+')[0])}`
+      + ` · commit <span class="mono">${esc((s.build.commit||(s.build.version||'').split('+')[1]||'—').slice(0,7))}</span>`
+      + ` · up since ${dt(s.build.startedAtUtc)}</p>`;
+    try {
+      const q = await api('/system/elevenlabs');
+      if (current !== 'system') return;
+      $('#sysQuota').innerHTML = q.available
+        ? `<div class="cards">`
+          + card('ElevenLabs chars left', Number(q.charactersLeft).toLocaleString(), q.charactersLeft < q.characterLimit*0.1 ? 'warn' : null)
+          + card('Used / limit', `${Math.round(100*q.charactersUsed/Math.max(1,q.characterLimit))}%`)
+          + card('Plan', esc(q.tier||'—'))
+          + card('Resets', q.resetsAtUtc ? new Date(q.resetsAtUtc).toLocaleDateString() : '—')
+          + `</div>`
+        : `ElevenLabs: ${esc(q.reason||'unavailable')}`;
+    } catch(e){ if (current === 'system') $('#sysQuota').textContent = 'ElevenLabs quota: '+e.message; }
+  },
+  // Logs (2026-09-24): this process's last Warning+ entries, redacted on the
+  // server before buffering. Railway keeps the full history.
+  async logs(){
+    main.innerHTML = `<div class="row">
+        <button class="ghost" id="lWarn">Warnings + errors</button>
+        <button class="ghost" id="lErr">Errors only</button>
+        <button class="ghost" id="lRef">Refresh</button>
+        <span id="lNote" class="mut"></span>
+      </div><div id="logList"></div>`;
+    let lvl = 'warning';
+    const draw = async () => {
+      const r = await api('/logs?level='+lvl+'&limit=300');
+      if (current !== 'logs') return;
+      $('#lNote').textContent = (lvl==='error'?'Showing errors only. ':'Showing warnings + errors. ') + r.note;
+      ['lWarn','lErr'].forEach(id=>$('#'+id).setAttribute('aria-pressed', String((id==='lErr')===(lvl==='error'))));
+      $('#logList').innerHTML = table([
+        {h:'When',f:e=>dt(e.atUtc)},
+        {h:'Level',f:e=>`<span class="pill ${e.level==='Warning'?'flag':'crit'}">${esc(e.level)}</span>`},
+        {h:'Source',f:e=>`<span class="mono mut">${esc(e.category.split('.').pop())}</span>`},
+        {h:'Message',f:e=>esc(e.message)+(e.exception?`<div class="mono mut">${esc(e.exception)}</div>`:'')},
+      ], r.entries);
+    };
+    $('#lWarn').onclick=()=>{ lvl='warning'; draw().catch(e=>err(e.message)); };
+    $('#lErr').onclick=()=>{ lvl='error'; draw().catch(e=>err(e.message)); };
+    $('#lRef').onclick=()=>draw().catch(e=>err(e.message));
+    await draw();
   },
   async tuning(){
     const s = (await api('/stories')).stories;

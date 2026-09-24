@@ -23,6 +23,12 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Operator console "Logs" tab: the last 500 Warning+ entries of this process,
+// redacted before buffering (see RecentLogBuffer). JSON console logs unchanged.
+var recentLogs = new ArmenianAiToy.Api.Observability.RecentLogBuffer();
+builder.Logging.AddProvider(recentLogs);
+builder.Services.AddSingleton(recentLogs);
+
 // Add controllers + Swagger. The UTC DateTime converters stamp every
 // wire timestamp with an explicit Z so the browser parses them as UTC
 // (SQLite round-trips DateTimes as Kind=Unspecified, which otherwise

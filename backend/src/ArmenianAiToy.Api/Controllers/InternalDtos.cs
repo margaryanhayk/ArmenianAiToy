@@ -142,6 +142,9 @@ public sealed record AdminDeviceDto(
     public string? FirmwareBuild { get; init; }
     public string? PartitionName { get; init; }
     public DateTime? FirmwareReportedAt { get; init; }
+    // Toy-reported SD card health (null = never reported). Parents already
+    // see it; the console did not, so a dead card read as "content missing".
+    public bool? SdCardOk { get; init; }
 
     /// <summary>
     /// Usage-tier metering foundation (2026-09-11). Always present (the
