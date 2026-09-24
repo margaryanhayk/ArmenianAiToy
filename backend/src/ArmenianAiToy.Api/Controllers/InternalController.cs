@@ -224,6 +224,7 @@ public class InternalController : ControllerBase
                 FirmwareBuild = d.FirmwareBuild,
                 PartitionName = d.PartitionName,
                 FirmwareReportedAt = d.FirmwareReportedAt,
+                SdCardOk = d.SdCardOk,
             };
         })
             .OrderByDescending(d => d.LastSeenAt)
@@ -322,6 +323,36 @@ public class InternalController : ControllerBase
             Snippet(r.Content), r.Flag.ToString(), r.Timestamp)).ToList();
         await AuditAccessAsync("flagged", targetId: null, dtos.Count, ct);
         return Ok(new { messages = dtos });
+    }
+
+    /// <summary>Non-Clean after-story reflection answers across ALL devices,
+    /// newest first. A child's spoken answer to a story's reflection question
+    /// is moderated and flagged like a chat message, but lives in its own
+    /// table — the Flagged tab never saw it, so a worrying answer there was
+    /// visible only to the parent. Audited like every other content read.</summary>
+    [HttpGet("flagged-reflections")]
+    public async Task<IActionResult> FlaggedReflections(
+        [FromQuery] int limit = 50, CancellationToken ct = default)
+    {
+        if (limit < 1) return BadRequest(new { error = "Invalid pagination." });
+        limit = Math.Min(limit, 100);
+
+        var rows = await _db.StoryReflectionAnswers.AsNoTracking()
+            .Where(a => a.SafetyFlag != SafetyFlag.Clean)
+            .OrderByDescending(a => a.CreatedAtUtc)
+            .Take(limit)
+            .Select(a => new { a.Id, a.DeviceId, a.StoryId, a.QuestionIndex, a.AnswerText, a.SafetyFlag, a.CreatedAtUtc })
+            .ToListAsync(ct);
+
+        var answers = rows.Select(a => new
+        {
+            a.Id, a.DeviceId, a.StoryId, a.QuestionIndex,
+            snippet = Snippet(a.AnswerText),
+            flag = a.SafetyFlag.ToString(),
+            a.CreatedAtUtc,
+        }).ToList();
+        await AuditAccessAsync("flagged-reflections", targetId: null, answers.Count, ct);
+        return Ok(new { answers });
     }
 
     /// <summary>Conversation summaries — all devices, or one when

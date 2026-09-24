@@ -277,6 +277,30 @@ Reading a child's conversation from the console writes an audit row naming
 the operator, what they opened and when. That is intended — look if you need
 to, and know the record exists.
 
+### System and Logs tabs (2026-09-24)
+
+- **System** (`GET /api/internal/system`): which model serves each path
+  (chat, the three speech-to-text paths, live voice, moderation), which
+  credentials are *present* (never their values), configuration checks to
+  fix (retired model, audio store, forwarded headers, alerts off, cost cap,
+  stale backup, vendor-terms warnings), newest backup age, and the durable
+  estimated spend: today, month to date, last 30 days by day, top 10 toys.
+  Spend is the backend's own estimate at list prices, not an invoice.
+- **Credits left** (`GET /api/internal/system/elevenlabs`): live ElevenLabs
+  character quota, cached 5 min. OpenAI and Gemini expose no balance to an
+  API key — the tab links their billing pages.
+- **Logs** (`GET /api/internal/logs?level=warning|error`): the last 500
+  Warning+ entries of *this process*, redacted (bearer/`sk-`/`key=`/`AIza`
+  shapes masked) before buffering. Empties on redeploy; Railway keeps the
+  full history.
+- **Flagged** now also lists flagged/blocked after-story reflection answers
+  (`GET /api/internal/flagged-reflections`, audited like every content read).
+- **Devices** Firmware column now shows a non-ok OTA health, a failed last
+  OTA attempt, an SD card fault and the dormancy-warning date.
+
+Changing a model is still a Railway variable + redeploy; the console only
+shows it.
+
 ## Move Gemini chat to Vertex AI
 
 The Gemini API (AI Studio) terms exclude services used by under-18s; Vertex AI

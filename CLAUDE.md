@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3172 tests, ~35 s in Release
+dotnet test            # 3196 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -171,7 +171,9 @@ Unknown values refuse boot. Moderation stays on OpenAI, fail-closed.
   device's timezone), assistant audio replay, story library + previews,
   story plays + reflection answers, story requests, audit feed, export.
 - **Internal** (`/api/internal/*`): overview, devices, parents, stories,
-  flagged, conversations, audit, backup pull, story-qa test playground,
+  flagged (+ flagged-reflections), conversations, audit, backup pull,
+  system (models/keys-present/checks/spend/backup age), system/elevenlabs
+  (quota), logs (recent Warning+), story-qa test playground,
   reversible device actions (revoke, pause, usage tier, claim code, sync
   now, enqueue command), per-toy content entitlement, story upload/release/
   retire.
@@ -1025,6 +1027,33 @@ shipped keys are `gpt-transcribe` and trigger no retirement warning;
 `dotnet test` green (3172, 1 new); booted in Production with no STT
 retirement warning. NOT verified: child voices, the toy microphone, a
 Railway `OpenAI__TranscriptionModel` env override (if set, it wins).
+
+### Operator console System + Logs tabs (2026-09-24, N19)
+
+Owner "go dev console". `InternalSystemController` (read-only, behind the
+existing `/api/internal/*` gate): `GET system` — effective model per path
+(pure `SystemStatusReport`, mirrors DI defaults/fallbacks, pinned), which
+credentials are PRESENT (booleans only; a test proves no value leaks),
+config checks (retired STT model, audio store, forwarded headers, alerts
+off, cost cap, stale backup >36 h, Gemini AI Studio / ElevenLabs vendor-
+terms warnings), newest backup, build/commit/uptime, and `DeviceUsageDays`
+spend (month, 30 days by day, top 10 toys; summed client-side — SQLite
+cannot aggregate decimals); `GET system/elevenlabs` — live character quota
+(`/v1/user/subscription`, shape checked live, cached 5 min, failure never
+5xx); `GET logs` — `RecentLogBuffer`, an extra `ILoggerProvider` holding the
+last 500 Warning+ entries, redacted (bearer/`sk-`/`key=`/`AIza`) before
+buffering. From an Explore gap audit, also: `GET flagged-reflections`
+(flagged after-story answers were parent-only; audited read), `SdCardOk` on
+the console device DTO, and the Devices Firmware column now shows OTA
+updating / failed last attempt / SD card fault / dormancy date (all already
+on the wire). ux-ui-designer review: 6 findings, all applied. Model
+switching from the console deliberately NOT built (child-facing; Railway
+variable + redeploy stays the path). `dotnet test` green (3196, 24 new);
+Production boot + Playwright at 400/1280 px (no page overflow, no JS
+errors) against seeded data. NOT verified: the live Railway console.
+Deferred from the gap audit: self-harm reason on Message (entity change),
+firmware-release "N toys behind", story/game plays in the console, alert
+history.
 
 ## Working in this repo (agents)
 

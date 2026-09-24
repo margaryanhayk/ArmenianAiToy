@@ -266,6 +266,36 @@ public class InternalControllerTests
         Assert.DoesNotContain("clean", json);
     }
 
+    [Fact]
+    public async Task FlaggedReflections_ReturnsOnlyNonClean_AndAuditsTheRead()
+    {
+        var db = NewDb();
+        var d = Dev();
+        db.Devices.Add(d);
+        db.StoryReflectionAnswers.AddRange(
+            new StoryReflectionAnswer { Id = Guid.NewGuid(), DeviceId = d.Id, StoryId = "s", AnswerText = "clean-answer", SafetyFlag = SafetyFlag.Clean, CreatedAtUtc = DateTime.UtcNow },
+            new StoryReflectionAnswer { Id = Guid.NewGuid(), DeviceId = d.Id, StoryId = "s", AnswerText = "worrying-answer", SafetyFlag = SafetyFlag.Blocked, CreatedAtUtc = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+
+        var json = Json(await NewController(db).FlaggedReflections(50, default));
+
+        Assert.Contains("worrying-answer", json);
+        Assert.DoesNotContain("clean-answer", json);
+        Assert.Contains(db.AuditEvents, e => e.EventType == AuditEventType.InternalConsoleAccess);
+    }
+
+    [Fact]
+    public async Task Devices_ExposeSdCardHealth()
+    {
+        var db = NewDb();
+        var d = Dev();
+        d.SdCardOk = false;
+        db.Devices.Add(d);
+        await db.SaveChangesAsync();
+
+        Assert.Contains("\"sdCardOk\":false", Json(await NewController(db).Devices(default)));
+    }
+
     // ── Global audit shows system-actor rows parents can't see ─────
 
     [Fact]
