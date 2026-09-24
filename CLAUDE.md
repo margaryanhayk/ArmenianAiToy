@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3171 tests, ~35 s in Release
+dotnet test            # 3172 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -1008,6 +1008,23 @@ cleared, and undo a riddle/game round written this turn; quality/fidelity
 retries never adopt an empty retry (moderation is skipped only for empty text
 that is then discarded). `dotnet test` green (3171, 39 new). NOT verified:
 a live Gemini re-run after the fix.
+
+### STT switched to gpt-transcribe (2026-09-24, N18)
+
+Owner-recorded Armenian bench (27 clips, his own voice, audio NOT committed —
+`tools/quality-evidence/stt-armenian-bench-20260924.md`): with no prompt,
+`gpt-4o-mini-transcribe` scored CER 52.1% and answered short replies in
+Korean/Latin script; `gpt-transcribe` 2.5%, same latency (with the neutral
+prompt 16.1% vs 3.8%). `/api/chat/audio` sends no prompt, so online
+game/riddle answers took the worst of it. Owner "go stt switch":
+`OpenAI:TranscriptionModel` and `StoryQa:TranscriptionModel` in
+`appsettings.json` → `gpt-transcribe` (voice-intent falls back to the
+former); also clears the 2027-02-26 removal. Pinned by a test that the
+shipped keys are `gpt-transcribe` and trigger no retirement warning;
+`response_format=text` (what the backend sends) checked live, HTTP 200.
+`dotnet test` green (3172, 1 new); booted in Production with no STT
+retirement warning. NOT verified: child voices, the toy microphone, a
+Railway `OpenAI__TranscriptionModel` env override (if set, it wins).
 
 ## Working in this repo (agents)
 
