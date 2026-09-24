@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3196 tests, ~35 s in Release
+dotnet test            # 3197 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -1054,6 +1054,15 @@ errors) against seeded data. NOT verified: the live Railway console.
 Deferred from the gap audit: self-harm reason on Message (entity change),
 firmware-release "N toys behind", story/game plays in the console, alert
 history.
+
+### Telegram alerts (2026-09-24, N20)
+
+The owner uses Telegram, not Slack. `Alerts:TelegramChatId` (optional) adds
+`chat_id` to the alerter's JSON body, so `Alerts:WebhookUrl` can be
+Telegram's `sendMessage` URL; unset, the payload is byte-identical to before
+(pinned). Setup steps in `docs/ops-runbook.md` § Alerting. `dotnet test`
+green (3197, 1 new). NOT verified: a real Telegram delivery (no bot token
+here).
 
 ## Working in this repo (agents)
 

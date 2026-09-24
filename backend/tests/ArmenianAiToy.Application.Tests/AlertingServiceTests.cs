@@ -411,6 +411,23 @@ public class AlertingServiceTests : IDisposable
         Assert.True(DateTime.TryParse(at, null,
             System.Globalization.DateTimeStyles.RoundtripKind, out _));
         Assert.EndsWith("Z", at);
+        Assert.False(root.TryGetProperty("chat_id", out _)); // generic receivers unchanged
+    }
+
+    [Fact]
+    public async Task SendAlert_TelegramChatId_AddsChatIdBesideText()
+    {
+        // Telegram's sendMessage needs chat_id + text; the owner uses Telegram.
+        var config = BaseConfig();
+        config["Alerts:TelegramChatId"] = " 123456789 ";
+        var (service, handler, _, provider) = MakeHarness(config);
+        using var _p = provider;
+
+        await service.SendAlertAsync("https://example.test/hook", "some_key", "warning", "db down", CancellationToken.None);
+
+        using var doc = JsonDocument.Parse(Assert.Single(handler.Bodies));
+        Assert.Equal("123456789", doc.RootElement.GetProperty("chat_id").GetString());
+        Assert.Equal("db down", doc.RootElement.GetProperty("text").GetString());
     }
 
     // ── Webhook failure never throws ──────────────────────────────────
