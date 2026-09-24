@@ -356,7 +356,21 @@ public class StoryQaController : ControllerBase
             stage.Restart();
             var inputModeration = await _moderation.CheckContentAsync(question);
             inModMs = stage.ElapsedMilliseconds;
-            if (!inputModeration.IsSafe)
+            // Self-harm (detector or moderation category) gets the grown-up
+            // line instead of the in-story fallback — same contract as
+            // ChatService step 1.4. Canned, so no output moderation needed.
+            if (SelfHarmSignal.IsPresent(question)
+                || inputModeration.FlaggedCategories.Contains("self-harm"))
+            {
+                _logger.LogWarning(
+                    "Story-QA self-harm signal. StoryId: {StoryId}, Segment: {Segment}",
+                    storyId, segmentIndex);
+                answerText = SelfHarmSignal.Response;
+                userFlag = SafetyFlag.Blocked;
+                assistantFlag = SafetyFlag.Flagged;
+                turnOutcome = "self_harm_signal";
+            }
+            else if (!inputModeration.IsSafe)
             {
                 var moderationUnavailable =
                     inputModeration.FlaggedCategories.Contains("moderation_unavailable");

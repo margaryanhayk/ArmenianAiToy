@@ -1519,6 +1519,18 @@ public class ChatService : IChatService
         return removed;
     }
 
+    // Shared by the self-harm detector and the moderation self-harm
+    // category: user turn Blocked, reply Flagged (same persistence shape as
+    // the input-moderation block), envelope Blocked.
+    private async Task<ChatResponse> BlockWithSelfHarmResponseAsync(Guid conversationId, string userMessage)
+    {
+        await _conversations.AddMessageAsync(
+            conversationId, MessageRole.User, userMessage, SafetyFlag.Blocked);
+        var msg = await _conversations.AddMessageAsync(
+            conversationId, MessageRole.Assistant, SelfHarmSignal.Response, SafetyFlag.Flagged);
+        return new ChatResponse(SelfHarmSignal.Response, conversationId, msg.Id, SafetyFlag.Blocked);
+    }
+
     internal const string DefaultFallbackResponse =
         "\u0531\u0580\u056b, \u0574\u056b \u0578\u0582\u0580\u056b\u0577 \u0570\u0565\u057f\u0561\u0584\u0580\u0584\u056b\u0580 \u0562\u0561\u0576 \u056d\u0578\u057d\u0565\u0576\u0584\u0589";
 
@@ -1797,6 +1809,19 @@ public class ChatService : IChatService
         // Step 1: Consume pending choice labels (always remove to prevent stale entries)
         PendingChoices.TryRemove(conversation.Id, out var pending);
 
+        // Step 1.4: Self-harm signal (live finding 2026-09-23 — a transliterated
+        // «chem uzum aprel» passed moderation and got a cheerful reply). Runs
+        // before everything else so the child hears the grown-up line, never
+        // a story; the user turn is Blocked and the reply Flagged so the
+        // parent dashboard surfaces it.
+        if (SelfHarmSignal.IsPresent(userMessage))
+        {
+            // Privacy (#005): no input content in logs.
+            _logger.LogWarning("Self-harm signal detected. Device: {DeviceId}, Len: {Len}",
+                deviceId, userMessage.Length);
+            return await BlockWithSelfHarmResponseAsync(conversation.Id, userMessage);
+        }
+
         // Step 1.5: Client-side dangerous-content prefilter. Catches obvious
         // weapon/explosive/poison/drug keywords that the moderation API misses
         // (e.g. "how to make a bomb" returns Flagged=false on all categories).
@@ -1835,6 +1860,10 @@ public class ChatService : IChatService
             bool moderationUnavailable = inputModeration.FlaggedCategories.Contains("moderation_unavailable");
             _logger.LogWarning("User input blocked. Device: {DeviceId}, Categories: {Categories}, unavailable={Unavailable}",
                 deviceId, string.Join(", ", inputModeration.FlaggedCategories), moderationUnavailable);
+
+            // A self-harm flag gets the grown-up line, not the story fallback.
+            if (inputModeration.FlaggedCategories.Contains("self-harm"))
+                return await BlockWithSelfHarmResponseAsync(conversation.Id, userMessage);
 
             await _conversations.AddMessageAsync(
                 conversation.Id, MessageRole.User, userMessage, SafetyFlag.Blocked);
@@ -2178,6 +2207,15 @@ public class ChatService : IChatService
         {
             _logger.LogError(ex, "AI service error for device {DeviceId}", deviceId);
             throw;
+        }
+
+        // Step 8.9: Never let a secrecy promise reach the child (live finding
+        // 2026-09-23). Swapped before output moderation so the honest line
+        // is what gets checked, stored and spoken.
+        if (SecrecyPromiseGuard.IsSecrecyPromise(aiResponse))
+        {
+            _logger.LogWarning("Secrecy promise replaced. Device: {DeviceId}", deviceId);
+            aiResponse = SecrecyPromiseGuard.HonestResponse;
         }
 
         // Step 9: Post-moderate AI response. Last point at which

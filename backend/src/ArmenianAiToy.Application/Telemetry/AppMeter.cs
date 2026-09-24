@@ -257,13 +257,16 @@ public static class AppMeter
     /// <c>StoryQaController.Ask</c> (one increment per turn that reaches
     /// transcription — input-validation rejections like unknown-story 404
     /// or empty-body 400 are NOT counted). Tag <c>outcome</c> is one of a
-    /// bounded five-value set:
+    /// bounded eight-value set:
     /// <list type="bullet">
     ///   <item><c>answered</c> — GPT answered and passed the answer filter.</item>
     ///   <item><c>answer_fallback</c> — the bounded Q&amp;A returned its safe
     ///     fallback (model/filter rejected; not a safety block).</item>
     ///   <item><c>moderation_blocked</c> — input moderation blocked the
     ///     transcript; no GPT call.</item>
+    ///   <item><c>self_harm_signal</c> — the transcript carried a self-harm
+    ///     signal (<c>SelfHarmSignal</c> or the moderation self-harm
+    ///     category); the grown-up line was spoken, no GPT call.</item>
     ///   <item><c>answer_blocked</c> — the generated answer failed OUTPUT
     ///     moderation and was replaced by the safe fallback before TTS.</item>
     ///   <item><c>empty_transcript</c> — Whisper returned nothing.</item>
