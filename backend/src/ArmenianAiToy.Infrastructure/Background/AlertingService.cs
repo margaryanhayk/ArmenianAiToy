@@ -419,13 +419,18 @@ public sealed class AlertingService : BackgroundService
         // turn a per-tick check into a per-tick retry storm.
         _lastSentUtc[key] = now;
 
-        var payload = new
+        var payload = new Dictionary<string, string>
         {
-            text,
-            key,
-            severity,
-            at = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            ["text"] = text,
+            ["key"] = key,
+            ["severity"] = severity,
+            ["at"] = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
         };
+        // Telegram: Alerts:WebhookUrl = https://api.telegram.org/bot<token>/sendMessage
+        // needs a chat_id beside `text`; Telegram ignores the other fields.
+        var telegramChatId = _config["Alerts:TelegramChatId"];
+        if (!string.IsNullOrWhiteSpace(telegramChatId))
+            payload["chat_id"] = telegramChatId.Trim();
         var json = JsonSerializer.Serialize(payload);
 
         if (await PostOnceAsync(url, json, ct) || await PostOnceAsync(url, json, ct))

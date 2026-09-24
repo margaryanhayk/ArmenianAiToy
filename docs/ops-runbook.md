@@ -149,6 +149,14 @@ convention as everything else here) to enable it. Works with either:
   ignores the rest.
 - Any **generic JSON receiver** — the full body is
   `{ "text": "...", "key": "...", "severity": "...", "at": "..." }`.
+- **Telegram** (2026-09-24): create a bot with @BotFather (it gives the
+  bot token), send the bot any message, then open
+  `https://api.telegram.org/bot<TOKEN>/getUpdates` and read
+  `result[0].message.chat.id`. Set
+  `Alerts__WebhookUrl=https://api.telegram.org/bot<TOKEN>/sendMessage` and
+  `Alerts__TelegramChatId=<chat id>`; the alerter then adds `chat_id` beside
+  `text`, and Telegram ignores the other fields. The bot token is a secret
+  and lives only in that Railway variable.
 
 Signals (each cooldown-gated per `key` so a flapping condition cannot
 spam):
