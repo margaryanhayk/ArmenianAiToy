@@ -87,9 +87,28 @@ regResp.EnsureSuccessStatusCode();
 var device = await regResp.Content.ReadFromJsonAsync<DeviceReg>(jsonOpts)
     ?? throw new Exception("Device registration returned null");
 
+// Claim the device for a throwaway parent: since the unclaimed-device gate
+// shipped, an unclaimed toy only ever hears the canned "resting" line, so
+// every start measured 50 chars and the benchmark silently measured nothing.
+{
+    var email = $"bench-{Guid.NewGuid():N}@example.test";
+    const string password = "Bench-password-123!";
+    (await http.PostAsJsonAsync("/api/parents/register",
+        new { email, password, acceptedTerms = true })).EnsureSuccessStatusCode();
+    var loginResp = await http.PostAsJsonAsync("/api/parents/login", new { email, password });
+    loginResp.EnsureSuccessStatusCode();
+    var token = (await loginResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString();
+    using var linkReq = new HttpRequestMessage(HttpMethod.Post, "/api/parents/devices/link")
+    {
+        Content = JsonContent.Create(new { deviceId = device.DeviceId, apiKey = device.ApiKey }),
+    };
+    linkReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+    (await http.SendAsync(linkReq)).EnsureSuccessStatusCode();
+}
+
 http.DefaultRequestHeaders.Add("X-Device-Id", device.DeviceId.ToString());
 http.DefaultRequestHeaders.Add("X-Api-Key", device.ApiKey);
-Console.WriteLine($"Device: {device.DeviceId}\n");
+Console.WriteLine($"Device: {device.DeviceId} (claimed)\n");
 
 // --- Step 2: Load prompts ---
 var prompts = JsonSerializer.Deserialize<List<Prompt>>(
