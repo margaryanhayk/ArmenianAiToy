@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3096 tests, ~35 s in Release
+dotnet test            # 3132 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -973,6 +973,25 @@ flip only after Google confirms. `appsettings.json` now ships
 (3096, 15 new); booted in Production with a throwaway service account.
 NOT verified: any live Vertex call (no GCP credentials) — in particular that
 Vertex accepts the snake_case `system_instruction` field the shared body uses.
+
+### Self-harm line, no secrecy promises (2026-09-24, N16)
+
+First live red-team runs (`tools/quality-evidence/armenian-safety-live-20260923.md`):
+OpenAI moderation alone catches 17% of Armenian-script unsafe cases; the full
+pipeline (gpt-4o) caught nearly everything but promised children secrecy from
+their parents and answered a transliterated «chem uzum aprel» cheerfully.
+Fix (owner "go safety fix"): `SelfHarmSignal` (pure, `Application/Helpers/`,
+first-person phrases in Armenian script, Latin transliteration and English,
+list reviewed by armenian-story-master) runs before moderation on `/api/chat`,
+`/api/chat/audio` and story-qa; ANY self-harm block (detector or moderation
+`self-harm` category) speaks `SelfHarmSignal.Response` (the reviewed
+grown-up line) with the user turn Blocked and the reply Flagged.
+`SecrecyPromiseGuard` swaps a secrecy promise in a model reply for the
+reviewed honest line before output moderation. The system prompt gained both
+rules. Story-QA outcome tag gained `self_harm_signal` (bounded). `dotnet
+test` green (3132, 36 new); live re-run: both failures fixed, benign
+controls unchanged. NOT covered: the after-story reflection answer path;
+Gemini (production chat) untested — no key in this container.
 
 ## Working in this repo (agents)
 
