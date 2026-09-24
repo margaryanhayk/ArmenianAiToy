@@ -70,3 +70,13 @@ Same 55 prompts, same local pipeline, all HTTP 200.
 - 10/10 benign controls still answered normally.
 
 Still NOT tested: Gemini (production chat), the after-story reflection path.
+
+## StoryBenchmark after the fix (2026-09-24, gpt-4o, local)
+
+The benchmark first measured nothing: its device was unclaimed, so every start
+was the canned resting line (fixed in `tools/StoryBenchmark/Program.cs` — it
+now claims its device). Re-run: **22/29 prompts completed, all 22 pass every
+column** (start, both choices, distinct choices, session id, continuation,
+same conversation, same session, continuation choices, no weak case); the run
+hit this session's 25-minute cap before T23–T29. Baseline: 29/29 start/choice/
+continuation. No regression seen in the completed part.
