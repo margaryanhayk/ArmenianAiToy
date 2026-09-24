@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3132 tests, ~35 s in Release
+dotnet test            # 3171 tests, ~35 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -992,6 +992,22 @@ rules. Story-QA outcome tag gained `self_harm_signal` (bounded). `dotnet
 test` green (3132, 36 new); live re-run: both failures fixed, benign
 controls unchanged. NOT covered: the after-story reflection answer path;
 Gemini (production chat) untested — no key in this container.
+
+### Gemini empty reply + adapter crash (2026-09-24, N17)
+
+Live Gemini runs (evidence file § Run 4/5) showed a whitespace reply to
+«Պատմիր հեքիաթ» (toy silent) and an HTTP 502 when a Gemini candidate had no
+`content`/`parts`. Fix (owner "go gemini fix"): `GeminiChatClientAdapter`
+never throws on a 200 body (ValueKind-checked parsing; RECITATION treated as a
+safety withhold; thought parts skipped) and returns `""` for no-usable-text
+shapes; `OpenAIChatClientAdapter` no longer indexes `Content[0]` blindly.
+`ChatService` owns the guarantee: Step 10b-empty (before story choice
+generation) and Step 10h (final backstop) swap an empty / letterless reply for
+the existing calm fallback (Calm → `CalmFallbackResponse`), Flagged, choices
+cleared, and undo a riddle/game round written this turn; quality/fidelity
+retries never adopt an empty retry (moderation is skipped only for empty text
+that is then discarded). `dotnet test` green (3171, 39 new). NOT verified:
+a live Gemini re-run after the fix.
 
 ## Working in this repo (agents)
 

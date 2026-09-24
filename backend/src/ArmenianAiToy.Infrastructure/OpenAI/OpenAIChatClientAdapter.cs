@@ -46,6 +46,11 @@ public class OpenAIChatClientAdapter : IAiChatClient
         var completion = await _gate.RunAsync(
             ct => _client.CompleteChatAsync(chatMessages, cancellationToken: ct),
             cts.Token);
-        return completion.Value.Content[0].Text;
+        // A completion with no content parts (e.g. refusal-only) returns
+        // string.Empty instead of throwing ArgumentOutOfRangeException →
+        // 502; ChatService's empty-reply guard turns it into the calm,
+        // Flagged fallback, and StoryAnswerFilter rejects it as Empty.
+        var parts = completion.Value.Content;
+        return parts.Count == 0 ? string.Empty : string.Concat(parts.Select(c => c.Text));
     }
 }

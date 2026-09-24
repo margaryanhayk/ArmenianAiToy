@@ -268,14 +268,20 @@ public class GeminiChatClientAdapter : IAiChatClient
         // A block is a VALID outcome: return the same calm Armenian
         // fallback ChatService uses, which then flows through output
         // moderation and persists as a normal assistant reply.
-        if (!root.TryGetProperty("candidates", out var candidates)
+        if (root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("candidates", out var candidates)
             || candidates.ValueKind != JsonValueKind.Array
             || candidates.GetArrayLength() == 0)
         {
-            var blockReason =
-                root.TryGetProperty("promptFeedback", out var pf)
-                && pf.TryGetProperty("blockReason", out var br)
-                    ? br.GetString() : "no_candidates";
+            var blockReason = "no_candidates";
+            if (root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty("promptFeedback", out var pf)
+                && pf.ValueKind == JsonValueKind.Object
+                && pf.TryGetProperty("blockReason", out var br))
+            {
+                blockReason = br.ValueKind == JsonValueKind.String
+                    ? br.GetString() ?? "unknown" : "unknown";
+            }
             _logger.LogWarning(
                 "Gemini blocked the prompt (reason {Reason}, model {Model}); returning the safety fallback",
                 blockReason, _model);
@@ -284,12 +290,22 @@ public class GeminiChatClientAdapter : IAiChatClient
 
         // Safety block, candidate level: generation was cut off by the
         // safety filter (or a related content policy) — same calm
-        // fallback. Non-safety finish reasons (STOP, MAX_TOKENS, …)
-        // fall through to normal parsing.
+        // fallback. RECITATION (2026-09-24) joins the set: a recited
+        // reply may be copyrighted and truncated, never child-facing.
+        // Other finish reasons (STOP, MAX_TOKENS, OTHER, LANGUAGE, …)
+        // fall through to the defensive parsing below.
         var candidate = candidates[0];
+        if (candidate.ValueKind != JsonValueKind.Object)
+        {
+            _logger.LogWarning(
+                "Gemini returned no usable text (finishReason {Reason}, model {Model}); returning empty for the caller's fallback",
+                "none", _model);
+            return string.Empty;
+        }
         var finishReason = candidate.TryGetProperty("finishReason", out var fr)
-            ? fr.GetString() : null;
-        if (finishReason is "SAFETY" or "PROHIBITED_CONTENT" or "BLOCKLIST" or "SPII" or "IMAGE_SAFETY")
+            && fr.ValueKind == JsonValueKind.String
+                ? fr.GetString() : null;
+        if (finishReason is "SAFETY" or "PROHIBITED_CONTENT" or "BLOCKLIST" or "SPII" or "IMAGE_SAFETY" or "RECITATION")
         {
             _logger.LogWarning(
                 "Gemini withheld the reply (finishReason {Reason}, model {Model}); returning the safety fallback",
@@ -297,14 +313,41 @@ public class GeminiChatClientAdapter : IAiChatClient
             return _safetyFallbackText;
         }
 
-        var parts = candidate
-            .GetProperty("content")
-            .GetProperty("parts");
+        // A structurally-valid 200 must never throw (live AD-005, Run 5:
+        // a candidate with no content/parts threw KeyNotFoundException →
+        // 502 → error clip, and fed the reliability gate's breaker). No
+        // content, no parts, no text parts, or only whitespace text (live
+        // OK-001: «Պատմիր հեքիաթ» → "\n", the toy said nothing) return
+        // string.Empty — NOT the safety fallback line — so each caller
+        // applies its own mode-aware fallback: ChatService's empty-reply
+        // guard (Calm line in Calm mode, Flagged, no choices) and
+        // StoryAnswerFilter's Empty rejection (story-qa / reflection
+        // canned line). Thought parts are skipped so model reasoning can
+        // never be spoken to a child. Logs carry finishReason + model only.
         var sb = new System.Text.StringBuilder();
-        foreach (var p in parts.EnumerateArray())
+        if (candidate.TryGetProperty("content", out var candContent)
+            && candContent.ValueKind == JsonValueKind.Object
+            && candContent.TryGetProperty("parts", out var parts)
+            && parts.ValueKind == JsonValueKind.Array)
         {
-            if (p.TryGetProperty("text", out var t)) sb.Append(t.GetString());
+            foreach (var p in parts.EnumerateArray())
+            {
+                if (p.ValueKind != JsonValueKind.Object) continue;
+                if (p.TryGetProperty("thought", out var th)
+                    && th.ValueKind == JsonValueKind.True) continue;
+                if (p.TryGetProperty("text", out var t)
+                    && t.ValueKind == JsonValueKind.String)
+                    sb.Append(t.GetString());
+            }
         }
-        return sb.ToString();
+        var text = sb.ToString();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            _logger.LogWarning(
+                "Gemini returned no usable text (finishReason {Reason}, model {Model}); returning empty for the caller's fallback",
+                finishReason ?? "none", _model);
+            return string.Empty;
+        }
+        return text;
     }
 }

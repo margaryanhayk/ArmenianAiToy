@@ -292,4 +292,107 @@ public class GeminiChatClientAdapterTests
         Assert.True(handler.SeenToken.CanBeCanceled);
         Assert.True(handler.SeenToken.IsCancellationRequested);
     }
+
+    // ---- AD-005 / OK-001 (live 2026-09-23): a structurally-valid 200 must
+    // never throw and never hand back empty/whitespace text.
+
+    [Theory]
+    [InlineData("{\"candidates\":[{\"finishReason\":\"OTHER\"}]}")]                                     // no content
+    [InlineData("{\"candidates\":[{\"finishReason\":\"STOP\",\"content\":{\"role\":\"model\"}}]}")]   // content without parts
+    [InlineData("{\"candidates\":[{\"finishReason\":\"MAX_TOKENS\",\"content\":{}}]}")]                  // MAX_TOKENS, no parts
+    [InlineData("{\"candidates\":[{\"content\":{\"parts\":\"oops\"}}]}")]                                 // parts not an array
+    [InlineData("{\"candidates\":[{\"content\":{\"parts\":[]}}]}")]                                         // empty parts
+    [InlineData("{\"candidates\":[{\"content\":{\"parts\":[{\"inlineData\":{}}]}}]}")]                    // no text part
+    [InlineData("{\"candidates\":[{\"finishReason\":\"STOP\",\"content\":{\"parts\":[{\"text\":\"\\n\"}]}}]}")] // whitespace (OK-001)
+    [InlineData("{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"\"},{\"text\":\"  \"}]}}]}")] // empty + blank
+    [InlineData("{\"candidates\":[{\"content\":{\"parts\":[{\"text\":42}]}}]}")]                          // non-string text
+    [InlineData("{\"candidates\":[{\"finishReason\":\"LANGUAGE\"}]}")]
+    [InlineData("{\"candidates\":[{\"finishReason\":\"MALFORMED_FUNCTION_CALL\"}]}")]
+    [InlineData("{\"candidates\":[{\"finishReason\":\"SOME_FUTURE_REASON\"}]}")]
+    [InlineData("{\"candidates\":[{\"finishReason\":7}]}")]                                                  // non-string finishReason
+    [InlineData("{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"I think the child\",\"thought\":true}]}}]}")] // thought-only
+    [InlineData("{\"candidates\":[1]}")]                                                                   // candidate not an object
+    public async Task UnusableCandidate_ReturnsEmpty_ForCallerFallback_NeverThrows(string json)
+    {
+        // Empty, not the adapter's safety line: ChatService's empty-reply
+        // guard (mode-aware, Flagged, no choices) and StoryAnswerFilter's
+        // Empty rejection each apply their own fallback.
+        var (svc, h) = Create();
+        h.ResponseJson = json;
+
+        var reply = await svc.GetCompletionAsync(
+            "SYSTEM", new List<(string, string)> { ("user", "x") });
+
+        Assert.Equal(string.Empty, reply);
+    }
+
+    [Theory]
+    [InlineData("[1,2]")]                                                        // root not an object
+    [InlineData("{\"promptFeedback\":\"oops\"}")]                                // promptFeedback not an object
+    [InlineData("{\"promptFeedback\":{\"blockReason\":3}}")]                     // blockReason not a string
+    [InlineData("{\"candidates\":\"oops\",\"promptFeedback\":{\"blockReason\":\"SAFETY\"}}")]
+    public async Task MalformedPromptLevelShapes_ReturnSafetyFallback_NeverThrow(string json)
+    {
+        var (svc, h) = Create();
+        h.ResponseJson = json;
+
+        var reply = await svc.GetCompletionAsync(
+            "SYSTEM", new List<(string, string)> { ("user", "x") });
+
+        Assert.Equal(GeminiChatClientAdapter.DefaultSafetyFallbackText, reply);
+    }
+
+    [Fact]
+    public async Task Recitation_WithPartialText_ReturnsCalmFallback_NotThePartial()
+    {
+        var (svc, h) = Create();
+        h.ResponseJson =
+            "{\"candidates\":[{\"finishReason\":\"RECITATION\",\"content\":{\"parts\":[{\"text\":\"Մի ժամանակ\"}]}}]}";
+
+        var reply = await svc.GetCompletionAsync(
+            "SYSTEM", new List<(string, string)> { ("user", "x") });
+
+        Assert.Equal(GeminiChatClientAdapter.DefaultSafetyFallbackText, reply);
+    }
+
+    [Fact]
+    public async Task MaxTokens_WithPartialText_ReturnsThePartial()
+    {
+        // Truncated but real text still flows on (ChatService moderates and
+        // quality-gates it) — only an EMPTY truncation becomes the fallback.
+        var (svc, h) = Create();
+        h.ResponseJson =
+            "{\"candidates\":[{\"finishReason\":\"MAX_TOKENS\",\"content\":{\"parts\":[{\"text\":\"Մի ժամանակ\"}]}}]}";
+
+        var reply = await svc.GetCompletionAsync(
+            "SYSTEM", new List<(string, string)> { ("user", "x") });
+
+        Assert.Equal("Մի ժամանակ", reply);
+    }
+
+    [Fact]
+    public async Task ThoughtParts_AreSkipped_RealTextKept()
+    {
+        var (svc, h) = Create();
+        h.ResponseJson =
+            "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"reasoning\",\"thought\":true},{\"text\":\"Բարև\"}]}}]}";
+
+        var reply = await svc.GetCompletionAsync(
+            "SYSTEM", new List<(string, string)> { ("user", "x") });
+
+        Assert.Equal("Բարև", reply);
+    }
+
+    [Fact]
+    public async Task NormalReply_WhitespaceInsideRealText_IsKeptVerbatim()
+    {
+        var (svc, h) = Create();
+        h.ResponseJson =
+            "{\"candidates\":[{\"finishReason\":\"STOP\",\"content\":{\"parts\":[{\"text\":\"Բարև\\n\"},{\"text\":\"Արեգ\"}]}}]}";
+
+        var reply = await svc.GetCompletionAsync(
+            "SYSTEM", new List<(string, string)> { ("user", "x") });
+
+        Assert.Equal("Բարև\nԱրեգ", reply);
+    }
 }

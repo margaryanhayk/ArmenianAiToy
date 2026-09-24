@@ -2264,6 +2264,14 @@ public class ChatService : IChatService
                 conversation.Id, newMemory.Character, newMemory.Place);
         }
 
+        // Snapshot the riddle/game rounds as they stand before this reply's
+        // tail blocks are applied, so an empty-reply fallback (Steps
+        // 10b-empty / 10h) can undo a round the child never heard.
+        var riddleRoundBeforeReply = RiddleSessions.TryGetValue(conversation.Id, out var rsBefore)
+            ? rsBefore.CurrentRound : null;
+        var gameRoundBeforeReply = GameSessions.TryGetValue(conversation.Id, out var gsBefore)
+            ? gsBefore.CurrentRound : null;
+
         // Step 10a-bis: Riddle Mode v2 — extract the RIDDLE_ANSWER/CATEGORY/DIFFICULTY
         // tail block. Only store the round in Riddle mode; on leaks from any other
         // mode the block is still stripped but no state is written.
@@ -2367,6 +2375,17 @@ public class ChatService : IChatService
                     choiceB = null;
                 }
             }
+        }
+
+        // Step 10b-empty: an empty/whitespace reply (or one that was only
+        // tail blocks) is swapped for the calm fallback BEFORE any story
+        // choice generation, so Step 10c never feeds the model empty prose
+        // (live OK-001, 2026-09-23) and no choices are glued onto silence.
+        if (string.IsNullOrWhiteSpace(aiResponse))
+        {
+            ApplyEmptyReplyFallback(conversation.Id, detectedMode, "empty_after_parse",
+                riddleRoundBeforeReply, gameRoundBeforeReply,
+                ref aiResponse, ref safetyFlag, ref choiceA, ref choiceB);
         }
 
         // Step 10b-coh: Pre-retry coherence detection on the parsed pair.
@@ -2486,8 +2505,13 @@ public class ChatService : IChatService
                 try
                 {
                     var retryRaw = await _aiClient.GetCompletionAsync(systemPrompt, history, cancellationToken);
-                    var retryMod = await _moderation.CheckContentAsync(retryRaw, cancellationToken);
-                    if (retryMod.IsSafe)
+                    // An empty/whitespace retry is never adopted: it is
+                    // treated like a rejected retry (original kept, or the
+                    // hard fallback for structurally broken originals).
+                    var retryMod = string.IsNullOrWhiteSpace(retryRaw)
+                        ? null
+                        : await _moderation.CheckContentAsync(retryRaw, cancellationToken);
+                    if (retryMod is { IsSafe: true })
                     {
                         var retryResp = retryRaw;
 
@@ -2710,8 +2734,12 @@ public class ChatService : IChatService
                         ("user", $"[SYSTEM: Your continuation does not contain any word from the chosen label \"{choiceLabel}\". Rewrite the continuation so the first sentence includes at least one key noun or verb from that label verbatim. Keep the story moving forward, do not recap.]")
                     };
                     var fidelityRaw = await _aiClient.GetCompletionAsync(systemPrompt, fidelityHistory, cancellationToken);
-                    var fidelityMod = await _moderation.CheckContentAsync(fidelityRaw, cancellationToken);
-                    if (fidelityMod.IsSafe)
+                    // An empty/whitespace retry is never adopted; the
+                    // original continuation is kept.
+                    var fidelityMod = string.IsNullOrWhiteSpace(fidelityRaw)
+                        ? null
+                        : await _moderation.CheckContentAsync(fidelityRaw, cancellationToken);
+                    if (fidelityMod is { IsSafe: true })
                     {
                         var fidelityResp = fidelityRaw;
 
@@ -2832,6 +2860,16 @@ public class ChatService : IChatService
             aiResponse = aiResponse.Replace("\u0589\u0589", "\u0589");
         }
 
+        // Step 10h: final backstop. Quality/fidelity retries and the
+        // cleaner can still empty a non-empty reply; nothing whitespace-only
+        // (or with no letter/digit, e.g. a lone "։") is ever stored or spoken.
+        if (string.IsNullOrWhiteSpace(aiResponse) || !aiResponse.Any(char.IsLetterOrDigit))
+        {
+            ApplyEmptyReplyFallback(conversation.Id, detectedMode, "empty_final",
+                riddleRoundBeforeReply, gameRoundBeforeReply,
+                ref aiResponse, ref safetyFlag, ref choiceA, ref choiceB);
+        }
+
         // Step 11: Store AI response. The runtime-resolved mode is then
         // stamped onto the assistant row (E1.3) — the same value the wire
         // response carries — so parent-facing views can group conversations
@@ -2861,6 +2899,52 @@ public class ChatService : IChatService
 
         return new ChatResponse(aiResponse, conversation.Id, responseMsg.Id, safetyFlag,
             choiceA, choiceB, activeStorySession, modeName, TurnEnded: turnEnded);
+    }
+
+    /// <summary>
+    /// Replaces an empty/whitespace model reply with the calm reviewed
+    /// fallback line (the same constant every other fallback swap uses, so
+    /// no second moderation pass is needed). Flagged, matching the
+    /// latin_run / leaked_tag fallback swaps: the parent dashboard can then
+    /// tell a safe-fallback from a normal toy reply, and every downstream
+    /// generation step (choice generation, retries, coherence) is gated off.
+    /// An existing Flagged is never downgraded. Logs conversation id and a
+    /// bounded reason only — never content.
+    /// </summary>
+    private void ApplyEmptyReplyFallback(
+        Guid conversationId, DetectedMode detectedMode, string reason,
+        RiddleRound? riddleRoundBeforeReply, GameRound? gameRoundBeforeReply,
+        ref string aiResponse, ref SafetyFlag safetyFlag,
+        ref string? choiceA, ref string? choiceB)
+    {
+        _logger.LogWarning(
+            "AI reply empty; using safety fallback. ConversationId: {ConversationId}, Reason: {Reason}",
+            conversationId, reason);
+        var fallback = _config["SafetyFallbackResponse"];
+        aiResponse = detectedMode == DetectedMode.Calm
+            ? CalmFallbackResponse
+            : string.IsNullOrEmpty(fallback) ? DefaultFallbackResponse : fallback!;
+        safetyFlag = SafetyFlag.Flagged;
+        choiceA = null;
+        choiceB = null;
+        PendingChoices.TryRemove(conversationId, out _);
+
+        // Game honesty: a riddle/game round stored from THIS reply's tail
+        // block was never heard by the child (the prose was empty), so put
+        // the round back to what it was before the reply. Reference
+        // comparison: only a round written this turn is undone.
+        if (RiddleSessions.TryGetValue(conversationId, out var rs)
+            && !ReferenceEquals(rs.CurrentRound, riddleRoundBeforeReply))
+        {
+            RiddleSessions.TryUpdate(conversationId,
+                rs with { CurrentRound = riddleRoundBeforeReply, UpdatedAt = DateTime.UtcNow }, rs);
+        }
+        if (GameSessions.TryGetValue(conversationId, out var gs)
+            && !ReferenceEquals(gs.CurrentRound, gameRoundBeforeReply))
+        {
+            GameSessions.TryUpdate(conversationId,
+                gs with { CurrentRound = gameRoundBeforeReply, UpdatedAt = DateTime.UtcNow }, gs);
+        }
     }
 
     /// <summary>
