@@ -1,0 +1,22 @@
+{
+  "timestampUtc": "2026-10-04T04:14:13Z",
+  "benchmarkName": "CuriosityBenchmark",
+  "baselineWeakCases": 1,
+  "currentWeakCases": 0,
+  "regressionVerdict": "improved",
+  "promptsCount": 6,
+  "promptsSha256": "93540a785a61b5b3a67edf39bf0725e30a687e7c59f13da98634a257263bbc46",
+  "promptsChanged": false,
+  "valid": true,
+  "invalidReason": null,
+  "firstTurnSignature": null,
+  "label": "arm3",
+  "gitHead": "8c717ff",
+  "latencyMs": {
+    "p50": 4679,
+    "p90": 7289,
+    "p99": 8136,
+    "max": 8136,
+    "n": 13
+  }
+}

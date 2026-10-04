@@ -1,0 +1,21 @@
+{
+  "timestampUtc": "2026-10-04T06:02:51Z",
+  "benchmarkName": "StoryBenchmark",
+  "currentWeakCases": 1,
+  "regressionVerdict": "unavailable",
+  "promptsCount": 29,
+  "promptsSha256": "f3c5592a5998ed5eebf5d754463c419f6d3e22e371d1ba0f087095e8e6ab3d09",
+  "promptsChanged": true,
+  "valid": true,
+  "invalidReason": null,
+  "firstTurnSignature": null,
+  "label": "arm5",
+  "gitHead": "8c717ff",
+  "latencyMs": {
+    "p50": 15558,
+    "p90": 18460,
+    "p99": 20187,
+    "max": 20187,
+    "n": 58
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "timestampUtc": "2026-10-04T05:13:53Z",
+  "benchmarkName": "GameBenchmark",
+  "currentWeakCases": 2,
+  "regressionVerdict": "unavailable",
+  "promptsCount": 11,
+  "promptsSha256": "11bdaf7d0366e60638ff73a37d29e696133264e24eaadf8dbc90d7063a82fbf6",
+  "promptsChanged": true,
+  "valid": false,
+  "invalidReason": "6/11 first-turn replies are byte-identical (canned-line signature: unclaimed / paused / cost-cap / moderation-unavailable, or the model-withhold safety fallback): «Հնչեցրու կատվի ձայնը։»",
+  "firstTurnSignature": {
+    "reply": "Հնչեցրու կատվի ձայնը։",
+    "count": 6,
+    "of": 11
+  },
+  "label": "arm4",
+  "gitHead": "8c717ff",
+  "latencyMs": {
+    "p50": 2299,
+    "p90": 4095,
+    "p99": 4745,
+    "max": 4745,
+    "n": 46
+  }
+}

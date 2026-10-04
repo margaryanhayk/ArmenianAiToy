@@ -1,0 +1,22 @@
+{
+  "timestampUtc": "2026-10-04T04:13:04Z",
+  "benchmarkName": "CalmBenchmark",
+  "baselineWeakCases": 0,
+  "currentWeakCases": 0,
+  "regressionVerdict": "unchanged",
+  "promptsCount": 5,
+  "promptsSha256": "d674d0c1184ece49d523eda130929736d1f6cea5a6aeb7ec255e4dad0401ec89",
+  "promptsChanged": false,
+  "valid": true,
+  "invalidReason": null,
+  "firstTurnSignature": null,
+  "label": "arm3",
+  "gitHead": "8c717ff",
+  "latencyMs": {
+    "p50": 5466,
+    "p90": 10755,
+    "p99": 14280,
+    "max": 14280,
+    "n": 15
+  }
+}

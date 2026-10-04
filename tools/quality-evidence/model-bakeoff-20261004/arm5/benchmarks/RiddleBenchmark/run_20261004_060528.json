@@ -1,0 +1,277 @@
+[
+  {
+    "id": "RB01",
+    "label": "new, give up, another",
+    "turnsTotal": 3,
+    "turnsOk": 3,
+    "hardFail": false,
+    "turns": [
+      {
+        "user": "give me a riddle",
+        "expect": "pose",
+        "response": "Կռահի՛ր, թե ինչ եմ մտածել։ Դեղին է, կեղևը մաքրում ենք, ներսը փափուկ ու քաղցր է։ Ի՞նչ է։",
+        "reply": "Կռահի՛ր, թե ինչ եմ մտածել։ Դեղին է, կեղևը մաքրում ենք, ներսը փափուկ ու քաղցր է։ Ի՞նչ է։",
+        "latencyMs": 2682,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 87,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "չգիտեմ",
+        "expect": "reveal",
+        "response": "Պատասխանն էր՝ բանան։  \nՈւզո՞ւմ ես ևս մեկ հանելուկ։",
+        "reply": "Պատասխանն էր՝ բանան։  \nՈւզո՞ւմ ես ևս մեկ հանելուկ։",
+        "latencyMs": 2463,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 50,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "ևս մեկ",
+        "expect": "pose",
+        "response": "Կռահի՛ր, թե ինչ եմ մտածել։ Զույգ է լինում, ոտքին ենք հագնում, որ տաք մնա։ Ի՞նչ է։",
+        "reply": "Կռահի՛ր, թե ինչ եմ մտածել։ Զույգ է լինում, ոտքին ենք հագնում, որ տաք մնա։ Ի՞նչ է։",
+        "latencyMs": 2702,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 81,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      }
+    ]
+  },
+  {
+    "id": "RB02",
+    "label": "hint flow — three wrong guesses",
+    "turnsTotal": 4,
+    "turnsOk": 4,
+    "hardFail": false,
+    "turns": [
+      {
+        "user": "give me a riddle",
+        "expect": "pose",
+        "response": "Կռահի՛ր, թե ինչ եմ մտածել։ Դեղին է, երկար է, կեղևը հանում ենք ու ուտում։ Ի՞նչ է։",
+        "reply": "Կռահի՛ր, թե ինչ եմ մտածել։ Դեղին է, երկար է, կեղևը հանում ենք ու ուտում։ Ի՞նչ է։",
+        "latencyMs": 2961,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 80,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "cat",
+        "response": "Ոչ, ուրիշ բան է։ Ներսը փափուկ ու բաց գույնի է։ Փորձիր էլի։",
+        "reply": "Ոչ, ուրիշ բան է։ Ներսը փափուկ ու բաց գույնի է։ Փորձիր էլի։",
+        "latencyMs": 6161,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 58,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "կատու",
+        "response": "Մի քիչ ուրիշ բան է։ Խանութում հաճախ մի քանի հատ միասին, իրար կպած են լինում։ Փորձիր էլի։",
+        "reply": "Մի քիչ ուրիշ բան է։ Խանութում հաճախ մի քանի հատ միասին, իրար կպած են լինում։ Փորձիր էլի։",
+        "latencyMs": 8703,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 88,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "ձուկ",
+        "response": "Պատասխանն էր՝ բանան։  \nՈւզու՞մ ես ևս մեկ հանելուկ։",
+        "reply": "Պատասխանն էր՝ բանան։  \nՈւզու՞մ ես ևս մեկ հանելուկ։",
+        "latencyMs": 3495,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 50,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      }
+    ]
+  },
+  {
+    "id": "RB03",
+    "label": "Armenian opener + reveal",
+    "turnsTotal": 2,
+    "turnsOk": 2,
+    "hardFail": false,
+    "turns": [
+      {
+        "user": "հանելուկ",
+        "expect": "pose",
+        "response": "Կռահի՞ր, թե ինչ եմ մտածել։ Նարնջագույն է, հողի մեջ է աճում, նապաստակը սիրում է ուտել։ Ի՞նչ է։",
+        "reply": "Կռահի՞ր, թե ինչ եմ մտածել։ Նարնջագույն է, հողի մեջ է աճում, նապաստակը սիրում է ուտել։ Ի՞նչ է։",
+        "latencyMs": 2480,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 93,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "ասա պատասխանը",
+        "expect": "reveal",
+        "response": "Պատասխանն էր՝ գազար։ Ուզու՞մ ես ևս մեկ հանելուկ։",
+        "reply": "Պատասխանն էր՝ գազար։ Ուզու՞մ ես ևս մեկ հանելուկ։",
+        "latencyMs": 2060,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 48,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      }
+    ]
+  },
+  {
+    "id": "RB04",
+    "label": "explicit trigger mid-round forces new",
+    "turnsTotal": 2,
+    "turnsOk": 2,
+    "hardFail": false,
+    "turns": [
+      {
+        "user": "give me a riddle",
+        "expect": "pose",
+        "response": "Կռահի՛ր, թե ինչ եմ մտածել։ Դեղին է, երկար է, կեղևը հանում ենք ու ուտում։ Ի՞նչ է։",
+        "reply": "Կռահի՛ր, թե ինչ եմ մտածել։ Դեղին է, երկար է, կեղևը հանում ենք ու ուտում։ Ի՞նչ է։",
+        "latencyMs": 2142,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 80,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "նորից",
+        "expect": "pose",
+        "response": "Կռահի՛ր, թե ինչ եմ մտածել։ Զույգով են լինում, ոտքերին ենք հագնում, որ տաք մնան։ Ի՞նչ է։",
+        "reply": "Կռահի՛ր, թե ինչ եմ մտածել։ Զույգով են լինում, ոտքերին ենք հագնում, որ տաք մնան։ Ի՞նչ է։",
+        "latencyMs": 3776,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 87,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      }
+    ]
+  },
+  {
+    "id": "RB05",
+    "label": "short follow-up stays in riddle",
+    "turnsTotal": 2,
+    "turnsOk": 2,
+    "hardFail": false,
+    "turns": [
+      {
+        "user": "riddle me",
+        "expect": "pose",
+        "response": "Կռահի՞ր, թե ինչ եմ մտածել։ Կլոր է, նարնջագույն, նապաստակն էլ շատ է սիրում։ Ի՞նչ է։",
+        "reply": "Կռահի՞ր, թե ինչ եմ մտածել։ Կլոր է, նարնջագույն, նապաստակն էլ շատ է սիրում։ Ի՞նչ է։",
+        "latencyMs": 3240,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 82,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "ok",
+        "response": "Մի քիչ ուրիշ բան է։ Հողի տակ է աճում, երկար է։ Փորձիր էլի։",
+        "reply": "Մի քիչ ուրիշ բան է։ Հողի տակ է աճում, երկար է։ Փորձիր էլի։",
+        "latencyMs": 2308,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 58,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      }
+    ]
+  },
+  {
+    "id": "RB06",
+    "label": "haneluk + i don't know",
+    "turnsTotal": 2,
+    "turnsOk": 2,
+    "hardFail": false,
+    "turns": [
+      {
+        "user": "haneluk",
+        "expect": "pose",
+        "response": "Կռահի՞ր, թե ինչ եմ մտածել։ Դեղին է, կեղևը մաքրում ենք, ներսը փափուկ ու քաղցր է։ Ի՞նչ է։",
+        "reply": "Կռահի՞ր, թե ինչ եմ մտածել։ Դեղին է, կեղևը մաքրում ենք, ներսը փափուկ ու քաղցր է։ Ի՞նչ է։",
+        "latencyMs": 2612,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 87,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "i don't know",
+        "expect": "reveal",
+        "response": "Պատասխանն էր՝ բանան։  \nՈւզու՞մ ես ևս մեկ հանելուկ։",
+        "reply": "Պատասխանն էր՝ բանան։  \nՈւզու՞մ ես ևս մեկ հանելուկ։",
+        "latencyMs": 2195,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 50,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      }
+    ]
+  }
+]

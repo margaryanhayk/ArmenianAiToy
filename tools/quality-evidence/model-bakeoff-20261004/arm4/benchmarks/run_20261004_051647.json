@@ -1,0 +1,158 @@
+{
+  "timestampUtc": "2026-10-04T05:16:47Z",
+  "baseUrl": "http://127.0.0.1:5204",
+  "overallResult": "INVALID",
+  "exitCode": 3,
+  "valid": false,
+  "invalidReason": "GameBenchmark: 6/11 first-turn replies are byte-identical (canned-line signature: unclaimed / paused / cost-cap / moderation-unavailable, or the model-withhold safety fallback): «Հնչեցրու կատվի ձայնը։»",
+  "firstTurnSignature": null,
+  "label": "arm4",
+  "gitHead": "8c717ff",
+  "latencyMs": null,
+  "totalDurationSeconds": 981.5,
+  "perBenchmark": [
+    {
+      "name": "StoryBenchmark",
+      "status": "OK",
+      "exitCode": 0,
+      "valid": true,
+      "invalidReason": null,
+      "firstTurnSignature": null,
+      "latencyMs": {
+        "p50": 11427,
+        "p90": 14390,
+        "p99": 17671,
+        "max": 17671,
+        "n": 58
+      },
+      "elapsedSeconds": 687.9,
+      "error": null,
+      "regression": {
+        "verdict": "unavailable",
+        "baselineWeakCases": null,
+        "currentWeakCases": 1
+      }
+    },
+    {
+      "name": "GameBenchmark",
+      "status": "INVALID",
+      "exitCode": 3,
+      "valid": false,
+      "invalidReason": "6/11 first-turn replies are byte-identical (canned-line signature: unclaimed / paused / cost-cap / moderation-unavailable, or the model-withhold safety fallback): «Հնչեցրու կատվի ձայնը։»",
+      "firstTurnSignature": {
+        "reply": "Հնչեցրու կատվի ձայնը։",
+        "count": 6,
+        "of": 11
+      },
+      "latencyMs": {
+        "p50": 2299,
+        "p90": 4095,
+        "p99": 4745,
+        "max": 4745,
+        "n": 46
+      },
+      "elapsedSeconds": 119.1,
+      "error": null,
+      "regression": {
+        "verdict": "invalid",
+        "baselineWeakCases": null,
+        "currentWeakCases": 2
+      }
+    },
+    {
+      "name": "RiddleBenchmark",
+      "status": "OK",
+      "exitCode": 0,
+      "valid": true,
+      "invalidReason": null,
+      "firstTurnSignature": null,
+      "latencyMs": {
+        "p50": 2714,
+        "p90": 4371,
+        "p99": 5362,
+        "max": 5362,
+        "n": 15
+      },
+      "elapsedSeconds": 46.2,
+      "error": null,
+      "regression": {
+        "verdict": "unchanged",
+        "baselineWeakCases": 0,
+        "currentWeakCases": 0
+      }
+    },
+    {
+      "name": "CalmBenchmark",
+      "status": "OK",
+      "exitCode": 0,
+      "valid": true,
+      "invalidReason": null,
+      "firstTurnSignature": null,
+      "latencyMs": {
+        "p50": 2349,
+        "p90": 3417,
+        "p99": 3668,
+        "max": 3668,
+        "n": 15
+      },
+      "elapsedSeconds": 38.5,
+      "error": null,
+      "regression": {
+        "verdict": "unchanged",
+        "baselineWeakCases": 0,
+        "currentWeakCases": 0
+      }
+    },
+    {
+      "name": "CuriosityBenchmark",
+      "status": "OK",
+      "exitCode": 0,
+      "valid": true,
+      "invalidReason": null,
+      "firstTurnSignature": null,
+      "latencyMs": {
+        "p50": 1740,
+        "p90": 2230,
+        "p99": 2415,
+        "max": 2415,
+        "n": 13
+      },
+      "elapsedSeconds": 26.3,
+      "error": null,
+      "regression": {
+        "verdict": "unchanged",
+        "baselineWeakCases": 1,
+        "currentWeakCases": 1
+      }
+    },
+    {
+      "name": "ModeBenchmark",
+      "status": "OK",
+      "exitCode": 0,
+      "valid": true,
+      "invalidReason": null,
+      "firstTurnSignature": null,
+      "latencyMs": {
+        "p50": 2025,
+        "p90": 11305,
+        "p99": 13212,
+        "max": 13212,
+        "n": 14
+      },
+      "elapsedSeconds": 63.4,
+      "error": null,
+      "regression": {
+        "verdict": "unchanged",
+        "baselineWeakCases": 0,
+        "currentWeakCases": 0
+      }
+    }
+  ],
+  "totals": {
+    "passed": 5,
+    "failed": 1,
+    "invalid": 1,
+    "errored": 0,
+    "total": 6
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "timestampUtc": "2026-10-04T04:15:23Z",
+  "benchmarkName": "ModeBenchmark",
+  "baselineWeakCases": 0,
+  "currentWeakCases": 0,
+  "regressionVerdict": "unchanged",
+  "promptsCount": 14,
+  "promptsSha256": "3653254365f6077b88f6e6818ee78fe79c2c3ee72b1ef5480c58c1f8797950e1",
+  "promptsChanged": false,
+  "totalScenarios": 14,
+  "hardScenarios": 7,
+  "scenariosOk": 14,
+  "modeMatches": 7,
+  "softScenarios": 1,
+  "gateScenarios": 3,
+  "gateTripsExpected": 3,
+  "gateTripsObserved": 3,
+  "childOverrideScenarios": 3,
+  "childOverrideMatches": 3,
+  "valid": true,
+  "invalidReason": null,
+  "firstTurnSignature": null,
+  "label": "arm3",
+  "gitHead": "8c717ff",
+  "latencyMs": {
+    "p50": 4298,
+    "p90": 8258,
+    "p99": 14944,
+    "max": 14944,
+    "n": 14
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "timestampUtc": "2026-10-04T01:53:48Z",
+  "benchmarkName": "GameBenchmark",
+  "currentWeakCases": 0,
+  "regressionVerdict": "unavailable",
+  "promptsCount": 11,
+  "promptsSha256": "11bdaf7d0366e60638ff73a37d29e696133264e24eaadf8dbc90d7063a82fbf6",
+  "promptsChanged": true,
+  "valid": true,
+  "invalidReason": null,
+  "firstTurnSignature": null,
+  "label": "arm1",
+  "gitHead": "8c717ff",
+  "latencyMs": {
+    "p50": 5178,
+    "p90": 7198,
+    "p99": 9506,
+    "max": 9506,
+    "n": 46
+  }
+}

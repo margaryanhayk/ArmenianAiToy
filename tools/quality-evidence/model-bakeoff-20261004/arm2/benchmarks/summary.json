@@ -1,0 +1,154 @@
+{
+  "timestampUtc": "2026-10-04T03:11:18Z",
+  "baseUrl": "http://127.0.0.1:5202",
+  "overallResult": "PASS",
+  "exitCode": 0,
+  "valid": true,
+  "invalidReason": null,
+  "firstTurnSignature": null,
+  "label": "arm2",
+  "gitHead": "8c717ff",
+  "latencyMs": null,
+  "totalDurationSeconds": 1165.9,
+  "perBenchmark": [
+    {
+      "name": "StoryBenchmark",
+      "status": "OK",
+      "exitCode": 0,
+      "valid": true,
+      "invalidReason": null,
+      "firstTurnSignature": null,
+      "latencyMs": {
+        "p50": 8195,
+        "p90": 17346,
+        "p99": 18458,
+        "max": 18458,
+        "n": 58
+      },
+      "elapsedSeconds": 616.5,
+      "error": null,
+      "regression": {
+        "verdict": "unavailable",
+        "baselineWeakCases": null,
+        "currentWeakCases": 0
+      }
+    },
+    {
+      "name": "GameBenchmark",
+      "status": "OK",
+      "exitCode": 0,
+      "valid": true,
+      "invalidReason": null,
+      "firstTurnSignature": null,
+      "latencyMs": {
+        "p50": 4584,
+        "p90": 7426,
+        "p99": 17065,
+        "max": 17065,
+        "n": 46
+      },
+      "elapsedSeconds": 249.8,
+      "error": null,
+      "regression": {
+        "verdict": "unavailable",
+        "baselineWeakCases": null,
+        "currentWeakCases": 2
+      }
+    },
+    {
+      "name": "RiddleBenchmark",
+      "status": "OK",
+      "exitCode": 0,
+      "valid": true,
+      "invalidReason": null,
+      "firstTurnSignature": null,
+      "latencyMs": {
+        "p50": 4755,
+        "p90": 8093,
+        "p99": 9053,
+        "max": 9053,
+        "n": 15
+      },
+      "elapsedSeconds": 78.1,
+      "error": null,
+      "regression": {
+        "verdict": "unchanged",
+        "baselineWeakCases": 0,
+        "currentWeakCases": 0
+      }
+    },
+    {
+      "name": "CalmBenchmark",
+      "status": "OK",
+      "exitCode": 0,
+      "valid": true,
+      "invalidReason": null,
+      "firstTurnSignature": null,
+      "latencyMs": {
+        "p50": 4520,
+        "p90": 10100,
+        "p99": 10550,
+        "max": 10550,
+        "n": 15
+      },
+      "elapsedSeconds": 91.6,
+      "error": null,
+      "regression": {
+        "verdict": "unchanged",
+        "baselineWeakCases": 0,
+        "currentWeakCases": 0
+      }
+    },
+    {
+      "name": "CuriosityBenchmark",
+      "status": "OK",
+      "exitCode": 0,
+      "valid": true,
+      "invalidReason": null,
+      "firstTurnSignature": null,
+      "latencyMs": {
+        "p50": 4369,
+        "p90": 6270,
+        "p99": 6667,
+        "max": 6667,
+        "n": 13
+      },
+      "elapsedSeconds": 61.9,
+      "error": null,
+      "regression": {
+        "verdict": "improved",
+        "baselineWeakCases": 1,
+        "currentWeakCases": 0
+      }
+    },
+    {
+      "name": "ModeBenchmark",
+      "status": "OK",
+      "exitCode": 0,
+      "valid": true,
+      "invalidReason": null,
+      "firstTurnSignature": null,
+      "latencyMs": {
+        "p50": 3595,
+        "p90": 9057,
+        "p99": 13706,
+        "max": 13706,
+        "n": 14
+      },
+      "elapsedSeconds": 67.9,
+      "error": null,
+      "regression": {
+        "verdict": "unchanged",
+        "baselineWeakCases": 0,
+        "currentWeakCases": 0
+      }
+    }
+  ],
+  "totals": {
+    "passed": 6,
+    "failed": 0,
+    "invalid": 0,
+    "errored": 0,
+    "total": 6
+  }
+}

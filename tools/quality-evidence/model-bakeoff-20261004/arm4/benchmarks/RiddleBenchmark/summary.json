@@ -1,0 +1,22 @@
+{
+  "timestampUtc": "2026-10-04T05:14:39Z",
+  "benchmarkName": "RiddleBenchmark",
+  "baselineWeakCases": 0,
+  "currentWeakCases": 0,
+  "regressionVerdict": "unchanged",
+  "promptsCount": 6,
+  "promptsSha256": "009bf79bd6cc17ee3fc5b7300bf23a834155e911691d4c2847ec29af4f6a8aa5",
+  "promptsChanged": false,
+  "valid": true,
+  "invalidReason": null,
+  "firstTurnSignature": null,
+  "label": "arm4",
+  "gitHead": "8c717ff",
+  "latencyMs": {
+    "p50": 2714,
+    "p90": 4371,
+    "p99": 5362,
+    "max": 5362,
+    "n": 15
+  }
+}

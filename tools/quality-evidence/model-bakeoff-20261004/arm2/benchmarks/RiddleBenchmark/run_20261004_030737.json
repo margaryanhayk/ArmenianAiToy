@@ -1,0 +1,277 @@
+[
+  {
+    "id": "RB01",
+    "label": "new, give up, another",
+    "turnsTotal": 3,
+    "turnsOk": 3,
+    "hardFail": false,
+    "turns": [
+      {
+        "user": "give me a riddle",
+        "expect": "pose",
+        "response": "Կռահի՞ր, թե ինչ եմ մտածել։ Դեղին է, տաքացնում է մեզ ու ցերեկը շողում է երկնքում։ Ի՞նչ է։",
+        "reply": "Կռահի՞ր, թե ինչ եմ մտածել։ Դեղին է, տաքացնում է մեզ ու ցերեկը շողում է երկնքում։ Ի՞նչ է։",
+        "latencyMs": 4324,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 88,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "չգիտեմ",
+        "expect": "reveal",
+        "response": "Պատասխանն էր՝ արևը։ Ուզու՞մ ես ևս մեկ հանելուկ։",
+        "reply": "Պատասխանն էր՝ արևը։ Ուզու՞մ ես ևս մեկ հանելուկ։",
+        "latencyMs": 2881,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 47,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "ևս մեկ",
+        "expect": "pose",
+        "response": "Կռահի՞ր, թե ինչ եմ մտածել։ Կանաչ խոտ է ուտում ու մեզ համեղ, սպիտակ կաթ է տալիս։ Ի՞նչ է։",
+        "reply": "Կռահի՞ր, թե ինչ եմ մտածել։ Կանաչ խոտ է ուտում ու մեզ համեղ, սպիտակ կաթ է տալիս։ Ի՞նչ է։",
+        "latencyMs": 6002,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 87,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      }
+    ]
+  },
+  {
+    "id": "RB02",
+    "label": "hint flow — three wrong guesses",
+    "turnsTotal": 4,
+    "turnsOk": 4,
+    "hardFail": false,
+    "turns": [
+      {
+        "user": "give me a riddle",
+        "expect": "pose",
+        "response": "Կռահի՛ր, թե ինչ եմ մտածել։ Նարնջագույն է, հողի մեջ է աճում, իսկ նապաստակները շատ են սիրում ուտել։ Ի՞նչ է։",
+        "reply": "Կռահի՛ր, թե ինչ եմ մտածել։ Նարնջագույն է, հողի մեջ է աճում, իսկ նապաստակները շատ են սիրում ուտել։ Ի՞նչ է։",
+        "latencyMs": 5727,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 105,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "cat",
+        "response": "Արի, մի հեքիաթ սկսենք։",
+        "reply": "Արի, մի հեքիաթ սկսենք։",
+        "latencyMs": 9053,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 22,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "կատու",
+        "response": "Արի, մի հեքիաթ սկսենք։",
+        "reply": "Արի, մի հեքիաթ սկսենք։",
+        "latencyMs": 8093,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 22,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "ձուկ",
+        "response": "Պատասխանն էր՝ գազարը։ Ուզու՞մ ես ևս մեկ հանելուկ։",
+        "reply": "Պատասխանն էր՝ գազարը։ Ուզու՞մ ես ևս մեկ հանելուկ։",
+        "latencyMs": 5245,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 49,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      }
+    ]
+  },
+  {
+    "id": "RB03",
+    "label": "Armenian opener + reveal",
+    "turnsTotal": 2,
+    "turnsOk": 2,
+    "hardFail": false,
+    "turns": [
+      {
+        "user": "հանելուկ",
+        "expect": "pose",
+        "response": "Կռահի՛ր, թե ինչ եմ մտածել։ Դեղին է, կլոր ու շատ տաք, երկնքից մեզ լույս է տալիս։ Ի՞նչ է։",
+        "reply": "Կռահի՛ր, թե ինչ եմ մտածել։ Դեղին է, կլոր ու շատ տաք, երկնքից մեզ լույս է տալիս։ Ի՞նչ է։",
+        "latencyMs": 4755,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 87,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "ասա պատասխանը",
+        "expect": "reveal",
+        "response": "Պատասխանն էր՝ արևը։ Ուզու՞մ ես ևս մեկ հանելուկ։",
+        "reply": "Պատասխանն էր՝ արևը։ Ուզու՞մ ես ևս մեկ հանելուկ։",
+        "latencyMs": 2634,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 47,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      }
+    ]
+  },
+  {
+    "id": "RB04",
+    "label": "explicit trigger mid-round forces new",
+    "turnsTotal": 2,
+    "turnsOk": 2,
+    "hardFail": false,
+    "turns": [
+      {
+        "user": "give me a riddle",
+        "expect": "pose",
+        "response": "Կռահի՛ր, թե ինչ եմ մտածել։ Կլոր է ու դեղին, երկնքում է շողում և բոլորին տաքացնում է։ Ի՞նչ է։",
+        "reply": "Կռահի՛ր, թե ինչ եմ մտածել։ Կլոր է ու դեղին, երկնքում է շողում և բոլորին տաքացնում է։ Ի՞նչ է։",
+        "latencyMs": 4520,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 92,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "նորից",
+        "expect": "pose",
+        "response": "Կռահի՛ր, տեսնեմ։ Կլորիկ է, կարմիր ու քաղցր, ծառի վրա է աճում։ Ի՞նչ է։",
+        "reply": "Կռահի՛ր, տեսնեմ։ Կլորիկ է, կարմիր ու քաղցր, ծառի վրա է աճում։ Ի՞նչ է։",
+        "latencyMs": 5352,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 69,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      }
+    ]
+  },
+  {
+    "id": "RB05",
+    "label": "short follow-up stays in riddle",
+    "turnsTotal": 2,
+    "turnsOk": 2,
+    "hardFail": false,
+    "turns": [
+      {
+        "user": "riddle me",
+        "expect": "pose",
+        "response": "Կռահի՞ր, թե ինչ եմ մտածել։ Դեղին է ու կլոր, երկնքում փայլում է և մեզ տաքացնում։ Ի՞նչ է։",
+        "reply": "Կռահի՞ր, թե ինչ եմ մտածել։ Դեղին է ու կլոր, երկնքում փայլում է և մեզ տաքացնում։ Ի՞նչ է։",
+        "latencyMs": 3830,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 87,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "ok",
+        "response": "Ոչ, ուրիշ բան է։ Այն առավոտյան է երկինք ելնում, իսկ գիշերը թաքնվում է, փորձի՛ր էլի։",
+        "reply": "Ոչ, ուրիշ բան է։ Այն առավոտյան է երկինք ելնում, իսկ գիշերը թաքնվում է, փորձի՛ր էլի։",
+        "latencyMs": 5360,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 83,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      }
+    ]
+  },
+  {
+    "id": "RB06",
+    "label": "haneluk + i don't know",
+    "turnsTotal": 2,
+    "turnsOk": 2,
+    "hardFail": false,
+    "turns": [
+      {
+        "user": "haneluk",
+        "expect": "pose",
+        "response": "Կռահի՛ր, թե ինչ եմ մտածել։ Կլոր է ու դեղին, երկնքում է շողում և մեզ տաքացնում է։ Ի՞նչ է։",
+        "reply": "Կռահի՛ր, թե ինչ եմ մտածել։ Կլոր է ու դեղին, երկնքում է շողում և մեզ տաքացնում է։ Ի՞նչ է։",
+        "latencyMs": 4547,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 88,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      },
+      {
+        "user": "i don't know",
+        "expect": "reveal",
+        "response": "Պատասխանն էր՝ արևը։ Ուզու՞մ ես ևս մեկ հանելուկ։",
+        "reply": "Պատասխանն էր՝ արևը։ Ուզու՞մ ես ևս մեկ հանելուկ։",
+        "latencyMs": 2785,
+        "safetyFlag": 0,
+        "mode": "riddle",
+        "responseLen": 47,
+        "hasArmenian": true,
+        "hasChoiceBlock": false,
+        "hasChoiceField": false,
+        "hasLeakedTail": false,
+        "hasLatinRun": false
+      }
+    ]
+  }
+]
