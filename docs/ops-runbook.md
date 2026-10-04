@@ -156,7 +156,7 @@ convention as everything else here) to enable it. Works with either:
   `Alerts__WebhookUrl=https://api.telegram.org/bot<TOKEN>/sendMessage` and
   `Alerts__TelegramChatId=<chat id>`; the alerter then adds `chat_id` beside
   `text`, and Telegram ignores the other fields. The bot token is a secret
-  and lives only in that Railway variable.
+  and lives only in that Railway variable and the password manager.
 
 Signals (each cooldown-gated per `key` so a flapping condition cannot
 spam):
@@ -214,9 +214,81 @@ against losing the volume — the automatic daily snapshots live on the same
 volume as the database they protect. Pull one weekly and keep it somewhere
 else.
 
+With `Internal__RequireSession=true` the static token alone gets **404**
+here: exchange it first (`POST /api/internal/session`, body `{}`, plus
+`"totp":"123456"` for an operator with a TOTP secret) and send the returned
+`sessionToken` instead. `tools/ops/pull_backup.sh` / `.ps1` do exactly that
+— see the next section.
+
 **Audio blobs are not in it.** `/data/audio-blobs` holds child voice
-recordings and is the one part that cannot be regenerated. Nothing backs it up
-today.
+recordings and is the one part that cannot be regenerated. Its daily zip
+(`areg-audio-blobs-*.zip`) sits on the same volume, with no pull endpoint
+yet — only Railway's own volume backups cover it.
+
+## Off-site backup pull (daily, automated)
+
+`tools/ops/pull_backup.ps1` (Windows) and `tools/ops/pull_backup.sh`
+(Linux/macOS) — same flow, same exit codes:
+
+1. read the backup operator's token from a file only you can read (a file
+   other users can read is refused);
+2. `POST /api/internal/session` → a 15-minute session token (works with
+   `Internal:RequireSession` on or off);
+3. `GET /api/internal/backup` → `areg-backup-<UTC>Z.db.part`;
+4. `PRAGMA integrity_check` through Python's `sqlite3` module, plus "is
+   `__EFMigrationsHistory` there" (an empty file passes integrity_check);
+   only then is the `.part` renamed;
+5. delete all but the newest 30 (`-Keep` / `--keep`) — only after a verified
+   pull, so a failing run never thins out good backups;
+6. ping the healthchecks.io URL, if given — **only on success**. A failing
+   run sends nothing and healthchecks.io alerts once period + grace pass.
+
+Exit codes: 0 ok (a failed ping only warns), 1 usage/config, 2 session or
+download refused (404 = wrong token or operator removed; 401 = that
+operator has a TOTP secret), 3 the snapshot failed its check. The token is
+never printed, logged or put on a command line.
+
+**One-time setup (Windows):**
+
+1. A named operator **without** a TOTP secret, used for nothing else:
+   `Internal__Operators__1__Name=backup-bot`,
+   `Internal__Operators__1__Token=<generated locally>`
+   (`docs/railway-deploy.md` § 4.5). It can read every family's data and has
+   no second factor: keep its token on this one machine only, and if the
+   machine is lost, delete the two variables and redeploy.
+2. Save the token in a file in your user profile, then lock it to you:
+   ```powershell
+   icacls C:\Users\<you>\areg\backup-bot.token /inheritance:r /grant:r "${env:USERNAME}:(R)"
+   ```
+3. A healthchecks.io check: period 1 day, grace 6 h, Telegram integration.
+   Copy its ping URL.
+4. Output folder on an encrypted (BitLocker) disk, used for nothing else.
+   Never a synced cloud folder, never GitHub (it is every family's data).
+5. Run it once by hand and check the three signs: the file exists, the log
+   says `integrity_check=ok`, healthchecks.io turns green.
+   ```powershell
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\areg\tools\ops\pull_backup.ps1 `
+     -BaseUrl https://<host> -TokenFile C:\Users\<you>\areg\backup-bot.token `
+     -OutDir D:\areg-backups -PingUrl https://hc-ping.com/<uuid> -LogFile D:\areg-backups\pull.log
+   ```
+6. Task Scheduler → Create Task: daily at 03:30, "Run whether user is logged
+   on or not", action = the same `powershell.exe` line. "Last Run Result"
+   shows the exit code; `pull.log` shows why.
+
+Linux/macOS: `chmod 600` the token file and run `pull_backup.sh` with the
+same values (`--base-url --token-file --out-dir --ping-url`, or the
+`AREG_BACKUP_*` variables) from cron.
+
+Restoring from one of these files: § Restore procedure, step 2 onwards.
+
+Verified 2026-10-03 against a throwaway local API (Production mode,
+`Internal:RequireSession=true`): both scripts saved a snapshot that passed
+the check (20 tables), pruned to `--keep`, pinged a local stand-in for
+healthchecks.io only on success, and refused with the right exit code for a
+TOTP operator, a wrong token, a world-readable token file, an unreachable
+host, an empty and a non-SQLite download. The `.ps1` ran under PowerShell
+7.6 on Linux — the Windows ACL check and Windows PowerShell 5.1 itself
+have not been run. NOT verified: a pull from the live Railway host.
 
 ## Restore procedure
 
