@@ -2,23 +2,31 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BenchCommon;
 
 // D2.3 — End-to-end mode-routing scaffold + device-gate + child-override
 // scenarios.
 //
-// CLI: first positional arg is baseUrl. No --write-baseline support yet —
-// the committed baseline ships with Placeholder=true and the first real
-// capture is a separate D2.x.bench follow-up slice.
+// CLI: first positional arg is baseUrl; --write-baseline saves baseline.json
+// to AppContext.BaseDirectory after a VALID run (operator copies it to
+// tools/ModeBenchmark/baseline.json and commits). --results-dir <dir> /
+// --label <text> / --provisioning-secret <s> (or env
+// AREG_PROVISIONING_SECRET): see tools/BenchCommon/BenchSetup.cs. Exit
+// 0 = passed, 1 = failed, 2 = self-check failed, 3 = INVALID (a claim
+// failed, or the hard/soft replies are mostly one canned line).
 //
 // Per-scenario contract:
-//   1. Register a fresh device via POST /api/devices/register.
-//   2. For "gate" scenarios: link the device to a per-run parent,
-//      apply the gate-specific setup (pause / bedtime window /
-//      mode-flags), then send the chat request from the device.
-//   3. For "child_override" scenarios: link the device to the per-run
-//      parent, apply the requested device-level mode flags, create a
-//      child, set the child's three-valued mode override, then send
-//      a chat request that includes childId in the body. Assertion
+//   1. Register a fresh device and CLAIM it for the per-run parent with
+//      its one-time claimCode (BenchDevice.RegisterAndClaimAsync). Every
+//      kind needs this: an unclaimed device only ever hears the resting
+//      line, so before C186 the hard/soft scenarios measured nothing.
+//   2. For "gate" scenarios: apply the gate-specific setup (pause /
+//      bedtime window / mode-flags) as that parent, then send the chat
+//      request from the device.
+//   3. For "child_override" scenarios: apply the requested device-level
+//      mode flags, create a child, set the child's three-valued mode
+//      override, then send a chat request that includes childId in the
+//      body. Assertion
 //      shape is hard (resp.Mode == expectedMode) when
 //      expectedResponseExact is null, otherwise gate-shape (5-invariant
 //      canned-response match).
@@ -36,11 +44,11 @@ using System.Text.Json.Serialization;
 // D1-F2 contract is mirrored: SHA-256 of scenarios.json is included in
 // summary.json; baseline-side hash mismatch flips the verdict to
 // "unavailable" with promptsChanged=true.
-var positional = args.Where(a => !a.StartsWith("--")).ToArray();
-var baseUrl = positional.Length > 0 ? positional[0] : "http://localhost:5000";
+var bench = BenchArgs.Parse(args);
+var baseUrl = bench.BaseUrl;
 var scenariosPath = Path.Combine(AppContext.BaseDirectory, "scenarios.json");
 var baselinePath = Path.Combine(AppContext.BaseDirectory, "baseline.json");
-var resultsDir = Path.Combine(AppContext.BaseDirectory, "results");
+var resultsDir = bench.ResultsDir;
 Directory.CreateDirectory(resultsDir);
 
 // Pin scenario-set identity (D1-F2). Hash is the SHA-256 of the raw
@@ -197,42 +205,31 @@ int modeMatches = 0;
 var failures = new List<string>();
 var results = new List<ScenarioResult>();
 
-// --- Per-run parent for gate / child-override scenario setup ---
-// Registered + logged in ONCE before the scenario loop. Reused across
-// all scenarios that need parent endpoints (link, pause, bedtime,
-// mode-flags, child create, child override). Skipped entirely when
-// no such scenarios are present.
-HttpClient? parentHttp = null;
-bool needsParent = gateCount > 0 || childOverrideCount > 0;
-if (needsParent)
+// --- Per-run parent: claims every device, and sets up gate / child ---
+// Registered + logged in ONCE before the scenario loop and reused for
+// every claim and every parent endpoint (pause, bedtime, mode-flags,
+// child create, child override). A failed setup makes the run INVALID.
+var validity = new RunValidity();
+var latency = new BenchLatency();
+BenchParent? parent = null;
+try
 {
-    parentHttp = new HttpClient
-    {
-        BaseAddress = new Uri(baseUrl),
-        Timeout = TimeSpan.FromSeconds(30),
-    };
-    var parentEmail = $"mbench-{DateTime.UtcNow:yyyyMMddHHmmssfff}@example.invalid";
-    var parentPassword = $"MBenchPass-{Guid.NewGuid():N}";
-    try
-    {
-        await RegisterParentAsync(parentHttp, parentEmail, parentPassword);
-        var jwt = await LoginParentAsync(parentHttp, parentEmail, parentPassword, jsonOpts);
-        parentHttp.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", jwt);
-        Console.WriteLine($"Registered + logged in parent: {parentEmail}\n");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[fatal] Parent setup failed — gate/child-override scenarios cannot run: {ex.Message}");
-        return 1;
-    }
+    parent = await BenchParent.CreateAsync(bench, "mbench");
+    Console.WriteLine($"Registered + logged in parent: {parent.Email}\n");
 }
+catch (Exception ex)
+{
+    validity.FailSetup($"bench parent: {ex.Message}");
+    Console.WriteLine($"[fatal] Parent setup failed — no scenario can run: {ex.Message}");
+}
+HttpClient? parentHttp = parent?.Http;
 
 Console.WriteLine("ID    | Kind  | Expected      | Observed   | Status");
 Console.WriteLine("------|-------|---------------|------------|-------");
 
 foreach (var scenario in scenarios)
 {
+    if (parent is null || validity.HasSetupFailure) break;
     bool isGate = string.Equals(scenario.Kind, "gate", StringComparison.Ordinal);
     bool isChildOverride = string.Equals(scenario.Kind, "child_override", StringComparison.Ordinal);
     bool isHard = !isGate && !isChildOverride && scenario.ExpectedMode is not null;
@@ -263,32 +260,28 @@ foreach (var scenario in scenarios)
         Timeout = TimeSpan.FromSeconds(60),
     };
 
-    DeviceReg device;
+    BenchDevice device;
     try
     {
-        var regBody = new { macAddress = $"MBENCH-{scenario.Id}-{DateTime.UtcNow:HHmmssfff}" };
-        var regResp = await http.PostAsJsonAsync("/api/devices/register", regBody);
-        regResp.EnsureSuccessStatusCode();
-        device = await regResp.Content.ReadFromJsonAsync<DeviceReg>(jsonOpts)
-            ?? throw new Exception("device registration returned null");
+        device = await BenchDevice.RegisterAndClaimAsync(parent, $"MBENCH-{scenario.Id}");
     }
     catch (Exception ex)
     {
-        sResult.Error = $"device registration failed: {ex.Message}";
-        failures.Add($"{scenario.Id}: device registration failed — {ex.Message}");
+        sResult.Error = $"device setup failed: {ex.Message}";
+        failures.Add($"{scenario.Id}: device setup failed — {ex.Message}");
+        validity.FailSetup($"{scenario.Id}: {ex.Message}");
         results.Add(sResult);
-        Console.WriteLine($" {scenario.Id} | {runtimeKind,-5} | reg-fail");
-        continue;
+        Console.WriteLine($" {scenario.Id} | {runtimeKind,-5} | claim-fail (run INVALID, stopping)");
+        break;
     }
-    http.DefaultRequestHeaders.Add("X-Device-Id", device.DeviceId.ToString());
-    http.DefaultRequestHeaders.Add("X-Api-Key", device.ApiKey);
+    device.ApplyTo(http);
 
-    // Gate-specific setup BEFORE the chat call.
+    // Gate-specific setup BEFORE the chat call (the device is already
+    // claimed by this parent).
     if (isGate)
     {
         try
         {
-            await LinkDeviceAsync(parentHttp!, device.DeviceId, device.ApiKey);
             switch (scenario.Gate)
             {
                 case "paused":
@@ -328,7 +321,6 @@ foreach (var scenario in scenarios)
     {
         try
         {
-            await LinkDeviceAsync(parentHttp!, device.DeviceId, device.ApiKey);
             // Apply device-level flags from the scenario.
             await SetDeviceModeFlagsAsync(parentHttp!, device.DeviceId,
                 scenario.DeviceFlags!.Story,
@@ -358,28 +350,37 @@ foreach (var scenario in scenarios)
         }
     }
 
+    // Run validity looks only at scenarios whose expected answer is a
+    // model-written reply; a gate (or gate-shape child override) is
+    // SUPPOSED to return one identical canned line.
+    bool expectsModelReply = isHard || isSoft
+        || (isChildOverride && string.IsNullOrEmpty(scenario.ExpectedResponseExact));
+
     ChatResponseShape? resp = null;
     int httpStatus = 0;
     try
     {
         // Conditional chat body — child-override scenarios pass childId.
         HttpResponseMessage httpResp;
+        long elapsedMs;
         if (isChildOverride && createdChildId is not null)
         {
             var body = new { message = scenario.Message, childId = createdChildId.Value };
-            httpResp = await http.PostAsJsonAsync("/api/chat", body);
+            (httpResp, elapsedMs) = await latency.TimeAsync(() => http.PostAsJsonAsync("/api/chat", body));
         }
         else
         {
             var body = new { message = scenario.Message };
-            httpResp = await http.PostAsJsonAsync("/api/chat", body);
+            (httpResp, elapsedMs) = await latency.TimeAsync(() => http.PostAsJsonAsync("/api/chat", body));
         }
+        sResult.LatencyMs = elapsedMs;
         httpStatus = (int)httpResp.StatusCode;
         if (!httpResp.IsSuccessStatusCode)
         {
             sResult.HttpStatus = httpStatus;
             sResult.Error = $"HTTP {httpStatus}";
             failures.Add($"{scenario.Id}: HTTP {httpStatus}");
+            if (expectsModelReply) validity.RecordFirstTurn(null);
             results.Add(sResult);
             Console.WriteLine($" {scenario.Id} | {runtimeKind,-5} | HTTP {httpStatus}");
             continue;
@@ -391,13 +392,17 @@ foreach (var scenario in scenarios)
         sResult.HttpStatus = httpStatus;
         sResult.Error = ex.Message;
         failures.Add($"{scenario.Id}: chat request failed — {ex.Message}");
+        if (expectsModelReply) validity.RecordFirstTurn(null);
         results.Add(sResult);
         Console.WriteLine($" {scenario.Id} | {runtimeKind,-5} | error");
         continue;
     }
+    if (expectsModelReply) validity.RecordFirstTurn(resp?.Response);
 
     sResult.HttpStatus = httpStatus;
     sResult.ObservedMode = resp?.Mode;
+    sResult.Reply = resp?.Response;
+    sResult.SafetyFlag = resp?.SafetyFlag;
     var responseText = resp?.Response ?? "";
     sResult.ResponseSnippet = responseText.Length > 120
         ? responseText.Substring(0, 120) + "…"
@@ -507,7 +512,7 @@ foreach (var scenario in scenarios)
 }
 
 // Always dispose the parent client after all scenarios run.
-parentHttp?.Dispose();
+parent?.Dispose();
 
 Console.WriteLine();
 Console.WriteLine("═══════════════════════════════════════");
@@ -518,13 +523,14 @@ Console.WriteLine($"  Scenarios passed:       {scenariosOk}/{scenarios.Count}");
 Console.WriteLine($"  Mode matches:           {modeMatches}/{hardCount}");
 Console.WriteLine($"  Gate trips:             {gateTripsObserved}/{gateTripsExpected}");
 Console.WriteLine($"  Child override matches: {childOverrideMatches}/{childOverrideCount}");
+validity.PrintVerdict();
 
 // --- Save per-scenario results + markdown ---
 var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
 var resultsJson = Path.Combine(resultsDir, $"run_{timestamp}.json");
 var resultsMd = Path.Combine(resultsDir, $"run_{timestamp}.md");
 
-await File.WriteAllTextAsync(resultsJson, JsonSerializer.Serialize(results, jsonOpts));
+await File.WriteAllTextAsync(resultsJson, JsonSerializer.Serialize(results, BenchSummary.ResultsJson));
 
 var md = new System.Text.StringBuilder();
 md.AppendLine("# ModeBenchmark Results");
@@ -532,6 +538,7 @@ md.AppendLine();
 md.AppendLine($"**Date:** {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
 md.AppendLine($"**Target:** {baseUrl}");
 md.AppendLine($"**Scenarios:** {scenarios.Count}  (hard {hardCount} / soft {softCount} / gate {gateCount} / child {childOverrideCount})");
+BenchSummary.AppendMarkdownHeader(md, bench, validity, latency);
 md.AppendLine();
 md.AppendLine("| ID | Kind | Message | Expected | Observed | Status |");
 md.AppendLine("|----|------|---------|----------|----------|--------|");
@@ -559,8 +566,8 @@ Console.WriteLine();
 Console.WriteLine($"  Results JSON:      {resultsJson}");
 Console.WriteLine($"  Results markdown:  {resultsMd}");
 
-// --- Suite summary artifact (D1-F2 contract consumed by BenchmarkAll if
-// ever wired in; ModeBenchmark is intentionally NOT wired today). ---
+// --- Suite summary artifact (D1-F2 contract consumed by BenchmarkAll,
+// which runs ModeBenchmark since C186). ---
 bool runSucceeded = (scenariosOk == scenarios.Count);
 int currentWeakCases = scenarios.Count - scenariosOk;
 bool promptsChanged = false;
@@ -603,8 +610,9 @@ if (File.Exists(baselinePath))
 }
 
 string regressionVerdict;
-if (promptsChanged)
+if (promptsChanged || !validity.Valid)
 {
+    // An INVALID run's weak-case count is not comparable either.
     regressionVerdict = "unavailable";
 }
 else if (baselineWeakCasesForSummary is null)
@@ -625,7 +633,7 @@ else
 }
 
 var summaryPath = Path.Combine(resultsDir, "summary.json");
-await File.WriteAllTextAsync(summaryPath, JsonSerializer.Serialize(new
+await BenchSummary.WriteAsync(summaryPath, new
 {
     timestampUtc = DateTime.UtcNow.ToString(
         "yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture),
@@ -646,7 +654,41 @@ await File.WriteAllTextAsync(summaryPath, JsonSerializer.Serialize(new
     gateTripsObserved,
     childOverrideScenarios = childOverrideCount,
     childOverrideMatches,
-}, jsonOpts));
+}, jsonOpts, bench, validity, latency);
+
+// --write-baseline (C186 phase 2 needs all six baselines rewritten from
+// one run). Same ModeMetrics shape as the committed baseline.json; never
+// from an INVALID run.
+if (bench.WriteBaseline && !validity.Valid)
+{
+    Console.WriteLine();
+    Console.WriteLine("  Baseline NOT written: this run is INVALID.");
+}
+else if (bench.WriteBaseline)
+{
+    var current = new ModeMetrics
+    {
+        TotalScenarios = scenarios.Count,
+        HardScenarios = hardCount,
+        SoftScenarios = softCount,
+        GateScenarios = gateCount,
+        GateTripsExpected = gateTripsExpected,
+        GateTripsObserved = gateTripsObserved,
+        ChildOverrideScenarios = childOverrideCount,
+        ChildOverrideMatches = childOverrideMatches,
+        ScenariosOk = scenariosOk,
+        ModeMatches = modeMatches,
+        GateTrips = gateTripsObserved,
+        WeakCases = currentWeakCases,
+        Placeholder = false,
+        PromptsCount = scenarios.Count,
+        PromptsSha256 = scenariosSha256,
+    };
+    await File.WriteAllTextAsync(baselinePath, JsonSerializer.Serialize(current, jsonOpts));
+    Console.WriteLine();
+    Console.WriteLine($"  Baseline written: {baselinePath}");
+    Console.WriteLine($"  Copy to: tools/ModeBenchmark/baseline.json");
+}
 
 if (failures.Count > 0)
 {
@@ -657,36 +699,9 @@ if (failures.Count > 0)
 
 Console.WriteLine("═══════════════════════════════════════");
 
-return runSucceeded ? 0 : 1;
+return validity.ExitCode(passed: runSucceeded);
 
 // --- Helpers (parent-side endpoints used by gate / child-override scenarios) ---
-
-static async Task RegisterParentAsync(HttpClient http, string email, string password)
-{
-    var body = new { email, password, acceptedTerms = true };
-    var resp = await http.PostAsJsonAsync("/api/parents/register", body);
-    resp.EnsureSuccessStatusCode();
-}
-
-static async Task<string> LoginParentAsync(
-    HttpClient http, string email, string password, JsonSerializerOptions jsonOpts)
-{
-    var body = new { email, password };
-    var resp = await http.PostAsJsonAsync("/api/parents/login", body);
-    resp.EnsureSuccessStatusCode();
-    var login = await resp.Content.ReadFromJsonAsync<ParentLoginShape>(jsonOpts)
-        ?? throw new Exception("parent login returned null");
-    if (string.IsNullOrWhiteSpace(login.Token))
-        throw new Exception("parent login response had no token");
-    return login.Token;
-}
-
-static async Task LinkDeviceAsync(HttpClient parentHttp, Guid deviceId, string apiKey)
-{
-    var body = new { deviceId, apiKey };
-    var resp = await parentHttp.PostAsJsonAsync("/api/parents/devices/link", body);
-    resp.EnsureSuccessStatusCode();
-}
 
 static async Task PauseDeviceAsync(HttpClient parentHttp, Guid deviceId)
 {
@@ -803,17 +818,6 @@ record ChatResponseShape
     public string? Mode { get; init; }
 }
 
-record DeviceReg
-{
-    public Guid DeviceId { get; init; }
-    public string ApiKey { get; init; } = "";
-}
-
-record ParentLoginShape
-{
-    public string Token { get; init; } = "";
-}
-
 record CreateChildResponseShape
 {
     public Guid ChildId { get; init; }
@@ -859,6 +863,12 @@ record ScenarioResult
 
     public string? ObservedMode { get; set; }
     public string? ResponseSnippet { get; set; }
+    // C186: per-turn fields the bake-off report reads (each scenario is one
+    // turn; mode duplicates observedMode under the shared name).
+    public string? Reply { get; set; }
+    public long? LatencyMs { get; set; }
+    public int? SafetyFlag { get; set; }
+    public string? Mode => ObservedMode;
     public int HttpStatus { get; set; }
     public bool Ok { get; set; }
     public string? Error { get; set; }

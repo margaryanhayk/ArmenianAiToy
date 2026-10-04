@@ -13,4 +13,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+  <!-- Shared bench setup (claim, validity, latency, CLI) — linked as source,
+       no NuGet and no ProjectReference (C186). -->
+  <ItemGroup>
+    <Compile Include="..\BenchCommon\*.cs" Link="BenchCommon\%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

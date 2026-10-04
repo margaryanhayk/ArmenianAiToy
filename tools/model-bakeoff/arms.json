@@ -1,0 +1,210 @@
+{
+ "schema": 1,
+ "note": "Bake-off arms. Secret values NEVER live here: secretEnv maps a backend config key to the NAME of an environment variable the runner reads at boot. Everything under commonEnv is a bench-only value for a throwaway local API (documented in README.md and the report), never a production setting.",
+ "modelIdsCheckedLive": "2026-10-03: all five chat model ids answered with the adapter's own request shape (orchestrator check before this build). Re-check on the run day.",
+ "vertex": {
+  "requiredSecretEnvNames": [
+   "GEMINI_VERTEX_SA_JSON",
+   "GEMINI_VERTEX_PROJECT_ID"
+  ],
+  "note": "Availability is decided at run time from whether these NAMES are set, never here. A Vertex arm without them is refused unless --vertex-fallback-ai-studio is passed; that choice is the owner's and is recorded in arm-run.json and in the report. Arm 2 is the first live Vertex call ever (N15): a 400 on the shared snake_case body stops that arm, and the adapter fix is a separate, approved change. Every probe is adult-written synthetic text already in the repo; no child data reaches either backend. The production flip to Vertex still needs Google's under-18 confirmation (C035)."
+ },
+ "apiDll": "backend/src/ArmenianAiToy.Api/bin/Release/net10.0/ArmenianAiToy.Api.dll",
+ "apiWorkingDir": "backend/src/ArmenianAiToy.Api",
+ "healthTimeoutSeconds": 120,
+ "secretEnv": {
+  "OpenAI__ApiKey": "OPENAI_API_KEY",
+  "Gemini__Vertex__ServiceAccountJson": "GEMINI_VERTEX_SA_JSON",
+  "Gemini__Vertex__ProjectId": "GEMINI_VERTEX_PROJECT_ID"
+ },
+ "secretEnvNote": "Gemini__Vertex__* are passed only to an arm that runs on Vertex. The backend reads GEMINI_API_KEY itself (secretEnvPassThrough); the calibration call uses it for every Gemini arm, Vertex arms included.",
+ "secretEnvPassThrough": [
+  "GEMINI_API_KEY"
+ ],
+ "commonEnv": {
+  "ASPNETCORE_ENVIRONMENT": "Production",
+  "Devices__AllowOpenRegistration": "true",
+  "RateLimiting__Auth__PermitLimit": "1000",
+  "RateLimiting__Chat__PermitLimit": "1000",
+  "OpenAI__DailyCostCap__Default": "1000",
+  "Backup__Database__Enabled": "false",
+  "Alerts__WebhookUrl": ""
+ },
+ "commonEnvWhy": {
+  "Devices__AllowOpenRegistration": "the runner and the benchmarks register a fresh toy per unit with no provisioning secret",
+  "RateLimiting__Auth__PermitLimit": "one register + claim per unit; the production 10-per-60s auth bucket would 429 the run",
+  "RateLimiting__Chat__PermitLimit": "calls are strictly sequential; the cap is lifted so a slow arm is never throttled into canned replies",
+  "OpenAI__DailyCostCap__Default": "the $0.25/toy/day cap would inject the canned pause line mid-persona and poison the comparison",
+  "Backup__Database__Enabled": "no snapshot of a throwaway DB",
+  "Alerts__WebhookUrl": "never page anyone from a bench"
+ },
+ "spend": {
+  "perArmBudgetUsdDefault": 12,
+  "cumulativeStopUsd": 90,
+  "hardCapUsd": 100,
+  "guardSafetyFactor": 1.5,
+  "note": "The guard prices a call with the calibration's measured tokens (reasoning/thinking included) once an arm has one, and arms.json's assumptions until then. Its figure is the larger of that estimate and the arm DB's DeviceUsageDays meter, which under-counts the chat path (question-only EstimateChatCostUsd). Every unit is checked against the arm budget, cumulativeStopUsd and hardCapUsd across EVERY runs folder in the ledger ($BAKEOFF_LEDGER, default <runs parent>/bakeoff-ledger.json). It is a guard, not the cap: the provider-side project budgets (OpenAI 'areg-bakeoff' $40, Google $60) are the hard cap and must be set before any live run."
+ },
+ "estimate": {
+  "note": "Guard assumptions only, NOT measurements. The token-measurement step of the plan replaces them in the cost write-up.",
+  "chatPromptTokensPerTurn": 3500,
+  "extraModelCallsPerChatTurn": 0.25,
+  "storyQaPromptTokens": 2086,
+  "storyQaPromptTokensSource": "8,343 chars / 4, measured 2026-08-12 (tools/quality-evidence/cost-per-hour-of-play-20260812.md)",
+  "storyQaOutTokens": 40,
+  "storyQaCallsPerProbe": 1.3,
+  "reflectionPromptTokens": 1500,
+  "reflectionOutTokens": 40,
+  "childAudioSeconds": 5,
+  "replyChars": 150,
+  "sttUsdPerMinute": 0.017,
+  "sttSource": "gpt-live-transcribe $0.017/min (docs/ai-landscape-2026-09.md); gpt-transcribe batch is not dearer as far as known, so this is the guard ceiling",
+  "ttsUsdPerMChars": 15.0,
+  "ttsSource": "OpenAICostEstimator.TtsUsdPerMillionChars (tts-1 rate; conservative for gpt-4o-mini-tts)",
+  "benchmarkChatTurns": {
+   "Story": 58,
+   "Game": 46,
+   "Riddle": 15,
+   "Calm": 15,
+   "Curiosity": 13,
+   "Mode": 26
+  },
+  "benchmarkChatTurnsSource": "prompts/scenarios.json turn counts at 2026-10-03; Story counts an opening + one continuation per prompt, Mode adds ~12 gate/claim scenario turns"
+ },
+ "defaultPasses": 3,
+ "defaultPassesWhy": "The plan: 3 passes on the safety and persona sets (worst-of-3, majority-of-3); voice-latency and the benchmarks run once. An arm's own `passes` caps it.",
+ "arms": [
+  {
+   "id": "arm1",
+   "label": "gemini-3.6-flash, AI Studio, default threshold (production control)",
+   "role": "control",
+   "port": 5201,
+   "env": {
+    "AI__ChatProvider": "gemini",
+    "Gemini__Model": "gemini-3.6-flash",
+    "Gemini__Backend": "ai-studio"
+   },
+   "threshold": "default (empty = BLOCK_LOW_AND_ABOVE)",
+   "requiredSecretEnvNames": [
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY"
+   ],
+   "budgetUsd": 15,
+   "budgetWhy": "3 passes plan ~$11.6 at the guard's assumptions (x1.5); $15 leaves room for the calibration to measure more Armenian tokens per char than 4 chars/token",
+   "guardPrices": {
+    "chatInPerMTok": 0.75,
+    "chatOutPerMTok": 3.75,
+    "source": "gemini-3.6/3.7/3.8 flash list price, docs/ai-landscape-2026-09.md R8 [S]; doubles 2027-01-01 per the same note"
+   },
+   "outTokensPerTurn": 400,
+   "thinkingBudget": {
+    "value": "unset",
+    "decidedAt": "2026-10-04",
+    "why": "Mirrors production: appsettings sets no Gemini:ThinkingBudget, and gemini-3.6-flash rejects thinkingConfig with HTTP 400 (adapter comment). Re-check against the Railway variable names (owner step 3) on the run day."
+   }
+  },
+  {
+   "id": "arm2",
+   "label": "gemini-3.8-flash, Vertex, default threshold",
+   "role": "candidate",
+   "port": 5202,
+   "env": {
+    "AI__ChatProvider": "gemini",
+    "Gemini__Model": "gemini-3.8-flash",
+    "Gemini__Backend": "vertex"
+   },
+   "threshold": "default (empty = BLOCK_LOW_AND_ABOVE)",
+   "requiredSecretEnvNames": [
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY"
+   ],
+   "budgetUsd": 15,
+   "budgetWhy": "3 passes plan ~$11.6 at the guard's assumptions (x1.5); $15 leaves room for the calibration to measure more Armenian tokens per char than 4 chars/token",
+   "guardPrices": {
+    "chatInPerMTok": 0.75,
+    "chatOutPerMTok": 3.75,
+    "source": "gemini-3.6/3.7/3.8 flash list price, docs/ai-landscape-2026-09.md R8 [S]"
+   },
+   "outTokensPerTurn": 400,
+   "thinkingBudget": {
+    "value": null,
+    "decidedAt": null,
+    "why": "RUN-DAY DECISION, not made yet. The adapter omits thinkingConfig unless Gemini:ThinkingBudget is set, so gemini-3.8-flash runs with its default thinking: slower and dearer than the production config shape. Run --calibrate-only first (it reports thoughtsTokenCount), then record \"unset\" (measure the model as it would ship with today's config) or an int (e.g. 0, which also needs Gemini__ThinkingBudget on Railway if this model is chosen). The live runner refuses this arm until it is recorded."
+   }
+  },
+  {
+   "id": "arm3",
+   "label": "gemini-3.8-flash, Vertex, BLOCK_MEDIUM_AND_ABOVE",
+   "role": "candidate",
+   "port": 5203,
+   "env": {
+    "AI__ChatProvider": "gemini",
+    "Gemini__Model": "gemini-3.8-flash",
+    "Gemini__Backend": "vertex",
+    "Gemini__SafetyThreshold": "BLOCK_MEDIUM_AND_ABOVE"
+   },
+   "threshold": "BLOCK_MEDIUM_AND_ABOVE (the C028 threshold decision's numbers)",
+   "requiredSecretEnvNames": [
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY"
+   ],
+   "budgetUsd": 15,
+   "budgetWhy": "3 passes plan ~$11.6 at the guard's assumptions (x1.5); $15 leaves room for the calibration to measure more Armenian tokens per char than 4 chars/token",
+   "guardPrices": {
+    "chatInPerMTok": 0.75,
+    "chatOutPerMTok": 3.75,
+    "source": "gemini-3.6/3.7/3.8 flash list price, docs/ai-landscape-2026-09.md R8 [S]"
+   },
+   "outTokensPerTurn": 400,
+   "thinkingBudget": {
+    "value": null,
+    "decidedAt": null,
+    "why": "RUN-DAY DECISION, not made yet. The adapter omits thinkingConfig unless Gemini:ThinkingBudget is set, so gemini-3.8-flash runs with its default thinking: slower and dearer than the production config shape. Run --calibrate-only first (it reports thoughtsTokenCount), then record \"unset\" (measure the model as it would ship with today's config) or an int (e.g. 0, which also needs Gemini__ThinkingBudget on Railway if this model is chosen). The live runner refuses this arm until it is recorded."
+   }
+  },
+  {
+   "id": "arm4",
+   "label": "gpt-5.6-luna (OpenAI chat)",
+   "role": "candidate",
+   "port": 5204,
+   "env": {
+    "AI__ChatProvider": "openai",
+    "OpenAI__ChatModel": "gpt-5.6-luna"
+   },
+   "threshold": "n/a (no provider-side filter knob; the adapter sends no reasoning-effort setting)",
+   "requiredSecretEnvNames": [
+    "OPENAI_API_KEY"
+   ],
+   "budgetUsd": 12,
+   "guardPrices": {
+    "chatInPerMTok": 0.2,
+    "chatOutPerMTok": 1.2,
+    "source": "GPT-5.6 Luna, docs/ai-landscape-2026-09.md (July 2026) [S]; re-check the price page on the run day"
+   },
+   "outTokensPerTurn": 800
+  },
+  {
+   "id": "arm5",
+   "label": "gpt-5.6-terra (OpenAI chat)",
+   "role": "candidate",
+   "port": 5205,
+   "env": {
+    "AI__ChatProvider": "openai",
+    "OpenAI__ChatModel": "gpt-5.6-terra"
+   },
+   "threshold": "n/a (no provider-side filter knob; the adapter sends no reasoning-effort setting)",
+   "requiredSecretEnvNames": [
+    "OPENAI_API_KEY"
+   ],
+   "budgetUsd": 25,
+   "passes": 1,
+   "passesWhy": "Terra plans ~$19 for one pass and ~$32 for two at the guard's assumptions; its $25 budget fits one. Its safety columns are therefore single-pass, not worst-of-3 (the report says so). Owner: raise budgetUsd and passes together to change it.",
+   "guardPrices": {
+    "chatInPerMTok": 2.0,
+    "chatOutPerMTok": 12.0,
+    "source": "GPT-5.6 Terra, docs/ai-landscape-2026-09.md (July 2026) [S]; re-check the price page on the run day"
+   },
+   "outTokensPerTurn": 800
+  }
+ ]
+}

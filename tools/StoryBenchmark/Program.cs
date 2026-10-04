@@ -2,16 +2,22 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using BenchCommon;
 
 // CLI: first positional arg is baseUrl; --write-baseline saves baseline.json
 // to AppContext.BaseDirectory after the run. Operator copies the generated
 // file to the source tools/StoryBenchmark/baseline.json and commits.
-bool writeBaseline = args.Any(a => a == "--write-baseline");
-var positional = args.Where(a => !a.StartsWith("--")).ToArray();
-var baseUrl = positional.Length > 0 ? positional[0] : "http://localhost:5000";
+// --results-dir <dir> / --label <text> / --provisioning-secret <s> (or env
+// AREG_PROVISIONING_SECRET): see tools/BenchCommon/BenchSetup.cs. Exit 0 =
+// passed, 1 = failed, 2 = self-check failed, 3 = INVALID (the claim failed,
+// or the start replies are mostly one canned line — the run measured
+// nothing).
+var bench = BenchArgs.Parse(args);
+bool writeBaseline = bench.WriteBaseline;
+var baseUrl = bench.BaseUrl;
 var promptsPath = Path.Combine(AppContext.BaseDirectory, "prompts.json");
 var baselinePath = Path.Combine(AppContext.BaseDirectory, "baseline.json");
-var resultsDir = Path.Combine(AppContext.BaseDirectory, "results");
+var resultsDir = bench.ResultsDir;
 Directory.CreateDirectory(resultsDir);
 
 // D1-F2: pin prompt-set identity so prompt edits cannot silently invalidate
@@ -77,38 +83,30 @@ var jsonOpts = new JsonSerializerOptions
 
 using var http = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(60) };
 
-// --- Step 1: Register a fresh device ---
+// --- Step 1: Register a fresh device and claim it ---
 Console.WriteLine($"Benchmark target: {baseUrl}");
 Console.WriteLine("Registering device...");
-
-var regBody = new { macAddress = $"BENCH-{DateTime.UtcNow:HHmmss}" };
-var regResp = await http.PostAsJsonAsync("/api/devices/register", regBody);
-regResp.EnsureSuccessStatusCode();
-var device = await regResp.Content.ReadFromJsonAsync<DeviceReg>(jsonOpts)
-    ?? throw new Exception("Device registration returned null");
 
 // Claim the device for a throwaway parent: since the unclaimed-device gate
 // shipped, an unclaimed toy only ever hears the canned "resting" line, so
 // every start measured 50 chars and the benchmark silently measured nothing.
+// Claimed with the one-time claimCode (C186), not the legacy
+// /api/parents/devices/link, which C079 may restrict or retire. A failed
+// setup makes the run INVALID (exit 3) instead of an unhandled crash.
+var validity = new RunValidity();
+var latency = new BenchLatency();
+try
 {
-    var email = $"bench-{Guid.NewGuid():N}@example.test";
-    const string password = "Bench-password-123!";
-    (await http.PostAsJsonAsync("/api/parents/register",
-        new { email, password, acceptedTerms = true })).EnsureSuccessStatusCode();
-    var loginResp = await http.PostAsJsonAsync("/api/parents/login", new { email, password });
-    loginResp.EnsureSuccessStatusCode();
-    var token = (await loginResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString();
-    using var linkReq = new HttpRequestMessage(HttpMethod.Post, "/api/parents/devices/link")
-    {
-        Content = JsonContent.Create(new { deviceId = device.DeviceId, apiKey = device.ApiKey }),
-    };
-    linkReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-    (await http.SendAsync(linkReq)).EnsureSuccessStatusCode();
+    using var parent = await BenchParent.CreateAsync(bench, "sbench");
+    var device = await BenchDevice.RegisterAndClaimAsync(parent, "BENCH");
+    device.ApplyTo(http);
+    Console.WriteLine($"Device: {device.DeviceId} (claimed)\n");
 }
-
-http.DefaultRequestHeaders.Add("X-Device-Id", device.DeviceId.ToString());
-http.DefaultRequestHeaders.Add("X-Api-Key", device.ApiKey);
-Console.WriteLine($"Device: {device.DeviceId} (claimed)\n");
+catch (Exception ex)
+{
+    validity.FailSetup(ex.Message);
+    Console.WriteLine($"[fatal] device setup failed — run INVALID: {ex.Message}\n");
+}
 
 // --- Step 2: Load prompts ---
 var prompts = JsonSerializer.Deserialize<List<Prompt>>(
@@ -126,25 +124,37 @@ var weakCases = new List<string>();
 
 foreach (var prompt in prompts)
 {
+    if (validity.HasSetupFailure) break;
     var result = new TestResult { Id = prompt.Id, Message = prompt.Message };
 
     // --- Step 3: Send start request ---
     ChatResponse? startResp;
+    long? startMs = null;
     try
     {
         var body = new { message = prompt.Message };
-        var resp = await http.PostAsJsonAsync("/api/chat", body);
+        var (resp, elapsedMs) = await latency.TimeAsync(() => http.PostAsJsonAsync("/api/chat", body));
+        startMs = elapsedMs;
         resp.EnsureSuccessStatusCode();
         startResp = await resp.Content.ReadFromJsonAsync<ChatResponse>(jsonOpts);
     }
     catch (Exception ex)
     {
         result.StartError = ex.Message;
+        result.Turns.Add(new TurnRecord { Kind = "start", User = prompt.Message, LatencyMs = startMs, Error = ex.Message });
+        validity.RecordFirstTurn(null);
         results.Add(result);
         failures.Add($"{prompt.Id}: start failed \u2014 {ex.Message}");
         PrintRow(prompt.Id, false, false, false, false, false, false, false, false, false, false);
         continue;
     }
+    validity.RecordFirstTurn(startResp?.Response);
+    result.Turns.Add(new TurnRecord
+    {
+        Kind = "start", User = prompt.Message, Reply = startResp?.Response, LatencyMs = startMs,
+        SafetyFlag = startResp?.SafetyFlag, Mode = startResp?.Mode,
+        Error = startResp is null ? "null response" : null,
+    });
 
     if (startResp is null)
     {
@@ -250,6 +260,7 @@ foreach (var prompt in prompts)
 
     if (hasChoiceA && hasSsid)
     {
+        long? contMs = null;
         try
         {
             var contBody = new
@@ -258,9 +269,16 @@ foreach (var prompt in prompts)
                 storySessionId = startResp.StorySessionId,
                 selectedChoice = "A"
             };
-            var contResp = await http.PostAsJsonAsync("/api/chat", contBody);
+            var (contResp, contElapsedMs) = await latency.TimeAsync(() => http.PostAsJsonAsync("/api/chat", contBody));
+            contMs = contElapsedMs;
             contResp.EnsureSuccessStatusCode();
             var cont = await contResp.Content.ReadFromJsonAsync<ChatResponse>(jsonOpts);
+            result.Turns.Add(new TurnRecord
+            {
+                Kind = "continuation", User = startResp.ChoiceA, Reply = cont?.Response, LatencyMs = contMs,
+                SafetyFlag = cont?.SafetyFlag, Mode = cont?.Mode,
+                Error = cont is null ? "null response" : null,
+            });
 
             if (cont is not null)
             {
@@ -382,6 +400,8 @@ foreach (var prompt in prompts)
         catch (Exception ex)
         {
             result.ContinuationError = ex.Message;
+            if (!result.Turns.Any(t => t.Kind == "continuation"))
+                result.Turns.Add(new TurnRecord { Kind = "continuation", User = startResp.ChoiceA, LatencyMs = contMs, Error = ex.Message });
             failures.Add($"{prompt.Id}: continuation failed \u2014 {ex.Message}");
         }
     }
@@ -396,7 +416,7 @@ foreach (var prompt in prompts)
 
 // --- Step 5: Save results ---
 var outputPath = Path.Combine(resultsDir, $"run_{DateTime.UtcNow:yyyyMMdd_HHmmss}.json");
-await File.WriteAllTextAsync(outputPath, JsonSerializer.Serialize(results, jsonOpts));
+await File.WriteAllTextAsync(outputPath, JsonSerializer.Serialize(results, BenchSummary.ResultsJson));
 
 // --- Step 5b: Generate markdown report ---
 var mdPath = Path.ChangeExtension(outputPath, ".md");
@@ -407,6 +427,7 @@ var mdPath = Path.ChangeExtension(outputPath, ".md");
     md.AppendLine($"**Date:** {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
     md.AppendLine($"**Target:** {baseUrl}");
     md.AppendLine($"**Prompts:** {prompts.Count}");
+    BenchSummary.AppendMarkdownHeader(md, bench, validity, latency);
     md.AppendLine();
 
     // Summary table
@@ -517,6 +538,7 @@ Console.WriteLine($"    same_first_verb:                {sameFirstVerbCount}/{to
 Console.WriteLine($"    continuation_no_label_reference:{noLabelRefCount}/{contEligible}");
 Console.WriteLine($"    start_continuation_recap_overlap:{recapCount}/{contEligible}");
 Console.WriteLine($"    avg recap-overlap:              {avgOverlap:F3}");
+validity.PrintVerdict();
 
 Console.WriteLine($"  Results JSON:           {outputPath}");
 Console.WriteLine($"  Results markdown:       {mdPath}");
@@ -563,12 +585,21 @@ if (File.Exists(baselinePath))
             }
 
             Console.WriteLine();
-            Console.WriteLine("  Delta vs baseline (negative = improvement for weak counts)");
-            Console.WriteLine($"    weak_cases:                       {Delta(baseline.WeakCases, currentMetrics.WeakCases)}");
-            Console.WriteLine($"    same_first_verb:                  {Delta(baseline.SameFirstVerb, currentMetrics.SameFirstVerb)}");
-            Console.WriteLine($"    continuation_no_label_reference:  {Delta(baseline.ContinuationNoLabelReference, currentMetrics.ContinuationNoLabelReference)}");
-            Console.WriteLine($"    start_continuation_recap_overlap: {Delta(baseline.StartContinuationRecapOverlap, currentMetrics.StartContinuationRecapOverlap)}");
-            Console.WriteLine($"    avg_recap_overlap:                {currentMetrics.AvgRecapOverlap - baseline.AvgRecapOverlap:+0.000;-0.000;0.000}");
+            if (!validity.Valid)
+            {
+                // An INVALID run's counts are not comparable; an unmeasured
+                // run's zeros would read as a clean improvement.
+                Console.WriteLine("  Delta vs baseline: (skipped: run INVALID)");
+            }
+            else
+            {
+                Console.WriteLine("  Delta vs baseline (negative = improvement for weak counts)");
+                Console.WriteLine($"    weak_cases:                       {Delta(baseline.WeakCases, currentMetrics.WeakCases)}");
+                Console.WriteLine($"    same_first_verb:                  {Delta(baseline.SameFirstVerb, currentMetrics.SameFirstVerb)}");
+                Console.WriteLine($"    continuation_no_label_reference:  {Delta(baseline.ContinuationNoLabelReference, currentMetrics.ContinuationNoLabelReference)}");
+                Console.WriteLine($"    start_continuation_recap_overlap: {Delta(baseline.StartContinuationRecapOverlap, currentMetrics.StartContinuationRecapOverlap)}");
+                Console.WriteLine($"    avg_recap_overlap:                {currentMetrics.AvgRecapOverlap - baseline.AvgRecapOverlap:+0.000;-0.000;0.000}");
+            }
         }
         else if (baseline is not null && baseline.Placeholder)
         {
@@ -588,7 +619,12 @@ else
     Console.WriteLine($"  the generated file to tools/StoryBenchmark/baseline.json and commit.");
 }
 
-if (writeBaseline)
+if (writeBaseline && !validity.Valid)
+{
+    Console.WriteLine();
+    Console.WriteLine("  Baseline NOT written: this run is INVALID.");
+}
+else if (writeBaseline)
 {
     await File.WriteAllTextAsync(
         baselinePath,
@@ -614,7 +650,14 @@ if (weakCases.Count > 0)
         Console.WriteLine($"    \u26a0 {w}");
 }
 
-if (failures.Count == 0 && weakCases.Count == 0)
+// An INVALID run measured nothing: its empty failure/weak lists must not
+// end the log on a passing line that contradicts exit 3 and summary.json.
+if (!validity.Valid)
+{
+    Console.WriteLine();
+    Console.WriteLine($"  RUN INVALID \u2014 nothing was measured: {validity.InvalidReason}");
+}
+else if (failures.Count == 0 && weakCases.Count == 0)
 {
     Console.WriteLine();
     Console.WriteLine("  ALL CHECKS PASSED \u2014 NO WEAK CASES");
@@ -645,13 +688,14 @@ if (runSucceeded && !promptsChanged && File.Exists(baselinePath))
     }
     catch { /* leave null → verdict stays "unavailable" */ }
 }
-string regressionVerdict = promptsChanged ? "unavailable"
+// An INVALID run's weak-case count is not comparable either.
+string regressionVerdict = promptsChanged || !validity.Valid ? "unavailable"
     : baselineWeakCasesForSummary is null ? "unavailable"
     : currentMetrics.WeakCases < baselineWeakCasesForSummary.Value ? "improved"
     : currentMetrics.WeakCases > baselineWeakCasesForSummary.Value ? "regressed"
     : "unchanged";
 var summaryPath = Path.Combine(resultsDir, "summary.json");
-await File.WriteAllTextAsync(summaryPath, JsonSerializer.Serialize(new
+await BenchSummary.WriteAsync(summaryPath, new
 {
     timestampUtc = DateTime.UtcNow.ToString(
         "yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture),
@@ -662,10 +706,10 @@ await File.WriteAllTextAsync(summaryPath, JsonSerializer.Serialize(new
     promptsCount = prompts.Count,
     promptsSha256,
     promptsChanged,
-}, jsonOpts));
+}, jsonOpts, bench, validity, latency);
 
-// Exit code: 0 if all start+choice checks pass, 1 otherwise
-return (startOk == total && choiceOk == total) ? 0 : 1;
+// Exit code: 0 if all start+choice checks pass, 1 otherwise, 3 if INVALID
+return validity.ExitCode(passed: startOk == total && choiceOk == total);
 
 // --- Helpers ---
 
@@ -823,12 +867,20 @@ record ChatResponse
     public string? ChoiceA { get; init; }
     public string? ChoiceB { get; init; }
     public Guid? StorySessionId { get; init; }
+    public string? Mode { get; init; }
 }
 
-record DeviceReg
+// C186: one record per measured POST (start, then continuation) with the
+// per-turn fields every benchmark's results JSON carries.
+record TurnRecord
 {
-    public Guid DeviceId { get; init; }
-    public string ApiKey { get; init; } = "";
+    public string Kind { get; init; } = "";   // "start" | "continuation"
+    public string? User { get; init; }
+    public string? Reply { get; init; }
+    public long? LatencyMs { get; init; }
+    public int? SafetyFlag { get; init; }
+    public string? Mode { get; init; }
+    public string? Error { get; init; }
 }
 
 // Aggregate metrics snapshot for baseline comparison. Shape is intentionally
@@ -893,4 +945,5 @@ record TestResult
     public string? ContinuationError { get; set; }
     public ChatResponse? StartResponse { get; set; }
     public ChatResponse? ContinuationResponse { get; set; }
+    public List<TurnRecord> Turns { get; set; } = [];
 }

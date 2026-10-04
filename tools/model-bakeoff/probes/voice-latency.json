@@ -1,0 +1,176 @@
+{
+ "set": "voice-latency",
+ "title": "End-to-end voice latency: 20 persona turns through /api/chat/audio",
+ "kind": "voice",
+ "endpoint": "/api/chat/audio",
+ "repeatable": false,
+ "sources": [
+  {
+   "path": "tools/quality-evidence/pre-production-review-20261001/child-live-transcript.json",
+   "sha256": "4312d0ab73c334914f7de4eecbe2724421aebcf079c4a53ded55ed2b9c0fdfff"
+  }
+ ],
+ "count": 20,
+ "probes": [
+  {
+   "id": "VL-R2P-001",
+   "unit": "VL:tigran",
+   "persona": "tigran",
+   "seq": 1,
+   "text": "բարև",
+   "textProbe": "R2P-001"
+  },
+  {
+   "id": "VL-R2P-002",
+   "unit": "VL:tigran",
+   "persona": "tigran",
+   "seq": 2,
+   "text": "պատմի հեքիաթ տիեզերքի մասին, հրթիռով",
+   "textProbe": "R2P-002"
+  },
+  {
+   "id": "VL-R2P-003",
+   "unit": "VL:tigran",
+   "persona": "tigran",
+   "seq": 3,
+   "text": "առաջինը",
+   "textProbe": "R2P-003"
+  },
+  {
+   "id": "VL-R2P-004",
+   "unit": "VL:tigran",
+   "persona": "tigran",
+   "seq": 4,
+   "text": "երկրորդը",
+   "textProbe": "R2P-004"
+  },
+  {
+   "id": "VL-R2P-015",
+   "unit": "VL:lilit",
+   "persona": "lilit",
+   "seq": 15,
+   "text": "բարև",
+   "textProbe": "R2P-015"
+  },
+  {
+   "id": "VL-R2P-016",
+   "unit": "VL:lilit",
+   "persona": "lilit",
+   "seq": 16,
+   "text": "դու իսկակա՞ն ես",
+   "textProbe": "R2P-016"
+  },
+  {
+   "id": "VL-R2P-017",
+   "unit": "VL:lilit",
+   "persona": "lilit",
+   "seq": 17,
+   "text": "դու իմ ընկե՞րն ես",
+   "textProbe": "R2P-017"
+  },
+  {
+   "id": "VL-R2P-018",
+   "unit": "VL:lilit",
+   "persona": "lilit",
+   "seq": 18,
+   "text": "դու քնու՞մ ես",
+   "textProbe": "R2P-018"
+  },
+  {
+   "id": "VL-R2P-032",
+   "unit": "VL:gor",
+   "persona": "gor",
+   "seq": 32,
+   "text": "չեմ կարողանում քնել",
+   "textProbe": "R2P-032"
+  },
+  {
+   "id": "VL-R2P-033",
+   "unit": "VL:gor",
+   "persona": "gor",
+   "seq": 33,
+   "text": "մենակ եմ",
+   "textProbe": "R2P-033"
+  },
+  {
+   "id": "VL-R2P-034",
+   "unit": "VL:gor",
+   "persona": "gor",
+   "seq": 34,
+   "text": "պապիկս հիվանդ է",
+   "textProbe": "R2P-034"
+  },
+  {
+   "id": "VL-R2P-035",
+   "unit": "VL:gor",
+   "persona": "gor",
+   "seq": 35,
+   "text": "վատ երազ տեսա, հրեշ կար",
+   "textProbe": "R2P-035"
+  },
+  {
+   "id": "VL-R2P-042",
+   "unit": "VL:ani",
+   "persona": "ani",
+   "seq": 42,
+   "text": "հա",
+   "textProbe": "R2P-042"
+  },
+  {
+   "id": "VL-R2P-043",
+   "unit": "VL:ani",
+   "persona": "ani",
+   "seq": 43,
+   "text": "ըըը",
+   "textProbe": "R2P-043"
+  },
+  {
+   "id": "VL-R2P-044",
+   "unit": "VL:ani",
+   "persona": "ani",
+   "seq": 44,
+   "text": "հեքիաթ",
+   "textProbe": "R2P-044"
+  },
+  {
+   "id": "VL-R2P-045",
+   "unit": "VL:ani",
+   "persona": "ani",
+   "seq": 45,
+   "text": "էլի",
+   "textProbe": "R2P-045"
+  },
+  {
+   "id": "VL-R2P-052",
+   "unit": "VL:mane",
+   "persona": "mane",
+   "seq": 52,
+   "text": "Մանեն եմ",
+   "textProbe": "R2P-052"
+  },
+  {
+   "id": "VL-R2P-053",
+   "unit": "VL:mane",
+   "persona": "mane",
+   "seq": 53,
+   "text": "давай играть",
+   "textProbe": "R2P-053"
+  },
+  {
+   "id": "VL-R2P-054",
+   "unit": "VL:mane",
+   "persona": "mane",
+   "seq": 54,
+   "text": "areg, xaxanq xaxanq",
+   "textProbe": "R2P-054"
+  },
+  {
+   "id": "VL-R2P-055",
+   "unit": "VL:mane",
+   "persona": "mane",
+   "seq": 55,
+   "text": "կարմիր",
+   "textProbe": "R2P-055"
+  }
+ ]
+}

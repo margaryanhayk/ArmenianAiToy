@@ -2,10 +2,15 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using BenchCommon;
 
 // CLI: first positional arg is baseUrl; --write-baseline saves baseline.json
 // to AppContext.BaseDirectory after the run. Operator copies the generated
 // file to the source tools/RiddleBenchmark/baseline.json and commits.
+// --results-dir <dir> / --label <text> / --provisioning-secret <s> (or env
+// AREG_PROVISIONING_SECRET): see tools/BenchCommon/BenchSetup.cs. Exit 0 =
+// passed, 1 = failed, 3 = INVALID (a claim failed, or the first-turn
+// replies are mostly one canned line — the run measured nothing).
 //
 // RiddleBenchmark runs MULTI-TURN scenarios — each scenario gets a fresh
 // device registration so per-conversation state (RiddleSessions) starts
@@ -20,12 +25,12 @@ using System.Text.RegularExpressions;
 // `expect` shape markers for turns where a specific shape is
 // deterministic: `pose` for explicit new-riddle triggers, `reveal` for
 // explicit give-up triggers).
-bool writeBaseline = args.Any(a => a == "--write-baseline");
-var positional = args.Where(a => !a.StartsWith("--")).ToArray();
-var baseUrl = positional.Length > 0 ? positional[0] : "http://localhost:5000";
+var bench = BenchArgs.Parse(args);
+bool writeBaseline = bench.WriteBaseline;
+var baseUrl = bench.BaseUrl;
 var promptsPath = Path.Combine(AppContext.BaseDirectory, "prompts.json");
 var baselinePath = Path.Combine(AppContext.BaseDirectory, "baseline.json");
-var resultsDir = Path.Combine(AppContext.BaseDirectory, "results");
+var resultsDir = bench.ResultsDir;
 Directory.CreateDirectory(resultsDir);
 
 // D1-F2: pin prompt-set identity so prompt edits cannot silently invalidate
@@ -89,34 +94,48 @@ int missingRevealMarker = 0;
 int missingOfferNext = 0;
 int tooLong = 0;
 
+// Every scenario's device must be CLAIMED — the unclaimed-device gate
+// answers an unclaimed toy with the resting line only (C186: this bench
+// used to register without claiming and so measured nothing). One parent
+// per run claims them all; a failed claim stops the run as INVALID.
+var validity = new RunValidity();
+var latency = new BenchLatency();
+BenchParent? parent = null;
+try
+{
+    parent = await BenchParent.CreateAsync(bench, "rbench");
+    Console.WriteLine($"Bench parent ready ({parent.Email})\n");
+}
+catch (Exception ex)
+{
+    validity.FailSetup($"bench parent: {ex.Message}");
+    Console.WriteLine($"[fatal] bench parent setup failed: {ex.Message}");
+}
+
 Console.WriteLine("ID    | Turns | OkN | Hard | Label");
 Console.WriteLine("------|-------|-----|------|--------------------------");
 
 foreach (var scenario in scenarios)
 {
+    if (parent is null || validity.HasSetupFailure) break;
     var sResult = new ScenarioResult { Id = scenario.Id, Label = scenario.Label };
 
     using var http = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(60) };
 
-    DeviceReg device;
     try
     {
-        var regBody = new { macAddress = $"RBENCH-{scenario.Id}-{DateTime.UtcNow:HHmmssfff}" };
-        var regResp = await http.PostAsJsonAsync("/api/devices/register", regBody);
-        regResp.EnsureSuccessStatusCode();
-        device = await regResp.Content.ReadFromJsonAsync<DeviceReg>(jsonOpts)
-            ?? throw new Exception("device registration returned null");
+        var device = await BenchDevice.RegisterAndClaimAsync(parent, $"RBENCH-{scenario.Id}");
+        device.ApplyTo(http);
     }
     catch (Exception ex)
     {
-        sResult.Error = $"device registration failed: {ex.Message}";
-        failures.Add($"{scenario.Id}: device registration failed — {ex.Message}");
+        sResult.Error = $"device setup failed: {ex.Message}";
+        failures.Add($"{scenario.Id}: device setup failed — {ex.Message}");
+        validity.FailSetup($"{scenario.Id}: {ex.Message}");
         results.Add(sResult);
-        Console.WriteLine($"{scenario.Id,5} |     - |   - |   X  | reg-fail");
-        continue;
+        Console.WriteLine($"{scenario.Id,5} |     - |   - |   X  | claim-fail (run INVALID, stopping)");
+        break;
     }
-    http.DefaultRequestHeaders.Add("X-Device-Id", device.DeviceId.ToString());
-    http.DefaultRequestHeaders.Add("X-Api-Key", device.ApiKey);
 
     int sTurnsOk = 0;
     bool sHardFail = false;
@@ -126,11 +145,14 @@ foreach (var scenario in scenarios)
         totalTurns++;
         var turnResult = new TurnResult { User = turn.User, Expect = turn.Expect };
 
+        bool firstTurn = sResult.Turns.Count == 0;
+
         ChatResponse? resp = null;
         try
         {
             var body = new { message = turn.User };
-            var httpResp = await http.PostAsJsonAsync("/api/chat", body);
+            var (httpResp, elapsedMs) = await latency.TimeAsync(() => http.PostAsJsonAsync("/api/chat", body));
+            turnResult.LatencyMs = elapsedMs;
             httpResp.EnsureSuccessStatusCode();
             resp = await httpResp.Content.ReadFromJsonAsync<ChatResponse>(jsonOpts);
         }
@@ -140,8 +162,10 @@ foreach (var scenario in scenarios)
             sResult.Turns.Add(turnResult);
             sHardFail = true;
             failures.Add($"{scenario.Id} turn '{turn.User}': request failed — {ex.Message}");
+            if (firstTurn) validity.RecordFirstTurn(null);
             continue;
         }
+        if (firstTurn) validity.RecordFirstTurn(resp?.Response);
         if (resp?.Response is null)
         {
             turnResult.Error = "null response";
@@ -154,6 +178,7 @@ foreach (var scenario in scenarios)
         var text = resp.Response;
         turnResult.Response = text;
         turnResult.Mode = resp.Mode;
+        turnResult.SafetyFlag = resp.SafetyFlag;
         turnResult.ResponseLen = text.Length;
         turnResult.HasArmenian = armenianRegex.IsMatch(text);
         turnResult.HasChoiceBlock = choiceBlockRegex.IsMatch(text);
@@ -256,13 +281,15 @@ Console.WriteLine($"  Missing riddle pose:    {missingRiddlePose}");
 Console.WriteLine($"  Missing reveal marker:  {missingRevealMarker}");
 Console.WriteLine($"  Missing offer-next:     {missingOfferNext}");
 Console.WriteLine($"  Too long:               {tooLong}");
+validity.PrintVerdict();
+parent?.Dispose();
 
 // --- Save results ---
 var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
 var resultsJson = Path.Combine(resultsDir, $"run_{timestamp}.json");
 var resultsMd = Path.Combine(resultsDir, $"run_{timestamp}.md");
 
-await File.WriteAllTextAsync(resultsJson, JsonSerializer.Serialize(results, jsonOpts));
+await File.WriteAllTextAsync(resultsJson, JsonSerializer.Serialize(results, BenchSummary.ResultsJson));
 
 var md = new System.Text.StringBuilder();
 md.AppendLine("# RiddleBenchmark Results");
@@ -270,6 +297,7 @@ md.AppendLine();
 md.AppendLine($"**Date:** {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
 md.AppendLine($"**Target:** {baseUrl}");
 md.AppendLine($"**Scenarios:** {scenarios.Count}");
+BenchSummary.AppendMarkdownHeader(md, bench, validity, latency);
 md.AppendLine();
 md.AppendLine("| Metric | Count |");
 md.AppendLine("|--------|-------|");
@@ -343,16 +371,25 @@ if (File.Exists(baselinePath))
             }
 
             Console.WriteLine();
-            Console.WriteLine("  Delta vs baseline (negative = improvement for weak counts)");
-            Console.WriteLine($"    scenarios_ok:           {Delta(baseline.ScenariosOk, current.ScenariosOk)}");
-            Console.WriteLine($"    turns_ok:               {Delta(baseline.TurnsOk, current.TurnsOk)}");
-            Console.WriteLine($"    weak_cases:             {Delta(baseline.WeakCases, current.WeakCases)}");
-            Console.WriteLine($"    leaked_tail:            {Delta(baseline.LeakedTail, current.LeakedTail)}");
-            Console.WriteLine($"    latin_run:              {Delta(baseline.LatinRun, current.LatinRun)}");
-            Console.WriteLine($"    missing_riddle_pose:    {Delta(baseline.MissingRiddlePose, current.MissingRiddlePose)}");
-            Console.WriteLine($"    missing_reveal_marker:  {Delta(baseline.MissingRevealMarker, current.MissingRevealMarker)}");
-            Console.WriteLine($"    missing_offer_next:     {Delta(baseline.MissingOfferNext, current.MissingOfferNext)}");
-            Console.WriteLine($"    too_long:               {Delta(baseline.TooLong, current.TooLong)}");
+            if (!validity.Valid)
+            {
+                // An INVALID run's counts are not comparable; an unmeasured
+                // run's zeros would read as a clean improvement.
+                Console.WriteLine("  Delta vs baseline: (skipped: run INVALID)");
+            }
+            else
+            {
+                Console.WriteLine("  Delta vs baseline (negative = improvement for weak counts)");
+                Console.WriteLine($"    scenarios_ok:           {Delta(baseline.ScenariosOk, current.ScenariosOk)}");
+                Console.WriteLine($"    turns_ok:               {Delta(baseline.TurnsOk, current.TurnsOk)}");
+                Console.WriteLine($"    weak_cases:             {Delta(baseline.WeakCases, current.WeakCases)}");
+                Console.WriteLine($"    leaked_tail:            {Delta(baseline.LeakedTail, current.LeakedTail)}");
+                Console.WriteLine($"    latin_run:              {Delta(baseline.LatinRun, current.LatinRun)}");
+                Console.WriteLine($"    missing_riddle_pose:    {Delta(baseline.MissingRiddlePose, current.MissingRiddlePose)}");
+                Console.WriteLine($"    missing_reveal_marker:  {Delta(baseline.MissingRevealMarker, current.MissingRevealMarker)}");
+                Console.WriteLine($"    missing_offer_next:     {Delta(baseline.MissingOfferNext, current.MissingOfferNext)}");
+                Console.WriteLine($"    too_long:               {Delta(baseline.TooLong, current.TooLong)}");
+            }
         }
         else if (baseline is not null && baseline.Placeholder)
         {
@@ -372,7 +409,12 @@ else
     Console.WriteLine($"  the generated file to tools/RiddleBenchmark/baseline.json and commit.");
 }
 
-if (writeBaseline)
+if (writeBaseline && !validity.Valid)
+{
+    Console.WriteLine();
+    Console.WriteLine("  Baseline NOT written: this run is INVALID.");
+}
+else if (writeBaseline)
 {
     await File.WriteAllTextAsync(baselinePath, JsonSerializer.Serialize(current, jsonOpts));
     Console.WriteLine();
@@ -394,7 +436,14 @@ if (weakCases.Count > 0)
     foreach (var w in weakCases) Console.WriteLine($"    \u26a0 {w}");
 }
 
-if (failures.Count == 0 && weakCases.Count == 0)
+// An INVALID run measured nothing: its empty failure/weak lists must not
+// end the log on a passing line that contradicts exit 3 and summary.json.
+if (!validity.Valid)
+{
+    Console.WriteLine();
+    Console.WriteLine($"  RUN INVALID \u2014 nothing was measured: {validity.InvalidReason}");
+}
+else if (failures.Count == 0 && weakCases.Count == 0)
 {
     Console.WriteLine();
     Console.WriteLine("  ALL CHECKS PASSED \u2014 NO WEAK CASES");
@@ -421,13 +470,14 @@ if (runSucceeded && !promptsChanged && File.Exists(baselinePath))
     }
     catch { /* leave null → verdict stays "unavailable" */ }
 }
-string regressionVerdict = promptsChanged ? "unavailable"
+// An INVALID run's weak-case count is not comparable either.
+string regressionVerdict = promptsChanged || !validity.Valid ? "unavailable"
     : baselineWeakCasesForSummary is null ? "unavailable"
     : current.WeakCases < baselineWeakCasesForSummary.Value ? "improved"
     : current.WeakCases > baselineWeakCasesForSummary.Value ? "regressed"
     : "unchanged";
 var summaryPath = Path.Combine(resultsDir, "summary.json");
-await File.WriteAllTextAsync(summaryPath, JsonSerializer.Serialize(new
+await BenchSummary.WriteAsync(summaryPath, new
 {
     timestampUtc = DateTime.UtcNow.ToString(
         "yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture),
@@ -438,9 +488,9 @@ await File.WriteAllTextAsync(summaryPath, JsonSerializer.Serialize(new
     promptsCount = scenarios.Count,
     promptsSha256,
     promptsChanged,
-}, jsonOpts));
+}, jsonOpts, bench, validity, latency);
 
-return scenariosOk == scenarios.Count ? 0 : 1;
+return validity.ExitCode(passed: scenariosOk == scenarios.Count);
 
 // --- Helpers ---
 
@@ -476,12 +526,6 @@ record ChatResponse
     public string? ChoiceB { get; init; }
     public Guid? StorySessionId { get; init; }
     public string? Mode { get; init; }
-}
-
-record DeviceReg
-{
-    public Guid DeviceId { get; init; }
-    public string ApiKey { get; init; } = "";
 }
 
 record RiddleMetrics
@@ -521,6 +565,11 @@ record TurnResult
     public string User { get; init; } = "";
     public string? Expect { get; init; }
     public string? Response { get; set; }
+    // C186: per-turn fields the bake-off report reads (reply duplicates
+    // response under the shared name).
+    public string? Reply => Response;
+    public long? LatencyMs { get; set; }
+    public int? SafetyFlag { get; set; }
     public string? Mode { get; set; }
     public int ResponseLen { get; set; }
     public bool HasArmenian { get; set; }
