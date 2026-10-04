@@ -127,9 +127,9 @@
    },
    "outTokensPerTurn": 400,
    "thinkingBudget": {
-    "value": null,
-    "decidedAt": null,
-    "why": "RUN-DAY DECISION, not made yet. The adapter omits thinkingConfig unless Gemini:ThinkingBudget is set, so gemini-3.8-flash runs with its default thinking: slower and dearer than the production config shape. Run --calibrate-only first (it reports thoughtsTokenCount), then record \"unset\" (measure the model as it would ship with today's config) or an int (e.g. 0, which also needs Gemini__ThinkingBudget on Railway if this model is chosen). The live runner refuses this arm until it is recorded."
+    "value": "unset",
+    "decidedAt": "2026-10-04",
+    "why": "Decided 2026-10-04 (run day): \"unset\" — measure gemini-3.8-flash exactly as it would ship with today's config shape (no Gemini:ThinkingBudget on Railway). Calibration 2026-10-04: arm2 553 and arm3 467 thinking tokens per reply vs 265 for the 3.6 control; the latency and cost columns show the effect."
    }
   },
   {
@@ -157,9 +157,9 @@
    },
    "outTokensPerTurn": 400,
    "thinkingBudget": {
-    "value": null,
-    "decidedAt": null,
-    "why": "RUN-DAY DECISION, not made yet. The adapter omits thinkingConfig unless Gemini:ThinkingBudget is set, so gemini-3.8-flash runs with its default thinking: slower and dearer than the production config shape. Run --calibrate-only first (it reports thoughtsTokenCount), then record \"unset\" (measure the model as it would ship with today's config) or an int (e.g. 0, which also needs Gemini__ThinkingBudget on Railway if this model is chosen). The live runner refuses this arm until it is recorded."
+    "value": "unset",
+    "decidedAt": "2026-10-04",
+    "why": "Decided 2026-10-04 (run day): \"unset\" — measure gemini-3.8-flash exactly as it would ship with today's config shape (no Gemini:ThinkingBudget on Railway). Calibration 2026-10-04: arm2 553 and arm3 467 thinking tokens per reply vs 265 for the 3.6 control; the latency and cost columns show the effect."
    }
   },
   {

@@ -583,7 +583,8 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("OPENAI_API_KEY=missing", text)
         self.assertIn("planned (each arm capped at its budget)", text)
         self.assertIn("WOULD REFUSE: arm2 runs on Vertex", text)
-        self.assertIn("arm2 Gemini thinking budget: PENDING", text)
+        # arm2/arm3 thinking budget was decided on the 2026-10-04 run day ("unset")
+        self.assertIn("arm2 Gemini thinking budget: unset (2026-10-04)", text)
         self.assertIn("provider-side project budgets", text)
 
     def test_secret_scan_detects_patterns(self):
@@ -1107,8 +1108,16 @@ class VertexAndThinkingTests(unittest.TestCase):
         arm["thinkingBudget"]["value"] = 0
         resolved, _ = ra.resolve_arm(arm, self.cfg, {}, vertex_fallback=True)
         self.assertEqual(resolved["env"]["Gemini__ThinkingBudget"], "0")
+        # The shipped arms.json now records a decision; rebuild the undecided state
+        # to prove the live runner still refuses a pending arm.
+        pending = json.loads(json.dumps(self.cfg))
+        for a in pending["arms"]:
+            if a["id"] == "arm2":
+                a["thinkingBudget"]["value"] = None
+                a["thinkingBudget"]["decidedAt"] = None
         buf = io.StringIO()
-        with tempfile.TemporaryDirectory() as d, mock.patch.object(ra, "calibrate") as cal, redirect_stdout(buf):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(ra, "calibrate") as cal, \
+                mock.patch.object(ra, "load_arms", return_value=pending), redirect_stdout(buf):
             code = ra.main(["--arm", "arm2", "--runs-dir", d, "--vertex-fallback-ai-studio"],
                            environ={"OPENAI_API_KEY": "dummy", "GEMINI_API_KEY": "dummy"}, out=print)
         self.assertEqual(code, 2)
