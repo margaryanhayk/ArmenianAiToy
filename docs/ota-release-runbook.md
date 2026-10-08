@@ -9,6 +9,55 @@ ESP32-S3 hardware in July 2026 — see `backend/docs/ota-bench-evidence.md`.
 This document adds no new OTA code; it is the operating procedure for what
 already exists.
 
+> **Chip security (2026-10-08) -- for LOCKED toys this procedure changes.**
+> A toy provisioned with `--profile release` (Secure Boot V2 + flash
+> encryption, ROM download mode OFF) only boots and only installs images
+> signed with the owner's Secure Boot key, and can NEVER be cable-flashed
+> again -- OTA is its only update path. For those toys:
+> - build with `tools/firmware/build_idf.sh release --version X --unsigned`
+>   (canonical, reproducible; or `tools/firmware/build_release.py` with
+>   arduino-cli), sign OFFLINE with `tools/firmware/sign_release.py app`,
+>   and stage **`app-signed.bin`** -- the manifest `sizeBytes` and `sha256`
+>   are of the SIGNED file;
+> - the gate becomes `check_release_image.py app-signed.bin --expect-version X
+>   --profile release --require-sbv2 --trusted-digests esp32/security/sb_trusted_digests.txt`;
+> - set `FirmwareUpdate:BoardModel=areg-s3-n8-sb` (a release image reports
+>   that board, so it is never offered to an unsecured toy, nor a dev image
+>   to a locked one). **Do this BEFORE staging any signed image -- including
+>   the hardware pilot's** (Railway: `FirmwareUpdate__BoardModel=areg-s3-n8-sb`,
+>   or a separate staging backend). Production ships it EMPTY today
+>   (`appsettings.json`), and an empty board model means "offer to every
+>   toy": a field toy on 1.3.2 has no signature or marker check, would
+>   install a signed release image, refuse its store (`RefuseUnsecuredChip`)
+>   and stay offline until cable-flashed. A code backstop now exists (review
+>   round 3): at startup the backend reads the staged image's own
+>   `AREGFWV1` marker (`FirmwareUpdate:ImagePath`) and offers an `-sb` image
+>   ONLY to devices reporting that exact board model, whatever `BoardModel`
+>   says -- but it cannot inspect an image behind an external `Url`, so set
+>   the variable anyway. One backend offers ONE image at a time: while it
+>   serves the `-sb` image, DEV and field toys get no updates;
+> - the toy refuses `image_shape_invalid` (unsigned shape),
+>   `image_sig_invalid` (not signed by a key in its eFuses) and
+>   `image_marker_mismatch` (the signed in-image version marker disagrees
+>   with the manifest, is not newer, or is a dev image) before switching;
+> - "cable-flash the merged.bin" (s9) is IMPOSSIBLE on a locked toy: every
+>   release must first prove on a locked bench toy that it can OTA to
+>   release+1. Rules: `docs/firmware-security.md` sections 6, 10 and 11.
+> **DEV images and toys on the OLD partition table.** Every toy flashed
+> before 2026-10-08 (the whole field fleet on 1.3.2, and any bench board not
+> re-flashed by cable) has the old table: no `nvs_sec`. A DEV image built
+> from this tree, delivered by the procedure below, runs there in
+> **legacy-store mode** (`[sec] ... store=legacy`): identity, Wi-Fi and OTA
+> state stay in the default `nvs`, as before. Moving such a toy to `nvs_sec`
+> is a CABLE conversion (Arduino upload of the new table, then
+> `tools/factory/provision_toy.py --profile dev`). **Never enqueue a release
+> (`-sb`) image to an unsecured toy** -- it would install, refuse its store
+> and go offline until cable-flashed. The bench builds with core **3.3.8**.
+> **Served images come from private storage, never git** (the repository was
+> public; `docs/firmware-security.md` s11): put `areg-current.bin` on a
+> Railway volume and point `FirmwareUpdate__ImagePath` at it (e.g.
+> `/data/firmware/areg-current.bin`) instead of committing it.
+
 ---
 
 ## 0. Read this before you push anything
@@ -22,7 +71,10 @@ already exists.
    firmware it has.
 2. **A bad image cannot survive a reboot.** The new image is written to the
    *inactive* slot, sha256-verified before finalize, and boots in
-   `pending_verify`. It only becomes permanent after it successfully checks in
+   `pending_verify` (since the chip-security review round 3 it really stays
+   there: `verifyRollbackLater()` returns true, so Arduino's `initArduino()`
+   no longer marks it valid before `setup()`, and ANY reset before the
+   check-in -- a crash in `setup()` included -- rolls back). It only becomes permanent after it successfully checks in
    with the backend. If it cannot check in within
    `AREG_OTA_CHECKIN_DEADLINE_MS` (**15 minutes** since 1.1.1 — 5 was
    demonstrably too tight in the field, `config.h`), it self-
@@ -335,6 +387,7 @@ The gates, in the order the backend applies them:
 | `Enabled` | env var not set / not redeployed |
 | `LatestVersion` non-empty and `Url` non-empty | one of them blank ⇒ no offer, no error |
 | **Board** | `FirmwareUpdate:BoardModel` is set **and** the device's stored `BoardModel` differs — **including when the device's is null** |
+| **Secured image** | the image at `FirmwareUpdate:ImagePath` carries an `AREGFWV1:...:<board>-sb:...` marker **and** the device's stored `BoardModel` is not exactly that board (null included) -- read once at startup, so restart after swapping the file |
 | Version | device is not strictly older than `LatestVersion` |
 
 **The board gate is the trap that would have hit this rollout**, which is why
@@ -413,7 +466,9 @@ unconditionally, on purpose, and there is no `allowDowngrade` flag in this
 slice. To move a toy off a bad-but-working 1.1.0 you must either:
 
 - ship **1.1.1** with the fix (the normal answer — cut it as in § 2), or
-- cable-flash `AregVoiceMvp.ino.merged.bin` with esptool at `0x0`.
+- cable-flash `AregVoiceMvp.ino.merged.bin` with esptool at `0x0` -- DEV
+  bench boards ONLY. A locked (release-profile) toy has no cable path at all
+  (`docs/firmware-security.md` s10).
 
 A toy that is bricked hard enough not to boot at all can only be recovered by
 cable. That is the failure this whole design is built to avoid, and the reason

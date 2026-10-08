@@ -2,11 +2,13 @@
 // AregVoiceMvp / device_creds.cpp   (Phase C — factory provisioning, toy side)
 //
 // NVS-backed device identity via Arduino Preferences. See device_creds.h for
-// the contract. Mirrors wifi_creds.cpp: lightweight, uses the existing `nvs`
-// partition, no partition-table change.
+// the contract. Mirrors wifi_creds.cpp. Lives in the "nvs_sec" partition
+// (encrypted on a locked release toy) via areg_prefs_begin -- see
+// secure_store.h.
 // -------------------------------------------------------------
 #include "device_creds.h"
 #include <Preferences.h>
+#include "secure_store.h"  // areg_prefs_begin: app state lives in nvs_sec
 #include "device_creds_rules.h"
 
 namespace {
@@ -20,7 +22,7 @@ using device_creds_rules::kPopKey;
 
 bool device_creds_present() {
     Preferences prefs;
-    if (!prefs.begin(kNamespace, /*readOnly=*/true)) {
+    if (!areg_prefs_begin(prefs, kNamespace, /*readOnly=*/true)) {
         return false;  // namespace doesn't exist yet → never provisioned
     }
     const bool has = prefs.getString(kIdKey, "").length() > 0;
@@ -30,7 +32,7 @@ bool device_creds_present() {
 
 bool device_creds_load(char *id, size_t id_cap, char *key, size_t key_cap) {
     Preferences prefs;
-    if (!prefs.begin(kNamespace, /*readOnly=*/true)) {
+    if (!areg_prefs_begin(prefs, kNamespace, /*readOnly=*/true)) {
         return false;
     }
     const String i = prefs.getString(kIdKey, "");
@@ -46,7 +48,7 @@ bool device_creds_load(char *id, size_t id_cap, char *key, size_t key_cap) {
 
 bool device_creds_pop_load(char *pop, size_t pop_cap) {
     Preferences prefs;
-    if (!prefs.begin(kNamespace, /*readOnly=*/true)) {
+    if (!areg_prefs_begin(prefs, kNamespace, /*readOnly=*/true)) {
         return false;
     }
     const String p = prefs.getString(kPopKey, "");
@@ -63,7 +65,7 @@ void device_creds_save(const char *id, const char *key, const char *pop) {
         return;  // never persist an empty identity
     }
     Preferences prefs;
-    if (!prefs.begin(kNamespace, /*readOnly=*/false)) {
+    if (!areg_prefs_begin(prefs, kNamespace, /*readOnly=*/false)) {
         return;
     }
     prefs.putString(kIdKey, id);
@@ -80,7 +82,7 @@ void device_creds_save(const char *id, const char *key, const char *pop) {
 
 void device_creds_clear() {
     Preferences prefs;
-    if (!prefs.begin(kNamespace, /*readOnly=*/false)) {
+    if (!areg_prefs_begin(prefs, kNamespace, /*readOnly=*/false)) {
         return;
     }
     prefs.clear();  // clears id, key AND pop — same namespace, same reset

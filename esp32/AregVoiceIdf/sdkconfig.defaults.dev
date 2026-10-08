@@ -1,0 +1,6 @@
+# ---- DEV profile (bench boards; no eFuse is ever touched) ----
+# Identical app configuration to the arduino-cli bench build. Flash with
+#   idf.py -B build-dev -DAREG_PROFILE=dev -DSDKCONFIG=build-dev/sdkconfig flash
+# or with the normal Arduino upload. nvs_sec is PLAINTEXT on a dev board;
+# bench flags (AREG_*_BENCH, AREG_PROVISION_*_ONCE, AREG_TLS_INSECURE) are
+# allowed in config.h.

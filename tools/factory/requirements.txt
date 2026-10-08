@@ -15,8 +15,12 @@
 # requests       -- calls POST /api/devices/register. Not needed for
 #                   --dry-run, but installed unconditionally to keep this
 #                   file a single `pip install` for the common case.
-esptool>=5.0
-esp-idf-nvs-partition-gen>=0.1.0
+# Pinned (chip security, 2026-10-08): the eFuse names, summary JSON shape and
+# `encrypt-flash-data`/`sign-data` behaviour secure_provision.py relies on were
+# verified with exactly these versions (QEMU + virtual eFuses). esptool 5.2.0
+# also provides espsecure and espefuse.
+esptool==5.2.0
+esp-idf-nvs-partition-gen==0.3.0
 qrcode[pil]>=7.4
 reportlab>=4.0
 requests>=2.31

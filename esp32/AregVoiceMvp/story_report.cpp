@@ -5,6 +5,7 @@
 #include "story_report.h"
 
 #include <Preferences.h>
+#include "secure_store.h"  // areg_prefs_begin: app state lives in nvs_sec
 #include <esp_system.h>  // esp_random() — key uniqueness fallback when NVS fails
 #include <string.h>
 
@@ -53,7 +54,7 @@ uint32_t  s_prompt_since_ms = 0;
 
 void persist_queue() {
     Preferences prefs;
-    if (!prefs.begin(kNamespace, /*readOnly=*/false)) {
+    if (!areg_prefs_begin(prefs, kNamespace, /*readOnly=*/false)) {
         Serial.println("[story-report] WARNING: NVS open failed; queue not persisted");
         return;
     }
@@ -72,7 +73,7 @@ void ensure_loaded() {
     s_loaded = true;
 
     Preferences prefs;
-    if (!prefs.begin(kNamespace, /*readOnly=*/false)) {
+    if (!areg_prefs_begin(prefs, kNamespace, /*readOnly=*/false)) {
         Serial.println("[story-report] WARNING: NVS open failed; reporting is RAM-only this boot");
         s_boot_seq = (uint32_t)(esp_random());  // still unique-ish keys
         return;

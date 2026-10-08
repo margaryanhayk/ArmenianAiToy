@@ -31,6 +31,18 @@ public sealed class FirmwareManifestService : IFirmwareManifestService
             return FirmwareManifestResponse.NoUpdate();
         }
 
+        // Fail-closed secured-image gate (chip-security review round 3): an image
+        // whose OWN marker names a secured board (...-sb) goes only to a device
+        // reporting exactly that board -- even when BoardModel above is empty
+        // ("every toy"). A null/legacy board model gets no offer. Without this,
+        // one forgotten Railway variable would let every field toy (no signature
+        // or marker check) install a locked-fleet image and strand itself offline.
+        if (FirmwareImageMarker.IsSecuredBoard(_options.ImageBoardModel)
+            && !string.Equals(_options.ImageBoardModel, deviceBoardModel, StringComparison.Ordinal))
+        {
+            return FirmwareManifestResponse.NoUpdate();
+        }
+
         // Offer only when the device is strictly OLDER than the latest release.
         if (FirmwareVersionComparer.Compare(deviceFirmwareVersion, _options.LatestVersion) >= 0)
         {

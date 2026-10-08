@@ -526,11 +526,15 @@
 //
 #define AREG_USE_BLE_PROVISIONING 1
 //
-// CORE VERSION WARNING: Arduino-ESP32 3.3.7 and 3.3.8 crash on the
-// ESP32-S3 inside btdm_controller_init the moment BLE provisioning
-// starts (LoadProhibited boot loop; upstream regression, arduino-esp32
-// issues #12436 / #12357). Build this with core 3.3.6:
-//     arduino-cli core install esp32:esp32@3.3.6
+// CORE VERSION (2026-10-08, N031): pinned to arduino-esp32 3.3.8.
+// 3.3.7-3.3.11 release the BT controller memory at boot unless a BT library
+// claims it (#12287); WiFiProv did not until 3.3.12 (#12885), which is the
+// btdm_controller_init boot loop reported in #12436 / #12357.
+// ble_provisioning.cpp now carries the one-line strong btInUse() override
+// the core's own comment invites, so 3.3.8 provisions. Do NOT go back to
+// 3.3.6: security_profile.h refuses any core but 3.3.8 for a RELEASE image
+// (the release bootloader is built from 3.3.8's exact ESP-IDF commit).
+//     arduino-cli core install esp32:esp32@3.3.8
 //
 // BLE service name the toy advertises during provisioning (what the parent
 // sees in the phone app). Keep it short.
@@ -544,7 +548,10 @@
 // below -- it is not a secret and must never be overridden with a real
 // per-device value (that belongs in NVS via the factory station or
 // AREG_BLE_POP, not here).
-#ifndef AREG_PROV_POP
+// DEV builds only: a RELEASE image refuses to compile with AREG_PROV_POP
+// defined at all (security_profile.h) and a release toy with no per-device
+// PoP refuses to open BLE setup instead of advertising this shared value.
+#if !defined(AREG_SECURITY_PROFILE_RELEASE) && !defined(AREG_PROV_POP)
 #define AREG_PROV_POP "areg-pair"
 #endif
 // Hold the button this long (ms) at power-on to forget the saved network and
@@ -586,8 +593,15 @@
 #ifndef AREG_FW_BUILD
 #define AREG_FW_BUILD     "dev"
 #endif
+// A RELEASE image (Secure Boot + flash encryption chip) reports a DIFFERENT
+// board model, so the backend's FirmwareUpdate:BoardModel gate never offers a
+// signed release image to an unsecured toy or a dev image to a locked one.
 #ifndef AREG_BOARD_MODEL
+#ifdef AREG_SECURITY_PROFILE_RELEASE
+#define AREG_BOARD_MODEL  "areg-s3-n8-sb"
+#else
 #define AREG_BOARD_MODEL  "areg-s3-n8"
+#endif
 #endif
 
 // --- OTA apply (real update) -------------------------------------

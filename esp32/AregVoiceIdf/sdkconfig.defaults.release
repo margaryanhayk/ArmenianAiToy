@@ -1,0 +1,38 @@
+# ---- RELEASE profile: the app image a LOCKED toy runs ----
+#
+# What makes a toy secure is NOT in this file, on purpose
+# (docs/firmware-security.md):
+#   * Secure Boot V2 (RSA-3072, 2 key digests, slot 2 revoked) and flash
+#     encryption RELEASE mode (XTS-AES-256, per-device key) are enforced by
+#     the RELEASE BOOTLOADER (esp32/bootloader-release/sdkconfig.defaults:
+#     CONFIG_SECURE_BOOT_V2_ENABLED, CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE,
+#     CONFIG_SECURE_DISABLE_ROM_DL_MODE, CONFIG_BOOTLOADER_LOG_LEVEL_NONE)
+#     and by the eFuses the factory station burns (JTAG pad + USB-JTAG off,
+#     ROM download mode permanently disabled as the very LAST step).
+#   * This image is signed (Secure Boot V2) by tools/firmware/build_idf.sh
+#     release / tools/firmware/sign_release.py, never by the build itself.
+#   * NVS encryption of the app store (nvs_sec, HMAC scheme, eFuse key 4) is
+#     done by the firmware's own secure_store.cpp, selected by
+#     AREG_SECURITY_PROFILE_RELEASE (areg_build_defs.h).
+#
+# The APP config deliberately does NOT set CONFIG_SECURE_* or
+# CONFIG_NVS_ENCRYPTION:
+#   * CONFIG_SECURE_DISABLE_ROM_DL_MODE in an app makes the app itself burn
+#     DIS_DOWNLOAD_MODE at its first boot (IDF v5.5.4
+#     components/efuse/src/esp_efuse_startup.c:116), which would skip the
+#     factory's step-8 verification window -- a toy failing that check could
+#     no longer be repaired by cable.
+#   * CONFIG_NVS_ENCRYPTION would make initArduino()'s plain nvs_flash_init()
+#     secure-init the DEFAULT nvs instead of nvs_sec, diverging from the
+#     Arduino precompiled libs the bench (DEV) build uses -- the app config
+#     must stay byte-for-byte the configuration the design verified.
+#
+# Logging: CONFIG_LOG_DEFAULT_LEVEL stays ERROR (the base), CORE_DEBUG_LEVEL
+# is 0, and the firmware itself redacts the SSID, backend URL and stream
+# URLs in a release image; no secret is ever printed (key_fp is 4 bytes of a
+# hash, and only while download mode is still open at the factory).
+
+# Byte-reproducible image: no build date/time, paths mapped. Lets anyone
+# rebuild a release from the tag and compare it with the signed one.
+CONFIG_APP_REPRODUCIBLE_BUILD=y
+# CONFIG_APP_COMPILE_TIME_DATE is not set

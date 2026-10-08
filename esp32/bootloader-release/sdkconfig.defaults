@@ -1,0 +1,44 @@
+# ---- Areg RELEASE bootloader profile (ESP32-S3, ESP-IDF v5.5.4) ----
+# Exact text tested in the design (Espressif QEMU, TEST keys): measured
+# 0x6000 unsigned / 0x7000 signed -- the 0x8000 partition-table offset
+# leaves 4 KB spare. INFO/WARN/ERROR log levels do NOT fit (0x9000+).
+# Anti-rollback is OFF in this CANDIDATE -- an OWNER DECISION that must be
+# made BEFORE the first toy is locked (docs/firmware-security.md s11, review
+# 2026-10-08): with it off and this bootloader frozen forever, anyone with a
+# flash clip can erase otadata and boot an OLDER owner-signed release still
+# in an OTA slot ("No factory image, trying OTA 0", bootloader_utility.c).
+# The app retires the older slot after every confirmed OTA (ota_slot_rules.h),
+# which closes that for attackers without an earlier dump of the same toy;
+# only CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=y (+ a secure_version in the IDF
+# release app, esp32/AregVoiceIdf) closes replay too. Measured: 0x8000
+# signed with it on -- exactly fits, zero margin.
+# To turn it on (the full recipe is docs/firmware-security.md s11 rule 8A):
+# replace the "is not set" line below with CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=y
+# -- build_release_bootloader.sh then REQUIRES it in the resolved config (and
+# refuses it whenever this file does not say so), build_idf.sh release then
+# REQUIRES CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=y + CONFIG_BOOTLOADER_APP_
+# SECURE_VERSION=<n> in esp32/AregVoiceIdf/sdkconfig.defaults.release, and
+# build_release.py (arduino-cli) refuses to make a release at all.
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_OFFSET=0x8000
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+# CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK is not set
+CONFIG_SECURE_BOOT=y
+CONFIG_SECURE_BOOT_V2_ENABLED=y
+CONFIG_SECURE_SIGNED_APPS_RSA_SCHEME=y
+# CONFIG_SECURE_BOOT_BUILD_SIGNED_BINARIES is not set
+# CONFIG_SECURE_BOOT_ENABLE_AGGRESSIVE_KEY_REVOKE is not set
+# CONFIG_SECURE_BOOT_V2_ALLOW_EFUSE_RD_DIS is not set
+CONFIG_SECURE_FLASH_ENC_ENABLED=y
+CONFIG_SECURE_FLASH_ENCRYPTION_AES256=y
+CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE=y
+CONFIG_SECURE_DISABLE_ROM_DL_MODE=y
+CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
+# Reproducible bytes: no build date/time in the bootloader (the only
+# addition to the design's tested text; it removes a string, nothing else).
+# CONFIG_BOOTLOADER_COMPILE_TIME_DATE is not set

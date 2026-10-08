@@ -27,6 +27,21 @@
 #include "wifi_creds.h"   // wifi_creds_save — persist the received creds (B.1)
 #include "device_creds.h" // device_creds_pop_load — per-device PoP (factory pairing)
 #include "device_creds_rules.h" // pop_is_wellformed — reject NVS garbage before advertising it
+#include "secure_store.h"       // purge request: the Wi-Fi driver keeps its own plaintext copy
+#include "security_profile.h"   // AREG_IS_RELEASE: no shared fallback PoP, SSID redacted
+#include "security_posture.h"   // security_network_allowed: half-secured toy never takes Wi-Fi
+#include <esp_arduino_version.h>
+
+// N031 (2026-10-08): arduino-esp32 3.3.7-3.3.11 release the BT controller
+// memory in initArduino() unless a BT library marks itself in use
+// (#12287); WiFiProv only does so from 3.3.12 (#12885). Without this the
+// toy boot-loops inside btdm_controller_init the moment BLE provisioning
+// starts (#12436 / #12357). The core's own esp32-hal-bt.c invites exactly
+// this strong override. Not hardware-verified yet.
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 3, 7) && \
+    ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 3, 12)
+extern "C" bool btInUse(void) { return true; }
+#endif
 
 // Non-secret knobs. Self-defaulted so the build never depends on config.h
 // carrying them (same pattern as the #047 watchdog tunables). Override in
@@ -34,8 +49,9 @@
 #ifndef AREG_PROV_SERVICE_NAME
 #define AREG_PROV_SERVICE_NAME "Areg-Setup"
 #endif
-#ifndef AREG_PROV_POP
-// Proof-of-possession BENCH FALLBACK ONLY, used when NVS holds no per-device
+#if !AREG_IS_RELEASE && !defined(AREG_PROV_POP)
+// Proof-of-possession BENCH FALLBACK ONLY (DEV builds -- a RELEASE image
+// never compiles it in: security_profile.h refuses the macro, C150), used when NVS holds no per-device
 // PoP (device_creds_pop_load returns false — a unit that was never run
 // through the factory station, or one factory-provisioned before the PoP
 // slice). Every real toy advertises its own per-device PoP instead (factory
@@ -48,6 +64,19 @@
 
 static volatile bool s_active = false;
 static volatile bool s_succeeded = false;  // B.3 — latched on CRED_SUCCESS
+
+// Review 2026-10-08: the provisioning manager writes the received Wi-Fi
+// password into the PLAINTEXT default nvs (nvs.net80211). The physical purge
+// runs only at the top of the next boot, and the toy reboots by itself only on
+// CRED_SUCCESS -- after a failed or abandoned session the (possibly correct)
+// password would sit readable with a flash clip until some later power cycle.
+// These three let the main loop reboot NOW instead (ble_provisioning_purge_reboot_due).
+#ifndef AREG_PROV_PURGE_AFTER_FAIL_MS
+#define AREG_PROV_PURGE_AFTER_FAIL_MS (3UL * 60UL * 1000UL)  // phone gave up after a failed validation
+#endif
+static volatile bool s_purge_pending = false;  // this session queued a default-nvs purge
+static volatile bool s_ended = false;          // PROV_END seen
+static volatile uint32_t s_cred_fail_ms = 0;   // last CRED_FAIL with no newer CRED_RECV (0 = none)
 
 // Provisioning event handler. Registered via WiFi.onEvent before
 // beginProvision. The credential-receive event is where we capture the
@@ -71,10 +100,23 @@ static void prov_event(arduino_event_t *sys_event) {
                 reinterpret_cast<const char *>(sys_event->event_info.prov_cred_recv.ssid);
             const char *pass =
                 reinterpret_cast<const char *>(sys_event->event_info.prov_cred_recv.password);
+#if AREG_IS_RELEASE
+            Serial.printf("[prov] credentials received (ssid=<redacted len=%u>) — persisting to NVS\n",
+                          (unsigned)(ssid != nullptr ? strlen(ssid) : 0));
+#else
             Serial.printf("[prov] credentials received (ssid=%s) — persisting to NVS\n",
                           ssid != nullptr ? ssid : "?");
+#endif
             Serial.flush();
             wifi_creds_save(ssid, pass);
+            // The provisioning manager stores its own copy in the DEFAULT
+            // (plaintext) nvs (esp_wifi_set_storage(WIFI_STORAGE_FLASH));
+            // erase it physically at the top of the next boot -- which the
+            // main loop brings forward if this session does not succeed.
+            if (secure_store_request_default_nvs_purge()) {
+                s_purge_pending = true;
+            }
+            s_cred_fail_ms = 0;  // a fresh attempt: the failure clock restarts
             break;
         }
 
@@ -85,6 +127,7 @@ static void prov_event(arduino_event_t *sys_event) {
             // re-sends on retry, overwriting it).
             Serial.println("[prov] credential validation FAILED (wrong Wi-Fi password / AP down?)");
             Serial.flush();
+            s_cred_fail_ms = millis() | 1u;  // never 0 ("no failure pending")
             break;
 
         case ARDUINO_EVENT_PROV_CRED_SUCCESS:
@@ -98,6 +141,7 @@ static void prov_event(arduino_event_t *sys_event) {
             Serial.println("[prov] provisioning session ended");
             Serial.flush();
             s_active = false;
+            s_ended = true;
             break;
 
         default:
@@ -122,6 +166,58 @@ void ble_provisioning_begin() {
         Serial.flush();
     }
 
+    // Factory pairing (2026-09-11): the toy advertises its OWN PoP, burned to
+    // NVS at manufacture, so a printed pairing code on one box does not open
+    // every other toy. Falls back to the shared bench placeholder only for a
+    // unit with nothing in NVS (never flashed through the factory station).
+    static char s_pop[24];
+#if AREG_IS_RELEASE
+    // RELEASE: the per-device PoP or nothing. A toy that would otherwise
+    // advertise a shared, published code (C150) refuses to open setup at
+    // all; it needs the factory station, not a fallback.
+    // Latched: the B.3 long-outage fallback calls this every loop pass, and
+    // a missing PoP will not appear by itself.
+    static bool s_refused = false;
+    if (s_refused) {
+        return;
+    }
+    // A toy whose factory run stopped before step 9 (download mode still
+    // open) must never receive a family's Wi-Fi password: RAM code loaded
+    // over the cable could derive the NVS keys and read it back. It stays
+    // visibly dead instead (security_posture_rules::network_allowed).
+    if (!security_network_allowed()) {
+        Serial.println("[prov] factory not finished (download mode open) - BLE setup refused");
+        Serial.flush();
+        s_active = false;
+        s_refused = true;
+        return;
+    }
+    if (!(device_creds_pop_load(s_pop, sizeof(s_pop))
+          && device_creds_rules::pop_is_wellformed(s_pop))) {
+        Serial.println("[prov] no per-device PoP - BLE setup refused");
+        Serial.flush();
+        s_active = false;
+        s_refused = true;
+        return;
+    }
+    const char *pop = s_pop;
+#else
+    const char *pop = AREG_PROV_POP;
+    if (device_creds_pop_load(s_pop, sizeof(s_pop))
+        && device_creds_rules::pop_is_wellformed(s_pop)) {
+        pop = s_pop;
+    } else if (device_creds_present()) {
+        // An id/key were burned but the PoP is missing or malformed (torn
+        // write, older factory-station version, hand-edited NVS image) —
+        // worth a distinct log line, since this toy WAS factory-provisioned
+        // and a silent fallback here would look identical to "never
+        // provisioned" in the serial log.
+        Serial.println("[prov] stored PoP missing/malformed — using the bench fallback");
+    } else {
+        Serial.println("[prov] no per-device PoP in NVS — using the bench fallback");
+    }
+#endif
+
     WiFi.onEvent(prov_event);
     s_active = true;
     // SCHEME_BLE: BLE transport. SECURITY_1: curve25519 key-exchange + AES-CTR
@@ -145,25 +241,6 @@ void ble_provisioning_begin() {
     const scheme_handler_t kMemHandler = NETWORK_PROV_SCHEME_HANDLER_NONE;
 #endif
 
-    // Factory pairing (2026-09-11): the toy advertises its OWN PoP, burned to
-    // NVS at manufacture, so a printed pairing code on one box does not open
-    // every other toy. Falls back to the shared bench placeholder only for a
-    // unit with nothing in NVS (never flashed through the factory station).
-    static char s_pop[24];
-    const char *pop = AREG_PROV_POP;
-    if (device_creds_pop_load(s_pop, sizeof(s_pop))
-        && device_creds_rules::pop_is_wellformed(s_pop)) {
-        pop = s_pop;
-    } else if (device_creds_present()) {
-        // An id/key were burned but the PoP is missing or malformed (torn
-        // write, older factory-station version, hand-edited NVS image) —
-        // worth a distinct log line, since this toy WAS factory-provisioned
-        // and a silent fallback here would look identical to "never
-        // provisioned" in the serial log.
-        Serial.println("[prov] stored PoP missing/malformed — using the bench fallback");
-    } else {
-        Serial.println("[prov] no per-device PoP in NVS — using the bench fallback");
-    }
 
     WiFiProv.beginProvision(
         NETWORK_PROV_SCHEME_BLE,
@@ -182,6 +259,17 @@ bool ble_provisioning_active() {
 
 bool ble_provisioning_succeeded() {
     return s_succeeded;
+}
+
+bool ble_provisioning_purge_reboot_due() {
+    if (!s_purge_pending || s_succeeded) {
+        return false;  // nothing plaintext pending, or the success reboot purges anyway
+    }
+    if (s_ended) {
+        return true;   // session over without success
+    }
+    const uint32_t failed_at = s_cred_fail_ms;
+    return failed_at != 0 && (uint32_t)(millis() - failed_at) >= AREG_PROV_PURGE_AFTER_FAIL_MS;
 }
 
 #endif  // AREG_USE_BLE_PROVISIONING

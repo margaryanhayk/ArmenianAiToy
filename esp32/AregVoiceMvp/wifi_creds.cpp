@@ -2,11 +2,13 @@
 // AregVoiceMvp / wifi_creds.cpp   (Phase B.1)
 //
 // NVS-backed Wi-Fi credential storage via Arduino Preferences. See
-// wifi_creds.h for the contract. Lightweight — Preferences uses the existing
-// `nvs` partition, so no partition-table change and negligible flash impact.
+// wifi_creds.h for the contract. Lives in the "nvs_sec" partition
+// (encrypted on a locked release toy) via areg_prefs_begin -- see
+// secure_store.h.
 // -------------------------------------------------------------
 #include "wifi_creds.h"
 #include <Preferences.h>
+#include "secure_store.h"  // areg_prefs_begin: app state lives in nvs_sec
 
 namespace {
 // Short namespace + keys (NVS keys are limited to 15 chars).
@@ -17,7 +19,7 @@ constexpr const char *kPassKey   = "pass";
 
 bool wifi_creds_present() {
     Preferences prefs;
-    if (!prefs.begin(kNamespace, /*readOnly=*/true)) {
+    if (!areg_prefs_begin(prefs, kNamespace, /*readOnly=*/true)) {
         return false;  // namespace doesn't exist yet → never provisioned
     }
     const bool has = prefs.getString(kSsidKey, "").length() > 0;
@@ -27,7 +29,7 @@ bool wifi_creds_present() {
 
 bool wifi_creds_load(char *ssid, size_t ssid_cap, char *pass, size_t pass_cap) {
     Preferences prefs;
-    if (!prefs.begin(kNamespace, /*readOnly=*/true)) {
+    if (!areg_prefs_begin(prefs, kNamespace, /*readOnly=*/true)) {
         return false;
     }
     const String s = prefs.getString(kSsidKey, "");
@@ -46,7 +48,7 @@ void wifi_creds_save(const char *ssid, const char *pass) {
         return;  // never persist an empty network
     }
     Preferences prefs;
-    if (!prefs.begin(kNamespace, /*readOnly=*/false)) {
+    if (!areg_prefs_begin(prefs, kNamespace, /*readOnly=*/false)) {
         return;
     }
     prefs.putString(kSsidKey, ssid);
@@ -56,7 +58,7 @@ void wifi_creds_save(const char *ssid, const char *pass) {
 
 void wifi_creds_clear() {
     Preferences prefs;
-    if (!prefs.begin(kNamespace, /*readOnly=*/false)) {
+    if (!areg_prefs_begin(prefs, kNamespace, /*readOnly=*/false)) {
         return;
     }
     prefs.clear();

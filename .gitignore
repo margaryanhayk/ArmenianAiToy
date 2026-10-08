@@ -76,3 +76,26 @@ tools/.render-out/
 # docs/variant-endings-serial-render-runbook.md) — same posture: the shipped
 # copies under story-audio/ are what ships, these are pre-levelling.
 render-out/
+
+# Firmware images never go into git (chip security review, 2026-10-08): the
+# repository has been PUBLIC, so every committed image -- and the manifest
+# HMAC key compiled into it -- must be treated as published. Serve release
+# images from private storage (a Railway volume + FirmwareUpdate__ImagePath).
+# The one image still tracked here is untracked by the OWNER once the served
+# copy lives on the volume:
+#   git rm --cached backend/src/ArmenianAiToy.Api/firmware/areg-current.bin
+# (docs/firmware-security.md s11). Tracked files are unaffected by this rule.
+backend/src/ArmenianAiToy.Api/firmware/*.bin
+
+# Secure Boot PRIVATE keys never enter git; only the public halves
+# (*.pub.pem) and the digests file are committed (esp32/security/README.md;
+# chip security review round 3). A key made inside the repo by mistake is then
+# at least never picked up by `git add -A`.
+*.pem
+!*.pub.pem
+
+# Factory station output: printed labels (claim code + PoP QR), PoP stickers,
+# factory-record.json / INCOMPLETE.json and -- DEV profile -- nvs.bin with the
+# toy's PLAINTEXT device key. The tools now default to ~/areg-factory-out
+# (outside the repo); this catches an explicit --out-dir/--out-root here.
+tools/factory/out/

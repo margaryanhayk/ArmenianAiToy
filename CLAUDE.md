@@ -81,7 +81,7 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3197 tests, ~35 s in Release
+dotnet test            # 3206 tests, ~37 s in Release
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
 ```
 
@@ -105,7 +105,8 @@ at compile time — a real incompatibility, not a config issue. That advisory
 stays open pending a compatible `Microsoft.AspNetCore.OpenApi`/Swashbuckle
 release.
 
-Firmware (`esp32/AregVoiceMvp/`): arduino-cli, core `esp32:esp32@3.3.8`,
+Firmware (`esp32/AregVoiceMvp/`): arduino-cli, core `esp32:esp32@3.3.8` (pinned; RELEASE
+images also build with ESP-IDF via `esp32/AregVoiceIdf`, see `docs/firmware-security.md`),
 FQBN `esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc`,
 libraries in the firmware README, `config.h` from `config.h.example`
 (gitignored — real creds live in NVS). Production image ≈ 1.33 MB of the 3 MB
@@ -1063,6 +1064,93 @@ Telegram's `sendMessage` URL; unset, the payload is byte-identical to before
 (pinned). Setup steps in `docs/ops-runbook.md` § Alerting. `dotnet test`
 green (3197, 1 new). NOT verified: a real Telegram delivery (no bot token
 here).
+
+### Chip security -- Secure Boot V2, flash encryption, NVS encryption (2026-10-08)
+
+Owner request: a buyer must not be able to read the toy's codes or modify
+it. Two firmware profiles (`security_profile.h`): DEV (default, bench, no
+eFuse touched) and RELEASE (`-DAREG_SECURITY_PROFILE_RELEASE`; `#error`s on
+every bench flag, compiled-in credential, the shared PoP, an http URL, an
+empty HMAC key, a core other than 3.3.8). ALL app NVS moved to a new
+`nvs_sec` partition (0x7F0000, where `coredump` was; `coredump` moved to
+0x7E0000, `encrypted`) opened only via
+`areg_prefs_begin()` (`secure_store.cpp`; NVS-encrypted with the eFuse HMAC
+key on a locked toy; the default `nvs` is physically purged after Wi-Fi
+provisioning). OTA verifies the Secure Boot V2 signature (`ota_sig_verify`)
+and a signed in-image version marker (`fw_version_marker`) before the boot
+switch; a `[sec]` posture line prints every boot; N031 fixed by a
+`btInUse()` override (core pinned 3.3.8). Builds: `esp32/AregVoiceIdf`
+(ESP-IDF v5.5.4 project, same sources, pinned deps, byte-reproducible) is
+canonical for release via `tools/firmware/build_idf.sh`; release bootloader
+`esp32/bootloader-release` (0x6000, logs off); offline signing
+`tools/firmware/sign_release.py`; gate `check_release_image.py --profile
+release --require-sbv2 / --bootloader`; factory
+`tools/factory/secure_provision.py` (one flow: host-generated per-device
+keys, pre-encrypted images on a blank chip, then eFuses, download mode off
+last; `dry-run` / `virt` rehearsals; `repair`). Doc:
+`docs/firmware-security.md`. Verified here: DEV+RELEASE `idf.py` builds,
+arduino-cli DEV + release builds, TEST-key signing + `espsecure
+verify-signature`, gate pass/fail, all host + Python tests, the factory
+flow against virtual eFuses. NOT verified: anything on real silicon
+(pilot: 2 sacrificial DevKitC-1 N8R8, doc s12). Owner-only: create the
+Secure Boot keys offline and commit the PUBLIC half to `esp32/security/`;
+gating rules before the first locked toy (doc s11).
+
+Review round 2 (same day), applied: TLS trusts five root CAs
+(`tls_trust_anchors.cpp`; RELEASE `#error`s and the gate refuses < 3); a
+RELEASE image stays offline and refuses BLE setup until ROM download mode is
+burned (half-secured toy), talks https only, and
+erases the first sector of the older image in the inactive OTA slot after a
+confirmed check-in (`ota_slot_rules.h`); DEV images on the OLD partition
+table run in legacy-store mode (`store=legacy`, app state stays in default
+`nvs`, never purged) instead of losing their identity; the station writes
+`<out-root>/<id>/INCOMPLETE.json` + DO NOT SHIP/revoke on any stop after
+registration and refuses `provision` without hardware-pilot evidence in
+`bundle.json` (`--pilot-board` for the pilot itself); `build_idf.sh release`
+stops unsigned by default (inline signing only with TEST digests, needs
+esptool 5.2.0's espsecure), refuses a dirty tree and an HMAC key found in any
+committed image, asserts compiler/IDF-esptool pins, re-verifies deps byte for
+byte, and always builds from a clean build dir (an incremental build carried
+the previous commit's `__TIME__`); `build_release.py` checks library
+versions + source hashes against `deps.lock`. **OWNER, before pushing this
+branch or locking a toy: make the GitHub repo private (it is public), move
+the served image to a Railway volume and `git rm --cached` it, decide
+anti-rollback (doc s11 rule 7 -- irreversible), set
+`FirmwareUpdate__BoardModel=areg-s3-n8-sb` before staging any signed image,
+run the pilot.**
+
+Review round 3 (same day), applied: a RELEASE image has NO network audio
+stream (ESP8266Audio's `AudioFileSourceHTTPStream` is plain TCP even for an
+https URL -- `HTTPClient::begin(client, "https://...")` adds no TLS -- so it
+is not compiled in; release toys play stories from SD only; the gate refuses
+its strings); `verifyRollbackLater()` returns true so a fresh OTA image stays
+PENDING_VERIFY until the check-in (a crash in `setup()` rolls back); a
+failed/abandoned BLE setup reboots so the plaintext Wi-Fi copy is purged at
+once; `coredump` kept as an `encrypted` partition (owner decision before the
+first lock). Station: every esptool call `--after no-reset`, ONE `BURN`
+confirmation for steps 6+7, MAC re-read before every burn, no normal boot
+while half-burned (`repair` reads eFuses first), https-only backend.
+`--profile` is required in `provision_toy.py` (dev refuses https without
+`--bench`); factory output defaults to `~/areg-factory-out` (mode 700);
+`tools/factory/out/` and private `*.pem` are gitignored. The bootloader,
+partition table and `boot_app0` that get frozen are pinned:
+`esp32/bootloader-release/RELEASED.md` Status (CANDIDATE -> PILOT ->
+APPROVED) is read by `sign_release.py`, the gate (`--bootloader
+--min-status`) and the station; a table must be the one recorded with its
+bootloader and parse to `partitions.csv`. Backend: `FirmwareImageMarker`
+reads the staged image's marker at startup and offers an `-sb` image only to
+devices reporting that board (fail-closed even with `BoardModel` empty).
+`build_idf.sh` / `build_release_bootloader.sh` export
+`IDF_COMPONENT_MANAGER=0`, refuse `dependencies.lock`/`managed_components`
+and a non-pristine IDF checkout or submodule; anti-rollback now follows
+`esp32/bootloader-release/sdkconfig.defaults` (full recipe: doc s11 rule
+8A). Verified: IDF dev + 3 byte-identical release builds, arduino-cli dev +
+release + 4 negative compiles, TEST signing + `espsecure verify-signature`,
+gate pass/fail incl. the app-config bootloader refused, APPROVED gating with
+non-TEST keys, virt factory flow, 11 host suites, Python tests, `dotnet
+test` (3206, 9 new). NOT verified on hardware. **OWNER, additionally: decide
+the coredump partition (doc s11 rule 9), and mark the RELEASED.md row
+APPROVED only after the pilot.**
 
 ## Working in this repo (agents)
 

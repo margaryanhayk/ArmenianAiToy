@@ -4,6 +4,7 @@
 // -------------------------------------------------------------
 #include "ota_state.h"
 #include <Preferences.h>
+#include "secure_store.h"  // areg_prefs_begin: app state lives in nvs_sec
 
 namespace {
 // Short namespace + keys (NVS keys are limited to 15 chars).
@@ -19,7 +20,7 @@ constexpr const char *kBootsKey   = "boots";
 void ota_state_load(OtaPersist &out) {
     out = OtaPersist{};  // defaults when the namespace has never been written
     Preferences prefs;
-    if (!prefs.begin(kNamespace, /*readOnly=*/true)) {
+    if (!areg_prefs_begin(prefs, kNamespace, /*readOnly=*/true)) {
         return;
     }
     out.state = prefs.getUChar(kStateKey, OTA_STATE_IDLE);
@@ -37,7 +38,7 @@ void ota_state_load(OtaPersist &out) {
 
 void ota_state_save(const OtaPersist &st) {
     Preferences prefs;
-    if (!prefs.begin(kNamespace, /*readOnly=*/false)) {
+    if (!areg_prefs_begin(prefs, kNamespace, /*readOnly=*/false)) {
         Serial.println("[ota] WARNING: NVS open failed; state not persisted");
         return;
     }

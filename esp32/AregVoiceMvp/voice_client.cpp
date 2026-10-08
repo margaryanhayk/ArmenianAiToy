@@ -16,6 +16,7 @@
 #include "wifi_creds.h"     // Phase B.1 — NVS-backed Wi-Fi credentials
 #include "device_creds.h"   // Phase C   — NVS-backed device identity
 #include "ota_foundation.h" // Proof 2 — AREG_FW_* identity + running-partition label
+#include "security_profile.h" // AREG_IS_RELEASE: no compiled-in identity/Wi-Fi fallback in release
 #include "content_report.h"
 #include "content_sync.h"   // sync status/error/streak for the heartbeat
 #include "ota_state.h"      // OTA apply — lastOtaStatus for the heartbeat report
@@ -23,6 +24,7 @@
 
 #include <esp_task_wdt.h>   // bounded blocking POSTs unsubscribe the loop task
 #include <Preferences.h>    // welcome flow — persisted last-known pause/bedtime
+#include "secure_store.h"  // areg_prefs_begin: app state lives in nvs_sec
 
 // -------------------------------------------------------------
 // WdtPause — unsubscribe THIS task from the watchdog for the length of a
@@ -100,9 +102,16 @@ static uint8_t *s_response_buffer = nullptr;
 // not change at runtime, so a one-time load is correct. With no NVS creds the
 // buffers are filled byte-for-byte from AREG_DEVICE_ID / AREG_DEVICE_API_KEY,
 // so the bench behaves exactly as before this change.
+//
+// RELEASE images have NO compile-time fallback (docs/firmware-security.md):
+// the identity comes from the factory-written nvs_sec partition or not at
+// all. A release toy without one is an offline, SD-only toy -- it makes no
+// backend call (areg_http_begin refuses) rather than authenticating as a
+// placeholder.
 static char s_device_id[48]      = {0};
 static char s_device_api_key[128] = {0};
 static bool s_device_creds_loaded = false;
+static bool s_device_identity_ok = false;
 
 static void ensure_device_creds() {
     if (s_device_creds_loaded) {
@@ -110,14 +119,30 @@ static void ensure_device_creds() {
     }
     if (device_creds_load(s_device_id, sizeof(s_device_id),
                           s_device_api_key, sizeof(s_device_api_key))) {
+        // The device id is not secret (it is printed in the box QR); the
+        // factory station matches this exact line.
         Serial.printf("[device] using provisioned identity (id=%s)\n", s_device_id);
+        s_device_identity_ok = true;
     } else {
+#if AREG_IS_RELEASE
+        s_device_id[0] = '\0';
+        s_device_api_key[0] = '\0';
+        s_device_identity_ok = false;
+        Serial.println("[device] identity missing (release) - offline only");
+#else
         snprintf(s_device_id, sizeof(s_device_id), "%s", AREG_DEVICE_ID);
         snprintf(s_device_api_key, sizeof(s_device_api_key), "%s", AREG_DEVICE_API_KEY);
         Serial.printf("[device] using compile-time identity (id=%s)\n", s_device_id);
+        s_device_identity_ok = true;
+#endif
     }
     Serial.flush();
     s_device_creds_loaded = true;
+}
+
+bool voice_device_identity_ready() {
+    ensure_device_creds();
+    return s_device_identity_ok;
 }
 
 // Single source of truth for the device-auth headers every backend call needs.
@@ -188,16 +213,37 @@ const char *voice_active_story_id() {
     return s_active_story_id[0] ? s_active_story_id : AREG_STORY_ID;
 }
 
+// What a log line may say about the network name. A RELEASE toy's console is
+// the support/factory cable; the family's SSID is theirs, not ours to print.
+static const char *ssid_for_log(const char *ssid) {
+#if AREG_IS_RELEASE
+    static char redacted[40];
+    snprintf(redacted, sizeof(redacted), "<redacted len=%u>",
+             (unsigned)(ssid != nullptr ? strlen(ssid) : 0));
+    return redacted;
+#else
+    return ssid != nullptr ? ssid : "?";
+#endif
+}
+
 static void wifi_load_effective_creds() {
     if (wifi_creds_load(s_wifi_ssid, sizeof(s_wifi_ssid),
                         s_wifi_pass, sizeof(s_wifi_pass))) {
-        Serial.printf("[wifi] using provisioned creds (ssid=%s)\n", s_wifi_ssid);
+        Serial.printf("[wifi] using provisioned creds (ssid=%s)\n", ssid_for_log(s_wifi_ssid));
     } else {
+#if AREG_IS_RELEASE
+        // No compiled-in network exists in a release image (security_profile.h
+        // asserts the strings are empty); BLE provisioning is the only source.
+        s_wifi_ssid[0] = '\0';
+        s_wifi_pass[0] = '\0';
+        Serial.println("[wifi] no provisioned network (release)");
+#else
         // Fallback: compile-time creds (config.h). Behavior-neutral for the
         // bench, which has no NVS creds.
         snprintf(s_wifi_ssid, sizeof(s_wifi_ssid), "%s", AREG_WIFI_SSID);
         snprintf(s_wifi_pass, sizeof(s_wifi_pass), "%s", AREG_WIFI_PASSWORD);
         Serial.printf("[wifi] using compile-time fallback creds (ssid=%s)\n", s_wifi_ssid);
+#endif
     }
     Serial.flush();
 }
@@ -213,7 +259,7 @@ void voice_wifi_set_credentials(const char *ssid, const char *password) {
     wifi_load_effective_creds();
     WiFi.disconnect();
     WiFi.begin(s_wifi_ssid, s_wifi_pass);
-    Serial.printf("[wifi] credentials updated; reconnecting to %s\n", s_wifi_ssid);
+    Serial.printf("[wifi] credentials updated; reconnecting to %s\n", ssid_for_log(s_wifi_ssid));
     Serial.flush();
 }
 
@@ -233,7 +279,7 @@ bool voice_wifi_begin() {
     // slice stays deliberately separate from any OTA release.
     WiFi.setSleep(WIFI_PS_MIN_MODEM);
     WiFi.begin(s_wifi_ssid, s_wifi_pass);
-    Serial.printf("[wifi] connecting to %s ...\n", s_wifi_ssid);
+    Serial.printf("[wifi] connecting to %s ...\n", ssid_for_log(s_wifi_ssid));
     const uint32_t timeout_ms = 20000;
     uint32_t started = millis();
     while (WiFi.status() != WL_CONNECTED) {
@@ -496,7 +542,7 @@ void voice_send_heartbeat() {
             // parent paused it six days ago.
             if (bedtime != s_in_bedtime_window || paused != s_is_paused) {
                 Preferences prefs;
-                if (prefs.begin(kStatePrefsNamespace, /*readOnly=*/false)) {
+                if (areg_prefs_begin(prefs, kStatePrefsNamespace, /*readOnly=*/false)) {
                     prefs.putBool(kStatePrefsPausedKey, paused);
                     prefs.putBool(kStatePrefsBedtimeKey, bedtime);
                     prefs.end();
@@ -523,7 +569,7 @@ bool voice_is_paused() {
 
 void voice_state_restore() {
     Preferences prefs;
-    if (!prefs.begin(kStatePrefsNamespace, /*readOnly=*/true)) {
+    if (!areg_prefs_begin(prefs, kStatePrefsNamespace, /*readOnly=*/true)) {
         return;   // never provisioned — the false defaults stand
     }
     s_is_paused         = prefs.getBool(kStatePrefsPausedKey, false);

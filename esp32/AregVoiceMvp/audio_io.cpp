@@ -15,6 +15,8 @@
 // -------------------------------------------------------------
 #include "audio_io.h"
 #include "config.h"
+#include "security_profile.h" // AREG_IS_RELEASE: stream URLs never on a release console
+#include "net_transport.h"    // areg_backend_allowed
 #include "diag.h"
 #include "volume_pot.h"   // hardware volume knob; folds to a fixed 0.6f when no pot pin is defined
 
@@ -48,7 +50,17 @@
 // AVR family. This is the canonical way to decode an in-
 // memory MP3 buffer on ESP32 with ESP8266Audio.
 #include <AudioFileSourcePROGMEM.h>
+#if !AREG_IS_RELEASE
+// DEV ONLY. ESP8266Audio's AudioFileSourceHTTPStream holds a plain
+// NetworkClient: HTTPClient::begin(client, "https://...") only sets port 443
+// and never adds TLS (arduino-esp32 3.3.8 HTTPClient.cpp), so an "https"
+// stream URL still travels -- story token included -- in cleartext and any
+// bytes that come back are played. A RELEASE image never includes or links
+// it: both stream functions below refuse, release toys play stories from
+// the SD card only, and check_release_image.py refuses an image carrying
+// this class's strings.
 #include <AudioFileSourceHTTPStream.h>
+#endif
 #include <AudioGeneratorMP3.h>
 #include <AudioOutputI2S.h>
 // Slice 2 (offline content pack): decode narration straight off the SD card.
@@ -385,11 +397,39 @@ bool audio_play_story_stream(const char *url,
     Serial.println("[story] playback disabled (AREG_DISABLE_MP3_PLAYBACK)");
     Serial.flush();
     return false;
+#elif AREG_IS_RELEASE
+    // RELEASE: no network story stream at all. The only stream source this
+    // firmware has (ESP8266Audio's AudioFileSourceHTTPStream) is plain TCP
+    // even for an https:// URL -- the story token would travel in cleartext
+    // and a network attacker could inject audio into a child's toy. Reported
+    // as an open failure; the session ends (no token was fetched, so no
+    // retry). Release toys play stories from the SD card only.
+    (void)url; (void)base_offset; (void)barge_in;
+    if (out_open_failed != nullptr) {
+        *out_open_failed = true;
+    }
+    Serial.println("[story] stream refused - a release toy plays stories from the SD card only");
+    Serial.flush();
+    return false;
 #else
     Serial.printf("[story] stream open: %s\n", url);
     Serial.flush();
+    if (!areg_backend_allowed()) {
+        if (out_open_failed != nullptr) {
+            *out_open_failed = true;
+        }
+        return false;
+    }
+    if (!areg_url_allowed(url)) {
+        if (out_open_failed != nullptr) {
+            *out_open_failed = true;
+        }
+        Serial.println("[story] refused stream URL");
+        Serial.flush();
+        return false;
+    }
 
-    AudioFileSourceHTTPStream http(url);
+    AudioFileSourceHTTPStream http(url);  // DEV only -- plain TCP, see the include
     if (!http.isOpen()) {
         // #063 â€” a non-200 GET (the concealment 404 of a rejected/expired
         // token) lands here. Surface it as the REAL open-failure signal so the
@@ -923,6 +963,15 @@ bool audio_play_thinking_bed_abortable(uint32_t pulse_index,
 // Arduino WiFiClient; the AudioFileSourceHTTPStream layer just reads
 // bytes and the MP3 decoder consumes them incrementally.
 bool audio_play_qa_stream(const char *url) {
+#if AREG_IS_RELEASE
+    // RELEASE: refused outright -- the stream source is plain TCP even for an
+    // https:// URL (see the AudioFileSourceHTTPStream include). The caller
+    // treats false as any other stream failure.
+    (void)url;
+    Serial.println("[audio] qa_stream refused - no TLS stream source in a release image");
+    Serial.flush();
+    return false;
+#else
     Serial.printf("[audio] qa_stream_begin url=%s\n", url);
     Serial.flush();
 #ifdef AREG_DISABLE_MP3_PLAYBACK
@@ -936,7 +985,15 @@ bool audio_play_qa_stream(const char *url) {
     // On a first-response latency of e.g. 300 ms the mp3.loop() decode
     // loop below will block briefly until the server sends the first MP3
     // sync word â€” this is fine; the decoder handles streaming natively.
-    AudioFileSourceHTTPStream http(url);
+    if (!areg_backend_allowed()) {
+        return false;
+    }
+    if (!areg_url_allowed(url)) {
+        Serial.println("[audio] qa_stream: refused URL");
+        Serial.flush();
+        return false;
+    }
+    AudioFileSourceHTTPStream http(url);  // DEV only -- plain TCP, see the include
     if (!http.isOpen()) {
         Serial.println("[audio] qa_stream: http open failed; caller may use buffered fallback");
         Serial.flush();
@@ -972,7 +1029,8 @@ bool audio_play_qa_stream(const char *url) {
     Serial.println("[audio] qa_stream_end ok=true");
     Serial.flush();
     return true;
-#endif
+#endif  // AREG_DISABLE_MP3_PLAYBACK
+#endif  // AREG_IS_RELEASE
 }
 
 

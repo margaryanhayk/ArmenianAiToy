@@ -45,26 +45,39 @@ subprocess (`python3 -m esp_idf_nvs_partition_gen generate ...`) rather than
 imported, so this script has no dependency on that package's internal API
 surface, only its documented CLI.
 
-USAGE
-    # Real unit, on the bench, with a serial port attached:
+USAGE  (--profile is REQUIRED: forgetting it must never make an unlocked toy)
+    # PRODUCTION -- lock the toy (docs/firmware-security.md s8; https only):
     export AREG_PROVISIONING_SECRET=...
-    python3 tools/factory/provision_toy.py \\
+    python3 tools/factory/provision_toy.py --profile release --bundle <bundle> \\
+        --backend-url https://<host> --port /dev/ttyACM0
+
+    # BENCH board (unlocked, PLAINTEXT identity), against a LAN dev backend:
+    python3 tools/factory/provision_toy.py --profile dev \\
         --backend-url http://192.168.1.50:5000 \\
         --mac AA:BB:CC:DD:EE:FF \\
         --port /dev/ttyUSB0
+    #   (--profile dev refuses an https:// -- i.e. production -- backend
+    #    unless --bench says this unlocked unit is meant to be one)
 
     # Register only, flash by hand later (no port given):
-    python3 tools/factory/provision_toy.py \\
+    python3 tools/factory/provision_toy.py --profile dev \\
         --backend-url http://192.168.1.50:5000 --mac AA:BB:CC:DD:EE:FF
 
     # Dry run -- label only, from a saved registration response, no network,
     # no esptool, no serial port. Useful for testing the label layout.
-    python3 tools/factory/provision_toy.py --dry-run sample_response.json
+    python3 tools/factory/provision_toy.py --profile dev --dry-run sample_response.json
 
-    # Rotate an ALREADY-REGISTERED toy's key (a leaked key, a repaired unit):
+    # Rotate an ALREADY-REGISTERED, UNLOCKED toy's key (a leaked key, a
+    # repaired unit) -- a locked conversion is `--profile release
+    # --rotate-existing` instead:
     export AREG_PROVISIONING_SECRET=...
-    python3 tools/factory/provision_toy.py --rotate-existing \\
+    python3 tools/factory/provision_toy.py --profile dev --bench --rotate-existing \\
         --backend-url https://<host> --mac <MAC exactly as the console shows it>
+
+OUTPUT. Labels, PoP stickers, factory records and -- dev profile -- nvs.bin
+(the toy's PLAINTEXT device key) go to ~/areg-factory-out/<deviceId>/ (mode
+700, OUTSIDE the repository; tools/factory/out/ is gitignored as a last net)
+unless --out-dir / --out-root says otherwise.
 
 ROTATING AN EXISTING TOY (--rotate-existing). Keeps the toy's device id, its
 Device row and its parent link; only the key changes. It sends
@@ -75,7 +88,7 @@ back in. The second call always mints a fresh one, and that is the key burned.
 A forced re-registration mints no claim code and no PoP, so the NVS image
 carries devid/apikey only (the toy then advertises the bench fallback PoP,
 `areg-pair`) and no label is printed -- the claim code on the box is
-unchanged. Writing nvs.bin replaces the WHOLE nvs partition, which also wipes
+unchanged. Writing nvs.bin replaces the WHOLE nvs_sec partition (all app state), which also wipes
 the toy's stored Wi-Fi: re-provision it over BLE afterwards. Not combinable
 with --port: no heartbeat can arrive until that BLE step is done, so the
 image is flashed by hand with the printed command. A rotation does not clear
@@ -84,6 +97,22 @@ a console revocation -- restore the toy there first if it is revoked. Unless
 directory OUTSIDE the repo (the path is printed): this is the key that
 replaces one that leaked through git, so it must never sit where a routine
 `git add -A` would pick it up.
+
+SECURITY PROFILES (chip security, 2026-10-08 -- docs/firmware-security.md).
+  --profile is required (review round 3: a production run that forgot the
+  flag used to make an UNLOCKED toy with a shippable-looking label).
+  --profile dev      today's flow, for BENCH boards: the identity
+                     image is PLAINTEXT and goes to the "nvs_sec" partition
+                     (0x7F0000; the firmware keeps ALL app state there now --
+                     the default "nvs" is ESP-IDF scratch). No eFuse is touched.
+  --profile release  the production flow that LOCKS the toy (Secure Boot V2,
+                     flash encryption, NVS encryption, JTAG off, download mode
+                     off). Delegates to tools/factory/secure_provision.py and
+                     needs a signed --bundle. Rehearsals: --dry-run-secure
+                     RESPONSE_JSON (steps 3-4 real, 5-9 printed), plus --virt
+                     (steps 6, 7, 9 executed against virtual eFuses).
+  `provision_toy.py repair ...` == `secure_provision.py repair ...` (finish a
+  release toy that stopped at step 6-8; the workdir must still exist).
 
 Exit code 0 = provisioned (or, in --dry-run, label rendered). Non-zero = do
 not ship this unit; read the printed reason.
@@ -108,6 +137,22 @@ except ImportError:
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PARTITIONS_CSV = REPO_ROOT / "esp32" / "AregVoiceMvp" / "partitions.csv"
+# Labels, records and (dev) nvs.bin with a PLAINTEXT device key: never inside
+# the repository, where one `git add -A` would publish them.
+DEFAULT_FACTORY_OUT = Path.home() / "areg-factory-out"
+
+
+def factory_out_dir(device_id: str, root: Path | None = None) -> Path:
+    """<root>/<deviceId>, root created mode 700. Only id-safe characters reach
+    the path, so a malformed id cannot steer it."""
+    root = root or DEFAULT_FACTORY_OUT
+    root.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(root, 0o700)
+    except OSError:
+        pass
+    return root / re.sub(r"[^0-9A-Za-z-]", "", device_id)
+
 
 # Must match device_creds_rules.h EXACTLY -- these three strings are the
 # whole contract between this script and the firmware that reads NVS back.
@@ -154,16 +199,22 @@ def parse_partition_offset(partitions_csv: Path, name: str) -> int:
     raise ProvisionError(f"no '{name}' row in {partitions_csv}")
 
 
+# The partition the firmware keeps its identity (and all app state) in since
+# the chip-security layout (secure_store.h): NOT the default "nvs", which is
+# ESP-IDF/Arduino scratch and gets physically erased by the firmware.
+APP_NVS_PARTITION = "nvs_sec"
+
+
 def nvs_partition_geometry(partitions_csv: Path) -> tuple[int, int]:
-    """(offset, size) of the 'nvs' row -- both read from the table actually
-    shipping, never hard-coded (see parse_partition_offset)."""
-    offset = parse_partition_offset(partitions_csv, "nvs")
+    """(offset, size) of the app store row ('nvs_sec') -- both read from the
+    table actually shipping, never hard-coded (see parse_partition_offset)."""
+    offset = parse_partition_offset(partitions_csv, APP_NVS_PARTITION)
     for line in partitions_csv.read_text().splitlines():
         m = PARTITION_ROW_RE.match(line.strip())
-        if m and m.group(1).strip() == "nvs":
+        if m and m.group(1).strip() == APP_NVS_PARTITION:
             size_str = m.group(5).strip()
             return offset, int(size_str, 16) if size_str.lower().startswith("0x") else int(size_str)
-    raise ProvisionError(f"could not read the nvs partition size from {partitions_csv}")
+    raise ProvisionError(f"could not read the {APP_NVS_PARTITION} partition size from {partitions_csv}")
 
 
 def _post_register(backend_url: str, mac: str, secret: str, force_rotate: bool = False):
@@ -431,18 +482,51 @@ def rotate_main(args: argparse.Namespace) -> int:
     return 0
 
 
+def release_argv(args: argparse.Namespace) -> list[str]:
+    """Maps this script's release-profile options onto secure_provision.py."""
+    if args.bundle is None:
+        raise ProvisionError("--profile release needs --bundle (a signed release bundle from sign_release.py)")
+    if args.dry_run:
+        raise ProvisionError("--dry-run renders a label only; for the release flow use --dry-run-secure RESPONSE_JSON")
+    if args.dry_run_secure:
+        mode = "virt" if args.virt else "dry-run"
+        argv = [mode, "--response", str(args.dry_run_secure)]
+        if args.efuse_file:
+            argv += ["--efuse-file", str(args.efuse_file)]
+    else:
+        if args.virt:
+            raise ProvisionError("--virt is a rehearsal: combine it with --dry-run-secure RESPONSE_JSON")
+        argv = ["provision"]
+    argv += ["--bundle", str(args.bundle), "--partitions-csv", str(args.partitions_csv)]
+    for flag, value in (("--port", args.port), ("--mac", args.mac), ("--backend-url", args.backend_url),
+                        ("--confirm-mac", args.confirm_mac)):
+        if value:
+            argv += [flag, value]
+    if args.rotate_existing:
+        argv.append("--rotate-existing")
+    if getattr(args, "pilot_board", False):
+        argv.append("--pilot-board")
+    return argv
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["repair"]:
+        import secure_provision
+        return secure_provision.main(argv)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--backend-url", help="e.g. http://192.168.1.50:5000")
+    ap.add_argument("--backend-url",
+                    help="release: https://<host> only; dev: a bench LAN backend (http://192.168.1.50:5000), "
+                         "or https with --bench")
     ap.add_argument("--mac", help="the toy's MAC address to register")
     ap.add_argument("--port", help="serial port; if given, flash the NVS image and verify a heartbeat")
     ap.add_argument("--baud", type=int, default=115200)
     ap.add_argument("--heartbeat-timeout", type=float, default=45.0,
                      help="seconds to wait for [heartbeat] status=200 after flashing (default 45)")
     ap.add_argument("--out-dir", type=Path, default=None,
-                     help="default: tools/factory/out/<deviceId>/ (with --rotate-existing: a fresh "
-                          "temp directory outside the repo, printed) -- CONTAINS THE DEVICE KEY "
-                          "in plaintext (nvs.bin); never commit, never upload, delete after the batch")
+                     help="default: ~/areg-factory-out/<deviceId>/ (mode 700, outside the repo; with "
+                          "--rotate-existing: a fresh temp directory outside the repo, printed) -- CONTAINS "
+                          "THE DEVICE KEY in plaintext (nvs.bin); never commit, never upload, delete after the batch")
     ap.add_argument("--partitions-csv", type=Path, default=DEFAULT_PARTITIONS_CSV)
     ap.add_argument("--dry-run", type=Path, metavar="RESPONSE_JSON",
                      help="skip registration AND hardware; render the label from a saved "
@@ -452,9 +536,33 @@ def main(argv: list[str] | None = None) -> int:
                      help="rotate the key of a toy that is ALREADY registered (same device id); "
                           "builds nvs.bin with devid/apikey only and prints no label -- see "
                           "'ROTATING AN EXISTING TOY' above")
+    ap.add_argument("--profile", choices=["dev", "release"], required=True,
+                    help="REQUIRED. release: lock the toy (tools/factory/secure_provision.py) -- every toy that "
+                         "leaves the house; dev: an UNLOCKED bench board with a plaintext identity in nvs_sec")
+    ap.add_argument("--bench", action="store_true",
+                    help="dev: allow an https:// (production) backend for this UNLOCKED bench unit")
+    ap.add_argument("--bundle", type=Path, help="release: the signed bundle directory (bundle.json)")
+    ap.add_argument("--dry-run-secure", type=Path, metavar="RESPONSE_JSON",
+                    help="release rehearsal: steps 3-4 for real in a temp dir, steps 5-9 printed")
+    ap.add_argument("--virt", action="store_true",
+                    help="with --dry-run-secure: also EXECUTE steps 6, 7, 9 against virtual eFuses")
+    ap.add_argument("--efuse-file", type=Path, help="--virt: virtual eFuse file (default: a fresh temp file)")
+    ap.add_argument("--confirm-mac", help="release: pre-confirm the irreversible steps for exactly this MAC")
+    ap.add_argument("--pilot-board", action="store_true",
+                    help="release: a SACRIFICIAL hardware-pilot board (no pilot evidence needed; never shipped)")
     args = ap.parse_args(argv)
 
     try:
+        if args.profile == "release":
+            import secure_provision
+            return secure_provision.main(release_argv(args))
+        if args.dry_run_secure or args.virt or args.bundle:
+            raise ProvisionError("--bundle/--dry-run-secure/--virt belong to --profile release")
+        if args.backend_url and not args.backend_url.startswith("http://") and not args.bench:
+            raise ProvisionError(
+                "--profile dev makes an UNLOCKED toy with a PLAINTEXT device key and PoP; against an https "
+                "(production) backend that is almost certainly a forgotten `--profile release`. Use --profile "
+                "release, or pass --bench if this really is an unlocked bench unit.")
         if args.rotate_existing:
             return rotate_main(args)
         if args.dry_run:
@@ -481,7 +589,7 @@ def main(argv: list[str] | None = None) -> int:
         # else in this file.
         api_key = data.get("apiKey")
 
-        out_dir = args.out_dir or (Path(__file__).resolve().parent / "out" / device_id)
+        out_dir = args.out_dir or factory_out_dir(device_id)
 
         print(f"[device] id={device_id}")  # deviceId is not secret (it is IN the QR)
 

@@ -9,6 +9,40 @@ BLE pairing code (`areg-pair`) every toy used to advertise; see CLAUDE.md §
 "State of the toy" for the summary and `esp32/AregVoiceMvp/README.md`'s bench
 checklist for what has and has not been heard on real hardware.
 
+> **Chip security (2026-10-08) -- two flows now.**
+> - **Production toys: `--profile release`** (`tools/factory/secure_provision.py`).
+>   The station flashes EVERYTHING (pre-encrypted bootloader, partition
+>   table, otadata, signed app, and the encrypted `nvs_sec` identity image)
+>   onto a BLANK chip, then burns the eFuses: flash encryption, NVS HMAC key,
+>   JTAG off, Secure Boot (both public-key digests, slot 2 revoked), and
+>   last ROM download mode off. Every key is generated on the station in
+>   `/dev/shm/areg-factory/<mac>/` (RAM, mode 700), never printed, and
+>   shredded after the toy verifies; the station holds PUBLIC Secure Boot
+>   keys only. Two typed `BURN <mac>` confirmations -- ONE for steps 6 and
+>   7 together (no human wait may sit between them), one for step 9; the
+>   station re-reads the chip's MAC before every burn and never resets the
+>   chip into a normal boot before step 7 is verified (`esptool --after
+>   no-reset`). `repair` for a toy that stopped at steps 6-8. `https://`
+>   backend only. `provision` refuses a bundle without hardware-pilot
+>   evidence, and a bootloader whose `esp32/bootloader-release/RELEASED.md`
+>   row is not APPROVED (`--pilot-board` -- PILOT allowed, no evidence --
+>   only for the sacrificial pilot boards, which are never shipped). A run
+>   that stops after registration writes
+>   `~/areg-factory-out/<deviceId>/INCOMPLETE.json` and prints **DO NOT SHIP**: repair
+>   it on the same station, or revoke the device
+>   (`POST /api/internal/devices/<id>/revoke`) and set the toy aside. Full
+>   procedure and what is irreversible: **`docs/firmware-security.md`
+>   section 8.**
+> - **Bench boards: `--profile dev`** (this document's flow). `--profile` is
+>   REQUIRED (there is no default any more: forgetting it used to make an
+>   unlocked toy with a shippable-looking label), and `--profile dev`
+>   refuses an `https://` (production) backend unless `--bench` says the
+>   unlocked unit is meant. No eFuse is touched; the identity image is PLAINTEXT and now goes to
+>   the **`nvs_sec` partition at 0x7F0000** (the firmware keeps all app
+>   state there; the default `nvs` at 0x9000 is ESP-IDF scratch). The
+>   offsets in the examples below are printed by the script -- read them
+>   from its output.
+
 ---
 
 ## 0. What gets stored, what gets printed
@@ -51,7 +85,7 @@ three fields printed in large text, for anyone whose phone can't scan.
   see that file's comments for why each is there).
 - A label printer (or just print the PDF), and a way to affix it to the box.
 - **The toy connected over USB, on the port you're about to name.** The
-  factory station writes ONLY the `nvs` partition — the firmware image
+  dev flow writes ONLY the `nvs_sec` partition — the firmware image
   itself must already be flashed (the normal release build; see
   `docs/ota-release-runbook.md` for how that image is cut). Provisioning a
   unit with no firmware on it yet will flash cleanly and then never heartbeat
@@ -61,7 +95,7 @@ three fields printed in large text, for anyone whose phone can't scan.
 
 ```bash
 export AREG_PROVISIONING_SECRET=<the real secret, not the dev bypass>
-python3 tools/factory/provision_toy.py \
+python3 tools/factory/provision_toy.py --profile dev \
     --backend-url http://<backend-host>:<port> \
     --mac <the toy's real MAC address> \
     --port /dev/ttyUSB0
@@ -77,7 +111,7 @@ What happens, in order:
    `apikey` / `pop` — see `esp32/AregVoiceMvp/device_creds_rules.h`, the
    single source of truth those three strings are checked against on both
    sides) is turned into `nvs.bin` by Espressif's own `nvs_partition_gen`.
-3. **Flash it.** `esptool write-flash` at the `nvs` partition's OWN offset,
+3. **Flash it.** `esptool write-flash` at the `nvs_sec` partition's OWN offset,
    read live from `esp32/AregVoiceMvp/partitions.csv` — never hand-typed,
    because that table has already moved once (B.2, `huge_app` → `custom`).
 4. **Verify.** Watches the toy's own serial log after the reset for its
@@ -86,20 +120,23 @@ What happens, in order:
    defect, not a flake. **This step needs the toy's Wi-Fi already reachable**
    (BLE-provisioned already, or a bench `config.h` fallback on THIS image) —
    see the caveat in § 4.
-5. **Render the label.** `out/<deviceId>/qr.png` + `out/<deviceId>/label.pdf`.
+5. **Render the label.** `~/areg-factory-out/<deviceId>/qr.png` +
+   `~/areg-factory-out/<deviceId>/label.pdf` (the root is created mode 700,
+   OUTSIDE the repository; `tools/factory/out/` is also gitignored in case an
+   explicit `--out-dir` points there).
 
 On success:
 
 ```
-[done] tools/factory/out/<deviceId>
+[done] /home/<you>/areg-factory-out/<deviceId>
 [done] out-dir also contains the device's plaintext key (nvs.bin) --
        treat like a filled-in config.h: never commit, delete after the batch.
 ```
 
-**`tools/factory/out/<deviceId>/nvs.bin` holds the device's API key in
+**`~/areg-factory-out/<deviceId>/nvs.bin` holds the device's API key in
 plaintext.** Same rule as a filled-in `config.h` (README, "Do not commit
 `config.h`"): never commit it, never upload it anywhere that isn't this one
-toy's flash. Delete the batch's `out/` directory once every label in it is
+toy's flash. Delete the batch's output directory once every label in it is
 printed and every image is flashed.
 
 Print `label.pdf`, affix it to the box, move to the next unit.
@@ -144,16 +181,16 @@ label; it prints the exact `esptool` command to run by hand once a port is
 available:
 
 ```
-python3 -m esptool --chip esp32s3 --port <PORT> write-flash 0x9000 tools/factory/out/<deviceId>/nvs.bin
+python3 -m esptool --chip esp32s3 --port <PORT> write-flash 0x7f0000 ~/areg-factory-out/<deviceId>/nvs.bin
 ```
 
-(`0x9000` here is whatever this repo's `partitions.csv` says today — read it
+(`0x7f0000` here is whatever this repo's `partitions.csv` says today — read it
 from the script's own printed output, don't copy this example.)
 
 ## 4. Testing the label pipeline without hardware (dry run)
 
 ```bash
-python3 tools/factory/provision_toy.py --dry-run sample_response.json --out-dir /tmp/label_test
+python3 tools/factory/provision_toy.py --profile dev --dry-run sample_response.json --out-dir /tmp/label_test
 ```
 
 `sample_response.json` is any JSON object shaped like a real

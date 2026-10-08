@@ -21,6 +21,7 @@
 #include <FS.h>
 #include <SD.h>
 #include <Preferences.h>   // NVS: the failure streak must survive a panic
+#include "secure_store.h"  // areg_prefs_begin: app state lives in nvs_sec
 #include <esp_task_wdt.h>
 #include <mbedtls/sha256.h>
 #include <time.h>          // time() — orphan-sweep .part staleness (wall clock)
@@ -341,7 +342,7 @@ constexpr uint8_t kIndexBadRebuildAfter = 2;
 
 uint8_t index_bad_count() {
     Preferences prefs;
-    if (!prefs.begin(kNvsNamespace, /*readOnly=*/true)) return 0;
+    if (!areg_prefs_begin(prefs, kNvsNamespace, /*readOnly=*/true)) return 0;
     const uint8_t n = prefs.getUChar(kNvsIndexBadKey, 0);
     prefs.end();
     return n;
@@ -349,7 +350,7 @@ uint8_t index_bad_count() {
 
 void index_bad_set(uint8_t n) {
     Preferences prefs;
-    if (!prefs.begin(kNvsNamespace, /*readOnly=*/false)) return;
+    if (!areg_prefs_begin(prefs, kNvsNamespace, /*readOnly=*/false)) return;
     prefs.putUChar(kNvsIndexBadKey, n);
     prefs.end();
 }
@@ -1990,14 +1991,14 @@ bool     s_requested_now   = false;
 
 void persist_state() {
     Preferences prefs;
-    if (!prefs.begin(kNvsNamespace, /*readOnly=*/false)) return;
+    if (!areg_prefs_begin(prefs, kNvsNamespace, /*readOnly=*/false)) return;
     prefs.putUShort(kNvsStreakKey, s_fail_streak);
     prefs.end();
 }
 
 void restore_state() {
     Preferences prefs;
-    if (!prefs.begin(kNvsNamespace, /*readOnly=*/true)) return;
+    if (!areg_prefs_begin(prefs, kNvsNamespace, /*readOnly=*/true)) return;
     s_fail_streak = prefs.getUShort(kNvsStreakKey, 0);
     prefs.end();
 }

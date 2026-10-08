@@ -25,6 +25,9 @@
 // with the DEFAULT version while other units use the config.h override —
 // and the post-OTA check-in compares versions across those units.
 #include "config.h"
+// security_profile.h owns the AREG_FW_VERSION / AREG_BOARD_MODEL defaults
+// (profile-aware: a RELEASE image defaults to the "-sb" board model).
+#include "security_profile.h"
 
 // --- Firmware identity (override from config.h / build flags) ---
 // AREG_FW_VERSION is the plain MAJOR.MINOR.PATCH the backend's

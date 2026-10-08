@@ -12,6 +12,7 @@
 #include <FS.h>
 #include <SD.h>
 #include <Preferences.h>
+#include "secure_store.h"  // areg_prefs_begin: app state lives in nvs_sec
 #include <esp_random.h>
 #include <esp_task_wdt.h>
 #include <string.h>
@@ -555,7 +556,7 @@ void offline_games_run_next() {
 
     char last_dir[16] = "";
     Preferences prefs;
-    if (prefs.begin(kCursorNamespace, /*readOnly=*/true)) {
+    if (areg_prefs_begin(prefs, kCursorNamespace, /*readOnly=*/true)) {
         prefs.getString(kCursorKey, last_dir, sizeof(last_dir));
         prefs.end();
     }
@@ -567,7 +568,7 @@ void offline_games_run_next() {
     const char *pick_dir = game_dir_for_index(pick);
 
     if (strcmp(pick_dir, last_dir) != 0) {
-        if (prefs.begin(kCursorNamespace, /*readOnly=*/false)) {
+        if (areg_prefs_begin(prefs, kCursorNamespace, /*readOnly=*/false)) {
             prefs.putString(kCursorKey, pick_dir);
             prefs.end();
         } else {

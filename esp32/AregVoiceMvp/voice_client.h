@@ -24,6 +24,12 @@ class HTTPClient;  // fwd-decl — keeps HTTPClient.h out of this header
 // voice_client call uses, so all backend traffic authenticates identically.
 void voice_add_device_auth_headers(HTTPClient &http);
 
+// True when this toy has a usable device identity: the factory-written one
+// from nvs_sec, or (DEV builds only) the compile-time config.h fallback. A
+// RELEASE toy without one is offline/SD-only: every backend call refuses
+// (areg_http_begin). First call loads and logs the identity.
+bool voice_device_identity_ready();
+
 // Block until Wi-Fi is associated. Returns true on success,
 // false on timeout. Called once in setup(). A false return is NOT fatal —
 // setup() proceeds to IDLE and voice_wifi_tick() recovers in the background.

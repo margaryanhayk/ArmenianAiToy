@@ -14,6 +14,7 @@
 #include <FS.h>
 #include <SD.h>
 #include <Preferences.h>
+#include "secure_store.h"  // areg_prefs_begin: app state lives in nvs_sec
 
 #include "content_sync_model.h"   // cs_index_parse — one owner of the schema
 #include "audio_io.h"             // audio_sd_available / audio_sd_has_file
@@ -150,7 +151,7 @@ struct HeardSet {
 void heard_load(HeardSet *set) {
     memset(set, 0, sizeof(*set));
     Preferences prefs;
-    if (!prefs.begin(kHeardPrefsNamespace, /*readOnly=*/true)) {
+    if (!areg_prefs_begin(prefs, kHeardPrefsNamespace, /*readOnly=*/true)) {
         return;   // never provisioned — an empty set, not an error
     }
     const size_t read = prefs.getBytes(kHeardPrefsKey, set, sizeof(*set));
@@ -165,7 +166,7 @@ void heard_load(HeardSet *set) {
 
 void heard_save(const HeardSet *set) {
     Preferences prefs;
-    if (!prefs.begin(kHeardPrefsNamespace, /*readOnly=*/false)) {
+    if (!areg_prefs_begin(prefs, kHeardPrefsNamespace, /*readOnly=*/false)) {
         Serial.println("[welcome] NVS unavailable — heard set not persisted");
         Serial.flush();
         return;   // never blocks playback
@@ -499,7 +500,7 @@ bool music_select_next(char *out_path, size_t out_len) {
     // story rotation.
     char last_id[CS_MAX_STORY_ID_LEN + 1] = "";
     Preferences prefs;
-    if (prefs.begin("aregmusic", /*readOnly=*/true)) {
+    if (areg_prefs_begin(prefs, "aregmusic", /*readOnly=*/true)) {
         prefs.getString("last_id", last_id, sizeof(last_id));
         prefs.end();
     }
@@ -512,7 +513,7 @@ bool music_select_next(char *out_path, size_t out_len) {
     }
     const int chosen = (prev_pos >= 0) ? (prev_pos + 1) % n : 0;
 
-    if (prefs.begin("aregmusic", /*readOnly=*/false)) {
+    if (areg_prefs_begin(prefs, "aregmusic", /*readOnly=*/false)) {
         prefs.putString("last_id", tracks[eligible[chosen]].track_id);
         prefs.end();
     }
@@ -528,7 +529,7 @@ bool story_select_load_last(char *out, size_t out_len) {
     out[0] = '\0';
 
     Preferences prefs;
-    if (!prefs.begin(kPrefsNamespace, /*readOnly=*/true)) {
+    if (!areg_prefs_begin(prefs, kPrefsNamespace, /*readOnly=*/true)) {
         return false;   // never provisioned yet — not an error
     }
     char buf[CS_MAX_STORY_ID_LEN + 1];
@@ -562,7 +563,7 @@ bool story_select_save_last(const char *story_id) {
     }
 
     Preferences prefs;
-    if (!prefs.begin(kPrefsNamespace, /*readOnly=*/false)) {
+    if (!areg_prefs_begin(prefs, kPrefsNamespace, /*readOnly=*/false)) {
         Serial.println("[story-select] NVS unavailable — rotation not persisted");
         Serial.flush();
         return false;   // never blocks playback; the caller ignores this
@@ -758,7 +759,7 @@ bool voice_clip_next_greeting(char *out_path, size_t out_len) {
 
     char last_id[CS_MAX_STORY_ID_LEN + 1] = "";
     Preferences prefs;
-    if (prefs.begin(kVoicePrefsNamespace, /*readOnly=*/true)) {
+    if (areg_prefs_begin(prefs, kVoicePrefsNamespace, /*readOnly=*/true)) {
         prefs.getString(kVoicePrefsLastKey, last_id, sizeof(last_id));
         prefs.end();
     }
@@ -774,7 +775,7 @@ bool voice_clip_next_greeting(char *out_path, size_t out_len) {
     // row" true by construction rather than by retrying.
     const CsVoice *pick = &s_voice_scratch[eligible[(prev_pos >= 0) ? (prev_pos + 1) % n : 0]];
 
-    if (prefs.begin(kVoicePrefsNamespace, /*readOnly=*/false)) {
+    if (areg_prefs_begin(prefs, kVoicePrefsNamespace, /*readOnly=*/false)) {
         prefs.putString(kVoicePrefsLastKey, pick->voice_id);
         prefs.end();
     }
@@ -960,7 +961,7 @@ struct QuestionCursorSet {
 void question_cursor_load(QuestionCursorSet *set) {
     memset(set, 0, sizeof(*set));
     Preferences prefs;
-    if (!prefs.begin(kQuestionPrefsNamespace, /*readOnly=*/true)) {
+    if (!areg_prefs_begin(prefs, kQuestionPrefsNamespace, /*readOnly=*/true)) {
         return;   // never provisioned — an empty set, not an error
     }
     const size_t read = prefs.getBytes(kQuestionPrefsKey, set, sizeof(*set));
@@ -1035,7 +1036,7 @@ void story_question_cursor_commit(const char *story_id, int index) {
     }
 
     Preferences prefs;
-    if (!prefs.begin(kQuestionPrefsNamespace, /*readOnly=*/false)) {
+    if (!areg_prefs_begin(prefs, kQuestionPrefsNamespace, /*readOnly=*/false)) {
         Serial.println("[post] NVS unavailable — question cursor not persisted");
         Serial.flush();
         return;   // never blocks the flow; the child still got their question

@@ -53,22 +53,34 @@ $3.60@1000); the flash size is not a datasheet fact, so treat that
 delta as a BOM-doc/market estimate, not a spec.
 
 **Current partition table** (`esp32/AregVoiceMvp/partitions.csv`, 8 MB
-target, comments verified against the file):
+target, comments verified against the file; chip-security layout of
+2026-10-08, `docs/firmware-security.md` s6 -- FROZEN on every locked toy):
 
 ```
-nvs        0x9000    0x5000    (  20 KB)
+nvs        0x9000    0x5000    (  20 KB)  ESP-IDF/Arduino scratch only, plaintext
 otadata    0xe000    0x2000    (   8 KB)
 app0       0x10000   0x300000  (3.00 MB)  <- OTA slot A
 app1       0x310000  0x300000  (3.00 MB)  <- OTA slot B
-spiffs     0x610000  0x1E0000  (1.875 MB)
-coredump   0x7F0000  0x10000   (  64 KB)
+spiffs     0x610000  0x1D0000  (1.81 MB)  flagged `encrypted`, unused
+coredump   0x7E0000  0x10000   (  64 KB)  crash dump, flagged `encrypted`
+nvs_sec    0x7F0000  0x10000   (  64 KB)  ALL app state; NVS-encrypted on a locked toy
                                 --------
                                 8.00 MB total, byte-exact
 ```
 
+The `coredump` row moved down by 64 KB and gained the `encrypted` flag:
+ESP-IDF v5.5.4 writes it with `esp_flash_write_encrypted` on a
+flash-encrypted chip, so a locked toy's crash dump is ciphertext under its
+per-device key and only the app itself can read it (an earlier draft
+dropped the row on the wrong belief that it would hold plaintext). Its old
+64 KB became `nvs_sec`; `spiffs` gave up the 64 KB for the dump. Keeping it
+is an owner decision before the first lock (`docs/firmware-security.md`
+s11). `tools/firmware/test_partitions.py` pins every rule of this table,
+including that this paragraph lists `nvs_sec`.
+
 Production firmware is **1,264,539 B** (per CLAUDE.md's OTA section) =
 **42%** of one 3 MB app slot, leaving **1.735 MB free per slot** (2×
-= 3.47 MB across both slots). The `spiffs` partition is **1.875 MB and
+= 3.47 MB across both slots). The `spiffs` partition is **1.81 MB and
 currently unmounted** — a repo-wide grep for `SPIFFS`/`LittleFS` across
 every `.cpp`/`.h`/`.ino` in `esp32/AregVoiceMvp/` returns zero hits.
 Story/game/music/voice content lives on the SD card via the
@@ -76,8 +88,8 @@ Story/game/music/voice content lives on the SD card via the
 CLAUDE.md), not on flash, so this partition is dead space by design,
 not by oversight.
 
-**Arithmetic**: of the 8 MB N8R8 offers today, **~5.35 MB (67%) is
-currently idle** (3.47 MB of OTA-slot headroom + the entire 1.875 MB
+**Arithmetic**: of the 8 MB N8R8 offers today, **~5.28 MB (66%) is
+currently idle** (3.47 MB of OTA-slot headroom + the entire 1.81 MB
 unused spiffs region). N16R8 would double an already two-thirds-empty
 resource.
 

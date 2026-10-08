@@ -518,6 +518,11 @@ public static class DependencyInjection
         fwOpts.BoardModel = fwSection["BoardModel"] ?? "";
         fwOpts.Url = fwSection["Url"] ?? "";
         fwOpts.ImagePath = fwSection["ImagePath"] ?? "";
+        // The staged image's own AREGFWV1 marker decides whether it is a
+        // locked-fleet (-sb) image, whatever BoardModel says (fail-closed gate
+        // in FirmwareManifestService). Read once; a new image means a new env
+        // (LatestVersion/Sha256) and therefore a restart.
+        fwOpts.ImageBoardModel = FirmwareImageMarker.ReadBoardModel(fwOpts.ImagePath);
         if (long.TryParse(fwSection["SizeBytes"], out var fwSize)) fwOpts.SizeBytes = fwSize;
         fwOpts.Sha256 = fwSection["Sha256"] ?? "";
         fwOpts.SigningKey = fwSection["SigningKey"] ?? "";

@@ -55,6 +55,19 @@ jobs:
         working-directory: tools/firmware
         run: python3 test_check_release_image.py -v
 
+      - name: Run chip-security firmware tests (partition table, source rules, release tools)
+        working-directory: tools/firmware
+        run: |
+          python3 test_partitions.py -v
+          python3 test_firmware_source_rules.py -v
+          python3 test_release_tools.py -v
+
+      - name: Run factory-station tests (incl. the virtual-eFuse rehearsal)
+        working-directory: tools/factory
+        run: |
+          python3 -m pip install esptool==5.2.0 esp-idf-nvs-partition-gen==0.3.0
+          python3 test_provision_toy.py -v
+
       - name: Run SD-card loader tests
         working-directory: tools/factory
         run: python3 test_load_sd_card.py -v

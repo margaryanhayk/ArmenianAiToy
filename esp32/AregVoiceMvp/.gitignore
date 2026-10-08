@@ -12,6 +12,9 @@ build_*/
 *.elf
 *.bin
 *.map
+# ...except the committed TEST Secure Boot signature sector the host test reads
+# (signed by a TEST key that never entered the repo; tools/firmware/testdata/).
+!host_tests/vectors/*.bin
 
 # Local environment secrets (in case anyone saves creds here).
 .env

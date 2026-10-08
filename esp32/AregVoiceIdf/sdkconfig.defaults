@@ -1,0 +1,79 @@
+# Areg COMMON overrides (both profiles) on top of the fetched base (arduino-esp32 3.3.8's
+# own esp32s3 sdkconfig). Mirrors the arduino-cli FQBN
+#   esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc
+# (FlashMode default qio -> memory variant qio_opi, CPUFreq 240, Core 1 loop/events).
+CONFIG_IDF_TARGET="esp32s3"
+
+# --- flash: ESP32-S3-WROOM-1 N8R8, 8 MB, QIO boot @ 80 MHz -----------------
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+# CONFIG_ESPTOOLPY_FLASHSIZE_16MB is not set
+
+# --- partitions: THE sketch's table (single source of truth, both profiles) --
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="../AregVoiceMvp/partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="../AregVoiceMvp/partitions.csv"
+CONFIG_PARTITION_TABLE_OFFSET=0x8000
+
+# --- PSRAM: octal (opi), 80 MHz (qio_opi variant of the precompiled libs) --
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+# CONFIG_SPIRAM_MODE_QUAD is not set
+CONFIG_SPIRAM_TYPE_AUTO=y
+CONFIG_SPIRAM_SPEED_80M=y
+
+# --- CPU / RTOS -------------------------------------------------------------
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_FREERTOS_HZ=1000
+
+# --- Arduino as component ---------------------------------------------------
+CONFIG_AUTOSTART_ARDUINO=y
+CONFIG_ARDUINO_RUN_CORE1=y
+CONFIG_ARDUINO_EVENT_RUN_CORE1=y
+CONFIG_ARDUINO_LOOP_STACK_SIZE=8192
+# Only the Arduino libraries the sketch (and ESP8266Audio) actually use; the
+# precompiled core links the rest lazily, the component build cannot (their
+# managed deps -- RainMaker, Insights, Zigbee, ESP-SR, Matter, LittleFS --
+# come from components.espressif.com, which is blocked here).
+CONFIG_ARDUINO_SELECTIVE_COMPILATION=y
+CONFIG_ARDUINO_SELECTIVE_SPI=y
+CONFIG_ARDUINO_SELECTIVE_Preferences=y
+CONFIG_ARDUINO_SELECTIVE_Update=y
+CONFIG_ARDUINO_SELECTIVE_Hash=y
+CONFIG_ARDUINO_SELECTIVE_FS=y
+CONFIG_ARDUINO_SELECTIVE_SD=y
+CONFIG_ARDUINO_SELECTIVE_SPIFFS=y
+CONFIG_ARDUINO_SELECTIVE_Network=y
+CONFIG_ARDUINO_SELECTIVE_WiFi=y
+CONFIG_ARDUINO_SELECTIVE_HTTPClient=y
+CONFIG_ARDUINO_SELECTIVE_NetworkClientSecure=y
+CONFIG_ARDUINO_SELECTIVE_WiFiProv=y
+# CONFIG_ARDUINO_SELECTIVE_Wire is not set
+# CONFIG_ARDUINO_SELECTIVE_ESP_SR is not set
+# CONFIG_ARDUINO_SELECTIVE_EEPROM is not set
+# CONFIG_ARDUINO_SELECTIVE_Ticker is not set
+# CONFIG_ARDUINO_SELECTIVE_Zigbee is not set
+# CONFIG_ARDUINO_SELECTIVE_SD_MMC is not set
+# CONFIG_ARDUINO_SELECTIVE_FFat is not set
+# CONFIG_ARDUINO_SELECTIVE_LittleFS is not set
+# CONFIG_ARDUINO_SELECTIVE_Ethernet is not set
+# CONFIG_ARDUINO_SELECTIVE_PPP is not set
+# CONFIG_ARDUINO_SELECTIVE_ArduinoOTA is not set
+# CONFIG_ARDUINO_SELECTIVE_AsyncUDP is not set
+# CONFIG_ARDUINO_SELECTIVE_DNSServer is not set
+# CONFIG_ARDUINO_SELECTIVE_ESPmDNS is not set
+# CONFIG_ARDUINO_SELECTIVE_Matter is not set
+# CONFIG_ARDUINO_SELECTIVE_NetBIOS is not set
+# CONFIG_ARDUINO_SELECTIVE_WebServer is not set
+# CONFIG_ARDUINO_SELECTIVE_BLE is not set
+# CONFIG_ARDUINO_SELECTIVE_BluetoothSerial is not set
+# CONFIG_ARDUINO_SELECTIVE_SimpleBLE is not set
+# CONFIG_ARDUINO_SELECTIVE_RainMaker is not set
+# CONFIG_ARDUINO_SELECTIVE_OpenThread is not set
+# CONFIG_ARDUINO_SELECTIVE_Insights is not set
+
+# --- Bluetooth: NimBLE, as the precompiled core (BLE Wi-Fi provisioning) ----
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI=y

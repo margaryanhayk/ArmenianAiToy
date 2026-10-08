@@ -17,6 +17,11 @@
 #include "ota_foundation.h"  // AREG_FW_VERSION / AREG_BOARD_MODEL
 #include "ota_state.h"
 #include "voice_client.h"    // voice_add_device_auth_headers
+#include "security_profile.h" // AREG_IS_RELEASE
+#include "ota_sig_verify.h"   // Secure Boot V2 signature pre-check (before the boot switch)
+#include "sbv2_rules.h"       // signed_image_shape_ok
+#include "fw_marker_rules.h"  // signed in-image version marker
+#include "fw_version_marker.h"
 
 #ifndef AREG_HTTP_CONNECT_MS
 #define AREG_HTTP_CONNECT_MS 5000
@@ -227,6 +232,15 @@ OtaApplyOutcome ota_apply_run(const char *command_id, char *err_out, size_t err_
         set_err(err_out, err_cap, "sha256_missing");
         return OTA_APPLY_REFUSED;
     }
+    // A toy that must verify a Secure Boot V2 signature can only accept a
+    // signed app's shape (64 KB-page body + 4 KB signature sector). Refused
+    // before a single byte is downloaded or written.
+    const bool need_sig = sbv2_required();
+    if (need_sig && !sbv2::signed_image_shape_ok((size_t)size_bytes)) {
+        Serial.printf("[ota] REFUSED: size %ld is not a signed-image shape\n", size_bytes);
+        set_err(err_out, err_cap, "image_shape_invalid");
+        return OTA_APPLY_REFUSED;
+    }
 
     Serial.printf("[ota] manifest: UPDATE %s -> %s (sig=%s board=ok size=%ld)\n",
                   AREG_FW_VERSION, version,
@@ -275,6 +289,15 @@ OtaApplyOutcome ota_apply_run(const char *command_id, char *err_out, size_t err_
     mbedtls_sha256_context sha;
     mbedtls_sha256_init(&sha);
     mbedtls_sha256_starts(&sha, /*is224=*/0);
+    if (need_sig) {
+        sbv2_begin((size_t)size_bytes);
+    } else {
+        Serial.println("[ota] signature check skipped (dev image on a chip without Secure Boot)");
+    }
+    // Static: ~0.5 KB, never on the loop task's stack. The magic comes from
+    // this image's own marker so the image carries exactly one copy of it.
+    static fw_marker::Scanner marker_scan(fw_marker_magic(), fw_marker::kMagicLen);
+    marker_scan.reset(fw_marker_magic(), fw_marker::kMagicLen);
 
     WiFiClient *stream = http.getStreamPtr();
     static uint8_t buf[4096];
@@ -310,6 +333,10 @@ OtaApplyOutcome ota_apply_run(const char *command_id, char *err_out, size_t err_
         }
         last_data_ms = millis();
         mbedtls_sha256_update(&sha, buf, (size_t)n);
+        if (need_sig) {
+            sbv2_update(buf, (size_t)n);
+        }
+        marker_scan.feed(buf, (size_t)n);
         if (Update.write(buf, (size_t)n) != (size_t)n) {
             io_ok = false;
             Serial.printf("[ota] flash write failed: %s\n", Update.errorString());
@@ -346,6 +373,37 @@ OtaApplyOutcome ota_apply_run(const char *command_id, char *err_out, size_t err_
         return OTA_APPLY_FAILED;
     }
     Serial.println("[ota] sha256 ok");
+
+    // ---- 5b. Secure Boot V2 signature (RELEASE, or any SB chip) ----
+    // The bootloader re-verifies on every boot; this keeps an unsigned or
+    // rogue-signed image from ever becoming the boot partition.
+    if (need_sig) {
+        char sig_err[32];
+        if (!sbv2_finish(sig_err, sizeof(sig_err))) {
+            Update.abort();
+            Serial.printf("[ota] signature INVALID (%s) — NOT applying\n", sig_err);
+            persist_failed(command_id, version, "image_sig_invalid");
+            set_err(err_out, err_cap, "image_sig_invalid");
+            return OTA_APPLY_FAILED;
+        }
+        Serial.println("[ota] signature ok");
+    }
+
+    // ---- 5c. Signed in-image version marker (fw_marker_rules.h) ----
+    // Binds version/board/profile to the signed bytes: a forged manifest
+    // can no longer relabel an older signed image as an upgrade.
+    marker_scan.finish();
+    fw_marker::Marker mk;
+    const fw_marker::Verdict mv = fw_marker::judge(marker_scan, version, AREG_FW_VERSION,
+                                                   AREG_BOARD_MODEL, AREG_IS_RELEASE != 0, &mk);
+    if (mv != fw_marker::Verdict::Ok) {
+        Update.abort();
+        Serial.printf("[ota] version marker %s — NOT applying\n", fw_marker::verdict_name(mv));
+        persist_failed(command_id, version, "image_marker_mismatch");
+        set_err(err_out, err_cap, "image_marker_mismatch");
+        return OTA_APPLY_FAILED;
+    }
+    Serial.printf("[ota] marker ok (%s %s %s)\n", mk.version, mk.board, mk.profile);
 
     // ---- 6. Finalize: native image validation + boot-partition switch ----
     if (!Update.end(/*evenIfRemaining=*/true) || !Update.isFinished()) {

@@ -17,8 +17,12 @@
 #include <esp_system.h>
 #include <esp_task_wdt.h>   // #047 — application task watchdog
 #include <WiFi.h>
+#include <esp_wifi.h>        // esp_wifi_restore: failed BLE setup purge (review 2026-10-08)
 
 #include "config.h"
+#include "security_profile.h"  // DEV/RELEASE profile + the release compile-time guard
+#include "secure_store.h"      // app NVS store (nvs_sec); MUST open before any NVS use
+#include "security_posture.h"  // one [sec] posture line per boot (factory verification)
 #include "net_transport.h"     // TLS/plain transport seam for every backend call
 #include "audio_io.h"
 #include "voice_client.h"
@@ -1756,8 +1760,11 @@ static void handle_story_session_once() {
     story_pause_session_begin(s_story_offset == 0, pauses_ok, sd_narration_path);
 
     // Story-audio access token (gap 1) — only the Wi-Fi stream needs it.
+    // A RELEASE image has no stream (audio_play_story_stream refuses: the
+    // only stream source is plain TCP), so it never fetches a token either
+    // -- and with no token there is no token retry: the session just ends.
     static char story_token[256];
-    bool have_token = use_sd
+    bool have_token = (use_sd || AREG_IS_RELEASE)
         ? false
         : voice_fetch_story_audio_token(active_story_id, story_token, sizeof(story_token));
     bool token_retry_used = false;
@@ -2463,7 +2470,28 @@ void setup() {
     delay(200);
     Serial.println();
     Serial.println("[boot] AregVoiceMvp starting");
+
+    // Chip security (docs/firmware-security.md). Order is load-bearing:
+    //  1. open the app store (nvs_sec) -- every NVS read/write below,
+    //     including the AREG_PROVISION_* bench burns, goes through it, and
+    //     it also runs the pending purge of the default "nvs" BEFORE Wi-Fi
+    //     or BT exist;
+    //  2. stop Arduino's WiFi.begin() from writing the password into the
+    //     default plaintext "nvs" (WiFi.persistent(true) is the default);
+    //  3. print the posture line the factory station checks.
+    secure_store_begin();
+    WiFi.persistent(false);
+    security_posture_print();
+    // Loads (and logs) the device identity now rather than at the first
+    // backend call: the factory station reads this line on a toy that has
+    // no Wi-Fi yet, and a release toy with no identity must say so at boot.
+    voice_device_identity_ready();
+
+#if AREG_IS_RELEASE
+    Serial.println("[boot] backend = <redacted (release)>");
+#else
     Serial.printf("[boot] backend = %s\n", AREG_BACKEND_BASE_URL);
+#endif
     areg_transport_log_policy();
     Serial.flush();
 
@@ -2579,7 +2607,9 @@ void setup() {
     // unambiguously shows what this build targets. No secrets
     // printed (SSID is already logged by voice_wifi_begin;
     // Wi-Fi password / device id / api key are intentionally not).
+#if !AREG_IS_RELEASE
     Serial.printf("[boot] backend=%s\n", AREG_BACKEND_URL);
+#endif
     Serial.flush();
     Serial.printf("[boot] pins button=%d led=%d\n",
                   AREG_PIN_BUTTON, AREG_PIN_LED);
@@ -2698,6 +2728,9 @@ void setup() {
             Serial.println("[prov] button held at boot — forgetting Wi-Fi, entering provisioning");
             Serial.flush();
             wifi_creds_clear();
+            // The Wi-Fi driver's own plaintext copy lives in the default
+            // "nvs"; erase it physically at the top of the next boot.
+            secure_store_request_default_nvs_purge();
         }
     }
 
@@ -2834,6 +2867,17 @@ void loop() {
             Serial.println("[prov] re-provisioned — rebooting to apply new Wi-Fi");
             Serial.flush();
             delay(2000);  // let the phone receive the success ack first
+            esp_restart();
+        }
+        // Review 2026-10-08: a failed/abandoned session left the received
+        // password in the plaintext default nvs; reboot now so the boot-time
+        // purge erases it (esp_wifi_restore first: the driver's config goes
+        // back to defaults even if the reboot were to stall).
+        if (ble_provisioning_purge_reboot_due()) {
+            Serial.println("[prov] setup did not finish - rebooting to erase the stored Wi-Fi password");
+            Serial.flush();
+            esp_wifi_restore();
+            delay(200);
             esp_restart();
         }
         if (!ble_provisioning_active()) {

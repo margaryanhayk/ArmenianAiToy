@@ -48,4 +48,13 @@ bool ble_provisioning_active();
 // of relying on the provisioning manager's in-session connection persisting.
 bool ble_provisioning_succeeded();
 
+// Review 2026-10-08 -- true when this session received Wi-Fi credentials (so
+// the provisioning manager wrote the password into the PLAINTEXT default nvs
+// and a boot-time purge is queued) but setup did NOT succeed: the session
+// ended, or no retry came within AREG_PROV_PURGE_AFTER_FAIL_MS of a failed
+// validation. The main loop then reboots from IDLE so the purge erases that
+// copy now rather than at some later power cycle. Never true in legacy store
+// mode (no purge is ever queued there).
+bool ble_provisioning_purge_reboot_due();
+
 #endif  // AREG_USE_BLE_PROVISIONING

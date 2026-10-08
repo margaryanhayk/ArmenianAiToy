@@ -1,0 +1,70 @@
+# Pinned inputs of the ESP-IDF build of the Areg firmware. Every line was
+# verified on 2026-10-08 (docs/firmware-security.md, appendix "toolchain").
+# tools/firmware/idf_fetch_deps.py fetches these into $AREG_IDF_DEPS
+# (OUTSIDE the repo) and refuses any commit / sha256 that does not match.
+# Change a pin only together with a re-proof on a locked bench toy.
+
+# ESP-IDF itself is NOT fetched (4+ GB with toolchains); build_idf.sh only
+# checks the checkout at $IDF_PATH is exactly this commit (tag v5.5.4).
+IDF_COMMIT=735507283d5b2f9fb363a1901172dbd9e847945d
+IDF_TAG=v5.5.4
+
+# The tools that decide the output bytes besides the sources. Both are
+# asserted by build_idf.sh and build_release_bootloader.sh and written into
+# release.json / RELEASED.md. TOOLCHAIN is what IDF v5.5.4's tools.json
+# installs (xtensa-esp-elf); IDF_ESPTOOL is the esptool IDF itself runs for
+# elf2image -- it comes from Espressif's DOWNLOADED constraints file
+# (espidf.constraints.v5.5.txt: esptool~=4.12), which changes over time, so a
+# later IDF install could produce different .bin bytes with every other pin
+# matching.
+TOOLCHAIN=esp-14.2.0_20260121
+IDF_ESPTOOL=4.12.0
+
+ARDUINO_ESP32_URL=https://github.com/espressif/arduino-esp32.git
+ARDUINO_ESP32_TAG=3.3.8
+ARDUINO_ESP32_COMMIT=b4f85baa2d4a251eb435e0f78fcdda1fb193791f
+
+# espressif/network_provisioning 1.0.2 -- the version arduino-esp32 3.3.8's
+# idf_component.yml pins (components.espressif.com is not reachable from
+# every build host, so it is taken from idf-extra-components at this commit).
+IEC_URL=https://github.com/espressif/idf-extra-components.git
+IEC_COMMIT=7ab0bd2d3dc3a9ea564aa86b3d49f08e86fbfc31
+# Content hash of the extracted network_provisioning/ directory (not a git
+# clone, so a commit check cannot see a hand edit): sha256 over (path,
+# sha256(file)) -- tools/firmware/release_checks.py tree-sha256. Reproduced
+# from a fresh `git archive` of IEC_COMMIT (2026-10-08).
+NETWORK_PROVISIONING_TREE_SHA256=877571e0dc7eaf49f6593f44ef47e51ea9077919c057a82b7ec1af5f75be9103
+
+ARDUINOJSON_URL=https://github.com/bblanchon/ArduinoJson.git
+ARDUINOJSON_TAG=v7.4.3
+ARDUINOJSON_COMMIT=77771d3c07668e01d8f52acb03910c1110bb373f
+
+ESP8266AUDIO_URL=https://github.com/earlephilhower/ESP8266Audio.git
+ESP8266AUDIO_TAG=2.4.2
+ESP8266AUDIO_COMMIT=74fc1f09bbba5e5c5450b445452ba64ef2d8bbad
+
+NEOPIXEL_URL=https://github.com/adafruit/Adafruit_NeoPixel.git
+NEOPIXEL_TAG=1.15.5
+NEOPIXEL_COMMIT=d514fc3beae85dd4c2b19781b93faa47bd6e996f
+
+# The arduino-cli path (tools/firmware/build_release.py, bench builds) must
+# compile the SAME library sources: `arduino-cli lib list` version (as its
+# library.properties says) + a hash of the compiled sources
+# (release_checks.py tree-sha256 --sources <source dir>). ESP8266Audio's tag
+# 2.4.2 still says 2.4.1 in library.properties and the Library Manager has no
+# 2.4.2, so it is installed from git (esp32/AregVoiceMvp/README.md); the
+# source hash is what tells it from the registry's 2.4.1 (different sources).
+ARDUINOJSON_LIBRARY_VERSION=7.4.3
+ARDUINOJSON_SRC_SHA256=c56c09958a26b2741760d77424404d632f549bbbb06e6add06ee414b4729a134
+ESP8266AUDIO_LIBRARY_VERSION=2.4.1
+ESP8266AUDIO_SRC_SHA256=7b82076b270d66eea75be51ee9ae37eafabb2d76713dd6e97380dd6106840016
+NEOPIXEL_LIBRARY_VERSION=1.15.5
+NEOPIXEL_SRC_SHA256=636d0f5f23d7905739a9eec3d515f863f2e4c6ad7ae1742c319df80d0bab416a
+
+# arduino-esp32 3.3.8's own esp32s3 sdkconfig: the configuration its
+# precompiled libs were built with, used as the base of this build's
+# sdkconfig so the IDF-built app matches the arduino-cli-built one. Pulled
+# out of the libs zip with HTTP Range requests (the zip is ~520 MB).
+ARDUINO_LIBS_ZIP_URL=https://dl.espressif.com/github_assets/espressif/esp32-arduino-lib-builder/releases/download/idf-release_v5.5/esp32-arduino-libs-idf-release_v5.5-73550728-v2.zip
+ARDUINO_LIBS_ZIP_MEMBER=esp32-arduino-libs/esp32s3/sdkconfig
+ARDUINO_LIBS_SDKCONFIG_SHA256=586165cee4ffbbda5c9b5e1436c34e83d02ff9205c0fa7c850a2b90ca449effa

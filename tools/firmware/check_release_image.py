@@ -25,12 +25,56 @@ the whole point is that the value must not travel any further.
 USAGE
     python3 tools/firmware/check_release_image.py <image.bin> [--expect-version 1.2.1]
                                                  [--forbid-version 1.2.0]
+    # chip-security release (2026-10-08, docs/firmware-security.md s10):
+    python3 tools/firmware/check_release_image.py app-unsigned.bin \
+        --expect-version 1.4.0 --profile release
+    python3 tools/firmware/check_release_image.py app-signed.bin \
+        --expect-version 1.4.0 --profile release \
+        --require-sbv2 --trusted-digests esp32/security/sb_trusted_digests.txt
+    python3 tools/firmware/check_release_image.py bootloader-signed.bin \
+        --bootloader --trusted-digests esp32/security/sb_trusted_digests.txt
+
+--profile release   the image must be what a LOCKED toy runs: ESP32-S3 app
+                    header (magic 0xE9, chip id 9, dio/80m/8MB), exactly one
+                    signed in-image marker AREGFWV1:<version>:<board-sb>:release,
+                    none of the bench/fallback markers (shared PoP
+                    "areg-pair", TLS-insecure banner, compile-time fallback
+                    identity/Wi-Fi, bench banners), and at least
+                    MIN_TLS_ANCHORS PEM root certificates (a locked toy's only
+                    update path is TLS to the backend: one pinned root would
+                    strand the whole locked fleet on a CA move).
+--require-sbv2      Secure Boot V2 (RSA-3072-PSS) signature: signed-app shape
+                    (4 KB multiple, body a whole number of 64 KB pages,
+                    <= 3 MB), at least one block that VERIFIES with a key in
+                    --trusted-digests, and no block that does not (an
+                    untrusted key, a bad CRC, a stale digest). Pure stdlib
+                    RSA -- this tool still needs no toolchain and no pip.
+--bootloader        the signed RELEASE bootloader: <= 0x8000, ESP32-S3
+                    header, EXACTLY two verifying blocks covering BOTH
+                    trusted digests (primary + backup -- a bootloader signed
+                    by one key bricks every toy once that key is revoked),
+                    AND its unsigned body (the image minus the 4 KB signature
+                    sector) is a build recorded in
+                    esp32/bootloader-release/RELEASED.md whose Status is at
+                    least --min-status (default APPROVED). A signature only
+                    proves WHO signed; this proves WHAT is frozen into a toy
+                    for life -- e.g. the app-config bootloader build_idf.sh
+                    also produces (no CONFIG_SECURE_BOOT: it never verifies
+                    the app) would carry two good signatures too.
+--released-md FILE  the RELEASED.md to read (default: this repository's)
+--min-status S      CANDIDATE < PILOT < APPROVED. APPROVED = what real toys
+                    get (the owner sets it after the hardware pilot and the
+                    anti-rollback decision); PILOT = the two sacrificial
+                    pilot boards; CANDIDATE = TEST rehearsals only.
 
 Exit code 0 = safe to stage. Non-zero = do not release.
 """
 import argparse
+import hashlib
 import re
+import struct
 import sys
+import zlib
 from pathlib import Path
 
 # Printable ASCII runs, the same thing `strings` extracts.
@@ -100,7 +144,367 @@ def extract_strings(data: bytes) -> list[str]:
     return [m.group().decode("ascii") for m in STRING_RE.finditer(data)]
 
 
-def main() -> int:
+# ---------------------------------------------------------------------------
+# Chip security (2026-10-08). Secure Boot V2 signature block, ESP32-S3:
+# 4096-byte sector at the end, up to 3 blocks of 1216 bytes -- magic 0xE7,
+# version 2, SHA-256 of the body at 4, RSA n (LE) at 36, e (LE u32) at 420,
+# R/M' up to 812, RSA-PSS signature (LE) at 812, CRC32 at 1196. Key digest =
+# SHA-256(block[36:812]) -- the 32 bytes espefuse burns. Mirrors
+# esp32/AregVoiceMvp/sbv2_rules.h; the RSA verify is RFC 8017 RSASSA-PSS
+# (MGF1-SHA256, salt 32), ported from the design's reference that agreed with
+# the ROM bootloader on every QEMU vector.
+# ---------------------------------------------------------------------------
+SB_SECTOR, SB_BLOCK, SB_MAX_BLOCKS = 4096, 1216, 3
+MMU_PAGE = 0x10000
+BOOTLOADER_MAX = 0x8000          # partition table at 0x8000
+CHIP_ID_ESP32S3 = 9
+FLASH_MODE_DIO = 2
+FLASH_BYTE_8MB_80M = 0x3F        # size 8 MB (3) << 4 | 80 MHz (0xF)
+MARKER_MAGIC = b"AREGFWV1:"
+# A whole PEM certificate block (header, base64 body, footer). The bare header
+# alone is NOT counted: mbedTLS's own x509 parser carries the literal
+# "-----BEGIN CERTIFICATE-----\0" in every image, anchors or not.
+PEM_CERT_RE = re.compile(rb"-----BEGIN CERTIFICATE-----\n(?:[A-Za-z0-9+/=]{1,76}\n){2,}-----END CERTIFICATE-----")
+MIN_TLS_ANCHORS = 3   # == security_profile.h's AREG_CA_ANCHOR_COUNT floor
+MARKER_RE = re.compile(rb"AREGFWV1:([0-9.]+):([\x21-\x39\x3b-\x7e]+):([a-z]+)\x00")
+RELEASE_FORBIDDEN = (
+    # (raw bytes, why)
+    (b"areg-pair", "the shared fallback BLE PoP (C150) -- a release toy has only its own"),
+    (b"TLS INSECURE", "the TLS-insecure banner (AREG_TLS_INSECURE)"),
+    (b"using compile-time fallback creds", "compiled-in Wi-Fi fallback"),
+    (b"using compile-time identity", "compiled-in device identity fallback"),
+    (b"using the bench fallback", "bench PoP fallback path"),
+    (b"[sd-bench]", "AREG_SD_BENCH_TEST banner"),
+    (b"[sd-diag] bench fw built", "AREG_SD_DIAG_BENCH banner"),
+    (b"[sd-playback] bench fw built", "AREG_SD_PLAYBACK_BENCH banner"),
+    (b"[fallback-test] bench fw built", "AREG_STORY_SD_FALLBACK_TEST_BENCH banner"),
+    (b"[cs-test]", "AREG_CONTENT_SYNC_TEST_BENCH banner"),
+    (b"[sel-test]", "AREG_STORY_SELECT_TEST_BENCH banner"),
+    (b"bench I2S conflict isolation", "AREG_DISABLE_MP3_PLAYBACK bench build"),
+    # ESP8266Audio's AudioFileSourceHTTPStream (and its ICY subclass): a plain
+    # NetworkClient -- HTTPClient::begin(client, "https://...") only sets port
+    # 443, it never adds TLS. Linked into a release image it would fetch story
+    # audio (token in the URL) in cleartext and play whatever came back.
+    (b"Can't open HTTP request", "ESP8266Audio's plain-TCP HTTP stream (no TLS) -- audio injection"),
+    (b"AudioFileSourceHTTPStream::", "ESP8266Audio's plain-TCP HTTP stream (no TLS) -- audio injection"),
+)
+
+
+# ---------------------------------------------------------------------------
+# What may be frozen into a locked toy (review round 3). The bootloader, the
+# partition table and otadata can never change after the factory; a valid
+# SIGNATURE does not say which BUILD was signed. The approved builds are rows
+# of esp32/bootloader-release/RELEASED.md (unsigned bootloader sha256 +
+# partition-table sha256 + Status); boot_app0.bin is Arduino's fixed file.
+# ---------------------------------------------------------------------------
+REPO_ROOT = Path(__file__).resolve().parents[2]
+RELEASED_MD = REPO_ROOT / "esp32" / "bootloader-release" / "RELEASED.md"
+# arduino-esp32 3.3.8 tools/partitions/boot_app0.bin (the otadata the factory
+# writes at 0xe000; identical in the core package and the git tag 3.3.8).
+BOOT_APP0_SHA256 = "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+BOOTLOADER_STATUSES = ("CANDIDATE", "PILOT", "APPROVED")   # ascending
+SHA256_RE = re.compile(r"\b[0-9a-f]{64}\b")
+
+
+def released_rows(path: Path = RELEASED_MD) -> list[dict]:
+    """The build table of RELEASED.md: one dict per row with
+    bootloader_unsigned_sha256, partition_table_sha256 and status (the first
+    upper-case word of the Status cell -- anything not in
+    BOOTLOADER_STATUSES, e.g. SUPERSEDED, is never approved)."""
+    rows, cols = [], None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.lstrip().startswith("|"):
+            cols = None if rows else cols
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if cols is None:
+            low = [c.lower() for c in cells]
+            bl = next((i for i, c in enumerate(low) if "bootloader-unsigned.bin" in c), None)
+            pt = next((i for i, c in enumerate(low) if "partition-table.bin" in c), None)
+            st = next((i for i, c in enumerate(low) if c == "status"), None)
+            if None not in (bl, pt, st):
+                cols = (bl, pt, st)
+            continue
+        if set("".join(cells)) <= set("-: "):
+            continue  # the |---|---| separator
+        if len(cells) <= max(cols):
+            continue
+        bl_sha = SHA256_RE.search(cells[cols[0]].lower())
+        pt_sha = SHA256_RE.search(cells[cols[1]].lower())
+        status = re.match(r"[A-Z]+", cells[cols[2]].lstrip("*_` "))
+        if bl_sha and pt_sha:
+            rows.append({"bootloader_unsigned_sha256": bl_sha.group(0),
+                         "partition_table_sha256": pt_sha.group(0),
+                         "status": status.group(0) if status else ""})
+    return rows
+
+
+def status_at_least(status: str, minimum: str) -> bool:
+    if status not in BOOTLOADER_STATUSES or minimum not in BOOTLOADER_STATUSES:
+        return False
+    return BOOTLOADER_STATUSES.index(status) >= BOOTLOADER_STATUSES.index(minimum)
+
+
+def release_row(bootloader_unsigned_sha256: str, path: Path = RELEASED_MD) -> dict | None:
+    """The LAST row recording this unsigned bootloader (a later row may
+    re-pin its partition table), or None."""
+    hits = [r for r in released_rows(path) if r["bootloader_unsigned_sha256"] == bootloader_unsigned_sha256.lower()]
+    return hits[-1] if hits else None
+
+
+def approved_bootloader_problems(unsigned_sha256: str, minimum: str, path: Path = RELEASED_MD) -> list[str]:
+    try:
+        row = release_row(unsigned_sha256, path)
+    except OSError as e:
+        return [f"cannot read {path}: {e}"]
+    if row is None:
+        return [f"unsigned bootloader {unsigned_sha256[:16]}... is not a build recorded in {path.name} -- "
+                "only a recorded esp32/bootloader-release build may be frozen into a toy (e.g. NOT the "
+                "app-config bootloader build_idf.sh also produces: no CONFIG_SECURE_BOOT, it never verifies the app)"]
+    if not status_at_least(row["status"], minimum):
+        return [f"unsigned bootloader {unsigned_sha256[:16]}... is '{row['status'] or '?'}' in {path.name}; "
+                f"this use needs at least {minimum} (the owner sets APPROVED after the hardware pilot and the "
+                "anti-rollback decision -- docs/firmware-security.md s11)"]
+    return []
+
+
+# The partition table binary (ESP-IDF gen_esp32part.py format): 32-byte
+# entries <2sBBLL16sL> (magic AA 50, type, subtype, offset, size, name,
+# flags), then an MD5 entry (EB EB + 14 x FF + md5 of the entries), padded
+# with FF to 0xC00. The factory station parses the bundle's table to prove
+# it is the repository's partitions.csv before anything is written.
+PART_MAGIC, PART_MD5_MAGIC, PART_TABLE_LEN = b"\xaa\x50", b"\xeb\xeb", 0xC00
+PART_TYPES = {"app": 0x00, "data": 0x01}
+PART_SUBTYPES = {
+    "app": {"factory": 0x00, "test": 0x20, **{f"ota_{i}": 0x10 + i for i in range(16)}},
+    "data": {"ota": 0x00, "phy": 0x01, "nvs": 0x02, "coredump": 0x03, "nvs_keys": 0x04, "efuse": 0x05,
+             "undefined": 0x06, "esphttpd": 0x80, "fat": 0x81, "spiffs": 0x82, "littlefs": 0x83},
+}
+PART_FLAGS = {"encrypted": 1 << 0, "readonly": 1 << 1}
+
+
+def partitions_from_csv(path: Path) -> list[dict]:
+    """The rows of a partitions.csv with explicit offsets (this repo's style)."""
+    rows = []
+    for line in path.read_text().splitlines():
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        cells = [c.strip() for c in line.split(",")] + [""] * 6
+        name, typ, sub, off, size, flags = cells[:6]
+        flag_bits = 0
+        for f in (x.strip() for x in flags.split(":") if x.strip()):
+            flag_bits |= PART_FLAGS[f]
+        rows.append({"name": name, "type": PART_TYPES[typ], "subtype": PART_SUBTYPES[typ][sub],
+                     "offset": int(off, 0), "size": int(size, 0), "flags": flag_bits})
+    return rows
+
+
+def encode_partition_table(rows: list[dict]) -> bytes:
+    """Byte-for-byte what IDF's gen_esp32part.py writes (MD5 entry on)."""
+    out = b"".join(struct.pack("<2sBBLL16sL", PART_MAGIC, r["type"], r["subtype"], r["offset"], r["size"],
+                               r["name"].encode(), r["flags"]) for r in rows)
+    out += PART_MD5_MAGIC + b"\xff" * 14 + hashlib.md5(out).digest()
+    return out + b"\xff" * (PART_TABLE_LEN - len(out))
+
+
+def parse_partition_table(data: bytes) -> list[dict]:
+    """Inverse of encode_partition_table; raises ValueError on anything else
+    (no MD5 entry, a bad MD5, a stray entry)."""
+    rows, i = [], 0
+    while i + 32 <= len(data):
+        e = data[i:i + 32]
+        if e[:2] == PART_MAGIC:
+            _, typ, sub, off, size, name, flags = struct.unpack("<2sBBLL16sL", e)
+            rows.append({"name": name.rstrip(b"\x00").decode("ascii", "replace"), "type": typ, "subtype": sub,
+                         "offset": off, "size": size, "flags": flags})
+        elif e[:2] == PART_MD5_MAGIC:
+            if hashlib.md5(data[:i]).digest() != e[16:32]:
+                raise ValueError("partition table MD5 does not match its entries")
+            if set(data[i + 32:]) - {0xFF}:
+                raise ValueError("bytes after the partition table's MD5 entry")
+            return rows
+        else:
+            raise ValueError(f"partition table entry {i // 32} has no AA 50 / EB EB magic")
+        i += 32
+    raise ValueError("partition table has no MD5 entry")
+
+
+def partition_table_problems(data: bytes, csv_path: Path) -> list[str]:
+    """The bundle's binary table must BE the repository's partitions.csv --
+    the station writes nvs_sec at the CSV's offset, so a different table is
+    only noticed after the irreversible burns (or never, if it still boots)."""
+    try:
+        got = parse_partition_table(data)
+    except ValueError as e:
+        return [f"partition-table.bin: {e}"]
+    want = partitions_from_csv(csv_path)
+    if got == want:
+        return []
+    def fmt(r: dict | None) -> str:
+        return "absent" if r is None else (f"type {r['type']}/{r['subtype']:#x} @ {r['offset']:#x} size {r['size']:#x} "
+                                           f"flags {r['flags']}")
+    g, w = {r["name"]: r for r in got}, {r["name"]: r for r in want}
+    bad = [f"partition-table.bin '{n}': {fmt(g.get(n))}; {csv_path.name}: {fmt(w.get(n))}"
+           for n in sorted(set(g) | set(w), key=lambda n: (n != "nvs_sec", n)) if g.get(n) != w.get(n)]
+    return bad or [f"partition-table.bin differs from {csv_path.name} (row order)"]
+
+
+def _mgf1(seed: bytes, length: int) -> bytes:
+    out, c = b"", 0
+    while len(out) < length:
+        out += hashlib.sha256(seed + struct.pack(">I", c)).digest()
+        c += 1
+    return out[:length]
+
+
+def pss_verify(n: int, e: int, m_hash: bytes, sig: bytes, s_len: int = 32) -> bool:
+    """RFC 8017 s8.1.2 + s9.1.2 with SHA-256 / MGF1-SHA256."""
+    mod_bits = n.bit_length()
+    k = (mod_bits + 7) // 8
+    if len(sig) != k:
+        return False
+    s = int.from_bytes(sig, "big")
+    if s >= n:
+        return False
+    em_bits = mod_bits - 1
+    em_len = (em_bits + 7) // 8
+    em = pow(s, e, n).to_bytes(k, "big")[k - em_len:]
+    h_len = 32
+    if em_len < h_len + s_len + 2 or em[-1] != 0xBC:
+        return False
+    masked_db, h = em[:em_len - h_len - 1], em[em_len - h_len - 1:-1]
+    unused = 8 * em_len - em_bits
+    if unused and masked_db[0] >> (8 - unused):
+        return False
+    db = bytes(a ^ b for a, b in zip(masked_db, _mgf1(h, len(masked_db))))
+    if unused:
+        db = bytes([db[0] & (0xFF >> unused)]) + db[1:]
+    ps_len = em_len - h_len - s_len - 2
+    if any(db[:ps_len]) or db[ps_len] != 0x01:
+        return False
+    salt = db[-s_len:]
+    return hashlib.sha256(b"\x00" * 8 + m_hash + salt).digest() == h
+
+
+def read_trusted_digests(path: Path) -> list[str]:
+    """One 64-hex-char SHA-256 public-key digest per line; '#' comments."""
+    out = []
+    for line in path.read_text().splitlines():
+        line = line.split("#", 1)[0].strip().lower()
+        if not line:
+            continue
+        if not re.fullmatch(r"[0-9a-f]{64}", line):
+            raise ValueError(f"not a 32-byte hex digest: {line[:20]}...")
+        out.append(line)
+    return out
+
+
+def sbv2_blocks(img: bytes, trusted: set[str]):
+    """Walk the signature sector. Returns (verified_digests, problems).
+    A problem is any block that is present but does NOT verify."""
+    verified, problems = [], []
+    if len(img) < 2 * SB_SECTOR or len(img) % SB_SECTOR:
+        return verified, ["length is not a positive multiple of 4096 -- not a signed image"]
+    body, sector = img[:-SB_SECTOR], img[-SB_SECTOR:]
+    digest = hashlib.sha256(body).digest()
+    for i in range(SB_MAX_BLOCKS):
+        b = sector[i * SB_BLOCK:(i + 1) * SB_BLOCK]
+        if b[0] != 0xE7 or b[1] != 0x02:
+            break
+        if zlib.crc32(b[:1196]) & 0xFFFFFFFF != struct.unpack_from("<I", b, 1196)[0]:
+            problems.append(f"signature block {i}: bad CRC (corrupted)")
+            break
+        kd = hashlib.sha256(b[36:812]).hexdigest()
+        if b[4:36] != digest:
+            problems.append(f"signature block {i}: image digest mismatch (image modified after signing)")
+            continue
+        if kd not in trusted:
+            problems.append(f"signature block {i}: signed by an UNTRUSTED key ({kd[:16]}...)")
+            continue
+        n = int.from_bytes(b[36:420], "little")
+        e = struct.unpack_from("<I", b, 420)[0]
+        if pss_verify(n, e, digest, b[812:1196][::-1]):
+            verified.append(kd)
+        else:
+            problems.append(f"signature block {i}: RSA-PSS verification FAILED")
+    return verified, problems
+
+
+def check_s3_header(data: bytes, failures: list[str], notes: list[str], app: bool) -> None:
+    if len(data) < 24 or data[0] != 0xE9:
+        failures.append("not an ESP image (first byte is not 0xE9)")
+        return
+    chip = struct.unpack_from("<H", data, 12)[0]
+    if chip != CHIP_ID_ESP32S3:
+        failures.append(f"image header chip id is {chip}, not 9 (ESP32-S3)")
+    if app and (data[2] != FLASH_MODE_DIO or data[3] != FLASH_BYTE_8MB_80M):
+        failures.append(f"image header flash byte(s) {data[2]:#04x}/{data[3]:#04x} are not "
+                        f"dio / 8MB@80m (0x02/0x3f) -- built with the wrong flash settings")
+    if not failures:
+        notes.append("ESP32-S3 image header ok" + (" (dio, 8MB, 80m)" if app else ""))
+
+
+def check_marker(data: bytes, expect_version: str | None, failures: list[str], notes: list[str]) -> None:
+    count = data.count(MARKER_MAGIC)
+    found = MARKER_RE.findall(data)
+    if count == 0:
+        failures.append("no AREGFWV1 version marker -- not built from this tree's fw_version_marker.cpp")
+        return
+    if len(found) != count or len(set(found)) != 1:
+        failures.append(f"version marker is malformed or inconsistent ({count} magic, "
+                        f"{len(set(found))} distinct well-formed) -- the toy would refuse it")
+        return
+    ver, board, profile = (x.decode() for x in found[0])
+    if profile != "release":
+        failures.append(f"marker profile is '{profile}', not 'release' -- a DEV image must never be signed or staged for locked toys")
+    if not board.endswith("-sb"):
+        failures.append(f"marker board '{board}' does not end in -sb (the secured fleet's board model)")
+    if expect_version and ver != expect_version:
+        failures.append(f"marker version {ver} != expected {expect_version}")
+    if not failures:
+        notes.append(f"marker AREGFWV1:{ver}:{board}:{profile} (x{count})")
+
+
+def check_bootloader(path: Path, data: bytes, trusted: list[str],
+                     released_md: Path = RELEASED_MD, min_status: str = "APPROVED") -> int:
+    failures: list[str] = []
+    notes: list[str] = []
+    print(f"bootloader {path}")
+    print(f"size       {len(data):,} B (limit {BOOTLOADER_MAX:#x}: the partition table sits at 0x8000)")
+    if len(data) > BOOTLOADER_MAX:
+        failures.append(f"{len(data):#x} bytes -- would overwrite the partition table at 0x8000")
+    check_s3_header(data, failures, notes, app=False)
+    verified, problems = sbv2_blocks(data, set(trusted))
+    failures.extend(problems)
+    if len(verified) != 2 or set(verified) != set(trusted[:2]) or len(trusted) < 2:
+        failures.append(
+            f"{len(verified)} verifying signature block(s) covering {len(set(verified))} trusted key(s); "
+            f"the release bootloader needs EXACTLY two -- primary AND backup. Signed by one key only, "
+            f"revoking that key later bricks every toy (QEMU case L).")
+    else:
+        notes.append("signed by both trusted keys (primary + backup)")
+    if len(data) > SB_SECTOR:
+        body_sha = hashlib.sha256(data[:-SB_SECTOR]).hexdigest()
+        bad = approved_bootloader_problems(body_sha, min_status, released_md)
+        if bad:
+            failures.extend(bad)
+        else:
+            notes.append(f"unsigned body {body_sha[:16]}... is a {released_md.name} build "
+                         f"({release_row(body_sha, released_md)['status']}, needed >= {min_status})")
+    for n in notes:
+        print(f"  ok    {n}")
+    for f in failures:
+        print(f"  FAIL  {f}")
+    print()
+    if failures:
+        print(f"FAIL - {len(failures)} reason(s). Do NOT flash this bootloader.")
+        return 1
+    print("PASS - release bootloader is dual-signed and fits.")
+    return 0
+
+
+def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("image", type=Path)
     ap.add_argument("--expect-version",
@@ -110,17 +514,48 @@ def main() -> int:
                          "being replaced) — catches the config.h override trap "
                          "where a -D flag is silently ignored and the old "
                          "version ships under a new name")
-    args = ap.parse_args()
+    ap.add_argument("--profile", choices=["release"],
+                    help="require a chip-security RELEASE image (header, marker, no bench strings)")
+    ap.add_argument("--require-sbv2", action="store_true",
+                    help="require a Secure Boot V2 signature by a key in --trusted-digests")
+    ap.add_argument("--bootloader", action="store_true",
+                    help="check a signed release BOOTLOADER instead of an app")
+    ap.add_argument("--trusted-digests", type=Path,
+                    help="file of SHA-256 public-key digests (hex, one per line)")
+    ap.add_argument("--released-md", type=Path, default=RELEASED_MD,
+                    help="--bootloader: the RELEASED.md whose recorded builds may be frozen into a toy")
+    ap.add_argument("--min-status", choices=BOOTLOADER_STATUSES, default="APPROVED",
+                    help="--bootloader: the RELEASED.md Status the build needs (default APPROVED)")
+    args = ap.parse_args(argv)
 
     if not args.image.is_file():
         print(f"FAIL - no such file: {args.image}")
         return 2
 
     data = args.image.read_bytes()
-    strings = extract_strings(data)
-    size = len(data)
     failures: list[str] = []
     notes: list[str] = []
+
+    trusted: list[str] = []
+    if args.require_sbv2 or args.bootloader:
+        if args.trusted_digests is None or not args.trusted_digests.is_file():
+            print("FAIL - --require-sbv2/--bootloader need --trusted-digests FILE "
+                  "(e.g. esp32/security/sb_trusted_digests.txt)")
+            return 2
+        try:
+            trusted = read_trusted_digests(args.trusted_digests)
+        except ValueError as e:
+            print(f"FAIL - {args.trusted_digests}: {e}")
+            return 2
+        if not trusted:
+            print(f"FAIL - {args.trusted_digests} holds no digest")
+            return 2
+
+    if args.bootloader:
+        return check_bootloader(args.image, data, trusted, args.released_md, args.min_status)
+
+    strings = extract_strings(data)
+    size = len(data)
 
     print(f"image   {args.image}")
     print(f"size    {size:,} B ({size / OTA_SLOT_BYTES * 100:.1f}% of the "
@@ -239,6 +674,37 @@ def main() -> int:
                 f"serve the old firmware under the new manifest.")
         else:
             notes.append(f"old version {args.forbid_version} absent")
+
+    if args.profile == "release":
+        check_s3_header(data, failures, notes, app=True)
+        check_marker(data, args.expect_version, failures, notes)
+        hits = [why for needle, why in RELEASE_FORBIDDEN if needle in data]
+        if hits:
+            failures.append("release image carries bench/fallback code: " + "; ".join(hits)
+                            + " -- build with the RELEASE profile (tools/firmware/build_idf.sh release)")
+        else:
+            notes.append("no bench / fallback / shared-PoP markers")
+        anchors = len(PEM_CERT_RE.findall(data))
+        if anchors < MIN_TLS_ANCHORS:
+            failures.append(f"only {anchors} TLS trust anchor(s) in the image, need >= {MIN_TLS_ANCHORS} "
+                            "(esp32/AregVoiceMvp/tls_trust_anchors.cpp) -- a locked toy can only be updated "
+                            "over TLS; one CA move would strand it forever")
+        else:
+            notes.append(f"{anchors} TLS trust anchors (>= {MIN_TLS_ANCHORS})")
+
+    if args.require_sbv2:
+        if len(data) % SB_SECTOR or (len(data) - SB_SECTOR) % MMU_PAGE or len(data) < MMU_PAGE + SB_SECTOR:
+            failures.append(
+                f"{len(data):,} B is not a signed-app shape (4 KB multiple whose body is a whole "
+                f"number of 64 KB pages) -- build with --secure-pad-v2 and sign with espsecure")
+        verified, problems = sbv2_blocks(data, set(trusted))
+        failures.extend(problems)
+        if not verified:
+            failures.append("NOT signed by a trusted Secure Boot key -- a locked toy's bootloader "
+                            "would refuse to boot it (and the toy's OTA pre-check refuses to install it)")
+        else:
+            notes.append(f"Secure Boot V2 signature verified by {len(verified)} trusted key(s) "
+                         f"({', '.join(d[:12] for d in verified)})")
 
     for n in notes:
         print(f"  ok    {n}")

@@ -11,6 +11,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <esp_ota_ops.h>
+#include <esp_partition.h>  // esp_partition_read_raw / erase_range: retire the old image
 #include <WiFi.h>          // WiFi.status() / RSSI() for the boot diagnostics
 #include <esp_system.h>    // esp_reset_reason()
 
@@ -21,6 +22,8 @@
 #include "ota_apply.h"   // real apply pipeline (reboots on success)
 #include "ota_state.h"   // persisted cross-reboot OTA state (NVS)
 #include "content_sync.h" // refresh_story_manifest — request a sync + report its last outcome
+#include "ota_slot_rules.h" // retire_inactive_due: physical-downgrade guard (pure, host-tested)
+#include "security_profile.h" // AREG_IS_RELEASE
 
 // Fallbacks mirrored from config.h.example so this module compiles even on
 // a config.h that predates them.
@@ -33,6 +36,26 @@
 #ifndef AREG_HTTP_READ_MS
 #define AREG_HTTP_READ_MS 30000
 #endif
+
+// -------------------------------------------------------------
+// Keep a fresh OTA image PENDING_VERIFY until the check-in confirms it
+// -------------------------------------------------------------
+// Review 2026-10-08. arduino-esp32 3.3.8's initArduino() (esp32-hal-misc.c)
+// marks a PENDING_VERIFY image VALID before setup() even runs unless this
+// weak hook returns true -- so the bootloader's own rollback (a reset while
+// PENDING_VERIFY boots the previous image) never fired, and an update that
+// panics or boot-loops before the first loop tick (setup, secure_store_begin,
+// BLE start...) crash-looped for ever: on a locked toy with no cable path,
+// every toy it reached would be bricked. Now the image stays PENDING_VERIFY
+// until ota_checkin_tick() gets the 2xx ack and calls
+// esp_ota_mark_app_valid_cancel_rollback(); ANY reset before that -- a
+// panic, the watchdog, a power cut -- rolls back (the release bootloader is
+// built with CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE, and so are Arduino's).
+// The inactive-slot retirement never runs while PENDING_VERIFY
+// (ota_slot_rules::retire_inactive_due), so the rollback target survives.
+extern "C" bool verifyRollbackLater(void) {
+    return true;
+}
 
 // -------------------------------------------------------------
 // Module state
@@ -221,6 +244,43 @@ static void handle_firmware_update(const char *command_id) {
 }
 
 // -------------------------------------------------------------
+// Physical-downgrade guard (RELEASE only) -- see ota_slot_rules.h
+// -------------------------------------------------------------
+
+// Makes the OLDER image in the inactive OTA slot unbootable once the running
+// image is confirmed, so erasing otadata with a flash clip cannot boot an
+// older owner-signed release. Idempotent; called at boot and right after a
+// check-in confirms an update.
+static void ota_retire_inactive_slot(const char *why) {
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    const esp_partition_t *inactive = esp_ota_get_next_update_partition(nullptr);
+    esp_ota_img_states_t img_state = ESP_OTA_IMG_UNDEFINED;
+    if (running != nullptr) {
+        esp_ota_get_state_partition(running, &img_state);
+    }
+    const bool self = (running == nullptr || inactive == nullptr ||
+                       inactive->address == running->address);
+    bool erased = false;
+    if (!self) {
+        // RAW read: on a flash-encrypted chip a normal read would decrypt
+        // the erased 0xFF bytes into garbage.
+        uint8_t head[ota_slot_rules::kProbeBytes];
+        erased = esp_partition_read_raw(inactive, 0, head, sizeof(head)) == ESP_OK &&
+                 ota_slot_rules::all_erased(head, sizeof(head));
+    }
+    if (!ota_slot_rules::retire_inactive_due(AREG_IS_RELEASE != 0,
+                                             s_ota.state == OTA_STATE_REBOOTING,
+                                             img_state == ESP_OTA_IMG_PENDING_VERIFY,
+                                             self, erased)) {
+        return;
+    }
+    const esp_err_t e = esp_partition_erase_range(inactive, 0, ota_slot_rules::kRetireEraseBytes);
+    Serial.printf("[ota] retired the older image in %s (%s): %s\n", inactive->label, why,
+                  esp_err_to_name(e));
+    Serial.flush();
+}
+
+// -------------------------------------------------------------
 // Boot-state normalization + post-reboot check-in
 // -------------------------------------------------------------
 
@@ -261,6 +321,27 @@ static void ota_boot_init() {
                   s_ota.cmd_id[0] ? s_ota.cmd_id : "-",
                   (unsigned)s_ota.boot_attempts);
     Serial.flush();
+
+    // verifyRollbackLater() keeps every fresh OTA image PENDING_VERIFY for
+    // ota_checkin_tick(). One with NO pending OTA record cannot prove itself:
+    // typically it cannot read the store the previous image wrote the record
+    // into -- e.g. a locked-fleet RELEASE image that reached an unsecured
+    // field toy (store refused, no identity, offline for good). Roll back to
+    // the image that applied it NOW rather than stranding the toy; only when
+    // there is nothing valid to roll back to is this one kept.
+    if (img_state == ESP_OTA_IMG_PENDING_VERIFY && s_ota.state != OTA_STATE_REBOOTING) {
+        Serial.println("[ota] pending_verify with no OTA record - rolling back to the previous image");
+        Serial.flush();
+        if (esp_ota_mark_app_invalid_rollback_and_reboot() != ESP_OK) {  // reboots on success
+            const esp_err_t e = esp_ota_mark_app_valid_cancel_rollback();
+            Serial.printf("[ota] no rollback target - keeping this image (%s)\n", esp_err_to_name(e));
+            Serial.flush();
+        }
+    }
+
+    // RELEASE: a boot with no OTA outcome pending (a power cut may have hit
+    // between a confirm and its erase) retires any older image still there.
+    ota_retire_inactive_slot("boot");
 }
 
 bool ota_outcome_pending() {
@@ -358,6 +439,9 @@ static void ota_checkin_tick() {
         s_ota.state = OTA_STATE_CONFIRMED;
         snprintf(s_ota.applied_cmd, sizeof(s_ota.applied_cmd), "%s", s_ota.cmd_id);
         ota_state_save(s_ota);
+        // The old image is no longer a rollback target: make it unbootable
+        // (RELEASE only; physical-downgrade guard).
+        ota_retire_inactive_slot("check-in confirmed");
     } else {
         Serial.printf("[ota] check-in ack failed (deadline in %lu s)\n",
                       (unsigned long)((AREG_OTA_CHECKIN_DEADLINE_MS > now)

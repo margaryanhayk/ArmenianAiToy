@@ -44,6 +44,16 @@ public sealed class FirmwareUpdateOptions
     /// never as a public static file. Empty → the endpoint 404s.</summary>
     public string ImagePath { get; set; } = string.Empty;
 
+    /// <summary>NOT configuration: the board model named by the
+    /// <c>AREGFWV1</c> marker inside the image at <see cref="ImagePath"/>, read
+    /// once at startup (<see cref="FirmwareImageMarker.ReadBoardModel"/>).
+    /// When it is a secured board (<c>...-sb</c>) the manifest offers the image
+    /// ONLY to a device reporting exactly that board model, even with
+    /// <see cref="BoardModel"/> empty -- a field toy without signature checks
+    /// must never install a locked-fleet image (it would never come online
+    /// again). Empty = no marker / no readable image (previous behaviour).</summary>
+    public string ImageBoardModel { get; set; } = string.Empty;
+
     public long SizeBytes { get; set; }
 
     /// <summary>Lowercase hex SHA-256 of the .bin; the device verifies this

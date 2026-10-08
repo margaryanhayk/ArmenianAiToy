@@ -19,6 +19,70 @@ This is a **bench prototype**. No wake word, no barge-in, no
 retries, no battery, no enclosure, no provisioning UX, no OTA.
 Those are later-phase concerns per the toy-mvp scope guard.
 
+## Chip security (2026-10-08) -- read before flashing anything
+
+The firmware now has two security profiles (`security_profile.h`): **DEV**
+(the default, every bench board, no eFuse ever touched) and **RELEASE**
+(the only image a locked toy runs: Secure Boot V2, flash encryption,
+encrypted app NVS, JTAG and ROM download mode off). Everything --
+threat model, factory procedure, key custody, what is irreversible, what
+a returned toy needs -- is in **`docs/firmware-security.md`**.
+
+What changes on the bench:
+- **New partition table** (`partitions.csv`): `coredump` moved to 0x7E0000
+  (flagged `encrypted`; `spiffs` is 64 KB smaller), a 64 KB
+  `nvs_sec` partition at 0x7F0000 holds ALL app state (identity, Wi-Fi,
+  OTA state, cursors, queues). The default `nvs` is ESP-IDF scratch. A
+  bench board flashed with this table starts with an EMPTY `nvs_sec`:
+  re-provision Wi-Fi over BLE and burn the identity once more
+  (`AREG_PROVISION_IDENTITY_ONCE`, or `tools/factory/provision_toy.py
+  --profile dev`, which now writes `nvs_sec`). The SD card is untouched.
+- **A board still on the OLD table** (every field toy on 1.3.2, a bench
+  board that got this firmware by OTA instead of a cable flash) has no
+  `nvs_sec`: a DEV image then runs in **legacy store mode**
+  (`[sec] ... store=legacy`) and keeps its identity, Wi-Fi and OTA state in
+  the default `nvs` exactly as before -- it is not wiped. Moving it to
+  `nvs_sec` is a cable conversion (Arduino upload with the new table, then
+  `provision_toy.py --profile dev`). A RELEASE image on such a board refuses
+  the store. Never enqueue a release (`-sb`) image to an unsecured toy.
+- **Core pinned to arduino-esp32 3.3.8** (not 3.3.6): BLE provisioning on
+  3.3.7-3.3.11 is fixed by the one-line `btInUse()` override in
+  `ble_provisioning.cpp` (N031). A RELEASE build refuses any other core.
+- **Libraries** (pinned in `../AregVoiceIdf/deps.lock`, the versions every
+  reproducible build uses; `tools/firmware/build_release.py` refuses any
+  other): ArduinoJson 7.4.3, ESP8266Audio 2.4.2 (from git -- see "Arduino
+  IDE setup"), Adafruit NeoPixel 1.15.5.
+- **TLS trusts five root CAs** (`tls_trust_anchors.cpp`: ISRG X1/X2, GTS
+  R1/R4, DigiCert G2) instead of one; a RELEASE build refuses fewer than 3.
+- **RELEASE images** talk https only, stay offline (no backend, no BLE
+  setup) until the factory has disabled ROM download mode, and erase the
+  first sector of the older image in the inactive OTA slot once an update
+  is confirmed (physical-downgrade guard, `ota_slot_rules.h`). They have NO
+  network audio stream (ESP8266Audio's HTTP stream is plain TCP even for an
+  https URL): stories play from the SD card only.
+- **Both profiles** (review round 3): a fresh OTA image stays
+  `pending_verify` until its check-in (`verifyRollbackLater()` returns
+  true), so a crash before the check-in rolls back; a failed or abandoned
+  BLE Wi-Fi setup reboots the toy from IDLE so the plaintext Wi-Fi copy is
+  purged at once (`[prov] setup did not finish - rebooting ...`). Bench
+  check: OTA an image that panics in `setup()` and watch it come back on
+  the previous one.
+- One `[sec] ...` posture line prints at every boot; a bench board reads
+  `profile=dev sb=0 fe=off ... store=plaintext`.
+- Release images are built by `tools/firmware/build_idf.sh release`
+  (canonical, reproducible) or `tools/firmware/build_release.py`
+  (arduino-cli fallback), signed OFFLINE by `tools/firmware/sign_release.py`.
+
+Host tests added with it: `secure_store_rules_test.cpp`,
+`sbv2_rules_test.cpp` (reads `vectors/`, run from `host_tests/`),
+`fw_marker_rules_test.cpp`, `security_posture_rules_test.cpp`,
+`ota_slot_rules_test.cpp` -- run all:
+
+```bash
+cd esp32/AregVoiceMvp/host_tests
+for f in *_test.cpp; do g++ -std=c++17 -I.. -o /tmp/host_test "$f" && /tmp/host_test || break; done
+```
+
 ## Hardware assumptions
 
 Defaults target an **ESP32-S3-DevKitC-1** (N8R8 or N16R8 —
@@ -80,19 +144,30 @@ sticky pause.
 - **Board**: "ESP32S3 Dev Module"
 - **PSRAM**: "OPI PSRAM" (or "QSPI PSRAM" depending on your
   board variant — required either way)
-- **Partition Scheme**: default "Default 4MB with spiffs" is
-  fine
+- **Partition Scheme**: "Custom" (uses this sketch's `partitions.csv`)
+  -- **REQUIRED**. Any other scheme has no `nvs_sec`: a DEV image then
+  falls back to legacy store mode at best, and nothing it builds matches
+  what the factory and OTA expect.
 - **Flash Size**: set to match your chip — "8MB (64Mb)" for
   N8R8, "16MB (128Mb)" for N16R8. The Arduino IDE does not
   detect this automatically.
 - **USB CDC On Boot**: Enabled (so Serial Monitor works over
   the native USB port)
-- **Libraries (via Library Manager)**:
-  - `Adafruit NeoPixel` by Adafruit
-  - `ESP8266Audio` by Earle Philhower — version not pinned yet;
-    record the exact installed version in this README after the
-    first successful C3.1 bench compile so future bench machines
-    can reproduce the build.
+- **Libraries** -- exactly the versions pinned in
+  `../AregVoiceIdf/deps.lock` (`tools/firmware/build_release.py` checks
+  the installed version AND a hash of the sources and refuses any other):
+
+  ```bash
+  arduino-cli lib install ArduinoJson@7.4.3 "Adafruit NeoPixel@1.15.5"
+  # ESP8266Audio 2.4.2 is NOT in the Library Manager (its tag still says
+  # 2.4.1 in library.properties, so the index never picked it up) -- from git:
+  arduino-cli config set library.enable_unsafe_install true
+  arduino-cli lib install --git-url https://github.com/earlephilhower/ESP8266Audio.git#2.4.2
+  ```
+
+  (Arduino IDE: ArduinoJson 7.4.3 and Adafruit NeoPixel 1.15.5 from the
+  Library Manager; ESP8266Audio by "Add .ZIP Library" of the GitHub tag
+  `2.4.2`. The Library Manager's ESP8266Audio 2.4.1 is a DIFFERENT source.)
 
 No other libraries. `WiFi`, `HTTPClient`, `driver/i2s.h`, and
 `esp_heap_caps.h` all ship with the ESP32 Arduino core.

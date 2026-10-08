@@ -11,7 +11,7 @@
 // change when certificate policy changes.
 //
 // CERTIFICATE POLICY (AREG_TLS_INSECURE)
-// Default is VERIFYING: the CA in net_transport.cpp is pinned and a
+// Default is VERIFYING: the root CAs in tls_trust_anchors.cpp are pinned and a
 // forged/MITM certificate is rejected. Defining AREG_TLS_INSECURE in
 // config.h switches to setInsecure() — encrypted but UNAUTHENTICATED,
 // i.e. it will happily talk to an impostor. That is a bench-triage
@@ -32,6 +32,16 @@
 // Opens `url` on `http`, choosing plain or TLS transport from the scheme.
 // Returns HTTPClient::begin()'s result. Follows redirects, which matters
 // because the live server 301s http -> https.
+// False when a RELEASE toy has no device identity (offline/SD-only toy), or
+// when the factory never finished locking it (ROM download mode still open).
+// areg_http_begin() and the audio HTTP streams check it.
+bool areg_backend_allowed();
+
+// RELEASE: true only for an https:// URL (no device key, story token or
+// audio ever over cleartext). DEV: any non-null URL (bench LAN servers).
+// areg_http_begin() and the audio HTTP streams check it.
+bool areg_url_allowed(const char *url);
+
 bool areg_http_begin(HTTPClient &http, const String &url);
 
 // Hard-stop the shared TLS client. For error recovery in long download

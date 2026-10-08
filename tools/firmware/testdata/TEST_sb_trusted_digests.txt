@@ -1,0 +1,4 @@
+# TEST ONLY -- digests of the TEST signing keys used by the gate's unit tests.
+# Never trusted by a real toy or by a real release.
+ccd748085be858b1561468e306a8f273c54053225ce3c4e07ca3b69f90f6b37b
+2559327a49ef80f5483ee7442faf41ff5dfab6feddb7b9940f227c520ae31fac
