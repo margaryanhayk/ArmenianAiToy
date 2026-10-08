@@ -24,11 +24,39 @@
 19. Send Claude the checklist: names, dates and ticket numbers. Never send values.
 
 ### Lock the chip (so nobody can read your codes or change the toy)
-20. When Claude's chip-lock plan arrives, reply "go".
-21. Make the firmware signing key on your own PC with Claude's command. Keep three copies: the password manager, a USB stick at home and a second USB stick with your second key holder. Never send the key to anyone, Claude included. If you lose it, locked toys can never be updated again. If it leaks, anyone can make firmware your toys will accept.
-22. Spare board 1: run Claude's lock script and its checks. The board must boot and play a story, refuse an unsigned image, and show no keys or Wi-Fi password when read over USB. Send Claude the log.
-23. Spare board 2: repeat step 22, then also install one update over Wi-Fi. Keep spare board 3 in reserve in case of a mistake.
-24. Only after boards 1 and 2 both pass, lock unit #1. No toy leaves your house unlocked.
+Section numbers (§) are in `docs/firmware-security.md`.
+
+20. Tell Claude two decisions, one line each. Both are frozen into every locked toy for life (§11 rules 8–9):
+    - anti-rollback: on (recommended) or off;
+    - crash-dump partition: keep (as built) or drop.
+21. Set up the offline signing laptop: an old laptop that never goes online again after the first bullet (§7).
+    - Install Linux fresh, with `python3-venv` and `openssl`. Then turn its Wi-Fi off for good and never plug in a network cable.
+    - On an online Linux PC with the same Python version (`python3 --version` on both), in the repo: `pip wheel -w wheels -r tools/factory/requirements.txt`.
+    - Copy the repo and `wheels/` to the laptop on a USB stick. On the laptop, in the repo: `python3 -m venv ~/areg-venv`, then `. ~/areg-venv/bin/activate`, then `pip install --no-index --find-links wheels -r tools/factory/requirements.txt`. Every later signing session: copy over a fresh repo the same way, then `. ~/areg-venv/bin/activate`.
+22. Make the TWO signing keys (primary and backup) on that laptop (§7). Run every command in a folder on a stick, never inside the repo.
+    - Encrypt two USB sticks first (Disks app: Format Disk, then Create Partition with "Password protect volume (LUKS)").
+    - Stick 1: `openssl genrsa -out sb_primary.pem 3072`, then `openssl rsa -in sb_primary.pem -pubout -out sb_primary.pub.pem`.
+    - Stick 2: the same with `sb_backup` in place of `sb_primary`.
+    - Copy the two `.pub.pem` files to the third stick (never a private key on it) and run there:
+      ```
+      espsecure digest-sbv2-public-key --keyfile sb_primary.pub.pem --output primary.digest
+      espsecure digest-sbv2-public-key --keyfile sb_backup.pub.pem --output backup.digest
+      python3 -c "print(open('primary.digest','rb').read().hex()); print(open('backup.digest','rb').read().hex())" > sb_trusted_digests.txt
+      ```
+    - Send Claude only `sb_primary.pub.pem`, `sb_backup.pub.pem` and `sb_trusted_digests.txt` for `esp32/security/`. They are public.
+    - Stick 1 stays with the laptop. After item 23's signing, stick 2 and a sealed paper copy of its passphrase go to your second key holder, in another building.
+    - The passphrases may go in the password manager. The key files (`sb_primary.pem`, `sb_backup.pem`) never go into the password manager, onto an online PC or into a cloud folder, and never to anyone, Claude included.
+    - If you lose both sticks, locked toys can never be updated again. If a key leaks, anyone can make firmware your toys accept until you revoke it.
+23. Run the hardware pilot on 2 spare boards, exactly as §12 says. Start only after Claude has built item 20's decisions.
+    - Ask Claude for the pilot-only builds: release+1, a release+2 that crashes, the unsigned-slot test app and the revocation app. None exists yet.
+    - Before staging any signed image, on Railway: `FirmwareUpdate__BoardModel=areg-s3-n8-sb`, the image on the volume (`FirmwareUpdate__ImagePath=/data/firmware/areg-current.bin`), and `FirmwareUpdate__SigningKey` = the new OTA key from item 10. While these are set, your bench toy and every other unlocked toy get no firmware updates.
+    - Build machine (ESP-IDF set up as in `esp32/AregVoiceIdf/README.md`): run `tools/firmware/build_release_bootloader.sh`. Its sha256s must equal the `CANDIDATE` row in `esp32/bootloader-release/RELEASED.md`; then change that row's Status to `PILOT` and commit it. Build each image with `tools/firmware/build_idf.sh release --version <X>`, with `AREG_BACKEND_BASE_URL=https://api.<domain>` and the new OTA key as `AREG_MANIFEST_HMAC_KEY`.
+    - Offline laptop, stick 2 needed: `tools/firmware/sign_release.py bootloader --pilot` (both keys), `app` for each image, each in its own `--out-dir` (primary key; board 2's revocation update with the backup key), and `add` (partition table, boot_app0) (§6 "Sign").
+    - Factory station, a Linux laptop with `pip install -r tools/factory/requirements.txt` and `AREG_PROVISIONING_SECRET` set (§8): rehearse with `tools/factory/secure_provision.py virt` first, then on each board `secure_provision.py provision --pilot-board --bundle <bundle> --backend-url https://api.<domain> --port <port>`.
+    - Board 1: every board-1 check in §12. Board 2: the revocation drill, and one run stopped on purpose between steps 7 and 9. Both: the silicon checks at the end of §12.
+    - Write `tools/quality-evidence/chip-security-pilot-YYYYMMDD.md` with the signed bootloader's sha256 and the exact line `OTA release+1 on locked board: PASS` (or send Claude every log to write it). Then run `sign_release.py add --out-dir <bundle> --pilot-evidence <that file>`.
+    - Pilot boards are never shipped. A board lost to a mistake is replaced by a spare.
+24. Only after both pilot boards pass: change that `RELEASED.md` row's Status to `APPROVED` and commit it, then lock unit #1 with the same `provision` command and bundle, without `--pilot-board`. If it prints DO NOT SHIP, follow §8 step 4 and send Claude the log. No toy leaves your house unlocked.
 
 ### Before your child uses it
 25. Approve each HIGH plan when it arrives (about 30 min each): safety-input-pipeline, stop-danger-routing, distress-calm-topics, safety-output-guards, fw-135-build-gate, fw-135-child.
@@ -52,9 +80,8 @@
 30. fw-135-build-gate:
     - sign off "no per-toy Wi-Fi code means no Bluetooth setup";
     - set the base URL to `https://api.<domain>`;
-    - paste `arduino-cli version`, `arduino-cli core list`, `arduino-cli lib list` and your config diff with the secrets removed.
-
-    Until Claude's fix lands, build anything that has Bluetooth setup on core 3.3.6. Cores 3.3.7 and 3.3.8 crash when setup starts.
+    - paste `arduino-cli version`, `arduino-cli core list`, `arduino-cli lib list` and your config diff with the secrets removed;
+    - build everything on core 3.3.8. A release build refuses any other core.
 31. Build unit #1 (2 evenings), wired exactly like the bench toy: main button 18, YES 21, NO 47, LED 48, mic 4/5/6, amp 15/16/7, SD 10/11/12/13 (SD board on 5 V), knob 8. Never connect anything to GPIO0.
 32. Fill in unit #1's check sheet and send the photos. All of these must pass:
     - the lid is closed with the security screws;
@@ -91,11 +118,11 @@
 
 ## What to order
 
-Unit #1 parts come to about $60–80. The 3 practice boards add about $45. The meter is €100–300 (or borrow one). The tools add about $40–60 (skip any you already have).
+Unit #1 parts come to about $60–80. The 4 extra boards for the lock pilot (2 pilot + 2 spare) add about $60. The meter is €100–300 (or borrow one). The tools add about $40–60 (skip any you already have).
 
 | # | What | How many | ≈ Price | Link | Link type |
 |---|---|---|---|---|---|
-| 1 | ESP32-S3-DevKitC-1 **N8R8**, the same chip as the toy (ESP32-S3-WROOM-1-N8R8). Choose the N8R8 option in the listing | **4** (1 for unit #1 + 3 spares to practise the lock) | $12–22 each | https://www.aliexpress.com/item/1005003819366900.html · https://www.aliexpress.com/w/wholesale-esp32-s3-devkitc-1-n8r8.html | from repo doc · search link |
+| 1 | ESP32-S3-DevKitC-1 **N8R8**, the same chip as the toy (ESP32-S3-WROOM-1-N8R8). Choose the N8R8 option in the listing | **5** (1 for unit #1, 2 for the lock pilot, 2 spares) | $12–22 each | https://www.aliexpress.com/item/1005003819366900.html · https://www.aliexpress.com/w/wholesale-esp32-s3-devkitc-1-n8r8.html | from repo doc · search link |
 | 2 | INMP441 microphone board | 2 | $1.61 | https://www.aliexpress.com/item/32962426410.html | from repo doc |
 | 3 | MAX98357A amplifier board | 2 | $1.85 | https://www.aliexpress.com/item/1005004840960248.html | from repo doc |
 | 4 | microSD SPI board, the same type as in your bench toy (the one with its own regulator, on 5 V) | 2 | $1–2 | https://www.aliexpress.com/w/wholesale-micro-sd-card-module-spi.html | search link |
@@ -125,7 +152,9 @@ Unit #1 parts come to about $60–80. The 3 practice boards add about $45. The m
 | 26 | Through-hole resistor kit with 100 kΩ (for the amp GAIN step), if you don't have one | 1 | $3–5 | https://www.aliexpress.com/w/wholesale-through-hole-resistor-kit-1-4w.html | search link |
 | 27 | Hot-glue gun and sticks, if you don't have one | 1 | $5–10 | https://www.aliexpress.com/w/wholesale-mini-hot-glue-gun.html | search link |
 | 28 | Step drill bit 4–32 mm, plus a 3 mm drill bit, if you don't have them | 1 each | $5–10 | https://www.aliexpress.com/w/wholesale-step-drill-bit-4-32mm.html | search link |
-| 29 | 2 small USB sticks for the offline copies of the signing key. Buy SanDisk from its official store only: a fake stick can lose the key | 2 | $5 each | https://www.aliexpress.com/store/1102960672 | from repo doc |
+| 29 | Small USB sticks: 2 for the two signing keys (one each, encrypted) and 1 to carry public files and images to and from the offline laptop. Buy SanDisk from its official store only: a fake stick can lose a key | 3 | $5 each | https://www.aliexpress.com/store/1102960672 | from repo doc |
+| 30 | An old laptop for offline signing (it never goes online again after setup) | 1 | reuse one | — | — |
+| 31 | A second old laptop for the factory station, running Linux | 1 | reuse one | — | — |
 
 - No link is marked "checked 200": the shop sites (AliExpress, Amazon, Mouser, Visaton) are blocked from Claude's side, so none could be opened. Item links often stop working; the search link in the same row finds the same part.
 - For units #2–#6 (later, after `ht-first-child` passes), order rows 1–21 again: 5 more sets, one per toy.

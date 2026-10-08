@@ -259,6 +259,20 @@ build_idf.sh release --unsigned          -> sign_release.py app (primary)       
 
 ## 7. Key custody (the crown jewels)
 
+- **Preparing the offline laptop** (once, before any key exists on it):
+  a fresh Linux install with `python3-venv` and `openssl`, then Wi-Fi off
+  for good. `sign_release.py` needs the repository and esptool 5.2.0's
+  `espsecure`, which arrive by USB stick: on an ONLINE Linux PC with the
+  same Python version run `pip wheel -w wheels -r
+  tools/factory/requirements.txt` in the repository (`pip wheel`, not
+  `pip download`: esptool 5.2.0 is published as an sdist only, and building
+  it offline would need setuptools, which `pip download` does not fetch --
+  checked 2026-10-08), copy the repository and `wheels/` over, then on the
+  laptop `python3 -m venv ~/areg-venv && . ~/areg-venv/bin/activate && pip
+  install --no-index --find-links wheels -r tools/factory/requirements.txt`
+  (a venv because current Debian/Ubuntu refuse a system-wide `pip install`).
+  Every later signing session brings a fresh copy of the repository the
+  same way (`RELEASED.md` and the gate change).
 - Generate both keys on an **offline** laptop: `openssl genrsa -out
   sb_primary.pem 3072`, same for `sb_backup.pem`.
 - Primary: encrypted USB stick, used only on that laptop; passphrase not
@@ -595,10 +609,11 @@ it must name the signed bootloader's sha256 and contain the exact line
 
 | Item | Qty | Link |
 |---|---|---|
-| ESP32-S3-DevKitC-1 **N8R8** (same chip as the toy) -- sacrificial pilot boards | 4 (2 for the pilot, 2 spare) | https://www.aliexpress.com/item/1005003819366900.html |
+| ESP32-S3-DevKitC-1 **N8R8** (same chip as the toy) -- sacrificial pilot boards, on top of the board for unit #1 | 4 (2 for the pilot, 2 spare) | https://www.aliexpress.com/item/1005003819366900.html |
 | USB **data** cable for the board | 2 | https://www.aliexpress.com/w/wholesale-usb-c-data-cable-1.5m.html |
-| USB sticks for the two encrypted key copies (SanDisk official store only) | 2 | https://www.aliexpress.com/store/1102960672 |
-| An old laptop that never goes online again (offline signing machine) | 1 | (any; reuse one) |
+| USB sticks: the two encrypted key sticks + one that carries only public files and images to and from the offline laptop (SanDisk official store only) | 3 | https://www.aliexpress.com/store/1102960672 |
+| An old laptop that never goes online again after setup (offline signing machine, section 7) | 1 | (any; reuse one) |
+| A Linux laptop for the factory station (section 8; online, so never the signing laptop) | 1 | (any; reuse one) |
 
 ## 15. Verified here (2026-10-08) / not verified
 
@@ -669,6 +684,30 @@ done: anti-rollback and the crash-dump decision (owner, section 11 rules
 8-9), the single combined 6+7 espefuse batch (needs QEMU + pilot proof), a
 TLS stream source for release toys, the pilot-only test apps of section 12,
 the repository visibility and the served-image move (owner, section 11).
+
+## 16. Open before the pilot (final independent review, 2026-10-08)
+
+The final review judged the code ready to commit and the procedure safe to
+run on a SPARE board. These should-fix items stay open before any family's
+toy is locked:
+
+1. `secure_provision.py` steps 8–9 read the toy's console on `--port`, but the
+   firmware prints its `[sec]` posture lines on the native USB-Serial/JTAG
+   port (HWCDC), not UART0. Point the station at the right port, or print on
+   both, before relying on those checks.
+2. Before the irreversible burns, check that the image's compiled backend URL
+   matches the `--backend-url` the device key was minted on.
+3. Rule 2 (§11) asks every release to prove OTA to release+1 on a locked board;
+   the pilot-evidence check compares only the bootloader, not the app.
+4. The §12 pilot-only builds (release+1, the crashing release+2, the
+   unsigned-slot test app, the revocation app) are not built yet. Ask Claude
+   for them before the pilot.
+5. The station does not check at run time that esptool/espefuse/espsecure are
+   the versions the burn plan was verified with (5.2.0).
+6. Backend board-model guard: it checks the image it read at startup only. It
+   fails open if the image on the volume changes after startup or if `Url`
+   points to an external host. Compare against `FirmwareUpdate:Sha256` or
+   re-read on serve (backend change; needs owner approval).
 
 ## Appendix A -- design evidence (Espressif QEMU `-M esp32s3`, emulated eFuses, TEST keys only)
 

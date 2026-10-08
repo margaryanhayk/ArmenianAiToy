@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sign an Areg release on the OFFLINE signing machine (Secure Boot V2).
 
-The private keys never leave this machine (docs/firmware-security.md s2.4):
+The private keys never leave this machine (docs/firmware-security.md s7):
 the build machine hands over UNSIGNED images, this script signs them and
 hands back signed images plus bundle.json. Nothing here touches a toy.
 

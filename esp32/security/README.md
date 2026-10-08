@@ -4,13 +4,13 @@ This directory holds ONLY public information. Nothing in it can sign
 firmware. It is empty on purpose until the owner creates the real keys --
 every release tool refuses to run without it (no default, no TEST fallback).
 
-Files the owner adds (docs/firmware-security.md s2.4):
+Files the owner adds (docs/firmware-security.md s7):
 
 | File | What | Made with |
 |---|---|---|
 | `sb_primary.pub.pem` | public half of the PRIMARY signing key (signs every release) | `openssl rsa -in sb_primary.pem -pubout -out sb_primary.pub.pem` |
 | `sb_backup.pub.pem` | public half of the BACKUP key (bootloader + revocation only) | `openssl rsa -in sb_backup.pem -pubout -out sb_backup.pub.pem` |
-| `sb_trusted_digests.txt` | two lines: SHA-256 digest (hex) of primary, then backup -- the 32 bytes burned into SECURE_BOOT_DIGEST0/1 | `espsecure digest-sbv2-public-key --keyfile sb_primary.pub.pem --output d.bin` (then hex), same for backup |
+| `sb_trusted_digests.txt` | two lines: SHA-256 digest (hex) of primary, then backup -- the 32 bytes burned into SECURE_BOOT_DIGEST0/1 | `espsecure digest-sbv2-public-key --keyfile sb_primary.pub.pem --output primary.digest`, same for backup (`backup.digest`), then `python3 -c "print(open('primary.digest','rb').read().hex()); print(open('backup.digest','rb').read().hex())" > sb_trusted_digests.txt` |
 
 The PRIVATE keys (`sb_primary.pem`, `sb_backup.pem`) are generated on the
 OFFLINE signing laptop with `openssl genrsa -out sb_primary.pem 3072` (RSA
