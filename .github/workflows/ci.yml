@@ -55,6 +55,10 @@ jobs:
         working-directory: tools/firmware
         run: python3 test_check_release_image.py -v
 
+      - name: Run bench serial-watcher tests
+        working-directory: tools/firmware
+        run: python3 test_bench_watch.py -v
+
       - name: Run SD-card loader tests
         working-directory: tools/factory
         run: python3 test_load_sd_card.py -v
