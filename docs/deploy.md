@@ -61,7 +61,7 @@ image.
 
 | Variable                   | Why                                                                                    |
 | -------------------------- | -------------------------------------------------------------------------------------- |
-| `OpenAI__ApiKey`           | Real OpenAI key. Image will start without it, but every chat call fails 502.           |
+| `OpenAI__ApiKey`           | Real OpenAI key. The container does NOT start without it (the OpenAI client refuses an empty key at boot); any non-empty value boots the non-AI parts, and then every chat call fails 502 until a real key is set. |
 | `Jwt__Keys__0`             | Primary HS256 signing key for parent JWTs. Must NOT be the legacy insecure default. The validator rejects empty / poisoned key sets at startup. The scalar legacy `Jwt__Key` is still honored as a one-element list — see § JWT key rotation in `CLAUDE.md`. |
 
 ## Recommended environment variables
@@ -85,7 +85,7 @@ image.
 | `Notifications__Resend__FromAddress`  | empty       | Sender for Resend mail, e.g. `Areg <noreply@yourdomain>`. The domain must be verified in Resend (SPF/DKIM) to deliver beyond the account owner's own inbox. |
 | `Notifications__PasswordResetLinkBase`| empty       | Public URL of the parent dashboard page (e.g. `https://<host>/parent.html`). Reset / verification links are built from it. Required for `smtp` and `resend`. |
 | `OpenAI__DailyCostCap__Enabled`       | `true`      | Whole-day per-device chat cost cap.                                      |
-| `OpenAI__DailyCostCap__Default`       | `0.50`      | USD/day per device.                                                      |
+| `OpenAI__DailyCostCap__Default`       | `0.25`      | USD/day per device.                                                      |
 | `Retention__Messages__MaxAgeDays`     | `90`        | Message/conversation TTL. Set `<= 0` to disable the retention worker.    |
 
 Other knobs (rate limits, retention sub-passes, dormancy windows,
@@ -201,14 +201,12 @@ curl -sf -H "Authorization: Bearer <token>" \
 
 ## Live build / run verification
 
-Slice author note: `docker build` and `docker run` were not
-exercised live on the host that produced this image because
-Docker was not installed on the build machine when the slice
-landed. Use the procedure above to validate on any host where
-Docker is available. The Dockerfile is a standard multi-stage
-`dotnet publish` + `aspnet:10.0` runtime — there is nothing
-unusual in the image structure that depends on host-specific
-behavior.
+Railway builds this Dockerfile on every push to `main`, and the
+resulting image has been live since August 2026 (`GET /api/health`
+answers `ok` on the production instance), so the multi-stage
+`dotnet publish` + `aspnet:10.0` build is exercised for real on each
+deploy. Use the procedure above to reproduce it locally on any host
+where Docker is available.
 
 If you hit a build error, the most likely cause is a base-image
 tag drift: Microsoft occasionally retires older `10.0.x` patch

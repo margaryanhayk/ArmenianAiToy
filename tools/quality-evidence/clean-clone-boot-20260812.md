@@ -80,3 +80,5 @@ belongs in its own commit with the owner's eyes on it.
 `CLAUDE.md` § Build & Test now lists both secrets as required before first run,
 separates them from `build`/`test` which genuinely do not need them, and says
 that a dummy OpenAI key is enough to bring up every non-AI surface.
+
+> **2026-10-22:** re-verified from a fresh clone with the now-explicit steps, and the empty-key guard below was added — see `clean-clone-boot-20261022.md`.

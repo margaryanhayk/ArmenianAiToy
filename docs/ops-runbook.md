@@ -8,6 +8,22 @@ Deployment is a single Docker image on Railway (`railway.json`,
 database, the audio blobs, the TTS cache, and the backups. If `/data` is not
 a mounted volume, everything is lost on redeploy.
 
+## If it is 3 a.m.
+
+**Health:** `curl -s https://armenianaitoy-production.up.railway.app/api/health` should return `{"status":"ok","service":"ArmenianAiToy API","database":"ok","openai":"ok","audioStore":"ok"}`. Only `status` / `database` decide 200 vs 503; `openai: degraded` and `audioStore: unconfigured` are advisory.
+
+**Restart:** Railway dashboard → project → service → Deployments → latest deployment → ⋮ menu → Restart (CLI: `railway redeploy --service <name>`). *The owner should confirm this click-path once; written from Railway's documented UI, not clicked here.* A restart will not fix an OpenAI outage and resets the circuit breaker, rate-limit buckets and daily cost counters (see § Restart).
+
+**Logs:** Railway → service → Deployments → View Logs (CLI: `railway logs`), or `admin.html` → Logs tab (this process's last 500 Warning+ entries, redacted).
+
+**The three likeliest failures:**
+
+- `ArgumentException: Value cannot be an empty string (Parameter 'key')` at boot: `OpenAI:ApiKey` is empty (any dummy value boots).
+- `Jwt signing key not configured` at boot: `Jwt:Key` is unset or under 32 characters.
+- Health shows `"audioStore":"unconfigured"` and voice chat answers 503: set `Audio__BlobStoreRoot=/data/audio-blobs`. Restarting will not fix it.
+
+Everything else is in the sections below.
+
 ---
 
 ## Is it up?
@@ -361,6 +377,8 @@ queues those events in flash and uploads them when the backend returns.
 *Verified 2026-08-12 against a live instance; the health output above is
 copied from it, not written from memory. See
 `tools/quality-evidence/clean-clone-boot-20260812.md`. The `audioStore` field
-and the `Audio__BlobStoreRoot` section (2026-09-11) are NOT yet re-verified
-against a live instance — confirmed by unit test only
-(`AudioBlobStoreRootResolverTests`, `AudioChatControllerTests`).*
+and the `Audio__BlobStoreRoot` section (2026-09-11) were re-verified against
+the live instance on 2026-10-22: `/api/health` returned `"audioStore":"ok"`
+(earlier they were confirmed by unit test only: `AudioBlobStoreRootResolverTests`,
+`AudioChatControllerTests`). The Railway restart / log click-paths in "If it is
+3 a.m." are NOT verified by anyone clicking them.*

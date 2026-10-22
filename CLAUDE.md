@@ -31,6 +31,23 @@ line is not something for HIM to do, it does not belong in that answer.
   the commit message, not the chat reply.
 - Applies to chat and to any status page written for him.
 
+## Release freeze (2026-10-22, in force until the owner lifts it)
+
+`SHIP.md` is the only finish line. Every other plan is archived with a
+banner. The evidence audit is `docs/ship-md-evidence-audit-20261022.md`;
+the owner's own steps are `docs/status/build-status.html`.
+
+- **Before any code change, name the `SHIP.md` item it serves.** If none,
+  write the idea into the reply as a `docs/v2-backlog.md` proposal and stop.
+  Nobody adds a child-facing feature or another "built but never verified"
+  slice while the freeze holds.
+- Allowed without asking: fixing a bug in shipped behaviour, closing a
+  `SHIP.md` item, recording evidence, docs, and the gates below.
+- Gates: `tools/release/preflight.sh` (every automated check, one command),
+  `python3 tools/listen/listen_test.py status` (what is still unheard),
+  `tools/firmware/bench_watch.py` (turns a bench evening's serial log into
+  SHIP evidence). All three are green/known before a PR is opened.
+
 ## Product constraints
 
 - **Armenian-first.** All child-facing output is Armenian. Story text is
@@ -81,8 +98,10 @@ line is not something for HIM to do, it does not belong in that answer.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3197 tests, ~35 s in Release
-dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000
+dotnet test            # 3214 tests, ~40 s in Release
+export OpenAI__ApiKey="sk-dummy-for-local-boot"               # any non-empty value boots everything non-AI
+export Jwt__Key="local-dev-jwt-key-0123456789abcdef0123456789"  # ≥32 chars, not the legacy literal
+dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000  (Windows: $env:OpenAI__ApiKey=...)
 ```
 
 Two secrets are REQUIRED before the API starts (build/test do not need them):
@@ -105,7 +124,10 @@ at compile time — a real incompatibility, not a config issue. That advisory
 stays open pending a compatible `Microsoft.AspNetCore.OpenApi`/Swashbuckle
 release.
 
-Firmware (`esp32/AregVoiceMvp/`): arduino-cli, core `esp32:esp32@3.3.8`,
+Firmware (`esp32/AregVoiceMvp/`): arduino-cli, core `esp32:esp32@3.3.6` on
+the release machine (3.3.7/3.3.8 boot-loop when BLE provisioning starts,
+`config.h.example:530-533`; the cloud container compiles on 3.3.8 for syntax
+only — see `docs/bench-test-session.md`),
 FQBN `esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc`,
 libraries in the firmware README, `config.h` from `config.h.example`
 (gitignored — real creds live in NVS). Production image ≈ 1.33 MB of the 3 MB
@@ -215,7 +237,8 @@ check `AREG_FW_BUILD` before diagnosing hardware.
 
 - **Stories** live in `Application/Stories/Content/*.story.json` (10 runtime
   stories, 3 reflection questions paired 1:1 with 3 conclusions). Audio in
-  `backend/story-audio/`, one `Version` per story in `ContentSync:Stories`;
+  `backend/src/ArmenianAiToy.Api/story-audio/` (`ContentSync:AudioRoot`),
+  one `Version` per story in `ContentSync:Stories`;
   **bump `Version` or toys keep the old file**; a placeholder row is
   `SizeBytes 0` + all-zero sha (validator drops it safely).
 - **Cast render**: `backend/content/story-voices/<id>.voices.json` (speaker
@@ -280,8 +303,9 @@ flat daily cost cap keeps governing every device until an operator opts a
 fleet in; nothing about a price has been decided).
 
 Still to implement: a `sound-detective` firmware game (backend content
-ready — 21 clips already in `ContentSync:Games` — no engine written); two
-Simon tone clips (`tone-green` / `tone-red`, not yet rendered); render the
+ready — 21 clips already in `ContentSync:Games` — no engine written); the two
+Simon tone clips (`tone-green` / `tone-red`) ARE on disk and in the manifest
+(0.39 s each) but nobody has confirmed by ear what they contain; render the
 Tsivik serial (variant endings are rendered and shipped, see below —
 the serial is blocked on owner sign-off); narrator PVC; rev-A PCB
 routing + speaker test + order.
@@ -1064,8 +1088,34 @@ Telegram's `sendMessage` URL; unset, the payload is byte-identical to before
 green (3197, 1 new). NOT verified: a real Telegram delivery (no bot token
 here).
 
+### Release path — audit, freeze, tooling (2026-10-22, N21)
+
+Owner: "do whatever it takes so I can release with minimal steps." Four
+section audits re-scored `SHIP.md` against today's tree with path:line
+evidence (`docs/ship-md-evidence-audit-20261022.md`): 1 DONE / 14 PARTIAL /
+3 NOT STARTED (July: 0/12/6). Nearly every gap is proof, not code, and
+closes in one bench evening plus one listen evening. Shipped in this slice:
+`tools/listen/listen_test.py` (guided, resumable, sha256-pinned listen test;
+first run: 240 files, 83 min, 98 never heard), `tools/release/preflight.sh`
+(all gates, GREEN here), `bench_watch.py` SHIP C1/A6/A4 counters + evidence
+writer, bench docs fixed (image ~1.64 MB/52 %, core 3.3.6, version label,
+flag truth, regression first), `esp32/ArmenianAiToy/` deleted (SHIP C2), D1 re-verified from a fresh clone with
+the boot secrets now spelled out and an empty-key guard that names the setting
+(`tools/quality-evidence/clean-clone-boot-20261022.md`),
+`docs/ops-runbook.md` "If it is 3 a.m." box (D4), a structural
+moderation-coverage test (B1), operator console presence rows for the
+family-pilot variables (booleans only), archive banners on the competing
+finish lines, the release freeze above, `docs/status/build-status.html`
+rewritten as a view of `SHIP.md`, A5/D3 evidence templates. Three findings
+outrank everything: the repo is PUBLIC with two credential leaks still in
+history (B4, owner decision); HEAD firmware has never been compiled by
+anyone (core 3.3.6 on the PC); the audio that ships has never been played
+on a toy. `dotnet test` green (3214, 17 new). NOT verified: anything on
+hardware, the live Railway console, a real `ffplay` listen session.
+
 ## Working in this repo (agents)
 
+- **Release freeze first** (section above): name the `SHIP.md` item or stop.
 - Classify first: workstream, mode, risk. HIGH risk (ChatService, system
   prompt, entities, safety, auth, new endpoint, NuGet) → plan, stop for
   approval. LOW risk → brief plan, proceed. Skills and agents in `.claude/`

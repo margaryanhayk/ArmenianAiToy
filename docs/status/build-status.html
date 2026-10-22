@@ -195,209 +195,136 @@
     padding-top: 1.25rem;
   }
   a { color: var(--lapis); }
+  code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 0.85em; background: var(--panel); padding: 0.05em 0.35em; border-radius: 3px; }
+  .score { display: flex; gap: 1.6rem; flex-wrap: wrap; margin-top: 1rem; }
+  .score div { min-width: 0; }
+  .score .n { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 2rem; font-weight: 800; line-height: 1; }
+  .score .l { font-size: 0.8rem; color: var(--ink-soft); margin-top: 0.25rem; }
+  .c-proof { background: var(--lapis); }
 </style>
 
 <div class="wrap">
 
   <header>
-    <p class="eyebrow">Areg · build status · 10 August 2026</p>
-    <h1>The toy works. Three things stand between it and children.</h1>
-    <p class="lede">You are not behind. Most of this is built. This page exists so you never have to hold it all in your head at once.</p>
+    <p class="eyebrow">Areg · build status · 22 October 2026</p>
+    <h1>Two evenings stand between the toy and your child.</h1>
+    <p class="lede">This page is a view of <strong>SHIP.md</strong>, your own definition of done: eighteen items. The code behind most of them has been there for months. What is missing is proof, and almost all of the proof comes out of one bench evening and one listen evening. The four other plans in the repo are archived; this page and SHIP.md are the only two that count.</p>
+    <div class="score">
+      <div><p class="n">1 / 18</p><p class="l">proven by the letter today</p></div>
+      <div><p class="n">14</p><p class="l">built, waiting for proof</p></div>
+      <div><p class="n">3</p><p class="l">not started: a friend's ear, a loudness number, a decision about git history</p></div>
+    </div>
   </header>
 
   <section class="next">
     <h2>Do this next</h2>
-    <p class="mins">An afternoon at your computer · this week</p>
-    <p class="do">Record all ten stories again in the voice you picked, and fix the three broken ones at the same time.</p>
-    <p class="why" style="color:var(--ink-soft);margin-top:0.7rem;font-size:0.95rem;">You changed the order, and you were right: you cannot sell a famous storyteller an idea. You hand him a toy that already works and ask whether he wants it to be his voice. So the toy gets a good voice now — the one you chose — and he comes later. Good news: the same test that found the three half-length stories shows the new voice does <strong>not</strong> cut them short. Changing the voice is also the repair. Every command, in order: <strong>docs/story-audio-rerender-runbook.md</strong>.</p>
+    <p class="mins">One click, then one evening with the cable · this week</p>
+    <p class="do">Merge the pull request. Then flash the toy and spend an evening pressing its button while the computer keeps score.</p>
+    <p class="why" style="color:var(--ink-soft);margin-top:0.7rem;font-size:0.95rem;">The pull request adds the three tools the evenings depend on: a bench watcher that turns the serial log into SHIP evidence by itself, a listen test that plays every shipped file and keeps the books, and one command that runs every automated gate. It also deletes the old sketch (SHIP C2), puts the 3 a.m. box at the top of the runbook (D4), freezes new features in <strong>CLAUDE.md</strong>, and archives the competing plans. Nothing in it needs your time beyond the merge.</p>
   </section>
 
   <section>
-    <h2>Waiting on you</h2>
-    <p class="note" style="margin-bottom:1.1rem;">Only three things in the whole project need <strong>you</strong>. Everything else is mine.</p>
-    <ul class="rows">
-      <li class="row">
-        <span class="chip c-you">Run</span>
-        <div>
-          <p class="what"><strong>The re-recording. One afternoon, your machine, your key.</strong></p>
-          <p class="why">Ten stories in the new voice, including the two that have never been recorded at all. Nothing here needs me and nothing waits for anyone else. The runbook checks the result before it installs anything, so a story that comes back short is caught by the computer this time instead of by a child.</p>
-        </div>
-      </li>
-      <li class="row">
-        <span class="chip c-you">Read</span>
-        <div>
-          <p class="what"><strong>The Armenian texts, and the 29 sound moments.</strong></p>
-          <p class="why">158 lines are waiting on your phone — the quiz, the Vardan and Katrin game, the after-story questions, the Tsivik serial. New this week: 29 places where a forest, a river or a door would come into a story. Answer both with numbers. You can do this today; it does not wait for the voice.</p>
-        </div>
-      </li>
-      <li class="row">
-        <span class="chip c-you">Buy</span>
-        <div>
-          <p class="what"><strong>Two push buttons.</strong></p>
-          <p class="why">About 500 dram at the Yerevan radio shop. Without them the three games inside the toy cannot be tested at all.</p>
-        </div>
-      </li>
-    </ul>
-    <p class="note" style="margin-top:1.1rem;"><strong>The storyteller comes after this</strong>, not before — with a working toy in your hand, the conversation is a demonstration instead of a pitch. Everything you will need for it is written down and waiting: the first question to ask him, the letter in Armenian, what to put in the contract. Two things to remember then: ask him for <strong>one sound file per part of a story</strong> (it costs the studio nothing and cannot be added afterwards), and know that ElevenLabs cannot make a copy of someone else's voice even with their permission — an Armenian company in Yerevan, VS.AM, sells exactly that.</p>
-  </section>
-
-  <section>
-    <h2>The toy today</h2>
-    <ul class="rows">
-      <li class="row">
-        <span class="chip c-live">Live</span>
-        <div>
-          <p class="what"><strong>The toy talks.</strong> Armenian conversation through the cloud, with safety checks on every message.</p>
-        </div>
-      </li>
-      <li class="row">
-        <span class="chip c-live">Live</span>
-        <div>
-          <p class="what"><strong>Stories play from the card</strong> with no internet at all.</p>
-        </div>
-      </li>
-      <li class="row">
-        <span class="chip c-broken">Broken</span>
-        <div>
-          <p class="what"><strong>Three of the eight stories stop halfway.</strong> «Խոսող ձուկը» plays 1 minute 21 seconds of a story that needs 5 minutes 17 — the child never hears the ending.</p>
-          <p class="why">Found on 10 August. Nobody had ever compared the recordings against the text. This is the first thing on the page above, and the fix is the same afternoon as the new voice — the new voice does not cut the stories short, so one job does both.</p>
-        </div>
-      </li>
-      <li class="row">
-        <span class="chip c-live">Live</span>
-        <div>
-          <p class="what"><strong>Questions during a story.</strong> The child can interrupt and ask, and the answer stays inside that story.</p>
-        </div>
-      </li>
-      <li class="row">
-        <span class="chip c-live">Live</span>
-        <div>
-          <p class="what"><strong>Parent dashboard on the web.</strong> See conversations, set bedtime, pause the toy, turn modes off.</p>
-        </div>
-      </li>
-      <li class="row">
-        <span class="chip c-live">Live</span>
-        <div>
-          <p class="what"><strong>The toy updates itself over Wi-Fi.</strong> Proven repeatedly — and it restores the old version by itself if an update fails.</p>
-        </div>
-      </li>
-      <li class="row">
-        <span class="chip c-live">Live</span>
-        <div>
-          <p class="what"><strong>All the sound files reach the toy by themselves</strong> — 8 stories, 43 greetings, 92 game clips, downloaded over Wi-Fi with no cable.</p>
-        </div>
-      </li>
-    </ul>
-  </section>
-
-  <section>
-    <h2>Built, but never tried on the real toy</h2>
-    <p class="note" style="margin-bottom:1.1rem;">The code exists and compiles. Nobody has pressed the buttons yet. Until someone does, none of it counts.</p>
-    <ul class="rows">
-      <li class="row">
-        <span class="chip c-untested">Untested</span>
-        <div>
-          <p class="what"><strong>Three games</strong> — mind-reader, two-player buzzer, tone memory.</p>
-          <p class="why">Needs the two buttons.</p>
-        </div>
-      </li>
-      <li class="row">
-        <span class="chip c-untested">Untested</span>
-        <div>
-          <p class="what"><strong>The greeting and spoken menu.</strong></p>
-          <p class="why">Switched back <strong>on</strong> — it is the opening you asked for. It has still never been tested with a child, so it is the first thing to watch when you next turn the toy on.</p>
-        </div>
-      </li>
-      <li class="row">
-        <span class="chip c-untested">Untested</span>
-        <div>
-          <p class="what"><strong>Pauses inside stories</strong>, where Areg stops and invites the child to shout something.</p>
-          <p class="why">Switched off after it cut a story short. It stays off until we test it together.</p>
-        </div>
-      </li>
-      <li class="row">
-        <span class="chip c-untested">Untested</span>
-        <div>
-          <p class="what"><strong>Different endings on a second listen</strong>, and the Tsivik serial playing in order.</p>
-          <p class="why">Also switched off. The endings are approved as words but have never been recorded.</p>
-        </div>
-      </li>
-    </ul>
-  </section>
-
-  <section>
-    <h2>Not built yet</h2>
-    <ul class="rows">
-      <li class="row">
-        <span class="chip c-todo">Open</span>
-        <div>
-          <p class="what"><strong>The circuit board.</strong> The wiring plan is finished and machine-checked, and the board itself is now drawn and passes its checks — eleven connections still need a human hand before it can be manufactured.</p>
-        </div>
-      </li>
-      <li class="row">
-        <span class="chip c-todo">Open</span>
-        <div>
-          <p class="what"><strong>A body for the toy.</strong> No case, no shape, no colour decided.</p>
-        </div>
-      </li>
-      <li class="row">
-        <span class="chip c-todo">Open</span>
-        <div>
-          <p class="what"><strong>iPhone app.</strong> Apple refused the developer account in August, so the phone surface is the web page for now. Android is unaffected.</p>
-        </div>
-      </li>
-      <li class="row">
-        <span class="chip c-todo">Open</span>
-        <div>
-          <p class="what"><strong>Safety certification and paying customers.</strong> Both needed before selling; neither needed to let a few friendly families try it.</p>
-        </div>
-      </li>
-    </ul>
-  </section>
-
-  <section>
-    <h2>The shortest path to five real families</h2>
+    <h2>Your six steps</h2>
     <ol class="rows path">
       <li class="row">
         <span class="step-n">1</span>
         <div>
-          <p class="what"><strong>Record all ten stories</strong> in the voice you picked — the three broken ones made whole in the same pass.</p>
-          <p class="why">This is the one that changes how the toy feels, and it is the cheapest step on this page. Two of the ten have never been recorded at all — they are twenty seconds each. The forest and river sounds are not in this pass: no sound has been bought yet, and they do not change whether the toy works. They ride the next recording.</p>
+          <p class="what"><strong>Merge the pull request.</strong> One click.</p>
+          <p class="why">Closes C2 on its own. Everything below uses what it adds.</p>
         </div>
       </li>
       <li class="row">
         <span class="step-n">2</span>
         <div>
-          <p class="what"><strong>Wire the two buttons and test everything on your own toy</strong> for a week — games, pauses, greeting.</p>
-          <p class="why">Your own children are the honest test. Anything they ignore, we cut.</p>
+          <p class="what"><strong>Bench evening.</strong> About two and a half hours, one cable, serial capture on.</p>
+          <p class="why">Install ESP32 core <strong>3.3.6</strong> on the PC (3.3.7 and 3.3.8 boot-loop when Bluetooth pairing starts). Give <code>config.h</code> a new <code>AREG_FW_VERSION</code> label so tonight's log is not mistaken for August's. Then: <code>tools/firmware/bench_session.sh --port COMx</code> and, in a second window, <code>python3 tools/firmware/bench_watch.py --port COMx</code>. Compile first; nobody has ever compiled the current code, so a compile error is a finding, not a bad evening. Follow <strong>docs/bench-test-session.md</strong> in order: the old behaviour first (ten minutes of presses), then five quick presses and a power cycle (A6), five presses mid-story with your phone filming so the stop can be timed (A4; no serial line can measure it), ten voice turns in a row (C1), the router off and on (C3), a phone sound-meter reading at one metre (C4), and one full story with its question through to the end (A1). Then stay online for forty-five minutes more: questions during stories, answers after them, the spoken menu. Stories from the card cost nothing; only those online turns do, and that is what D3 measures. The watcher writes <code>tools/quality-evidence/bench-&lt;date&gt;.md</code> with the counts and the minutes when you stop it; commit it.</p>
         </div>
       </li>
       <li class="row">
         <span class="step-n">3</span>
         <div>
-          <p class="what"><strong>Build four more toys by hand</strong> on the same boards you already use, in simple cases.</p>
-          <p class="why">Do not wait for the factory board for this. Five hand-made toys are enough to learn everything a first version can teach.</p>
+          <p class="what"><strong>Listen evening.</strong> About eighty minutes, headphones, no toy.</p>
+          <p class="why"><code>python3 tools/listen/listen_test.py run --device "PC headphones" --listener "Hayk"</code>. It plays the next file you have not judged, asks pass or fail, and resumes where you stopped. 240 files, 83 minutes of audio; 98 of them nobody has ever heard: the ten second-listen endings, the four bedtime tracks, the greetings, the story intros. Commit the evidence file it writes.</p>
         </div>
       </li>
       <li class="row">
         <span class="step-n">4</span>
         <div>
-          <p class="what"><strong>Give them to five families you know</strong>, free, for a month.</p>
-          <p class="why">Before this step, have someone check what you legally owe families in Armenia and the EU even when giving a device away — I can prepare the questions, but a lawyer answers them.</p>
+          <p class="what"><strong>Desk hour.</strong> About forty-five minutes, phone or laptop.</p>
+          <p class="why">Railway: <code>ForwardedHeaders__Enabled=true</code>, <code>Alerts__WebhookUrl</code> + <code>Alerts__TelegramChatId</code>, and <code>Notifications__Transport=resend</code> with its key (only strangers need the last one; your own child does not); confirm the <code>/data</code> volume is mounted. Open the operator console's System tab: the new rows show what is still missing. Read the three cost numbers into <strong>tools/quality-evidence/cost-per-hour-TEMPLATE.md</strong> (D3). Then SHIP.md: paste the eighteen statuses from <strong>docs/ship-md-evidence-audit-20261022.md</strong> section 3, write <code>3214</code> for D2, answer open question 1 ("SHIP.md is authoritative"), decide B4 (below) and what "choice" means for Game (A3). Say "go" or "v2" to the three safety items that need your approval before I touch them: the Armenian output gate (A2), the self-harm line on the after-story answer (B1), scary-topic probes (B2).</p>
         </div>
       </li>
       <li class="row">
         <span class="step-n">5</span>
         <div>
-          <p class="what"><strong>Then</strong> decide about the factory board, the case, certification and selling.</p>
-          <p class="why">Those cost thousands. Spend them after five families tell you the toy is worth it, not before.</p>
+          <p class="what"><strong>One Armenian adult who is not you</strong> listens for ten minutes and writes three lines. (A5)</p>
+          <p class="why">The playlist and the form are in <strong>tools/quality-evidence/native-listener-note-TEMPLATE.md</strong>. Any evening, anyone, about twenty-five minutes including finding them.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="step-n">6</span>
+        <div>
+          <p class="what"><strong>Give the toy to your own child for a week.</strong></p>
+          <p class="why">Honest arithmetic: after steps 1 to 5 you will have 9 to 12 of 18 proven by the letter, and six items still open: three waiting on your "go", two decisions, and C3, which as written needs a firmware change. SHIP.md's own rule says ship to one real child when fewer than three items block, so step 6 is a decision you make explicitly, by writing down which of the six do not block a week in your own home with your own child. Everything you learn in that week is worth more than everything we would polish before it.</p>
         </div>
       </li>
     </ol>
   </section>
 
+  <section>
+    <h2>Three things to know before the evening</h2>
+    <ul class="rows">
+      <li class="row">
+        <span class="chip c-you">Decide</span>
+        <div>
+          <p class="what"><strong>The repository is public, and two real credentials are still in its history.</strong></p>
+          <p class="why">Wi-Fi and device credentials in <code>config.h</code> across four commits in June, and a real device key inside the firmware image committed on 13 August and reverted the same day. Nothing in the repo records that the device was revoked or the Wi-Fi password changed. Two honest options for B4: accept it (revoke and re-provision that device in the console, change the home Wi-Fi password, reword B4 to "every committed secret is revoked, a full history scan is recorded, a scanner gates commits"), or rewrite history (filter-repo, force-push, re-clone every machine, ask GitHub to purge). A public repo cannot be un-leaked by the second; the first takes fifteen minutes.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-untested">Compile</span>
+        <div>
+          <p class="what"><strong>The current firmware has never been compiled by anyone.</strong></p>
+          <p class="why">The last firmware commit says so in its own message. Every "compile-verified" claim since 2 September was made in the cloud on core 3.3.8, which your bench must not use. The first ten minutes of step 2 are the compile. If it fails, send me the error; that is the evening's result and it is a good one.</p>
+        </div>
+      </li>
+      <li class="row">
+        <span class="chip c-untested">Listen</span>
+        <div>
+          <p class="what"><strong>The audio that ships today has never been played on a toy.</strong></p>
+          <p class="why">The stories were re-recorded with the cast on 8 September, the endings and bedtime music on 11 September. The only on-toy listen on record is from 2 September. The first story of step 2 is the first time anyone hears the real library through the real speaker. Hear the real clips in the real order right now, from the browser: <a href="https://claude.ai/artifact/BnxVuFuRNCfVamH3nVjRi8">An Evening with Areg</a>.</p>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Where SHIP.md stands today</h2>
+    <p class="note" style="margin-bottom:1.1rem;">Status by the letter of each item. Every row has its evidence with line numbers in <strong>docs/ship-md-evidence-audit-20261022.md</strong>. Only you edit SHIP.md.</p>
+    <ul class="rows">
+      <li class="row"><span class="chip c-live">Proven</span><div><p class="what"><strong>D1</strong> Runs from a clean clone on a machine that is not yours.</p><p class="why">Re-run today from a fresh clone with the four documented commands, after the pull request made the two secrets explicit; Railway builds the same Dockerfile from GitHub and is live now.</p></div></li>
+      <li class="row"><span class="chip c-proof">On merge</span><div><p class="what"><strong>C2</strong> Device auth works; the legacy sketch is deleted.</p><p class="why">Auth returned 401 to a bad key on production today; the old sketch leaves with this pull request.</p></div></li>
+      <li class="row"><span class="chip c-untested">Bench</span><div><p class="what"><strong>A1 · A4 · A6 · C1 · C3 · C4</strong> A full story on the toy; interrupt within a second; three stories without a repeat; ten voice turns in a row; Wi-Fi drop and recovery; loudness measured.</p><p class="why">All six come out of step 2. Three voice turns, eight story selections and one barge-in are already on record from August; the counts SHIP.md asks for were never attempted in one sitting. C3 as written also covers a drop longer than five minutes, where the toy opens Bluetooth pairing and waits for an adult; closing that needs a firmware change you approve, or a reword.</p></div></li>
+      <li class="row"><span class="chip c-untested">Desk</span><div><p class="what"><strong>D2 · D3 · D4</strong> The test count written down; cost per hour measured; the 3 a.m. runbook.</p><p class="why">3214 tests are green. The cost figure on file is an estimate for a provider mix production no longer uses; step 2 is the hour of play, step 4 reads the bill. The runbook box is in the pull request; you confirm two Railway click-paths once.</p></div></li>
+      <li class="row"><span class="chip c-you">Friend</span><div><p class="what"><strong>A5</strong> A native adult, not you, says it sounds natural.</p><p class="why">Step 5.</p></div></li>
+      <li class="row"><span class="chip c-you">Decide</span><div><p class="what"><strong>B4 · A3</strong> Secrets in history; what "choice" means for Game.</p><p class="why">Both are yours to decide in step 4; no evening can close them.</p></div></li>
+      <li class="row"><span class="chip c-todo">After "go"</span><div><p class="what"><strong>A2 · B1 · B2 · B3</strong> A positive Armenian gate; the self-harm line on the after-story answer; scary-topic probes; the privacy page naming the real processors.</p><p class="why">Mine, after your approval: three touch the safety pipeline, one is parent-facing. B1's structural test (a new model-reaching class without moderation now fails the build) is already in the pull request; the privacy page needs you to confirm which chat provider Railway runs.</p></div></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>The toy today</h2>
+    <ul class="rows">
+      <li class="row"><span class="chip c-live">Live</span><div><p class="what"><strong>Ten stories play from the card</strong> with cast voices and ambience, chosen in turn, pause and resume, browse with the two buttons.</p><p class="why">Seen on hardware through 2 September. The 8 September re-recording is on the card now and has not been heard there yet.</p></div></li>
+      <li class="row"><span class="chip c-live">Live</span><div><p class="what"><strong>The greeting, the spoken menu, a story offered by name, the question after the story, the answer sent to the cloud and answered.</strong></p><p class="why">The menu by voice has never resolved on the toy: every attempt logged <code>intent=unknown</code>. The buttons work. Step 2 settles whether the new speech model fixes it.</p></div></li>
+      <li class="row"><span class="chip c-live">Live</span><div><p class="what"><strong>The backend</strong> on Railway with TLS, daily backups, a proven restore, alerting code, the parent dashboard and the operator console.</p><p class="why">Health is green today. Three variables are still yours to set (step 4).</p></div></li>
+      <li class="row"><span class="chip c-untested">Untested</span><div><p class="what"><strong>Riddles, games, questions and calm by voice; the three offline games; pauses inside stories; second-listen endings; bedtime music.</strong></p><p class="why">Compiled into every build since September. None of it has been pressed. Step 2 lists them as optional extras after the SHIP evidence is in; none of them is needed to hand the toy to your child.</p></div></li>
+      <li class="row"><span class="chip c-todo">Frozen</span><div><p class="what"><strong>Anything new.</strong></p><p class="why">CLAUDE.md now carries a release freeze: a change must name the SHIP.md item it serves, or it goes to the v2 backlog and stops. That is the rule that ends the pile of "built but never verified".</p></div></li>
+    </ul>
+  </section>
+
   <footer>
-    <p>Written for Hayk, updated 10 August 2026 — twice: once after a full review of the repository, and again when you reversed the order and put the working toy before the storyteller. Every claim here was checked against the code and the actual sound files today, not remembered — which is how the three half-length stories were found. Where something is untested, it says untested.</p>
+    <p>Written for Hayk, 22 October 2026. Every claim on this page was checked today against the code, the serial logs and the sound files, not remembered; the line numbers are in <strong>docs/ship-md-evidence-audit-20261022.md</strong>. Where something is untested, it says untested. The ten-day plan, the gated roadmap and the "100 units" list from earlier months are archived with a banner; they were all supersets of SHIP.md, and their status columns went stale within weeks.</p>
   </footer>
 
 </div>
