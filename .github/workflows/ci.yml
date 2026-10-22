@@ -58,3 +58,7 @@ jobs:
       - name: Run SD-card loader tests
         working-directory: tools/factory
         run: python3 test_load_sd_card.py -v
+
+      - name: Run listen-test tool tests
+        working-directory: tools/listen
+        run: python3 test_listen_test.py -v
