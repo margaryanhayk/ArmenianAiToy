@@ -12,13 +12,12 @@ this doc only describes the *chain* and its known quirks.
 There are **two parallel firmware tracks** for this project, and
 this distinction matters for any reproducibility / safety story:
 
-- **Repo-tracked firmware** — `esp32/AregVoiceMvp/`,
-  `esp32/ArmenianAiToy/`. These are committed sketches that any
-  collaborator can build. The voice MVP is current; the legacy
-  text sketch is stale (see below). Neither sketch carries
-  credentials in tree (the `config.h` files are tracked for pins
-  / timing constants, with credential lines left blank or as
-  placeholders that the operator fills in locally).
+- **Repo-tracked firmware** — `esp32/AregVoiceMvp/` (the legacy
+  text sketch `esp32/ArmenianAiToy/` was deleted 2026-10-22,
+  SHIP C2). This is a committed sketch that any collaborator can
+  build. It carries no credentials in tree (the `config.h` is
+  tracked for pins / timing constants, with credential lines left
+  blank or as placeholders that the operator fills in locally).
 - **Local-scratch prototype** — typically lives under the operator's
   `~/Documents/Arduino/` (or `%USERPROFILE%\Documents\Arduino\`)
   outside this repo. This is where iterative bench work happens
@@ -30,18 +29,19 @@ this distinction matters for any reproducibility / safety story:
   committed config.
 
 When this doc says "the proven chain", it refers to the
-**repo-tracked** sketches plus the backend on this branch. If a
+**repo-tracked** sketch plus the backend on this branch. If a
 behavior only works in the local-scratch sketch, it is not
 reproducible from a fresh clone — say so explicitly.
 
 ## What's in the repo
 
-Two firmware sketches and a backend with three browser pages:
+One firmware sketch (a second, legacy one was deleted 2026-10-22) and a
+backend with three browser pages:
 
 | Path | What it is | Status |
 |---|---|---|
 | `esp32/AregVoiceMvp/AregVoiceMvp.ino` | C1 voice bench prototype (button-to-talk → `/api/chat/audio`). Sends device-auth headers. | **Active** — matches current backend contract. |
-| `esp32/ArmenianAiToy/ArmenianAiToy.ino` | Phase-1 text-chat sketch (browser → ESP32 → `/api/chat`). | **Stale.** Does not send `X-Device-Id` / `X-Api-Key`; the backend's `DeviceAuthMiddleware` rejects it with 401. Not part of any current proven flow. |
+| `esp32/ArmenianAiToy/ArmenianAiToy.ino` | Phase-1 text-chat sketch (browser → ESP32 → `/api/chat`). | **Deleted 2026-10-22 (SHIP C2).** It never sent `X-Device-Id` / `X-Api-Key`, so the backend's `DeviceAuthMiddleware` rejected it with 401. Listed here as history only. |
 | `backend/src/ArmenianAiToy.Api/wwwroot/bench.html` | Browser dev UI: register a device + send chat messages with the issued device id/key. Served at `/bench.html`; it was moved off `/` on 2026-08-04 because a visitor to the site was landing on it. | Active. |
 | `backend/src/ArmenianAiToy.Api/wwwroot/story.html` | Browser story-mode UI (handles `storySessionId` / `selectedChoice` round-trip). | Active. |
 | `backend/src/ArmenianAiToy.Api/wwwroot/parent.html` | Parent dashboard (login, linked devices, conversation history, etc.). | Active. |
@@ -155,9 +155,8 @@ These files carry secrets when used and must never be staged:
   commit and confirm it prints nothing. Optionally
   `git update-index --skip-worktree esp32/AregVoiceMvp/config.h`
   during bench work.
-- `esp32/ArmenianAiToy/config.h` — no credentials today (only
-  pins / timeouts) but treat the same way if you ever add SSID
-  / device creds.
+- `esp32/ArmenianAiToy/config.h` — deleted 2026-10-22 (SHIP C2)
+  together with the legacy sketch; nothing to guard any more.
 - `backend/src/ArmenianAiToy.Api/armenian_ai_toy.db*` — local
   SQLite scratch DB.
 - `backend/src/ArmenianAiToy.Api/wwwroot/audio-blobs/` (and any
@@ -170,14 +169,13 @@ and lives outside the repo entirely.
 
 ## Known quirks and limitations
 
-- **Legacy text sketch is broken against the current backend.**
-  `esp32/ArmenianAiToy/ArmenianAiToy.ino` forwards
+- **Legacy text sketch: deleted 2026-10-22 (SHIP C2).**
+  `esp32/ArmenianAiToy/ArmenianAiToy.ino` forwarded
   `POST /api/chat` with no `X-Device-Id` / `X-Api-Key`, so the
-  `DeviceAuthMiddleware` returns 401. The browser dev UI
+  `DeviceAuthMiddleware` returned 401; instead of a retrofit it
+  was removed from the repo. The browser dev UI
   (`wwwroot/bench.html` / `wwwroot/story.html`) is the
-  currently-working text path; the legacy sketch needs a
-  register-then-attach-headers retrofit before it talks to the
-  current backend. Not in scope for this slice.
+  currently-working text path.
 - **`192.168.X.X` is dynamic.** Whatever IP your laptop has on
   the LAN today may change tomorrow. WiFiManager exposes a
   config-portal field so the ESP32 backend URL can be re-entered
@@ -222,7 +220,7 @@ backend DB. Clear site data for the host and reload.
 Status of the physical-toy build, broken down so the next operator
 can pick the smallest useful next slice. Items marked **local-only**
 exist in the operator's local-scratch prototype today; they would
-need a clean re-implementation against the repo-tracked sketches
+need a clean re-implementation against the repo-tracked sketch
 to be a shipped invariant.
 
 | Item | Status | Notes |

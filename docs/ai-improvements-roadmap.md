@@ -1,3 +1,5 @@
+> **Archived 2026-10-22.** This document is kept as history. `SHIP.md` is the only finish line for v1.0; the current evidence audit is `docs/ship-md-evidence-audit-20261022.md` and the owner's steps are in `docs/status/build-status.html`. Rows here that are not on SHIP.md belong in `docs/v2-backlog.md`. Phase 1 vendor/legal items are real but not on SHIP.md; owner decides.
+
 # AI improvements roadmap — zero to hero (2026-09-23)
 
 Every improvement from `docs/ai-landscape-2026-09.md`, put in the order it has

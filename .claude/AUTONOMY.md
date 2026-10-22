@@ -11,6 +11,8 @@ files this points to before making non-trivial changes.
 
 If a task tempts you to weaken any of those three, **stop and ask**.
 
+Release freeze: a task must name the `SHIP.md` item it serves; if it serves none, it goes to `docs/v2-backlog.md` and stops (the canonical wording lives in `CLAUDE.md`).
+
 ## The session flow
 
 ```
