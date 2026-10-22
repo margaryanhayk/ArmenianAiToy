@@ -692,7 +692,17 @@ const tabs = {
       : '<div class="msg info">All configuration checks pass.</div>';
     const labels = {openaiKey:'OpenAI key', geminiKey:'Gemini key', elevenLabsKey:'ElevenLabs key',
       vertexServiceAccount:'Vertex service account', alertsWebhook:'Alerts webhook', metricsToken:'Metrics token',
-      audioStore:'Audio storage', forwardedHeaders:'Forwarded headers'};
+      audioStore:'Audio storage', forwardedHeaders:'Forwarded headers',
+      notificationsKey:'Email key (Resend / SMTP)', provisioningSecret:'Toy provisioning secret',
+      googleClientId:'Google sign-in', firmwareUpdateEnabled:'Firmware offered to toys',
+      firmwareImagePath:'Firmware image path', contentSyncEnabled:'Content sync',
+      allowedHostsPinned:'Allowed hosts pinned', requireHttps:'Require HTTPS'};
+    // Switches read on/off; credentials and paths read set/not set.
+    const switches = new Set(['forwardedHeaders','firmwareUpdateEnabled','contentSyncEnabled','requireHttps']);
+    const cfgPill = ([k,v]) => `<span class="pill ${v?'on':''}">${esc(labels[k]||k)}: ${switches.has(k)?(v?'on':'off'):(v?'set':'not set')}</span>`;
+    // Names, not secrets (the server only ever sends log | smtp | resend | unrecognised).
+    const tr = (s.settings||{}).notificationsTransport;
+    const trPill = tr ? ` <span class="pill ${tr==='log'||tr==='unrecognised'?'':'on'}">Email transport: ${esc(tr)}</span>` : '';
     const maxUsd = Math.max(0.0001, ...s.spend.days.map(d=>d.estimatedUsd));
     const bar = v => `<div style="background:var(--acc);height:8px;border-radius:4px;width:${Math.max(2,Math.round(100*v/maxUsd))}%"></div>`;
     main.innerHTML = `<div class="cards">`
@@ -719,7 +729,7 @@ const tabs = {
       + s.billing.map(b=>`<a href="${esc(b.url)}" target="_blank" rel="noopener" style="color:var(--acc)">${esc(b.provider)}</a>`).join(' · ')
       + `</p>`
       + `<h3>Configured</h3><div class="row">`
-      + Object.entries(s.configured).map(([k,v])=>`<span class="pill ${v?'on':''}">${esc(labels[k]||k)}: ${v?'set':'not set'}</span>`).join(' ')
+      + Object.entries(s.configured).map(cfgPill).join(' ') + trPill
       + `</div>`
       + `<h3>Estimated spend by day</h3><p class="mut">${esc(s.spend.note)}</p>`
       + table([

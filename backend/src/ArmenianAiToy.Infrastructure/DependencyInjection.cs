@@ -76,8 +76,13 @@ public static class DependencyInjection
         OpenAICostEstimator.ConfigureChatRates(chatCostIn, chatCostOut);
 
         // OpenAI
-        var apiKey = config["OpenAI:ApiKey"]
-            ?? throw new InvalidOperationException("OpenAI:ApiKey is required");
+        // Null AND empty/whitespace: appsettings.json ships "ApiKey": "" and an
+        // empty string used to die inside ApiKeyCredential's constructor with a
+        // message that never named the setting (SHIP D1, clean-clone-boot-20260812.md).
+        var apiKey = config["OpenAI:ApiKey"];
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new InvalidOperationException(
+                "OpenAI:ApiKey is required — set OpenAI__ApiKey (any non-empty value boots the non-AI parts; see CLAUDE.md § Build & test)");
         var chatModel = config["OpenAI:ChatModel"] ?? "gpt-4o-mini";
 
         var moderationModel = config["OpenAI:ModerationModel"] ?? "omni-moderation-latest";
