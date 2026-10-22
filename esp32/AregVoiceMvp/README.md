@@ -887,19 +887,24 @@ would break them, so it stays until those harnesses are migrated.
 
 ### What still blocks SHIP A6
 
-Selection exists, but A6 is **not** DONE. Still required, on real
-hardware:
+Selection is live and is the default press path: ten approved stories are
+synced to the bench card (10/10 items, index written —
+`button-back-story-answer-20260818.log`), `[story] selected <id> (10 eligible)`
+appears in eight saved logs, and a Q&A barge-in resumed the same story once
+(`button-jumper3-20260819.log`). A6 is still **not** DONE, because no recorded
+run shows the rotation itself. Still required, on real hardware, in **one**
+log:
 
-- **three approved MP3 stories** (today: 2 approved stories, and only
-  `anban-huri` has an SD-wired MP3; `anban-huri` itself is still a
-  `draft` pending its TTS listen test);
-- a real **three-item sync** onto the card;
-- selection **observed across repeated new-story requests**;
-- **no back-to-back repeats** observed;
-- **reboot persistence** of the rotation;
-- **pause/resume staying on the same story**.
+- **three or more consecutive selections** with **no adjacent repeat** —
+  today every log holds exactly one rotation pick, each from a separate boot
+  (`tools/quality-evidence/*.log`);
+- **a power-cycle between two of them**, so the `aregstory` NVS cursor's
+  persistence is observed rather than read from the code.
 
-None of that has been run. Do not mark A6 DONE without recorded evidence.
+`tools/firmware/bench_watch.py` scores exactly this (`SHIP A6  N selections,
+adjacent repeats: 0, power-cycles between selections: K`); the five-start
+recipe is `docs/bench-test-session.md` Part 2. Do not mark A6 DONE without
+that log.
 
 ## Welcome flow — the toy's opening (`handle_welcome_flow`)
 
@@ -984,9 +989,21 @@ fixed, 48 slots costs 8 KB against 32 and is comfortable.
 overflowed by 130 KB) because eleven test functions each held their own
 `static CsStory[CS_MAX_STORIES]`. They now share one set of scratch buffers.
 
-### Bench verification — NOT yet run
+### Bench verification — partly run (2026-08-26); the voice answer never resolved
 
-Nothing below has been observed on hardware. Compile-verified only.
+**Observed on hardware:** the hold gesture opens the menu
+(`sd-recheck-20260826.log:91`, `[button] hold -- opening the menu`); the ask
+clip plays; the **GREEN button** path reaches `[welcome] GREEN -> story`,
+`offering from 10 already-heard stories` and `playing chosen story
+little-cloud` (`menu-first-test-20260826.log`). **Never observed:** a voice
+answer that resolves. The only intent ever logged is `[welcome] intent=unknown`
+(`owner-live-test-20260815.log:58`, `sd-selftest-20260830.log:81`) — so the
+transcript below, and by-ear item 1, are the *expected* shape, not a recorded
+one, and Game / Riddle / Curiosity / Calm (voice-only doors) have never been
+reached. Items 2–6 below have not been run. `bench_watch.py` prints
+`[welcome] intent=<x>` as an event and warns on `unknown`.
+
+Expected on a good run:
 
 ```
 [content-sync] manifest status=200 stories=... voice=28 modes=1111
@@ -1003,7 +1020,7 @@ Nothing below has been observed on hardware. Compile-verified only.
 [welcome] heard anban-huri (1 known)
 ```
 
-By ear, in this order:
+By ear, in this order (item 1 by voice has never resolved on a recorded run):
 
 1. power on → a greeting plays → the question follows → say «հեքիաթ» → it offers
    an **unheard** story → say «այո» → it plays;
