@@ -62,3 +62,7 @@ jobs:
       - name: Run listen-test tool tests
         working-directory: tools/listen
         run: python3 test_listen_test.py -v
+
+      - name: Run release preflight helper tests
+        working-directory: tools/release
+        run: python3 test_preflight_checks.py -v
