@@ -1,3 +1,5 @@
+> **Archived 2026-10-22.** This document is kept as history. `SHIP.md` is the only finish line for v1.0; the current evidence audit is `docs/ship-md-evidence-audit-20261022.md` and the owner's steps are in `docs/status/build-status.html`. Rows here that are not on SHIP.md belong in `docs/v2-backlog.md`. Closed by `tools/quality-evidence/armenian-text-approval-20260813.md`.
+
 # Content waiting for the owner's read
 
 Companion to `docs/review/content-review.html` (open that on a phone).

@@ -1,3 +1,5 @@
+> **Archived 2026-10-22.** This document is kept as history. `SHIP.md` is the only finish line for v1.0; the current evidence audit is `docs/ship-md-evidence-audit-20261022.md` and the owner's steps are in `docs/status/build-status.html`. Rows here that are not on SHIP.md belong in `docs/v2-backlog.md`.
+
 # Areg Current Readiness Evaluation
 
 **Branch:** `evaluation/areg-current-readiness-20260518` (off `main` at `a3c930f`)
@@ -20,8 +22,8 @@ tests** that pass in ~1 second without network.
 
 The honest gap is between **bench-ready** and
 **production / 24-7-unattended ready**. The voice path is
-Story-only; the legacy text-only ESP32 sketch is broken against
-the current backend; the bench runs HTTP-only on a dynamic LAN
+Story-only; the legacy text-only ESP32 sketch (deleted 2026-10-22,
+SHIP C2) was broken against the current backend; the bench runs HTTP-only on a dynamic LAN
 IP; OpenAI cost is uncapped beyond a per-device rate-limiter
 token bucket; live-benchmark evidence is one-sample-per-day on a
 noise floor of ~1–3 weak cases per 90 turns; and no production
@@ -69,7 +71,7 @@ unsupervised always-on toy is not.
 | Riddle mode | 84 | 2026-05-18 targeted live run 0/15 weak. DIRECTIVE-IS-BINDING rule + defensive multi-word triggers in `RiddleIntent`. «նորից»-dispatch capability live-verified. |
 | Curiosity mode | 86 | Eliminated a metric that lived in the committed baseline (`length_growing` 1 → 0). Exemption for «ավելի պատմիր» is rule-only, not benchmark-triggered. |
 | Calm mode | 80 | Anti-companion + grounding + wind-down arc are mature. Formal-plural ban added. NOT live-retested on 2026-05-18 (was 0/13 on prior runs). |
-| ESP32 browser prototype | 65 | `wwwroot/index.html` + `story.html` + `parent.html` work from a phone on LAN. Legacy `esp32/ArmenianAiToy/ArmenianAiToy.ino` sketch is broken against current backend (no device-auth headers, documented as stale). Dynamic LAN IP requires re-provisioning. |
+| ESP32 browser prototype | 65 | `wwwroot/index.html` + `story.html` + `parent.html` work from a phone on LAN. Legacy `esp32/ArmenianAiToy/ArmenianAiToy.ino` sketch was broken against current backend (no device-auth headers) and was deleted 2026-10-22 (SHIP C2). Dynamic LAN IP requires re-provisioning. |
 | ESP32 voice/TTS readiness | 62 | `AregVoiceMvp.ino` works on one ESP32-S3-DevKitC-1 + INMP441 + MAX98357A. Buffered playback only, no retry, no barge-in, HTTP-only, no enclosure. Audio endpoint is **Story-only** per CLAUDE.md C1 spec — Game/Riddle/Calm/Curiosity do not flow through voice. |
 | Parent dashboard / monitoring | 78 | `wwwroot/parent.html` is read-only with login + linked devices + summaries + flagged messages + conversation detail + audit feed + Today panel (server-aggregated, timezone-aware). Email verification, Google sign-in, password reset, account delete, per-child mode overrides, bedtime window. No UX testing evidence. |
 | Safety / moderation | **84** (+2) | Dual moderation (input + output), fail-closed sentinel pinned by 32 offline-mocked tests, `OpenAIReliabilityGate` retry/circuit, `ChatGateEvaluator` pause/bedtime/mode gating, `DangerousInputFilter` helper. The mocking-strategy is now discoverable from the test file header. |
@@ -203,10 +205,10 @@ dotnet test ... --filter "Moderation"
 
 - **Current status:** demo-ready on a controlled LAN.
 - **Works:** Phone → wwwroot/index.html → device-register → `/api/chat` with X-Device-Id/X-Api-Key. Story page with choice handoff via `storySessionId` + `selectedChoice`. Parent dashboard separately.
-- **Weak:** Legacy `esp32/ArmenianAiToy/ArmenianAiToy.ino` text sketch sends no auth headers → rejected 401 by middleware. Dynamic LAN IP requires WiFiManager portal re-entry on every IP change. No TLS.
+- **Weak:** Legacy `esp32/ArmenianAiToy/ArmenianAiToy.ino` text sketch sent no auth headers → rejected 401 by middleware (sketch deleted 2026-10-22, SHIP C2). Dynamic LAN IP requires WiFiManager portal re-entry on every IP change. No TLS.
 - **Evidence:** `docs/esp32-chain.md`.
 - **Score:** 65
-- **Next action:** retrofit legacy text sketch OR mark it as deprecated and remove from repo.
+- **Next action:** ~~retrofit legacy text sketch OR mark it as deprecated and remove from repo~~ — removed from the repo 2026-10-22 (SHIP C2).
 
 ### ESP32 voice MVP
 
@@ -323,7 +325,7 @@ For each: P0/P1/P2 = priority; S/M/L = difficulty.
 10. **[P1 / S]** **Update CLAUDE.md test count to 1336** (and document the gap to `Esp32TestController*` untracked work).
 11. **[P1 / M]** **Run a 5-sample noise-floor characterization** on the current `main` (consumes ~$10-15 OpenAI). Document the actual noise distribution per mode. *Affected:* `tools/quality-evidence/areg-noise-floor-characterization-YYYYMMDD.md`. *Validation:* report committed.
 12. **[P1 / M]** **Voice path: extend at least Riddle.** Currently Story-only. Adds backend dispatch + AudioChatController coverage. *Affected:* `AudioChatController`, `ChatService.GetResponseAsync` voice path. *Validation:* `tools/test-chat-audio.ps1` extended.
-13. **[P2 / S]** **Retrofit or remove legacy `esp32/ArmenianAiToy/ArmenianAiToy.ino`.** Either add device-auth headers or move to `esp32/_deprecated/`. *Affected:* one sketch file. *Validation:* docs/esp32-chain.md re-read.
+13. **[P2 / S]** **Retrofit or remove legacy `esp32/ArmenianAiToy/ArmenianAiToy.ino`.** *(Done: deleted 2026-10-22, SHIP C2.)* Either add device-auth headers or move to `esp32/_deprecated/`. *Affected:* one sketch file. *Validation:* docs/esp32-chain.md re-read.
 14. **[P2 / M]** **Split ChatService by mode dispatcher.** Extract `BuildXxxTurnDirective` family into a `ModeDirectiveBuilder` class. *Affected:* `ChatService.cs` (large refactor). *Validation:* full test suite + targeted live re-run.
 15. **[P2 / S]** **TTS canned-phrase cache.** Pre-render and cache the four canned replies (pause, bedtime, mode-disabled, safety-fallback). *Affected:* `CannedVoiceClips` or new `TtsCacheService`. *Validation:* gated-path turn skips OpenAI TTS.
 16. **[P2 / S]** **PostgreSQL CI matrix.** Run the test suite against Postgres in CI to catch SQLite-only assumptions. *Affected:* `.github/workflows/`. *Validation:* CI green on Postgres.

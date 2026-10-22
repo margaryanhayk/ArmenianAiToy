@@ -1,6 +1,10 @@
 # Screenless story selection — design proposal
 
-**Status:** proposal for owner decision. No code yet. Targets the current
+**Status:** implemented (as of 2026-10-22) in `esp32/AregVoiceMvp/story_select.cpp`;
+the text below is the original proposal, kept as the design record and it may
+differ from the shipped behaviour in detail. Its single-button GPIO0 wiring is
+superseded: GPIO0 is a strapping pin, the main button is GPIO18.
+Originally: proposal for owner decision. Targets the current
 bench hardware (ESP32-S3-DevKitC-1: ONE button on GPIO0, one WS2812 RGB LED
 on GPIO48, INMP441 mic, MAX98357A speaker) and the offline SD content pack
 (`manifest.json` + `/stories/<id>/` produced by `tools/ContentPackBuilder`).

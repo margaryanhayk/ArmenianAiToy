@@ -137,6 +137,7 @@ public class InternalSystemController : ControllerBase
             openAiCircuitOpen = _openAiGate?.IsCircuitOpen() ?? false,
             models = report.Models,
             configured = report.Configured,
+            settings = report.Settings,
             checks,
             backup = new { newestAtUtc = backup.NewestAtUtc, sizeBytes = backup.SizeBytes },
             spend = new

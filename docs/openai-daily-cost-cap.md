@@ -24,10 +24,15 @@ For every `POST /api/chat` and `POST /api/chat/audio` request:
 
 - Does NOT expose money / cost detail to the child. The canned
   response is shape-compatible with the paused-device response.
-- Does NOT persist counters across process restarts (v1 is
-  in-memory only — `ConcurrentDictionary` + lock). Accepted
-  limitation; worst case is one extra cap-worth of spend during
-  a restart, never unbounded.
+- Does NOT persist the cap counter across process restarts (the
+  gate's `OpenAICostMeter` is in-memory only — dictionary + lock).
+  Accepted limitation; worst case is one extra cap-worth of spend
+  during a restart, never unbounded. Since 2026-09-11 a durable
+  per-device, per-UTC-day record (`DeviceUsageDay`: question count +
+  estimated USD) is written alongside it unconditionally and survives
+  restarts, but it only governs the gate when `Usage:Tiers:Enabled`
+  is on (default `false`); today's flat dollar cap still resets on a
+  restart. See `docs/usage-tiers-brainstorm.md`.
 - Does NOT use a real tokenizer. Cost estimates are based on
   character length × conservative `chars-per-token` factor.
   Designed to over-estimate slightly, so the cap fires earlier
@@ -43,7 +48,7 @@ Configuration section: `OpenAI:DailyCostCap` (bound by
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `Enabled` | bool | `true` | Master switch. False = gate never trips, no recording. |
-| `Default` | decimal | `0.50` | Per-device daily cap in USD. |
+| `Default` | decimal | `0.25` | Per-device daily cap in USD (30 in-story questions x ~$0.0078, rounded; interim until tiers are decided). |
 | `Global` | decimal | `0` | **#022** fleet-wide daily ceiling (USD) across ALL devices. `0` = disabled (opt-in). When the day's fleet total reaches it, every paid path fails closed until the next UTC day. |
 | `PerDeviceOverride` | dict<string, decimal> | empty | Optional `{ "<deviceGuid>": <capUsd> }` overrides. |
 
@@ -54,7 +59,7 @@ Configuration section: `OpenAI:DailyCostCap` (bound by
   "OpenAI": {
     "DailyCostCap": {
       "Enabled": true,
-      "Default": 0.50,
+      "Default": 0.25,
       "PerDeviceOverride": {
         // "11111111-2222-3333-4444-555555555555": 2.00
       }
@@ -64,7 +69,7 @@ Configuration section: `OpenAI:DailyCostCap` (bound by
 ```
 
 If the entire section is missing, defaults apply (`Enabled=true`,
-`Default=0.50`, `Global=0`).
+`Default=0.25`, `Global=0`).
 
 ## Global / fleet ceiling (#022)
 
