@@ -1,6 +1,6 @@
 # ADR-001: Production deploy target and TLS termination
 
-**Status:** Proposed
+**Status:** Accepted in practice: Railway + its TLS edge, live since 2026-08; the owner remains the formal decider and can still overrule it.
 **Date:** 2026-07-26
 **Deciders:** Hayk (owner — sole decider)
 **Supersedes:** the open question in `docs/deploy.md` ("TLS, metrics scraping
