@@ -98,7 +98,7 @@ the owner's own steps are `docs/status/build-status.html`.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3214 tests, ~40 s in Release
+dotnet test            # 3244 tests, ~45 s in Release
 export OpenAI__ApiKey="sk-dummy-for-local-boot"               # any non-empty value boots everything non-AI
 export Jwt__Key="local-dev-jwt-key-0123456789abcdef0123456789"  # ≥32 chars, not the legacy literal
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000  (Windows: $env:OpenAI__ApiKey=...)
@@ -1110,8 +1110,15 @@ rewritten as a view of `SHIP.md`, A5/D3 evidence templates. Three findings
 outrank everything: the repo is PUBLIC with two credential leaks still in
 history (B4, owner decision); HEAD firmware has never been compiled by
 anyone (core 3.3.6 on the PC); the audio that ships has never been played
-on a toy. `dotnet test` green (3214, 17 new). NOT verified: anything on
-hardware, the live Railway console, a real `ffplay` listen session.
+on a toy. A code review of the branch (13 findings) and the
+ux-ui-designer review were applied before merge: the bench stuck-button
+detector was inverted against the firmware's prints (it now flags
+silence after a non-IDLE state), the console report threw on a
+non-boolean env value, its provisioning-secret row disagreed with the
+registration gate, the B1 structural test was per-controller (now per
+action), and the Configured row could look calmer than the checks.
+`dotnet test` green (3244, 47 new). NOT verified: anything on hardware,
+the live Railway console, a real `ffplay` listen session.
 
 ## Working in this repo (agents)
 
