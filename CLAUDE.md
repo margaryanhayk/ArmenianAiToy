@@ -181,8 +181,9 @@ Unknown values refuse boot. Moderation stays on OpenAI, fail-closed.
   output moderation → TTS. Story-qa streams first byte only when the toy
   sends `X-Areg-Accept-Stream: 1` (kill switch `StoryQa:StreamAnswerAudio`).
   Both chat endpoints hand `RequestAborted` to `ChatService`: a toy that
-  drops mid-turn aborts the moderation/model calls with nothing stored,
-  while a reply output moderation already approved is stored regardless.
+  drops mid-turn aborts the moderation/model calls with no assistant row
+  stored (the child's own row is written before the model call, as on a
+  model failure); a reply output moderation already approved is stored.
 - **Parents** (`/api/parents/*`, JWT): register/login (anti-enumeration,
   uniform 401/202/400 shapes, BCrypt on both paths), Google sign-in, password
   reset, email verification, devices (claim by code, invite second parent,

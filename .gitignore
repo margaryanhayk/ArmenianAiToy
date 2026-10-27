@@ -76,3 +76,6 @@ tools/.render-out/
 # docs/variant-endings-serial-render-runbook.md) — same posture: the shipped
 # copies under story-audio/ are what ships, these are pre-levelling.
 render-out/
+
+# Agent worktrees (Claude Code isolation), never content
+.claude/worktrees/

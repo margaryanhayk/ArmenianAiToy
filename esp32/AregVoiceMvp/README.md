@@ -306,7 +306,13 @@ Duplicate ids keep the **first**, matching the backend.
 sha256, zero or oversized size, empty audioUrl, over-long path) is
 dropped and counted; its valid siblings still sync. A failed download
 leaves the previously-good file untouched and never enters the index.
-Manifests longer than `CS_MAX_STORIES` are truncated with a log line,
+**Today the shipped catalogue offers 20 stories (10 base + 10 alt) against a
+`CS_MAX_STORIES` of 16, so the last four alts are cut by POSITION, and any
+operator-uploaded story (appended after the config rows) can never pass the
+cap** — AI logic review 2026-10-27, F2; the owner decides between raising
+the cap to 20 (~+24 KB `.bss`, needs a bench heap check) or having the
+backend emit base stories before alts. Manifests longer than
+`CS_MAX_STORIES` are truncated with a log line,
 never a crash.
 
 **`audioUrl` is used exactly as supplied** — bare
@@ -421,6 +427,14 @@ was possible from this session; nothing here has ever been flashed):
       sparing until the session ends`, the file and index entry survive,
       resume still works. Resume the story, let the session end, wait for
       the next sync attempt → NOW it retires.
+- [ ] (AI logic review 2026-10-27, F3) With `orphanSweepEnabled:true` and a
+      fully synced card, the sweep logs ZERO `orphan swept: /games/...`
+      lines — the games index used to be cleared before the sweep read
+      it, which deleted up to 20 game clips per boot.
+- [ ] (F6) Block one voice-clip URL on the backend (or corrupt its sha in
+      the manifest), run a sync → the summary says `PARTIAL (... items
+      failed)`, `status=partial`, and the next attempt is scheduled in
+      ~300 s, not 6 h; the heartbeat reports `contentSyncStatus=partial`.
 - [ ] Set `orphanSweepEnabled:true` on the backend, manually drop a stray
       MP3 into `/stories` that no index entry names (or leave a `.part`
       in `/tmp` from a killed download, then power-cycle so NTP re-syncs
@@ -668,6 +682,16 @@ Two parent switches (`PUT /api/parents/devices/{id}/story-pauses` and
 `storyPausesEnabled` / `variantEndingsEnabled` and are cached in the index
 root as `pausesEnabled` / `variantsEnabled`, so they apply offline exactly
 the way `introEnabled` does.
+
+> **Before `AREG_VARIANT_ENDINGS_ENABLED` is ever set to 1** (AI logic
+> review 2026-10-27, F4 + B13): (a) `story_heard_mark` runs at playback
+> START, so a pause-and-resume on a first listen would re-resolve to the
+> alt FILE and apply the base file's byte offset to a different MP3 —
+> record the session's variant decision (`s_session_variant`) and reuse
+> it on resume; (b) in-story Q&A posts the BASE story id with alt-file
+> offsets, so the backend maps against the wrong render — send
+> `variant=1` and resolve the alt byte map in `StoryQaController`.
+> Neither is reachable while the flag is 0.
 
 - **Index schema v5 → v6.** The two root flags plus a per-story `altOf`,
   written only for real variants. Superset like every previous bump: a v5
@@ -991,6 +1015,19 @@ overflowed by 130 KB) because eleven test functions each held their own
 
 ### Bench verification — partly run (2026-08-26); the voice answer never resolved
 
+**Added 2026-10-27 (AI logic review F1, a reboot-on-press fix, never
+compiled here):**
+
+- [ ] Open the menu, press the MAIN button again DURING the greeting → no
+      `Guru Meditation`/`StoreProhibited` line, a `[story] SD barge-in`
+      log, toy back at IDLE. Before the fix this dereferenced a null
+      resume pointer and rebooted.
+- [ ] Same with GREEN, then with RED, during the greeting → no reboot, and
+      the NEXT story press plays the next story in rotation (no stale
+      browse hop) and marks it heard.
+- [ ] Inside the bedtime window, press during the bedtime music → same:
+      no reboot, back to IDLE.
+
 **Observed on hardware:** the hold gesture opens the menu
 (`sd-recheck-20260826.log:91`, `[button] hold -- opening the menu`); the ask
 clip plays; the **GREEN button** path reaches `[welcome] GREEN -> story`,
@@ -1143,6 +1180,11 @@ was possible from this session; nothing here has ever been flashed):
       session` is a blocking call from `loop()`, exactly like a story
       session or the welcome flow; that is not new here) and that a long
       Game session does not leave a stray open TLS connection behind.
+- [ ] (AI logic review 2026-10-27, F5) Bench build with
+      `AREG_CHAT_SESSION_MAX_TURNS=2`: after the SECOND reply the LED must
+      NOT go red and the log says `turn cap (2) reached — session over`;
+      the loop used to open a listen window whose recording it then
+      discarded.
 - [ ] With offline game clips ON the card, say «խաղանք» → hears a REAL
       offline game (mind-reader/who-first/button-simon), NOT this online
       loop — confirms the owner's offline-first precedence still holds.
