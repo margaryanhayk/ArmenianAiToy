@@ -1,6 +1,6 @@
 ---
 name: "repo-scout"
-description: "Use this agent for read-only reconnaissance before any work begins. It answers 'what is the current state?' questions about test counts, endpoint inventory, benchmark status, file structure, dependency versions, or any other factual repo state. Launch this agent FIRST in every session before planning or implementation.\n\nExamples:\n\n- User: \"What's the current test count?\"\n  Assistant: \"Let me launch the repo-scout agent to get the exact count.\"\n\n- User: \"What endpoints exist for parents?\"\n  Assistant: \"I'll use the repo-scout agent to inventory all parent-facing routes.\"\n\n- User: \"What's the benchmark status?\"\n  Assistant: \"Let me have the repo-scout agent check the latest benchmark results and prompt coverage.\"\n\n- Context: Starting a new work session.\n  Assistant: \"Before planning, let me launch the repo-scout agent to understand the current repo state.\""
+description: "Read-only reconnaissance: test counts, endpoint inventory, benchmark status, file structure, dependency versions. Launch first in a session, before planning."
 model: sonnet
 color: blue
 ---

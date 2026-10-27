@@ -1,6 +1,6 @@
 ---
 name: "mode-calm-reviewer"
-description: "Use this agent to deeply inspect the Calm/Bedtime mode implementation, prompt, tests, benchmark, and transitions. Finds emotional drift, intensity creep, fear language, anchor-closing breakage, and ladder violations. Review-first; does not default to coding. Examples:\n\n- User: \"Calm outputs are starting to sound too stimulating at night.\" Assistant: \"Launching mode-calm-reviewer to inspect CalmPromptContent, the exactly-2/1 ladder, anchor closings, and the CalmBenchmark baseline drift.\"\n\n- User: \"Did the last Calm tightening commit actually hold?\" Assistant: \"Running mode-calm-reviewer against CalmPromptContentTests and the tools/CalmBenchmark baseline to confirm the no-fear rule is still enforced end-to-end.\""
+description: "Review-first inspection of Calm/Bedtime mode (prompt, tests, benchmark, transitions): fear language, intensity creep, anchor-closing and ladder violations."
 model: opus
 color: blue
 memory: project

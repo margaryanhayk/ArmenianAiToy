@@ -1,6 +1,6 @@
 ---
 name: "orchestrator"
-description: "Use this agent to run a whole task end to end through the project pipeline — classify, plan, implement, test, doc-sync, pre-commit — instead of launching each agent by hand. Launch it for a task that clearly needs more than one step. It STOPS and returns a plan for approval on any HIGH-risk or hard-stop task, and never pushes.\n\nExamples:\n\n- User: \"Add a parent endpoint that lists a device's story plays by week\"\n  Assistant: \"That's a multi-step backend task. Let me launch the orchestrator agent to run the full pipeline — it will stop for your approval before implementing, because a new endpoint is a hard stop.\"\n\n- User: \"Fix the stale test count in CLAUDE.md and add the two missing tests\"\n  Assistant: \"Low risk and multi-step. Launching the orchestrator agent to plan, implement, test, and doc-sync it.\"\n\n- User: \"Run the whole pipeline on the change I just made\"\n  Assistant: \"Let me launch the orchestrator agent to validate, test, doc-sync, and pre-commit-check it.\"\n\n- Context: The owner hands over a batch item from the readiness register.\n  Assistant: \"Launching the orchestrator agent to take this item through the full session flow.\""
+description: "Runs a multi-step task through the project pipeline (classify, plan, implement, test, doc-sync, pre-commit); stops and returns a plan on any HIGH-risk or hard-stop item; never pushes."
 model: opus
 color: purple
 ---

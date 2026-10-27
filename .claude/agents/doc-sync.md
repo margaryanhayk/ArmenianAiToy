@@ -1,6 +1,6 @@
 ---
 name: "doc-sync"
-description: "Use this agent to keep CLAUDE.md, Swagger docs, and test counts accurate after code changes. Launch it after any implementation that adds/removes endpoints, tests, or features.\n\nExamples:\n\n- Context: New tests were added, test count in CLAUDE.md is stale.\n  Assistant: \"Let me launch the doc-sync agent to update the test count in CLAUDE.md.\"\n\n- Context: A new endpoint was added.\n  Assistant: \"I'll use the doc-sync agent to document the new endpoint in CLAUDE.md and add Swagger docs.\"\n\n- Context: Implementation batch is complete, need to sync docs.\n  Assistant: \"Let me have the doc-sync agent verify and update all documentation.\""
+description: "Keeps CLAUDE.md, Swagger docs and the recorded test count accurate after a change that adds or removes endpoints, tests or features."
 model: sonnet
 color: yellow
 ---

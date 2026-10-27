@@ -81,6 +81,21 @@ class ClaudeMdCount(unittest.TestCase):
         self.assertEqual(pc.check_claude_md_count("no such line", DOTNET_OK)[0], 2)
         self.assertEqual(pc.check_claude_md_count(self.MD, "Build succeeded.")[0], 2)
 
+    def test_size_within_budget_passes(self):
+        code, msg = pc.check_claude_md_size(20_000)
+        self.assertEqual(code, 0)
+        self.assertIn("19.5 KB", msg)
+
+    def test_size_over_budget_fails_and_says_where_to_move_text(self):
+        code, msg = pc.check_claude_md_size(70_958)
+        self.assertEqual(code, 1)
+        self.assertIn("69.3 KB", msg)
+        self.assertIn("CLAUDE-history.md", msg)
+
+    def test_real_claude_md_is_within_budget(self):
+        real = Path(__file__).resolve().parents[2] / "CLAUDE.md"
+        self.assertEqual(pc.check_claude_md_size(real.stat().st_size)[0], 0)
+
     def test_real_claude_md_has_a_parsable_line(self):
         md = (Path(__file__).resolve().parents[2] / "CLAUDE.md").read_text(encoding="utf-8")
         self.assertIsNotNone(pc.documented_test_count(md))

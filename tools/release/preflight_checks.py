@@ -7,6 +7,7 @@ Three subcommands, each exiting 0 (ok) / 1 (the check found a problem) /
     test-summary    --log <dotnet test output>
         prints "<total> <failed> <skipped>" summed over every test assembly.
     claude-md-count --claude-md CLAUDE.md --log <dotnet test output>
+    claude-md-size  --claude-md CLAUDE.md
         CLAUDE.md "Build & test" carries `dotnet test   # N tests, ...`;
         fails when N is not what dotnet just ran.
     secret-scan     [--root <repo>]
@@ -68,6 +69,23 @@ def documented_test_count(claude_md: str):
     if not m:
         return None
     return int(re.sub(r"[,._]", "", m.group(1))), claude_md.count("\n", 0, m.start()) + 1
+
+
+CLAUDE_MD_MAX_BYTES = 24_000  # owner rule 2026-10-27: the file rides on every tool call
+
+
+def check_claude_md_size(size_bytes: int, limit: int = CLAUDE_MD_MAX_BYTES):
+    """Returns (code, message): 0 within the budget, 1 over it.
+
+    CLAUDE.md is re-sent with every tool call of every session, so its size is a
+    per-call token cost (~1 token per 4 bytes). It was 71 KB on 2026-10-27 after
+    the slice log grew back; the log now lives in docs/CLAUDE-history.md.
+    """
+    kb = size_bytes / 1024
+    if size_bytes <= limit:
+        return 0, f"CLAUDE.md is {kb:.1f} KB (budget {limit // 1000} KB)"
+    return 1, (f"CLAUDE.md is {kb:.1f} KB, over the {limit // 1000} KB budget — move slice notes "
+               "to docs/CLAUDE-history.md § \"State of the toy — slice log\"")
 
 
 def check_claude_md_count(claude_md: str, log: str):
@@ -241,6 +259,7 @@ def main(argv=None) -> int:
     p = sub.add_parser("test-summary"); p.add_argument("--log", type=Path, required=True)
     p = sub.add_parser("claude-md-count")
     p.add_argument("--claude-md", type=Path, required=True); p.add_argument("--log", type=Path, required=True)
+    p = sub.add_parser("claude-md-size"); p.add_argument("--claude-md", type=Path, required=True)
     p = sub.add_parser("secret-scan"); p.add_argument("--root", type=Path, default=Path.cwd())
     args = ap.parse_args(argv)
 
@@ -254,6 +273,10 @@ def main(argv=None) -> int:
     if args.cmd == "claude-md-count":
         code, msg = check_claude_md_count(
             args.claude_md.read_text(encoding="utf-8"), args.log.read_text(encoding="utf-8", errors="replace"))
+        print(msg)
+        return code
+    if args.cmd == "claude-md-size":
+        code, msg = check_claude_md_size(args.claude_md.stat().st_size)
         print(msg)
         return code
     findings, scanned = secret_scan(args.root.resolve())

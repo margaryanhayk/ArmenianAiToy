@@ -20,6 +20,7 @@ printed at the top and bottom. Gates keep running after a failure.
 | dotnet-build | restore + Release build of `backend/ArmenianAiToy.slnx` (as CI) |
 | dotnet-test | `dotnet test`; a failed OR skipped test is a FAIL |
 | claude-md-count | the `dotnet test # N tests` line in CLAUDE.md must equal what ran; on a mismatch it tells you the number to write |
+| claude-md-size | CLAUDE.md must stay under 24 KB — it is re-sent on every tool call of every session (owner rule 2026-10-27); slice notes go to `docs/CLAUDE-history.md` |
 | firmware-host-tests | every `esp32/AregVoiceMvp/host_tests/*_test.cpp` with `g++ -std=c++17 -I..` (as CI) |
 | python-tests | the unittest suites CI runs, plus `test_preflight_checks.py` |
 | story-audio / music-audio | `check_story_audio.py`, `check_music_audio.py` |

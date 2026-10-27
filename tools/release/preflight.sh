@@ -10,6 +10,7 @@
 #   dotnet-build      restore + Release build of backend/ArmenianAiToy.slnx
 #   dotnet-test       dotnet test (no skips allowed)          [skip: --quick]
 #   claude-md-count   CLAUDE.md "dotnet test # N tests" == what ran
+#   claude-md-size    CLAUDE.md under 24 KB (it rides on every tool call)
 #   firmware-host-tests  esp32/AregVoiceMvp/host_tests/*_test.cpp (g++ C++17)
 #   python-tests      the unittest suites ci.yml runs, plus this script's own
 #   story-audio       tools/story-audio/check_story_audio.py
@@ -184,6 +185,12 @@ python_tests() {
 }
 
 dotnet_gates
+begin
+if [ -z "$PY" ]; then record claude-md-size FAIL "python3 not found"
+else
+  msg="$("$PY" "$HELPER" claude-md-size --claude-md "$REPO_ROOT/CLAUDE.md" 2>&1)"
+  [ $? = 0 ] && record claude-md-size PASS "$msg" || record claude-md-size FAIL "$msg"
+fi
 host_tests
 python_tests
 py_gate story-audio     '^PASS'    tools/story-audio/check_story_audio.py

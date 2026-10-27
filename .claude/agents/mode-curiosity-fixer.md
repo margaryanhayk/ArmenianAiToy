@@ -1,6 +1,6 @@
 ---
 name: "mode-curiosity-fixer"
-description: "Use this agent to implement a scoped fix in Curiosity Window mode AFTER a review has produced findings. Pairs with mode-curiosity-reviewer in a reviewer → fixer → reviewer loop. Implementation-first BUT scope-bound: accepts only an explicit findings list and refuses to widen. Examples:\n\n- User: \"Apply the return-to-play fix from the Curiosity reviewer's finding 4.2.\" Assistant: \"Launching mode-curiosity-fixer with the finding as input, restating scope, and making only the minimum CuriosityPromptContent edit plus targeted tests.\"\n\n- User: \"Tighten the Curiosity length cap per the reviewer's accepted prompt-only change.\" Assistant: \"Running mode-curiosity-fixer bounded to CuriosityPromptContent and its tests.\""
+description: "Implements a scoped Curiosity Window fix from an explicit findings list (pairs with mode-curiosity-reviewer); refuses to widen scope."
 model: opus
 color: yellow
 memory: project

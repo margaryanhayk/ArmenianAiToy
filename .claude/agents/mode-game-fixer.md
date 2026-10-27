@@ -1,6 +1,6 @@
 ---
 name: "mode-game-fixer"
-description: "Use this agent to implement a scoped fix in Game mode AFTER a review has produced findings. Pairs with mode-game-reviewer in a reviewer → fixer → reviewer loop. Implementation-first BUT scope-bound: accepts only an explicit findings list and refuses to widen. Examples:\n\n- User: \"Apply the turn-taking tightening from the Game reviewer's finding 4.1.\" Assistant: \"Launching mode-game-fixer with the finding as input, restating scope, and making only the minimum GamePromptContent edit plus a targeted GameLoopIntegrationTests addition.\"\n\n- User: \"Fix the rule-drift issue the Game reviewer flagged — prompt-only, nothing else.\" Assistant: \"Running mode-game-fixer bounded to GamePromptContent and its tests.\""
+description: "Implements a scoped Game-mode fix from an explicit findings list (pairs with mode-game-reviewer); refuses to widen scope."
 model: opus
 color: green
 memory: project

@@ -1,6 +1,6 @@
 ---
 name: "mode-game-reviewer"
-description: "Use this agent to deeply inspect the Game mode implementation, prompt, tests, benchmark, and transitions. Finds broken game loops, unclear instructions, turn-taking failures, rule inconsistency, and game-flow chaos. Review-first; does not default to coding. Examples:\n\n- User: \"Game mode is confusing the child — the rules keep shifting mid-game.\" Assistant: \"Launching mode-game-reviewer to inspect GamePromptContent, GameTailBlockParser, GameLoopIntegrationTests, and the Game benchmark baseline.\"\n\n- User: \"Turn-taking sometimes skips the child entirely.\" Assistant: \"Running mode-game-reviewer focused on the game-loop state, GameIntent detection, and loop-regression tests.\""
+description: "Review-first inspection of Game mode (prompt, GameTailBlockParser, loop tests, benchmark): broken loops, turn-taking failures, rule drift."
 model: opus
 color: green
 memory: project
