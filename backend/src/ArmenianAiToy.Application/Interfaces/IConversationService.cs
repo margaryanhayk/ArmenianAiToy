@@ -18,6 +18,13 @@ public interface IConversationService
     /// an unknown message id.
     /// </summary>
     Task StampMessageModeAsync(Guid messageId, string? mode);
+    /// <summary>
+    /// The newest <paramref name="count"/> messages, oldest first, as
+    /// (lowercase role, content) for the model's history. Rows stored
+    /// <see cref="SafetyFlag.Blocked"/> are excluded: they hold the child's
+    /// raw unsafe text and must not be re-sent as context (AI logic review
+    /// 2026-10-27, A1). Flagged rows (canned fallback text) are kept.
+    /// </summary>
     Task<List<(string Role, string Content)>> GetRecentMessagesAsync(Guid conversationId, int count = 20);
     Task<List<ConversationDto>> GetConversationHistoryAsync(Guid deviceId, int limit = 10, int offset = 0);
     Task<ConversationDto?> GetConversationByIdAsync(Guid conversationId);

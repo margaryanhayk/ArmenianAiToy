@@ -24,10 +24,11 @@ public sealed class UsageTierPlan
 /// is byte-identical to today: the existing flat
 /// <see cref="OpenAIDailyCostCapOptions"/> dollar cap keeps governing, and
 /// nothing reads <see cref="Plans"/> on the request path at all. Flipping
-/// it on makes the per-tier allowance REPLACE the flat cap in the gate
-/// (see <c>ChatController</c>/<c>AudioChatController</c>/
-/// <c>StoryQaController</c>) and turns on the parent-facing
-/// "N of M questions today" line. See
+/// it on makes the per-tier allowance REPLACE the per-device flat cap in
+/// the gate (see <c>ChatController</c>/<c>AudioChatController</c>/
+/// <c>StoryQaController</c>); the fleet-wide <c>Global</c> ceiling still
+/// applies (AI logic review 2026-10-27, A4) — and turns on the
+/// parent-facing "N of M questions today" line. See
 /// <c>docs/usage-tiers-brainstorm.md</c> — the owner has decided only that
 /// content stays paid and controls stay free; tiers themselves are to be
 /// revisited before production, so this ships off.

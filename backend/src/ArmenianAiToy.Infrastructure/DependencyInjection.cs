@@ -200,7 +200,11 @@ public static class DependencyInjection
             // AudioChatController feature-detects IStreamingAudioSynthesisService
             // to start the device playing at first byte, which beats chunking
             // outright — wrapping would hide that capability behind the
-            // decorator and make the toy slower.
+            // decorator and make the toy slower. That pass-through is
+            // NEGOTIATED (AI logic review 2026-10-27, B1): the controller
+            // streams only for a toy that sent X-Areg-Accept-Stream: 1 and
+            // while AudioChat:StreamReplyAudio is not false; every other
+            // caller still gets the buffered Content-Length reply.
             var parallelTts = ParallelTtsOptions.Resolve(config);
             var innerTtsFactory = ttsFactory;
             services.AddSingleton<IAudioSynthesisService>(sp =>

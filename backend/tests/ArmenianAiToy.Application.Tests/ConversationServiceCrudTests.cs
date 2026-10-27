@@ -273,6 +273,29 @@ public class ConversationServiceCrudTests
     }
 
     [Fact]
+    public async Task GetRecentMessages_ExcludesBlockedRows_KeepsFlaggedAndClean()
+    {
+        // AI logic review 2026-10-27, A1: a Blocked row holds the child's raw
+        // unsafe text and must never be re-sent to the model as history.
+        var (service, db) = CreateService();
+        var t0 = new DateTime(2026, 4, 8, 12, 0, 0, DateTimeKind.Utc);
+        var conv = NewConversation(Guid.NewGuid(), t0);
+        db.Set<Conversation>().Add(conv);
+        db.Set<Message>().AddRange(
+            NewMessage(conv.Id, MessageRole.User, "bomb", t0.AddSeconds(1), SafetyFlag.Blocked),
+            NewMessage(conv.Id, MessageRole.Assistant, "fallback", t0.AddSeconds(2), SafetyFlag.Flagged),
+            NewMessage(conv.Id, MessageRole.User, "hi", t0.AddSeconds(3)));
+        await db.SaveChangesAsync();
+
+        var result = await service.GetRecentMessagesAsync(conv.Id);
+
+        Assert.Equal(2, result.Count);
+        Assert.DoesNotContain(result, m => m.Content.Contains("bomb"));
+        Assert.Equal("fallback", result[0].Content);
+        Assert.Equal("hi", result[1].Content);
+    }
+
+    [Fact]
     public async Task GetRecentMessages_NoMessages_ReturnsEmptyList()
     {
         var (service, db) = CreateService();

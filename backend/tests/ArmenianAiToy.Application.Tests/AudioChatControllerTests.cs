@@ -92,6 +92,7 @@ public class AudioChatControllerTests
         IAudioTranscriptionService Transcription,
         IAudioSynthesisService Synthesis,
         CannedVoiceClips Canned,
+        OpenAICostMeter CostMeter,
         Guid DeviceId) : IAsyncDisposable
     {
         public async ValueTask DisposeAsync()
@@ -108,7 +109,10 @@ public class AudioChatControllerTests
         bool streamingSynthesis = false,
         bool isDevelopment = true,
         string? blobStoreRoot = null,
-        UsageTiersOptions? usageTiersOptions = null)
+        UsageTiersOptions? usageTiersOptions = null,
+        IChildService? childService = null,
+        bool costCapEnabled = false,
+        string? streamReplyAudioSetting = null)
     {
         var conn = new SqliteConnection("Data Source=:memory:");
         await conn.OpenAsync();
@@ -146,7 +150,7 @@ public class AudioChatControllerTests
         // AudioChatControllerCostCapTests.cs.
         var costMeter = new OpenAICostMeter();
         var costCapOptions = Options.Create(
-            new OpenAIDailyCostCapOptions { Enabled = false });
+            new OpenAIDailyCostCapOptions { Enabled = costCapEnabled });
 
         // Fail-closed blob-store gate: defaults to Development/unset so the
         // large body of pre-existing tests exercises exactly the code path
@@ -156,11 +160,14 @@ public class AudioChatControllerTests
         env.EnvironmentName = isDevelopment ? "Development" : "Production";
         var config = Substitute.For<IConfiguration>();
         config["Audio:BlobStoreRoot"].Returns(blobStoreRoot);
+        // AudioChat:StreamReplyAudio kill switch (AI logic review 2026-10-27, B1).
+        if (streamReplyAudioSetting is not null)
+            config["AudioChat:StreamReplyAudio"].Returns(streamReplyAudioSetting);
 
         var controller = new AudioChatController(
             chatService, deviceService, transcription, synthesis,
             blobStore, canned, db, costMeter, costCapOptions, env, config, logger,
-            usageTiersOptions);
+            usageTiersOptions, childService);
 
         var httpContext = new DefaultHttpContext();
         var deviceId = Guid.NewGuid();
@@ -173,7 +180,7 @@ public class AudioChatControllerTests
 
         var h = new Harness(
             controller, db, conn, blobStore,
-            chatService, deviceService, transcription, synthesis, canned, deviceId);
+            chatService, deviceService, transcription, synthesis, canned, costMeter, deviceId);
         configure?.Invoke(h);
         return h;
     }
@@ -976,6 +983,7 @@ public class AudioChatControllerTests
             .SynthesizeArmenianStreamAsync(AssistantText, Arg.Any<CancellationToken>())
             .Returns(new AudioSynthesisStreamResult(new MemoryStream(TtsMp3), MimeMp3));
         h.Controller.HttpContext.Response.Body = new MemoryStream();
+        h.Controller.HttpContext.Request.Headers["X-Areg-Accept-Stream"] = "1";
 
         var result = await h.Controller.Chat(CancellationToken.None);
 
@@ -999,6 +1007,7 @@ public class AudioChatControllerTests
             .Returns(new AudioSynthesisStreamResult(new MemoryStream(TtsMp3), MimeMp3));
         var responseBody = new MemoryStream();
         h.Controller.HttpContext.Response.Body = responseBody;
+        h.Controller.HttpContext.Request.Headers["X-Areg-Accept-Stream"] = "1";
 
         var result = await h.Controller.Chat(CancellationToken.None);
 
@@ -1035,6 +1044,7 @@ public class AudioChatControllerTests
             .SynthesizeArmenianStreamAsync(AssistantText, Arg.Any<CancellationToken>())
             .Returns(new AudioSynthesisStreamResult(new ExplodingStream(TtsMp3), MimeMp3));
         h.Controller.HttpContext.Response.Body = new MemoryStream();
+        h.Controller.HttpContext.Request.Headers["X-Areg-Accept-Stream"] = "1";
 
         var result = await h.Controller.Chat(CancellationToken.None);
 
@@ -1136,5 +1146,194 @@ public class AudioChatControllerTests
             h.DeviceId, Arg.Any<Guid?>(), cts.Token);
         await h.Synthesis.DidNotReceiveWithAnyArgs()
             .SynthesizeArmenianAsync(default!, default);
+    }
+
+    // --- B1: streaming pass-through is negotiated (AI logic review 2026-10-27) ---
+
+    [Fact]
+    public async Task AudioChat_StreamingProvider_NoOptInHeader_ReturnsBufferedFile()
+    {
+        // The firmware's reader rejects a chunked body with no Content-Length
+        // (voice_client.cpp read_response_into). A streaming-capable provider
+        // must therefore stream ONLY for a toy that sent X-Areg-Accept-Stream: 1;
+        // everyone else gets the buffered, Content-Length reply.
+        await using var h = await CreateAsync(streamingSynthesis: true);
+        WireHappyPath(h);
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal(TtsMp3, file.FileContents);
+        await h.Synthesis.Received(1).SynthesizeArmenianAsync(AssistantText, Arg.Any<CancellationToken>());
+        await ((IStreamingAudioSynthesisService)h.Synthesis).DidNotReceiveWithAnyArgs()
+            .SynthesizeArmenianStreamAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task AudioChat_StreamingProvider_KillSwitchOff_ReturnsBufferedEvenWithHeader()
+    {
+        // AudioChat:StreamReplyAudio=false neutralises the streaming path by
+        // config alone, same idiom as StoryQa:StreamAnswerAudio.
+        await using var h = await CreateAsync(streamingSynthesis: true, streamReplyAudioSetting: "false");
+        WireHappyPath(h);
+        h.Controller.HttpContext.Request.Headers["X-Areg-Accept-Stream"] = "1";
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        await ((IStreamingAudioSynthesisService)h.Synthesis).DidNotReceiveWithAnyArgs()
+            .SynthesizeArmenianStreamAsync(default!, default);
+    }
+
+    // --- A5/B7: the mode gate honours the default child's override ---------
+
+    private static IChildService ChildServiceWithDefaultChild(Guid childId)
+    {
+        var childService = Substitute.For<IChildService>();
+        childService.GetDefaultChildForDeviceAsync(Arg.Any<Guid>())
+            .Returns(new Child { Id = childId, Name = "Անի" });
+        return childService;
+    }
+
+    [Fact]
+    public async Task AudioChat_ModeGate_ChildOverrideOff_GameRequest_ReturnsModeDisabledClip()
+    {
+        // Device-level Game is ON but the default child's override is OFF: the
+        // manifest hid Game for this child, so the voice gate must refuse it
+        // too. Pre-fix the gate passed childId:null and let the game run.
+        var childId = Guid.NewGuid();
+        await using var h = await CreateAsync(childService: ChildServiceWithDefaultChild(childId));
+        h.DeviceService.IsDevicePausedAsync(h.DeviceId).Returns(false);
+        h.DeviceService.IsDeviceInBedtimeWindowAsync(h.DeviceId, Arg.Any<DateTime>()).Returns(false);
+        h.DeviceService.IsModeEnabledForRequestAsync(h.DeviceId, (Guid?)null, DetectedMode.Game).Returns(true);
+        h.DeviceService.IsModeEnabledForRequestAsync(h.DeviceId, childId, DetectedMode.Game).Returns(false);
+        h.Transcription.TranscribeArmenianAsync(
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns("խաղանք");
+        h.Synthesis.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisResult(TtsMp3, MimeMp3));
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        Assert.Equal("1", h.Controller.Response.Headers["X-Areg-Turn-End"].ToString());
+        await h.DeviceService.Received(1).IsModeEnabledForRequestAsync(h.DeviceId, childId, DetectedMode.Game);
+        await h.ChatService.DidNotReceiveWithAnyArgs().GetResponseAsync(
+            default, default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task AudioChat_ModeGate_ChildOverrideOn_DeviceOff_GameRequest_ProceedsToChat()
+    {
+        // Inverse: device-level Game is OFF but the child's override forces it
+        // ON; the manifest offered it, so the voice turn must be allowed.
+        var childId = Guid.NewGuid();
+        await using var h = await CreateAsync(childService: ChildServiceWithDefaultChild(childId));
+        h.DeviceService.IsDevicePausedAsync(h.DeviceId).Returns(false);
+        h.DeviceService.IsDeviceInBedtimeWindowAsync(h.DeviceId, Arg.Any<DateTime>()).Returns(false);
+        h.DeviceService.IsModeEnabledForRequestAsync(h.DeviceId, (Guid?)null, DetectedMode.Game).Returns(false);
+        h.DeviceService.IsModeEnabledForRequestAsync(h.DeviceId, childId, DetectedMode.Game).Returns(true);
+        h.Transcription.TranscribeArmenianAsync(
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns("խաղանք");
+        h.ChatService.GetResponseAsync(h.DeviceId, "խաղանք")
+            .Returns(new ChatResponse(
+                "Հնչեցրու կատվի ձայնը։", Guid.NewGuid(), Guid.NewGuid(),
+                SafetyFlag.Clean, Mode: "game"));
+        h.Synthesis.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisResult(TtsMp3, MimeMp3));
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        await h.ChatService.Received(1).GetResponseAsync(h.DeviceId, "խաղանք");
+    }
+
+    [Fact]
+    public async Task AudioChat_AutoplayContinue_ModeGate_UsesDefaultChild()
+    {
+        // The second gate site (autoplay-continue, Story): the child's Story
+        // override OFF must refuse the continuation, not only the device flag.
+        var childId = Guid.NewGuid();
+        await using var h = await CreateAsync(childService: ChildServiceWithDefaultChild(childId));
+        h.DeviceService.IsDevicePausedAsync(h.DeviceId).Returns(false);
+        h.DeviceService.IsDeviceInBedtimeWindowAsync(h.DeviceId, Arg.Any<DateTime>()).Returns(false);
+        h.DeviceService.IsModeEnabledForRequestAsync(h.DeviceId, (Guid?)null, DetectedMode.Story).Returns(true);
+        h.DeviceService.IsModeEnabledForRequestAsync(h.DeviceId, childId, DetectedMode.Story).Returns(false);
+        h.Synthesis.SynthesizeArmenianAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisResult(TtsMp3, MimeMp3));
+        h.Controller.ControllerContext.HttpContext.Request.Headers["X-Areg-Continue"] = "1";
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result); // the canned mode-disabled clip
+        await h.ChatService.DidNotReceiveWithAnyArgs().ContinueLibraryStoryAsync(default, default, default);
+    }
+
+    // --- B8: STT + chat were paid when TTS fails (AI logic review 2026-10-27) ---
+
+    [Fact]
+    public async Task AudioChat_TtsThrows_SttAndChatSpendStillRecordedOnce()
+    {
+        await using var h = await CreateAsync(
+            costCapEnabled: true,
+            usageTiersOptions: new UsageTiersOptions { Enabled = true });
+        WireHappyPath(h);
+        h.DeviceService.GetUsageAllowanceStatusAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(new UsageAllowanceStatus("free", 1, 1, 999, null, IsExhausted: false));
+        h.Synthesis.SynthesizeArmenianAsync(AssistantText, Arg.Any<CancellationToken>())
+            .Throws(new InvalidOperationException("tts provider failure"));
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.Equal(502, Assert.IsType<ObjectResult>(result).StatusCode);
+        await h.DeviceService.Received(1).RecordUsageQuestionAsync(
+            h.DeviceId, Arg.Is<decimal>(d => d > 0m), Arg.Any<DateTime>());
+        Assert.True(h.CostMeter.GetCurrentTotal(h.DeviceId, DateTime.UtcNow) > 0m);
+    }
+
+    [Fact]
+    public async Task AudioChat_StreamStartThrows_SttAndChatSpendStillRecordedOnce()
+    {
+        await using var h = await CreateAsync(
+            streamingSynthesis: true,
+            costCapEnabled: true,
+            usageTiersOptions: new UsageTiersOptions { Enabled = true });
+        WireHappyPath(h);
+        h.DeviceService.GetUsageAllowanceStatusAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(new UsageAllowanceStatus("free", 1, 1, 999, null, IsExhausted: false));
+        ((IStreamingAudioSynthesisService)h.Synthesis)
+            .SynthesizeArmenianStreamAsync(AssistantText, Arg.Any<CancellationToken>())
+            .Throws(new InvalidOperationException("tts stream start failure"));
+        h.Controller.HttpContext.Request.Headers["X-Areg-Accept-Stream"] = "1";
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.Equal(502, Assert.IsType<ObjectResult>(result).StatusCode);
+        await h.DeviceService.Received(1).RecordUsageQuestionAsync(
+            h.DeviceId, Arg.Is<decimal>(d => d > 0m), Arg.Any<DateTime>());
+        Assert.True(h.CostMeter.GetCurrentTotal(h.DeviceId, DateTime.UtcNow) > 0m);
+    }
+
+    [Fact]
+    public async Task AudioChat_SttThrows_NothingRecorded()
+    {
+        // STT failing means nothing billable happened: no spend to record.
+        await using var h = await CreateAsync(
+            costCapEnabled: true,
+            usageTiersOptions: new UsageTiersOptions { Enabled = true });
+        h.DeviceService.IsDevicePausedAsync(h.DeviceId).Returns(false);
+        h.DeviceService.IsDeviceInBedtimeWindowAsync(h.DeviceId, Arg.Any<DateTime>()).Returns(false);
+        h.DeviceService.GetUsageAllowanceStatusAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(new UsageAllowanceStatus("free", 1, 1, 999, null, IsExhausted: false));
+        h.Transcription.TranscribeArmenianAsync(
+                Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Throws(new InvalidOperationException("stt provider failure"));
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.Equal(502, Assert.IsType<ObjectResult>(result).StatusCode);
+        await h.DeviceService.DidNotReceiveWithAnyArgs().RecordUsageQuestionAsync(default, default, default);
+        Assert.Equal(0m, h.CostMeter.GetCurrentTotal(h.DeviceId, DateTime.UtcNow));
     }
 }

@@ -179,7 +179,9 @@ Unknown values refuse boot. Moderation stays on OpenAI, fail-closed.
   gate chain unclaimed → pause → bedtime → mode (device flag, per-child
   override) → rate limit → daily cost cap → STT → input moderation → model →
   output moderation → TTS. Story-qa streams first byte only when the toy
-  sends `X-Areg-Accept-Stream: 1` (kill switch `StoryQa:StreamAnswerAudio`).
+  sends `X-Areg-Accept-Stream: 1` (kill switch `StoryQa:StreamAnswerAudio`);
+  `/api/chat/audio` streams only under the same header and
+  `AudioChat:StreamReplyAudio` (2026-10-27, B1 — the toy needs Content-Length).
   Both chat endpoints hand `RequestAborted` to `ChatService`: a toy that
   drops mid-turn aborts the moderation/model calls with no assistant row
   stored (the child's own row is written before the model call, as on a
