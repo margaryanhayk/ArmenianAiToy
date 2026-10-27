@@ -191,6 +191,50 @@ public class VoiceIntentTests
         Assert.Equal(expected, IntentOf(await Post(h)));
     }
 
+    // AI logic review 2026-10-27, D1: the menu's fourth option is «…կամ մի բան հարցնել։»; its natural
+    // answers share no ModeDetector starter, so they used to come back unknown.
+    [Theory]
+    [InlineData("Հարցնել")]
+    [InlineData("Մի բան հարցնել")]
+    [InlineData("Հարց")]
+    [InlineData("Հարց ունեմ")]
+    public async Task AskAnswers_ClassifyAsCuriosity_Matched(string transcript)
+    {
+        using var capture = MetricCapture.Start("aat_voice_intent_turn_total");
+        var h = Create();
+        WireTranscript(h, transcript);
+        WireSafe(h);
+
+        Assert.Equal(VoiceIntents.Curiosity, IntentOf(await Post(h)));
+
+        var turn = Assert.Single(capture.Counter("aat_voice_intent_turn_total"));
+        Assert.Equal(VoiceIntentReasons.Matched, turn.Tag("reason"));
+    }
+
+    [Fact]
+    public async Task AskAnswer_RidesTheModeEnabledGateAsCuriosity()
+    {
+        var h = Create(modesEnabled: false);
+        WireTranscript(h, "Հարցնել");
+        WireSafe(h);
+
+        Assert.Equal(VoiceIntents.Unknown, IntentOf(await Post(h)));
+        await h.DeviceService.Received(1).IsModeEnabledForRequestAsync(
+            h.DeviceId, Arg.Any<Guid?>(), DetectedMode.Curiosity);
+    }
+
+    // «Հարցրու ինձ հանելուկ» starts with the ask stem but is a riddle request:
+    // the stem fallback must never override a mode the detector already found.
+    [Fact]
+    public async Task AskStemInsideARiddleRequest_StaysRiddle()
+    {
+        var h = Create();
+        WireTranscript(h, "Հարցրու ինձ հանելուկ");
+        WireSafe(h);
+
+        Assert.Equal(VoiceIntents.Riddle, IntentOf(await Post(h)));
+    }
+
     [Fact]
     public async Task EmptyTranscript_ReturnsUnknown_WithoutModerating()
     {
@@ -308,6 +352,27 @@ public class VoiceIntentTests
     [InlineData("չեմ ուզում լսել")]
     public void DetectYesNo_NegationBeatsAffirmation(string message) =>
         Assert.Equal(YesNo.No, WelcomeIntentDetector.DetectYesNo(message));
+
+    // AI logic review 2026-10-27, D1: pure ask-stem helper behind the voice-intent fallback.
+    [Theory]
+    [InlineData("Հարցնել")]
+    [InlineData("Մի բան հարցնել")]
+    [InlineData("Հարց")]
+    [InlineData("Հարց ունեմ")]
+    [InlineData("Հարց տալ։")]
+    [InlineData("հարցը՞")]
+    public void IsAskIntent_TrueForATokenStartingWithTheAskStem(string message) =>
+        Assert.True(WelcomeIntentDetector.IsAskIntent(message));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("բլբլբլ")]
+    [InlineData("պատմիր հեքիաթ")]
+    [InlineData("ընդհարց")]   // the stem only counts at the START of a token
+    public void IsAskIntent_FalseWithoutAnAskToken(string? message) =>
+        Assert.False(WelcomeIntentDetector.IsAskIntent(message));
 
     [Theory]
     [InlineData(null)]

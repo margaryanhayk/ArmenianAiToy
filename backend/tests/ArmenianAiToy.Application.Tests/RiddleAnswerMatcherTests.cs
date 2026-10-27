@@ -26,6 +26,36 @@ public class RiddleAnswerMatcherTests
         Assert.Equal(RiddleAnswerMatcher.Result.Wrong, RiddleAnswerMatcher.Match(guess, answer));
     }
 
+    // AI logic review 2026-10-27, D2: ChatService stores Normalize(answer), which peels a stem-final
+    // ն/ի off the ANSWER («շուն»→«շու») while an article-bearing guess loses only one layer
+    // («շունը»→«շուն»); a bare short answer with the article («ձին» vs «ձի») hit the 4-char floor.
+    [Theory]
+    [InlineData("Շունը", "շուն")]
+    [InlineData("Լուսինը", "լուսին")]
+    [InlineData("ձին", "ձի")]
+    [InlineData("Դա շունն է", "շուն")]
+    public void Match_AcceptsDefiniteArticleOnStemFinalN(string guess, string answer)
+    {
+        Assert.Equal(RiddleAnswerMatcher.Result.Match, RiddleAnswerMatcher.Match(guess, answer));
+    }
+
+    [Fact]
+    public void Match_AcceptsDefiniteArticleAgainstStoredNormalizedAnswer()
+    {
+        // Exactly what ChatService does: the answer is stored already normalised, Match normalises again.
+        Assert.Equal(
+            RiddleAnswerMatcher.Result.Match,
+            RiddleAnswerMatcher.Match("Շունը", RiddleAnswerMatcher.Normalize("շուն")));
+    }
+
+    [Theory]
+    [InlineData("ձուկ", "կատու")]
+    [InlineData("ձուն", "ձի")]
+    public void Match_ArticleFixDoesNotAcceptUnrelatedWords(string guess, string answer)
+    {
+        Assert.Equal(RiddleAnswerMatcher.Result.Wrong, RiddleAnswerMatcher.Match(guess, answer));
+    }
+
     [Fact]
     public void Match_AcceptsTokenInPhrase()
     {

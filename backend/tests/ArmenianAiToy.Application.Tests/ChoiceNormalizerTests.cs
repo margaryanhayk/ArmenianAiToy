@@ -251,6 +251,50 @@ public class ChoiceNormalizerTests
         Assert.Equal("unknown", r.Normalized);
     }
 
+    // --- AI logic review 2026-10-27, D3: a verbatim label repeat must pick that label ---
+
+    [Theory]
+    [InlineData("Կանչել արջուկին", "option_b")]   // B label verbatim; shares «արջուկին» with A
+    [InlineData("Փնտրել արջուկին", "option_a")]   // A label verbatim
+    [InlineData("Փնտրել արջուկին։", "option_a")]  // same, with the Armenian full stop
+    public void VerbatimLabelRepeat_PicksThatLabel(string input, string expected)
+    {
+        var r = ChoiceNormalizer.Normalize(input, "Փնտրել արջուկին", "Կանչել արջուկին");
+        Assert.Equal(expected, r.Normalized);
+        Assert.Equal("high", r.Confidence);
+        Assert.Equal("exact_label", r.Method);
+    }
+
+    [Fact]
+    public void MoreDistinctOverlappingWords_WinsOverFewer()
+    {
+        // follow + fox overlap A (2), only follow overlaps B (1).
+        var r = ChoiceNormalizer.Normalize("please follow the fox", "Follow the fox", "Follow the bird");
+        Assert.Equal("option_a", r.Normalized);
+        Assert.Equal("keyword_match", r.Method);
+    }
+
+    // --- AI logic review 2026-10-27, D4: Armenian punctuation and filler around a positional word ---
+
+    [Theory]
+    [InlineData("Առաջինը։", "option_a")]
+    [InlineData("Երկրորդը։", "option_b")]
+    [InlineData("Առաջինը, խնդրում եմ", "option_a")]
+    [InlineData("Մեկը։", "option_a")]
+    public void ArmenianPositional_WithPunctuationOrFiller_IsRecognised(string input, string expected)
+    {
+        var r = ChoiceNormalizer.Normalize(input, OptA, OptB);
+        Assert.Equal(expected, r.Normalized);
+        Assert.Equal("positional_hy", r.Method);
+    }
+
+    [Fact]
+    public void ArmenianPositional_BothWordsInOneAnswer_IsUnknown()
+    {
+        var r = ChoiceNormalizer.Normalize("առաջինը երկրորդը", OptA, OptB);
+        Assert.Equal("unknown", r.Normalized);
+    }
+
     // --- Raw input preservation ---
 
     [Fact]
