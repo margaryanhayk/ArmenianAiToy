@@ -58,10 +58,24 @@ public class StoryQaTextDevGateTests
         Assert.True(StoryQaTextDevGate.IsStoryQaTextPath(path));
     }
 
+    // AI logic review 2026-10-27, B12: routing treats a trailing slash as
+    // the same endpoint, so `/api/story-qa-text/` used to bypass the gate
+    // and get ASP.NET's own 400/415 on a malformed body. These now match.
     [Theory]
     [InlineData("/api/story-qa-text/")]
     [InlineData("/api/story-qa-text/extra")]
+    [InlineData("/API/STORY-QA-TEXT/")]
+    public void IsStoryQaTextPath_TrailingSlashAndSubPaths_Match(string path)
+    {
+        Assert.True(StoryQaTextDevGate.IsStoryQaTextPath(path));
+    }
+
+    // Segment-bounded: a sibling route that merely shares the prefix string
+    // is not the harness and must not be swallowed by the gate.
+    [Theory]
     [InlineData("/api/story-qa")]
+    [InlineData("/api/story-qa-textx")]
+    [InlineData("/api/story-qa-text-other")]
     [InlineData("/api/internal/devices")]
     [InlineData("/")]
     [InlineData("")]
