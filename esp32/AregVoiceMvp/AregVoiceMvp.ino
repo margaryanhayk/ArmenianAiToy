@@ -1152,6 +1152,18 @@ static void handle_online_chat_session(uint8_t *payload, size_t payload_len,
             // riddles are not library stories; log and ignore.
             Serial.println("[chat] unexpected continue flag — ignoring");
         }
+        // The last allowed turn's reply has played: do NOT open a listen
+        // window whose recording could never be uploaded (the for-loop's
+        // cap check would discard it silently after a red "I am
+        // listening" light — a lie to the child, F5). Ending right after
+        // the reply is the honest option; payload is nullptr here, so the
+        // post-loop free and transition_to(ST_IDLE) still run.
+        if (!online_session_can_listen_after(turn_no, AREG_CHAT_SESSION_MAX_TURNS)) {
+            Serial.printf("[chat] turn cap (%d) reached — session over\n",
+                          AREG_CHAT_SESSION_MAX_TURNS);
+            Serial.flush();
+            break;
+        }
 
         // The child's turn: press-to-talk within the window. Longer
         // window than the welcome menu — a game answer may need a
@@ -1394,6 +1406,14 @@ static void handle_welcome_flow(bool child_present) {
             // Barge-in allowed: an impatient child pressing during the
             // hello should move things along, not be ignored.
             audio_play_story_file(greeting, 0, story_barge_in_poll, nullptr);
+#if AREG_HAS_ANSWER_BUTTONS
+            // A GREEN/RED press during the hello is "move along", not a
+            // browse request: story_barge_in_poll() parks the colour in
+            // s_browse_request and only the story session consumes it,
+            // so without this line the NEXT story would skip its
+            // rotation bookkeeping and hop to a neighbour (F1b).
+            s_browse_request = 0;
+#endif
         }
     }
 

@@ -34,6 +34,17 @@ int main() {
     check(online_session_turn_cap_reached(1, 0), "zero cap fails closed");
     check(online_session_turn_cap_reached(1, -1), "negative cap fails closed");
 
+    // --- listen window after a reply (F5) ---
+    check(online_session_can_listen_after(1, 12), "after turn 1 of 12: listen");
+    check(online_session_can_listen_after(11, 12), "after turn 11 of 12: listen (turn 12 may run)");
+    check(!online_session_can_listen_after(12, 12),
+          "after the LAST allowed turn: no listen window (nothing could be uploaded)");
+    check(!online_session_can_listen_after(13, 12), "past the cap: no listen window");
+    check(!online_session_can_listen_after(1, 0), "zero cap: never listen");
+    check(!online_session_can_listen_after(1, -1), "negative cap: never listen");
+    check(online_session_can_listen_after(1, 2) && !online_session_can_listen_after(2, 2),
+          "bench setting MAX_TURNS=2: red LED after reply 1, none after reply 2");
+
     // --- Ending right after a turn's reply ---
     check(online_session_ends_after_reply(/*upload_ok=*/false, /*turn_ended=*/false),
           "upload failure always ends the session");

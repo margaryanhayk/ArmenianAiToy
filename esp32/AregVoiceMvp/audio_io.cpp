@@ -427,13 +427,19 @@ bool audio_play_story_stream(const char *url,
             uint32_t abs_pos = base_offset + (uint32_t)http.getPos();
             // Back up past the decoded-but-unplayed I2S-buffered tail so
             // resume lands at the audible pause point (overlap, not skip).
-            *out_resume_offset = (abs_pos > AREG_STORY_RESUME_FUDGE_BYTES)
+            const uint32_t resume_from = (abs_pos > AREG_STORY_RESUME_FUDGE_BYTES)
                 ? (abs_pos - AREG_STORY_RESUME_FUDGE_BYTES) : 0;
+            // out_resume_offset is OPTIONAL (the welcome greeting and the
+            // bedtime music pass nullptr: a press there ends the clip, it
+            // never resumes). Writing through a null pointer here was a
+            // StoreProhibited panic on the first thing every menu plays
+            // (AI logic review 2026-10-27, F1).
+            if (out_resume_offset != nullptr) *out_resume_offset = resume_from;
             mp3.stop();
             interrupted = true;
             Serial.printf("[story] barge-in: base=%u rel_pos=%u abs=%u resume_from=%u\n",
                           (unsigned)base_offset, (unsigned)http.getPos(),
-                          (unsigned)abs_pos, (unsigned)*out_resume_offset);
+                          (unsigned)abs_pos, (unsigned)resume_from);
             Serial.flush();
             break;
         }
@@ -637,12 +643,15 @@ bool audio_play_story_file(const char *path,
             uint32_t abs_pos = (uint32_t)file.getPos();
             // Back up past the decoded-but-unplayed I2S-buffered tail so resume
             // lands at the audible pause point (overlap, not skip).
-            *out_resume_offset = (abs_pos > AREG_STORY_RESUME_FUDGE_BYTES)
+            const uint32_t resume_from = (abs_pos > AREG_STORY_RESUME_FUDGE_BYTES)
                 ? (abs_pos - AREG_STORY_RESUME_FUDGE_BYTES) : 0;
+            // Same optional-pointer rule as the stream variant above: the
+            // greeting and bedtime-music callers pass nullptr (F1).
+            if (out_resume_offset != nullptr) *out_resume_offset = resume_from;
             mp3.stop();
             interrupted = true;
             Serial.printf("[story] SD barge-in: abs=%u resume_from=%u\n",
-                          (unsigned)abs_pos, (unsigned)*out_resume_offset);
+                          (unsigned)abs_pos, (unsigned)resume_from);
             Serial.flush();
             break;
         }

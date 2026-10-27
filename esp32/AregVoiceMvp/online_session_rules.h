@@ -24,6 +24,15 @@ inline bool online_session_turn_cap_reached(int turn_no, int max_turns) {
     return max_turns <= 0 || turn_no > max_turns;
 }
 
+// After turn `turn_no`'s reply has played, may the loop open a listen
+// window? Only if turn (turn_no + 1) would still be allowed to upload —
+// a recording the cap would then discard must never be invited (the LED
+// said "I am listening"; the child answered; nothing happened). Same
+// decision as the loop head, asked one turn early.
+inline bool online_session_can_listen_after(int turn_no, int max_turns) {
+    return !online_session_turn_cap_reached(turn_no + 1, max_turns);
+}
+
 // --- Ending right after a turn's reply played -------------------------
 //
 // True when the session must end BEFORE ever opening a listen window:

@@ -246,6 +246,10 @@ uint16_t s_fail_streak     = 0;        // persisted; survives a panic
 // within a boot (the sweep itself runs at most once per boot).
 int s_last_retired_deleted = 0;
 int s_last_orphans_swept   = 0;
+// Per-ITEM failures across EVERY namespace this attempt (clips, voice,
+// music, games, the games work-list alloc). The narration counter in
+// content_sync_run() is separate; both feed cs_sync_verdict() (F6).
+int s_item_failures        = 0;
 
 void set_status(const char *status, const char *reason) {
     snprintf(s_last_status, sizeof(s_last_status), "%s", status);
@@ -261,6 +265,9 @@ void fail(const char *reason) {
 void story_fail(const char *story_id, const char *reason) {
     // Per-ITEM failure. Deliberately does not overwrite a "failed" verdict:
     // "the whole attempt died" outranks "one file of many did not land".
+    // Counted so the final verdict cannot overwrite this "partial" with
+    // "ok" when only the narration counter is clean (F6).
+    s_item_failures++;
     if (strcmp(s_last_status, "failed") != 0) set_status("partial", reason);
     Serial.printf("[content-sync] story %s FAILED (%s)\n", story_id, reason);
     Serial.flush();
@@ -1492,6 +1499,7 @@ void sync_games(JsonDocument &manifest_doc, JsonArrayConst games) {
             free(work);
             free(prevs);
             manifest_doc.clear();
+            s_item_failures++;   // counted: the verdict must stay "partial" (F6)
             if (strcmp(s_last_status, "failed") != 0) {
                 set_status("partial", "games_alloc_failed");
             }
@@ -1647,6 +1655,7 @@ void content_sync_run() {
     s_voice_active_count   = 0;
     s_games_index.clear();
     s_games_active_count = 0;
+    s_item_failures = 0;
 
     // ---- 1. Manifest ----
     HTTPClient http;
@@ -1892,10 +1901,6 @@ void content_sync_run() {
     } else {
         Serial.println("[content-sync] index written");
     }
-    // The streamed games array is only needed until the index is on disk;
-    // releasing it here gives the ~90-entry document's heap back for the
-    // rest of the boot (a TLS handshake during audio wants 40-50 KB).
-    s_games_index.clear();
     // Re-read what is now on the card so the next heartbeat reports the
     // library the child will actually hear. Reads the INDEX rather than
     // s_active[] on purpose — see content_report.h.
@@ -1908,6 +1913,15 @@ void content_sync_run() {
     if (index_written) {
         content_orphan_sweep_run();
     }
+    // The streamed games array is only needed until the index is on disk
+    // AND the sweep has read it: cleared AFTER the sweep, because
+    // game_file_is_referenced() iterates s_games_index — clearing first
+    // made every game clip look unreferenced and deleted up to
+    // AREG_ORPHAN_SWEEP_MAX_PER_BOOT of them per boot (F3). Releasing it
+    // here still gives the ~90-entry document back for the rest of the
+    // boot; it lives in PSRAM (g_json_psram), so holding it one call
+    // longer costs no internal heap.
+    s_games_index.clear();
     Serial.flush();
 
     // ---- 6. Aggregate result (no credentials, no URLs, no headers) ----
@@ -1930,20 +1944,31 @@ void content_sync_run() {
     Serial.printf("[content-sync] heap after=%u\n", (unsigned)ESP.getFreeHeap());
     Serial.flush();
 
-    if (failed > 0) {
+    // One verdict for the whole attempt — pure rule in content_sync_rules.h
+    // (host-tested). A whole-attempt "failed" set earlier (fail()) outranks
+    // everything; per-item failures in ANY namespace give "partial" (F6:
+    // the old verdict looked only at the narration counter, so a sync with
+    // every story fine and 78 game clips missing reported "ok" and waited
+    // the clean 6 h instead of the 5 min backoff).
+    const bool whole_failed = strcmp(s_last_status, "failed") == 0;
+    const char *verdict = cs_sync_verdict(whole_failed, failed, s_item_failures,
+                                          index_written);
+    if (strcmp(verdict, "partial") == 0) {
         // story_fail() already recorded WHICH reason; only the verdict is set
-        // here, and never over a whole-attempt "failed".
-        if (strcmp(s_last_status, "failed") != 0) {
-            snprintf(s_last_status, sizeof(s_last_status), "partial");
+        // here.
+        snprintf(s_last_status, sizeof(s_last_status), "partial");
+        Serial.printf("[content-sync] PARTIAL (%d ok, %d stories failed, %d items failed)\n",
+                      already + downloaded, failed, s_item_failures);
+    } else if (strcmp(verdict, "failed") == 0) {
+        if (!whole_failed) {
+            // Everything downloaded but the card would not take the index.
+            // The next boot re-reads the OLD index and re-downloads the
+            // lot, so this is a failure however well the transfers went.
+            set_status("failed", "index_write_failed");
+            Serial.println("[content-sync] FAILED (index not written)");
+        } else {
+            Serial.println("[content-sync] FAILED");
         }
-        Serial.printf("[content-sync] PARTIAL (%d ok, %d failed)\n",
-                      already + downloaded, failed);
-    } else if (!index_written) {
-        // Everything downloaded but the card would not take the index. The
-        // next boot re-reads the OLD index and re-downloads the lot, so this
-        // is a failure however well the transfers went.
-        set_status("failed", "index_write_failed");
-        Serial.println("[content-sync] FAILED (index not written)");
     } else {
         set_status("ok", "");
         Serial.println("[content-sync] PASS");
