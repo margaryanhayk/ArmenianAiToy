@@ -1,6 +1,6 @@
 ---
 name: "backend-implementer"
-description: "Use this agent to execute an approved implementation plan. It writes C# code, DTOs, services, controllers, and tests. It ONLY works from an approved plan — never launch it without a plan.\n\nExamples:\n\n- Context: A plan for adding story memory injection has been approved.\n  Assistant: \"The plan is approved. Let me launch the backend-implementer agent to execute it.\"\n\n- Context: A plan for new ConversationService tests has been approved.\n  Assistant: \"I'll use the backend-implementer agent to write the tests per the approved plan.\"\n\n- Context: A plan for a new DTO and endpoint has been approved.\n  Assistant: \"Let me have the backend-implementer agent implement the approved changes.\""
+description: "Executes an APPROVED implementation plan: C# code, DTOs, services, controllers and tests. Never launch it without a plan."
 model: opus
 color: purple
 ---

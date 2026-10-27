@@ -20,7 +20,8 @@ namespace ArmenianAiToy.Application.Helpers;
 ///   - RawInput is ALWAYS preserved verbatim.
 ///   - If no heuristic matches clearly, Normalized is "unknown".
 ///   - "unknown" is not an error; callers must handle it gracefully.
-///   - Keyword matching returns "unknown" when input matches BOTH labels.
+///   - Keyword matching returns "unknown" when input matches BOTH labels equally;
+///     the label with strictly more distinct matching words wins.
 ///   - Armenian yes/no ("ayo", "voch") are NOT mapped — too ambiguous.
 /// </summary>
 public static class ChoiceNormalizer
@@ -68,13 +69,28 @@ public static class ChoiceNormalizer
         "that", "this", "me", "my", "is", "to", "in", "on", "of",
     ];
 
-    // Punctuation that children commonly append to short replies.
-    private static readonly char[] TrailingPunctuation = ['.', ',', '!', '?', ';', ':'];
+    // Punctuation that children commonly append to short replies. The Armenian
+    // verjaket ։ (U+0589) and the marks ՞ ՜ ՝ (U+055E/055C/055D) are included
+    // (AI logic review 2026-10-27, D4: «Առաջինը։» used to miss the positional check).
+    private static readonly char[] TrailingPunctuation =
+        ['.', ',', '!', '?', ';', ':', '\u0589', '\u055E', '\u055C', '\u055D'];
 
     public static ChoiceResult Normalize(
         string rawInput, string optionALabel, string optionBLabel)
     {
         var text = rawInput.Trim().ToLowerInvariant().TrimEnd(TrailingPunctuation);
+
+        // 0. Exact label repeat (AI logic review 2026-10-27, D3). A child who repeats one label
+        //    verbatim shares words with the OTHER label too, which used to make it "unknown".
+        if (text.Length > 0)
+        {
+            var exactA = text == LabelKey(optionALabel);
+            var exactB = text == LabelKey(optionBLabel);
+            if (exactA && !exactB)
+                return new ChoiceResult(rawInput, "option_a", "high", "exact_label");
+            if (exactB && !exactA)
+                return new ChoiceResult(rawInput, "option_b", "high", "exact_label");
+        }
 
         // 1a. English positional (multi-char)
         if (PositionalA.Contains(text))
@@ -104,28 +120,42 @@ public static class ChoiceNormalizer
         if (ArmenianPositionalB.Contains(text))
             return new ChoiceResult(rawInput, "option_b", "high", "positional_hy");
 
-        // 3. Keyword overlap (conservative: ambiguous both-match -> unknown)
-        var matchA = WordsOverlap(text, optionALabel);
-        var matchB = WordsOverlap(text, optionBLabel);
-        if (matchA && !matchB)
+        // 2b. Armenian positional, word-level (AI logic review 2026-10-27, D4): «Առաջինը, խնդրում եմ».
+        //     Mirrors 1c; one-sided only, so «առաջինը երկրորդը» stays unknown.
+        var hasArmenianA = words.Any(w => ArmenianPositionalA.Contains(w));
+        var hasArmenianB = words.Any(w => ArmenianPositionalB.Contains(w));
+        if (hasArmenianA && !hasArmenianB)
+            return new ChoiceResult(rawInput, "option_a", "high", "positional_hy");
+        if (hasArmenianB && !hasArmenianA)
+            return new ChoiceResult(rawInput, "option_b", "high", "positional_hy");
+
+        // 3. Keyword overlap (conservative: a tie, including both-match 1:1 -> unknown;
+        //    AI logic review 2026-10-27, D3: strictly more distinct matching words wins)
+        var matchA = DistinctOverlapCount(text, optionALabel);
+        var matchB = DistinctOverlapCount(text, optionBLabel);
+        if (matchA > matchB)
             return new ChoiceResult(rawInput, "option_a", "low", "keyword_match");
-        if (matchB && !matchA)
+        if (matchB > matchA)
             return new ChoiceResult(rawInput, "option_b", "low", "keyword_match");
 
         // 4. Unknown
         return new ChoiceResult(rawInput, "unknown", "low", "no_match");
     }
 
-    private static bool WordsOverlap(string text, string label)
+    private static string LabelKey(string label) =>
+        label.Trim().ToLowerInvariant().TrimEnd(TrailingPunctuation);
+
+    private static int DistinctOverlapCount(string text, string label)
     {
         var labelLower = label.ToLowerInvariant();
         var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var seen = new HashSet<string>();
         foreach (var w in words)
         {
             if (w.Length >= 3 && !StopWords.Contains(w) && labelLower.Contains(w))
-                return true;
+                seen.Add(w);
         }
-        return false;
+        return seen.Count;
     }
 }
 

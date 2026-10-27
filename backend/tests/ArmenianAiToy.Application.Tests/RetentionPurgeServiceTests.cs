@@ -1244,7 +1244,9 @@ public class RetentionPurgeServiceTests
         await h.Service.RunTickAsync(CancellationToken.None);
 
         var row = await h.Db.Set<Parent>().AsNoTracking().FirstAsync(p => p.Id == parentId);
-        Assert.Equal("", row.Email);
+        // AI logic review 2026-10-27, E3: unique per-row placeholder, not "".
+        Assert.StartsWith("anonymized-", row.Email);
+        Assert.EndsWith("@anonymized.invalid", row.Email);
         Assert.Equal("", row.PasswordHash);
         Assert.Null(row.GoogleSubject);
         Assert.Null(row.LastLoginAt);
@@ -1536,6 +1538,37 @@ public class RetentionPurgeServiceTests
     }
 
     [Fact]
+    public async Task AnonymizePass_TwoEligibleParents_BothAnonymized_NoUniqueViolation()
+    {
+        // AI logic review 2026-10-27, E3: Parents.Email has an UNFILTERED
+        // unique index, and the pass used to scrub every row to the same ""
+        // sentinel, so the second anonymized parent threw a UNIQUE violation
+        // and wedged the whole tick. Default batch size: both must go through.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateHarnessAsync(
+            dormancyWarnAfterDays: 180,
+            dormancyAnonymizeAfterDays: 60,
+            notifier: notifier);
+        var p1 = SeedParent(h.Db,
+            lastLoginAt: DateTime.UtcNow.AddDays(-260),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-30));
+        var p2 = SeedParent(h.Db,
+            lastLoginAt: DateTime.UtcNow.AddDays(-250),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-30));
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        var rows = await h.Db.Set<Parent>().AsNoTracking()
+            .Where(p => p.Id == p1 || p.Id == p2)
+            .ToListAsync();
+        Assert.Equal(2, rows.Count);
+        Assert.All(rows, r => Assert.NotNull(r.AnonymizedAt));
+        Assert.All(rows, r => Assert.StartsWith("anonymized-", r.Email));
+        Assert.Equal(2, rows.Select(r => r.Email).Distinct().Count());
+    }
+
+    [Fact]
     public async Task AnonymizePass_BatchSizeCapRespected()
     {
         // FINDING 2 regression pin. Three eligible parents, cap of 1:
@@ -1543,18 +1576,10 @@ public class RetentionPurgeServiceTests
         // tick; the other two are left untouched — still eligible, and
         // will be picked up on a future tick, never silently dropped.
         //
-        // Deliberately capped at 1 and exercised for ONE tick only,
-        // unlike the sibling batch-cap tests in this file (which run a
-        // second tick to completion): Parents.Email carries an
-        // UNFILTERED unique index (AppDbContext.cs), and anonymize
-        // scrubs Email to the same "" sentinel for every row it
-        // touches. A second parent anonymized to "" in ANY tick — via
-        // this cap or via the pre-existing uncapped code path, this
-        // batch-cap fix changes neither — collides on that constraint.
-        // That is a pre-existing Domain-entity limitation this slice
-        // is barred from touching (CLAUDE.md hard stop: no Domain
-        // entity changes without a plan and owner approval); reported
-        // to the owner separately rather than routed around here.
+        // (The one-tick-only limit this test used to carry was a workaround
+        // for every anonymized row sharing Email = "" against the unique
+        // index; AI logic review 2026-10-27, E3 gave each row a unique
+        // placeholder, so a second tick now runs to completion below.)
         //
         // Also leaves Dormancy:Parent:WarnAfterDays unset (falls back
         // to 0, warn pass disabled) so the warn pass does not run in
@@ -1600,6 +1625,19 @@ public class RetentionPurgeServiceTests
             .Where(a => a.EventType == AuditEventType.ParentDormancyAnonymized)
             .ToListAsync();
         Assert.Single(audits);
+
+        // Second tick: the next-oldest parent is anonymized too (the case
+        // that used to collide on the unique Email index); p3 waits its turn.
+        await h.Service.RunTickAsync(CancellationToken.None);
+        var afterSecond = await h.Db.Set<Parent>().AsNoTracking()
+            .Where(p => p.AnonymizedAt != null)
+            .Select(p => p.Id)
+            .ToListAsync();
+        Assert.Equal(2, afterSecond.Count);
+        Assert.Contains(p1, afterSecond);
+        Assert.Contains(p2, afterSecond);
+        Assert.Null((await h.Db.Set<Parent>().AsNoTracking()
+            .FirstAsync(p => p.Id == p3)).AnonymizedAt);
     }
 
     [Fact]
@@ -2434,6 +2472,36 @@ public class RetentionPurgeServiceTests
         Assert.Equal(0, (int)meta["children_deleted"]!);
         Assert.Equal(0, (int)meta["conversations_deleted"]!);
         Assert.Equal(0, (int)meta["messages_deleted"]!);
+    }
+
+    [Fact]
+    public async Task DeviceDeletePass_WarnedBeforeLastSeen_IsNotDeleted()
+    {
+        // AI logic review 2026-10-27, E7: the warning is from an EARLIER
+        // dormancy (warned 60 d ago, then the toy came back at 40 d ago and
+        // went quiet again). Refire 90 keeps the warn pass from restamping
+        // it this tick, so the delete pass sees a stale stamp that is past
+        // the grace — it must not treat it as warning for THIS dormancy.
+        var notifier = new CapturingNotifier();
+        await using var h = await CreateDeviceWarnHarnessAsync(
+            devicesWarnAfterDays: 30,
+            devicesRefireIntervalDays: 90,
+            devicesDeleteAfterDays: 30,
+            notifier: notifier);
+        var deviceId = SeedDeviceWithLastSeen(h.Db,
+            lastSeen: DateTime.UtcNow.AddDays(-40),
+            dormancyWarnedAt: DateTime.UtcNow.AddDays(-60));
+        var parentId = SeedParentSimple(h.Db, emailVerified: true);
+        LinkParentToDevice(h.Db, parentId, deviceId);
+        await h.Db.SaveChangesAsync();
+
+        await h.Service.RunTickAsync(CancellationToken.None);
+
+        Assert.NotNull(await h.Db.Set<Device>().AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == deviceId));
+        Assert.Empty(await h.Db.Set<AuditEvent>().AsNoTracking()
+            .Where(a => a.EventType == AuditEventType.DeviceDormancyDeleted)
+            .ToListAsync());
     }
 
     [Fact]

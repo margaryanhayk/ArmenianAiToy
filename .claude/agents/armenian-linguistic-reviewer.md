@@ -1,6 +1,6 @@
 ---
 name: "armenian-linguistic-reviewer"
-description: "Use this agent when Armenian-facing text needs linguistic review — system prompts, story output, choice labels, UI strings, or any child-facing Armenian content. This includes reviewing GPT-4o prompt templates that produce Armenian output, evaluating generated Armenian story samples, and polishing choice labels or narrator text.\\n\\nExamples:\\n\\n- User: \"I updated the story mode system prompt, can you check the Armenian parts?\"\\n  Assistant: \"Let me use the Armenian linguistic reviewer agent to evaluate the Armenian text quality in the updated prompt.\"\\n\\n- User: \"Here are some sample outputs from the story engine — do they sound natural?\"\\n  Assistant: \"I'll launch the Armenian linguistic reviewer agent to check these samples for naturalness and child-friendliness.\"\\n\\n- User: \"I wrote new choice labels for the branching story: 'CHOICE_A: Գնանք անտառ' / 'CHOICE_B: Մնանք տանը'\"\\n  Assistant: \"Let me use the Armenian linguistic reviewer agent to evaluate whether these choice labels sound natural and engaging for children.\"\\n\\n- User: \"I'm adding a new calm mode greeting in Armenian.\"\\n  Assistant: \"I'll use the Armenian linguistic reviewer agent to review the greeting for tone, naturalness, and age-appropriateness.\""
+description: "Linguistic review of any Armenian-facing text (prompts, story output, choice labels, UI strings) for naturalness, grammar and child-friendliness."
 model: sonnet
 color: yellow
 memory: project

@@ -261,6 +261,18 @@ public class ParentServiceDeviceInviteTests
         Assert.True(await service.RedeemDeviceInviteAsync(ownerId, issued!.Code));
 
         Assert.Equal(1, await db.Set<ParentDevice>().CountAsync(pd => pd.DeviceId == deviceId));
+
+        // AI logic review 2026-10-27, E14: a no-op redeem must not burn the
+        // code that was made for the other household member.
+        var row = Assert.Single(await db.Set<DeviceInvite>().ToListAsync());
+        Assert.Null(row.ConsumedAt);
+        Assert.Null(row.ConsumedByParentId);
+        Assert.DoesNotContain(await db.Set<AuditEvent>().ToListAsync(),
+            a => a.EventType == AuditEventType.ParentDeviceInviteRedeemed);
+
+        var spouse = NewParent(db, "spouse@x.com");
+        Assert.True(await service.RedeemDeviceInviteAsync(spouse, issued.Code));
+        Assert.Equal(2, await db.Set<ParentDevice>().CountAsync(pd => pd.DeviceId == deviceId));
     }
 
     // ------------------------------------------------------------- redeeming

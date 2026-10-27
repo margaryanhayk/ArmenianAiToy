@@ -1,9 +1,11 @@
 using System.Text.Json;
 using ArmenianAiToy.Api.Controllers;
 using ArmenianAiToy.Api.Observability;
+using ArmenianAiToy.Api.Security;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Domain.Entities;
 using ArmenianAiToy.Infrastructure.Data;
+using ArmenianAiToy.Infrastructure.Notifications;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -91,7 +93,9 @@ public class InternalSystemControllerTests
             ("ForwardedHeaders:Enabled", "true"),
             ("Alerts:WebhookUrl", "https://hooks.example/x"),
             ("OpenAI:DailyCostCap:Enabled", "true"),
-            ("OpenAI:DailyCostCap:Global", "5")), isDevelopment: false, Now);
+            ("OpenAI:DailyCostCap:Global", "5"),
+            ("Notifications:Transport", "resend"),
+            ("Devices:ProvisioningSecret", "pilot-secret")), isDevelopment: false, Now);
 
         Assert.Empty(r.Checks);
     }
@@ -107,13 +111,276 @@ public class InternalSystemControllerTests
             ("OpenAI:ApiKey", openAi), ("GEMINI_API_KEY", gemini),
             ("ElevenLabs:ApiKey", eleven), ("Alerts:WebhookUrl", webhook),
             ("Gemini:Vertex:ServiceAccountJson", "{\"private_key\":\"SECRETVALUE\"}"),
-            ("Metrics:ScrapeToken", "SECRETVALUE")), isDevelopment: false, Now);
+            ("Metrics:ScrapeToken", "SECRETVALUE"),
+            // Family-pilot rows (2026-10-22): every one of these is a secret
+            // or an identifier the report must reduce to a yes/no.
+            ("Notifications:Transport", "resend"),
+            ("Notifications:Resend:ApiKey", "re_SECRETVALUE_resend"),
+            ("Notifications:Smtp:Password", "SECRETVALUE-smtp"),
+            ("Devices:ProvisioningSecret", "SECRETVALUE-provisioning"),
+            ("GoogleAuth:ClientId", "1234-SECRETVALUE.apps.googleusercontent.com"),
+            ("FirmwareUpdate:SigningKey", "SECRETVALUE-hmac"),
+            ("FirmwareUpdate:ImagePath", "/app/SECRETVALUE/areg-current.bin"),
+            ("AllowedHosts", "SECRETVALUE.example.com")), isDevelopment: false, Now);
 
         Assert.DoesNotContain("SECRETVALUE", Json(r));
         Assert.True(r.Configured["openaiKey"]);
         Assert.True(r.Configured["geminiKey"]);   // env-name fallback, as in DI
         Assert.True(r.Configured["elevenLabsKey"]);
         Assert.True(r.Configured["alertsWebhook"]);
+    }
+
+    [Fact]
+    public void Report_FamilyPilotRows_ArePresenceBooleans_AndTheTransportIsAName()
+    {
+        var on = SystemStatusReport.Build(Config(
+            ("Notifications:Transport", " Resend "),
+            ("RESEND_API_KEY", "re_SECRETVALUE"),            // provider-style alias, as ResendNotifier accepts
+            ("Devices:ProvisioningSecret", "SECRETVALUE"),
+            ("GoogleAuth:ClientId", "cid-SECRETVALUE"),
+            ("FirmwareUpdate:Enabled", "true"),
+            ("FirmwareUpdate:ImagePath", "/app/firmware/areg-current.bin"),
+            ("ContentSync:Enabled", "true"),
+            ("AllowedHosts", "api.example.com;example.com"),
+            ("Security:RequireHttps", "true")), isDevelopment: false, Now);
+
+        foreach (var key in new[] { "notificationsKey", "provisioningSecret", "googleClientId",
+                     "firmwareUpdateEnabled", "firmwareImagePath", "contentSyncEnabled",
+                     "allowedHostsPinned", "requireHttps" })
+            Assert.True(on.Configured[key], key);
+        Assert.Equal("resend", on.Settings["notificationsTransport"]); // trimmed, lower-cased name
+        Assert.DoesNotContain("SECRETVALUE", Json(on));
+
+        var off = SystemStatusReport.Build(Config(
+            ("AllowedHosts", "*"),
+            ("FirmwareUpdate:ImagePath", "relative/areg-current.bin")), isDevelopment: false, Now);
+        foreach (var key in new[] { "notificationsKey", "provisioningSecret", "googleClientId",
+                     "firmwareUpdateEnabled", "firmwareImagePath", "contentSyncEnabled",
+                     "allowedHostsPinned", "requireHttps" })
+            Assert.False(off.Configured[key], key);                    // "*" is not pinned; relative is not absolute
+        Assert.Equal("log", off.Settings["notificationsTransport"]);   // unset = log, as the selector resolves it
+    }
+
+    [Fact]
+    public void Report_SmtpPassword_CountsAsANotificationsKey()
+    {
+        var r = SystemStatusReport.Build(Config(
+            ("Notifications:Transport", "smtp"),
+            ("Notifications:Smtp:Password", "SECRETVALUE")), isDevelopment: false, Now);
+
+        Assert.True(r.Configured["notificationsKey"]);
+        Assert.Equal("smtp", r.Settings["notificationsTransport"]);
+        Assert.DoesNotContain("SECRETVALUE", Json(r));
+    }
+
+    [Fact]
+    public void Report_UnrecognisedTransport_IsNeverEchoed()
+    {
+        // A value pasted into the wrong variable must not surface; the boot
+        // refuses it anyway, the report just stays honest and non-throwing.
+        var r = SystemStatusReport.Build(Config(
+            ("Notifications:Transport", "re_SECRETVALUE_pasted_key")), isDevelopment: false, Now);
+
+        Assert.Equal("unrecognised", r.Settings["notificationsTransport"]);
+        Assert.DoesNotContain("SECRETVALUE", Json(r));
+    }
+
+    [Theory]
+    [InlineData(false, "log", true)]       // production, default transport: the owner must act
+    [InlineData(false, "", true)]          // unset resolves to log
+    [InlineData(false, "resend", false)]
+    [InlineData(false, "smtp", false)]
+    [InlineData(true, "log", false)]       // Development: stdout mail is the point
+    public void Report_EmailLogOnly_FiresOnlyOutsideDevelopmentOnTheLogTransport(
+        bool isDevelopment, string transport, bool expected)
+    {
+        var r = SystemStatusReport.Build(Config(("Notifications:Transport", transport)), isDevelopment, Now);
+
+        Assert.Equal(expected, r.Checks.Any(c => c.Code == "email_log_only" && c.Level == SystemStatusReport.Warn));
+    }
+
+    [Theory]
+    [InlineData(false, null, false, true)]     // production, no secret: warn
+    [InlineData(false, "  ", false, false)]    // the gate treats ANY non-empty string as the secret (header must equal it), so the report must too
+    [InlineData(false, "", false, true)]       // empty = unset, for gate and report alike
+    [InlineData(false, "pilot-secret", false, false)]
+    [InlineData(true, null, false, false)]     // Development: bench registers openly
+    [InlineData(false, null, true, true)]      // open registration does not make the gap OK, only worse
+    public void Report_ProvisioningSecretMissing_FiresOnlyOutsideDevelopmentWithoutASecret(
+        bool isDevelopment, string? secret, bool openRegistration, bool expected)
+    {
+        var r = SystemStatusReport.Build(Config(
+            ("Devices:ProvisioningSecret", secret),
+            ("Devices:AllowOpenRegistration", openRegistration.ToString())), isDevelopment, Now);
+
+        var check = r.Checks.SingleOrDefault(c => c.Code == "provisioning_secret_missing");
+        Assert.Equal(expected, check is not null);
+        if (check is not null) Assert.Equal(SystemStatusReport.Warn, check.Level);
+    }
+
+    // ---- review fixes (2026-10-27) ----
+
+    private static readonly string[] BoolBackedRows =
+    {
+        "forwardedHeaders", "firmwareUpdateEnabled", "contentSyncEnabled", "requireHttps",
+    };
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("yes")]
+    [InlineData("on")]
+    [InlineData("enabled")]
+    [InlineData("")]
+    public void Report_NonBooleanFlagValues_NeverThrow_AndReadAsOff(string value)
+    {
+        // Railway Variables are free text. IConfiguration.GetValue<bool> throws
+        // on these; the paths this report mirrors (bool.TryParse) read them as
+        // off, so the report must not throw AND must agree with them.
+        var r = SystemStatusReport.Build(Config(
+            ("ForwardedHeaders:Enabled", value),
+            ("FirmwareUpdate:Enabled", value),
+            ("ContentSync:Enabled", value),
+            ("Security:RequireHttps", value),
+            ("Devices:AllowOpenRegistration", value)), isDevelopment: false, Now);
+
+        foreach (var key in BoolBackedRows)
+            Assert.False(r.Configured[key], key);
+        // AllowOpenRegistration "1"/"yes" is NOT open registration (DeviceController
+        // uses bool.TryParse), so the check must say registration is refused.
+        var check = Assert.Single(r.Checks, c => c.Code == "provisioning_secret_missing");
+        Assert.Contains("refused", check.Message);
+        Assert.DoesNotContain("anyone can mint", check.Message);
+        Assert.Contains(r.Checks, c => c.Code == "forwarded_headers");
+    }
+
+    [Theory]
+    [InlineData("true")]
+    [InlineData("True")]
+    [InlineData(" TRUE ")]
+    public void Report_BooleanFlagValues_ReadLikeTheMirroredPaths(string value)
+    {
+        // bool.TryParse is case-insensitive and trims; so does the report.
+        var r = SystemStatusReport.Build(Config(
+            ("ForwardedHeaders:Enabled", value),
+            ("FirmwareUpdate:Enabled", value),
+            ("ContentSync:Enabled", value),
+            ("Security:RequireHttps", value),
+            ("Devices:AllowOpenRegistration", value)), isDevelopment: false, Now);
+
+        foreach (var key in BoolBackedRows)
+            Assert.True(r.Configured[key], key);
+        var check = Assert.Single(r.Checks, c => c.Code == "provisioning_secret_missing");
+        Assert.Contains("anyone can mint", check.Message);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("x")]
+    public void Report_ProvisioningSecretRow_AlwaysAgreesWithTheRegistrationGate(string? secret)
+    {
+        // What the gate does with this value, observed through its own
+        // function: with open registration ON, a request carrying no header is
+        // allowed only when the gate sees NO secret configured.
+        var gateSeesNoSecret = DeviceProvisioningAuth.Evaluate(
+            presentedSecret: null, configuredSecret: secret, allowOpenRegistration: true)
+            == DeviceProvisioningAuth.Decision.Allow;
+
+        var r = SystemStatusReport.Build(Config(
+            ("Devices:ProvisioningSecret", secret)), isDevelopment: false, Now);
+
+        Assert.Equal(!gateSeesNoSecret, r.Configured["provisioningSecret"]);
+        Assert.Equal(gateSeesNoSecret, r.Checks.Any(c => c.Code == "provisioning_secret_missing"));
+        Assert.Equal(!gateSeesNoSecret, DeviceProvisioningAuth.IsSecretConfigured(secret));
+    }
+
+    [Theory]
+    [InlineData(true, "*", true)]                     // Development runs with "*" on purpose (Program.cs): no warning, row reads pinned
+    [InlineData(true, "", true)]
+    [InlineData(false, "*", false)]
+    [InlineData(false, "", false)]
+    [InlineData(false, "api.example.com", true)]
+    public void Report_AllowedHostsRow_ReadsTheWayProgramCsDecidesForTheRealEnvironment(
+        bool isDevelopment, string allowedHosts, bool expectedPinned)
+    {
+        var r = SystemStatusReport.Build(Config(("AllowedHosts", allowedHosts)), isDevelopment, Now);
+
+        Assert.Equal(expectedPinned, r.Configured["allowedHostsPinned"]);
+        Assert.Equal(HostFilteringConfig.Resolve(isDevelopment, allowedHosts).Warning is null,
+            r.Configured["allowedHostsPinned"]);
+    }
+
+    public static IEnumerable<object[]> ResendApiKeyAliases()
+        => ResendNotifier.ApiKeyConfigKeys.Select(k => new object[] { k });
+
+    [Theory]
+    [MemberData(nameof(ResendApiKeyAliases))]
+    public void Report_NotificationsKey_AgreesWithResendNotifierForEveryAlias(string alias)
+    {
+        // The alias list lives in ResendNotifier alone; walking ITS list means a
+        // fifth alias added later is covered here without anyone remembering to.
+        var present = Config((alias, "re_SECRETVALUE"));
+        Assert.True(ResendNotifier.HasApiKey(present));
+        Assert.True(SystemStatusReport.Build(present, isDevelopment: false, Now).Configured["notificationsKey"]);
+
+        var blank = Config((alias, "   "));
+        Assert.False(ResendNotifier.HasApiKey(blank));
+        Assert.False(SystemStatusReport.Build(blank, isDevelopment: false, Now).Configured["notificationsKey"]);
+    }
+
+    [Fact]
+    public void Report_NotificationsKey_IgnoresAKeyNoNotifierWouldRead()
+    {
+        var c = Config(("Resend:Unrelated", "re_SECRETVALUE"));
+
+        Assert.False(ResendNotifier.HasApiKey(c));
+        Assert.False(SystemStatusReport.Build(c, isDevelopment: false, Now).Configured["notificationsKey"]);
+    }
+
+    [Theory]
+    [InlineData("log", "log")]
+    [InlineData("", "log")]
+    [InlineData("  ", "log")]
+    [InlineData(" Resend ", "resend")]
+    [InlineData("SMTP", "smtp")]
+    public void Report_TransportName_AgreesWithTheNotifierSelector(string raw, string expected)
+    {
+        // Fully configured so the selector's own validation passes and returns
+        // the type it would actually register.
+        var c = Config(
+            ("Notifications:Transport", raw),
+            ("Notifications:Resend:ApiKey", "re_SECRETVALUE"),
+            ("Notifications:Smtp:Host", "smtp.example"),
+            ("Notifications:Smtp:FromAddress", "a@example.com"),
+            ("Notifications:PasswordResetLinkBase", "https://example.com/parent.html"));
+        var registered = NotifierTransport.ResolveImplementation(c);
+        var registeredName = registered == typeof(ResendNotifier) ? NotifierTransport.Resend
+            : registered == typeof(SmtpNotifier) ? NotifierTransport.Smtp
+            : NotifierTransport.Log;
+
+        var r = SystemStatusReport.Build(c, isDevelopment: false, Now);
+
+        Assert.Equal(expected, registeredName);
+        Assert.Equal(registeredName, r.Settings["notificationsTransport"]);
+    }
+
+    [Fact]
+    public async Task System_Endpoint_CarriesTheNewRowsAndSettings_WithoutAnyValue()
+    {
+        using var db = NewDb();
+        var ok = Assert.IsType<OkObjectResult>(await NewController(db, Config(
+            ("Notifications:Transport", "resend"),
+            ("Notifications:Resend:ApiKey", "re_SECRETVALUE_resend"),
+            ("Devices:ProvisioningSecret", "SECRETVALUE-provisioning"))).System(default));
+        using var doc = JsonDocument.Parse(Json(ok.Value!));
+
+        Assert.Equal("resend", doc.RootElement.GetProperty("settings").GetProperty("notificationsTransport").GetString());
+        var configured = doc.RootElement.GetProperty("configured");
+        Assert.True(configured.GetProperty("notificationsKey").GetBoolean());
+        Assert.True(configured.GetProperty("provisioningSecret").GetBoolean());
+        Assert.False(configured.GetProperty("googleClientId").GetBoolean());
+        Assert.DoesNotContain("SECRETVALUE", doc.RootElement.GetRawText());
     }
 
     [Fact]

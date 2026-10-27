@@ -124,10 +124,19 @@ public static class ArmenianVoiceReplyGuard
         {
             if (SentenceTerminators.Contains(reply[i]))
             {
+                // AI logic review 2026-10-27, D5: a run of terminators («...», «։։», «?!») is ONE
+                // boundary; counting each char let an ASCII «Հմմ...» burn the whole cap.
+                if (i > 0 && SentenceTerminators.Contains(reply[i - 1])) continue;
                 sentenceCount++;
                 if (sentenceCount == maxSentences)
                 {
                     cutoffExclusive = i + 1;
+                    // Keep the rest of the run so «...» is never cut in half.
+                    while (cutoffExclusive < reply.Length
+                           && SentenceTerminators.Contains(reply[cutoffExclusive]))
+                    {
+                        cutoffExclusive++;
+                    }
                     break;
                 }
             }
@@ -178,7 +187,9 @@ public static class ArmenianVoiceReplyGuard
             if (s[i] == s[i - 1])
             {
                 consec++;
-                if (consec >= run) return true;
+                // AI logic review 2026-10-27, D10: a drawn-out VOWEL («հաաա», «այոոո») is child
+                // prosody, not noise; only a repeated non-vowel counts as garble.
+                if (consec >= run && !ArmenianVowels.Contains(s[i])) return true;
             }
             else
             {

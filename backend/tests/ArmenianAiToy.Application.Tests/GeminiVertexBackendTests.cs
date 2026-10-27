@@ -150,6 +150,70 @@ public class GeminiVertexBackendTests
         Assert.Equal(2, handler.Calls.Count);
     }
 
+    // AI logic review 2026-10-27, C9: inside the 5-minute refresh margin the
+    // cached token is still valid for minutes. A failing refresh used to throw
+    // anyway and fail every chat turn (a gemini breaker failure each); it now
+    // serves the cached token until its REAL expiry.
+    private sealed class ListLogger : ILogger
+    {
+        public readonly List<(LogLevel Level, string Message)> Entries = new();
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter)
+            => Entries.Add((logLevel, formatter(state, exception)));
+    }
+
+    [Fact]
+    public async Task GetAccessToken_RefreshFailsInsideMargin_ServesCachedToken_UntilRealExpiry()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var handler = new FakeHandler();
+        handler.Respond = _ => FakeHandler.Json("{\"access_token\":\"tok-1\",\"expires_in\":3600}");
+        var log = new ListLogger();
+        using var provider = new VertexAiAccessTokenProvider(
+            new HttpClient(handler), ServiceAccountJson(), () => now) { Logger = log };
+
+        Assert.Equal("tok-1", await provider.GetAccessTokenAsync(default));
+
+        // 56 min: inside the refresh margin, token still valid for 4 min.
+        now = now.AddMinutes(56);
+        handler.Respond = _ => FakeHandler.Json(
+            "{\"error\":\"backend_error areg-chat@test-project\"}", HttpStatusCode.ServiceUnavailable);
+        Assert.Equal("tok-1", await provider.GetAccessTokenAsync(default));
+        Assert.Equal(2, handler.Calls.Count); // the refresh WAS attempted
+
+        // Reported with type + status only - no token, no response body.
+        var warning = Assert.Single(log.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Contains("503", warning.Message);
+        Assert.DoesNotContain("tok-1", warning.Message);
+        Assert.DoesNotContain("areg-chat", warning.Message);
+        Assert.DoesNotContain("backend_error", warning.Message);
+
+        // 61 min: the token has really expired - the outage now surfaces.
+        now = now.AddMinutes(5);
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => provider.GetAccessTokenAsync(default));
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, ex.StatusCode);
+        Assert.DoesNotContain("areg-chat", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetAccessToken_RefreshFailsInsideMargin_CallerCancelled_StillPropagates()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var handler = new FakeHandler();
+        handler.Respond = _ => FakeHandler.Json("{\"access_token\":\"tok-1\",\"expires_in\":3600}");
+        using var provider = new VertexAiAccessTokenProvider(
+            new HttpClient(handler), ServiceAccountJson(), () => now);
+        await provider.GetAccessTokenAsync(default);
+
+        now = now.AddMinutes(56);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => provider.GetAccessTokenAsync(cts.Token));
+    }
+
     [Fact]
     public async Task GetAccessToken_Failure_ThrowsWithStatusOnly()
     {

@@ -386,6 +386,11 @@ public class DeviceController : ControllerBase
         // Deterministic keyword classification — no model call. hasActiveStorySession
         // is false by construction: the welcome flow runs before any story.
         var mode = ModeDetector.Detect(transcript, history: null, hasActiveStorySession: false);
+        // AI logic review 2026-10-27, D1: the menu offers «…կամ մի բան հարցնել»; «հարցնել» / «հարց ունեմ»
+        // match no ModeDetector starter. Only when nothing matched, an ask-stem token means Curiosity,
+        // so the mode-enabled gate below still runs with the right mode.
+        if (mode == DetectedMode.None && WelcomeIntentDetector.IsAskIntent(transcript))
+            mode = DetectedMode.Curiosity;
         var intent = mode switch
         {
             DetectedMode.Story => VoiceIntents.Story,

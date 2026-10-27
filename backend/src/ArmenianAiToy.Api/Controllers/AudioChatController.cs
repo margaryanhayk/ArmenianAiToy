@@ -64,6 +64,7 @@ public class AudioChatController : ControllerBase
     private readonly OpenAICostMeter _costMeter;
     private readonly IOptions<OpenAIDailyCostCapOptions> _costCapOptions;
     private readonly UsageTiersOptions _usageTiersOptions;
+    private readonly IChildService? _childService;
     private readonly IWebHostEnvironment _env;
     private readonly IConfiguration _config;
     private readonly ILogger<AudioChatController> _logger;
@@ -81,7 +82,8 @@ public class AudioChatController : ControllerBase
         IWebHostEnvironment env,
         IConfiguration config,
         ILogger<AudioChatController> logger,
-        UsageTiersOptions? usageTiersOptions = null)
+        UsageTiersOptions? usageTiersOptions = null,
+        IChildService? childService = null)
     {
         _chatService = chatService;
         _deviceService = deviceService;
@@ -93,6 +95,7 @@ public class AudioChatController : ControllerBase
         _costMeter = costMeter;
         _costCapOptions = costCapOptions;
         _usageTiersOptions = usageTiersOptions ?? new UsageTiersOptions();
+        _childService = childService;
         _env = env;
         _config = config;
         _logger = logger;
@@ -208,6 +211,10 @@ public class AudioChatController : ControllerBase
         // Story-only off silenced every mode. STT has already been paid
         // for at this point; that is the unavoidable cost of not knowing
         // the mode until the child's words are known.
+        //
+        // AI logic review 2026-10-27, A5/B7: the gate resolves the device's
+        // DEFAULT child (as the manifest and voice-intent do) so a per-child
+        // override that hid or offered a mode on the toy is honoured here too.
         var voiceDetectedMode = ModeDetector.Detect(
             transcript, history: null, hasActiveStorySession: false);
         if (voiceDetectedMode is DetectedMode.Story
@@ -215,7 +222,7 @@ public class AudioChatController : ControllerBase
                 or DetectedMode.Riddle
                 or DetectedMode.Curiosity
             && !await _deviceService.IsModeEnabledForRequestAsync(
-                deviceId, childId: null, voiceDetectedMode))
+                deviceId, await ResolveDefaultChildIdAsync(deviceId), voiceDetectedMode))
         {
             AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "mode_disabled"));
             return await CannedResultAsync(CannedVoiceClips.ModeDisabledKey, cancellationToken);
@@ -259,7 +266,15 @@ public class AudioChatController : ControllerBase
         // device in ~1 s instead of after full synthesis (3-5 s measured),
         // which is what makes the storyteller clone viable as the LIVE
         // voice. Buffered providers (OpenAI) keep the original path.
-        if (_synthesis is IStreamingAudioSynthesisService streamer)
+        //
+        // AI logic review 2026-10-27, B1: the pass-through is chunked (no
+        // Content-Length), which the firmware's reader rejects, so it is
+        // NEGOTIATED exactly like story-qa: only when the toy sent
+        // X-Areg-Accept-Stream: 1 and the AudioChat:StreamReplyAudio kill
+        // switch is not false. Everyone else gets the buffered reply below.
+        var streamRequested = StreamReplyAudioEnabled()
+            && string.Equals(Request.Headers[StoryQaController.AcceptStreamHeader], "1", StringComparison.Ordinal);
+        if (streamRequested && _synthesis is IStreamingAudioSynthesisService streamer)
         {
             return await StreamTtsPassThroughAsync(
                 streamer, ttsText, transcript, chatResult, audioBytes,
@@ -277,6 +292,7 @@ public class AudioChatController : ControllerBase
         {
             _logger.LogWarning(ex,
                 "Audio chat: TTS failure for Device {DeviceId}", deviceId);
+            await RecordPartialSpendAsync(deviceId, audioBytes.LongLength, transcript, chatResult.Text);
             return StatusCode(502, new { error = "AI service unavailable. Please try again." });
         }
 
@@ -342,6 +358,13 @@ public class AudioChatController : ControllerBase
         return File(tts.Content, tts.MimeType);
     }
 
+    /// <summary>Server-side kill switch for the negotiated streaming reply —
+    /// <c>AudioChat:StreamReplyAudio</c>, default <c>true</c>. Same idiom as
+    /// <c>StoryQa:StreamAnswerAudio</c>: a de-framing defect on real hardware
+    /// can be neutralised by config alone.</summary>
+    private bool StreamReplyAudioEnabled() =>
+        !bool.TryParse(_config["AudioChat:StreamReplyAudio"], out var enabled) || enabled;
+
     /// <summary>
     /// Streaming TTS pass-through (the C2+ item C1 deferred): reads the
     /// provider's live audio stream and writes it to the response
@@ -374,6 +397,7 @@ public class AudioChatController : ControllerBase
         {
             _logger.LogWarning(ex,
                 "Audio chat: TTS stream start failure for Device {DeviceId}", deviceId);
+            await RecordPartialSpendAsync(deviceId, childAudioBytes.LongLength, transcript, chatResult.Text);
             return StatusCode(502, new { error = "AI service unavailable. Please try again." });
         }
 
@@ -550,8 +574,13 @@ public class AudioChatController : ControllerBase
         // STT instead; the autoplay-continue path passes Story explicitly
         // (a library segment IS story content, and no STT ever runs
         // there).
+        //
+        // AI logic review 2026-10-27, A5/B7: resolved here (not threaded in) so
+        // a paused / bedtime / unclaimed trip above never pays the lookup, and
+        // the autoplay path still resolves the default child exactly once.
         if (modeToGate is { } gateMode
-            && !await _deviceService.IsModeEnabledForRequestAsync(deviceId, childId: null, gateMode))
+            && !await _deviceService.IsModeEnabledForRequestAsync(
+                deviceId, await ResolveDefaultChildIdAsync(deviceId), gateMode))
         {
             AppMeter.ChatGateTrip.Add(1, new KeyValuePair<string, object?>("gate", "mode_disabled"));
             return await CannedResultAsync(CannedVoiceClips.ModeDisabledKey, cancellationToken);
@@ -559,6 +588,23 @@ public class AudioChatController : ControllerBase
 
         var costCapOpts = _costCapOptions.Value;
         var usageTiersOpts = _usageTiersOptions;
+        var nowUtc = DateTime.UtcNow;
+        // AI logic review 2026-10-27, A4/C4: the #022 fleet-wide ceiling
+        // (kill-switch) is orthogonal to the per-device tier allowance, so it
+        // runs whenever the flat cap is on, regardless of Usage:Tiers:Enabled.
+        // Opt-in (skipped when Global <= 0); same canned soft-off as the
+        // per-device cap.
+        if (costCapOpts.Enabled && costCapOpts.Global > 0m && _costMeter.IsGlobalOverCap(costCapOpts.Global, nowUtc))
+        {
+            AppMeter.OpenAICostCapTrip.Add(1, new KeyValuePair<string, object?>("kind", "audio"));
+            if (_costMeter.ShouldLogGlobalCapTrip(nowUtc))
+            {
+                _logger.LogWarning(
+                    "OpenAI GLOBAL daily cost ceiling reached (fleet kill-switch). CurrentEstimatedUsd={Current:F4} GlobalCapUsd={Cap:F4} UtcDate={Date:yyyy-MM-dd}",
+                    _costMeter.GetGlobalTotal(nowUtc), costCapOpts.Global, nowUtc.Date);
+            }
+            return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
+        }
         if (usageTiersOpts.Enabled)
         {
             // Usage:Tiers:Enabled REPLACES the flat dollar cap with the
@@ -575,20 +621,6 @@ public class AudioChatController : ControllerBase
         }
         else if (costCapOpts.Enabled)
         {
-            var nowUtc = DateTime.UtcNow;
-            // #022 — fleet-wide ceiling (kill-switch), opt-in (skipped when
-            // Global <= 0). Same canned soft-off as the per-device cap.
-            if (costCapOpts.Global > 0m && _costMeter.IsGlobalOverCap(costCapOpts.Global, nowUtc))
-            {
-                AppMeter.OpenAICostCapTrip.Add(1, new KeyValuePair<string, object?>("kind", "audio"));
-                if (_costMeter.ShouldLogGlobalCapTrip(nowUtc))
-                {
-                    _logger.LogWarning(
-                        "OpenAI GLOBAL daily cost ceiling reached (fleet kill-switch). CurrentEstimatedUsd={Current:F4} GlobalCapUsd={Cap:F4} UtcDate={Date:yyyy-MM-dd}",
-                        _costMeter.GetGlobalTotal(nowUtc), costCapOpts.Global, nowUtc.Date);
-                }
-                return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
-            }
             var cap = costCapOpts.CapForDevice(deviceId);
             if (_costMeter.IsOverCap(deviceId, cap, nowUtc))
             {
@@ -605,6 +637,52 @@ public class AudioChatController : ControllerBase
         }
         return null;
     }
+
+    /// <summary>
+    /// AI logic review 2026-10-27, B8: STT and the chat model were already
+    /// paid when TTS failed, so the spend must still reach the cost meter and
+    /// the usage counter (a TTS outage must not leave the daily cap blind to
+    /// it). Same either-flag gate and best-effort try/catch as the success
+    /// block; TTS is not counted because nothing was synthesised.
+    /// </summary>
+    private async Task RecordPartialSpendAsync(
+        Guid deviceId, long audioBytes, string transcript, string reply)
+    {
+        if (!(_costCapOptions.Value.Enabled || _usageTiersOptions.Enabled))
+        {
+            return;
+        }
+        try
+        {
+            var partialCost = OpenAICostEstimator.EstimateWhisperCostUsd(audioBytes)
+                + OpenAICostEstimator.EstimateChatCostUsd(transcript, reply);
+            if (_costCapOptions.Value.Enabled)
+            {
+                _costMeter.Record(deviceId, partialCost, DateTime.UtcNow);
+            }
+            await _deviceService.RecordUsageQuestionAsync(deviceId, partialCost, DateTime.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "OpenAI cost-cap: audio partial cost-record failure (suppressed). DeviceId={DeviceId}",
+                deviceId);
+        }
+    }
+
+    /// <summary>
+    /// AI logic review 2026-10-27, A5/B7: the device's default child, the
+    /// same lookup <c>DeviceController</c> (manifest, voice-intent) and
+    /// <c>StoryQaController</c> use, so the per-child mode override that
+    /// decided what the toy OFFERED also decides what the voice turn is
+    /// ALLOWED. Null when the device has no child (device-level flags then
+    /// decide, as before) or when no child service was supplied (test
+    /// harnesses only; DI always supplies one).
+    /// </summary>
+    private async Task<Guid?> ResolveDefaultChildIdAsync(Guid deviceId)
+        => _childService is null
+            ? null
+            : (await _childService.GetDefaultChildForDeviceAsync(deviceId))?.Id;
 
     private async Task<IActionResult> CannedResultAsync(
         string key, CancellationToken cancellationToken)

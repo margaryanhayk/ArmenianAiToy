@@ -189,6 +189,10 @@ public class ModeDetectorTests
     [InlineData("սա ինչ է")]                                                                        // սա ինչ է (this what is)
     [InlineData("ոնց է աշխատում")]                                     // ոնց է աշխատում (how does it work)
     [InlineData("ինչի համար է")]                                                 // ինչի համար է (what is it for)
+    // AI logic review 2026-10-27, D11: a question word followed by ։ ՝ or ',' used to fall through to None.
+    [InlineData("Ինչու՞։")]
+    [InlineData("Ինչու՞, Արեգ")]
+    [InlineData("Ինչի՞։")]
     public void Curiosity_ArmenianStarter_DetectsCuriosity(string message)
     {
         Assert.Equal(DetectedMode.Curiosity, ModeDetector.Detect(message, EmptyHistory));

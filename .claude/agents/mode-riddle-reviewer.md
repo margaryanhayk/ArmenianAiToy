@@ -1,6 +1,6 @@
 ---
 name: "mode-riddle-reviewer"
-description: "Use this agent to deeply inspect the Riddle mode implementation, prompt, tests, benchmark, and transitions. Finds unfair riddles, ambiguous clues, age-inappropriate challenge, answer-matching failures, and follow-up handling drift. Review-first; does not default to coding. Examples:\n\n- User: \"Riddles feel either too hard or too abstract for a 5-year-old.\" Assistant: \"Launching mode-riddle-reviewer to inspect RiddlePromptContent, RiddleAnswerMatcher, and the Riddle benchmark prompts.\"\n\n- User: \"When the child guesses wrong, the follow-up is discouraging.\" Assistant: \"Running mode-riddle-reviewer focused on after-guess handling and RiddleLoopIntegrationTests.\""
+description: "Review-first inspection of Riddle mode (prompt, RiddleAnswerMatcher, tests, benchmark): unfair or ambiguous riddles, answer-matching failures, discouraging follow-ups."
 model: opus
 color: orange
 memory: project

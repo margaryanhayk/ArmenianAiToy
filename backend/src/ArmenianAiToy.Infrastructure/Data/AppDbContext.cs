@@ -286,6 +286,14 @@ public class AppDbContext : DbContext
                 .HasForeignKey(u => u.DeviceId)
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(u => new { u.DeviceId, u.DayUtc }).IsUnique();
+            // AI logic review 2026-10-27, C3: without a token two overlapping
+            // read-modify-write UPDATEs both succeed and one increment is
+            // silently lost (the tier gate reads this counter). With it EF
+            // emits `... WHERE Id = @id AND Questions = @old`; a lost race
+            // surfaces as DbUpdateConcurrencyException, which
+            // RecordUsageQuestionAsync retries once. No DDL: a concurrency
+            // token on a plain int adds no column or index, so no migration.
+            e.Property(u => u.Questions).IsConcurrencyToken();
         });
     }
 }

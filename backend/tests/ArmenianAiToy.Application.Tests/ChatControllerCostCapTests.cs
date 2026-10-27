@@ -193,6 +193,53 @@ public class ChatControllerCostCapTests
     }
 
     [Fact]
+    public async Task GlobalCeiling_UsageTiersOn_StillTrips_AllowanceNeverConsulted()
+    {
+        // AI logic review 2026-10-27, A4/C4: the fleet kill-switch used to be
+        // skipped whenever Usage:Tiers:Enabled=true (it lived in the flag-off
+        // `else if`). It is a fleet-dollar ceiling, orthogonal to the
+        // per-device allowance, so it must still fire.
+        var h = Create(
+            o => o.Global = 1.00m,
+            usageTiersOptions: new UsageTiersOptions { Enabled = true });
+        h.CostMeter.Record(Guid.NewGuid(), 1.50m, DateTime.UtcNow); // some other device
+        h.DeviceService.GetUsageAllowanceStatusAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(new UsageAllowanceStatus("free", 1, 1, 999, null, IsExhausted: false));
+
+        var result = await h.Controller.Chat(new ChatRequest("Բարև"));
+
+        var payload = OkPayload(result);
+        Assert.Equal(ChatController.CostCapResponse, payload.Response);
+        Assert.Equal(SafetyFlag.Clean, payload.SafetyFlag);
+        await h.ChatService.DidNotReceive().GetResponseAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(),
+            Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<string?>());
+        await h.DeviceService.DidNotReceive()
+            .GetUsageAllowanceStatusAsync(Arg.Any<Guid>(), Arg.Any<DateTime>());
+    }
+
+    [Fact]
+    public async Task GlobalCeiling_UsageTiersOn_FlatCapOff_DoesNotTrip()
+    {
+        // The ceiling is part of the flat-cap system: with the flat cap OFF it
+        // must stay inert even when tiers are on (meter is not fed either).
+        var h = Create(
+            o => { o.Enabled = false; o.Global = 1.00m; },
+            usageTiersOptions: new UsageTiersOptions { Enabled = true });
+        h.CostMeter.Record(Guid.NewGuid(), 1.50m, DateTime.UtcNow);
+        h.DeviceService.GetUsageAllowanceStatusAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(new UsageAllowanceStatus("free", 1, 1, 999, null, IsExhausted: false));
+        h.ChatService.GetResponseAsync(
+                Arg.Any<Guid>(), Arg.Any<string>(),
+                Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<string?>())
+            .Returns(new ChatResponse("ok", Guid.NewGuid(), Guid.NewGuid(), SafetyFlag.Clean));
+
+        var result = await h.Controller.Chat(new ChatRequest("Բարև"));
+
+        Assert.NotEqual(ChatController.CostCapResponse, OkPayload(result).Response);
+    }
+
+    [Fact]
     public async Task GlobalCeiling_Zero_IsDisabled()
     {
         // Default Global = 0 (opt-in): even a large fleet total does NOT gate.

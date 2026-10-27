@@ -1,6 +1,7 @@
 using ArmenianAiToy.Api.Security;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Infrastructure.Ai;
+using ArmenianAiToy.Infrastructure.Notifications;
 
 namespace ArmenianAiToy.Api.Observability;
 
@@ -27,7 +28,8 @@ public static class SystemStatusReport
     public sealed record Report(
         IReadOnlyList<ModelRow> Models,
         IReadOnlyDictionary<string, bool> Configured,
-        IReadOnlyList<Check> Checks);
+        IReadOnlyList<Check> Checks,
+        IReadOnlyDictionary<string, string> Settings);
 
     public const string Warn = "warn";
     public const string Info = "info";
@@ -105,7 +107,10 @@ public static class SystemStatusReport
 
         // ---- what is configured (presence only — never a value) ----
         var audio = AudioBlobStoreRootResolver.Resolve(isDevelopment, config["Audio:BlobStoreRoot"]);
-        var forwarded = config.GetValue<bool>("ForwardedHeaders:Enabled");
+        var forwarded = ReadBool(config, "ForwardedHeaders:Enabled");
+        // The gate's own predicate (any non-empty string, whitespace included), not a
+        // second opinion: report and DeviceProvisioningAuth.Evaluate cannot disagree.
+        var provisioningSecretSet = DeviceProvisioningAuth.IsSecretConfigured(config["Devices:ProvisioningSecret"]);
         var configured = new Dictionary<string, bool>
         {
             ["openaiKey"] = !string.IsNullOrWhiteSpace(config["OpenAI:ApiKey"]),
@@ -116,7 +121,33 @@ public static class SystemStatusReport
             ["metricsToken"] = FirstNonEmpty(config["Metrics:ScrapeToken"]) is not null,
             ["audioStore"] = audio.IsConfigured,
             ["forwardedHeaders"] = forwarded,
+            // Family-pilot readiness: can a parent get mail, can a toy be
+            // provisioned, can a parent sign in with Google, will a toy be
+            // offered firmware / content, is the front door pinned. Booleans
+            // only — the value behind each one never leaves this method.
+            ["notificationsKey"] = NotificationsKeyPresent(config),
+            ["provisioningSecret"] = provisioningSecretSet,
+            ["googleClientId"] = FirstNonEmpty(config["GoogleAuth:ClientId"]) is not null,
+            ["firmwareUpdateEnabled"] = ReadBool(config, "FirmwareUpdate:Enabled"),
+            // Mirrors DeviceController.GetFirmwareImage's gate (non-empty AND
+            // absolute) without touching the disk: "set correctly", not "file exists".
+            ["firmwareImagePath"] = FirstNonEmpty(config["FirmwareUpdate:ImagePath"]) is { } fwPath
+                && Path.IsPathRooted(fwPath),
+            ["contentSyncEnabled"] = ReadBool(config, "ContentSync:Enabled"),
+            // Same decision Program.cs applies, with the real environment: a real
+            // hostname beyond "*" — or Development, which deliberately runs with
+            // "*" and raises no warning.
+            ["allowedHostsPinned"] = HostFilteringConfig
+                .Resolve(isDevelopment, config["AllowedHosts"]).Warning is null,
+            ["requireHttps"] = ReadBool(config, "Security:RequireHttps"),
         };
+
+        // The only non-boolean row: the transport NAME (log | smtp | resend) —
+        // a name, not a secret. Anything else is reported as "unrecognised"
+        // rather than echoed, so a value pasted into the wrong variable can
+        // never surface here.
+        var transport = ResolveTransportName(config);
+        var settings = new Dictionary<string, string> { ["notificationsTransport"] = transport };
 
         if (!audio.IsConfigured)
             checks.Add(new Check(Warn, "audio_store",
@@ -128,6 +159,22 @@ public static class SystemStatusReport
             checks.Add(new Check(Warn, "alerts_off",
                 "Alerts__WebhookUrl is not set — nobody is notified when the database, OpenAI, moderation or backups fail."));
 
+        if (!isDevelopment && transport == NotifierTransport.Log)
+            checks.Add(new Check(Warn, "email_log_only",
+                "Parents get no email: password resets, email verification and the \"another parent joined your toy\" " +
+                "notice are only written to the server log. Set Notifications__Transport=resend and Notifications__Resend__ApiKey."));
+        if (!isDevelopment && !provisioningSecretSet)
+        {
+            if (ReadBool(config, "Devices:AllowOpenRegistration"))
+                // A security hole, not a missing feature: first in the list.
+                checks.Insert(0, new Check(Warn, "provisioning_secret_missing",
+                    "Open registration: anyone can mint a device key (Devices:AllowOpenRegistration is on and " +
+                    "Devices__ProvisioningSecret is not set). Set Devices__ProvisioningSecret — that alone closes it."));
+            else
+                checks.Add(new Check(Warn, "provisioning_secret_missing",
+                    "Devices__ProvisioningSecret is not set — registering a new toy is refused until it is."));
+        }
+
         var capSection = config.GetSection("OpenAI:DailyCostCap");
         if (bool.TryParse(capSection["Enabled"], out var capOn) && !capOn)
             checks.Add(new Check(Warn, "cost_cap_off",
@@ -137,8 +184,36 @@ public static class SystemStatusReport
             checks.Add(new Check(Info, "global_cap_off",
                 "No fleet-wide daily spending ceiling (OpenAI:DailyCostCap:Global is 0)."));
 
-        return new Report(models, configured, checks);
+        return new Report(models, configured, checks, settings);
     }
+
+    // Mirrors NotifierTransport.ResolveImplementation's selector (missing or
+    // empty = log; trimmed, case-insensitive) without its validation side
+    // effects — a report must never throw. The names are NotifierTransport's own
+    // constants; a test walks the selector's real result for each to pin it.
+    private static string ResolveTransportName(IConfiguration config)
+    {
+        var raw = config["Notifications:Transport"];
+        var name = string.IsNullOrWhiteSpace(raw) ? NotifierTransport.Log : raw.Trim().ToLowerInvariant();
+        return name is NotifierTransport.Log or NotifierTransport.Smtp or NotifierTransport.Resend
+            ? name
+            : "unrecognised";
+    }
+
+    // Either transport's secret: a Resend key under any alias — asked of
+    // ResendNotifier itself, not copied — or an SMTP password.
+    private static bool NotificationsKeyPresent(IConfiguration config)
+        => ResendNotifier.HasApiKey(config)
+           || !string.IsNullOrWhiteSpace(config["Notifications:Smtp:Password"]);
+
+    // The same parse the code paths this report mirrors use for these keys
+    // (DeviceController register gate, DependencyInjection FirmwareUpdate,
+    // ContentSyncOptions.Resolve): bool.TryParse, anything else = off.
+    // IConfiguration.GetValue<bool> THROWS on "1" / "yes", and a report must
+    // never throw — a Railway "Devices__AllowOpenRegistration=1" would blank
+    // the whole System tab.
+    private static bool ReadBool(IConfiguration config, string key, bool fallback = false)
+        => bool.TryParse(config[key], out var value) ? value : fallback;
 
     // The boot already refused an unknown provider; a report must never
     // throw, so an unexpected value is shown as-is instead.

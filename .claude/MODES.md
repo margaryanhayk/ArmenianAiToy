@@ -469,6 +469,13 @@ spoken. Continue/stop turns carry no block; leaks are stripped by
 - Voice path (`AudioChatController`): the parent-flag gate checks the
   DETECTED mode post-STT — Game off blocks game requests over voice,
   and Story off does not block them.
+- Parent toggles are checked only when a turn makes a definitive mode
+  detection (the documented "conservative: miss a classification, let it
+  through" design). A live Game/Riddle/Calm session continues on
+  keyword-less turns until its 30-min expiry or the firmware's 12-turn
+  cap, so a parent switching Game off mid-game takes effect on the next
+  trigger turn. Enforcing it inside `ChatService` is a hard-stop plan
+  (AI logic review 2026-10-27, A6/B2).
 
 **Tests.**
 - `GameIntentTests`, `GameTailBlockParserTests`, `GamePromptContentTests`

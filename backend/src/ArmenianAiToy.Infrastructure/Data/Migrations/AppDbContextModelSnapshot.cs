@@ -482,6 +482,7 @@ namespace ArmenianAiToy.Infrastructure.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Questions")
+                        .IsConcurrencyToken()
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");

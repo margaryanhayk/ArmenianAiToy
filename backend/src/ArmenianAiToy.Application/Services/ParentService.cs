@@ -660,6 +660,11 @@ public class ParentService : IParentService
         var alreadyLinked = await _db.Set<ParentDevice>()
             .AnyAsync(pd => pd.ParentId == parentId && pd.DeviceId == invite.DeviceId);
 
+        // AI logic review 2026-10-27, E14: nothing to link, so succeed without
+        // burning the code — it was made for someone else in the household.
+        if (alreadyLinked)
+            return true;
+
         var existingHolders = new List<string>();
         if (!alreadyLinked)
         {
@@ -797,6 +802,11 @@ public class ParentService : IParentService
             _db.Set<StoryReflectionAnswer>().Where(a => a.DeviceId == deviceId));
         _db.Set<DeviceCommand>().RemoveRange(
             _db.Set<DeviceCommand>().Where(c => c.DeviceId == deviceId));
+        // AI logic review 2026-10-27, E4: the Device row (and with it the FK
+        // cascade that used to sweep invites) now survives, so a live invite
+        // code must be removed here or it would seat a stranger on the reset toy.
+        _db.Set<DeviceInvite>().RemoveRange(
+            _db.Set<DeviceInvite>().Where(i => i.DeviceId == deviceId));
 
         var device = await _db.Set<Device>().FindAsync(deviceId);
         if (device != null)
@@ -1186,7 +1196,7 @@ public class ParentService : IParentService
             return new GoogleSignInResult(GoogleSignInStatus.InvalidToken, null);
 
         // Rule 4: returning user — lookup by GoogleSubject first.
-        // Anonymized rows (Email == "") are filtered out by the
+        // Anonymized rows (AnonymizedAt set; Email is a synthetic anonymized-<id>@anonymized.invalid since 2026-10-27, E3) are filtered out by the
         // AnonymizedAt == null predicate so a scrubbed row cannot be
         // resurrected via its stamped subject.
         var bySub = await _db.Set<Parent>()
@@ -2110,7 +2120,7 @@ public class ParentService : IParentService
     /// verification timestamp. Single-row two-column projection.
     /// Returns null when the parent row no longer exists — controller
     /// maps null to a 404, matching the silent-miss convention for
-    /// parent-owned reads. Anonymized parents (Email == "") are
+    /// parent-owned reads. Anonymized parents (AnonymizedAt set, synthetic email) are
     /// filtered at the query level so a stale-JWT-against-anonymized-
     /// row case behaves identically to a missing row.
     /// </summary>

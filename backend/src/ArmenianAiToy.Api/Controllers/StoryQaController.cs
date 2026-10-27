@@ -192,6 +192,24 @@ public class StoryQaController : ControllerBase
         // the flat cap with the per-tier allowance — see ChatController.
         var costCapOpts = _costCapOptions.Value;
         var usageTiersOpts = _usageTiersOptions;
+        // #022 — fleet-wide ceiling (kill-switch), opt-in (skipped when Global <= 0).
+        // AI logic review 2026-10-27, A4/C4: hoisted ABOVE the tier branch. It is
+        // a fleet-dollar ceiling, not the per-device flat cap that tiers replace,
+        // so Usage:Tiers:Enabled must not disarm it. Flag-off order is unchanged
+        // (Global was already the first check inside the flat-cap branch).
+        var globalCheckUtc = DateTime.UtcNow;
+        if (costCapOpts.Enabled && costCapOpts.Global > 0m
+            && _costMeter.IsGlobalOverCap(costCapOpts.Global, globalCheckUtc))
+        {
+            AppMeter.OpenAICostCapTrip.Add(1, new KeyValuePair<string, object?>("kind", "story_qa"));
+            if (_costMeter.ShouldLogGlobalCapTrip(globalCheckUtc))
+            {
+                _logger.LogWarning(
+                    "OpenAI GLOBAL daily cost ceiling reached (fleet kill-switch). CurrentEstimatedUsd={Current:F4} GlobalCapUsd={Cap:F4} UtcDate={Date:yyyy-MM-dd}",
+                    _costMeter.GetGlobalTotal(globalCheckUtc), costCapOpts.Global, globalCheckUtc.Date);
+            }
+            return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
+        }
         if (usageTiersOpts.Enabled)
         {
             var allowance = await _deviceService.GetUsageAllowanceStatusAsync(deviceId, DateTime.UtcNow);
@@ -205,18 +223,6 @@ public class StoryQaController : ControllerBase
         else if (costCapOpts.Enabled)
         {
             var nowUtc = DateTime.UtcNow;
-            // #022 — fleet-wide ceiling (kill-switch), opt-in (skipped when Global <= 0).
-            if (costCapOpts.Global > 0m && _costMeter.IsGlobalOverCap(costCapOpts.Global, nowUtc))
-            {
-                AppMeter.OpenAICostCapTrip.Add(1, new KeyValuePair<string, object?>("kind", "story_qa"));
-                if (_costMeter.ShouldLogGlobalCapTrip(nowUtc))
-                {
-                    _logger.LogWarning(
-                        "OpenAI GLOBAL daily cost ceiling reached (fleet kill-switch). CurrentEstimatedUsd={Current:F4} GlobalCapUsd={Cap:F4} UtcDate={Date:yyyy-MM-dd}",
-                        _costMeter.GetGlobalTotal(nowUtc), costCapOpts.Global, nowUtc.Date);
-                }
-                return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
-            }
             var cap = costCapOpts.CapForDevice(deviceId);
             if (_costMeter.IsOverCap(deviceId, cap, nowUtc))
             {
@@ -417,6 +423,8 @@ public class StoryQaController : ControllerBase
                 {
                     _logger.LogWarning(ex, "Story-QA: answer failure for {StoryId}", storyId);
                     RecordTurn("transient_failure");
+                    // AI logic review 2026-10-27, B8: STT was already paid for.
+                    await RecordPartialSpendAsync(deviceId, audioBytes.LongLength, 0, null);
                     return await SpokenFailureResultAsync(cancellationToken);
                 }
             }
@@ -579,6 +587,12 @@ public class StoryQaController : ControllerBase
         {
             _logger.LogWarning(ex, "Story-QA: TTS failure for {StoryId}", storyId);
             RecordTurn("transient_failure");
+            // AI logic review 2026-10-27, B8: STT and (when a model ran) the
+            // answer call were already paid for. A canned line is not a model
+            // reply, so it is only priced as output when a prompt was sent.
+            await RecordPartialSpendAsync(
+                deviceId, audioBytes.LongLength, answerPromptChars,
+                answerPromptChars > 0 ? answerText : null);
             return await SpokenFailureResultAsync(cancellationToken);
         }
 
@@ -682,20 +696,42 @@ public class StoryQaController : ControllerBase
             // WHILE the answer streams instead of before it.
             var tailTask = GetTailClipsAsync(storyId, segmentIndex, answerText, cancellationToken);
 
+            var buffer = new byte[8192];
+
+            // AI logic review 2026-10-27, B3: read the FIRST chunk before the
+            // response is touched. A failure here used to land after the 200
+            // status was set and ended as an empty chunked body the toy could
+            // only give up on at its read deadline; nothing has been sent yet,
+            // so the buffered spoken failure clip (with a Content-Length) is
+            // still available.
+            int read;
+            try
+            {
+                read = await stream.AudioStream.ReadAsync(
+                    buffer.AsMemory(0, buffer.Length), cancellationToken);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) when (!Response.HasStarted)
+            {
+                _logger.LogWarning(ex,
+                    "Story-QA: answer stream failed before the first byte for {StoryId}; speaking the failure clip", storyId);
+                _ = tailTask.ContinueWith(t => { _ = t.Exception; }, TaskScheduler.Default);
+                return await SpokenFailureResultAsync(cancellationToken);
+            }
+
             Response.ContentType = stream.MimeType;
             Response.StatusCode = 200;
 
-            var buffer = new byte[8192];
             try
             {
-                int read;
-                while ((read = await stream.AudioStream.ReadAsync(
-                    buffer.AsMemory(0, buffer.Length), cancellationToken)) > 0)
+                while (read > 0)
                 {
                     await Response.Body.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
                     // Flush per chunk: the saving IS the first byte leaving
                     // early, so nothing may sit in a server-side buffer.
                     await Response.Body.FlushAsync(cancellationToken);
+                    read = await stream.AudioStream.ReadAsync(
+                        buffer.AsMemory(0, buffer.Length), cancellationToken);
                 }
 
                 var (bridge, recap) = await tailTask;
@@ -825,6 +861,14 @@ public class StoryQaController : ControllerBase
         // flat cap with the per-tier allowance — see ChatController.
         var costCapOpts = _costCapOptions.Value;
         var usageTiersOpts = _usageTiersOptions;
+        // #022 fleet kill-switch, hoisted above the tier branch (AI logic review
+        // 2026-10-27, A4/C4) — see Ask(): tiers replace the per-device cap only.
+        if (costCapOpts.Enabled && costCapOpts.Global > 0m
+            && _costMeter.IsGlobalOverCap(costCapOpts.Global, DateTime.UtcNow))
+        {
+            AppMeter.OpenAICostCapTrip.Add(1, new KeyValuePair<string, object?>("kind", "story_qa"));
+            return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
+        }
         if (usageTiersOpts.Enabled)
         {
             var allowance = await _deviceService.GetUsageAllowanceStatusAsync(deviceId, DateTime.UtcNow);
@@ -838,12 +882,6 @@ public class StoryQaController : ControllerBase
         else if (costCapOpts.Enabled)
         {
             var nowUtc = DateTime.UtcNow;
-            // #022 — fleet-wide ceiling (kill-switch), opt-in (skipped when Global <= 0).
-            if (costCapOpts.Global > 0m && _costMeter.IsGlobalOverCap(costCapOpts.Global, nowUtc))
-            {
-                AppMeter.OpenAICostCapTrip.Add(1, new KeyValuePair<string, object?>("kind", "story_qa"));
-                return await CannedResultAsync(CannedVoiceClips.PausedKey, cancellationToken);
-            }
             var cap = costCapOpts.CapForDevice(deviceId);
             if (_costMeter.IsOverCap(deviceId, cap, nowUtc))
             {
@@ -1024,6 +1062,10 @@ public class StoryQaController : ControllerBase
         {
             _logger.LogWarning(ex, "Reflection: clip render failure for {StoryId}", storyId);
             RecordTurn("transient_failure");
+            // AI logic review 2026-10-27, B8: STT and the reaction call were
+            // already paid for (both are zero/skipped on the paths that never ran).
+            await RecordPartialSpendAsync(
+                deviceId, audioBytes.LongLength, reactionPromptChars, reactionText);
             return await SpokenFailureResultAsync(cancellationToken);
         }
 
@@ -1156,6 +1198,40 @@ public class StoryQaController : ControllerBase
             _logger.LogWarning(ex,
                 "Story-QA: turn persistence failed for Device {DeviceId}; continuing (child still hears the answer)",
                 deviceId);
+        }
+    }
+
+    /// <summary>
+    /// Records the spend of a turn that failed AFTER a paid upstream call
+    /// (AI logic review 2026-10-27, B8): STT for <paramref name="audioBytes"/>
+    /// plus, when a model ran, the chat call priced from
+    /// <paramref name="promptChars"/> and <paramref name="reply"/>. Same
+    /// either-flag gate and best-effort try/catch as the success cost block
+    /// in <see cref="Ask"/>, so a failing turn can never break the spoken
+    /// failure clip and the flat cap / usage counter stay honest during an
+    /// upstream outage.
+    /// </summary>
+    private async Task RecordPartialSpendAsync(
+        Guid deviceId, long audioBytes, long promptChars, string? reply)
+    {
+        if (!_costCapOptions.Value.Enabled && !_usageTiersOptions.Enabled)
+        {
+            return;
+        }
+        try
+        {
+            var turnCost = OpenAICostEstimator.EstimateWhisperCostUsd(audioBytes)
+                + OpenAICostEstimator.EstimateChatCostUsdFromPrompt(promptChars, reply);
+            if (_costCapOptions.Value.Enabled)
+            {
+                _costMeter.Record(deviceId, turnCost, DateTime.UtcNow);
+            }
+            await _deviceService.RecordUsageQuestionAsync(deviceId, turnCost, DateTime.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Story-QA partial cost-record failure (suppressed). DeviceId={DeviceId}", deviceId);
         }
     }
 
@@ -1462,12 +1538,16 @@ public class StoryQaController : ControllerBase
     /// </para>
     ///
     /// <para>
-    /// Cache first, because <c>StoryAudioController</c> re-renders whenever
-    /// the audio or either sidecar is missing — a streaming session always
-    /// has a correct cache map by the time it serves a byte, so it never
-    /// reaches the ContentSync map. The SD child, whose offsets belong to
-    /// the shipped file, reaches it every time. That ordering is what lets
-    /// this work with no firmware change and no <c>src</c> query param.
+    /// Shipped first (AI logic review 2026-10-27, B4). The production path is
+    /// the toy playing the shipped narration from its SD card, so its offsets
+    /// belong to the shipped file. <c>StoryAudioController</c> writes the
+    /// cache MP3 + sidecar on ANY Wi-Fi stream, so once one device has
+    /// streamed a story the cache map exists for good — reading it first
+    /// would score every SD child against the wrong file. The cache map is
+    /// used only when the story has no shipped row (a streaming-only story).
+    /// The rare child on the Wi-Fi-stream fallback loses exact grounding for
+    /// a shipped story until the firmware sends a source hint (<c>src=</c>),
+    /// which is a firmware change.
     /// </para>
     ///
     /// <para>
@@ -1488,10 +1568,10 @@ public class StoryQaController : ControllerBase
         }
         try
         {
-            // Cache render first, shipped narration second — see the ordering
-            // rationale above. A null entry simply means that source is not
-            // configured for this story.
-            var candidates = new[] { CacheAudioPath(storyId), ShippedAudioPath(storyId) };
+            // Shipped narration first, cache render second — see the ordering
+            // rationale above (AI logic review 2026-10-27, B4). A null entry
+            // simply means that source is not configured for this story.
+            var candidates = new[] { ShippedAudioPath(storyId), CacheAudioPath(storyId) };
 
             // Preferred: exact segment-start byte map. Q&A is infrequent
             // (one per barge-in), so reading the small sidecar per call is

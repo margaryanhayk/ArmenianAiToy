@@ -153,6 +153,8 @@ public static class ModeDetector
         "\u056b\u0576\u0579\u0578\u0582",                          // ինչու (why)
         "\u056b\u0576\u0579\u057a\u0565\u057d",                    // ինչպես (how)
         "\u056b\u0576\u0579 \u0567",                               // ինչ է (what is)
+        // ոնց also fires on «Ոնց ես, Արեգ» by design (a one-turn Curiosity answer to "how are you" is
+        // harmless); narrowing it to «ոնց է/են» is an owner/story-master call. AI logic review 2026-10-27, D11.
         "\u0578\u0576\u0581",                                      // ոնց (how — colloquial)
         "\u056b\u0576\u0579\u056b",                                // ինչի (what for)
         "\u057d\u0561 \u056b\u0576\u0579",                         // սա delays (this what — reversed question)
@@ -239,20 +241,33 @@ public static class ModeDetector
     /// this made Curiosity effectively unreachable). Removing these marks
     /// restores the word so the existing needle set matches. Letters are
     /// untouched, so no new/false matches are introduced.
+    /// <para>
+    /// AI logic review 2026-10-27, D11: the sentence marks ։ (U+0589), ՝ (U+055D)
+    /// and ',' become a space. StartsWithWord only accepts a needle followed by a
+    /// space, '?' or end of string, so «Ինչու՞։» / «Ինչու՞, Արեգ» (the marks left
+    /// behind once ՞ is stripped) used to detect nothing. No needle contains any
+    /// of the three, so no existing match can change.
+    /// </para>
     /// </summary>
     private static string NormalizeForMatch(string? message)
     {
         var lower = (message ?? string.Empty).ToLowerInvariant();
         if (lower.IndexOf('՞') < 0
             && lower.IndexOf('՛') < 0
-            && lower.IndexOf('՜') < 0)
+            && lower.IndexOf('՜') < 0
+            && lower.IndexOf('\u0589') < 0
+            && lower.IndexOf('\u055D') < 0
+            && lower.IndexOf(',') < 0)
         {
             return lower;
         }
         return lower
             .Replace("՞", string.Empty)
             .Replace("՛", string.Empty)
-            .Replace("՜", string.Empty);
+            .Replace("՜", string.Empty)
+            .Replace('\u0589', ' ')
+            .Replace('\u055D', ' ')
+            .Replace(',', ' ');
     }
 
     private static bool ContainsAny(string lower, string[] needles)

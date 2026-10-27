@@ -80,8 +80,12 @@ public class ConversationService : IConversationService
 
     public async Task<List<(string Role, string Content)>> GetRecentMessagesAsync(Guid conversationId, int count = 20)
     {
+        // AI logic review 2026-10-27, A1: model-history projection only (single
+        // caller: ChatService Step 6). A Blocked row holds the child's raw unsafe
+        // text; it must never be re-sent to the model as context. Flagged rows
+        // stay (they hold only the canned fallback text).
         var messages = await _db.Set<Message>()
-            .Where(m => m.ConversationId == conversationId)
+            .Where(m => m.ConversationId == conversationId && m.SafetyFlag != SafetyFlag.Blocked)
             .OrderByDescending(m => m.Timestamp)
             .Take(count)
             .OrderBy(m => m.Timestamp)

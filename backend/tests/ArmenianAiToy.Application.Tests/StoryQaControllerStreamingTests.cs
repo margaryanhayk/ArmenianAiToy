@@ -348,6 +348,64 @@ public class StoryQaControllerStreamingTests
         await Streamer(h).DidNotReceiveWithAnyArgs().SynthesizeArmenianStreamAsync(default!, default);
     }
 
+    // (g) AI logic review 2026-10-27, B3: the provider stream opens but its
+    // FIRST read throws. Nothing has been written, so the toy must get the
+    // buffered spoken failure clip (a sized body it can play), not a 200 with
+    // an empty chunked body that it only gives up on at its read deadline.
+
+    /// <summary>A provider stream that opens fine and then throws on the
+    /// first read, like a socket reset between headers and the first frame.</summary>
+    private sealed class FirstReadThrowsStream : Stream
+    {
+        public bool Disposed { get; private set; }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default) =>
+            throw new IOException("upstream reset before first byte");
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            throw new IOException("upstream reset before first byte");
+
+        protected override void Dispose(bool disposing)
+        {
+            Disposed = true;
+            base.Dispose(disposing);
+        }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public async Task OptInHeader_StreamFailsBeforeFirstByte_SpeaksFailureClipWithContentLength()
+    {
+        var h = Create(streamingProvider: true, acceptStream: true);
+        var broken = new FirstReadThrowsStream();
+        Streamer(h).SynthesizeArmenianStreamAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new AudioSynthesisStreamResult(broken, "audio/mpeg"));
+
+        var result = await h.Controller.Ask(StoryId, offset: 0, CancellationToken.None);
+
+        // A sized (buffered) clip, not the EmptyResult of a half-started stream.
+        // FileContentResult derives Content-Length from FileContents when the
+        // MVC pipeline executes it; this unit test returns it unexecuted, so
+        // the proof is "a non-empty FileContents and an untouched response".
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("audio/mpeg", file.ContentType);
+        Assert.NotEmpty(file.FileContents);
+        var response = h.Controller.HttpContext.Response;
+        Assert.False(response.HasStarted);
+        Assert.Null(response.ContentType); // never committed to the streaming shape
+        Assert.Equal(0, Body(h).Length);   // zero bytes on the wire
+        Assert.True(broken.Disposed, "the failed provider stream must still be closed");
+    }
+
     private static IEnumerable<byte[]> SlidingWindows(byte[] data, int window)
     {
         for (var i = 0; i + window <= data.Length; i++)

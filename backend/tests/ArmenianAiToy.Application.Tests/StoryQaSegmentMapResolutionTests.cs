@@ -56,18 +56,35 @@ public class StoryQaSegmentMapResolutionTests : IDisposable
 
     // ---- the three resolution steps ----
 
-    /// <summary>KEYSTONE (ordering): a streaming session's own map still wins.
-    /// StoryAudioController re-renders whenever the audio or either sidecar is
-    /// missing, so a streaming child always has a correct cache map — and its
-    /// offsets belong to THAT file. Reading the shipped map for it would
-    /// answer about the wrong scene just as surely as the old bug did.</summary>
+    /// <summary>KEYSTONE (ordering, flipped by AI logic review 2026-10-27, B4):
+    /// the shipped map wins when both exist. The toy plays the shipped
+    /// (SD) narration in production, and StoryAudioController writes the
+    /// cache MP3 + sidecar on ANY Wi-Fi stream — so once one device has
+    /// streamed a story the cache map exists forever, and reading it first
+    /// would score every SD child's barge-in against the wrong file. The
+    /// rare Wi-Fi-fallback child loses exact grounding (it falls to the
+    /// shipped map or the proportional estimate) until the firmware sends a
+    /// source hint.</summary>
     [Fact]
-    public void CacheMap_WinsWhenPresent()
+    public void ShippedMap_WinsWhenBothPresent()
     {
         WriteMap(_cacheRoot, [0, 100, 200, 300]);
         WriteMap(_shippedRoot, [0, 10_000, 20_000, 30_000]);
 
+        var c = Controller();
         // 250 is segment 2 by the cache map, segment 0 by the shipped one.
+        Assert.Equal(0, c.OffsetToSegment(StoryId, 250, SegmentCount));
+        // 25_000 is past the end of the cache map (segment 3), segment 2 by the shipped one.
+        Assert.Equal(2, c.OffsetToSegment(StoryId, 25_000, SegmentCount));
+    }
+
+    /// <summary>The cache map is still the right source when the story has
+    /// no shipped row (streaming-only story).</summary>
+    [Fact]
+    public void CacheMap_IsUsedWhenNoShippedMapExists()
+    {
+        WriteMap(_cacheRoot, [0, 100, 200, 300]);
+
         Assert.Equal(2, Controller().OffsetToSegment(StoryId, 250, SegmentCount));
     }
 

@@ -54,14 +54,14 @@ public class UsageTiersGateTests
         public List<(long Value, string? Tier)> Measurements { get; } = new();
         private readonly MeterListener _listener;
 
-        private MetricCapture()
+        private MetricCapture(string instrumentName, string tagKey)
         {
             _listener = new MeterListener
             {
                 InstrumentPublished = (instrument, listener) =>
                 {
                     if (instrument.Meter.Name == AppMeter.Name
-                        && instrument.Name == "aat_usage_allowance_exhausted_total")
+                        && instrument.Name == instrumentName)
                     {
                         listener.EnableMeasurementEvents(instrument);
                     }
@@ -72,14 +72,17 @@ public class UsageTiersGateTests
                 string? tier = null;
                 foreach (var tag in tags)
                 {
-                    if (tag.Key == "tier") { tier = tag.Value as string; break; }
+                    if (tag.Key == tagKey) { tier = tag.Value as string; break; }
                 }
                 lock (Measurements) { Measurements.Add((measurement, tier)); }
             });
             _listener.Start();
         }
 
-        public static MetricCapture Start() => new();
+        public static MetricCapture Start() => new("aat_usage_allowance_exhausted_total", "tier");
+
+        /// <summary>AI logic review 2026-10-27, A4: captures the cost-cap trip counter (tag <c>kind</c>).</summary>
+        public static MetricCapture StartCostCapTrips() => new("aat_openai_cost_cap_trip_total", "kind");
         public void Dispose() => _listener.Dispose();
     }
 
@@ -93,15 +96,21 @@ public class UsageTiersGateTests
 
     private sealed record ChatHarness(ChatController Controller, IChatService ChatService, IDeviceService DeviceService, Guid DeviceId);
 
-    private static ChatHarness CreateChat(UsageTiersOptions? usageTiers = null, bool flatCapTripped = false)
+    private static ChatHarness CreateChat(
+        UsageTiersOptions? usageTiers = null, bool flatCapTripped = false, decimal globalCeiling = 0m)
     {
         var chatService = Substitute.For<IChatService>();
         var deviceService = Substitute.For<IDeviceService>();
         deviceService.HasLinkedParentAsync(Arg.Any<Guid>()).Returns(true);
         var costMeter = new OpenAICostMeter();
-        var costCapOptions = Options.Create(new OpenAIDailyCostCapOptions { Enabled = true, Default = 0.50m });
+        var costCapOptions = Options.Create(new OpenAIDailyCostCapOptions
+        {
+            Enabled = true, Default = 0.50m, Global = globalCeiling
+        });
         var deviceId = Guid.NewGuid();
         if (flatCapTripped) costMeter.Record(deviceId, 0.51m, DateTime.UtcNow);
+        // A DIFFERENT device pushed the fleet total over the ceiling.
+        if (globalCeiling > 0m) costMeter.Record(Guid.NewGuid(), globalCeiling + 0.50m, DateTime.UtcNow);
         var controller = new ChatController(
             chatService, deviceService, costMeter, costCapOptions,
             Substitute.For<ILogger<ChatController>>(), usageTiers);
@@ -161,11 +170,54 @@ public class UsageTiersGateTests
         await h.DeviceService.Received(1).RecordUsageQuestionAsync(h.DeviceId, Arg.Any<decimal>(), Arg.Any<DateTime>());
     }
 
+    [Fact]
+    public async Task Chat_FlagOn_GlobalCeilingTripped_ReturnsCanned_AllowanceNeverConsulted()
+    {
+        // AI logic review 2026-10-27, A4/C4: the fleet kill-switch must still
+        // fire with Usage:Tiers:Enabled=true (it used to sit inside the
+        // flag-off `else if`, so the tiers branch skipped it).
+        using var capture = MetricCapture.StartCostCapTrips();
+        var h = CreateChat(usageTiers: EnabledOptions(exhausted: false), globalCeiling: 1.00m);
+        h.DeviceService.GetUsageAllowanceStatusAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(new UsageAllowanceStatus("free", 1, 1, 999, null, false));
+
+        var result = await h.Controller.Chat(new ChatRequest("Բարև"));
+
+        var payload = Assert.IsType<ChatResponse>(Assert.IsType<OkObjectResult>(result).Value);
+        Assert.Equal(ChatController.CostCapResponse, payload.Response);
+        Assert.Equal(SafetyFlag.Clean, payload.SafetyFlag);
+        await h.ChatService.DidNotReceive().GetResponseAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<string?>());
+        await h.DeviceService.DidNotReceive().GetUsageAllowanceStatusAsync(Arg.Any<Guid>(), Arg.Any<DateTime>());
+        Assert.Single(capture.Measurements);
+        Assert.Equal("chat", capture.Measurements[0].Tier);
+    }
+
+    [Fact]
+    public async Task Chat_FlagOn_GlobalCeilingZero_FallsThroughToAllowance()
+    {
+        // Global=0 is opt-out: even a huge fleet total must not gate, and the
+        // allowance path runs exactly as before.
+        var h = CreateChat(usageTiers: EnabledOptions(exhausted: false));
+        h.DeviceService.GetUsageAllowanceStatusAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(new UsageAllowanceStatus("free", 1, 1, 999, null, false));
+        h.ChatService.GetResponseAsync(
+                Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<string?>())
+            .Returns(new ChatResponse("Կար մի կատու։", Guid.NewGuid(), Guid.NewGuid(), SafetyFlag.Clean));
+
+        var result = await h.Controller.Chat(new ChatRequest("Բարև"));
+
+        var payload = Assert.IsType<ChatResponse>(Assert.IsType<OkObjectResult>(result).Value);
+        Assert.NotEqual(ChatController.CostCapResponse, payload.Response);
+        await h.DeviceService.Received(1).GetUsageAllowanceStatusAsync(h.DeviceId, Arg.Any<DateTime>());
+    }
+
     // ================= AudioChatController =================
 
     private sealed record AudioHarness(AudioChatController Controller, IDeviceService DeviceService, Guid DeviceId);
 
-    private static AudioHarness CreateAudio(UsageTiersOptions? usageTiers, bool flatCapTripped)
+    private static AudioHarness CreateAudio(
+        UsageTiersOptions? usageTiers, bool flatCapTripped, decimal globalCeiling = 0m)
     {
         var chatService = Substitute.For<IChatService>();
         var deviceService = Substitute.For<IDeviceService>();
@@ -182,12 +234,17 @@ public class UsageTiersGateTests
             .Returns(new AudioSynthesisResult(Encoding.UTF8.GetBytes("canned"), "audio/mpeg"));
         var canned = new CannedVoiceClips(synthesis);
         var costMeter = new OpenAICostMeter();
-        var costCapOptions = Options.Create(new OpenAIDailyCostCapOptions { Enabled = true, Default = 0.50m });
+        var costCapOptions = Options.Create(new OpenAIDailyCostCapOptions
+        {
+            Enabled = true, Default = 0.50m, Global = globalCeiling
+        });
         var env = Substitute.For<IWebHostEnvironment>();
         env.EnvironmentName = "Development";
         var config = Substitute.For<IConfiguration>();
         var deviceId = Guid.NewGuid();
         if (flatCapTripped) costMeter.Record(deviceId, 0.51m, DateTime.UtcNow);
+        // A DIFFERENT device pushed the fleet total over the ceiling.
+        if (globalCeiling > 0m) costMeter.Record(Guid.NewGuid(), globalCeiling + 0.50m, DateTime.UtcNow);
 
         // A minimal AppDbContext isn't needed for the gate path — the
         // controller only touches _db after STT, which the exhausted /
@@ -243,6 +300,23 @@ public class UsageTiersGateTests
         Assert.IsType<FileContentResult>(result);
         Assert.Single(capture.Measurements);
         Assert.Equal("free", capture.Measurements[0].Tier);
+    }
+
+    [Fact]
+    public async Task Audio_FlagOn_GlobalCeilingTripped_ReturnsCanned_AllowanceNeverConsulted()
+    {
+        // AI logic review 2026-10-27, A4/C4: mirror of the Chat test above.
+        using var capture = MetricCapture.StartCostCapTrips();
+        var h = CreateAudio(usageTiers: EnabledOptions(exhausted: false), flatCapTripped: false, globalCeiling: 1.00m);
+        h.DeviceService.GetUsageAllowanceStatusAsync(h.DeviceId, Arg.Any<DateTime>())
+            .Returns(new UsageAllowanceStatus("free", 1, 1, 999, null, false));
+
+        var result = await h.Controller.Chat(CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result); // canned clip served as a file
+        await h.DeviceService.DidNotReceive().GetUsageAllowanceStatusAsync(Arg.Any<Guid>(), Arg.Any<DateTime>());
+        Assert.Single(capture.Measurements);
+        Assert.Equal("audio", capture.Measurements[0].Tier);
     }
 
     // ================= StoryQaController (Ask + AnswerReflection) =================

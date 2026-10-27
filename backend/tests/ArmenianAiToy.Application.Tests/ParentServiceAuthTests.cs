@@ -56,6 +56,10 @@ public class ParentServiceAuthTests
             modelBuilder.Entity<GamePlay>().HasKey(p => p.Id);
             modelBuilder.Entity<StoryReflectionAnswer>().HasKey(a => a.Id);
             modelBuilder.Entity<DeviceCommand>().HasKey(c => c.Id);
+            // AI logic review 2026-10-27, E4: the last-parent unlink now also
+            // clears the toy's invites, so this model must know the type.
+            modelBuilder.Entity<DeviceInvite>().HasKey(i => i.Id);
+            modelBuilder.Entity<DeviceInvite>().Ignore(i => i.Device);
         }
     }
 

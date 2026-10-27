@@ -201,3 +201,5 @@ mid-story.
 Tiers on usage stay available as shape B, but the number that makes them
 humane can only be learned from watching children, and no child has used this
 toy yet.
+
+*Note (2026-10-27, AI logic review A12):* the allowance day (`DeviceUsageDay`) and the per-device cost cap reset at 00:00 UTC (04:00 Yerevan); the dashboard's Today panel uses the device timezone. Keying the counter on the device-local date changes the `(DeviceId, DayUtc)` index semantics and the in-process meter bucket — a later tier slice, not a copy fix.

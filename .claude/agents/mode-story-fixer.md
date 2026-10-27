@@ -1,6 +1,6 @@
 ---
 name: "mode-story-fixer"
-description: "Use this agent to implement a scoped fix in Story mode AFTER a review has produced findings. Pairs with mode-story-reviewer in a reviewer → fixer → reviewer loop. Implementation-first BUT scope-bound: accepts only an explicit findings list and refuses to widen. Examples:\n\n- User: \"Here are the confirmed Story findings from the reviewer; implement the smallest safe fix for finding #2.\" Assistant: \"Launching mode-story-fixer with the finding as input, restating scope, making only the minimum edit, and validating with targeted tests.\"\n\n- User: \"Apply the approved prompt-only tightening on StoryPromptContent from last session.\" Assistant: \"Running mode-story-fixer against that exact accepted scope — no cross-mode work, no orchestration touches.\""
+description: "Implements a scoped Story-mode fix from an explicit findings list (pairs with mode-story-reviewer); refuses to widen scope."
 model: opus
 color: purple
 memory: project

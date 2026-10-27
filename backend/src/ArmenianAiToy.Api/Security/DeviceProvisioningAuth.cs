@@ -34,6 +34,18 @@ public static class DeviceProvisioningAuth
 
     public enum Decision { Allow, Deny }
 
+    /// <summary>
+    /// THE definition of "a provisioning secret is configured": any non-empty
+    /// string, whitespace included (the gate then requires the header to equal
+    /// it exactly). <see cref="Evaluate"/> and the operator console's System
+    /// report (<c>SystemStatusReport</c>) both call this, so the report can
+    /// never say "not set / anyone can mint a device key" while the gate is
+    /// actually demanding a secret, or the reverse.
+    /// </summary>
+    public static bool IsSecretConfigured(
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] string? configuredSecret)
+        => !string.IsNullOrEmpty(configuredSecret);
+
     /// <summary>Pure decision function. <paramref name="presentedSecret"/> is the
     /// caller's <c>X-Provisioning-Secret</c> header (null/empty if absent).</summary>
     public static Decision Evaluate(
@@ -41,7 +53,7 @@ public static class DeviceProvisioningAuth
         string? configuredSecret,
         bool allowOpenRegistration)
     {
-        if (!string.IsNullOrEmpty(configuredSecret))
+        if (IsSecretConfigured(configuredSecret))
         {
             return ConstantTimeEquals(presentedSecret, configuredSecret)
                 ? Decision.Allow

@@ -9,7 +9,7 @@ minute. This is how, and what each one buys.
 Anyone reading an older commit message that claims verification was impossible
 should read it as *"was not done"*, not *"could not be done"*.
 
-## .NET 10 SDK — run the 2,542 backend tests locally
+## .NET 10 SDK — run the 3,197 backend tests locally
 
 ```sh
 dpkg --configure -a          # the image ships with dpkg mid-interrupt

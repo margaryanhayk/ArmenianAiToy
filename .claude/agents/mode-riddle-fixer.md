@@ -1,6 +1,6 @@
 ---
 name: "mode-riddle-fixer"
-description: "Use this agent to implement a scoped fix in Riddle mode AFTER a review has produced findings. Pairs with mode-riddle-reviewer in a reviewer → fixer → reviewer loop. Implementation-first BUT scope-bound: accepts only an explicit findings list and refuses to widen. Examples:\n\n- User: \"Apply the after-guess tightening from the Riddle reviewer's finding 4.4.\" Assistant: \"Launching mode-riddle-fixer with the finding as input, restating scope, and making only the minimum RiddlePromptContent edit plus targeted tests.\"\n\n- User: \"Tighten RiddleAnswerMatcher acceptance on a specific near-miss case the reviewer flagged.\" Assistant: \"Running mode-riddle-fixer bounded to RiddleAnswerMatcher and RiddleAnswerMatcherTests only.\""
+description: "Implements a scoped Riddle-mode fix from an explicit findings list (pairs with mode-riddle-reviewer); refuses to widen scope."
 model: opus
 color: orange
 memory: project

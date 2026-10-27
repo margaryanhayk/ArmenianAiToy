@@ -1,5 +1,7 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
+using System.Diagnostics.Metrics;
+using ArmenianAiToy.Application.Telemetry;
 using ArmenianAiToy.Infrastructure.OpenAI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
@@ -266,6 +268,132 @@ public class OpenAIReliabilityGateTests
 
         Assert.Equal("recovered", result);
         Assert.Equal(1, innerCalls); // probe ran — the reads did not consume it
+    }
+
+    // ---------- AI logic review 2026-10-27, C2: caller gone is not an upstream failure ----------
+
+    private static OpenAIReliabilityGate CreateGate(FakeTimeProvider clock, string provider)
+    {
+        var logger = Substitute.For<ILogger<OpenAIReliabilityGate>>();
+        return new OpenAIReliabilityGate(clock, (_, _) => Task.CompletedTask, logger, provider);
+    }
+
+    // The MeterListener API is process-wide; filtering on a unique `provider`
+    // tag keeps this test immune to other classes' gates incrementing the same
+    // counter in parallel.
+    private static List<string> CaptureFailureKinds(string provider, out MeterListener listener)
+    {
+        var kinds = new List<string>();
+        var l = new MeterListener
+        {
+            InstrumentPublished = (instrument, ml) =>
+            {
+                if (instrument.Meter.Name == AppMeter.Name
+                    && instrument.Name == "aat_chat_openai_failure_total")
+                    ml.EnableMeasurementEvents(instrument);
+            }
+        };
+        l.SetMeasurementEventCallback<long>((instrument, measurement, tags, state) =>
+        {
+            string? p = null, kind = null;
+            for (int i = 0; i < tags.Length; i++)
+            {
+                if (tags[i].Key == "provider") p = tags[i].Value as string;
+                else if (tags[i].Key == "kind") kind = tags[i].Value as string;
+            }
+            if (p == provider) lock (kinds) { kinds.Add(kind ?? "?"); }
+        });
+        l.Start();
+        listener = l;
+        return kinds;
+    }
+
+    [Fact]
+    public async Task CallerCancelled_FiveTimes_DoesNotCountAsFailure_NorTripBreaker()
+    {
+        var provider = "c2-" + Guid.NewGuid().ToString("N");
+        var clock = new FakeTimeProvider();
+        var gate = CreateGate(clock, provider);
+        var kinds = CaptureFailureKinds(provider, out var listener);
+        using var _l = listener;
+
+        // A toy that dropped mid-turn: the caller's token is cancelled and the
+        // SDK call surfaces an OperationCanceledException carrying it.
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        for (int i = 0; i < 5; i++)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+                await gate.RunAsync<string>(
+                    ct => throw new OperationCanceledException(ct), cts.Token));
+        }
+
+        // Healthy upstream: the sixth (healthy) call must not be short-circuited.
+        var result = await gate.RunAsync<string>(_ => Task.FromResult("ok"), CancellationToken.None);
+
+        Assert.Equal("ok", result);
+        Assert.False(gate.IsCircuitOpen());
+        lock (kinds) { Assert.Empty(kinds); }
+    }
+
+    [Fact]
+    public async Task CallerCancelledDuringHalfOpenProbe_FreesTheProbeSlot_DoesNotReopen()
+    {
+        var clock = new FakeTimeProvider(startDateTime: new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero));
+        var gate = CreateGate(clock);
+
+        for (int i = 0; i < 5; i++)
+        {
+            await Assert.ThrowsAnyAsync<Exception>(async () =>
+                await gate.RunAsync<string>(_ => throw Http(503), CancellationToken.None));
+        }
+        clock.Advance(TimeSpan.FromSeconds(61));
+
+        // The probe's caller drops mid-flight: not a verdict on the upstream.
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await gate.RunAsync<string>(ct => throw new OperationCanceledException(ct), cts.Token));
+
+        // The very next call is allowed to probe (slot freed, breaker NOT reopened for 60 s).
+        int calls = 0;
+        var result = await gate.RunAsync<string>(_ =>
+        {
+            calls++;
+            return Task.FromResult("recovered");
+        }, CancellationToken.None);
+
+        Assert.Equal("recovered", result);
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task OperationCanceled_WithoutCallerCancellation_StillCountsAsTimeout()
+    {
+        // The adapter's own 30 s ceiling surfaces as an OCE while the caller's
+        // token is NOT cancelled — that is a real upstream timeout and must
+        // keep counting (and retrying) exactly as before.
+        var provider = "c2-" + Guid.NewGuid().ToString("N");
+        var clock = new FakeTimeProvider();
+        var gate = CreateGate(clock, provider);
+        var kinds = CaptureFailureKinds(provider, out var listener);
+        using var _l = listener;
+        int calls = 0;
+
+        for (int i = 0; i < 5; i++)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+                await gate.RunAsync<string>(_ =>
+                {
+                    calls++;
+                    throw new OperationCanceledException("adapter 30 s ceiling");
+                }, CancellationToken.None));
+        }
+
+        Assert.Equal(10, calls); // Timeout is retryable: 5 calls x 2 attempts
+        lock (kinds) { Assert.Equal(10, kinds.Count(k => k == "timeout")); }
+        await Assert.ThrowsAsync<OpenAIReliabilityCircuitOpenException>(async () =>
+            await gate.RunAsync<string>(_ => Task.FromResult("x"), CancellationToken.None));
     }
 
     // ---------- test helpers ----------

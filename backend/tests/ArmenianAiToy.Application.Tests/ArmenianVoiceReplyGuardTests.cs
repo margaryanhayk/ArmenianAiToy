@@ -84,6 +84,26 @@ public class ArmenianVoiceReplyGuardTests
         Assert.False(ArmenianVoiceReplyGuard.IsGarbledInput("քրռռռռ հեքիաթ բխխխ"));
     }
 
+    // AI logic review 2026-10-27, D10: a drawn-out VOWEL is child prosody («հաաա» is a listed YES
+    // token), a repeated consonant is noise. The guard must not swallow the former.
+    [Theory]
+    [InlineData("Հաաա")]
+    [InlineData("հաաա")]
+    [InlineData("Այոոո")]
+    public void IsGarbledInput_DrawnOutVowel_IsNotGarbled(string input)
+    {
+        Assert.False(ArmenianVoiceReplyGuard.IsGarbledInput(input));
+    }
+
+    [Theory]
+    [InlineData("քրռռռռ բխխխ")]
+    [InlineData("աքքք")]
+    [InlineData("Ոչչչ")]
+    public void IsGarbledInput_RepeatedConsonantRun_StaysGarbled(string input)
+    {
+        Assert.True(ArmenianVoiceReplyGuard.IsGarbledInput(input));
+    }
+
     // -----------------------------------------------------------------
     // EnforceMaxSentences
     // -----------------------------------------------------------------
@@ -140,6 +160,30 @@ public class ArmenianVoiceReplyGuardTests
     {
         Assert.Equal(string.Empty, ArmenianVoiceReplyGuard.EnforceMaxSentences(null, 3));
         Assert.Equal(string.Empty, ArmenianVoiceReplyGuard.EnforceMaxSentences("", 3));
+    }
+
+    // AI logic review 2026-10-27, D5: an ASCII ellipsis used to burn the whole cap and cut inside the run.
+    [Fact]
+    public void EnforceMaxSentences_AsciiEllipsisCountsAsOneBoundary()
+    {
+        var reply = "Հմմ... Այո, դա լավ միտք է։ Արի խաղանք։ Պատրա՞ստ ես։";
+        Assert.Equal(
+            "Հմմ... Այո, դա լավ միտք է։ Արի խաղանք։",
+            ArmenianVoiceReplyGuard.EnforceMaxSentences(reply, 3));
+    }
+
+    [Fact]
+    public void EnforceMaxSentences_RepeatedVerjakCountsAsOneBoundaryAndIsKeptWhole()
+    {
+        var reply = "Մեկ։։ Երկու։ Երեք։ Չորս։";
+        Assert.Equal("Մեկ։։ Երկու։ Երեք։", ArmenianVoiceReplyGuard.EnforceMaxSentences(reply, 3));
+    }
+
+    [Fact]
+    public void EnforceMaxSentences_CutLandsOnEllipsis_KeepsRunWhole()
+    {
+        var reply = "Մեկ։ Երկու։ Երեք... Չորս։";
+        Assert.Equal("Մեկ։ Երկու։ Երեք...", ArmenianVoiceReplyGuard.EnforceMaxSentences(reply, 3));
     }
 
     // -----------------------------------------------------------------

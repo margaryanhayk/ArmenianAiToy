@@ -1,6 +1,6 @@
 ---
 name: "mode-story-reviewer"
-description: "Use this agent to deeply inspect the Story mode implementation, prompt, tests, benchmark, and transitions. Finds bugs, product gaps, regressions, prompt drift, and transition issues specific to Story. Review-first; does not default to coding. Examples:\n\n- User: \"Something feels off with story continuations lately.\" Assistant: \"Launching mode-story-reviewer to inspect StoryPromptContent, ChoiceNormalizer, StoryMemory, and recent Story-mode commits, then produce a structured findings report.\"\n\n- User: \"Can you check whether Story → Curiosity → Story transitions still work cleanly?\" Assistant: \"Running mode-story-reviewer focused on the PREVIOUS_MODE signal, ModeDetector priority rules, and the Curiosity partner code path.\"\n\n- User: \"Is the StoryBenchmark baseline still meaningful?\" Assistant: \"Using mode-story-reviewer to compare current outputs against the current baseline and report drift without refreshing the baseline itself.\""
+description: "Review-first inspection of Story mode (StoryPromptContent, ChoiceNormalizer, StoryMemory, benchmark, transitions): bugs, prompt drift, transition issues."
 model: opus
 color: purple
 memory: project

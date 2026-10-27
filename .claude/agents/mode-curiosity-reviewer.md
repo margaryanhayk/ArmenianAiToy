@@ -1,6 +1,6 @@
 ---
 name: "mode-curiosity-reviewer"
-description: "Use this agent to deeply inspect the Curiosity Window mode implementation, prompt, tests, benchmark, and transitions. Finds answer-quality drift, lecture tone, over-explanation, unsafe redirection failures, and Story↔Curiosity transition bugs. Review-first; does not default to coding. Examples:\n\n- User: \"Curiosity answers are getting long and lecture-y.\" Assistant: \"Launching mode-curiosity-reviewer to inspect CuriosityPromptContent, the answer-length constraint, and the Curiosity baseline.\"\n\n- User: \"Story is getting hijacked whenever the child asks why.\" Assistant: \"Running mode-curiosity-reviewer focused on the PREVIOUS_MODE signal and the return-to-play behavior after a Curiosity answer.\""
+description: "Review-first inspection of Curiosity Window mode (prompt, tests, benchmark, transitions): lecture tone, over-length answers, unsafe redirection, Story↔Curiosity transition bugs."
 model: opus
 color: yellow
 memory: project

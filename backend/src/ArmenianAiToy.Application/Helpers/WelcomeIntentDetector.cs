@@ -235,6 +235,24 @@ public static class WelcomeIntentDetector
         return hasYes ? YesNo.Yes : YesNo.Unknown;
     }
 
+    /// <summary>
+    /// True when any token of <paramref name="message"/> starts with «հարց»
+    /// (ask / question: «հարցնել», «հարց ունեմ», «մի բան հարցնել») — the
+    /// natural answers to the welcome menu's fourth option, which
+    /// <see cref="ModeDetector"/> has no starter for. Deliberately NOT a
+    /// ModeDetector starter: Curiosity is checked first there, so the stem would
+    /// hijack «Հարցրու ինձ հանելուկ» (a riddle request). The caller uses this
+    /// only when ModeDetector found nothing. AI logic review 2026-10-27, D1.
+    /// </summary>
+    public static bool IsAskIntent(string? message)
+    {
+        foreach (var token in Normalize(message).Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (token.StartsWith("հարց", StringComparison.Ordinal)) return true;
+        }
+        return false;
+    }
+
     /// <summary>Lowercases, strips the Armenian intra-word marks ՞ ՛ ՜, and
     /// flattens every punctuation mark to a space so a one-word answer like
     /// «Այո՛։» tokenises to «այո». Mirrors ModeDetector.NormalizeForMatch and

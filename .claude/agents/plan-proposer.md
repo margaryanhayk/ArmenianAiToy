@@ -1,6 +1,6 @@
 ---
 name: "plan-proposer"
-description: "Use this agent to generate a concrete implementation plan for a single task. It produces a plan document with exact files, exact changes, exact insertion points, verification steps, and rollback strategy. Launch this AFTER the repo-scout and BEFORE any implementation.\n\nExamples:\n\n- User: \"I want to add story memory injection into prompts\"\n  Assistant: \"Let me launch the plan-proposer agent to design the exact implementation plan before we write code.\"\n\n- User: \"Add a new endpoint for device statistics\"\n  Assistant: \"I'll use the plan-proposer agent to plan the exact files, routes, and DTOs needed.\"\n\n- User: \"We need to fix the choice normalization for Armenian input\"\n  Assistant: \"Let me have the plan-proposer agent create a targeted fix plan with verification steps.\""
+description: "Writes a concrete implementation plan for one task: exact files, changes, insertion points, verification steps, rollback. After repo-scout, before any implementation."
 model: opus
 color: green
 ---

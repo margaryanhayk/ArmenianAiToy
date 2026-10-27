@@ -1,6 +1,6 @@
 ---
 name: "test-runner"
-description: "Use this agent to run tests, report results, and diagnose failures. Launch it after any code change as a validation step, or before commits to verify everything passes.\n\nExamples:\n\n- Context: Code changes were just made.\n  Assistant: \"Let me launch the test-runner agent to verify all tests pass.\"\n\n- Context: A test is failing and needs diagnosis.\n  Assistant: \"I'll use the test-runner agent to diagnose the failure.\"\n\n- Context: About to commit.\n  Assistant: \"Let me run the test-runner agent as a pre-commit validation step.\""
+description: "Runs tests, reports results and diagnoses failures. Use after any code change and before a commit."
 model: sonnet
 color: cyan
 ---

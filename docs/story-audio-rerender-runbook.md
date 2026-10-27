@@ -235,8 +235,9 @@ has not reached. It needs nothing installed.
 > the ElevenLabs narration the toy plays from SD (`story-audio/`, this map) and
 > an OpenAI-TTS render of the same story that the backend streams over Wi-Fi
 > (`StoryAudio:CacheRoot`, its own map, written automatically by
-> `StoryAudioController`). `OffsetToSegment` reads the cache map first and this
-> one second, so each is only ever paired with its own audio. Moving this file
+> `StoryAudioController`). `OffsetToSegment` reads THIS (shipped) map first and
+> the cache map only when no shipped map exists (2026-10-27, B4 — the SD child
+> is the production path), so each is only ever paired with its own audio. Moving this file
 > into the cache folder would make a map of one file be read as a map of the
 > other — worse than having no map at all.
 >

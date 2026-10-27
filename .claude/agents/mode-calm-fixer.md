@@ -1,6 +1,6 @@
 ---
 name: "mode-calm-fixer"
-description: "Use this agent to implement a scoped fix in Calm/Bedtime mode AFTER a review has produced findings. Pairs with mode-calm-reviewer in a reviewer → fixer → reviewer loop. Implementation-first BUT scope-bound: accepts only an explicit findings list and refuses to widen. Examples:\n\n- User: \"Apply the approved no-fear tightening from the Calm reviewer's finding 4.1.\" Assistant: \"Launching mode-calm-fixer with the finding as input, restating scope, and making only the minimum CalmPromptContent edit plus targeted tests.\"\n\n- User: \"Implement the ladder-shape correction the Calm reviewer flagged — prompt-only, nothing else.\" Assistant: \"Running mode-calm-fixer bounded to CalmPromptContent and CalmPromptContentTests.\""
+description: "Implements a scoped Calm/Bedtime fix from an explicit findings list (pairs with mode-calm-reviewer); refuses to widen scope."
 model: opus
 color: blue
 memory: project

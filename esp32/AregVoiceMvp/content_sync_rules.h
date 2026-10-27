@@ -867,6 +867,30 @@ inline bool cs_index_should_restore_backup(bool primary_exists, bool backup_exis
     return !primary_exists && backup_exists;
 }
 
+/// The one verdict a sync attempt reports (and the heartbeat forwards).
+///
+/// Ranking, highest first:
+///   failed  — the whole attempt died (manifest/parse/alloc), or the index
+///             could not be written (the next boot re-downloads the lot).
+///   partial — at least one ITEM of any namespace did not land: a story
+///             narration, a per-story clip, a welcome clip, a music track,
+///             a game clip, or the games work-list allocation. Partial
+///             keeps the short retry backoff and the parent-visible E-401.
+///   ok      — nothing failed and the index is on the card.
+///
+/// `item_failures` must count EVERY namespace's per-item failures, not
+/// just the narration counter: before 2026-10-27 the verdict looked only
+/// at `story_failed`, so 78 of 92 game clips failing (the 2026-08-07
+/// field log) reported "ok" and waited the clean 6 h instead of the 5 min
+/// backoff (AI logic review F6).
+inline const char *cs_sync_verdict(bool whole_failed, int story_failed,
+                                   int item_failures, bool index_written) {
+    if (whole_failed) return "failed";
+    if (story_failed > 0 || item_failures > 0) return "partial";
+    if (!index_written) return "failed";
+    return "ok";
+}
+
 /// Bounded copy that always NUL-terminates. Returns false when the
 /// source had to be truncated, so callers can reject rather than store a
 /// silently shortened id/hash (truncation is only tolerated for titles).

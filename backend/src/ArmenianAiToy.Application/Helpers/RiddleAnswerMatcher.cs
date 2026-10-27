@@ -46,6 +46,17 @@ public static class RiddleAnswerMatcher
         foreach (var token in normGuess.Split(' ', StringSplitOptions.RemoveEmptyEntries))
         {
             if (token == normAnswer) return Result.Match;
+            // AI logic review 2026-10-27, D2: Normalize peels a stem-final ն/ի off the ANSWER
+            // («շուն»→«շու») but an article-bearing guess loses only one layer («շունը»→«շուն»),
+            // so a correct «Շունը» was Wrong. Peel the token once more and compare...
+            if (StripSuffix(token) == normAnswer) return Result.Match;
+            // ...and accept a bare definite article (-ն/-ը) on a short answer («ձին» vs «ձի»),
+            // which the 4-char floors below would otherwise reject.
+            if (token.Length == normAnswer.Length + 1 && (token[^1] is 'ն' or 'ը')
+                && token[..^1] == normAnswer)
+            {
+                return Result.Match;
+            }
             if (normAnswer.Length >= 4 && token.Length >= 4
                 && Math.Abs(token.Length - normAnswer.Length) <= 1
                 && EditDistanceAtMost1(token, normAnswer))

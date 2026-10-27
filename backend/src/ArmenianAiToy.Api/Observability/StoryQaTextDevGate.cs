@@ -35,9 +35,14 @@ public static class StoryQaTextDevGate
     /// <summary>The single route this guard covers.</summary>
     public const string Path = "/api/story-qa-text";
 
-    /// <summary>Whether <paramref name="path"/> is exactly the guarded
-    /// harness route. Case-insensitive, no prefix matching — this route
-    /// has no sub-paths.</summary>
+    /// <summary>Whether <paramref name="path"/> is the guarded harness route
+    /// or anything beneath it. Case-insensitive and segment-bounded
+    /// (<see cref="PathString.StartsWithSegments(PathString, StringComparison)"/>,
+    /// the same idiom as the <c>/api/internal</c> gate): routing treats a
+    /// trailing slash as the same endpoint, so an exact match let
+    /// <c>/api/story-qa-text/</c> reach model binding (AI logic review
+    /// 2026-10-27, B12), while a sibling such as <c>/api/story-qa-textx</c>
+    /// or <c>/api/story-qa</c> still does not match.</summary>
     public static bool IsStoryQaTextPath(PathString path) =>
-        path.Equals(Path, StringComparison.OrdinalIgnoreCase);
+        path.StartsWithSegments(Path, StringComparison.OrdinalIgnoreCase);
 }
