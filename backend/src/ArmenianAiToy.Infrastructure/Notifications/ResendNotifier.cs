@@ -293,10 +293,22 @@ public sealed class ResendNotifier : INotifier
     // (and, with the strict validator, a refused boot). Both name
     // families resolve; the app-style key wins when both are present.
 
+    /// <summary>The config keys <see cref="ResolveApiKey"/> reads, in
+    /// precedence order. The ONE list: the resolver iterates it, and the
+    /// operator console's System report asks <see cref="HasApiKey"/> instead
+    /// of copying it, so an alias added here is seen everywhere (and a test
+    /// walks this list to prove the report agrees for each entry).</summary>
+    public static readonly IReadOnlyList<string> ApiKeyConfigKeys =
+    [
+        "Notifications:Resend:ApiKey", "Resend:ApiKey", "RESEND_API_KEY", "Resend:Key",
+    ];
+
     internal static string ResolveApiKey(IConfiguration c) =>
-        FirstNonEmpty(
-            c["Notifications:Resend:ApiKey"],
-            c["Resend:ApiKey"], c["RESEND_API_KEY"], c["Resend:Key"]);
+        FirstNonEmpty(ApiKeyConfigKeys.Select(k => c[k]).ToArray());
+
+    /// <summary>True when <see cref="ResolveApiKey"/> would find a key under
+    /// any alias. Never exposes the key itself.</summary>
+    public static bool HasApiKey(IConfiguration c) => ResolveApiKey(c).Length > 0;
 
     internal static string ResolveFrom(IConfiguration c) =>
         FirstNonEmpty(

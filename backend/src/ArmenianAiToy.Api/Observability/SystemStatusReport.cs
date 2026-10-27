@@ -1,6 +1,7 @@
 using ArmenianAiToy.Api.Security;
 using ArmenianAiToy.Application.Helpers;
 using ArmenianAiToy.Infrastructure.Ai;
+using ArmenianAiToy.Infrastructure.Notifications;
 
 namespace ArmenianAiToy.Api.Observability;
 
@@ -106,8 +107,10 @@ public static class SystemStatusReport
 
         // ---- what is configured (presence only — never a value) ----
         var audio = AudioBlobStoreRootResolver.Resolve(isDevelopment, config["Audio:BlobStoreRoot"]);
-        var forwarded = config.GetValue<bool>("ForwardedHeaders:Enabled");
-        var provisioningSecretSet = FirstNonEmpty(config["Devices:ProvisioningSecret"]) is not null;
+        var forwarded = ReadBool(config, "ForwardedHeaders:Enabled");
+        // The gate's own predicate (any non-empty string, whitespace included), not a
+        // second opinion: report and DeviceProvisioningAuth.Evaluate cannot disagree.
+        var provisioningSecretSet = DeviceProvisioningAuth.IsSecretConfigured(config["Devices:ProvisioningSecret"]);
         var configured = new Dictionary<string, bool>
         {
             ["openaiKey"] = !string.IsNullOrWhiteSpace(config["OpenAI:ApiKey"]),
@@ -125,16 +128,18 @@ public static class SystemStatusReport
             ["notificationsKey"] = NotificationsKeyPresent(config),
             ["provisioningSecret"] = provisioningSecretSet,
             ["googleClientId"] = FirstNonEmpty(config["GoogleAuth:ClientId"]) is not null,
-            ["firmwareUpdateEnabled"] = config.GetValue<bool>("FirmwareUpdate:Enabled"),
+            ["firmwareUpdateEnabled"] = ReadBool(config, "FirmwareUpdate:Enabled"),
             // Mirrors DeviceController.GetFirmwareImage's gate (non-empty AND
             // absolute) without touching the disk: "set correctly", not "file exists".
             ["firmwareImagePath"] = FirstNonEmpty(config["FirmwareUpdate:ImagePath"]) is { } fwPath
                 && Path.IsPathRooted(fwPath),
-            ["contentSyncEnabled"] = config.GetValue<bool>("ContentSync:Enabled"),
-            // Same decision Program.cs applies: a real hostname beyond "*".
+            ["contentSyncEnabled"] = ReadBool(config, "ContentSync:Enabled"),
+            // Same decision Program.cs applies, with the real environment: a real
+            // hostname beyond "*" — or Development, which deliberately runs with
+            // "*" and raises no warning.
             ["allowedHostsPinned"] = HostFilteringConfig
-                .Resolve(isDevelopment: false, config["AllowedHosts"]).Warning is null,
-            ["requireHttps"] = config.GetValue<bool>("Security:RequireHttps"),
+                .Resolve(isDevelopment, config["AllowedHosts"]).Warning is null,
+            ["requireHttps"] = ReadBool(config, "Security:RequireHttps"),
         };
 
         // The only non-boolean row: the transport NAME (log | smtp | resend) —
@@ -154,13 +159,13 @@ public static class SystemStatusReport
             checks.Add(new Check(Warn, "alerts_off",
                 "Alerts__WebhookUrl is not set — nobody is notified when the database, OpenAI, moderation or backups fail."));
 
-        if (!isDevelopment && transport == "log")
+        if (!isDevelopment && transport == NotifierTransport.Log)
             checks.Add(new Check(Warn, "email_log_only",
                 "Notifications:Transport is log — password reset and verification mail go to stdout only. " +
                 "Set Notifications__Transport=resend (and Notifications__Resend__ApiKey)."));
         if (!isDevelopment && !provisioningSecretSet)
             checks.Add(new Check(Warn, "provisioning_secret_missing",
-                config.GetValue<bool>("Devices:AllowOpenRegistration")
+                ReadBool(config, "Devices:AllowOpenRegistration")
                     ? "Devices__ProvisioningSecret is not set and Devices:AllowOpenRegistration is on — anyone can mint a device key."
                     : "Devices__ProvisioningSecret is not set — registering a new toy is refused until it is."));
 
@@ -178,22 +183,31 @@ public static class SystemStatusReport
 
     // Mirrors NotifierTransport.ResolveImplementation's selector (missing or
     // empty = log; trimmed, case-insensitive) without its validation side
-    // effects — a report must never throw.
+    // effects — a report must never throw. The names are NotifierTransport's own
+    // constants; a test walks the selector's real result for each to pin it.
     private static string ResolveTransportName(IConfiguration config)
     {
         var raw = config["Notifications:Transport"];
-        var name = string.IsNullOrWhiteSpace(raw) ? "log" : raw.Trim().ToLowerInvariant();
-        return name is "log" or "smtp" or "resend" ? name : "unrecognised";
+        var name = string.IsNullOrWhiteSpace(raw) ? NotifierTransport.Log : raw.Trim().ToLowerInvariant();
+        return name is NotifierTransport.Log or NotifierTransport.Smtp or NotifierTransport.Resend
+            ? name
+            : "unrecognised";
     }
 
-    // Either transport's secret: a Resend key under any alias
-    // ResendNotifier.ResolveApiKey accepts (that helper is internal to
-    // Infrastructure, so the names are mirrored), or an SMTP password.
+    // Either transport's secret: a Resend key under any alias — asked of
+    // ResendNotifier itself, not copied — or an SMTP password.
     private static bool NotificationsKeyPresent(IConfiguration config)
-        => FirstNonEmpty(
-               config["Notifications:Resend:ApiKey"], config["Resend:ApiKey"],
-               config["RESEND_API_KEY"], config["Resend:Key"],
-               config["Notifications:Smtp:Password"]) is not null;
+        => ResendNotifier.HasApiKey(config)
+           || !string.IsNullOrWhiteSpace(config["Notifications:Smtp:Password"]);
+
+    // The same parse the code paths this report mirrors use for these keys
+    // (DeviceController register gate, DependencyInjection FirmwareUpdate,
+    // ContentSyncOptions.Resolve): bool.TryParse, anything else = off.
+    // IConfiguration.GetValue<bool> THROWS on "1" / "yes", and a report must
+    // never throw — a Railway "Devices__AllowOpenRegistration=1" would blank
+    // the whole System tab.
+    private static bool ReadBool(IConfiguration config, string key, bool fallback = false)
+        => bool.TryParse(config[key], out var value) ? value : fallback;
 
     // The boot already refused an unknown provider; a report must never
     // throw, so an unexpected value is shown as-is instead.
