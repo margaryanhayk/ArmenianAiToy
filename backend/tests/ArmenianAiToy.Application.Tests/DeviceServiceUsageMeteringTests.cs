@@ -199,6 +199,86 @@ public class DeviceServiceUsageMeteringTests
         }
     }
 
+    /// <summary>
+    /// AI logic review 2026-10-27, C3: the UPDATE-side twin of
+    /// <see cref="RaceInjectingDbContext"/>. On the first SaveChangesAsync
+    /// that carries a MODIFIED usage row (read-modify-write of an existing
+    /// day), a second context increments that very row and commits first —
+    /// two overlapping UPDATEs, which without a concurrency token both
+    /// succeed and one increment is silently lost.
+    /// </summary>
+    private sealed class UpdateRaceInjectingDbContext : AppDbContext
+    {
+        private readonly DbContextOptions<AppDbContext> _options;
+        private bool _injected;
+
+        public UpdateRaceInjectingDbContext(DbContextOptions<AppDbContext> options) : base(options)
+            => _options = options;
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            if (!_injected)
+            {
+                var modified = ChangeTracker.Entries<DeviceUsageDay>()
+                    .FirstOrDefault(e => e.State == EntityState.Modified);
+                if (modified is not null)
+                {
+                    _injected = true;
+                    await using var racer = new AppDbContext(_options);
+                    var theirs = await racer.Set<DeviceUsageDay>()
+                        .SingleAsync(u => u.Id == modified.Entity.Id, cancellationToken);
+                    theirs.Questions += 1;
+                    theirs.EstimatedUsd += 0.01m;
+                    await racer.SaveChangesAsync(cancellationToken);
+                }
+            }
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task RecordUsageQuestionAsync_ConcurrentUpdateRace_RetriesAndBothIncrementsLand()
+    {
+        var conn = new SqliteConnection("Data Source=:memory:");
+        await conn.OpenAsync();
+        try
+        {
+            var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(conn).Options;
+            var seedDb = new AppDbContext(options);
+            await seedDb.Database.EnsureCreatedAsync();
+            var device = Dev();
+            seedDb.Devices.Add(device);
+            var now = DateTime.UtcNow;
+            seedDb.Set<DeviceUsageDay>().Add(new DeviceUsageDay
+            {
+                Id = Guid.NewGuid(),
+                DeviceId = device.Id,
+                DayUtc = now.Date,
+                Questions = 3,
+                EstimatedUsd = 0.03m,
+            });
+            await seedDb.SaveChangesAsync();
+
+            var dbUnderTest = new UpdateRaceInjectingDbContext(options);
+            var service = new DeviceService(dbUnderTest, Substitute.For<ILogger<DeviceService>>());
+
+            await service.RecordUsageQuestionAsync(device.Id, 0.01m, now);
+
+            var verifyDb = new AppDbContext(options);
+            var row = await verifyDb.Set<DeviceUsageDay>()
+                .SingleAsync(u => u.DeviceId == device.Id);
+            // Start (3, $0.03) + the racing writer's +1/+$0.01 + this call's
+            // +1/+$0.01. The unguarded UPDATE overwrote the racer's increment
+            // with (4, $0.04).
+            Assert.Equal(5, row.Questions);
+            Assert.Equal(0.05m, row.EstimatedUsd);
+        }
+        finally
+        {
+            await conn.DisposeAsync();
+        }
+    }
+
     // ---------- GetUsageAllowanceStatusAsync ----------
 
     [Fact]

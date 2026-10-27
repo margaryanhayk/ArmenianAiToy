@@ -31,7 +31,9 @@ repo's 4-characters-per-token approximation.
 | TTS, ~120 chars | $0.00180 | 23% |
 | **total** | **$0.0078** | |
 
-The 2,086 tokens is **measured, not assumed**: 8,343 characters is the mean
+The 2,086 tokens is **derived from measured prompt characters at the 4
+chars/token approximation** (8,343 / 4); the characters were measured, the
+tokens were not (AI logic review 2026-10-27, C5). 8,343 characters is the mean
 assembled prompt across all nine guided stories at every segment, obtained by
 calling `LibraryStoryQuestionPromptBuilder.Build` directly and summing
 `SystemPrompt` + `UserMessage`. Two thirds of the cost of answering a child is

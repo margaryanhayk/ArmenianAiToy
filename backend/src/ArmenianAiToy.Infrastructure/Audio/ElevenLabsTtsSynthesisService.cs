@@ -48,6 +48,14 @@ public class ElevenLabsTtsSynthesisService
 {
     private const string MimeMp3 = "audio/mpeg";
 
+    // AI logic review 2026-10-27, C8: per-attempt ceiling on the BUFFERED path.
+    // The shared 100 s HttpClient.Timeout is 3x the toy's 30 s read window
+    // (AREG_HTTP_READ_MS), so a hung ElevenLabs call outlived the toy. Same
+    // 30 s as OpenAITtsSynthesisService; settable only so a test need not wait.
+    internal TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(30);
+    private const int MaxAttempts = 2;
+    private static readonly TimeSpan RetryBackoff = TimeSpan.FromMilliseconds(400);
+
     private readonly HttpClient _http;
     private readonly string _apiKey;
     private readonly string _voiceId;
@@ -71,9 +79,32 @@ public class ElevenLabsTtsSynthesisService
     public async Task<AudioSynthesisResult> SynthesizeArmenianAsync(
         string text, CancellationToken cancellationToken = default)
     {
-        using var resp = await SendAsync(text, stream: false, cancellationToken);
-        var bytes = await resp.Content.ReadAsByteArrayAsync(cancellationToken);
-        return new AudioSynthesisResult(bytes, MimeMp3);
+        // AI logic review 2026-10-27, C8: ceiling + one retry, mirroring
+        // OpenAITtsSynthesisService. The retry fires only when the CALLER did
+        // not cancel (an own-ceiling timeout leaves cancellationToken
+        // un-cancelled); on the last attempt the filter is false and the
+        // exception flows out to the controller's sanitized-502 catch.
+        // The STREAMING method below is deliberately left alone: a ceiling
+        // linked here would be disposed with this scope while the toy is
+        // still reading the stream.
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(RequestTimeout);
+                using var resp = await SendAsync(text, stream: false, cts.Token);
+                var bytes = await resp.Content.ReadAsByteArrayAsync(cts.Token);
+                return new AudioSynthesisResult(bytes, MimeMp3);
+            }
+            catch (Exception ex) when (
+                attempt < MaxAttempts && !cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogWarning(ex,
+                    "ElevenLabs TTS attempt {Attempt} failed transiently; retrying once", attempt);
+                await Task.Delay(RetryBackoff, cancellationToken);
+            }
+        }
     }
 
     public async Task<AudioSynthesisStreamResult> SynthesizeArmenianStreamAsync(

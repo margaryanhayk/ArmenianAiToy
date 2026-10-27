@@ -249,6 +249,49 @@ public class DeviceServiceOtaTests
         Assert.Equal(24, d.ResetReason!.Length);
     }
 
+    // AI logic review 2026-10-27, B10: the six remaining device-writable free-text
+    // columns were stored verbatim (no HasMaxLength, SQLite enforces none, the
+    // heartbeat has no body limit below Kestrel's 30 MB). Same truncate-not-reject
+    // posture as the three fields above.
+    [Fact]
+    public async Task UpdateFirmwareReport_LongFreeTextIsTruncated()
+    {
+        var (svc, db) = Create();
+        var id = Guid.NewGuid();
+        db.Add(new Device { Id = id, MacAddress = "m", Name = "t" });
+        await db.SaveChangesAsync();
+        var huge = new string('x', 5000);
+
+        await svc.UpdateFirmwareReportAsync(id, new DeviceHeartbeatRequest(
+            FirmwareVersion: huge, FirmwareBuild: huge, BoardModel: huge,
+            PartitionName: huge, LastOtaStatus: huge, ContentStories: huge), Now);
+
+        var d = await db.Set<Device>().FirstAsync(x => x.Id == id);
+        Assert.Equal(32, d.FirmwareVersion!.Length);
+        Assert.Equal(64, d.FirmwareBuild!.Length);
+        Assert.Equal(48, d.BoardModel!.Length);
+        Assert.Equal(16, d.PartitionName!.Length);
+        Assert.Equal(48, d.LastOtaStatus!.Length);
+        Assert.Equal(1024, d.ContentStories!.Length);
+    }
+
+    [Fact]
+    public async Task UpdateFirmwareReport_ExplicitEmptyContentStories_StaysEmptyNotNull()
+    {
+        // "Present but empty" (a card with no stories) is a real report and is
+        // not the same as "absent" (leave the stored value alone) - the cap must
+        // not collapse it to null the way NormalizeReported does.
+        var (svc, db) = Create();
+        var id = Guid.NewGuid();
+        db.Add(new Device { Id = id, MacAddress = "m", Name = "t", ContentStories = "a,b" });
+        await db.SaveChangesAsync();
+
+        await svc.UpdateFirmwareReportAsync(id, new DeviceHeartbeatRequest(ContentStories: ""), Now);
+
+        var d = await db.Set<Device>().FirstAsync(x => x.Id == id);
+        Assert.Equal("", d.ContentStories);
+    }
+
     [Theory]
     [InlineData(-1)]
     [InlineData(int.MaxValue)]

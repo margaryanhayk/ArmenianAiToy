@@ -97,6 +97,96 @@ public class ElevenLabsTtsSynthesisServiceTests
         Assert.DoesNotContain("test-key", ex.Message);
     }
 
+    // ── AI logic review 2026-10-27, C8: ceiling + one retry on the buffered path ──
+
+    private sealed class ScriptedHandler : HttpMessageHandler
+    {
+        public int Requests;
+        public Queue<HttpStatusCode> Script = new();
+        public Func<CancellationToken, Task>? OnRequest;
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken ct)
+        {
+            Interlocked.Increment(ref Requests);
+            if (OnRequest is not null) await OnRequest(ct);
+            var status = Script.Count > 0 ? Script.Dequeue() : HttpStatusCode.OK;
+            return new HttpResponseMessage(status)
+            {
+                Content = new ByteArrayContent(Encoding.ASCII.GetBytes("MP3BYTES")),
+            };
+        }
+    }
+
+    private static ElevenLabsTtsSynthesisService CreateScripted(
+        ScriptedHandler handler, TimeSpan? timeout = null) =>
+        new(new HttpClient(handler), "test-key", "voice123", "eleven_v3",
+            Substitute.For<ILogger<ElevenLabsTtsSynthesisService>>())
+        {
+            RequestTimeout = timeout ?? TimeSpan.FromSeconds(30),
+        };
+
+    [Fact]
+    public async Task Buffered_TransientFailureThenSuccess_RetriesOnceAndReturnsAudio()
+    {
+        var h = new ScriptedHandler();
+        h.Script.Enqueue(HttpStatusCode.ServiceUnavailable);
+        h.Script.Enqueue(HttpStatusCode.OK);
+        var svc = CreateScripted(h);
+
+        var result = await svc.SynthesizeArmenianAsync("Բարև՛");
+
+        Assert.Equal("MP3BYTES", Encoding.ASCII.GetString(result.Content));
+        Assert.Equal(2, h.Requests);
+    }
+
+    [Fact]
+    public async Task Buffered_FailsTwice_ThrowsAfterExactlyTwoRequests()
+    {
+        var h = new ScriptedHandler();
+        h.Script.Enqueue(HttpStatusCode.ServiceUnavailable);
+        h.Script.Enqueue(HttpStatusCode.ServiceUnavailable);
+        var svc = CreateScripted(h);
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(
+            () => svc.SynthesizeArmenianAsync("Բարև՛"));
+
+        Assert.Contains("503", ex.Message);
+        Assert.Equal(2, h.Requests);
+    }
+
+    [Fact]
+    public async Task Buffered_CallerGoneMidRequest_IsNotRetried()
+    {
+        using var caller = new CancellationTokenSource();
+        var h = new ScriptedHandler();
+        h.Script.Enqueue(HttpStatusCode.ServiceUnavailable);
+        h.OnRequest = _ => { caller.Cancel(); return Task.CompletedTask; };
+        var svc = CreateScripted(h);
+
+        await Assert.ThrowsAnyAsync<Exception>(
+            () => svc.SynthesizeArmenianAsync("Բարև՛", caller.Token));
+
+        Assert.Equal(1, h.Requests);
+    }
+
+    [Fact]
+    public async Task Buffered_HungUpstream_IsCutOffByTheOwnCeiling_NotTheCallersToken()
+    {
+        // The handler never answers. The caller's token is a 5 s safety net
+        // only: the service's OWN ceiling (100 ms here, 30 s in production)
+        // must fire first, so the caller token stays un-cancelled.
+        var h = new ScriptedHandler { OnRequest = ct => Task.Delay(Timeout.Infinite, ct) };
+        var svc = CreateScripted(h, TimeSpan.FromMilliseconds(100));
+        using var safety = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => svc.SynthesizeArmenianAsync("Բարև՛", safety.Token));
+
+        Assert.False(safety.IsCancellationRequested);
+        Assert.Equal(2, h.Requests); // timeout is transient: one retry, also cut off
+    }
+
     [Fact]
     public void Adapter_ImplementsBothSynthesisContracts()
     {

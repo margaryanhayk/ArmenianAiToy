@@ -252,17 +252,25 @@ public class DeviceService : IDeviceService
         }
         // Only overwrite fields the device actually sent; a partial report
         // never blanks a previously-reported value.
-        if (report.FirmwareVersion is not null) device.FirmwareVersion = report.FirmwareVersion;
-        if (report.FirmwareBuild is not null) device.FirmwareBuild = report.FirmwareBuild;
-        if (report.BoardModel is not null) device.BoardModel = report.BoardModel;
-        if (report.PartitionName is not null) device.PartitionName = report.PartitionName;
-        if (report.LastOtaStatus is not null) device.LastOtaStatus = report.LastOtaStatus;
+        // AI logic review 2026-10-27, B10: device-writable free text is capped
+        // (TruncateReported), never stored verbatim.
+        if (report.FirmwareVersion is not null)
+            device.FirmwareVersion = TruncateReported(report.FirmwareVersion, MaxFirmwareVersionLength);
+        if (report.FirmwareBuild is not null)
+            device.FirmwareBuild = TruncateReported(report.FirmwareBuild, MaxFirmwareBuildLength);
+        if (report.BoardModel is not null)
+            device.BoardModel = TruncateReported(report.BoardModel, MaxBoardModelLength);
+        if (report.PartitionName is not null)
+            device.PartitionName = TruncateReported(report.PartitionName, MaxPartitionNameLength);
+        if (report.LastOtaStatus is not null)
+            device.LastOtaStatus = TruncateReported(report.LastOtaStatus, MaxLastOtaStatusLength);
         if (report.SdCardOk is not null) device.SdCardOk = report.SdCardOk;
         // Content report — same partial-report rule. The toy sends this block
         // only when its card changed, so most heartbeats leave it all null and
         // the previously-reported snapshot must survive untouched.
         if (report.ContentIndexSchema is not null) device.ContentIndexSchema = report.ContentIndexSchema;
-        if (report.ContentStories is not null) device.ContentStories = report.ContentStories;
+        if (report.ContentStories is not null)
+            device.ContentStories = TruncateReported(report.ContentStories, MaxContentStoriesLength);
         if (report.ContentGameClips is not null) device.ContentGameClips = report.ContentGameClips;
         if (report.ContentVoiceClips is not null) device.ContentVoiceClips = report.ContentVoiceClips;
         if (report.ContentMusicTracks is not null) device.ContentMusicTracks = report.ContentMusicTracks;
@@ -296,6 +304,24 @@ public class DeviceService : IDeviceService
     private const int MaxSyncStatusLength = 16;
     private const int MaxSyncErrorLength = 48;
     private const int MaxResetReasonLength = 24;
+    // AI logic review 2026-10-27, B10. Generous against what the honest
+    // firmware sends (ContentStories: 320-byte buffer, content_report.cpp
+    // kStoriesBufLen -> 1024 is 3x+).
+    private const int MaxFirmwareVersionLength = 32;
+    private const int MaxFirmwareBuildLength = 64;
+    private const int MaxBoardModelLength = 48;
+    private const int MaxPartitionNameLength = 16;
+    private const int MaxLastOtaStatusLength = 48;
+    private const int MaxContentStoriesLength = 1024;
+
+    /// <summary>Trims and caps, but PRESERVES an explicitly-sent empty string
+    /// ("present but empty" is a real partial-report value, not "absent") -
+    /// unlike <see cref="NormalizeReported"/>, which maps blank to null.</summary>
+    private static string TruncateReported(string value, int maxLength)
+    {
+        var trimmed = value.Trim();
+        return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
+    }
 
     /// <summary>Trims, caps, and maps blank to null. Null means "the toy has
     /// nothing to say here", which for an error field is the same thing the
@@ -492,6 +518,15 @@ public class DeviceService : IDeviceService
             var outcome = ev.Outcome?.Trim().ToLowerInvariant();
             if (outcome is null
                 || !GamePlayReportRequest.AllowedOutcomes.Contains(outcome, StringComparer.Ordinal))
+            {
+                outcome = null;
+            }
+            // AI logic review 2026-10-27, B11: the buzzer round has no outcome
+            // the toy can honestly claim (CLAUDE.md § Game honesty; the DTO's
+            // own doc says who-first MUST send null). Server-side bound,
+            // firmware-independent: a buggy or older toy cannot put "won" on
+            // the parent dashboard.
+            if (string.Equals(gameKey, "who-first", StringComparison.Ordinal))
             {
                 outcome = null;
             }
@@ -705,7 +740,6 @@ public class DeviceService : IDeviceService
         var addedCostUsd = costUsd < 0m ? 0m : costUsd;
         var row = await _db.Set<DeviceUsageDay>()
             .FirstOrDefaultAsync(u => u.DeviceId == deviceId && u.DayUtc == dayUtc);
-        var isNew = row is null;
         if (row is null)
         {
             row = new DeviceUsageDay
@@ -722,7 +756,7 @@ public class DeviceService : IDeviceService
         {
             await _db.SaveChangesAsync();
         }
-        catch (DbUpdateException) when (isNew)
+        catch (DbUpdateException)
         {
             // IX_DeviceUsageDays_DeviceId_DayUtc race, same idiom as
             // ReportStoryPlaysAsync/ReportGamePlaysAsync above: two
@@ -732,6 +766,10 @@ public class DeviceService : IDeviceService
             // quota, so the fix is a re-read-and-increment retry rather
             // than a skip. One retry is enough — a third concurrent writer
             // in the same instant is not worth chasing.
+            // AI logic review 2026-10-27, C3: no longer limited to a new row. Two
+            // overlapping UPDATEs of an EXISTING row trip the Questions
+            // concurrency token (DbUpdateConcurrencyException derives from
+            // DbUpdateException) and take the same re-read-and-increment path.
             _db.Entry(row).State = EntityState.Detached;
             row = await _db.Set<DeviceUsageDay>()
                 .FirstOrDefaultAsync(u => u.DeviceId == deviceId && u.DayUtc == dayUtc);

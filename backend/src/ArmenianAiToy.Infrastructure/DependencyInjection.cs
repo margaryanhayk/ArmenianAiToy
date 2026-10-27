@@ -105,6 +105,10 @@ public static class DependencyInjection
         };
         // Generous ceiling; the STT/TTS/chat adapters impose their own 30s
         // CancellationToken timeouts, which fire first. Must stay >= those.
+        // AI logic review 2026-10-27, C8: that now includes the BUFFERED
+        // ElevenLabs TTS path; its STREAMING path sets no 30s token of its
+        // own (it would be disposed while the toy still reads) and is
+        // bounded only by this 100 s.
         var openAiHttpClient = new HttpClient(openAiHandler) { Timeout = TimeSpan.FromSeconds(100) };
         var openAiOptions = new OpenAIClientOptions
         {
@@ -304,10 +308,19 @@ public static class DependencyInjection
                 // breaker window survives across scoped requests (the
                 // health endpoint's `openai` field keeps reading the
                 // OpenAI singleton only — naming drift noted).
-                services.AddSingleton(sp => new GeminiGateHolder(
-                    new OpenAIReliabilityGate(
-                        sp.GetRequiredService<ILogger<OpenAIReliabilityGate>>(),
-                        "gemini")));
+                services.AddSingleton(sp =>
+                {
+                    // AI logic review 2026-10-27, C9: the token provider is built
+                    // above, at registration time (a bad key refuses boot), so it
+                    // has no logger yet. This factory runs once, before the first
+                    // adapter (which resolves the holder) can ask for a token.
+                    if (gmTokens is not null)
+                        gmTokens.Logger = sp.GetRequiredService<ILogger<VertexAiAccessTokenProvider>>();
+                    return new GeminiGateHolder(
+                        new OpenAIReliabilityGate(
+                            sp.GetRequiredService<ILogger<OpenAIReliabilityGate>>(),
+                            "gemini"));
+                });
                 services.AddScoped<IAiChatClient>(sp =>
                     new GeminiChatClientAdapter(
                         openAiHttpClient, // warm pooled client, host-agnostic

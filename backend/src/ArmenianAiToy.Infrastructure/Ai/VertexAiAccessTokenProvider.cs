@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace ArmenianAiToy.Infrastructure.Ai;
 
@@ -39,6 +40,15 @@ public sealed class VertexAiAccessTokenProvider : IDisposable
     private readonly SemaphoreSlim _lock = new(1, 1);
     private string? _token;
     private DateTimeOffset _expiresAt;
+
+    /// <summary>
+    /// Optional. The provider is built at registration time (so a bad key
+    /// refuses boot) - before any logger exists - hence a property DI sets
+    /// once the container is up, not a constructor parameter. Used only to
+    /// report a refresh that fell back to the cached token (type + status,
+    /// never a body or a token).
+    /// </summary>
+    public ILogger? Logger { get; set; }
 
     public VertexAiAccessTokenProvider(
         HttpClient http, string serviceAccountJson, Func<DateTimeOffset>? clock = null)
@@ -124,32 +134,50 @@ public sealed class VertexAiAccessTokenProvider : IDisposable
             if (_token is not null && now < _expiresAt - RefreshMargin)
                 return _token;
 
-            using var req = new HttpRequestMessage(HttpMethod.Post, _tokenUri)
+            try
             {
-                Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                using var req = new HttpRequestMessage(HttpMethod.Post, _tokenUri)
                 {
-                    ["grant_type"] = "urn:ietf:params:oauth:grant-type:jwt-bearer",
-                    ["assertion"] = BuildAssertion(now),
-                }),
-            };
-            using var resp = await _http.SendAsync(req, ct);
-            var body = await resp.Content.ReadAsStringAsync(ct);
-            if (!resp.IsSuccessStatusCode)
-            {
-                // Status only — the error body can name the account.
-                throw new HttpRequestException(
-                    $"Vertex AI token exchange returned HTTP {(int)resp.StatusCode}.",
-                    inner: null, statusCode: resp.StatusCode);
-            }
+                    Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                    {
+                        ["grant_type"] = "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                        ["assertion"] = BuildAssertion(now),
+                    }),
+                };
+                using var resp = await _http.SendAsync(req, ct);
+                var body = await resp.Content.ReadAsStringAsync(ct);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    // Status only — the error body can name the account.
+                    throw new HttpRequestException(
+                        $"Vertex AI token exchange returned HTTP {(int)resp.StatusCode}.",
+                        inner: null, statusCode: resp.StatusCode);
+                }
 
-            using var doc = JsonDocument.Parse(body);
-            var token = doc.RootElement.GetProperty("access_token").GetString()
-                ?? throw new InvalidOperationException("Vertex AI token response had no access_token.");
-            var lifetime = doc.RootElement.TryGetProperty("expires_in", out var e)
-                           && e.TryGetInt32(out var secs) ? secs : 3600;
-            _token = token;
-            _expiresAt = now.AddSeconds(lifetime);
-            return token;
+                using var doc = JsonDocument.Parse(body);
+                var token = doc.RootElement.GetProperty("access_token").GetString()
+                    ?? throw new InvalidOperationException("Vertex AI token response had no access_token.");
+                var lifetime = doc.RootElement.TryGetProperty("expires_in", out var e)
+                               && e.TryGetInt32(out var secs) ? secs : 3600;
+                _token = token;
+                _expiresAt = now.AddSeconds(lifetime);
+                return token;
+            }
+            // AI logic review 2026-10-27, C9: a refresh inside the 5-minute
+            // margin that fails while the cached token is still valid must not
+            // fail the chat turn (it was a gemini breaker failure each, with a
+            // retry). Serve the cached token until its REAL expiry - a
+            // persistent outage still surfaces then. A caller who is gone
+            // still propagates. Type + status only: never a body or a token.
+            catch (Exception ex) when (!ct.IsCancellationRequested && _token is not null && now < _expiresAt)
+            {
+                Logger?.LogWarning(
+                    "Vertex AI token refresh failed ({ErrorType}, HTTP {Status}); serving the cached token for {Seconds}s more",
+                    ex.GetType().Name,
+                    (int?)(ex as HttpRequestException)?.StatusCode,
+                    (int)(_expiresAt - now).TotalSeconds);
+                return _token;
+            }
         }
         finally
         {

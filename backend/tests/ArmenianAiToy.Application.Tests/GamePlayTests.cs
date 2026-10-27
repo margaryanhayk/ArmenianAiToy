@@ -196,18 +196,66 @@ public class GamePlayTests
         var svc = NewDeviceService(db);
         var deviceId = await SeedDeviceAsync(db);
 
+        // AI logic review 2026-10-27, B11: this used to send who-first and
+        // expect the outcomes to be stored. who-first is now always null
+        // (see Report_WhoFirst_OutcomeIsAlwaysNull), so the vocabulary is
+        // pinned on button-simon, whose outcome the toy really measures.
         await svc.ReportGamePlaysAsync(deviceId, new GamePlayReportRequest(
         [
-            new GamePlayReportEvent("k1", "who-first", Outcome: "WON"),
-            new GamePlayReportEvent("k2", "who-first", Outcome: "lost"),
-            new GamePlayReportEvent("k3", "who-first", Outcome: "stopped"),
-            new GamePlayReportEvent("k4", "who-first", Outcome: "crushed it"),
-            new GamePlayReportEvent("k5", "who-first", Outcome: null),
+            new GamePlayReportEvent("k1", "button-simon", Outcome: "WON"),
+            new GamePlayReportEvent("k2", "button-simon", Outcome: "lost"),
+            new GamePlayReportEvent("k3", "button-simon", Outcome: "stopped"),
+            new GamePlayReportEvent("k4", "button-simon", Outcome: "crushed it"),
+            new GamePlayReportEvent("k5", "button-simon", Outcome: null),
         ]), Now);
 
         var outcomes = await db.Set<GamePlay>()
             .OrderBy(p => p.ClientEventKey).Select(p => p.Outcome).ToListAsync();
         Assert.Equal(["won", "lost", "stopped", null, null], outcomes);
+    }
+
+    // KEYSTONE (Game honesty): the who-first buzzer round has no outcome the
+    // toy can honestly claim - it cannot tell who "won" a two-player race. The
+    // firmware already sends null; the server bounds it too, so a buggy or
+    // older toy cannot put "won" on the parent dashboard.
+    [Fact]
+    public async Task Report_WhoFirst_OutcomeIsAlwaysNull()
+    {
+        var db = NewDb();
+        var svc = NewDeviceService(db);
+        var deviceId = await SeedDeviceAsync(db);
+
+        await svc.ReportGamePlaysAsync(deviceId, new GamePlayReportRequest(
+        [
+            new GamePlayReportEvent("k1", "who-first", Outcome: "WON"),
+            new GamePlayReportEvent("k2", "who-first", Outcome: "lost"),
+            new GamePlayReportEvent("k3", "who-first", Outcome: "stopped"),
+            new GamePlayReportEvent("k4", " Who-First ", Outcome: "won"),
+            new GamePlayReportEvent("k5", "who-first", Outcome: null),
+        ]), Now);
+
+        var rows = await db.Set<GamePlay>().OrderBy(p => p.ClientEventKey).ToListAsync();
+        Assert.Equal(5, rows.Count); // the session itself is still recorded
+        Assert.All(rows, r => Assert.Null(r.Outcome));
+    }
+
+    [Fact]
+    public async Task Report_ButtonSimon_OutcomeKept()
+    {
+        // Contrast for the who-first rule above: it is specific to the buzzer.
+        var db = NewDb();
+        var svc = NewDeviceService(db);
+        var deviceId = await SeedDeviceAsync(db);
+
+        await svc.ReportGamePlaysAsync(deviceId, new GamePlayReportRequest(
+        [
+            new GamePlayReportEvent("k1", "button-simon", Outcome: "won"),
+            new GamePlayReportEvent("k2", "mind-reader", Outcome: "lost"),
+        ]), Now);
+
+        var outcomes = await db.Set<GamePlay>()
+            .OrderBy(p => p.ClientEventKey).Select(p => p.Outcome).ToListAsync();
+        Assert.Equal(["won", "lost"], outcomes);
     }
 
     [Fact]

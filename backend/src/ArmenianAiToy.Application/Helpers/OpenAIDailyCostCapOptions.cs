@@ -57,7 +57,11 @@ public sealed class OpenAIDailyCostCapOptions
     /// together.</summary>
     public const int IntendedQuestionsPerDay = 30;
 
-    /// <summary>Measured USD cost of one in-story question, 2026-08-12.
+    /// <summary>USD cost of one in-story question, 2026-08-12, derived from
+    /// MEASURED prompt characters at the 4 chars/token approximation
+    /// (<see cref="OpenAICostEstimator.CharsPerTokenEstimate"/>) - the
+    /// characters were measured, the tokens were not, so the dollar figure
+    /// inherits that approximation. AI logic review 2026-10-27, C5.
     /// Source: tools/quality-evidence/cost-per-hour-of-play-20260812.md.</summary>
     public const decimal MeasuredUsdPerQuestion = 0.0078m;
 

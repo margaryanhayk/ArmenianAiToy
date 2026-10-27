@@ -165,6 +165,20 @@ public sealed class OpenAIReliabilityGate
                     }
                     return result;
                 }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    // AI logic review 2026-10-27, C2: the caller is gone (a toy
+                    // dropped mid-turn) - not an upstream failure. No metric, no
+                    // breaker update; a cancelled half-open probe frees its slot
+                    // instead of reopening the breaker for every toy. The adapter's
+                    // own 30 s ceiling is linked INSIDE the operation, so it
+                    // leaves ct untouched and still counts as Timeout below.
+                    if (isProbe)
+                    {
+                        lock (_stateLock) { _probeInFlight = false; }
+                    }
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     var kind = OpenAIFailureClassifier.Classify(ex);

@@ -33,19 +33,21 @@ public class OpenAIChatClientAdapter : IAiChatClient
             });
         }
 
-        // Caller cancellation (a toy that dropped mid-turn) linked with the
-        // 30 s ceiling — same shape as GeminiChatClientAdapter.CoreAsync.
-        // Either one aborts the SDK call; the gate sees a single token, so
-        // a caller abort is accounted exactly like a timeout (no retry).
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(RequestTimeout);
+        // AI logic review 2026-10-27, C2: the gate gets the CALLER's token so it
+        // can tell a toy that dropped mid-turn (not an upstream failure, never
+        // counted) from our own 30 s ceiling (a real Timeout, retried and
+        // counted). The ceiling is linked inside the operation, per attempt —
+        // same shape as GeminiChatClientAdapter.CoreAsync.
         // Route the SDK call through the reliability gate — classification,
         // one retry on retryable kinds, and circuit-breaker protection.
         // The gate rethrows the classified exception on final failure,
         // which ChatController's existing Path-5 catch already handles.
-        var completion = await _gate.RunAsync(
-            ct => _client.CompleteChatAsync(chatMessages, cancellationToken: ct),
-            cts.Token);
+        var completion = await _gate.RunAsync(async ct =>
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(RequestTimeout);
+            return await _client.CompleteChatAsync(chatMessages, cancellationToken: cts.Token);
+        }, cancellationToken);
         // A completion with no content parts (e.g. refusal-only) returns
         // string.Empty instead of throwing ArgumentOutOfRangeException →
         // 502; ChatService's empty-reply guard turns it into the calm,

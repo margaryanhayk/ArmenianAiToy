@@ -63,9 +63,11 @@ public static class OpenAICostEstimator
 
     /// <summary>Rough "characters per token" used to convert text length
     /// to an estimated token count. 4 is a common practical
-    /// approximation for English / Latin text; Armenian text generally
-    /// uses fewer characters per token but the over-estimate is
-    /// intentional (cap fires earlier).</summary>
+    /// approximation for English / Latin text. Armenian uses FEWER
+    /// characters per token than Latin text, so chars/4 UNDER-counts
+    /// Armenian tokens (an under-estimate of cost, not an over-estimate);
+    /// the real ratio has not been measured with a tokenizer. AI logic
+    /// review 2026-10-27, C5 (wording only - the constant is unchanged).</summary>
     public const int CharsPerTokenEstimate = 4;
 
     /// <summary>
