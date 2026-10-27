@@ -161,13 +161,19 @@ public static class SystemStatusReport
 
         if (!isDevelopment && transport == NotifierTransport.Log)
             checks.Add(new Check(Warn, "email_log_only",
-                "Notifications:Transport is log — password reset and verification mail go to stdout only. " +
-                "Set Notifications__Transport=resend (and Notifications__Resend__ApiKey)."));
+                "Parents get no email: password resets, email verification and the \"another parent joined your toy\" " +
+                "notice are only written to the server log. Set Notifications__Transport=resend and Notifications__Resend__ApiKey."));
         if (!isDevelopment && !provisioningSecretSet)
-            checks.Add(new Check(Warn, "provisioning_secret_missing",
-                ReadBool(config, "Devices:AllowOpenRegistration")
-                    ? "Devices__ProvisioningSecret is not set and Devices:AllowOpenRegistration is on — anyone can mint a device key."
-                    : "Devices__ProvisioningSecret is not set — registering a new toy is refused until it is."));
+        {
+            if (ReadBool(config, "Devices:AllowOpenRegistration"))
+                // A security hole, not a missing feature: first in the list.
+                checks.Insert(0, new Check(Warn, "provisioning_secret_missing",
+                    "Open registration: anyone can mint a device key (Devices:AllowOpenRegistration is on and " +
+                    "Devices__ProvisioningSecret is not set). Set Devices__ProvisioningSecret — that alone closes it."));
+            else
+                checks.Add(new Check(Warn, "provisioning_secret_missing",
+                    "Devices__ProvisioningSecret is not set — registering a new toy is refused until it is."));
+        }
 
         var capSection = config.GetSection("OpenAI:DailyCostCap");
         if (bool.TryParse(capSection["Enabled"], out var capOn) && !capOn)
