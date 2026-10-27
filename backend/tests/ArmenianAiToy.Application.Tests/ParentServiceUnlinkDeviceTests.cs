@@ -227,6 +227,73 @@ public class ParentServiceUnlinkDeviceTests
     }
 
     [Fact]
+    public async Task UnlinkLastParent_RemovesOutstandingInvite_AndRedeemIsRefused()
+    {
+        // AI logic review 2026-10-27, E4: the Device row no longer dies on the
+        // last unlink, so the FK cascade that used to sweep its invites does
+        // not fire. A live code must not outlive the family that issued it.
+        var (service, db, conn) = await CreateServiceAsync();
+        await using var _ = conn;
+        var oldParent = SeedParent(db);
+        var (deviceId, _, _, _) = SeedDeviceWithChildAndConversation(db);
+        db.Set<ParentDevice>().Add(new ParentDevice
+        {
+            ParentId = oldParent, DeviceId = deviceId, LinkedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var issued = await service.CreateDeviceInviteAsync(oldParent, deviceId);
+        Assert.NotNull(issued);
+        Assert.Equal(1, await db.Set<DeviceInvite>().CountAsync());
+
+        Assert.True(await service.UnlinkDeviceAsync(oldParent, deviceId));
+
+        Assert.Equal(0, await db.Set<DeviceInvite>().CountAsync(i => i.DeviceId == deviceId));
+
+        // KEYSTONE: an outsider holding the old code gets no seat on the reset toy.
+        var outsider = SeedParent(db);
+        await db.SaveChangesAsync();
+        Assert.False(await service.RedeemDeviceInviteAsync(outsider, issued!.Code));
+        Assert.Equal(0, await db.Set<ParentDevice>().CountAsync(pd => pd.DeviceId == deviceId));
+    }
+
+    [Fact]
+    public async Task UnlinkWithAnotherParentStillLinked_KeepsInvite()
+    {
+        // AI logic review 2026-10-27, E4: only the LAST unlink clears invites;
+        // while another parent still holds the toy the code stays redeemable.
+        var (service, db, conn) = await CreateServiceAsync();
+        await using var _ = conn;
+        var parentA = SeedParent(db);
+        var parentB = SeedParent(db);
+        var (deviceId, _, _, _) = SeedDeviceWithChildAndConversation(db);
+        db.Set<ParentDevice>().Add(new ParentDevice
+        {
+            ParentId = parentA, DeviceId = deviceId, LinkedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        // Issue while only A holds the toy (a free seat), then B takes the second seat.
+        var issued = await service.CreateDeviceInviteAsync(parentA, deviceId);
+        Assert.NotNull(issued);
+        db.Set<ParentDevice>().Add(new ParentDevice
+        {
+            ParentId = parentB, DeviceId = deviceId, LinkedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        Assert.True(await service.UnlinkDeviceAsync(parentA, deviceId));
+
+        var invite = Assert.Single(await db.Set<DeviceInvite>().ToListAsync());
+        Assert.Equal(deviceId, invite.DeviceId);
+
+        // The seat A vacated is takeable with the still-live code.
+        var joiner = SeedParent(db);
+        await db.SaveChangesAsync();
+        Assert.True(await service.RedeemDeviceInviteAsync(joiner, issued!.Code));
+    }
+
+    [Fact]
     public async Task UnlinkDeviceAsync_UnknownDeviceLink_ReturnsFalseAndDoesNotMutate()
     {
         var (service, db, conn) = await CreateServiceAsync();

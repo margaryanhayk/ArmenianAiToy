@@ -855,9 +855,12 @@ public sealed class RetentionPurgeService : BackgroundService
             }
 
             // Scrub the Parent row in place. Post-save:
-            //   Email = "", PasswordHash = "", GoogleSubject = null,
-            //   LastLoginAt = null, DormancyWarnedAt = null,
-            //   AnonymizedAt = nowUtc.
+            //   Email = "anonymized-<id>@anonymized.invalid" (unique per
+            //   row: Parents.Email has an unfiltered unique index, so a
+            //   shared "" sentinel wedged the pass at the second parent —
+            //   AI logic review 2026-10-27, E3), PasswordHash = "",
+            //   GoogleSubject = null, LastLoginAt = null,
+            //   DormancyWarnedAt = null, AnonymizedAt = nowUtc.
             // The row persists as an audit-event anchor; credential
             // material does not. Login naturally fails for this row
             // because BCrypt.Verify against an empty hash cannot
@@ -865,7 +868,7 @@ public sealed class RetentionPurgeService : BackgroundService
             // GoogleSubject is scrubbed so a later fresh Google sign-in
             // from the same identity can create a new Parent row
             // without colliding with the filtered unique index.
-            parent.Email = "";
+            parent.Email = $"anonymized-{parent.Id:N}@anonymized.invalid";
             parent.PasswordHash = "";
             parent.GoogleSubject = null;
             parent.LastLoginAt = null;
@@ -1187,7 +1190,10 @@ public sealed class RetentionPurgeService : BackgroundService
             .Where(d =>
                 d.LastSeenAt < dormantCutoff
                 && d.DormancyWarnedAt != null
-                && d.DormancyWarnedAt < deleteGraceCutoff)
+                && d.DormancyWarnedAt < deleteGraceCutoff
+                // AI logic review 2026-10-27, E7: the warning must belong to
+                // THIS dormancy; a stamp older than the last heartbeat does not.
+                && d.DormancyWarnedAt > d.LastSeenAt)
             .OrderBy(d => d.LastSeenAt)
             .Take(batchSize)
             .Select(d => new

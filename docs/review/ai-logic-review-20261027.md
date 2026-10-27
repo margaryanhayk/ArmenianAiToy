@@ -53,7 +53,55 @@ Numbers that matter for SHIP.md: every fix-now item is a bug in shipped behaviou
 | F5 | LOGIC | Traced end to end. Turn 12 is allowed to run (online_session_turn_cap_reached(12,12) is false, pinned by host test line 28); after its reply plays the loop unconditional… |
 | F6 | LOGIC | All clip downloads (story clips, welcome/voice, music, game) go through download_file_verified, whose every failure calls story_fail (content_sync.cpp:886-1030), and sto… |
 
-<!-- FIXED-TESTS -->
+
+**Tests (each failed on the old code first, per the fixers' reports; the full suite on the merged tree: 3346 passed, 0 failed, 0 skipped — was 3244):**
+
+| Id | Test(s) |
+|---|---|
+| A1 | `ConversationServiceCrudTests.GetRecentMessages_ExcludesBlockedRows_KeepsFlaggedAndClean` |
+| A4 | `UsageTiersGateTests.Chat/Audio_FlagOn_GlobalCeilingTripped_ReturnsCanned_AllowanceNeverConsulted`, `ChatControllerCostCapTests.GlobalCeiling_UsageTiersOn_*`, `StoryQaControllerGlobalCeilingTests.*` (Ask + AnswerReflection) |
+| A5 | `AudioChatControllerTests.AudioChat_ModeGate_ChildOverride{Off,On}_*`, `AudioChat_AutoplayContinue_ModeGate_UsesDefaultChild` |
+| B1 | `AudioChatControllerTests.AudioChat_StreamingProvider_NoOptInHeader_ReturnsBufferedFile`, `..._KillSwitchOff_ReturnsBufferedEvenWithHeader`; three existing streaming tests now send the header |
+| B10 | `DeviceServiceOtaTests.UpdateFirmwareReport_LongFreeTextIsTruncated`, `..._ExplicitEmptyContentStories_StaysEmptyNotNull` |
+| B11 | `GamePlayTests.Report_WhoFirst_OutcomeIsAlwaysNull` (who-first rows flipped), `Report_ButtonSimon_OutcomeKept` |
+| B12 | `StoryQaTextDevGateTests.IsStoryQaTextPath_TrailingSlashAndSubPaths_Match` (flipped rows), `/api/story-qa-textx` non-match |
+| B3 | `StoryQaControllerStreamingTests.OptInHeader_StreamFailsBeforeFirstByte_SpeaksFailureClipWithContentLength` |
+| B4 | `StoryQaSegmentMapResolutionTests.ShippedMap_WinsWhenBothPresent` (flipped from `CacheMap_WinsWhenPresent`), `CacheMap_IsUsedWhenNoShippedMapExists` |
+| B7 | same tests as A5 |
+| B8 | `AudioChatControllerTests.AudioChat_{TtsThrows,StreamStartThrows}_SttAndChatSpendStillRecordedOnce`, `AudioChat_SttThrows_NothingRecorded`; `StoryQaControllerPartialSpendTests.*` (model / TTS / reflection-clip failures, STT-only guards) |
+| C2 | `OpenAIReliabilityGateTests.CallerCancelled_FiveTimes_DoesNotCountAsFailure_NorTripBreaker`, `CallerCancelledDuringHalfOpenProbe_FreesTheProbeSlot_DoesNotReopen`, `OperationCanceled_WithoutCallerCancellation_StillCountsAsTimeout`; `OpenAIChatClientAdapterEmptyContentTests.CallerCancelled_FiveTimes_DoesNotOpenTheGate` |
+| C3 | `DeviceServiceUsageMeteringTests.RecordUsageQuestionAsync_ConcurrentUpdateRace_RetriesAndBothIncrementsLand`; `Migrate()` boot-verified against a throwaway DB (36 migrations, no PendingModelChanges) |
+| C4 | same tests as A4 (Global half); parse half accept-document |
+| C8 | `ElevenLabsTtsSynthesisServiceTests.Buffered_TransientFailureThenSuccess_RetriesOnceAndReturnsAudio`, `Buffered_FailsTwice_ThrowsAfterExactlyTwoRequests`, `Buffered_CallerGoneMidRequest_IsNotRetried`, `Buffered_HungUpstream_IsCutOffByTheOwnCeiling_NotTheCallersToken` |
+| C9 | `GeminiVertexBackendTests.GetAccessToken_RefreshFailsInsideMargin_ServesCachedToken_UntilRealExpiry`, `..._CallerCancelled_StillPropagates` |
+| D1 | `VoiceIntentTests.AskAnswers_ClassifyAsCuriosity_Matched` (4 transcripts), `AskAnswer_RidesTheModeEnabledGateAsCuriosity`, `AskStemInsideARiddleRequest_StaysRiddle`, `IsAskIntent_*` |
+| D10 | `ArmenianVoiceReplyGuardTests.IsGarbledInput_DrawnOutVowel_IsNotGarbled` (3), `IsGarbledInput_RepeatedConsonantRun_StaysGarbled` (3) |
+| D11 | `ModeDetectorTests.Curiosity_ArmenianStarter_DetectsCuriosity` + «Ինչու՞։», «Ինչու՞, Արեգ», «Ինչի՞։» |
+| D2 | `RiddleAnswerMatcherTests.Match_AcceptsDefiniteArticleOnStemFinalN` (4 pairs), `Match_AcceptsDefiniteArticleAgainstStoredNormalizedAnswer`, `Match_ArticleFixDoesNotAcceptUnrelatedWords` |
+| D3 | `ChoiceNormalizerTests.VerbatimLabelRepeat_PicksThatLabel` (3), `MoreDistinctOverlappingWords_WinsOverFewer` (the verdict's English example was wrong — stop words make it 1 vs 1 — and was replaced) |
+| D4 | `ChoiceNormalizerTests.ArmenianPositional_WithPunctuationOrFiller_IsRecognised` (4), `ArmenianPositional_BothWordsInOneAnswer_IsUnknown` |
+| D5 | `ArmenianVoiceReplyGuardTests.EnforceMaxSentences_AsciiEllipsisCountsAsOneBoundary`, `..._RepeatedVerjakCountsAsOneBoundaryAndIsKeptWhole`, `..._CutLandsOnEllipsis_KeepsRunWhole` |
+| E14 | `ParentServiceDeviceInviteTests.Redeem_ByAParentWhoAlreadyHoldsIt_TakesNoSecondSeat` extended (invite unconsumed, no audit row, second parent can still redeem) |
+| E3 | `RetentionPurgeServiceTests.AnonymizePass_TwoEligibleParents_BothAnonymized_NoUniqueViolation`; `AnonymizePass_EligibleParent_IsAnonymizedStampedAndAudited` flipped to the synthetic address; `AnonymizePass_BatchSizeCapRespected` gains the second tick that used to collide |
+| E4 | `ParentServiceUnlinkDeviceTests.UnlinkLastParent_RemovesOutstandingInvite_AndRedeemIsRefused`, `UnlinkWithAnotherParentStillLinked_KeepsInvite` |
+| E7 | `RetentionPurgeServiceTests.DeviceDeletePass_WarnedBeforeLastSeen_IsNotDeleted` |
+| F1 | no host seam (Arduino-only); bench steps in `esp32/AregVoiceMvp/README.md` § welcome flow |
+| F3 | no host seam; bench step in the README content-sync checklist |
+| F5 | `host_tests/online_session_rules_test.cpp` (`online_session_can_listen_after`, 7 checks); bench step with `AREG_CHAT_SESSION_MAX_TURNS=2` |
+| F6 | new `host_tests/content_sync_verdict_rules_test.cpp` (`cs_sync_verdict`, 8 checks); bench step: block one clip URL → `partial`, 300 s |
+
+Five fixer agents (one per file group) worked in isolated worktrees from exact verdicts; their patches were applied to this branch in five commits (`daed98a` firmware, `92f4e3d` Armenian helpers, `ebab098` chat path, `47deba4` story-qa, `2729630` adapters/device service, plus the parent/retention commit). Things the fixers noticed and left alone are listed in §6.
+
+## 6. Noticed by the fixers, not touched (candidates for the next pass)
+
+- `AudioChatController.Chat()`: the ChatService-throws 502 catch also leaves STT paid and unrecorded (outside B8's sites); the autoplay-continue TTS catch records no library-segment TTS spend either.
+- `StreamAnswerAsync` still passes a 0-byte but successful provider stream through to pause + bridge + recap; `RecordTurn` runs before streaming, so a stream failing before the first byte is metered `answered`.
+- `ModeDetector.cs` has mangled comment fragments («սա delays (this what…)») around :120 and :161 — cosmetic.
+- `ChoiceNormalizer` now accepts a single-sided Armenian positional word anywhere in a sentence (mirrors the English rule; D4 asked for it).
+- `InternalController.cs:254` shows the synthetic anonymized email instead of a blank for anonymized parents; `Parent.cs:65` (Domain, untouchable here) still describes it as `""`.
+- Other `RecordUsageQuestionAsync` callers can still lose a race beyond the single retry (by design). `OpenAIModerationAdapter` (hard stop) was not checked for the C2 "caller cancelled counts as failure" accounting.
+- Within the last five minutes of a Vertex token, every turn re-attempts the exchange under the refresh lock during a token-endpoint outage (small added latency, inherent to C9's design).
+- The API ignores `ASPNETCORE_URLS` (Kestrel config in `appsettings.json` wins), so parallel local boots collide on port 5000.
 
 ## 3. Refuted or dropped
 

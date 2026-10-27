@@ -98,7 +98,7 @@ the owner's own steps are `docs/status/build-status.html`.
 ```bash
 cd backend
 dotnet build
-dotnet test            # 3244 tests, ~45 s in Release
+dotnet test            # 3346 tests, ~45 s in Release
 export OpenAI__ApiKey="sk-dummy-for-local-boot"               # any non-empty value boots everything non-AI
 export Jwt__Key="local-dev-jwt-key-0123456789abcdef0123456789"  # ≥32 chars, not the legacy literal
 dotnet run --project src/ArmenianAiToy.Api   # http://0.0.0.0:5000  (Windows: $env:OpenAI__ApiKey=...)
