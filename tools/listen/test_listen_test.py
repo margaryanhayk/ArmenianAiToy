@@ -301,6 +301,23 @@ class PendingTests(WorldCase):
         self.assertNotIn("s1-alt", again)   # ...but not what was already answered today on this device
 
 
+    def test_the_device_argument_takes_the_same_road_as_the_evidence_header(self):
+        """The header stores the device through _cell() (pipe -> '/', whitespace
+        collapsed); the raw --device argument must match what was written."""
+        items = self.w.items()
+        s1 = items[0]
+        for typed, stored in (("PC | headphones", "PC / headphones"),
+                              ("PC   headphones", "PC headphones"),
+                              ("  Toy  |  speaker ", "toy / speaker")):
+            with self.subTest(typed=typed):
+                rows = [row(s1, "PASS", device=stored)]
+                results = lt.compute_status(items, rows, {i.path: i.sha256 for i in items})
+                got = {i.id for i in lt.pending_items(results, rows, DATE, typed, again=True)}
+                self.assertNotIn("s1", got, "answered today on this device: must not be re-offered")
+                other = {i.id for i in lt.pending_items(results, rows, DATE, "somewhere else", again=True)}
+                self.assertIn("s1", other)
+
+
 class PlayerTests(unittest.TestCase):
     def test_defaults(self):
         f = Path("/a b/x.mp3")
@@ -401,6 +418,48 @@ class CommandTests(WorldCase):
         _, out, _ = self.run_main(*self.w.args("run", *who), answers=["q"])
         self.assertIn("4 to hear", out)
         self.assertIn("[1/4] s1/question", out)
+
+    def test_resume_works_with_a_device_name_that_has_a_pipe_or_doubled_spaces(self):
+        for device in ("PC | headphones", "PC   headphones"):
+            with self.subTest(device=device):
+                self.setUp()
+                who = ("--listener", "Hayk", "--device", device)
+                # SKIP, not PASS: an approved file is never re-offered anyway, so
+                # only a skipped one proves the "answered today on this device" match
+                self.run_main(*self.w.args("run", "--only", "m1", *who), answers=["s"])
+                self.assertEqual([(r.id, r.verdict) for r in lt.load_evidence(self.w.evidence)],
+                                 [("m1", "SKIP")])
+                code, out, play = self.run_main(*self.w.args("run", "--only", "m1", *who))
+                self.assertEqual(code, 0)
+                self.assertIn("Nothing left to hear", out)       # resume: not re-offered
+                self.assertEqual(play.call_count, 0)
+
+    def test_a_utf8_bom_in_appsettings_does_not_stop_the_tool(self):
+        """Visual Studio on Windows saves JSON with a BOM; plain utf-8 hands
+        that to json.loads as a stray character and every command died."""
+        self.w.appsettings.write_bytes(b"\xef\xbb\xbf" + json.dumps(self.w.config).encode("utf-8"))
+        code, out, _ = self.run_main(*self.w.args("status"))
+        self.assertEqual(code, 1)                      # red because nothing is heard yet, not a crash
+        self.assertIn("NEVER HEARD 7", out)
+        code, out, play = self.run_main(*self.w.args("run", "--only", "m1", "--listener", "Hayk",
+                                                     "--device", "PC headphones"), answers=["p"])
+        self.assertEqual(code, 0)
+        self.assertEqual(play.call_count, 1)
+
+    def test_a_bom_prefixed_evidence_file_is_still_read(self):
+        who = ("--listener", "Hayk", "--device", "PC headphones")
+        self.run_main(*self.w.args("run", "--only", "m1", *who), answers=["s"])
+        ev = lt.evidence_path(self.w.evidence, DATE)
+        text = ev.read_text(encoding="utf-8")
+        # a hand-trimmed file whose first line is the Device header field, re-saved with a
+        # BOM: without utf-8-sig the BOM glues itself to that field and the device is lost
+        ev.write_bytes(b"\xef\xbb\xbf" + text[text.index("- **Device:**"):].encode("utf-8"))
+        self.assertEqual([(r.id, r.device) for r in lt.load_evidence(self.w.evidence)],
+                         [("m1", "PC headphones")])
+        code, out, play = self.run_main(*self.w.args("run", "--only", "m1", *who))
+        self.assertEqual(code, 0)
+        self.assertIn("Nothing left to hear", out)
+        self.assertEqual(play.call_count, 0)
 
     def test_fail_without_inline_note_asks_what_was_heard(self):
         who = ("--listener", "Hayk", "--device", "PC headphones")

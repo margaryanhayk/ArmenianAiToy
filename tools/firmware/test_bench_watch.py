@@ -323,6 +323,42 @@ class WifiRecoveryTests(unittest.TestCase):
         self.assertEqual(c.verdict, "PASS")
         self.assertIn("outage 35 s", " ".join(c.notes))
 
+    def test_a_short_blip_before_the_real_test_does_not_hide_the_recovery(self):
+        # a 5 s router blip (with a chain after it), THEN the real 35 s test
+        w = bw.Watcher(echo=False)
+        feed_at(w, [(1.0, self.UP), (50.0, self.DOWN), (55.0, self.UP), (60.0, QA),
+                    (100.0, self.DOWN), (135.0, self.UP), (150.0, QA)])
+        c = w.check_c3()
+        self.assertEqual(c.verdict, "PASS")
+        notes = " ".join(c.notes)
+        self.assertIn("outage 35 s", notes)
+        self.assertIn("drop 1: 5 s", notes)          # every outage is reported
+        self.assertIn("drop 2: 35 s", notes)
+
+    def test_the_longest_qualifying_outage_is_the_one_reported(self):
+        w = bw.Watcher(echo=False)
+        feed_at(w, [(1.0, self.UP), (50.0, self.DOWN), (75.0, self.UP), (80.0, QA),
+                    (100.0, self.DOWN), (160.0, self.UP), (170.0, QA)])
+        c = w.check_c3()
+        self.assertEqual(c.verdict, "PASS")
+        self.assertIn("outage 60 s", " ".join(c.notes))
+
+    def test_only_short_outages_report_the_longest_one(self):
+        w = bw.Watcher(echo=False)
+        feed_at(w, [(1.0, self.UP), (50.0, self.DOWN), (55.0, self.UP), (60.0, QA),
+                    (100.0, self.DOWN), (108.0, self.UP), (110.0, QA)])
+        c = w.check_c3()
+        self.assertEqual(c.verdict, "NOT YET")
+        self.assertIn("longest recovered outage lasted only 8 s", " ".join(c.notes))
+
+    def test_a_long_outage_that_never_got_a_chain_does_not_count_over_a_short_one(self):
+        w = bw.Watcher(echo=False)
+        feed_at(w, [(1.0, self.UP), (50.0, self.DOWN), (55.0, self.UP), (60.0, QA),
+                    (100.0, self.DOWN), (160.0, self.UP)])       # 60 s, but no chain after
+        c = w.check_c3()
+        self.assertEqual(c.verdict, "NOT YET")
+        self.assertIn("drop 2: 60 s, link back but no voice chain", " ".join(c.notes))
+
     def test_boot_time_disconnects_are_not_an_outage(self):
         w = run(boot_lines() + [self.DOWN, self.DOWN, self.UP, QA], t0=1.0)
         self.assertEqual(w.outages, [])
@@ -501,22 +537,158 @@ class MarkerTests(unittest.TestCase):
 
 
 class StuckStateTests(unittest.TestCase):
-    def test_alive_with_a_non_idle_state_is_the_dead_button_bug(self):
-        alive = "[alive] ms=5000 heap=1 psram=2 wifi=3 ip=1 rssi=-60 btn=UP"
-        w = run(boot_lines() + ["[state] 0 -> 3", "[state] 3 -> 4"] + [alive] * 6)
-        self.assertEqual(w.stuck_events, 1)       # flagged once per episode
-        self.assertTrue(any("s_state != ST_IDLE" in t for t in w.troubles))
+    """The dead-button bug (s_state left != ST_IDLE) makes loop() skip its
+    idle branch: AregVoiceMvp.ino:2822-2861 prints `[alive]` ONLY there, so a
+    stuck toy goes SILENT. The signature is silence after a non-IDLE
+    `[state]`, never `[alive]` lines."""
 
-    def test_alive_in_idle_is_fine(self):
-        alive = "[alive] ms=5000 heap=1 psram=2 wifi=3 ip=1 rssi=-60 btn=UP"
-        w = run(boot_lines() + ["[state] 0 -> 3", "[state] 3 -> 0"] + [alive] * 6)
+    ALIVE = "[alive] ms=5000 heap=1 psram=2 wifi=3 ip=1 rssi=-60 btn=UP"
+
+    def ticked(self, stamped, now):
+        """Feed (t, line) pairs, then tick once at `now`; return (watcher, output)."""
+        w = bw.Watcher(echo=False)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            for t, line in stamped:
+                w.feed(line, t)
+            w.tick(now)
+        return w, buf.getvalue()
+
+    def test_silence_after_a_non_idle_state_is_the_dead_button_bug(self):
+        # a flow returned from PLAYING (3) -> ERROR (4) and never went back to IDLE
+        stamped = [(100.0, "[state] 0 -> 3"), (101.0, "[audio] play_end ok=true"),
+                   (102.0, "[state] 3 -> 4")]
+        w, out = self.ticked(stamped, 102.0 + bw.STUCK_SILENCE_S + 0.5)
+        self.assertEqual(w.stuck_events, 1)
+        self.assertTrue(any("s_state != ST_IDLE" in t for t in w.troubles))
+        self.assertIn("TROUBLE", out)
+        # flagged once per episode, however long the silence lasts
+        with contextlib.redirect_stdout(io.StringIO()):
+            w.tick(10_000.0)
+        self.assertEqual(w.stuck_events, 1)
+        # a new [state] line is a new episode
+        with contextlib.redirect_stdout(io.StringIO()):
+            w.feed("[state] 4 -> 3", 20_000.0)
+            w.tick(20_000.0 + bw.STUCK_SILENCE_S + 1)
+        self.assertEqual(w.stuck_events, 2)
+
+    def test_not_silent_long_enough_is_not_stuck(self):
+        stamped = [(100.0, "[state] 0 -> 3"), (101.0, "[audio] play_end ok=true")]
+        w, _ = self.ticked(stamped, 101.0 + bw.STUCK_SILENCE_S - 0.5)
+        self.assertEqual(w.stuck_events, 0)
+
+    def test_silence_in_idle_is_fine(self):
+        stamped = [(100.0, "[state] 0 -> 3"), (101.0, "[state] 3 -> 0")]
+        w, _ = self.ticked(stamped, 5_000.0)
         self.assertEqual(w.stuck_events, 0)
         self.assertEqual(w.troubles, [])
 
-    def test_a_reboot_clears_the_state(self):
-        alive = "[alive] ms=5000 heap=1 psram=2 wifi=3 ip=1 rssi=-60 btn=UP"
-        w = run(["[state] 0 -> 3"] + boot_lines() + [alive] * 5)
+    def test_silence_before_any_state_line_is_not_stuck(self):
+        w, _ = self.ticked([(100.0, "[boot] AregVoiceMvp starting")], 5_000.0)
         self.assertEqual(w.stuck_events, 0)
+
+    def test_a_story_playing_is_quiet_by_design(self):
+        stamped = [(100.0, "[state] 0 -> 3"), (101.0, "[story] SD open: /stories/ulik.mp3 @ 0")]
+        w, _ = self.ticked(stamped, 101.0 + 400.0)       # a six-minute story
+        self.assertEqual(w.stuck_events, 0)
+        # ... but once the audio has ended and the toy is still not IDLE, it is stuck
+        with contextlib.redirect_stdout(io.StringIO()):
+            w.feed("[story] SD end interrupted=false", 501.0)
+            w.tick(501.0 + bw.STUCK_SILENCE_S + 1)
+        self.assertEqual(w.stuck_events, 1)
+
+    def test_every_audio_begin_has_a_matching_end_marker(self):
+        for begin, end in (("[audio] play_begin bytes=100", "[audio] play_end ok=true"),
+                           ("[audio] record_begin", "[audio] record_end bytes=10"),
+                           ("[audio] qa_stream_begin url=x", "[audio] qa_stream_end ok=true"),
+                           ("[story] stream open: http://x", "[story] stream end interrupted=false"),
+                           # early failures print no end line
+                           ("[story] SD open: /a.mp3 @ 0", "[story] mp3.begin (SD) failed")):
+            with self.subTest(begin=begin):
+                w, _ = self.ticked([(1.0, "[state] 0 -> 3"), (2.0, begin)], 9_999.0)
+                self.assertEqual(w.stuck_events, 0, "audio in flight is not stuck")
+                with contextlib.redirect_stdout(io.StringIO()):
+                    w.feed(end, 10_000.0)
+                    w.tick(10_000.0 + bw.STUCK_SILENCE_S + 1)
+                self.assertEqual(w.stuck_events, 1, "...and silence after it is")
+
+    def test_a_slow_upload_is_not_stuck_until_past_the_upload_timeout(self):
+        stamped = [(100.0, "[state] 3 -> 2")]
+        w, _ = self.ticked(stamped, 100.0 + 40.0)
+        self.assertEqual(w.stuck_events, 0)
+        with contextlib.redirect_stdout(io.StringIO()):
+            w.tick(100.0 + bw.STUCK_UPLOAD_SILENCE_S + 1)
+        self.assertEqual(w.stuck_events, 1)
+
+    def test_a_reboot_clears_the_state(self):
+        stamped = [(100.0, "[state] 0 -> 3")] + [(101.0 + i, b) for i, b in enumerate(boot_lines())]
+        w, _ = self.ticked(stamped, 5_000.0)
+        self.assertEqual(w.stuck_events, 0)
+
+    def test_a_lost_port_is_not_the_toys_silence(self):
+        w, _ = self.ticked([(100.0, "[state] 0 -> 3"), (101.0, "[state] 3 -> 4")], 101.0)
+        w.note_port_lost()
+        with contextlib.redirect_stdout(io.StringIO()):
+            w.tick(5_000.0)
+        self.assertEqual(w.stuck_events, 0)
+
+    def test_alive_after_a_non_idle_state_is_a_separate_warn_not_the_stuck_verdict(self):
+        w, out = run_out(boot_lines() + ["[state] 0 -> 3", "[state] 3 -> 4"] + [self.ALIVE] * 6)
+        self.assertEqual(w.stuck_events, 0)
+        self.assertEqual(w.troubles, [])
+        self.assertEqual(w.alive_nonidle_warnings, 1)        # once per episode
+        self.assertIn("unexpected, check the firmware", out)
+        self.assertTrue(any("`[alive]` lines after a non-IDLE state" in m
+                            for m in w._marker_lines()))
+
+    def test_alive_in_idle_is_fine(self):
+        w = run(boot_lines() + ["[state] 0 -> 3", "[state] 3 -> 0"] + [self.ALIVE] * 6)
+        self.assertEqual((w.stuck_events, w.alive_nonidle_warnings), (0, 0))
+        self.assertEqual(w.troubles, [])
+
+    def test_a_reboot_clears_the_alive_warn_counter(self):
+        w = run(["[state] 0 -> 3"] + boot_lines() + [self.ALIVE] * 5)
+        self.assertEqual((w.stuck_events, w.alive_nonidle_warnings), (0, 0))
+
+    def test_a_replayed_log_says_the_detector_needs_live_timing(self):
+        w = run(boot_lines() + ["[state] 0 -> 3", "[state] 3 -> 4"])        # untimed
+        w.tick(10_000.0)                                                     # nothing to measure
+        self.assertEqual(w.stuck_events, 0)
+        self.assertTrue(any("NOT RUN" in m and "live timing" in m for m in w._marker_lines()))
+        text = w.render_evidence(when=dt.datetime(2026, 10, 22, 19, 30),
+                                 source="replay of `x.log` (no timestamps)",
+                                 raw_log="x.log", raw_sha256="0" * 64, port=None)
+        self.assertIn("| R10 | Button alive after every flow | not checked", text)
+
+    def test_a_live_log_with_no_silence_says_so_in_r10(self):
+        w = bw.Watcher(echo=False)
+        feed_at(w, [(1.0, "[state] 0 -> 3"), (2.0, "[state] 3 -> 0")])
+        self.assertFalse(any("NOT RUN" in m for m in w._marker_lines()))
+        text = w.render_evidence(when=dt.datetime(2026, 10, 22, 19, 30),
+                                 source="live", raw_log="x.log", raw_sha256="0" * 64, port="COM7")
+        self.assertIn("| R10 | Button alive after every flow | no stuck-state signature", text)
+
+    def test_the_stuck_verdict_reaches_the_evidence_row(self):
+        w, _ = self.ticked([(1.0, "[state] 0 -> 3"), (2.0, "[state] 3 -> 4")], 100.0)
+        text = w.render_evidence(when=dt.datetime(2026, 10, 22, 19, 30),
+                                 source="live", raw_log="x.log", raw_sha256="0" * 64, port="COM7")
+        self.assertIn("| R10 | Button alive after every flow | STUCK-STATE signature seen", text)
+
+    def test_the_live_loop_ticks_on_a_silent_port(self):
+        """readline() times out every second with b"" - a dead button prints
+        nothing, so the check must run on those empty reads, not on lines."""
+        w = bw.Watcher(echo=False)
+        first = FakeSerial([b"[state] 0 -> 3\n", b"", b""])      # then KeyboardInterrupt
+        times = iter([100.0, 105.0, 120.0])
+
+        class Sink:
+            def write(self, s): pass
+            def flush(self): pass
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            bw.run_live(lambda: first, first, w, Sink(), clock=lambda: next(times),
+                        sleep=lambda s: None)
+        self.assertEqual(w.stuck_events, 1)
 
 
 class LatencyTests(unittest.TestCase):

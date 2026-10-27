@@ -35,11 +35,22 @@ WHAT IT MEASURES
                    Target with streaming on: about 2700 ms perceived.
 
   Button alive     every flow must end back at idle. A story that finishes
-                   and a session that ends are both logged; if the toy
-                   keeps printing `[alive]` while its last `[state]` is not
-                   IDLE, that is the `s_state != ST_IDLE` bug, and it is
-                   the most important thing you can find. The watcher says
-                   so the moment it sees it.
+                   and a session that ends are both logged. The firmware
+                   prints `[alive]` ONLY inside `if (s_state == ST_IDLE)`
+                   (AregVoiceMvp.ino:2822-2861), and s_state changes only
+                   through transition_to(), which always prints
+                   `[state] a -> b`. A flow that returns with s_state not
+                   IDLE (the `s_state != ST_IDLE` bug) therefore makes
+                   loop() skip the whole idle branch: no `[alive]`, no
+                   button poll - the log goes SILENT. That silence is the
+                   signature: no serial line for more than STUCK_SILENCE_S
+                   while the last `[state]` ended in a non-IDLE state, with
+                   no audio playing/recording and no upload in flight (those
+                   are legitimately quiet for minutes). It needs live
+                   timing: a replayed log carries no timestamps, so the
+                   detector does not run there and the summary says so.
+                   `[alive]` lines AFTER a non-IDLE state are impossible
+                   from this firmware and are reported as a separate WARN.
 
   SHIP C1          counts completed voice chains (`[qa] answer played`,
                    `[post] reply N played`, `[chat] turn N ... played`) and
@@ -172,6 +183,15 @@ RE_FAULT = re.compile(
 
 RE_STATE = re.compile(r"\[state\]\s+(\d+)\s*->\s*(\d+)")
 RE_ALIVE = re.compile(r"\[alive\]")
+# Audio that is legitimately silent on the serial line for minutes (a story,
+# an answer, a recording). Markers from audio_io.cpp: `[audio] <tag>_begin` /
+# `<tag>_end` (play, record, qa_stream, ...), `[story] SD open:` / `SD end`,
+# `[story] stream open:` / `stream end`, and the early-failure prints that
+# are NOT followed by an end line.
+RE_AUDIO_OPEN = re.compile(r"\[audio\]\s+\w+_begin\b|\[story\]\s+(?:SD open:|stream open:)")
+RE_AUDIO_CLOSE = re.compile(
+    r"\[audio\]\s+\w+_end\b|\[story\]\s+(?:SD|stream) end"
+    r"|\[story\]\s+(?:mp3\.begin .*failed|SD open failed|http stream open failed)")
 RE_VOLUME = re.compile(r"\[volume\]\s+gain\s+([\d.]+)")
 RE_SYNC_MANIFEST = re.compile(r"\[content-sync\]\s+manifest status=(\d+)")
 RE_SYNC_INDEX = re.compile(r"\[content-sync\]\s+index written")
@@ -214,7 +234,14 @@ C1_NEEDS = 10          # SHIP C1: ten in a row
 A6_NEEDS_SELECTIONS = 3  # SHIP A6: at least three stories
 A4_NEEDS_PRESSES = 5   # the sheet asks for five mid-story presses
 C3_MIN_OUTAGE_S = 20.0  # the sheet asks for 30 s; allow slack for the join
-STUCK_ALIVE_LINES = 3   # [alive] prints every 5 s; 3 in a row = >10 s stuck
+STUCK_SILENCE_S = 10.0  # no serial line this long after a non-IDLE [state] = stuck
+# A turn's upload legitimately prints nothing while it waits for STT + model +
+# TTS (AREG_HTTP_READ_MS 30 s, AREG_ASYNC_UPLOAD_TIMEOUT_MS 45 s): UPLOADING
+# (state 2) gets the longest wait plus a margin before it counts as stuck.
+STUCK_UPLOAD_SILENCE_S = 50.0
+ST_IDLE = 0             # AregVoiceMvp.ino enum State: IDLE=0 RECORDING UPLOADING PLAYING ERROR
+ST_UPLOADING = 2
+STUCK_ALIVE_LINES = 3   # `[alive]` lines after a non-IDLE state before the WARN
 
 # esp_reset_reason_t numbers: 1 POWERON, 2 EXT, 3 SW, 11 USB (the firmware's
 # name table has no entry for 11, so it prints "11/UNKNOWN" on every cable
@@ -315,10 +342,15 @@ class Watcher:
         self._story_open_epoch: int | None = None
         self.a1_complete = 0
 
-        # button alive
+        # button alive: the stuck-state signature is SILENCE after a
+        # non-IDLE [state] (see the module docstring); `[alive]` after one is
+        # a separate, "impossible" WARN.
         self.state: int | None = None
         self._alive_nonidle = 0
+        self._alive_warned = False
+        self.alive_nonidle_warnings = 0
         self._stuck_flagged = False
+        self._audio_open = False
         self.stuck_events = 0
 
         self.port_losses = 0
@@ -430,6 +462,13 @@ class Watcher:
     def _observe(self, line: str, t: float | None) -> None:
         """State that must be tracked whatever else the line is. Never prints
         and never consumes the line."""
+        # Quiet-by-design stretches: audio in flight prints nothing for as
+        # long as it plays, so silence during it is not the stuck signature.
+        if RE_AUDIO_CLOSE.search(line):
+            self._audio_open = False
+        elif RE_AUDIO_OPEN.search(line):
+            self._audio_open = True
+
         m = RE_BTN_RAW.search(line)
         if m:
             if m.group(1) == "DOWN":
@@ -449,24 +488,25 @@ class Watcher:
         if m:
             self.state = int(m.group(2))
             self._alive_nonidle = 0
+            self._alive_warned = False
             self._stuck_flagged = False
+            self._audio_open = False
             return
 
         if RE_ALIVE.search(line):
-            # `[alive]` prints from the idle section of loop(). If the last
-            # state transition did not end in IDLE and loop() is running
-            # anyway, a flow returned without transition_to(ST_IDLE): the
-            # button is dead until a power cycle (the standing "never" rule).
-            if self.state not in (None, 0):
+            # `[alive]` prints ONLY inside `if (s_state == ST_IDLE)` in loop(),
+            # and every s_state change prints a `[state]` line. So `[alive]`
+            # after a non-IDLE `[state]` cannot come from this firmware: a
+            # line was lost or s_state was written without transition_to().
+            # The real dead-button bug is the opposite - silence (see tick()).
+            if self.state not in (None, ST_IDLE):
                 self._alive_nonidle += 1
-                if self._alive_nonidle >= STUCK_ALIVE_LINES and not self._stuck_flagged:
-                    self._stuck_flagged = True
-                    self.stuck_events += 1
-                    msg = (f"toy is idling but its last [state] ended in {self.state}, "
-                           f"not IDLE (0) - the s_state != ST_IDLE bug: the button is "
-                           f"dead until a power cycle")
-                    self.troubles.append(msg)
-                    print(f"{C_BAD}TROUBLE{C_OFF} {msg}")
+                if self._alive_nonidle >= STUCK_ALIVE_LINES and not self._alive_warned:
+                    self._alive_warned = True
+                    self.alive_nonidle_warnings += 1
+                    print(f"{C_WARN}WARN{C_OFF}  [alive] lines after a non-IDLE state "
+                          f"(last [state] ended in {self.state}): unexpected, check the "
+                          f"firmware")
             return
 
         if RE_FAULT.search(line):
@@ -520,6 +560,28 @@ class Watcher:
             self._break_note("failed chain: " + line.strip()[:70], only_strict=True)
 
     # ---------------------------------------------------- recognised events
+    # -------------------------------------------------- stuck-state (silence)
+    def tick(self, now: float) -> None:
+        """Called by the live loop on every poll (the port read times out every
+        second), NOT only when a line arrives - a dead button prints nothing,
+        so a detector that waits for a line would wait forever. `now` is the
+        same monotonic clock the lines were stamped with."""
+        if (self.state in (None, ST_IDLE) or self.t_last is None
+                or self._stuck_flagged or self._audio_open):
+            return
+        limit = STUCK_UPLOAD_SILENCE_S if self.state == ST_UPLOADING else STUCK_SILENCE_S
+        silent = now - self.t_last
+        if silent <= limit:
+            return
+        self._stuck_flagged = True
+        self.stuck_events += 1
+        msg = (f"the log went silent for {silent:.0f} s while the last [state] ended in "
+               f"{self.state}, not IDLE (0) - the s_state != ST_IDLE bug: loop() skips "
+               f"its idle branch, so the button is dead until a power cycle. "
+               f"Press the button to confirm")
+        self.troubles.append(msg)
+        print(f"{C_BAD}TROUBLE{C_OFF} {msg}")
+
     def _event(self, tag: str, text: str, colour: str = C_OK) -> None:
         print(f"{colour}{tag}{C_OFF}  {text}")
 
@@ -676,7 +738,9 @@ class Watcher:
         self._link_up = False
         self.state = None
         self._alive_nonidle = 0
+        self._alive_warned = False
         self._stuck_flagged = False
+        self._audio_open = False
         self._story_open_epoch = None
         self._pending_barge = None
         for o in self.outages:               # a reboot proves nothing about recovery
@@ -724,6 +788,10 @@ class Watcher:
     # --------------------------------------------------------- port events
     def note_port_lost(self) -> None:
         self.port_losses += 1
+        # A vanished port is silence of the host's making, not the toy's, and
+        # what the toy is doing now is unknown until it speaks again.
+        self.state = None
+        self._audio_open = False
 
     # ------------------------------------------------------------- latency
     def _latency(self, ms: int, streamed: bool = False) -> None:
@@ -852,21 +920,48 @@ class Watcher:
                      f"{n} barge-in(s), {answered} answered (log half); the <1 s stop needs "
                      "ear / phone video / stopwatch seconds")
 
+    @staticmethod
+    def _outage_text(o: Outage) -> str:
+        """One line per outage for the C3 detail."""
+        dur = (f"{o.t_end - o.t_start:.0f} s" if o.t_start is not None and o.t_end is not None
+               else "length unknown")
+        if o.prov:
+            return f"{dur}, BLE provisioning opened (the toy needed an adult)"
+        if o.broken:
+            return f"{dur}, ended in a reboot (not a recovery)"
+        if not o.closed:
+            return "still open (no `event=got_ip` after it)"
+        if not o.chain_after:
+            return f"{dur}, link back but no voice chain completed after it"
+        return f"{dur}, recovered with a completed chain"
+
     def check_c3(self) -> Check:
         outs = self.outages
         done = [o for o in outs if o.closed and not o.broken and o.chain_after and not o.prov]
         if done:
-            o = done[0]
-            dur = (o.t_end - o.t_start) if (o.t_start is not None and o.t_end is not None) else None
-            if dur is not None and dur < C3_MIN_OUTAGE_S:
+            # Judge the BEST recovered outage, not the first: a 5 s router
+            # blip before the real 30 s test must not hide a proven recovery.
+            def length(o: Outage) -> float | None:
+                return (o.t_end - o.t_start) if (o.t_start is not None and o.t_end is not None) else None
+
+            timed = [(length(o), o) for o in done if length(o) is not None]
+            long_enough = [(d, o) for d, o in timed if d >= C3_MIN_OUTAGE_S]
+            if long_enough:
+                best = max(long_enough, key=lambda p: p[0])[0]
+                verdict = "PASS"
+                tail = f"outage {best:.0f} s, then a completed chain with no reboot"
+            elif timed:
+                best = max(timed, key=lambda p: p[0])[0]
                 verdict = "NOT YET"
-                tail = f"the outage lasted only {dur:.0f} s (the sheet asks for 30 s)"
+                tail = f"the longest recovered outage lasted only {best:.0f} s (the sheet asks for 30 s)"
             else:
                 verdict = "PASS"
-                tail = (f"outage {dur:.0f} s, then a completed chain with no reboot" if dur is not None
-                        else "outage length not measurable from a replayed log")
+                tail = "outage length not measurable from a replayed log"
             head = f"SHIP C3  Wi-Fi drop recovered without a reboot: {len(done)} of {len(outs)} drop(s)"
-            return Check("C3", verdict, head, [tail],
+            notes = [tail]
+            if len(outs) > 1:
+                notes += [f"drop {i}: {self._outage_text(o)}" for i, o in enumerate(outs, 1)]
+            return Check("C3", verdict, head, notes,
                          f"{len(done)} drop(s) recovered; {tail}")
         notes = []
         if not outs:
@@ -1005,6 +1100,12 @@ class Watcher:
             lines.append(f"WARN: BLE provisioning opened after a long Wi-Fi outage x{c['prov_outage']}")
         if self.stuck_events:
             lines.append(f"STUCK-STATE signature seen {self.stuck_events} time(s)")
+        if self.alive_nonidle_warnings:
+            lines.append(f"WARN: `[alive]` lines after a non-IDLE state x{self.alive_nonidle_warnings}"
+                         " - unexpected, check the firmware")
+        if self.lines and not self.timed:
+            lines.append("stuck-state (silence) detector NOT RUN: it needs live timing and a "
+                         "replayed log carries no timestamps")
         if self.port_losses:
             lines.append(f"serial port dropped {self.port_losses} time(s) "
                          "(expected on a power-cycle: USB re-enumerates)")
@@ -1147,9 +1248,14 @@ class Watcher:
             "(by ear: does the loudness follow?) |")
         add(f"| R9 | ~3 min after boot | manifest 200 x{c['sync_manifest_ok']}; "
             f"index written x{c['sync_index_written']} |")
-        add(f"| R10 | Button alive after every flow | "
-            + ("STUCK-STATE signature seen" if self.stuck_events
-               else "no stuck-state signature (only your press proves it)") + " |")
+        if self.stuck_events:
+            r10 = "STUCK-STATE signature seen (log silent after a non-IDLE state)"
+        elif not self.timed:
+            r10 = ("not checked: the silence detector needs live timing and a replayed log "
+                   "carries no timestamps (only your press proves it)")
+        else:
+            r10 = "no stuck-state signature (only your press proves it)"
+        add(f"| R10 | Button alive after every flow | {r10} |")
         add("")
 
         markers = self._marker_lines()
@@ -1281,6 +1387,7 @@ def run_live(open_port, first, w: Watcher, fh, *, clock=time.monotonic,
                 announced = True
                 continue
             if not raw:
+                w.tick(clock())  # a silent port must still trigger the stuck-state check
                 continue
             t = clock()          # stamp on arrival, before any parsing
             line = raw.decode("utf-8", errors="replace")

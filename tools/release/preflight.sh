@@ -174,14 +174,13 @@ python_tests() {
            tools/listen/test_listen_test.py tools/firmware/test_bench_watch.py \
            tools/release/test_preflight_checks.py; do
     if [ ! -f "$REPO_ROOT/$t" ]; then
-      case "$t" in tools/listen/*) continue ;; esac   # newer than the first CI job
-      bad="$bad missing:$(basename "$t")"; continue
+      bad="$bad missing:$(basename "$t")"; continue   # a missing suite fails the gate, whichever it is
     fi
     echo "=== $t" >>"$log"
     ( cd "$(dirname "$REPO_ROOT/$t")" && "$PY" "$(basename "$t")" -v ) >>"$log" 2>&1 || bad="$bad $(basename "$t")"
   done
   if [ -n "$bad" ]; then record python-tests FAIL "failed:$bad"
-  else record python-tests PASS "$(grep -Ec '^Ran [0-9]+ tests' "$log") suites, $(grep -E '^Ran [0-9]+ tests' "$log" | awk '{s+=$2} END {print s}') tests OK"; fi
+  else record python-tests PASS "$(grep -Ec '^Ran [0-9]+ tests?' "$log") suites, $(grep -E '^Ran [0-9]+ tests?' "$log" | awk '{s+=$2} END {print s}') tests OK"; fi
 }
 
 dotnet_gates

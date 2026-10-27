@@ -188,6 +188,13 @@ def _cell(value: object) -> str:
     return " ".join(str(value).replace("|", "/").split())  # one line, no table-breaking pipes
 
 
+def _read_text(path: Path) -> str:
+    """Every catalogue / evidence read goes through here. `utf-8-sig` because
+    Visual Studio and Notepad on Windows write a BOM, which plain `utf-8`
+    hands to json.loads as a stray character (every command then exits 2)."""
+    return path.read_text(encoding="utf-8-sig")
+
+
 def render_row(r: Row) -> str:
     secs = "?" if r.seconds is None else f"{r.seconds:.1f}"
     cells = [r.id, r.group, r.path, r.sha256, secs, r.verdict, r.note]
@@ -232,7 +239,7 @@ def load_evidence(directory: Path) -> list[Row]:
     for p in sorted(directory.iterdir()) if directory.is_dir() else []:
         m = EVIDENCE_RE.fullmatch(p.name)
         if m:
-            rows += parse_evidence(p.read_text(encoding="utf-8"), m.group(1))[0]
+            rows += parse_evidence(_read_text(p), m.group(1))[0]
     return rows
 
 
@@ -247,7 +254,7 @@ def _append(path: Path, text: str) -> None:
 
 def start_session(path: Path, date: str, ctx: dict) -> None:
     """Write a header unless the file's last header already says the same."""
-    last = parse_evidence(path.read_text(encoding="utf-8"), date)[1] if path.exists() else {}
+    last = parse_evidence(_read_text(path), date)[1] if path.exists() else {}
     if not all(last.get(k) == _cell(ctx[k]) for k in ("listener", "device", "player")):
         _append(path, render_session(date, ctx, first=not path.exists()))
 
@@ -280,7 +287,11 @@ def compute_status(items: list[Item], rows: list[Row], current: dict[str, str | 
 def pending_items(results: list[Result], rows: list[Row], date: str, device: str, again: bool = False) -> list[Item]:
     """What `run` asks about: not yet answered today on this device and (unless
     `again`) not already APPROVED. MISSING files cannot be played."""
-    done = {r.path for r in rows if r.date == date and r.device.lower() == device.lower()}
+    # The evidence header stores the device through _cell() (pipes -> "/",
+    # whitespace collapsed), so the raw --device argument must take the same
+    # road or `--device "PC | headphones"` never matches the rows it wrote.
+    want = _cell(device).lower()
+    done = {r.path for r in rows if r.date == date and _cell(r.device).lower() == want}
     return [x.item for x in results if x.state != "MISSING" and x.item.path not in done
             and (again or x.state != "APPROVED")]
 
@@ -410,7 +421,7 @@ def git_commit() -> str:
 # --- commands ------------------------------------------------------------
 
 def _catalogue(args: argparse.Namespace) -> list[Item]:
-    config = json.loads(args.appsettings.read_text(encoding="utf-8"))
+    config = json.loads(_read_text(args.appsettings))
     root = resolve_audio_root((config.get("ContentSync") or {}).get("AudioRoot", ""), args.appsettings)
     return select_group(load_catalogue(config, root), args.group, getattr(args, "only", None))
 
@@ -445,7 +456,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         print("Nothing advertised matches that group / --only.")
         return 1
     path = evidence_path(args.evidence_dir, date)
-    last = parse_evidence(path.read_text(encoding="utf-8"), date)[1] if path.exists() else {}
+    last = parse_evidence(_read_text(path), date)[1] if path.exists() else {}
     ctx = {"listener": args.listener or ask_default("Listener (your name)", last.get("listener")),
            "device": args.device or ask_default("Playback device (PC headphones / toy speaker)", last.get("device")),
            "player": args.player, "commit": git_commit()}
