@@ -82,7 +82,12 @@ arduino-cli compile --fqbn "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,Partition
   "1.26 MB / 40%" figure is stale. **96–97% still means the wrong partition
   scheme** (`PartitionScheme=default` measures against a 1.25 MB slot) — stop
   and fix that before flashing.
-- The newest firmware commit, `5cf65b6` (2026-09-14), says in its own message
+- **Update 2026-10-27:** HEAD was compiled in the cloud on core 3.3.6 with the example
+  `config.h`: exit 0, 0 warnings, 1,632,992 B = 51.9 % of the slot
+  (`tools/quality-evidence/firmware-compile-20261027.md`). A compile error on your PC
+  therefore points at your `config.h` or your library versions (ArduinoJson 7.4.2,
+  ESP8266Audio 2.4.1, Adafruit NeoPixel 1.15.5 built), not at the sketch.
+- The newest firmware commit, `5cf65b6` (2026-09-14), said in its own message
   *"NOT compile-verified: arduino-cli is not available in this environment"*,
   and CI runs host tests only. **A compile error here is a finding, not a bench
   failure** — keep the error text and stop; do not debug it at the bench.
@@ -359,7 +364,7 @@ enough for a fix session to start from evidence instead of memory.
   line named here (grepped from `esp32/AregVoiceMvp/*.ino|cpp` and compared with
   the real logs in `tools/quality-evidence/`); the `reset_reason` numbers.
 - **Not verified by anyone:** every item in Parts 2 and 3 on hardware; the newest
-  firmware commit has never been compiled (`5cf65b6`); whether the guarded browse
+  firmware commit had never been compiled (`5cf65b6`; compiled clean 2026-10-27, never flashed); whether the guarded browse
   and menu-choice path plays the chosen story.
 - **`bench_watch.py`** is covered by 80 offline unit tests (`tools/firmware/
   test_bench_watch.py`, run in CI) over synthetic logs in the firmware's real line

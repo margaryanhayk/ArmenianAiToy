@@ -105,6 +105,33 @@ and 128 kbps confirming those files never went through the 192 kbps shipper.
 - **Two apt PPAs** (`deadsnakes`, `ondrej/php`) 403 through the proxy. They are
   unrelated to this project; `apt-get update` warns and carries on.
 
+## Firmware compile (arduino-cli, core 3.3.6) — works, with one permission rule
+
+Verified 2026-10-27 (`tools/quality-evidence/firmware-compile-20261027.md`).
+`arduino-cli` is not in apt and the GitHub releases page 403s, but
+`downloads.arduino.cc`, `espressif.github.io` and the core's GitHub release
+asset are reachable. Downloading and running a program is blocked by the
+auto-mode classifier unless `.claude/settings.json` allows exactly these
+(already committed, `permissions.allow`): the `curl -fsSL -o * https://downloads.arduino.cc/arduino-cli/*`
+download, `tar xzf * arduino-cli`, and `~/bin/arduino-cli *`. Run each as its
+own command so it matches; read a new session's rules at startup.
+
+```bash
+D=<an empty scratch dir>
+curl -fsSL -o $D/arduino-cli.tar.gz https://downloads.arduino.cc/arduino-cli/arduino-cli_latest_Linux_64bit.tar.gz
+cd $D && tar xzf arduino-cli.tar.gz arduino-cli && mv arduino-cli ~/bin/ && cd -
+U=https://espressif.github.io/arduino-esp32/package_esp32_index.json
+~/bin/arduino-cli --additional-urls $U core update-index
+~/bin/arduino-cli --additional-urls $U core install esp32:esp32@3.3.6      # ~1 GB, a few minutes
+~/bin/arduino-cli lib install "Adafruit NeoPixel" "ESP8266Audio" "ArduinoJson@7.4.2"
+cp esp32/AregVoiceMvp/config.h.example esp32/AregVoiceMvp/config.h         # gitignored
+~/bin/arduino-cli compile --fqbn "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc" --output-dir $D/fwbuild ./esp32/AregVoiceMvp
+```
+
+About 90 s to compile once the core is installed. The example config has an
+empty OTA signing key, so `check_release_image.py` correctly refuses that
+binary: it is a compile check, never a release image. Flashing needs the toy.
+
 ## The general lesson
 
 Check `apt-cache search` before concluding a tool is unavailable. The proxy
