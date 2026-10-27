@@ -1,4 +1,11 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(curl -fsSL -o * https://downloads.arduino.cc/arduino-cli/*)",
+      "Bash(tar xzf * arduino-cli)",
+      "Bash(~/bin/arduino-cli *)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
