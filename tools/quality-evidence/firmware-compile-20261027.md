@@ -40,6 +40,23 @@ were present (no real credential in the image).
 - ESP8266Audio's version was never pinned in the README; 2.4.1 is what
   Library Manager gave today.
 
+## Flashed on the owner's PC (2026-10-29, local night) — reported by the PC session
+
+Relayed from the Claude session on the owner's PC; not independently verified from the cloud.
+
+| | |
+|---|---|
+| Source | local main after merging origin/main `a2389ba` (merge `b33e148`; the one local-only commit `cb7c4e7` is docs) |
+| Toolchain | arduino-cli 1.4.1 (PC); core 3.3.6 (the script refuses 3.3.7/3.3.8 with BLE on) |
+| Label | `fw=1.3.5-bench build=bench-20261029` (set by `bench_session.sh --label`) |
+| Compile | 1,649,487 B = **52.4 %** of the 3 MB slot; globals 200,360 B (61 %) |
+| Upload | COM7, "hash of data verified", hard reset by RTS, script printed "flashed" |
+| Config | the owner's real `config.h`: `AREG_QA_STREAM_PLAYBACK` OFF (first flash = regression build); `AREG_PROVISION_WIFI_ONCE` and `_FORCE` left ON (no-ops with Wi-Fi already saved) |
+| SD card | not loaded by the script; the toy syncs over Wi-Fi about 180 s after boot |
+
+An earlier flash the same night used a stale checkout (no `--label`, streaming flag ON, none of the
+2026-10-27 fixes); it is superseded by this one. **Still not verified: any runtime behaviour.**
+
 ## Reproduce
 
 `docs/container-toolchain.md` § "Firmware compile".
