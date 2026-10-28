@@ -126,8 +126,8 @@ release.
 
 Firmware (`esp32/AregVoiceMvp/`): arduino-cli, core `esp32:esp32@3.3.6` on
 the release machine (3.3.7/3.3.8 boot-loop when BLE provisioning starts,
-`config.h.example:530-533`; the cloud container compiles on 3.3.8 for syntax
-only — see `docs/bench-test-session.md`),
+`config.h.example:530-533`; the cloud container compiles on 3.3.6 too — recipe
+in `docs/container-toolchain.md`),
 FQBN `esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc`,
 libraries in the firmware README, `config.h` from `config.h.example`
 (gitignored — real creds live in NVS). Production image ≈ 1.33 MB of the 3 MB
@@ -290,7 +290,7 @@ System/Logs tabs; backup restore drill (local only); release tooling
 
 Not built: the `sound-detective` game engine; the Tsivik serial render
 (owner sign-off); narrator PVC; rev-A PCB. Three facts outrank the rest:
-HEAD firmware has never been compiled by anyone (core 3.3.6 on the PC);
+HEAD firmware compiles clean on core 3.3.6 (cloud, 2026-10-27, 51.9 % of the OTA slot) but has never been flashed;
 the shipped audio has never been played on a toy; the repo is public with
 two credential leaks in history (SHIP B4, owner decision).
 

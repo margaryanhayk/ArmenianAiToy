@@ -63,6 +63,9 @@ sd-content-pack/
 
 # Firmware secrets — copy config.h.example -> config.h and fill in locally.
 esp32/AregVoiceMvp/config.h
+# bench_session.sh writes config.h.bak.<timestamp> before editing config.h; a backup holds the same
+# Wi-Fi password as config.h and was NOT ignored until 2026-10-29.
+esp32/AregVoiceMvp/config.h.bak*
 
 # Voice-audition intermediates — the finished renders are kept, the
 # per-chunk pieces are regenerable and just bulk.

@@ -68,7 +68,7 @@ blockers for that week; this audit does not make it for him.
    the same day in `d425c4e`) carried a real device id and API key. Both are still on
    `origin/main`. No record in the repo says the device was revoked or the Wi-Fi password
    changed. This needs an owner decision, not more code (section 4).
-2. **The firmware at HEAD has never been compiled by anyone.** The last firmware commit
+2. **The firmware at HEAD had never been compiled by anyone** (*update 2026-10-27: compiled clean on core 3.3.6 in the cloud, 0 warnings, 51.9 % of the OTA slot — `tools/quality-evidence/firmware-compile-20261027.md`; still never flashed*). The last firmware commit
    (`5cf65b6`, 2026-09-14) says so in its own body, and every container "compile-verified"
    claim since 2026-09-02 was on core 3.3.8 while the owner's release machine must use
    3.3.6 (3.3.7/3.3.8 boot-loop when BLE provisioning starts, `config.h.example:530-533`).
