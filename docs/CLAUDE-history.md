@@ -6509,7 +6509,7 @@ is the likely cause; replug USB first, then re-seat the wires.
 
 Verified: full `preflight.sh` GREEN on the owner's Windows PC (first time):
 `dotnet test` 3346 (no backend change), firmware host tests 8/8 and the virtual
-card (103 + 246 + 45 checks) built with MSVC, python suites 191 tests incl.
+card (103 + 246 + 67 checks) built with MSVC, python suites 201 tests incl.
 `bench_watch.py` 99 and `preflight_checks.py` 25. The sketch compiles with
 arduino-cli on core 3.3.6 (nothing flashed): +308 bytes of code and +16 bytes of
 internal RAM against the 1.3.5-bench build. NOT verified: any of this on a toy,
