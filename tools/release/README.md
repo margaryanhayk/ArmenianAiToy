@@ -10,8 +10,9 @@ tools/release/preflight.sh --image esp32/AregVoiceMvp/build/AregVoiceMvp.ino.bin
 ```
 
 Works in Git Bash on Windows. Needs `python3` (or `python`), `dotnet` 10 and a
-C++ compiler (`g++`) on PATH; a missing compiler is a SKIP, a missing dotnet
-or python is a FAIL. Output ends in `PREFLIGHT: GREEN` (exit 0) or
+C++ compiler (`g++` on PATH, or on Windows the Visual Studio C++ Build Tools,
+which the host-test runner finds by itself); a missing compiler is a SKIP, a
+missing dotnet or python is a FAIL. Output ends in `PREFLIGHT: GREEN` (exit 0) or
 `PREFLIGHT: RED` (exit 1). Every gate's full output is in the log directory
 printed at the top and bottom. Gates keep running after a failure.
 
@@ -21,7 +22,8 @@ printed at the top and bottom. Gates keep running after a failure.
 | dotnet-test | `dotnet test`; a failed OR skipped test is a FAIL |
 | claude-md-count | the `dotnet test # N tests` line in CLAUDE.md must equal what ran; on a mismatch it tells you the number to write |
 | claude-md-size | CLAUDE.md must stay under 24 KB — it is re-sent on every tool call of every session (owner rule 2026-10-27); slice notes go to `docs/CLAUDE-history.md` |
-| firmware-host-tests | every `esp32/AregVoiceMvp/host_tests/*_test.cpp` with `g++ -std=c++17 -I..` (as CI) |
+| firmware-host-tests | every `esp32/AregVoiceMvp/host_tests/*_test.cpp` with `g++ -std=c++17 -I..` (as CI); with no g++ on PATH it falls back to `host_tests/virtual_card/run_virtual_card.py --host-tests`, which also finds the Visual Studio C++ tools |
+| firmware-virtual-card | the REAL sketch sources on a PC against a fake SD card: the on-device suites `story_select_test.cpp` and `content_sync_test.cpp`, plus checks that a short or damaged index read is retried and then read from the previous copy, and that story rotation never repeats across power cycles (`host_tests/virtual_card/`). SKIP without a C++ compiler or ArduinoJson 7 |
 | python-tests | the unittest suites CI runs, plus `test_preflight_checks.py` |
 | story-audio / music-audio | `check_story_audio.py`, `check_music_audio.py` |
 | speaker-maps / ambience-anchors | `check_speaker_map.py`, `check_ambience_anchors.py` |
