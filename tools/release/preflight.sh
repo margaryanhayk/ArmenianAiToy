@@ -12,6 +12,8 @@
 #   claude-md-count   CLAUDE.md "dotnet test # N tests" == what ran
 #   claude-md-size    CLAUDE.md under 24 KB (it rides on every tool call)
 #   firmware-host-tests  esp32/AregVoiceMvp/host_tests/*_test.cpp (g++ C++17)
+#   firmware-virtual-card  real sketch sources on a PC against a fake SD card
+#                     (host_tests/virtual_card/; SKIP without a compiler or ArduinoJson 7)
 #   python-tests      the unittest suites ci.yml runs, plus this script's own
 #   story-audio       tools/story-audio/check_story_audio.py
 #   music-audio       tools/story-audio/check_music_audio.py
@@ -112,7 +114,7 @@ dotnet_gates() {
   begin
   ( cd "$REPO_ROOT/backend" && dotnet test ArmenianAiToy.slnx --no-build -c Release ) >"$log" 2>&1; local rc=$?
   local total="" failed="" skipped=""
-  [ -n "$PY" ] && read -r total failed skipped < <("$PY" "$HELPER" test-summary --log "$log" 2>/dev/null) || true
+  [ -n "$PY" ] && read -r total failed skipped < <("$PY" "$HELPER" test-summary --log "$log" 2>/dev/null | tr -d '\r') || true
   if [ -z "$total" ]; then
     record dotnet-test FAIL "exit $rc and no test totals found (see log)"
   elif [ "$rc" != 0 ] || [ "$failed" != 0 ]; then
@@ -139,7 +141,21 @@ host_tests() {
     [ -n "$c" ] && command -v "$c" >/dev/null 2>&1 && { cxx="$c"; break; }
   done
   begin
-  [ -n "$cxx" ] || { record firmware-host-tests SKIP "no C++ compiler (g++) on PATH"; return; }
+  if [ -z "$cxx" ]; then
+    # No g++/clang++ on the PATH - e.g. a Windows PC that only has the Visual
+    # Studio C++ tools. The runner finds whatever compiler there is and exits
+    # 77 when there really is none, which stays a SKIP.
+    if [ -n "$PY" ]; then
+      local rlog="$LOGDIR/firmware-host-tests.log" rrc
+      "$PY" "$REPO_ROOT/esp32/AregVoiceMvp/host_tests/virtual_card/run_virtual_card.py" --host-tests >"$rlog" 2>&1; rrc=$?
+      case "$rrc" in
+        0)  record firmware-host-tests PASS "$(grep -c '^\[.*\] PASS' "$rlog") suites compiled and passed (run_virtual_card.py --host-tests)"; return ;;
+        77) ;;   # no compiler at all: SKIP below
+        *)  record firmware-host-tests FAIL "failed: see firmware-host-tests.log"; return ;;
+      esac
+    fi
+    record firmware-host-tests SKIP "no C++ compiler (g++) on PATH"; return
+  fi
   local dir="$REPO_ROOT/esp32/AregVoiceMvp/host_tests" log="$LOGDIR/firmware-host-tests.log" bin="$LOGDIR/host_test_bin"
   local f n=0 bad=""
   : >"$log"
@@ -152,6 +168,23 @@ host_tests() {
   if [ "$n" = 0 ]; then record firmware-host-tests FAIL "no *_test.cpp found in host_tests/"
   elif [ -n "$bad" ]; then record firmware-host-tests FAIL "failed:$bad"
   else record firmware-host-tests PASS "$n suites compiled and passed ($cxx -std=c++17)"; fi
+}
+
+# ------------------------------- firmware on a PC with a fake SD card (virtual card)
+# Builds the REAL sketch sources (story selection, index reading, the on-device
+# self-test suites) against an in-memory SD card. g++, clang++ or the Visual
+# Studio C++ Build Tools, plus ArduinoJson 7; the runner exits 77 when either
+# is missing and that is a SKIP, not a failure.
+virtual_card() {
+  local log="$LOGDIR/firmware-virtual-card.log"
+  begin
+  [ -n "$PY" ] || { record firmware-virtual-card SKIP "python3 not found"; return; }
+  "$PY" "$REPO_ROOT/esp32/AregVoiceMvp/host_tests/virtual_card/run_virtual_card.py" >"$log" 2>&1; local rc=$?
+  case "$rc" in
+    0)  record firmware-virtual-card PASS "$(tr -d '\r' <"$log" | awk -F'[()]' '/PASS \(/ {split($2, a, " "); s += a[1]} END {print s}') checks on the real sketch sources, fake SD card" ;;
+    77) record firmware-virtual-card SKIP "$(head -1 "$log" | tr -d '\r')" ;;
+    *)  record firmware-virtual-card FAIL "exit $rc: $(first_line '(FAIL|BUILD FAILED)' "$log" || echo 'see log')" ;;
+  esac
 }
 
 # ------------------------------------------------------------ python gates
@@ -173,6 +206,7 @@ python_tests() {
   # The same suites ci.yml runs (python-tool-tests job), plus this script's own.
   for t in tools/firmware/test_check_release_image.py tools/factory/test_load_sd_card.py \
            tools/listen/test_listen_test.py tools/firmware/test_bench_watch.py \
+           tools/firmware/test_net_budget_sites.py \
            tools/release/test_preflight_checks.py; do
     if [ ! -f "$REPO_ROOT/$t" ]; then
       bad="$bad missing:$(basename "$t")"; continue   # a missing suite fails the gate, whichever it is
@@ -192,6 +226,7 @@ else
   [ $? = 0 ] && record claude-md-size PASS "$msg" || record claude-md-size FAIL "$msg"
 fi
 host_tests
+virtual_card
 python_tests
 py_gate story-audio     '^PASS'    tools/story-audio/check_story_audio.py
 py_gate music-audio     '^PASS'    tools/story-audio/check_music_audio.py

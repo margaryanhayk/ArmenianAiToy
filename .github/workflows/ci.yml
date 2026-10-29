@@ -59,6 +59,10 @@ jobs:
         working-directory: tools/firmware
         run: python3 test_bench_watch.py -v
 
+      - name: Run firmware network-budget source guard
+        working-directory: tools/firmware
+        run: python3 test_net_budget_sites.py -v
+
       - name: Run SD-card loader tests
         working-directory: tools/factory
         run: python3 test_load_sd_card.py -v

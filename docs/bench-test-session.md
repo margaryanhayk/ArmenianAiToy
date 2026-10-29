@@ -70,6 +70,11 @@ arduino-cli core install esp32:esp32@3.3.6
   `AREG_OFFLINE_GAMES_BENCH` is compiled in.
 - **The variant-endings and story-pauses gates stay undefined** for Parts 1–2;
   see N6 for what they need.
+- **Do not set `AREG_WDT_TIMEOUT_S` below 60.** An old override of 30 (the same
+  as the HTTP read timeout) rebooted a toy on a stalled heartbeat on 2026-10-29.
+  The firmware now raises a value below its floor and says so
+  (`[boot] task watchdog raised 30s -> 53s ...`); if you see that line, delete
+  the `AREG_WDT_TIMEOUT_S` line from `config.h`.
 
 ### 0.3 Compile first
 
@@ -152,7 +157,7 @@ main button must still work (R10) — if it does not, that is the
 | R6 | Press **and hold** mid-story, ask, let go | the answer plays, then the story resumes | `[story] SD barge-in`, `[audio] record_begin`, `[qa] answer played (buffered POST response)` | `button-jumper3-20260819.log` |
 | R7 | Hold 2 s in idle, press GREEN | the menu opens, a chosen story plays | `[button] hold -- opening the menu`, `[welcome] playing chosen story <id>` | `sd-recheck-20260826.log:91`, `menu-first-test-20260826.log` |
 | R8 | Turn the knob mid-story | volume follows | `[volume] gain …` | `volume-median-verify-20260816.log` |
-| R9 | Wait ~3 min after boot | a sync runs, the index is written, **no** `index parse failed`; dashboard shows the content report | `[content-sync] manifest status=200`, `[content-sync] index written` | `content-sync-fix-verified-20260814.log`, `card-heal-20260902.log` |
+| R9 | Wait ~3 min after boot | a sync runs, the index is written, **no** `index parse failed` (an `index read recovered on attempt N` or `using the previous copy` line means the card gave a bad read and the firmware worked around it: write it down, it points at wiring or the card); dashboard shows the content report | `[content-sync] manifest status=200`, `[content-sync] index written` | `content-sync-fix-verified-20260814.log`, `card-heal-20260902.log` |
 | R10 | After every row above | the main button still responds | no `[alive]` while `[state]` ≠ 0 | the "never" rule |
 
 R4 and R7 are worth a close look. The code comment near the browse path

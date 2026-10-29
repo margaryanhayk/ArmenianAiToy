@@ -867,6 +867,63 @@ inline bool cs_index_should_restore_backup(bool primary_exists, bool backup_exis
     return !primary_exists && backup_exists;
 }
 
+// ---- reading the card index: retry, then the previous copy (2026-10-29) ----
+//
+// The bench toy printed `index parse failed: IncompleteInput` seven times in
+// the first 30 s after boot, then parsed the SAME file without a complaint
+// three minutes later. A short read from a card is not a bad file. Every
+// reader used to give up on the first failure, which meant "no cached
+// stories", the Wi-Fi stream fallback and a silent toy, and the restore rule
+// above only covered a MISSING primary, never a damaged one.
+//
+// content_index_load() (content_index_io.cpp) follows this plan: read the
+// primary up to CS_INDEX_READ_TRIES times, then read the previous generation
+// (<primary>.prev) the same way, and only then report the index unreadable.
+// The plan is pure so the order is pinned by a host test.
+#ifndef CS_INDEX_READ_TRIES
+#define CS_INDEX_READ_TRIES 3        // total attempts per file, not retries
+#endif
+#ifndef CS_INDEX_RETRY_GAP_MS
+// Settle time between two attempts. The bench failures cluster in the first
+// ~30 s after boot, while Wi-Fi is busy, so a few ms is too short to matter;
+// 250 ms is still cheap (two gaps, half a second, only when a read failed).
+#define CS_INDEX_RETRY_GAP_MS 250
+#endif
+// After a read failed on every attempt of both files, callers inside this
+// window fail at once. A dying card turns each read into a multi-second
+// timeout and the boot chain asks several times back to back.
+#ifndef CS_INDEX_DEAD_MEMO_MS
+#define CS_INDEX_DEAD_MEMO_MS 5000
+#endif
+// After the primary failed every attempt but the previous copy read fine,
+// later readers go straight to the previous copy for this long instead of
+// repaying three failed reads (and ~0.5 s of settling) on every load - a
+// quick press makes four or more loads before any sound, the menu seven.
+// Content sync never uses the shortcut: it reads the primary afresh before
+// deciding whether anything needs repairing.
+#ifndef CS_INDEX_PRIMARY_SKIP_MS
+#define CS_INDEX_PRIMARY_SKIP_MS 60000
+#endif
+
+enum CsIndexStep {
+    CS_INDEX_STEP_READ_PRIMARY = 0,  // try (or retry) the primary file
+    CS_INDEX_STEP_READ_BACKUP,       // try (or retry) the previous generation
+    CS_INDEX_STEP_ABSENT,            // neither file exists: no index, not an error
+    CS_INDEX_STEP_UNREADABLE         // a file exists but no attempt parsed
+};
+
+inline CsIndexStep cs_index_next_step(bool primary_exists, int primary_failures,
+                                      bool backup_exists, int backup_failures) {
+    if (primary_exists && primary_failures < CS_INDEX_READ_TRIES) {
+        return CS_INDEX_STEP_READ_PRIMARY;
+    }
+    if (backup_exists && backup_failures < CS_INDEX_READ_TRIES) {
+        return CS_INDEX_STEP_READ_BACKUP;
+    }
+    return (primary_exists || backup_exists) ? CS_INDEX_STEP_UNREADABLE
+                                             : CS_INDEX_STEP_ABSENT;
+}
+
 /// The one verdict a sync attempt reports (and the heartbeat forwards).
 ///
 /// Ranking, highest first:

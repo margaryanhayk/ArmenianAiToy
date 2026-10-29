@@ -131,7 +131,9 @@ in `docs/container-toolchain.md`),
 FQBN `esp32:esp32:esp32s3:PSRAM=opi,FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc`,
 libraries in the firmware README, `config.h` from `config.h.example`
 (gitignored — real creds live in NVS). Production image ≈ 1.33 MB of the 3 MB
-OTA slot. Pure logic gets host tests under `host_tests/` (plain g++).
+OTA slot. Pure logic gets host tests under `host_tests/` (plain g++);
+`host_tests/virtual_card/run_virtual_card.py` also runs the real SD-index and
+story-picking code on a PC against a fake card (preflight runs it).
 Nothing can be flashed from the cloud; say so.
 
 Python tools need ffmpeg/ffprobe; `ELEVENLABS_API_KEY` comes from the

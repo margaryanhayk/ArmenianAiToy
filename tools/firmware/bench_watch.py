@@ -195,7 +195,7 @@ RE_AUDIO_CLOSE = re.compile(
 RE_VOLUME = re.compile(r"\[volume\]\s+gain\s+([\d.]+)")
 RE_SYNC_MANIFEST = re.compile(r"\[content-sync\]\s+manifest status=(\d+)")
 RE_SYNC_INDEX = re.compile(r"\[content-sync\]\s+index written")
-RE_SYNC_RESTORED = re.compile(r"\[content-sync\]\s+primary index missing.*restored from backup")
+RE_SYNC_RESTORED = re.compile(r"\[content-sync\]\s+primary index (?:missing|unreadable).*restored from backup")
 
 # Anything here is worth stopping for.
 TROUBLE = [

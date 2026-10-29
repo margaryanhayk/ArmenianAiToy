@@ -6452,3 +6452,65 @@ registration gate, the B1 structural test was per-controller (now per
 action), and the Configured row could look calmer than the checks.
 `dotnet test` green (3244, 47 new). NOT verified: anything on hardware,
 the live Railway console, a real `ffplay` listen session.
+
+### 2026-10-29 — virtual-bench findings and fixes (branch `fix/virtual-bench-findings-20261029`)
+
+Trigger: an idle bench toy (fw 1.3.5-bench) rebooted with `TASK_WDT` after 136
+minutes, its button never produced an edge, and the story index failed to parse
+seven times in the first 30 s then parsed fine. The rig was unusable, so the
+owner asked for software-only ("virtual") tests. Evidence and the raw findings:
+`tools/quality-evidence/bench-notes-20261029.md`.
+
+Fixed, with the `SHIP.md` item each serves:
+
+- **Network stall reboots an idle toy** (C3, C1). Core 3.3.6 gives the TLS
+  handshake a 120 s default that no HTTPClient timeout covers, and the toy's
+  `config.h` still carried `AREG_WDT_TIMEOUT_S 30`, the same value as the read
+  timeout (the 2026-08-16 collision again). Now: handshake bounded to 10 s in
+  `net_transport.cpp`; the idle calls (heartbeat, command poll and ack, story
+  token, play reports) wait 8 s, not 30; `voice_post_voice_intent` pauses the
+  watchdog like its siblings; `setup()` raises a configured watchdog below the
+  53 s floor and logs `[boot] task watchdog raised`. The arithmetic is
+  `net_budget_rules.h` with a host test.
+- **A short or damaged index read silenced the toy** (A6, A1). One reader,
+  `content_index_io.cpp`: three attempts, then the previous copy
+  (`content_index.json.prev`), then a 5 s memo so a dying card is not hammered.
+  Content sync also repairs the primary from the backup. Story selection, the
+  content report and sync all use it; the plan is `cs_index_next_step` in
+  `content_sync_rules.h` (host test). A parent's "intro off" now survives a bad
+  read instead of reverting to ON.
+- **Release gates** (D2, B4). `preflight.sh` reported a green test run as FAIL on
+  Windows (python wrote CRLF, "0\r" != "0"); the Google-key secret pattern now
+  needs a delimited token, because random base64 audio matched it.
+- **New tests.** `esp32/AregVoiceMvp/host_tests/virtual_card/` runs the real
+  index and story-picking sources and both on-device suites on a PC against a
+  fake SD card (`run_virtual_card.py`; `--host-tests` runs the plain host tests
+  with whatever compiler exists, including the Visual Studio C++ tools).
+  `preflight.sh` gained `firmware-virtual-card` and no longer skips the host
+  tests on a PC that has only MSVC.
+
+- **Independent review follow-ups.** A fresh read-only reviewer found no
+  blockers and seven points, all applied: the watchdog is fed after every
+  chained idle network call (the 53 s floor covers ONE call); a damaged
+  primary is skipped for 60 s once the previous copy has served, and content
+  sync reads afresh; the bench-only SD fallback test hides the `.prev` copy;
+  the 30 s-read GETs start on a fresh window;
+  `tools/firmware/test_net_budget_sites.py` (also in CI) fails if a call site is
+  reverted; the settle gap is 250 ms and the recovery line prints elapsed time.
+  Open: the bench failures cluster in the first 30 s after boot, so whether
+  three tries over half a second are enough is a bench question.
+
+NOT fixed, owner decision (`docs/v2-backlog.md`): the Wi-Fi story stream is a
+live OpenAI-voice render and stays silent on a fresh server; the toy keeps 16 of
+the 20 offered stories (four alternate endings never arrive; RAM, see backlog).
+NOT fixed, hardware: the SD card has not mounted since the watchdog reset, the
+button never read, the knob read 0 mV: one loose ground or 5 V wire on the rig
+is the likely cause; replug USB first, then re-seat the wires.
+
+Verified: full `preflight.sh` GREEN on the owner's Windows PC (first time):
+`dotnet test` 3346 (no backend change), firmware host tests 8/8 and the virtual
+card (103 + 246 + 67 checks) built with MSVC, python suites 201 tests incl.
+`bench_watch.py` 99 and `preflight_checks.py` 25. The sketch compiles with
+arduino-cli on core 3.3.6 (nothing flashed): +308 bytes of code and +16 bytes of
+internal RAM against the 1.3.5-bench build. NOT verified: any of this on a toy,
+the TLS bound against a really stalled link, or free heap while running.

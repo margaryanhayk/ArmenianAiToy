@@ -113,7 +113,10 @@ ALLOW_MARKER = "preflight:allow-secret"
 LINE_RULES = [
     ("openai-key", re.compile(r"(?<![A-Za-z0-9])sk-(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}"), 0),
     ("elevenlabs-key", re.compile(r"(?<![A-Za-z0-9])sk_[0-9a-f]{32,}"), 0),
-    ("google-api-key", re.compile(r"AIza[0-9A-Za-z_-]{35}"), 0),
+    # Delimited on both sides: a real key is exactly 39 characters and stands
+    # alone. Without the guards, random base64 audio embedded in a generated page
+    # matched by chance (2026-10-29: tools/story-audio/clip-listen-test.html).
+    ("google-api-key", re.compile(r"(?<![A-Za-z0-9_-])AIza[0-9A-Za-z_-]{35}(?![A-Za-z0-9_-])"), 0),
     ("device-key", re.compile(r"(?<![A-Za-z0-9])dtk_[0-9a-fA-F]{32}"), 0),
     ("github-token", re.compile(
         r"(?<![A-Za-z0-9])(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,})"), 0),
@@ -262,6 +265,17 @@ def main(argv=None) -> int:
     p = sub.add_parser("claude-md-size"); p.add_argument("--claude-md", type=Path, required=True)
     p = sub.add_parser("secret-scan"); p.add_argument("--root", type=Path, default=Path.cwd())
     args = ap.parse_args(argv)
+
+    # Windows text-mode stdout turns "\n" into "\r\n". preflight.sh reads these
+    # lines with `read`, so "0\r" != "0" made a green test run report FAIL
+    # (2026-10-29). Always emit bare LF.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(newline="\n")
+            except (ValueError, OSError):
+                pass
 
     if args.cmd == "test-summary":
         s = parse_test_summary(args.log.read_text(encoding="utf-8", errors="replace"))

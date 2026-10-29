@@ -368,7 +368,11 @@
 //   legitimate single blocking operation (<=30 s HTTP read, <=15 s record), so
 //   only a genuine stall (a loop that stops iterating, hence stops feeding)
 //   trips it -> clean reset instead of a silent freeze. The minutes-long story
-//   decode loops feed it each iteration.
+//   decode loops feed it each iteration. The firmware never arms it below the
+//   longest bounded idle network call (net_budget_rules.h: 53 s as shipped):
+//   an older, lower value in your config.h is raised at boot and logged as
+//   "[boot] task watchdog raised ...". A 30 s override once rebooted a toy
+//   on a stalled heartbeat (2026-10-29); delete the line to use the default.
 // AREG_I2S_CONSUME_TIMEOUT_MS: per-sample cap on synth_write_tone's I2S
 //   back-pressure wait; on expiry the (optional) tone is aborted, not hung.
 // AREG_ASYNC_UPLOAD_TIMEOUT_MS: cap on the async-Q&A completion wait; on expiry

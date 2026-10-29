@@ -72,6 +72,39 @@ is one place to look.
 
 ---
 
+## Found by the 2026-10-29 virtual bench: owner decision needed
+
+Two findings that are NOT fixed, because each needs a decision or a measurement
+only the owner can supply. Evidence: `tools/quality-evidence/bench-notes-20261029.md`.
+
+- **The Wi-Fi story stream is silent when the SD card has no story.** The
+  fallback stream (`/api/story-audio/{id}`) is by design a second, OpenAI-voice
+  render of each story, made live on the first request (moderation plus four
+  TTS chunks) and cached under `StoryAudio:CacheRoot` (`/data/story-audio-cache`).
+  On a fresh deploy, or while the `/data` volume is not mounted, the first
+  request cannot finish inside the toy's wait, so the toy fails twice and says
+  nothing. Locally, with a dummy key, the same request returns 404.
+  Options: (a) warm the cache once after each deploy, a paid render of ten
+  stories; (b) remove the stream fallback and make the SD card the only path;
+  (c) render the failure clip (`canned_clip.h` is still a committed stub) and
+  play it when no story can start. (c) needs Armenian copy that fits a story
+  that did not start (the planned line says "I can't hear you") and a listen test.
+  Serves SHIP A1 only at the edge (a toy with a dead card), so it is held here.
+- **The toy keeps 16 stories; the server offers 20.** The four dropped
+  entries are the alternate endings of `sutasan`, `sutlik-orskan`,
+  `three-piglets` and `ulik`, so only 6 of the 10 variant endings can ever be on
+  a toy. Raising `CS_MAX_STORIES` is not a one-line change: a `CsStory` is 1,120
+  bytes and five tables of them take about 90 KB of the toy's internal RAM, of
+  which about 90 KB is free at idle and a TLS handshake needs about 45 KB.
+  Going to 20 adds about 22 KB. Also `browse_pick` has a 16-bit mask
+  (`static_assert(CS_MAX_STORIES <= 16)`), and the heard-set and question-cursor
+  NVS blobs change size with the constant, so both reset once on upgrade.
+  The sound fix is to move the five tables to PSRAM (frees the ~90 KB and makes
+  20 or 24 cheap), then read the `[alive] heap=` lines on the bench. Variant
+  endings are not in SHIP v1.0, so it waits for your word.
+
+---
+
 ## Tooling considered and not adopted
 
 - **`install-areg-claude.ps1` setup pack** (reviewed 2026-07-26, not installed).

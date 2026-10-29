@@ -160,11 +160,38 @@ class SecretScan(unittest.TestCase):
                  '#define AREG_PROV_POP "areg-pair"\n#define AREG_MANIFEST_HMAC_KEY ""\n')
         self.assertEqual(scan_one("fw/config.h", clean)[0], [])
 
+    def test_google_key_inside_a_base64_run_is_not_a_finding(self):
+        # Generated pages embed audio as base64; random bytes once spelled "AIza"
+        # plus 35 more characters (2026-10-29). A real key stands alone.
+        run = "QQjBKBiNOMB0xV" + GOOGLE + "L9MuABoYFE06x6" + "A" * 200
+        findings, _ = scan_one("page.html", 'const DATA = [{"audio": "' + run + '"}];\n')
+        self.assertEqual(findings, [])
+
+    def test_google_key_is_still_caught_when_delimited(self):
+        for text in (f'key = "{GOOGLE}"\n', f"key={GOOGLE}\n", f"{GOOGLE}\n", f"x: {GOOGLE}, y: 1\n"):
+            with self.subTest(text=text[:8]):
+                findings, _ = scan_one("src/leak.txt", text)
+                self.assertEqual([f[2] for f in findings], ["google-api-key"])
+
     def test_binary_files_are_skipped(self):
         with tempfile.TemporaryDirectory() as d:
             Path(d, "a.mp3").write_bytes(OPENAI.encode())
             Path(d, "b.dat").write_bytes(b"\0\0" + OPENAI.encode())
             self.assertEqual(pc.secret_scan(Path(d))[0], [])
+
+
+class HelperOutputLineEndings(unittest.TestCase):
+    def test_helper_prints_bare_lf_even_on_windows(self):
+        # preflight.sh does `read -r total failed skipped` on this line; a trailing
+        # carriage return turned "0" into "0\r" and a green run into a FAIL.
+        import subprocess
+        with tempfile.TemporaryDirectory() as d:
+            log = Path(d, "t.log")
+            log.write_text(DOTNET_OK, encoding="utf-8")
+            proc = subprocess.run([sys.executable, str(Path(pc.__file__)), "test-summary", "--log", str(log)],
+                                  capture_output=True)
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(proc.stdout, b"3197 0 0\n")
 
 
 if __name__ == "__main__":

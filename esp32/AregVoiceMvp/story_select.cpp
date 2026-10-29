@@ -16,12 +16,16 @@
 #include <Preferences.h>
 
 #include "content_sync_model.h"   // cs_index_parse — one owner of the schema
+#include "content_index_io.h"     // the ONE reader of /content_index.json (retry + previous copy)
 #include "audio_io.h"             // audio_sd_available / audio_sd_has_file
 #include "json_psram.h"           // g_json_psram — the shared PSRAM JsonDocument allocator
 
 namespace {
 
-constexpr const char *kIndexPath = "/content_index.json";
+// The index is read ONLY through content_index_load() (content_index_io.cpp),
+// which retries a short read and falls back to the previous copy. 2026-10-29:
+// seven readers each giving up on the first IncompleteInput left the toy with
+// "no cached stories" and a silent press.
 
 // PARSE THE INDEX OUT OF PSRAM, NOT INTERNAL HEAP.
 //
@@ -81,33 +85,13 @@ int load_raw_index(CsStory *out, int max_out) {
     if (out == NULL || max_out <= 0) {
         return 0;
     }
-    if (!audio_sd_available() || !SD.exists(kIndexPath)) {
-        return 0;
-    }
-    File f = SD.open(kIndexPath, FILE_READ);
-    if (!f) {
-        return 0;
-    }
-    // Feed the watchdog around the read. A HEALTHY card parses this in
-    // milliseconds; a DYING one (2026-08-19: flaky SPI, IncompleteInput,
-    // then no mount at all) makes every read a multi-second timeout, and
-    // the boot chain calls this several times back to back -- the sum
-    // starved the 30 s task watchdog and the toy REBOOTED instead of
-    // saying "no card" calmly. A panic reboot is the worst possible answer
-    // to a loose wire.
-    esp_task_wdt_reset();
+    // content_index_load() retries a short read, falls back to the previous
+    // copy, feeds the watchdog around every attempt (a DYING card makes each
+    // read a multi-second timeout and the boot chain calls this several times
+    // back to back: the sum once starved the 30 s watchdog and rebooted the
+    // toy, 2026-08-19) and, on total failure, names the reason once.
     JsonDocument doc(&g_json_psram);
-    const DeserializationError err = deserializeJson(doc, f);
-    f.close();
-    esp_task_wdt_reset();   // see above -- the read may have taken seconds
-    if (err != DeserializationError::Ok) {
-        // Name the reason. "index parse failed" on its own sent this
-        // hunting for a corrupt card when the card was fine.
-        Serial.printf("[story-select] index parse failed: %s (heap=%u psram=%u)\n",
-                      err.c_str(),
-                      (unsigned)ESP.getFreeHeap(),
-                      (unsigned)ESP.getFreePsram());
-        Serial.flush();
+    if (!content_index_ok(content_index_load(doc, "story-select"))) {
         return 0;
     }
     int schema = 0;
@@ -419,35 +403,17 @@ bool story_select_resolve_clip_path(const char *story_id, const char *kind,
 }
 
 bool story_select_intro_enabled() {
-    if (!audio_sd_available() || !SD.exists(kIndexPath)) {
-        return true;   // no card / no index — shipped default is ON
-    }
-    File f = SD.open(kIndexPath, FILE_READ);
-    if (!f) {
-        return true;
-    }
     JsonDocument doc(&g_json_psram);
-    const DeserializationError err = deserializeJson(doc, f);
-    f.close();
-    if (err != DeserializationError::Ok) {
-        return true;
+    if (!content_index_ok(content_index_load(doc, "story-select"))) {
+        return true;   // no card / no index / unreadable — shipped default is ON
     }
     return cs_index_intro_enabled(doc);
 }
 
 bool story_select_music_enabled() {
-    if (!audio_sd_available() || !SD.exists(kIndexPath)) {
-        return false;   // opt-in: absent card/index means OFF
-    }
-    File f = SD.open(kIndexPath, FILE_READ);
-    if (!f) {
-        return false;
-    }
     JsonDocument doc(&g_json_psram);
-    const DeserializationError err = deserializeJson(doc, f);
-    f.close();
-    if (err != DeserializationError::Ok) {
-        return false;
+    if (!content_index_ok(content_index_load(doc, "story-select"))) {
+        return false;   // opt-in: absent card/index means OFF
     }
     return cs_index_music_enabled(doc);
 }
@@ -457,17 +423,8 @@ bool music_select_next(char *out_path, size_t out_len) {
         return false;
     }
     out_path[0] = '\0';
-    if (!audio_sd_available() || !SD.exists(kIndexPath)) {
-        return false;
-    }
-    File f = SD.open(kIndexPath, FILE_READ);
-    if (!f) {
-        return false;
-    }
     JsonDocument doc(&g_json_psram);
-    const DeserializationError err = deserializeJson(doc, f);
-    f.close();
-    if (err != DeserializationError::Ok) {
+    if (!content_index_ok(content_index_load(doc, "story-select"))) {
         return false;
     }
 
@@ -636,16 +593,7 @@ CsVoice s_voice_scratch[CS_MAX_VOICE];
 /// reader below, all of which need the whole document rather than the
 /// story array the story path already has a loader for.
 bool load_index_doc(JsonDocument &doc) {
-    if (!audio_sd_available() || !SD.exists(kIndexPath)) {
-        return false;
-    }
-    File f = SD.open(kIndexPath, FILE_READ);
-    if (!f) {
-        return false;
-    }
-    const DeserializationError err = deserializeJson(doc, f);
-    f.close();
-    return err == DeserializationError::Ok;
+    return content_index_ok(content_index_load(doc, "story-select"));
 }
 
 }  // namespace
