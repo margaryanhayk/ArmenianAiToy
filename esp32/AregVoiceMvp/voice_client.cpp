@@ -11,6 +11,7 @@
 #include "voice_client.h"
 #include "config.h"
 #include "net_transport.h"
+#include "net_budget_rules.h"   // AREG_POLL_READ_MS - the short wait for small idle calls
 #include "audio_io.h"   // audio_sd_available() - SD health in the heartbeat
 #include "diag.h"
 #include "wifi_creds.h"     // Phase B.1 — NVS-backed Wi-Fi credentials
@@ -366,7 +367,10 @@ void voice_send_heartbeat() {
     }
     add_device_auth_headers(http);
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
-    http.setTimeout(AREG_HTTP_READ_MS);
+    // A heartbeat reply is a few hundred bytes. Waiting the full 30 s for one
+    // let a stalled call outlast the task watchdog and reboot an idle toy
+    // (2026-10-29). See net_budget_rules.h.
+    http.setTimeout(AREG_POLL_READ_MS);
 
     // OTA foundation: report the firmware identity alongside presence. The
     // heartbeat body is OPTIONAL on the backend (EmptyBodyBehavior.Allow),
@@ -572,7 +576,14 @@ bool voice_post_voice_intent(const uint8_t *payload, size_t length,
     http.addHeader("Content-Type", "audio/wav");
     add_device_auth_headers(http);
 
-    const int status = http.POST((uint8_t *)payload, length);
+    // The reply waits on speech-to-text, so this keeps the long read -- and,
+    // like the other calls that wait on the backend (see WdtPause), pauses
+    // the watchdog for the length of the bounded wait.
+    int status;
+    {
+        WdtPause wdt;
+        status = http.POST((uint8_t *)payload, length);
+    }
     if (status != 200) {
         http.end();
         Serial.printf("[welcome] intent status=%d\n", status);
@@ -613,7 +624,7 @@ int voice_post_story_plays(const char *json_body) {
     }
     add_device_auth_headers(http);
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
-    http.setTimeout(AREG_HTTP_READ_MS);
+    http.setTimeout(AREG_POLL_READ_MS);   // tiny reply; see net_budget_rules.h
     http.addHeader("Content-Type", "application/json");
     const int status = http.POST((uint8_t *)json_body, strlen(json_body));
     http.end();
@@ -633,7 +644,7 @@ int voice_post_game_plays(const char *json_body) {
     }
     add_device_auth_headers(http);
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
-    http.setTimeout(AREG_HTTP_READ_MS);
+    http.setTimeout(AREG_POLL_READ_MS);   // tiny reply; see net_budget_rules.h
     http.addHeader("Content-Type", "application/json");
     const int status = http.POST((uint8_t *)json_body, strlen(json_body));
     http.end();
@@ -682,7 +693,7 @@ bool voice_fetch_story_audio_token(const char *story_id, char *out_token, size_t
     }
     add_device_auth_headers(http);
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
-    http.setTimeout(AREG_HTTP_READ_MS);
+    http.setTimeout(AREG_POLL_READ_MS);   // tiny reply; see net_budget_rules.h
 
     const int status = http.GET();
     if (status != 200) {

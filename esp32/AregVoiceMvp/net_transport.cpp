@@ -3,6 +3,7 @@
 #include <WiFiClientSecure.h>
 
 #include "config.h"
+#include "net_budget_rules.h"   // AREG_TLS_HANDSHAKE_S
 
 // ISRG Root X1 — the Let's Encrypt root. The live server's certificate
 // chains to it (verified 2026-08-02: CN=*.up.railway.app, issued by a
@@ -57,6 +58,12 @@ static WiFiClientSecure &tls_client() {
     static WiFiClientSecure *client = nullptr;
     if (client == nullptr) {
         client = new WiFiClientSecure();
+        // Bound the TLS handshake. The core's default is 120 s and neither
+        // HTTPClient::setConnectTimeout nor setTimeout covers it, so one
+        // stalled handshake could hold loop() past the task watchdog and
+        // reboot an idle toy (2026-10-29). Takes SECONDS. See
+        // net_budget_rules.h for the whole budget.
+        client->setHandshakeTimeout(AREG_TLS_HANDSHAKE_S);
 #ifdef AREG_TLS_INSECURE
         client->setInsecure();
 #else

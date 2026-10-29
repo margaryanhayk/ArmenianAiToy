@@ -16,6 +16,7 @@
 
 #include "config.h"
 #include "net_transport.h"
+#include "net_budget_rules.h"   // AREG_POLL_READ_MS - the short wait for small idle calls
 #include "voice_client.h"
 #include "audio_io.h"    // audio_sd_available() — one bootDiag field
 #include "ota_apply.h"   // real apply pipeline (reboots on success)
@@ -144,7 +145,7 @@ static bool ack_command(const char *command_id, const char *result,
     voice_add_device_auth_headers(http);
     http.addHeader("Content-Type", "application/json");
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
-    http.setTimeout(AREG_HTTP_READ_MS);
+    http.setTimeout(AREG_POLL_READ_MS);   // tiny reply; see net_budget_rules.h
 
     // ArduinoJson for serialization so error strings are safely escaped.
     JsonDocument doc;
@@ -385,7 +386,9 @@ static void poll_commands() {
     }
     voice_add_device_auth_headers(http);
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
-    http.setTimeout(AREG_HTTP_READ_MS);
+    // The idle poll runs on loop(); a stalled one must end well inside the
+    // task watchdog (2026-10-29 reset). See net_budget_rules.h.
+    http.setTimeout(AREG_POLL_READ_MS);
 
     const int status = http.GET();
     if (status != 200) {

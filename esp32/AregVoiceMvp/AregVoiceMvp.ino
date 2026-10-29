@@ -20,6 +20,7 @@
 
 #include "config.h"
 #include "net_transport.h"     // TLS/plain transport seam for every backend call
+#include "net_budget_rules.h"  // network time budget: sets the watchdog floor
 #include "audio_io.h"
 #include "voice_client.h"
 #include "online_session_rules.h" // pure loop-termination logic for the online chat session (host-testable)
@@ -52,6 +53,9 @@
 // on config.h carrying them; overridable in config.h. See config.h.example.
 #ifndef AREG_WDT_TIMEOUT_S
 #define AREG_WDT_TIMEOUT_S            60
+#endif
+#ifndef AREG_HTTP_CONNECT_MS          // read by the watchdog floor below
+#define AREG_HTTP_CONNECT_MS          5000
 #endif
 #ifndef AREG_ASYNC_UPLOAD_TIMEOUT_MS
 #define AREG_ASYNC_UPLOAD_TIMEOUT_MS  45000
@@ -2623,8 +2627,18 @@ void setup() {
     // Core 3.x / IDF5 config-struct API; reconfigure if the core already
     // initialised the TWDT for the idle tasks.
     {
+        // Never arm the watchdog below the longest bounded idle network call.
+        // A stale config.h override of 30 s (== the old read timeout) rebooted
+        // an idle toy on 2026-10-29; the firmware now raises it and says so.
+        // See net_budget_rules.h.
+        const uint32_t wdt_s = areg_wdt_effective_s(
+            (uint32_t)AREG_WDT_TIMEOUT_S, AREG_HTTP_CONNECT_MS, AREG_POLL_READ_MS);
+        if (wdt_s != (uint32_t)AREG_WDT_TIMEOUT_S) {
+            Serial.printf("[boot] task watchdog raised %us -> %us (config.h value is below the longest idle network call)\n",
+                          (unsigned)AREG_WDT_TIMEOUT_S, (unsigned)wdt_s);
+        }
         esp_task_wdt_config_t wdt_cfg = {};
-        wdt_cfg.timeout_ms = (uint32_t)AREG_WDT_TIMEOUT_S * 1000u;
+        wdt_cfg.timeout_ms = wdt_s * 1000u;
         wdt_cfg.idle_core_mask = 0;     // don't watch idle tasks — avoid fighting Arduino
         wdt_cfg.trigger_panic = true;   // panic handler resets the chip
         esp_err_t werr = esp_task_wdt_init(&wdt_cfg);
@@ -2633,7 +2647,7 @@ void setup() {
         }
         esp_task_wdt_add(NULL);   // subscribe THIS (the loop) task
         esp_task_wdt_reset();
-        Serial.printf("[boot] task watchdog enabled (%ds)\n", AREG_WDT_TIMEOUT_S);
+        Serial.printf("[boot] task watchdog enabled (%us)\n", (unsigned)wdt_s);
         Serial.flush();
     }
     DIAG_MARK(115, "wdt_enabled");
