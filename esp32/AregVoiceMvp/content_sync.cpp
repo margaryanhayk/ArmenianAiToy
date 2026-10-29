@@ -29,6 +29,7 @@
 #include "net_transport.h"
 #include "content_sync_rules.h"  // pure validation / path / decision logic
 #include "content_sync_model.h"  // JSON <-> CsStory (manifest + index schemas)
+#include "content_index_io.h"   // the ONE reader of /content_index.json (retry + previous copy)
 #include "content_retirement_rules.h"  // pure retirement / orphan-sweep decisions
 #include "audio_io.h"      // audio_sd_available() — reuse the boot mount
 #include "voice_client.h"  // voice_wifi_is_connected / voice_add_device_auth_headers
@@ -413,20 +414,16 @@ void load_previous_index() {
         }
         Serial.flush();
     }
-    if (!SD.exists(kIndexPath)) {
+    // Read through content_index_load(): it retries a short read (2026-10-29:
+    // the bench toy saw IncompleteInput on a file that parsed fine minutes
+    // later) and, if the primary stays unreadable, reads the previous copy.
+    JsonDocument doc(&g_json_psram);
+    const ContentIndexStatus idx = content_index_load(doc, "content-sync");
+    if (idx == CONTENT_INDEX_ABSENT) {
         Serial.println("[content-sync] no existing index");
         return;
     }
-    File f = SD.open(kIndexPath, FILE_READ);
-    if (!f) {
-        s_prev_index_state = CS_PREV_UNREADABLE;
-        Serial.println("[content-sync] index open FAILED — previous contents UNKNOWN");
-        return;
-    }
-    JsonDocument doc(&g_json_psram);
-    const DeserializationError err = deserializeJson(doc, f);
-    f.close();
-    if (err != DeserializationError::Ok) {
+    if (idx == CONTENT_INDEX_UNREADABLE) {
         // The message here used to say "cached files preserved", which is
         // false in the way that matters: the MP3s are preserved, their INDEX
         // ENTRIES are not, and an entry is what playback resolves a clip
@@ -436,6 +433,19 @@ void load_previous_index() {
         Serial.println("[content-sync] index parse FAILED — previous contents UNKNOWN "
                        "(cached MP3s untouched)");
         return;
+    }
+    if (idx == CONTENT_INDEX_OK_FROM_BACKUP) {
+        // The primary stayed unreadable but the previous generation parsed:
+        // this run carries on from it instead of striking the card, and the
+        // backup takes the primary's place so every other reader sees a good
+        // file. Same shape as the missing-primary restore above.
+        if (content_index_repair_from_backup()) {
+            Serial.println("[content-sync] primary index unreadable — restored from backup");
+        } else {
+            Serial.println("[content-sync] primary index unreadable — backup restore FAILED "
+                           "(continuing from the backup in memory)");
+        }
+        Serial.flush();
     }
     int schema = 0;
     s_previous_count = cs_index_parse(doc, s_previous, CS_MAX_STORIES, &schema);
@@ -1435,16 +1445,11 @@ void sync_games(JsonDocument &manifest_doc, JsonArrayConst games) {
     {
         JsonDocument prev(&g_json_psram);
         JsonArrayConst prev_games;
-        if (SD.exists(kIndexPath)) {
-            File f = SD.open(kIndexPath, FILE_READ);
-            if (f) {
-                const DeserializationError err = deserializeJson(prev, f);
-                f.close();
-                if (err == DeserializationError::Ok
-                    && prev["games"].is<JsonArrayConst>()) {
-                    prev_games = prev["games"].as<JsonArrayConst>();
-                }
-            }
+        // Same shared reader as every other index consumer: a short read is
+        // retried, and a damaged primary falls back to the previous copy.
+        if (content_index_ok(content_index_load(prev, "content-sync"))
+            && prev["games"].is<JsonArrayConst>()) {
+            prev_games = prev["games"].as<JsonArrayConst>();
         }
 
         const size_t cap = CS_MAX_GAMES;

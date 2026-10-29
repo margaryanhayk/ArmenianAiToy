@@ -6,13 +6,11 @@
 #include <SD.h>
 #include <string.h>
 
-#include "audio_io.h"            // audio_sd_available()
+#include "content_index_io.h"     // the ONE reader of /content_index.json
 #include "content_report_rules.h"  // pure buffer arithmetic (host-testable)
 #include "json_psram.h"          // g_json_psram — the shared PSRAM JsonDocument allocator
 
 namespace {
-
-constexpr const char *kIndexPath = "/content_index.json";
 
 // Sized from the real library, not from the theoretical maximum. The
 // shipped ids are 4-16 characters, so the ten-story library occupies about
@@ -53,22 +51,15 @@ void content_report_refresh() {
     s_voice_clips = 0;
     s_music_tracks = 0;
 
-    if (!audio_sd_available() || !SD.exists(kIndexPath)) {
-        return;
-    }
-    File f = SD.open(kIndexPath, FILE_READ);
-    if (!f) {
-        return;
-    }
     // PSRAM, not internal heap (CLAUDE.md standing "never" — 2026-08-14
     // field failure): this is the same /content_index.json every other
     // reader (content_sync.cpp, story_select.cpp) parses through
-    // g_json_psram, up to 156 items with a 64-char sha256 each.
+    // g_json_psram, up to 156 items with a 64-char sha256 each. Read through
+    // content_index_load(): it retries a short read and falls back to the
+    // previous copy (2026-10-29, see content_index_io.h) and names a total
+    // failure once.
     JsonDocument doc(&g_json_psram);
-    const DeserializationError err = deserializeJson(doc, f);
-    f.close();
-    if (err) {
-        Serial.printf("[content-report] index parse failed: %s\n", err.c_str());
+    if (!content_index_ok(content_index_load(doc, "content-report"))) {
         return;
     }
 

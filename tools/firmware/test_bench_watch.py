@@ -514,6 +514,21 @@ class MarkerTests(unittest.TestCase):
         self.assertEqual(len(w.troubles), 1)          # failed=0 is a healthy counter
         self.assertIn("index failed to parse", w.troubles[0])
 
+    def test_index_restored_from_the_previous_copy_is_counted(self):
+        # A missing primary (power-loss gap) and, since 2026-10-29, a primary
+        # that stayed unreadable: both end with the backup put back in place.
+        w = run([f"[content-sync] primary index missing {DASH} restored from backup",
+                 f"[content-sync] primary index unreadable {DASH} restored from backup",
+                 f"[content-sync] primary index unreadable {DASH} backup restore FAILED (continuing from the backup in memory)"])
+        self.assertEqual(w.counts["sync_restored_from_prev"], 2)
+
+    def test_index_read_recovered_on_a_retry_is_not_trouble(self):
+        # content_index_load() retried a short read and it worked: informative,
+        # not a failure. Only the final "index parse failed" line is trouble.
+        w = run(["[story-select] index read recovered on attempt 2",
+                 "[story-select] index: using the previous copy (primary unreadable)"])
+        self.assertEqual(w.troubles, [])
+
     def test_real_content_sync_failures_are_trouble(self):
         w = run(["[content-sync] story ulik:offer FAILED (sd_write_failed)",
                  "[content-sync] FAIL (manifest_http)"])
