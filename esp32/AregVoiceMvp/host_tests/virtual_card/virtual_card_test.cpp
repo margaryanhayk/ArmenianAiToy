@@ -105,7 +105,9 @@ static void install_card(const Card &c, bool with_backup = true) {
     SD.opens = 0;
     g_sd_available = true;
     Serial.clear();
-    g_host_millis += CS_INDEX_DEAD_MEMO_MS + 1;   // time passes between scenarios
+    // Time passes between scenarios: longer than either memo, so what one
+    // scenario taught the reader about a bad card cannot leak into the next.
+    g_host_millis += CS_INDEX_PRIMARY_SKIP_MS + CS_INDEX_DEAD_MEMO_MS + 1;
     SD.put(kPrimary, c.index_json);
     if (with_backup) SD.put(kBackup, c.index_json);
     for (auto &s : c.stories) SD.put_sized(s.cache_path, s.size_bytes);
@@ -206,14 +208,85 @@ int main() {
     SD.files[kPrimary]->fail_after = 50;
     {
         JsonDocument doc;
-        check(content_index_load(doc, "content-sync") == CONTENT_INDEX_OK_FROM_BACKUP, "sync reads the backup when the primary is damaged");
+        check(content_index_load(doc, "content-sync", /*fresh=*/true) == CONTENT_INDEX_OK_FROM_BACKUP, "sync reads the backup when the primary is damaged");
         check(content_index_repair_from_backup(), "repair succeeds");
         check(SD.exists(kPrimary) && !SD.exists(kBackup), "the backup now sits in the primary's place");
         check(SD.files[kPrimary]->bytes == full.index_json && SD.files[kPrimary]->fail_after == (size_t)-1,
               "and it is the good copy");
         JsonDocument doc2;
-        check(content_index_load(doc2, "content-sync") == CONTENT_INDEX_OK, "the next read is a plain OK");
+        check(content_index_load(doc2, "story-select") == CONTENT_INDEX_OK,
+              "the next ordinary read is a plain OK: the repair also cleared the skip memo");
         check(!content_index_repair_from_backup(), "with no backup left, repair does nothing");
+    }
+
+    // ---- a damaged primary must not be re-read on every single load ------------------
+    // A quick press makes four or more loads before any sound, the menu seven
+    // (independent review, 2026-10-29).
+    install_card(full);
+    SD.files[kPrimary]->fail_after = full.index_json.size() / 2;       // permanently damaged
+    {
+        JsonDocument d1;
+        check(content_index_load(d1, "story-select") == CONTENT_INDEX_OK_FROM_BACKUP, "first load: primary fails, the previous copy is used");
+        const int primary_opens = SD.files[kPrimary]->opens;
+        check(primary_opens == CS_INDEX_READ_TRIES, "and the primary was tried exactly the planned number of times");
+        Serial.clear();
+        const uint32_t t0 = g_host_millis;
+        for (int i = 0; i < 7; i++) {
+            JsonDocument d;
+            check(content_index_load(d, "story-select") == CONTENT_INDEX_OK_FROM_BACKUP, "later load " + std::to_string(i + 1) + ": still served from the previous copy");
+        }
+        check(SD.files[kPrimary]->opens == primary_opens, "seven more loads never touched the damaged primary");
+        check(g_host_millis == t0, "and cost no settling time at all");
+        check(!Serial.saw("using the previous copy"), "and did not repeat the log line");
+        g_host_millis += CS_INDEX_PRIMARY_SKIP_MS + 1;
+        JsonDocument d2;
+        check(content_index_load(d2, "story-select") == CONTENT_INDEX_OK_FROM_BACKUP && SD.files[kPrimary]->opens > primary_opens,
+              "after the window the primary gets another look");
+    }
+    {   // the story-picking path itself: a menu's worth of loads costs one retry penalty, not seven
+        install_card(full);
+        SD.files[kPrimary]->fail_after = full.index_json.size() / 2;
+        const uint32_t t0 = g_host_millis;
+        for (int i = 0; i < 8; i++) eligible_count();
+        check(g_host_millis - t0 == (uint32_t)(CS_INDEX_RETRY_GAP_MS * (CS_INDEX_READ_TRIES - 1)),
+              "eight story loads on a damaged primary settle only once", "ms=" + std::to_string(g_host_millis - t0));
+    }
+
+    // ---- the shortcut must never hide a recovered primary from content sync ------------
+    install_card(full);
+    SD.files[kPrimary]->short_reads_left = CS_INDEX_READ_TRIES;        // three bad reads, then healthy again
+    {
+        JsonDocument d1;
+        check(content_index_load(d1, "story-select") == CONTENT_INDEX_OK_FROM_BACKUP, "primary fails three times, previous copy used");
+        JsonDocument d2;
+        check(content_index_load(d2, "story-select") == CONTENT_INDEX_OK_FROM_BACKUP, "the card is healthy again, but readers keep the shortcut for the window");
+        JsonDocument d3;
+        check(content_index_load(d3, "content-sync", /*fresh=*/true) == CONTENT_INDEX_OK,
+              "content sync reads afresh, finds the primary healthy, and has nothing to repair");
+        JsonDocument d4;
+        check(content_index_load(d4, "story-select") == CONTENT_INDEX_OK, "and the shortcut is gone for everyone");
+    }
+    install_card(full);
+    SD.files[kPrimary]->short_reads_left = CS_INDEX_READ_TRIES;
+    {
+        JsonDocument d1;
+        content_index_load(d1, "story-select");                          // sets the skip memo
+        SD.files[kBackup]->bytes.resize(100);                            // now the previous copy goes bad, the primary is fine
+        JsonDocument d2;
+        check(content_index_load(d2, "story-select") == CONTENT_INDEX_OK,
+              "a shortcut that leads nowhere falls back to the primary instead of giving up");
+    }
+    install_card(full, /*with_backup=*/false);
+    SD.files[kPrimary]->bytes.resize(100);
+    {
+        JsonDocument d1;
+        check(content_index_load(d1, "story-select") == CONTENT_INDEX_UNREADABLE, "total failure sets the dead-card memo");
+        SD.files[kPrimary]->bytes = full.index_json;                     // the card recovers
+        JsonDocument d2;
+        check(content_index_load(d2, "story-select") == CONTENT_INDEX_UNREADABLE, "an ordinary reader inside the window still gets UNREADABLE");
+        JsonDocument d3;
+        check(content_index_load(d3, "content-sync", /*fresh=*/true) == CONTENT_INDEX_OK,
+              "content sync is not held back by another caller's total-failure memo");
     }
 
     // ---- what the parent chose must survive a bad read ---------------------------

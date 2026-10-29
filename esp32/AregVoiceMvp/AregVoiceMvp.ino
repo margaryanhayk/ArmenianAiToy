@@ -2333,6 +2333,19 @@ static bool fbtest_autostop_barge_in() { return millis() >= g_fbtest_autostop_ms
 static const char *kFbIndex     = "/content_index.json";
 static const char *kFbIndexBak  = "/content_index.json.bak";
 static const char *kFbIndexOrig = "/content_index.json.orig";
+
+// content_index_io falls back to <index>.prev when the primary is missing or
+// unreadable (2026-10-29), so a test that fakes "no index" must hide it too.
+static const char *kFbIndexPrev     = "/content_index.json.prev";
+static const char *kFbIndexPrevHide = "/content_index.json.prev.fbhide";
+static bool fb_hide_prev() {
+    return SD.exists(kFbIndexPrev) && SD.rename(kFbIndexPrev, kFbIndexPrevHide);
+}
+static void fb_restore_prev(bool hidden) {
+    if (hidden && !SD.rename(kFbIndexPrevHide, kFbIndexPrev)) {
+        Serial.println("[fallback-test] WARN .prev restore failed");
+    }
+}
 static const char *kFbPackBak   = "/stories/pack_narration.bak";
 
 static void story_fallback_test_run() {
@@ -2348,6 +2361,7 @@ static void story_fallback_test_run() {
     Serial.println("[fallback-test] --- Test B: content index missing ---");
     Serial.flush();
     if (SD.rename(kFbIndex, kFbIndexBak)) {
+        const bool prev_hidden = fb_hide_prev();
         bool is_cache = false;
         fbtest_log_source("Test B", &is_cache, nullptr);
         Serial.printf("[fallback-test] Test B %s (SD-cache NOT selected)\n",
@@ -2355,6 +2369,7 @@ static void story_fallback_test_run() {
         if (!SD.rename(kFbIndexBak, kFbIndex)) {
             Serial.println("[fallback-test] WARN Test B restore failed");
         }
+        fb_restore_prev(prev_hidden);
     } else {
         Serial.println("[fallback-test] Test B SETUP-FAIL: could not rename index");
     }
@@ -2403,6 +2418,7 @@ static void story_fallback_test_run() {
     Serial.println("[fallback-test] --- Test C: Wi-Fi fallback ---");
     Serial.flush();
     const bool moved_index = SD.rename(kFbIndex, kFbIndexBak);
+    const bool prev_hidden = moved_index ? fb_hide_prev() : false;
     const bool had_pack = audio_sd_has_file(AREG_SD_STORY_NARRATION);
     const bool moved_pack = had_pack ? SD.rename(AREG_SD_STORY_NARRATION, kFbPackBak) : false;
     if (!moved_index) {
@@ -2442,6 +2458,7 @@ static void story_fallback_test_run() {
     if (moved_index && !SD.rename(kFbIndexBak, kFbIndex)) {
         Serial.println("[fallback-test] WARN Test C index restore failed");
     }
+    fb_restore_prev(prev_hidden);
     Serial.flush();
 
     // ---------- Final SD-state verification ----------
@@ -2926,9 +2943,17 @@ void loop() {
         // app's online dot reflects an idle-but-powered toy. Best-effort and
         // brief; runs only in IDLE (never during a turn). Chat turns already
         // refresh LastSeenAt, so this only matters during long idle stretches.
+        //
+        // ONE network call per watchdog feed. The watchdog floor in
+        // net_budget_rules.h covers a single call; on the first idle pass after
+        // boot the heartbeat, the OTA poll and both play reports can all be due,
+        // and with a dead resolver they would add up past the watchdog and
+        // reboot-loop until DNS returned. So every call below is followed by a
+        // feed (independent review, 2026-10-29).
         if (now - s_last_net_heartbeat_ms >= AREG_HEARTBEAT_INTERVAL_MS) {
             s_last_net_heartbeat_ms = now;
             voice_send_heartbeat();
+            esp_task_wdt_reset();
         }
 
         // OTA foundation (Proof 2 skeleton) — phone-home command poll +
@@ -2937,6 +2962,7 @@ void loop() {
         // (this branch), same as the heartbeat, so a poll can never stall a
         // voice turn. NO firmware download/apply in this slice.
         ota_foundation_tick();
+        esp_task_wdt_reset();
 
         // FIRST BOOT AFTER AN UPDATE: the check-in owns the tick, and that
         // means nothing long-running may run beside it.
@@ -2975,10 +3001,12 @@ void loop() {
             // cadence while anything is queued. IDLE-only, best-effort; events
             // are deleted only after a server 2xx.
             story_report_tick();
+            esp_task_wdt_reset();
 
             // Same store-and-forward shape, for the offline games — they
             // make no network call of their own either.
             game_report_tick();
+            esp_task_wdt_reset();
 
 #ifdef AREG_CONTENT_SYNC_BENCH
             // Cloud→SD story sync (bench builds only): one attempt per boot,

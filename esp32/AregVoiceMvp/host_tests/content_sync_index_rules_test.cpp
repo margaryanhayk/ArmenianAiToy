@@ -70,18 +70,22 @@ int main() {
           "primary missing and the backup unreadable: UNREADABLE");
     check(cs_index_next_step(false, 0, false, 0) == CS_INDEX_STEP_ABSENT,
           "neither file: ABSENT (a fresh card is not an error)");
-    // The plan always terminates, whatever the card does.
-    bool terminates = true;
+    // The plan always terminates, and spends exactly N attempts on each file
+    // that exists, whatever the card does.
+    bool exact = true;
     for (int pe = 0; pe < 2; pe++) for (int be = 0; be < 2; be++) {
         int pf = 0, bf = 0, steps = 0;
+        CsIndexStep last = CS_INDEX_STEP_READ_PRIMARY;
         for (;;) {
-            const CsIndexStep s = cs_index_next_step(pe, pf, be, bf);
-            if (s == CS_INDEX_STEP_ABSENT || s == CS_INDEX_STEP_UNREADABLE) break;
-            if (s == CS_INDEX_STEP_READ_PRIMARY) pf++; else bf++;   // every attempt fails
-            if (++steps > 4 * N) { terminates = false; break; }
+            last = cs_index_next_step(pe, pf, be, bf);
+            if (last == CS_INDEX_STEP_ABSENT || last == CS_INDEX_STEP_UNREADABLE) break;
+            if (last == CS_INDEX_STEP_READ_PRIMARY) pf++; else bf++;   // every attempt fails
+            if (++steps > 2 * N) { exact = false; break; }
         }
+        if (steps != (pe ? N : 0) + (be ? N : 0)) exact = false;
+        if (last != ((pe || be) ? CS_INDEX_STEP_UNREADABLE : CS_INDEX_STEP_ABSENT)) exact = false;
     }
-    check(terminates, "with every read failing, the plan still ends in at most two files' worth of attempts");
+    check(exact, "with every read failing, the plan spends exactly N attempts per file that exists, then stops");
 
     printf(failures == 0 ? "PASS\n" : "FAIL (%d)\n", failures);
     return failures == 0 ? 0 : 1;

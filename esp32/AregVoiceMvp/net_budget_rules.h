@@ -28,6 +28,14 @@
 // config.h can no longer reintroduce the collision: the firmware raises the
 // value and says so on the serial line.
 //
+// The floor covers ONE call, so loop() feeds the watchdog after every network
+// call it chains on the idle path (heartbeat, OTA poll, both play reports, the
+// OTA check-in's heartbeat then ack), and the few calls that still wait the
+// long AREG_HTTP_READ_MS (content-sync manifest, OTA manifest and image GET)
+// start on a fresh window. tools/firmware/test_net_budget_sites.py reads the
+// sources and fails if any of that is reverted. The allowances below add every
+// phase together on purpose; a real stall hits one phase, not all of them.
+//
 // What this does NOT do: bound DNS (lwIP gives up on its own, 20 s is the
 // allowance below) or make a blocked loop responsive -- the button is dead
 // for the length of a stalled poll, which is why the polls are short.

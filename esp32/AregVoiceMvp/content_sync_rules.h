@@ -884,13 +884,25 @@ inline bool cs_index_should_restore_backup(bool primary_exists, bool backup_exis
 #define CS_INDEX_READ_TRIES 3        // total attempts per file, not retries
 #endif
 #ifndef CS_INDEX_RETRY_GAP_MS
-#define CS_INDEX_RETRY_GAP_MS 150    // settle time between two attempts
+// Settle time between two attempts. The bench failures cluster in the first
+// ~30 s after boot, while Wi-Fi is busy, so a few ms is too short to matter;
+// 250 ms is still cheap (two gaps, half a second, only when a read failed).
+#define CS_INDEX_RETRY_GAP_MS 250
 #endif
 // After a read failed on every attempt of both files, callers inside this
 // window fail at once. A dying card turns each read into a multi-second
 // timeout and the boot chain asks several times back to back.
 #ifndef CS_INDEX_DEAD_MEMO_MS
 #define CS_INDEX_DEAD_MEMO_MS 5000
+#endif
+// After the primary failed every attempt but the previous copy read fine,
+// later readers go straight to the previous copy for this long instead of
+// repaying three failed reads (and ~0.5 s of settling) on every load - a
+// quick press makes four or more loads before any sound, the menu seven.
+// Content sync never uses the shortcut: it reads the primary afresh before
+// deciding whether anything needs repairing.
+#ifndef CS_INDEX_PRIMARY_SKIP_MS
+#define CS_INDEX_PRIMARY_SKIP_MS 60000
 #endif
 
 enum CsIndexStep {

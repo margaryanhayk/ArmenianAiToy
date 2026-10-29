@@ -206,6 +206,7 @@ python_tests() {
   # The same suites ci.yml runs (python-tool-tests job), plus this script's own.
   for t in tools/firmware/test_check_release_image.py tools/factory/test_load_sd_card.py \
            tools/listen/test_listen_test.py tools/firmware/test_bench_watch.py \
+           tools/firmware/test_net_budget_sites.py \
            tools/release/test_preflight_checks.py; do
     if [ ! -f "$REPO_ROOT/$t" ]; then
       bad="$bad missing:$(basename "$t")"; continue   # a missing suite fails the gate, whichever it is

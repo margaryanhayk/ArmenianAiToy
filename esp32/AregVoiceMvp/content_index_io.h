@@ -39,9 +39,16 @@ inline bool content_index_ok(ContentIndexStatus s) {
 /// PSRAM allocator (g_json_psram - never internal heap). `who` tags the serial
 /// lines ("story-select"). Feeds the task watchdog around every attempt.
 ///
-/// After a total failure, callers inside CS_INDEX_DEAD_MEMO_MS return
-/// UNREADABLE at once instead of repeating the same slow read.
-ContentIndexStatus content_index_load(JsonDocument &doc, const char *who);
+/// Two short memos stop a bad card being asked the same question again and
+/// again (see the constants in content_sync_rules.h):
+///   - after BOTH files failed every attempt, callers inside
+///     CS_INDEX_DEAD_MEMO_MS return UNREADABLE at once;
+///   - after the primary failed every attempt but the previous copy read fine,
+///     callers inside CS_INDEX_PRIMARY_SKIP_MS go straight to the previous copy.
+/// `fresh` ignores and clears both memos. Content sync passes it: it decides
+/// whether the card needs repairing and must see the card as it is now, not as
+/// an earlier caller found it.
+ContentIndexStatus content_index_load(JsonDocument &doc, const char *who, bool fresh = false);
 
 /// After CONTENT_INDEX_OK_FROM_BACKUP: make the card agree with what was just
 /// read by moving the previous copy into the primary's place (the damaged file

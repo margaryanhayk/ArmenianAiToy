@@ -418,7 +418,9 @@ void load_previous_index() {
     // the bench toy saw IncompleteInput on a file that parsed fine minutes
     // later) and, if the primary stays unreadable, reads the previous copy.
     JsonDocument doc(&g_json_psram);
-    const ContentIndexStatus idx = content_index_load(doc, "content-sync");
+    // fresh: this is the reader that decides whether to repair the card or
+    // strike it, so it must not inherit another caller's "just failed" memo.
+    const ContentIndexStatus idx = content_index_load(doc, "content-sync", /*fresh=*/true);
     if (idx == CONTENT_INDEX_ABSENT) {
         Serial.println("[content-sync] no existing index");
         return;
@@ -1671,6 +1673,9 @@ void content_sync_run() {
     voice_add_device_auth_headers(http);
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
     http.setTimeout(AREG_HTTP_READ_MS);
+    // A 30 s read is longer than the idle-poll budget in net_budget_rules.h,
+    // so start it on a fresh watchdog window, as the downloads below do.
+    esp_task_wdt_reset();
     const int mstatus = http.GET();
     if (mstatus != 200) {
         http.end();

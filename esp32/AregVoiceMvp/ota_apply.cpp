@@ -144,6 +144,9 @@ OtaApplyOutcome ota_apply_run(const char *command_id, char *err_out, size_t err_
     voice_add_device_auth_headers(mh);
     mh.setConnectTimeout(AREG_HTTP_CONNECT_MS);
     mh.setTimeout(AREG_HTTP_READ_MS);
+    // A 30 s read is longer than the idle-poll budget in net_budget_rules.h,
+    // so start it on a fresh watchdog window (independent review, 2026-10-29).
+    esp_task_wdt_reset();
     const int mstatus = mh.GET();
     if (mstatus != 200) {
         mh.end();
@@ -255,6 +258,7 @@ OtaApplyOutcome ota_apply_run(const char *command_id, char *err_out, size_t err_
     voice_add_device_auth_headers(http);
     http.setConnectTimeout(AREG_HTTP_CONNECT_MS);
     http.setTimeout(AREG_HTTP_READ_MS);
+    esp_task_wdt_reset();   // fresh window for the 30 s read; chunks feed it after this
     const int dstatus = http.GET();
     if (dstatus != 200) {
         http.end();

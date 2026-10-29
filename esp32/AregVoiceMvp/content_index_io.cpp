@@ -16,8 +16,19 @@ namespace {
 constexpr const char *kPrimary = "/content_index.json";
 constexpr const char *kBackup  = "/content_index.json.prev";
 
-// 0 = no memo. Otherwise: do not try again before this millis() value.
-uint32_t s_dead_until_ms = 0;
+// Two short-lived memos so a bad card is not asked the same question over and
+// over. 0 = no memo; otherwise "do not before this millis() value".
+uint32_t s_dead_until_ms = 0;          // both files failed every attempt
+uint32_t s_primary_skip_until_ms = 0;  // primary failed every attempt, previous copy read fine
+
+bool memo_active(uint32_t until) {
+    return until != 0 && (int32_t)(millis() - until) < 0;   // wrap-safe
+}
+
+uint32_t memo_for(uint32_t ms) {
+    const uint32_t until = millis() + ms;
+    return until == 0 ? 1 : until;                          // 0 means "no memo"
+}
 
 enum ReadResult { READ_OK, READ_OPEN_FAILED, READ_PARSE_FAILED };
 
@@ -45,7 +56,7 @@ void settle() {
 
 }  // namespace
 
-ContentIndexStatus content_index_load(JsonDocument &doc, const char *who) {
+ContentIndexStatus content_index_load(JsonDocument &doc, const char *who, bool fresh) {
     if (!audio_sd_available()) {
         return CONTENT_INDEX_ABSENT;
     }
@@ -54,14 +65,28 @@ ContentIndexStatus content_index_load(JsonDocument &doc, const char *who) {
     if (!primary_exists && !backup_exists) {
         return CONTENT_INDEX_ABSENT;
     }
-    if (s_dead_until_ms != 0 && (int32_t)(millis() - s_dead_until_ms) < 0) {
+    if (fresh) {
+        // Content sync decides whether the card needs repairing, so it must
+        // see the card as it is NOW, not as an earlier caller found it.
+        s_dead_until_ms = 0;
+        s_primary_skip_until_ms = 0;
+    } else if (memo_active(s_dead_until_ms)) {
         return CONTENT_INDEX_UNREADABLE;   // a caller just paid for this; see CS_INDEX_DEAD_MEMO_MS
     }
 
+    const uint32_t started_ms = millis();
     int primary_failures = 0;
     int backup_failures = 0;
     const char *why = "";
     DeserializationError err = DeserializationError::Ok;
+
+    // The primary was just found unreadable while the previous copy was fine:
+    // start at the previous copy instead of repaying the retries.
+    bool skipping_primary = false;
+    if (!fresh && primary_exists && backup_exists && memo_active(s_primary_skip_until_ms)) {
+        skipping_primary = true;
+        primary_failures = CS_INDEX_READ_TRIES;
+    }
 
     for (;;) {
         const CsIndexStep step = cs_index_next_step(primary_exists, primary_failures,
@@ -70,11 +95,12 @@ ContentIndexStatus content_index_load(JsonDocument &doc, const char *who) {
             const ReadResult r = read_one(kPrimary, doc, err);
             if (r == READ_OK) {
                 if (primary_failures > 0) {
-                    Serial.printf("[%s] index read recovered on attempt %d\n",
-                                  who, primary_failures + 1);
+                    Serial.printf("[%s] index read recovered on attempt %d (%u ms)\n",
+                                  who, primary_failures + 1, (unsigned)(millis() - started_ms));
                     Serial.flush();
                 }
                 s_dead_until_ms = 0;
+                s_primary_skip_until_ms = 0;
                 return CONTENT_INDEX_OK;
             }
             why = (r == READ_OPEN_FAILED) ? "open failed" : err.c_str();
@@ -85,9 +111,14 @@ ContentIndexStatus content_index_load(JsonDocument &doc, const char *who) {
         } else if (step == CS_INDEX_STEP_READ_BACKUP) {
             const ReadResult r = read_one(kBackup, doc, err);
             if (r == READ_OK) {
-                Serial.printf("[%s] index: using the previous copy (primary %s)\n",
-                              who, primary_exists ? "unreadable" : "missing");
-                Serial.flush();
+                if (!skipping_primary) {
+                    Serial.printf("[%s] index: using the previous copy (primary %s)\n",
+                                  who, primary_exists ? "unreadable" : "missing");
+                    Serial.flush();
+                    if (primary_exists) {
+                        s_primary_skip_until_ms = memo_for(CS_INDEX_PRIMARY_SKIP_MS);
+                    }
+                }
                 s_dead_until_ms = 0;
                 return CONTENT_INDEX_OK_FROM_BACKUP;
             }
@@ -95,6 +126,12 @@ ContentIndexStatus content_index_load(JsonDocument &doc, const char *who) {
             backup_failures++;
             if (backup_failures < CS_INDEX_READ_TRIES) {
                 settle();
+            } else if (skipping_primary) {
+                // The shortcut led nowhere: the primary may have recovered
+                // since it was last tried, so give it a real turn.
+                skipping_primary = false;
+                primary_failures = 0;
+                s_primary_skip_until_ms = 0;
             }
         } else {
             // ABSENT cannot happen here (checked above); this is UNREADABLE.
@@ -105,10 +142,7 @@ ContentIndexStatus content_index_load(JsonDocument &doc, const char *who) {
                           who, why,
                           (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getFreePsram());
             Serial.flush();
-            s_dead_until_ms = millis() + CS_INDEX_DEAD_MEMO_MS;
-            if (s_dead_until_ms == 0) {
-                s_dead_until_ms = 1;
-            }
+            s_dead_until_ms = memo_for(CS_INDEX_DEAD_MEMO_MS);
             return CONTENT_INDEX_UNREADABLE;
         }
     }
@@ -121,5 +155,11 @@ bool content_index_repair_from_backup() {
     if (SD.exists(kPrimary) && !SD.remove(kPrimary)) {
         return false;
     }
-    return SD.rename(kBackup, kPrimary);
+    if (!SD.rename(kBackup, kPrimary)) {
+        return false;
+    }
+    // The primary is the good copy again: forget what was learned about the bad one.
+    s_dead_until_ms = 0;
+    s_primary_skip_until_ms = 0;
+    return true;
 }

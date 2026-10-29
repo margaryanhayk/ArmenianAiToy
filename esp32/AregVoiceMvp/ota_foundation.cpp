@@ -11,6 +11,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <esp_ota_ops.h>
+#include <esp_task_wdt.h>   // feed between back-to-back network calls
 #include <WiFi.h>          // WiFi.status() / RSSI() for the boot diagnostics
 #include <esp_system.h>    // esp_reset_reason()
 
@@ -342,6 +343,7 @@ static void ota_checkin_tick() {
     // Refresh presence + firmware report first (best-effort), then the ack
     // that decides validity.
     voice_send_heartbeat();
+    esp_task_wdt_reset();   // two network calls back to back: give the ack its own window
     char bd[144];
     boot_diag_json(bd, sizeof(bd));
     char diag[256];

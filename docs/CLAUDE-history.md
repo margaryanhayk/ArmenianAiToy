@@ -6489,6 +6489,17 @@ Fixed, with the `SHIP.md` item each serves:
   `preflight.sh` gained `firmware-virtual-card` and no longer skips the host
   tests on a PC that has only MSVC.
 
+- **Independent review follow-ups.** A fresh read-only reviewer found no
+  blockers and seven points, all applied: the watchdog is fed after every
+  chained idle network call (the 53 s floor covers ONE call); a damaged
+  primary is skipped for 60 s once the previous copy has served, and content
+  sync reads afresh; the bench-only SD fallback test hides the `.prev` copy;
+  the 30 s-read GETs start on a fresh window;
+  `tools/firmware/test_net_budget_sites.py` (also in CI) fails if a call site is
+  reverted; the settle gap is 250 ms and the recovery line prints elapsed time.
+  Open: the bench failures cluster in the first 30 s after boot, so whether
+  three tries over half a second are enough is a bench question.
+
 NOT fixed, owner decision (`docs/v2-backlog.md`): the Wi-Fi story stream is a
 live OpenAI-voice render and stays silent on a fresh server; the toy keeps 16 of
 the 20 offered stories (four alternate endings never arrive; RAM, see backlog).
@@ -6500,6 +6511,6 @@ Verified: full `preflight.sh` GREEN on the owner's Windows PC (first time):
 `dotnet test` 3346 (no backend change), firmware host tests 8/8 and the virtual
 card (103 + 246 + 45 checks) built with MSVC, python suites 191 tests incl.
 `bench_watch.py` 99 and `preflight_checks.py` 25. The sketch compiles with
-arduino-cli on core 3.3.6 (nothing flashed): +112 bytes of code and +8 bytes of
+arduino-cli on core 3.3.6 (nothing flashed): +308 bytes of code and +16 bytes of
 internal RAM against the 1.3.5-bench build. NOT verified: any of this on a toy,
 the TLS bound against a really stalled link, or free heap while running.
